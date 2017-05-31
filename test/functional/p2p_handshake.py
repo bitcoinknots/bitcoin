@@ -11,6 +11,7 @@ import time
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.messages import (
+    NODE_REDUCED_DATA,
     NODE_NETWORK,
     NODE_NETWORK_LIMITED,
     NODE_NONE,
@@ -34,8 +35,8 @@ from test_framework.util import (
 # the desirable service flags for pruned peers are dynamic and only apply if
 #  1. the peer's service flag NODE_NETWORK_LIMITED is set *and*
 #  2. the local chain is close to the tip (<24h)
-DESIRABLE_SERVICE_FLAGS_FULL = NODE_NETWORK | NODE_WITNESS
-DESIRABLE_SERVICE_FLAGS_PRUNED = NODE_NETWORK_LIMITED | NODE_WITNESS
+DESIRABLE_SERVICE_FLAGS_FULL = NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA
+DESIRABLE_SERVICE_FLAGS_PRUNED = NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_REDUCED_DATA
 
 
 class P2PHandshakeTest(BitcoinTestFramework):
@@ -98,15 +99,15 @@ class P2PHandshakeTest(BitcoinTestFramework):
         self.log.info("Check that lacking desired service flags leads to disconnect (non-pruned peers)")
         self.test_desirable_service_flags(node, [NODE_NONE, NODE_NETWORK, NODE_WITNESS],
                                           DESIRABLE_SERVICE_FLAGS_FULL, expect_disconnect=True)
-        self.test_desirable_service_flags(node, [NODE_NETWORK | NODE_WITNESS],
+        self.test_desirable_service_flags(node, [NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA],
                                           DESIRABLE_SERVICE_FLAGS_FULL, expect_disconnect=False)
 
         self.log.info("Check that limited peers are only desired if the local chain is close to the tip (<24h)")
         self.generate_at_mocktime(int(time.time()) - 25 * 3600)  # tip outside the 24h window, should fail
-        self.test_desirable_service_flags(node, [NODE_NETWORK_LIMITED | NODE_WITNESS],
+        self.test_desirable_service_flags(node, [NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_REDUCED_DATA],
                                           DESIRABLE_SERVICE_FLAGS_FULL, expect_disconnect=True)
         self.generate_at_mocktime(int(time.time()) - 23 * 3600)  # tip inside the 24h window, should succeed
-        self.test_desirable_service_flags(node, [NODE_NETWORK_LIMITED | NODE_WITNESS],
+        self.test_desirable_service_flags(node, [NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_REDUCED_DATA],
                                           DESIRABLE_SERVICE_FLAGS_PRUNED, expect_disconnect=False)
 
         self.log.info("Check that feeler connections get disconnected immediately")
