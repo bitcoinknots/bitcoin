@@ -1657,13 +1657,14 @@ bool PeerManagerImpl::HasAllDesirableServiceFlags(ServiceFlags services) const
 
 ServiceFlags PeerManagerImpl::GetDesirableServiceFlags(ServiceFlags services) const
 {
+    // We want to preferentially peer with other nodes that enforce BIP148, in case of a chain split
     if (services & NODE_NETWORK_LIMITED) {
         // Limited peers are desirable when we are close to the tip.
         if (ApproximateBestBlockDepth() < NODE_NETWORK_LIMITED_ALLOW_CONN_BLOCKS) {
-            return ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS);
+            return ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_BIP148);
         }
     }
-    return ServiceFlags(NODE_NETWORK | NODE_WITNESS);
+    return ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_BIP148);
 }
 
 PeerRef PeerManagerImpl::GetPeerRef(NodeId id) const
