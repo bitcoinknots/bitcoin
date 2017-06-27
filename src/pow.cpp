@@ -15,6 +15,8 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
 {
     unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
 
+    unsigned int nBits;
+
     // Only change once per difficulty adjustment interval
     if ((pindexLast->nHeight+1) % params.DifficultyAdjustmentInterval() != 0)
     {
@@ -27,23 +29,26 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
                 return nProofOfWorkLimit;
             else
             {
-                // Return the last non-special-min-difficulty-rules-block
+                // Look back to the last non-special-min-difficulty-rules-block
                 const CBlockIndex* pindex = pindexLast;
                 while (pindex->pprev && pindex->nHeight % params.DifficultyAdjustmentInterval() != 0 && pindex->nBits == nProofOfWorkLimit)
                     pindex = pindex->pprev;
-                return pindex->nBits;
+                nBits = pindex->nBits;
             }
+        } else {
+            nBits = pindexLast->nBits;
         }
-        return pindexLast->nBits;
+    } else {
+        // Go back by what we want to be 14 days worth of blocks
+        int nHeightFirst = pindexLast->nHeight - (params.DifficultyAdjustmentInterval()-1);
+        assert(nHeightFirst >= 0);
+        const CBlockIndex* pindexFirst = pindexLast->GetAncestor(nHeightFirst);
+        assert(pindexFirst);
+
+        nBits = CalculateNextWorkRequired(pindexLast, pindexFirst->GetBlockTime(), params);
     }
 
-    // Go back by what we want to be 14 days worth of blocks
-    int nHeightFirst = pindexLast->nHeight - (params.DifficultyAdjustmentInterval()-1);
-    assert(nHeightFirst >= 0);
-    const CBlockIndex* pindexFirst = pindexLast->GetAncestor(nHeightFirst);
-    assert(pindexFirst);
-
-    return CalculateNextWorkRequired(pindexLast, pindexFirst->GetBlockTime(), params);
+    return nBits;
 }
 
 unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nFirstBlockTime, const Consensus::Params& params)
