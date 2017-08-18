@@ -539,13 +539,18 @@ void NetWatchLogModel::log_append(const LogEntry& le, size_t& rows_used)
 {
     AssertLockHeld(cs);
     if (logskip) {
-        // Replace a deleted row
+    // Replace a deleted row
         getLogEntryRow(rows_used) = le;
         --logskip;
     } else {
-        // Haven't filled up yet, so just push_back
-        assert(!logpos);
-        log.push_back(le);
+
+    // Haven't filled up yet, so just push_back
+    if (!logpos) {
+        qWarning("Haven't filled up yet, so just push_back...");
+    }
+
+    log.push_back(le);
+
     }
     ++rows_used;
     if (rows_used > max_nonweak_txouts) {

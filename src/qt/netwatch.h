@@ -12,6 +12,9 @@
 #include <QAbstractTableModel>
 #include <QWidget>
 
+#define NDEBUG
+#define QT_NO_DEBUG
+
 QT_BEGIN_NAMESPACE
 class QLineEdit;
 class QTableView;
