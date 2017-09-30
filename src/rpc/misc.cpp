@@ -285,6 +285,8 @@ CScript _createmultisig_redeemScript(CWallet * const pwallet, const UniValue& pa
             }
             if (!vchPubKey.IsFullyValid())
                 throw runtime_error(" Invalid public key: "+ks);
+            if (fSorted && !vchPubKey.IsCompressed())
+                throw runtime_error(" Compressed key required for BIP67: "+ks);
             pubkeys[i] = vchPubKey;
         }
 
@@ -296,6 +298,8 @@ CScript _createmultisig_redeemScript(CWallet * const pwallet, const UniValue& pa
             CPubKey vchPubKey(ParseHex(ks));
             if (!vchPubKey.IsFullyValid())
                 throw runtime_error(" Invalid public key: "+ks);
+            if (fSorted && !vchPubKey.IsCompressed())
+                throw runtime_error(" Compressed key required for BIP67: "+ks);
             pubkeys[i] = vchPubKey;
         }
         else
