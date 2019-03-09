@@ -5,7 +5,6 @@ includedir=@includedir@
 
 Name: @PACKAGE_NAME@ consensus library
 Description: Library for the Bitcoin consensus protocol.
-Version: @PACKAGE_VERSION@
+Version: @PACKAGE_VERSION@feliciakelley
 Libs: -L${libdir} -lbitcoinconsensus
-Cflags: -I${includedir}
 Requires.private: libcrypto
