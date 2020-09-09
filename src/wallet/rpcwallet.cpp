@@ -136,7 +136,6 @@ std::shared_ptr<CWallet> GetWalletForJSONRPCRequest(const JSONRPCRequest& reques
     have_requested_wallet = GetWalletNameFromJSONRPCRequest(request, requested_wallet_name);
 
     std::shared_ptr<CWallet> pwallet;
-    LogPrintf("uri=%s wres=%s wreq=%s\n", request.URI, have_wallet_restriction?authorized_wallet_name:"(n/a)", have_requested_wallet?requested_wallet_name:"(n/a)");
 
     if (!have_wallet_restriction) {
         // Any wallet is permitted; select by endpoint, or use the sole wallet
