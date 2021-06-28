@@ -85,6 +85,10 @@
     </context>
 <context>
     <name>OverviewPage</name>
+    <message>
+        <source>Watch-only:</source>
+        <translation type="unfinished">wo nikan:</translation>
+    </message>
     </context>
 <context>
     <name>PSBTOperationsDialog</name>
@@ -178,6 +182,10 @@
     <message>
         <source>This year</source>
         <translation>Odun yi</translation>
+    </message>
+    <message>
+        <source>Watch-only</source>
+        <translation>wo nikan</translation>
     </message>
     <message>
         <source>Date</source>

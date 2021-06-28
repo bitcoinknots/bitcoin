@@ -2,10 +2,6 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>လိပ်စာ သို့မဟုတ် ခေါင်းစဉ်တပ်ရန် Right-click နှိပ်ပါ။</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
         <translation>လိပ်စာအသစ်ယူမယ်။</translation>
     </message>
@@ -123,6 +119,10 @@
     </context>
 <context>
     <name>RPCConsole</name>
+    <message>
+        <source>&amp;Information</source>
+        <translation type="unfinished">&amp;အချက်အလက်</translation>
+    </message>
     </context>
 <context>
     <name>ReceiveCoinsDialog</name>
@@ -189,5 +189,9 @@
     </context>
 <context>
     <name>bitcoin-core</name>
+    <message>
+        <source>Error</source>
+        <translation>အမှား</translation>
+    </message>
     </context>
 </TS>

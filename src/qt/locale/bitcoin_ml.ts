@@ -2,10 +2,6 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>വിലാസം അല്ലെങ്കിൽ ലേബൽ എഡിറ്റുചെയ്യാൻ വലത് ക്ലിക്കുചെയ്യുക</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
         <translation>ഒരു പുതിയ വിലാസം സൃഷ്ടിക്കുക</translation>
     </message>
@@ -19,7 +15,7 @@
     </message>
     <message>
         <source>&amp;Copy</source>
-        <translation>&amp; പകർത്തുക</translation>
+        <translation>&amp;പകർത്തുക</translation>
     </message>
     <message>
         <source>C&amp;lose</source>
@@ -68,12 +64,6 @@
     <message>
         <source>These are your Bitcoin addresses for sending payments. Always check the amount and the receiving address before sending coins.</source>
         <translation>പേയ്മെന്റുകൾ അയയ്ക്കുന്നതിനുള്ള നിങ്ങളുടെ ബിറ്റ്കോയിൻ വിലാസങ്ങളാണ് ഇവ. നാണയങ്ങൾ അയയ്ക്കുന്നതിനുമുമ്പ് എല്ലായ്പ്പോഴും തുകയും സ്വീകരിക്കുന്ന വിലാസവും പരിശോധിക്കുക.</translation>
-    </message>
-    <message>
-        <source>These are your Bitcoin addresses for receiving payments. Use the 'Create new receiving address' button in the receive tab to create new addresses.
-Signing is only possible with addresses of the type 'legacy'.</source>
-        <translation>ഇവയാണ് പണം  സ്വീകരിയ്ക്കുന്നതിനായുള്ള താങ്കളുടെ ബിറ്റ്കോയിൻ വിലാസങ്ങൾ. പുതിയ വിലാസങ്ങൾ കൂട്ടിച്ചേർക്കുന്നതിനായി ' പുതിയ വിലാസം സൃഷ്ടിയ്ക്കുക ' എന്ന ബട്ടൺ അമർത്തുക.
-'ലെഗസി' തരത്തിന്റെ വിലാസങ്ങളിൽ മാത്രമേ സൈൻ ചെയ്യാൻ കഴിയൂ.</translation>
     </message>
     <message>
         <source>&amp;Copy Address</source>
@@ -340,16 +330,9 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>വാലറ്റ്:</translation>
     </message>
     <message>
-        <source>Click to disable network activity.</source>
-        <translation>നെറ്റ്‌വർക്ക് പ്രവർത്തനം പ്രവർത്തനരഹിതമാക്കാൻ ക്ലിക്കുചെയ്യുക.</translation>
-    </message>
-    <message>
         <source>Network activity disabled.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
         <translation>നെറ്റ്‌വർക്ക് പ്രവർത്തനം പ്രവർത്തനരഹിതമാക്കി.</translation>
-    </message>
-    <message>
-        <source>Click to enable network activity again.</source>
-        <translation>നെറ്റ്‌വർക്ക് പ്രവർത്തനം വീണ്ടും പ്രവർത്തനക്ഷമമാക്കാൻ ക്ലിക്കുചെയ്യുക.</translation>
     </message>
     <message>
         <source>Syncing Headers (%1%)...</source>
@@ -548,10 +531,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>അവലോകന ടാബിൽ മൂല്യങ്ങൾ മാസ്ക് ചെയ്യുക</translation>
     </message>
     <message>
-        <source>default wallet</source>
-        <translation>സ്ഥിരം ആയ വാലറ്റ്</translation>
-    </message>
-    <message>
         <source>No wallets available</source>
         <translation>വാലറ്റ് ഒന്നും ലഭ്യം അല്ല </translation>
     </message>
@@ -735,28 +714,32 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>സ്ഥിതീകരിച്ചു</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>വിലാസം പകർത്തുക</translation>
-    </message>
-    <message>
-        <source>Copy label</source>
-        <translation>പകർത്തുക  ലേബൽ</translation>
-    </message>
-    <message>
         <source>Copy amount</source>
         <translation>തുക പകർത്തുക</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>ഇടപാട് ഐഡി പകർത്തുക</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;വിലാസം പകർത്തുക</translation>
     </message>
     <message>
-        <source>Lock unspent</source>
-        <translation>ചെലവഴിക്കാത്തത് പൂട്ടുക</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;പകർത്തുക  ലേബൽ</translation>
     </message>
     <message>
-        <source>Unlock unspent</source>
-        <translation>അൺസ്പെന്റുകൾ അൺലോക്ക് ചെയ്യുക </translation>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;തുക പകർത്തുക</translation>
+    </message>
+    <message>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;ഇടപാട് ഐഡി പകർത്തുക</translation>
+    </message>
+    <message>
+        <source>L&amp;ock unspent</source>
+        <translation type="unfinished">&amp;ചെലവഴിക്കാത്തത് പൂട്ടുക</translation>
+    </message>
+    <message>
+        <source>&amp;Unlock unspent</source>
+        <translation type="unfinished">&amp;അൺസ്പെന്റുകൾ അൺലോക്ക് ചെയ്യുക </translation>
     </message>
     <message>
         <source>Copy quantity</source>
@@ -837,6 +820,10 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>വാലറ്റ് / പണസഞ്ചി സൃഷ്ടിക്കുക :</translation>
     </message>
     <message>
+        <source>Wallet</source>
+        <translation type="unfinished">വാലറ്റ്</translation>
+    </message>
+    <message>
         <source>Wallet Name</source>
         <translation>വാലറ്റ് പേര്</translation>
     </message>
@@ -906,12 +893,27 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <source>name</source>
         <translation>നാമധേയം / പേര് </translation>
     </message>
+    <message>
+        <source>Path already exists, and is not a directory.</source>
+        <translation>പാത്ത് ഇതിനകം നിലവിലുണ്ട്, അത് ഒരു ഡയറക്ടറിയല്ല.</translation>
+    </message>
+    <message>
+        <source>Cannot create data directory here.</source>
+        <translation>ഡാറ്റ ഡയറക്ടറി ഇവിടെ സൃഷ്ടിക്കാൻ കഴിയില്ല.</translation>
+    </message>
+</context>
+<context>
+    <name>GuiNetWatch</name>
     </context>
 <context>
     <name>HelpMessageDialog</name>
     <message>
         <source>version</source>
         <translation>പതിപ്പ്</translation>
+    </message>
+    <message>
+        <source>About %1</source>
+        <translation type="unfinished"> ഏകദേശം%1</translation>
     </message>
     <message>
         <source>Command-line options</source>
@@ -961,7 +963,19 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </message>
     </context>
 <context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation>വിലാസം</translation>
+    </message>
+</context>
+<context>
     <name>OpenURIDialog</name>
+    <message>
+        <source>Open bitcoin URI</source>
+        <translation>ഒരു ബിറ്റ്കോയിൻ തുറക്കുക: URI</translation>
+    </message>
     </context>
 <context>
     <name>OpenWalletActivity</name>
@@ -972,6 +986,14 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </context>
 <context>
     <name>OptionsDialog</name>
+    <message>
+        <source>Options</source>
+        <translation type="unfinished">ഓപ്ഷനുകൾ </translation>
+    </message>
+    <message>
+        <source>W&amp;allet</source>
+        <translation type="unfinished">&amp;വാലറ്റ്</translation>
+    </message>
     <message>
         <source>&amp;Window</source>
         <translation>&amp;ജാലകം </translation>
@@ -1002,6 +1024,13 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </context>
 <context>
     <name>PSBTOperationsDialog</name>
+    <message>
+        <source>Close</source>
+        <translation type="unfinished">അടയ്ക്കുക</translation>
+    </message>
+    </context>
+<context>
+    <name>PairingPage</name>
     </context>
 <context>
     <name>PaymentServer</name>
@@ -1014,20 +1043,8 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>'bitcoin://' എന്നത് ശരിയായ ഒരു URI അല്ല .പകരം 'bitcoin:' ഉപയോഗിക്കൂ </translation>
     </message>
     <message>
-        <source>Cannot process payment request because BIP70 is not supported.</source>
-        <translation>BIP70 പിന്തുണയ്‌ക്കാത്തതിനാൽ പേയ്‌മെന്റ് അഭ്യർത്ഥന പ്രോസസ്സ് ചെയ്യാൻ കഴിയില്ല.</translation>
-    </message>
-    <message>
-        <source>Due to widespread security flaws in BIP70 it's strongly recommended that any merchant instructions to switch wallets be ignored.</source>
-        <translation>BIP70 ലെ വ്യാപകമായ സുരക്ഷാ പോരായ്മകൾ കാരണം, വാലറ്റുകൾ സ്വിച്ചുചെയ്യാനുള്ള ഏതെങ്കിലും വ്യാപാര നിർദ്ദേശങ്ങൾ അവഗണിക്കണമെന്ന് ശക്തമായി ശുപാർശ ചെയ്യുന്നു.</translation>
-    </message>
-    <message>
-        <source>If you are receiving this error you should request the merchant provide a BIP21 compatible URI.</source>
-        <translation>നിങ്ങൾക്ക് ഈ പിശക് ലഭിക്കുകയാണെങ്കിൽ, വ്യാപാരിയോട് ഒരു BIP21 അനുയോജ്യമായ URI നൽകാൻ അഭ്യർത്ഥിക്കണം.</translation>
-    </message>
-    <message>
-        <source>Invalid payment address %1</source>
-        <translation>പേയ്‌മെന്റ് വിലാസം അസാധുവാണ് %1</translation>
+        <source>Invalid payment address</source>
+        <translation>പേയ്മെന്റ് വിലാസം അസാധുവാണ്</translation>
     </message>
     <message>
         <source>URI cannot be parsed! This can be caused by an invalid Bitcoin address or malformed URI parameters.</source>
@@ -1049,10 +1066,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>നോഡ് /സേവനങ്ങൾ </translation>
     </message>
     <message>
-        <source>NodeId</source>
-        <translation>നോഡ്ഐഡി</translation>
-    </message>
-    <message>
         <source>Ping</source>
         <translation>പിംഗ് </translation>
     </message>
@@ -1064,7 +1077,7 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <source>Received</source>
         <translation>ലഭിച്ചവ </translation>
     </message>
-</context>
+    </context>
 <context>
     <name>QObject</name>
     <message>
@@ -1086,6 +1099,14 @@ Signing is only possible with addresses of the type 'legacy'.</source>
 <context>
     <name>RPCConsole</name>
     <message>
+        <source>&amp;Information</source>
+        <translation type="unfinished">&amp;വിവരം </translation>
+    </message>
+    <message>
+        <source>Wallet: </source>
+        <translation type="unfinished">വാലറ്റ്: </translation>
+    </message>
+    <message>
         <source>Received</source>
         <translation>ലഭിച്ചവ </translation>
     </message>
@@ -1105,16 +1126,37 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <source>Last block time</source>
         <translation>അവസാന ബ്ലോക്കിന്റെ സമയം </translation>
     </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <extracomment>Context menu action to copy the address of a peer</extracomment>
+        <translation type="unfinished">&amp;വിലാസം പകർത്തുക</translation>
+    </message>
+    <message>
+        <source>Network activity disabled</source>
+        <translation type="unfinished">നെറ്റ്‌വർക്ക് പ്രവർത്തനം പ്രവർത്തനരഹിതമാക്കി</translation>
+    </message>
     </context>
 <context>
     <name>ReceiveCoinsDialog</name>
     <message>
-        <source>Copy label</source>
-        <translation>പകർത്തുക  ലേബൽ</translation>
+        <source>&amp;Amount:</source>
+        <translation type="unfinished">&amp;തുക :</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>തുക പകർത്തുക</translation>
+        <source>&amp;Label:</source>
+        <translation type="unfinished">&amp;ലേബൽ:</translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;വിലാസം പകർത്തുക</translation>
+    </message>
+    <message>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;പകർത്തുക  ലേബൽ</translation>
+    </message>
+    <message>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;തുക പകർത്തുക</translation>
     </message>
     <message>
         <source>Could not unlock wallet.</source>
@@ -1124,12 +1166,24 @@ Signing is only possible with addresses of the type 'legacy'.</source>
 <context>
     <name>ReceiveRequestDialog</name>
     <message>
+        <source>Address:</source>
+        <translation type="unfinished">വിലാസം:</translation>
+    </message>
+    <message>
         <source>Amount:</source>
         <translation>തുക:</translation>
     </message>
     <message>
+        <source>Label:</source>
+        <translation type="unfinished">ലേബൽ:</translation>
+    </message>
+    <message>
         <source>Wallet:</source>
         <translation>വാലറ്റ്:</translation>
+    </message>
+    <message>
+        <source>Copy &amp;Address</source>
+        <translation type="unfinished">&amp;വിലാസം പകർത്തുക</translation>
     </message>
     </context>
 <context>
@@ -1174,8 +1228,16 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>മാറ്റം</translation>
     </message>
     <message>
+        <source>Choose...</source>
+        <translation type="unfinished">തിരഞ്ഞെടുക്കുക...</translation>
+    </message>
+    <message>
         <source>Dust:</source>
         <translation>പൊടി:</translation>
+    </message>
+    <message>
+        <source>S&amp;end</source>
+        <translation type="unfinished">&amp;അയയ്‌ക്കുക</translation>
     </message>
     <message>
         <source>Copy quantity</source>
@@ -1206,6 +1268,10 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>ചേഞ്ച് പകർത്തു</translation>
     </message>
     <message>
+        <source>Send</source>
+        <translation type="unfinished">അയയ്‌ക്കുക</translation>
+    </message>
+    <message>
         <source>Payment request expired.</source>
         <translation>പെയ്മെന്റിനുള്ള അഭ്യർത്ഥന  കാലഹരണപ്പെട്ടു പോയിരിക്കുന്നു. </translation>
     </message>
@@ -1216,6 +1282,14 @@ Signing is only possible with addresses of the type 'legacy'.</source>
 </context>
 <context>
     <name>SendCoinsEntry</name>
+    <message>
+        <source>A&amp;mount:</source>
+        <translation type="unfinished">&amp;തുക :</translation>
+    </message>
+    <message>
+        <source>&amp;Label:</source>
+        <translation type="unfinished">&amp;ലേബൽ:</translation>
+    </message>
     <message>
         <source>Choose previously used address</source>
         <translation>മുൻപ്‌ ഉപയോഗിച്ച അഡ്രസ് തെരഞ്ഞെടുക്കുക</translation>
@@ -1278,20 +1352,20 @@ Signing is only possible with addresses of the type 'legacy'.</source>
 <context>
     <name>TransactionView</name>
     <message>
-        <source>Copy address</source>
-        <translation>വിലാസം പകർത്തുക</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;വിലാസം പകർത്തുക</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>പകർത്തുക  ലേബൽ</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;പകർത്തുക  ലേബൽ</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>തുക പകർത്തുക</translation>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;തുക പകർത്തുക</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>ഇടപാട് ഐഡി പകർത്തുക</translation>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;ഇടപാട് ഐഡി പകർത്തുക</translation>
     </message>
     <message>
         <source>Comma separated file (*.csv)</source>
@@ -1360,9 +1434,17 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <source>Error</source>
         <translation>പിശക് </translation>
     </message>
+    <message>
+        <source>Backup Wallet</source>
+        <translation type="unfinished">ബാക്കപ്പ് വാലറ്റ് </translation>
+    </message>
     </context>
 <context>
     <name>bitcoin-core</name>
+    <message>
+        <source>Error</source>
+        <translation>പിശക് </translation>
+    </message>
     <message>
         <source>Error reading from database, shutting down.</source>
         <translation>ഡാറ്റാബേസിൽ നിന്നും വായിച്ചെടുക്കുന്നതിനു തടസം നേരിട്ടു, പ്രവർത്തനം അവസാനിപ്പിക്കുന്നു.</translation>

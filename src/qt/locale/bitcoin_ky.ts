@@ -34,8 +34,16 @@
         <translation>&amp;Транзакциялар</translation>
     </message>
     <message>
+        <source>Wallet:</source>
+        <translation type="unfinished">Капчык:</translation>
+    </message>
+    <message>
         <source>&amp;Verify message...</source>
         <translation>Билдирүүнү &amp;текшерүү...</translation>
+    </message>
+    <message>
+        <source>&amp;Send</source>
+        <translation type="unfinished">&amp;Жөнөтүү</translation>
     </message>
     <message>
         <source>&amp;File</source>
@@ -82,6 +90,10 @@
     </context>
 <context>
     <name>CreateWalletDialog</name>
+    <message>
+        <source>Wallet</source>
+        <translation>Капчык</translation>
+    </message>
     </context>
 <context>
     <name>EditAddressDialog</name>
@@ -115,7 +127,19 @@
     <name>ModalOverlay</name>
     </context>
 <context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation>Дарек</translation>
+    </message>
+</context>
+<context>
     <name>OpenURIDialog</name>
+    <message>
+        <source>Paste address from clipboard</source>
+        <translation>Даректи алмашуу буферинен коюу</translation>
+    </message>
     </context>
 <context>
     <name>OpenWalletActivity</name>
@@ -173,7 +197,12 @@
     </context>
 <context>
     <name>QObject</name>
-    </context>
+    <message>
+        <source>Txn</source>
+        <comment>Tx Watch: Transaction type abbreviation</comment>
+        <translation>транзакция</translation>
+    </message>
+</context>
 <context>
     <name>QRImageWidget</name>
     </context>
@@ -194,6 +223,10 @@
     <message>
         <source>Name</source>
         <translation>Аты</translation>
+    </message>
+    <message>
+        <source>Wallet: </source>
+        <translation type="unfinished">Капчык: </translation>
     </message>
     <message>
         <source>&amp;Open</source>
@@ -218,8 +251,16 @@
 <context>
     <name>ReceiveRequestDialog</name>
     <message>
+        <source>Address:</source>
+        <translation type="unfinished">Дарек:</translation>
+    </message>
+    <message>
         <source>Message:</source>
         <translation>Билдирүү:</translation>
+    </message>
+    <message>
+        <source>Wallet:</source>
+        <translation type="unfinished">Капчык:</translation>
     </message>
     </context>
 <context>
@@ -246,6 +287,10 @@
     <message>
         <source>S&amp;end</source>
         <translation>&amp;Жөнөтүү</translation>
+    </message>
+    <message>
+        <source>Send</source>
+        <translation type="unfinished">Жөнөтүү</translation>
     </message>
     <message>
         <source>(no label)</source>
@@ -289,6 +334,10 @@
     <message>
         <source>Message</source>
         <translation>Билдирүү</translation>
+    </message>
+    <message>
+        <source>Transaction</source>
+        <translation>транзакция</translation>
     </message>
     </context>
 <context>
@@ -334,8 +383,16 @@
         <source>Error</source>
         <translation>Ката</translation>
     </message>
-    </context>
+    <message>
+        <source>Cancel</source>
+        <translation type="unfinished">Жокко чыгаруу</translation>
+    </message>
+</context>
 <context>
     <name>bitcoin-core</name>
+    <message>
+        <source>Error</source>
+        <translation>Ката</translation>
+    </message>
     </context>
 </TS>

@@ -2,12 +2,8 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>Kliknij prawym przyciskiem myszy, aby edytować adres lub etykietę</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
-        <translation>Stwórz nowy portfel</translation>
+        <translation>Stwórz nowy adres</translation>
     </message>
     <message>
         <source>&amp;New</source>
@@ -68,12 +64,6 @@
     <message>
         <source>These are your Bitcoin addresses for sending payments. Always check the amount and the receiving address before sending coins.</source>
         <translation>To są twoje adresy Bitcoin do wysyłania płatności. Zawsze sprawdź kwotę i adres odbiorcy przed wysłaniem monet.</translation>
-    </message>
-    <message>
-        <source>These are your Bitcoin addresses for receiving payments. Use the 'Create new receiving address' button in the receive tab to create new addresses.
-Signing is only possible with addresses of the type 'legacy'.</source>
-        <translation>To są twoje adresy Bitcoin do otrzymywania płatności. Użyj przycisku „Utwórz nowy adres odbiorcy” na karcie odbioru, aby utworzyć nowe adresy.
-Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
     </message>
     <message>
         <source>&amp;Copy Address</source>
@@ -340,16 +330,9 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <translation>Portfel:</translation>
     </message>
     <message>
-        <source>Click to disable network activity.</source>
-        <translation>Kliknij aby wyłączyć aktywność sieciową.</translation>
-    </message>
-    <message>
         <source>Network activity disabled.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
         <translation>Aktywność sieciowa została wyłączona.</translation>
-    </message>
-    <message>
-        <source>Click to enable network activity again.</source>
-        <translation>Kliknij, aby ponownie włączyć aktywności sieciową.</translation>
     </message>
     <message>
         <source>Syncing Headers (%1%)...</source>
@@ -438,10 +421,6 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
     <message>
         <source>&amp;Command-line options</source>
         <translation>&amp;Opcje linii komend</translation>
-    </message>
-    <message numerus="yes">
-        <source>%n active connection(s) to Bitcoin network</source>
-        <translation><numerusform>%n aktywnych połączeń do sieci Bitcoin</numerusform><numerusform>%n aktywnych połączeń do sieci Bitcoin</numerusform><numerusform>%n aktywnych połączeń do sieci Bitcoin</numerusform><numerusform>%n aktywnych połączeń do sieci Bitcoin</numerusform></translation>
     </message>
     <message>
         <source>Indexing blocks on disk...</source>
@@ -556,10 +535,6 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <translation>Schowaj wartości w zakładce Podsumowanie</translation>
     </message>
     <message>
-        <source>default wallet</source>
-        <translation>domyślny portfel</translation>
-    </message>
-    <message>
         <source>No wallets available</source>
         <translation>Brak dostępnych portfeli</translation>
     </message>
@@ -582,6 +557,11 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
     <message>
         <source>%1 client</source>
         <translation>%1 klient</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n active connection(s) to Bitcoin network.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
+        <translation type="unfinished"><numerusform>%n aktywnych połączeń do sieci Bitcoin</numerusform><numerusform>%n aktywnych połączeń do sieci Bitcoin</numerusform><numerusform>%n aktywnych połączeń do sieci Bitcoin</numerusform><numerusform>%n aktywnych połączeń do sieci Bitcoin</numerusform><numerusform>%n aktywnych połączeń do sieci Bitcoin</numerusform><numerusform>%n aktywnych połączeń do sieci Bitcoin</numerusform><numerusform>%n aktywnych połączeń do sieci Bitcoin</numerusform><numerusform>%n aktywnych połączeń do sieci Bitcoin</numerusform></translation>
     </message>
     <message>
         <source>Connecting to peers...</source>
@@ -743,28 +723,32 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <translation>Potwierdzony</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Kopiuj adres</translation>
-    </message>
-    <message>
-        <source>Copy label</source>
-        <translation>Kopiuj etykietę</translation>
-    </message>
-    <message>
         <source>Copy amount</source>
         <translation>Kopiuj kwotę</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Skopiuj ID transakcji</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Kopiuj adres</translation>
     </message>
     <message>
-        <source>Lock unspent</source>
-        <translation>Zablokuj niewydane</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Kopiuj etykietę</translation>
     </message>
     <message>
-        <source>Unlock unspent</source>
-        <translation>Odblokuj niewydane</translation>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Kopiuj kwotę</translation>
+    </message>
+    <message>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Skopiuj ID transakcji</translation>
+    </message>
+    <message>
+        <source>L&amp;ock unspent</source>
+        <translation type="unfinished">&amp;Zablokuj niewydane</translation>
+    </message>
+    <message>
+        <source>&amp;Unlock unspent</source>
+        <translation type="unfinished">&amp;Odblokuj niewydane</translation>
     </message>
     <message>
         <source>Copy quantity</source>
@@ -845,6 +829,10 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <translation>Stwórz portfel</translation>
     </message>
     <message>
+        <source>Wallet</source>
+        <translation>Portfel</translation>
+    </message>
+    <message>
         <source>Wallet Name</source>
         <translation>Nazwa portfela</translation>
     </message>
@@ -855,6 +843,10 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
     <message>
         <source>Encrypt Wallet</source>
         <translation>Zaszyfruj portfel</translation>
+    </message>
+    <message>
+        <source>Advanced Options</source>
+        <translation>Opcje Zaawansowane</translation>
     </message>
     <message>
         <source>Disable private keys for this wallet. Wallets with private keys disabled will have no private keys and cannot have an HD seed or imported private keys. This is ideal for watch-only wallets.</source>
@@ -888,7 +880,7 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <source>Compiled without sqlite support (required for descriptor wallets)</source>
         <translation>Skompilowano bez wsparcia sqlite (wymaganego dla deskryptorów potfeli)</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>EditAddressDialog</name>
     <message>
@@ -1025,10 +1017,6 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <translation>Bitcoin</translation>
     </message>
     <message>
-        <source>Discard blocks after verification, except most recent %1 GB (prune)</source>
-        <translation>Skasuj bloki po weryfikacji, oprócz najnowszych %1 GB (prune)</translation>
-    </message>
-    <message>
         <source>At least %1 GB of data will be stored in this directory, and it will grow over time.</source>
         <translation>Co najmniej %1 GB danych, zostanie zapisane w tym katalogu, dane te będą przyrastały w czasie.</translation>
     </message>
@@ -1065,6 +1053,13 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <translation><numerusform>(%n GB potrzebny na pełny łańcuch)</numerusform><numerusform>(%n GB potrzebne na pełny łańcuch)</numerusform><numerusform>(%n GB potrzebnych na pełny łańcuch)</numerusform><numerusform>(%n GB potrzebnych na pełny łańcuch)</numerusform></translation>
     </message>
 </context>
+<context>
+    <name>MempoolStats</name>
+    <message>
+        <source>N/A</source>
+        <translation>NIEDOSTĘPNE</translation>
+    </message>
+    </context>
 <context>
     <name>ModalOverlay</name>
     <message>
@@ -1125,6 +1120,19 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
     </message>
 </context>
 <context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Type</source>
+        <comment>NetWatch: Type header</comment>
+        <translation>Typ</translation>
+    </message>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation>Adres</translation>
+    </message>
+</context>
+<context>
     <name>OpenURIDialog</name>
     <message>
         <source>Open bitcoin URI</source>
@@ -1133,6 +1141,10 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
     <message>
         <source>URI:</source>
         <translation>URI:</translation>
+    </message>
+    <message>
+        <source>Paste address from clipboard</source>
+        <translation>Wklej adres ze schowka</translation>
     </message>
 </context>
 <context>
@@ -1231,10 +1243,6 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
     <message>
         <source>Prune &amp;block storage to</source>
         <translation>Przytnij magazyn &amp;bloków do</translation>
-    </message>
-    <message>
-        <source>GB</source>
-        <translation>GB</translation>
     </message>
     <message>
         <source>Reverting this setting requires re-downloading the entire blockchain.</source>
@@ -1391,6 +1399,10 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
     <message>
         <source>none</source>
         <translation>żaden</translation>
+    </message>
+    <message>
+        <source>Bitcoin Core</source>
+        <translation>Rdzeń Bitcoina</translation>
     </message>
     <message>
         <source>Confirm options reset</source>
@@ -1646,20 +1658,8 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <translation>'bitcoin://' nie jest poprawnym URI. Użyj 'bitcoin:'.</translation>
     </message>
     <message>
-        <source>Cannot process payment request because BIP70 is not supported.</source>
-        <translation>Nie można przetworzyć żądania zapłaty z powodu braku wsparcia BIP70.</translation>
-    </message>
-    <message>
-        <source>Due to widespread security flaws in BIP70 it's strongly recommended that any merchant instructions to switch wallets be ignored.</source>
-        <translation>Z powodu znanych błędów bezpieczeństwa w BIP70 zaleca się ignorować wszelkie polecenie od sprzedawcy dotyczące zmiany portfela.</translation>
-    </message>
-    <message>
-        <source>If you are receiving this error you should request the merchant provide a BIP21 compatible URI.</source>
-        <translation>Jeżeli otrzymałeś ten błąd, powinieneś zażądać od sprzedawcy URI kompatybilnego z BIP21.</translation>
-    </message>
-    <message>
-        <source>Invalid payment address %1</source>
-        <translation>błędny adres płatności %1</translation>
+        <source>Invalid payment address</source>
+        <translation>błędny adres płatności</translation>
     </message>
     <message>
         <source>URI cannot be parsed! This can be caused by an invalid Bitcoin address or malformed URI parameters.</source>
@@ -1681,10 +1681,6 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <translation>Węzeł/Usługi</translation>
     </message>
     <message>
-        <source>NodeId</source>
-        <translation>Identyfikator węzła</translation>
-    </message>
-    <message>
         <source>Ping</source>
         <translation>Ping</translation>
     </message>
@@ -1696,7 +1692,11 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <source>Received</source>
         <translation>Otrzymane</translation>
     </message>
-</context>
+    <message>
+        <source>Type</source>
+        <translation>Typ</translation>
+    </message>
+    </context>
 <context>
     <name>QObject</name>
     <message>
@@ -1706,6 +1706,10 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
     <message>
         <source>Enter a Bitcoin address (e.g. %1)</source>
         <translation>Wprowadź adres bitcoinowy (np. %1)</translation>
+    </message>
+    <message>
+        <source>Inbound</source>
+        <translation>Wejściowy</translation>
     </message>
     <message>
         <source>%1 d</source>
@@ -1802,6 +1806,11 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
     <message>
         <source>unknown</source>
         <translation>nieznane</translation>
+    </message>
+    <message>
+        <source>Txn</source>
+        <comment>Tx Watch: Transaction type abbreviation</comment>
+        <translation>Tsa</translation>
     </message>
 </context>
 <context>
@@ -1938,10 +1947,6 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <translation>Wybierz węzeł żeby zobaczyć szczegóły.</translation>
     </message>
     <message>
-        <source>Direction</source>
-        <translation>Kierunek</translation>
-    </message>
-    <message>
         <source>Version</source>
         <translation>Wersja</translation>
     </message>
@@ -2046,10 +2051,6 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <translation>$Ruch sieci</translation>
     </message>
     <message>
-        <source>Totals</source>
-        <translation>Kwota ogólna</translation>
-    </message>
-    <message>
         <source>In:</source>
         <translation>Wejście:</translation>
     </message>
@@ -2070,10 +2071,6 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <translation>1 &amp;godzina</translation>
     </message>
     <message>
-        <source>1 &amp;day</source>
-        <translation>1 &amp;dzień</translation>
-    </message>
-    <message>
         <source>1 &amp;week</source>
         <translation>1 &amp;tydzień</translation>
     </message>
@@ -2086,8 +2083,29 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <translation>&amp;Rozłącz</translation>
     </message>
     <message>
+        <source>To</source>
+        <translation>Do</translation>
+    </message>
+    <message>
+        <source>From</source>
+        <translation>Od</translation>
+    </message>
+    <message>
+        <source>No</source>
+        <translation>Nie</translation>
+    </message>
+    <message>
         <source>Ban for</source>
         <translation>Zbanuj na</translation>
+    </message>
+    <message>
+        <source>1 d&amp;ay</source>
+        <translation type="unfinished">1 &amp;dzień</translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <extracomment>Context menu action to copy the address of a peer</extracomment>
+        <translation type="unfinished">&amp;Kopiuj adres</translation>
     </message>
     <message>
         <source>&amp;Unban</source>
@@ -2134,22 +2152,10 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <translation>przez %1</translation>
     </message>
     <message>
-        <source>never</source>
-        <translation>nigdy</translation>
-    </message>
-    <message>
-        <source>Inbound</source>
-        <translation>Wejściowy</translation>
-    </message>
-    <message>
-        <source>Outbound</source>
-        <translation>Wyjściowy</translation>
-    </message>
-    <message>
         <source>Unknown</source>
         <translation>Nieznany</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>ReceiveCoinsDialog</name>
     <message>
@@ -2189,8 +2195,8 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <translation>Dodatkowa wiadomość dołączana do żądania zapłaty, która może być odczytana przez płacącego.</translation>
     </message>
     <message>
-        <source>&amp;Create new receiving address</source>
-        <translation>&amp;Stwórz nowy adres odbiorczy</translation>
+        <source>&amp;Request payment</source>
+        <translation>&amp;Żądaj płatności</translation>
     </message>
     <message>
         <source>Clear all fields of the form.</source>
@@ -2229,20 +2235,24 @@ Podpisywanie jest możliwe tylko z adresami typu „legacy”.</translation>
         <translation>Usuń</translation>
     </message>
     <message>
-        <source>Copy URI</source>
-        <translation>Kopiuj URI:</translation>
+        <source>Copy &amp;URI</source>
+        <translation>Kopiuj &amp;URI</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Kopiuj etykietę</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Kopiuj adres</translation>
     </message>
     <message>
-        <source>Copy message</source>
-        <translation>Kopiuj wiadomość</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Kopiuj etykietę</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Kopiuj kwotę</translation>
+        <source>Copy &amp;message</source>
+        <translation type="unfinished">&amp;Kopiuj wiadomość</translation>
+    </message>
+    <message>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Kopiuj kwotę</translation>
     </message>
     <message>
         <source>Could not unlock wallet.</source>
@@ -3248,10 +3258,6 @@ Zwróć uwagę, że poprawnie zweryfikowana wiadomość potwierdza to, że nadaw
         <translation>Wysłane do</translation>
     </message>
     <message>
-        <source>To yourself</source>
-        <translation>Do siebie</translation>
-    </message>
-    <message>
         <source>Mined</source>
         <translation>Wydobyto</translation>
     </message>
@@ -3268,44 +3274,44 @@ Zwróć uwagę, że poprawnie zweryfikowana wiadomość potwierdza to, że nadaw
         <translation>Minimalna kwota</translation>
     </message>
     <message>
-        <source>Abandon transaction</source>
-        <translation>Porzuć transakcję</translation>
+        <source>A&amp;bandon transaction</source>
+        <translation type="unfinished">&amp;Porzuć transakcję</translation>
     </message>
     <message>
-        <source>Increase transaction fee</source>
-        <translation>Zwiększ prowizję</translation>
+        <source>Increase transaction &amp;fee</source>
+        <translation type="unfinished">&amp;Zwiększ prowizję</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Kopiuj adres</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Kopiuj adres</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Kopiuj etykietę</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Kopiuj etykietę</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Kopiuj kwotę</translation>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Kopiuj kwotę</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Skopiuj ID transakcji</translation>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Skopiuj ID transakcji</translation>
     </message>
     <message>
-        <source>Copy raw transaction</source>
-        <translation>Skopiuj surowe dane transakcji</translation>
+        <source>Copy &amp;raw transaction</source>
+        <translation type="unfinished">&amp;Skopiuj surowe dane transakcji</translation>
     </message>
     <message>
-        <source>Copy full transaction details</source>
-        <translation>Skopiuj pełne informacje o transakcji</translation>
+        <source>Copy full transaction &amp;details</source>
+        <translation type="unfinished">&amp;Skopiuj pełne informacje o transakcji</translation>
     </message>
     <message>
-        <source>Edit label</source>
-        <translation>Zmień etykietę</translation>
+        <source>&amp;Edit label</source>
+        <translation type="unfinished">&amp;Zmień etykietę</translation>
     </message>
     <message>
-        <source>Show transaction details</source>
-        <translation>Pokaż szczegóły transakcji</translation>
+        <source>&amp;Show transaction details</source>
+        <translation type="unfinished">&amp;Pokaż szczegóły transakcji</translation>
     </message>
     <message>
         <source>Export Transaction History</source>
@@ -3523,6 +3529,10 @@ Przejdź do Plik &gt; Otwórz Portfel aby wgrać portfel.
         <translation>Wystąpił błąd przy próbie zapisu pliku portfela do %1.</translation>
     </message>
     <message>
+        <source>There was an error trying to save the wallet data to %1: %2</source>
+        <translation>Wystąpił błąd przy próbie zapisu pliku portfela do %1: %2</translation>
+    </message>
+    <message>
         <source>Backup Successful</source>
         <translation>Wykonano kopię zapasową</translation>
     </message>
@@ -3580,6 +3590,14 @@ Przejdź do Plik &gt; Otwórz Portfel aby wgrać portfel.
     <message>
         <source>Please contribute if you find %s useful. Visit %s for further information about the software.</source>
         <translation>Wspomóż proszę, jeśli uznasz %s za użyteczne. Odwiedź  %s, aby uzyskać więcej informacji o tym oprogramowaniu.</translation>
+    </message>
+    <message>
+        <source>SQLiteDatabase: Failed to prepare the statement to fetch the application id: %s</source>
+        <translation>SQLiteDatabase: Nie udało się przygotować zapytania do pobrania identyfikatora aplikacji: %s</translation>
+    </message>
+    <message>
+        <source>SQLiteDatabase: Unknown sqlite wallet schema version %d. Only version %d is supported</source>
+        <translation>SQLiteDatabase: Nieznany schemat portfela sqlite wersji %d. Obsługiwana jest tylko wersja %d</translation>
     </message>
     <message>
         <source>The block database contains a block which appears to be from the future. This may be due to your computer's date and time being set incorrectly. Only rebuild the block database if you are sure that your computer's date and time are correct</source>
@@ -3678,6 +3696,10 @@ Przejdź do Plik &gt; Otwórz Portfel aby wgrać portfel.
         <translation>Błąd otwierania bazy bloków</translation>
     </message>
     <message>
+        <source>Error</source>
+        <translation>Błąd</translation>
+    </message>
+    <message>
         <source>Failed to listen on any port. Use -listen=0 if you want this.</source>
         <translation>Próba nasłuchiwania na jakimkolwiek porcie nie powiodła się. Użyj -listen=0 jeśli tego chcesz.</translation>
     </message>
@@ -3748,6 +3770,12 @@ Przejdź do Plik &gt; Otwórz Portfel aby wgrać portfel.
     <message>
         <source>Specified blocks directory "%s" does not exist.</source>
         <translation>Podany folder bloków "%s" nie istnieje.
+</translation>
+    </message>
+    <message>
+        <source>The specified R/W config file %s does not exist
+</source>
+        <translation>Podany plik R/W konfiguracyjny %s nie istnieje
 </translation>
     </message>
     <message>
@@ -3831,6 +3859,10 @@ Przejdź do Plik &gt; Otwórz Portfel aby wgrać portfel.
         <translation>Błąd: Nasłuchiwanie połączeń przychodzących nie powiodło się (nasłuch zwrócił błąd %s)</translation>
     </message>
     <message>
+        <source>%s corrupt. Try using the wallet tool bitcoin-wallet to salvage or restoring a backup.</source>
+        <translation>%s jest uszkodzony. Spróbuj użyć narzędzia bitcoin-portfel, aby uratować portfel lub przywrócić kopię zapasową.</translation>
+    </message>
+    <message>
         <source>Invalid amount for -maxtxfee=&lt;amount&gt;: '%s' (must be at least the minrelay fee of %s to prevent stuck transactions)</source>
         <translation>Niewłaściwa ilość dla -maxtxfee=&lt;ilość&gt;: '%s' (musi wynosić przynajmniej minimalną wielkość %s aby zapobiec utknięciu transakcji)</translation>
     </message>
@@ -3841,6 +3873,10 @@ Przejdź do Plik &gt; Otwórz Portfel aby wgrać portfel.
     <message>
         <source>This error could occur if this wallet was not shutdown cleanly and was last loaded using a build with a newer version of Berkeley DB. If so, please use the software that last loaded this wallet</source>
         <translation>Ten błąd mógł wystąpić jeżeli portfel nie został poprawnie zamknięty oraz był ostatnio załadowany przy użyciu buildu z nowszą wersją Berkley DB. Jeżeli tak, proszę użyć oprogramowania które ostatnio załadowało ten portfel</translation>
+    </message>
+    <message>
+        <source>This is the maximum transaction fee you pay (in addition to the normal fee) to prioritize partial spend avoidance over regular coin selection.</source>
+        <translation>Jest to maksymalna opłata transakcyjna, którą płacisz (oprócz normalnej opłaty) za priorytetowe traktowanie unikania częściowych wydatków w stosunku do regularnego wyboru monet.</translation>
     </message>
     <message>
         <source>You need to rebuild the database using -reindex to go back to unpruned mode.  This will redownload the entire blockchain</source>
@@ -4047,10 +4083,6 @@ Przejdź do Plik &gt; Otwórz Portfel aby wgrać portfel.
     <message>
         <source>Loading wallet...</source>
         <translation>Wczytywanie portfela...</translation>
-    </message>
-    <message>
-        <source>Cannot downgrade wallet</source>
-        <translation>Nie można dezaktualizować portfela</translation>
     </message>
     <message>
         <source>Rescanning...</source>

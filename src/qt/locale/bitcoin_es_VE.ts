@@ -2,10 +2,6 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>Haga clic con el botón derecho para editar una dirección o etiqueta</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
         <translation>Crear una nueva dirección</translation>
     </message>
@@ -180,6 +176,10 @@
         <translation>Ingrese la nueva contraseña para la billetera. Use una contraseña de diez o más caracteres aleatorios, u ocho o más palabras.</translation>
     </message>
     <message>
+        <source>Enter the old passphrase and new passphrase for the wallet.</source>
+        <translation>Introduzca la contraseña anterior y la contraseña nueva para este monedero.</translation>
+    </message>
+    <message>
         <source>Wallet to be encrypted</source>
         <translation>Billetera a ser cifrada</translation>
     </message>
@@ -262,6 +262,10 @@
         <translation>Salir de la aplicación</translation>
     </message>
     <message>
+        <source>Show information about %1</source>
+        <translation>Mostrar información acerca de %1</translation>
+    </message>
+    <message>
         <source>About &amp;Qt</source>
         <translation>Acerca de &amp;Qt</translation>
     </message>
@@ -298,7 +302,12 @@
         <translation>Crear una nueva billetera</translation>
     </message>
     <message>
+        <source>Wallet:</source>
+        <translation type="unfinished">Billetera:</translation>
+    </message>
+    <message>
         <source>Network activity disabled.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
         <translation>Actividad de red deshabilitada.</translation>
     </message>
     <message>
@@ -382,6 +391,10 @@
         <translation>&amp;Opciones de linea de comando</translation>
     </message>
     <message>
+        <source>Indexing blocks on disk...</source>
+        <translation>Indexando bloques en el disco...</translation>
+    </message>
+    <message>
         <source>%1 behind</source>
         <translation>%1 atrás</translation>
     </message>
@@ -410,12 +423,20 @@
         <translation>Actualizado</translation>
     </message>
     <message>
-        <source>Close wallet</source>
-        <translation>Cerrar monedero</translation>
+        <source>Open node debugging and diagnostic console</source>
+        <translation>Abrir la consola de depuración y diagnóstico</translation>
     </message>
     <message>
-        <source>default wallet</source>
-        <translation>billetera por defecto</translation>
+        <source>&amp;Sending addresses</source>
+        <translation type="unfinished">&amp;Envío de direcciones</translation>
+    </message>
+    <message>
+        <source>&amp;Receiving addresses</source>
+        <translation type="unfinished">&amp;Direcciones de recepción</translation>
+    </message>
+    <message>
+        <source>Close wallet</source>
+        <translation>Cerrar monedero</translation>
     </message>
     <message>
         <source>No wallets available</source>
@@ -517,28 +538,32 @@
         <translation>Confirmado</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Copiar dirección</translation>
-    </message>
-    <message>
-        <source>Copy label</source>
-        <translation>Copiar etiqueta</translation>
-    </message>
-    <message>
         <source>Copy amount</source>
         <translation>Copiar cantidad</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Copiar ID de la transacción</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Copiar dirección</translation>
     </message>
     <message>
-        <source>Lock unspent</source>
-        <translation>Bloqueo no gastado</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Copiar etiqueta</translation>
     </message>
     <message>
-        <source>Unlock unspent</source>
-        <translation>Desbloqueo no gastado</translation>
+        <source>Copy &amp;amount</source>
+        <translation>Copiar c&amp;antidad</translation>
+    </message>
+    <message>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Copiar ID de la transacción</translation>
+    </message>
+    <message>
+        <source>L&amp;ock unspent</source>
+        <translation type="unfinished">&amp;Bloqueo no gastado</translation>
+    </message>
+    <message>
+        <source>&amp;Unlock unspent</source>
+        <translation type="unfinished">&amp;Desbloqueo no gastado</translation>
     </message>
     <message>
         <source>Copy quantity</source>
@@ -594,6 +619,18 @@
     </context>
 <context>
     <name>CreateWalletDialog</name>
+    <message>
+        <source>Create Wallet</source>
+        <translation type="unfinished">Crear Billetera</translation>
+    </message>
+    <message>
+        <source>Wallet</source>
+        <translation>Monedero</translation>
+    </message>
+    <message>
+        <source>Encrypt Wallet</source>
+        <translation>Cifrar monedero</translation>
+    </message>
     </context>
 <context>
     <name>EditAddressDialog</name>
@@ -699,12 +736,31 @@
         <translation>Bitcoin</translation>
     </message>
     <message>
+        <source>At least %1 GB of data will be stored in this directory, and it will grow over time.</source>
+        <translation>Al menos %1GB de datos serán almacenados en este directorio, y crecerá con el tiempo.</translation>
+    </message>
+    <message>
+        <source>%1 will download and store a copy of the Bitcoin block chain.</source>
+        <translation>%1 descargará y almacenará una copia de la cadena de bloques Bitcoin.</translation>
+    </message>
+    <message>
+        <source>The wallet will also be stored in this directory.</source>
+        <translation>La billetera será también almacenada en este directorio.</translation>
+    </message>
+    <message>
         <source>Error: Specified data directory "%1" cannot be created.</source>
         <translation>Error: Directorio de datos especificado "%1" no puede ser creado.</translation>
     </message>
     <message>
         <source>Error</source>
         <translation>Error</translation>
+    </message>
+    </context>
+<context>
+    <name>MempoolStats</name>
+    <message>
+        <source>N/A</source>
+        <translation>N/D</translation>
     </message>
     </context>
 <context>
@@ -719,10 +775,22 @@
     </message>
     </context>
 <context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation>Dirección</translation>
+    </message>
+</context>
+<context>
     <name>OpenURIDialog</name>
     <message>
         <source>URI:</source>
         <translation>URI:</translation>
+    </message>
+    <message>
+        <source>Paste address from clipboard</source>
+        <translation>Pegar dirección desde portapapeles</translation>
     </message>
 </context>
 <context>
@@ -839,6 +907,10 @@
         <translation>ninguno</translation>
     </message>
     <message>
+        <source>Bitcoin Core</source>
+        <translation>Núcleo de Bitcoin</translation>
+    </message>
+    <message>
         <source>Confirm options reset</source>
         <translation>Confirme el restablecimiento de las opciones</translation>
     </message>
@@ -904,6 +976,13 @@
     </context>
 <context>
     <name>PSBTOperationsDialog</name>
+    <message>
+        <source>Close</source>
+        <translation type="unfinished">Cerrar</translation>
+    </message>
+    </context>
+<context>
+    <name>PairingPage</name>
     </context>
 <context>
     <name>PaymentServer</name>
@@ -953,6 +1032,16 @@
         <source>unknown</source>
         <translation>desconocido</translation>
     </message>
+    <message>
+        <source>Blk</source>
+        <comment>Tx Watch: Block type abbreviation</comment>
+        <translation>Blq</translation>
+    </message>
+    <message>
+        <source>Txn</source>
+        <comment>Tx Watch: Transaction type abbreviation</comment>
+        <translation>Tsn</translation>
+    </message>
 </context>
 <context>
     <name>QRImageWidget</name>
@@ -1000,6 +1089,10 @@
         <translation>Cadena de bloques</translation>
     </message>
     <message>
+        <source>Wallet: </source>
+        <translation type="unfinished">Billetera: </translation>
+    </message>
+    <message>
         <source>Last block time</source>
         <translation>Hora del último bloque</translation>
     </message>
@@ -1014,10 +1107,6 @@
     <message>
         <source>&amp;Network Traffic</source>
         <translation>&amp;Tráfico de Red</translation>
-    </message>
-    <message>
-        <source>Totals</source>
-        <translation>Total:</translation>
     </message>
     <message>
         <source>In:</source>
@@ -1035,6 +1124,15 @@
         <source>Clear console</source>
         <translation>Borrar consola</translation>
     </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <extracomment>Context menu action to copy the address of a peer</extracomment>
+        <translation type="unfinished">&amp;Copiar dirección</translation>
+    </message>
+    <message>
+        <source>Network activity disabled</source>
+        <translation type="unfinished">Actividad de red deshabilitada</translation>
+    </message>
     </context>
 <context>
     <name>ReceiveCoinsDialog</name>
@@ -1049,6 +1147,10 @@
     <message>
         <source>&amp;Message:</source>
         <translation>Mensaje:</translation>
+    </message>
+    <message>
+        <source>&amp;Request payment</source>
+        <translation>&amp;Solicitar pago</translation>
     </message>
     <message>
         <source>Clear all fields of the form.</source>
@@ -1075,16 +1177,24 @@
         <translation>Eliminar</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Copiar etiqueta</translation>
+        <source>Copy &amp;URI</source>
+        <translation>Copiar &amp;URI</translation>
     </message>
     <message>
-        <source>Copy message</source>
-        <translation>Copiar mensaje</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Copiar dirección</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Copiar cantidad</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Copiar etiqueta</translation>
+    </message>
+    <message>
+        <source>Copy &amp;message</source>
+        <translation type="unfinished">&amp;Copiar mensaje</translation>
+    </message>
+    <message>
+        <source>Copy &amp;amount</source>
+        <translation>Copiar c&amp;antidad</translation>
     </message>
     <message>
         <source>Could not unlock wallet.</source>
@@ -1094,12 +1204,24 @@
 <context>
     <name>ReceiveRequestDialog</name>
     <message>
+        <source>Address:</source>
+        <translation type="unfinished">Dirección:</translation>
+    </message>
+    <message>
         <source>Amount:</source>
         <translation>Cuantía:</translation>
     </message>
     <message>
+        <source>Label:</source>
+        <translation type="unfinished">Etiqueta:</translation>
+    </message>
+    <message>
         <source>Message:</source>
         <translation>Mensaje:</translation>
+    </message>
+    <message>
+        <source>Wallet:</source>
+        <translation type="unfinished">Billetera:</translation>
     </message>
     <message>
         <source>Copy &amp;URI</source>
@@ -1123,6 +1245,10 @@
     <message>
         <source>Label</source>
         <translation>Etiqueta</translation>
+    </message>
+    <message>
+        <source>Message</source>
+        <translation type="unfinished">Mensaje</translation>
     </message>
     <message>
         <source>(no label)</source>
@@ -1188,6 +1314,10 @@
         <translation>Comisión de transacción:</translation>
     </message>
     <message>
+        <source>Choose...</source>
+        <translation type="unfinished">Escoger...</translation>
+    </message>
+    <message>
         <source>Send to multiple recipients at once</source>
         <translation>Enviar a múltiples destinatarios de una vez</translation>
     </message>
@@ -1246,6 +1376,10 @@
     <message>
         <source>Transaction fee</source>
         <translation>Comisión de transacción</translation>
+    </message>
+    <message>
+        <source>Send</source>
+        <translation type="unfinished">Enviar</translation>
     </message>
     <message>
         <source>(no label)</source>
@@ -1399,8 +1533,16 @@
         <translation>Comisión de transacción</translation>
     </message>
     <message>
+        <source>Message</source>
+        <translation type="unfinished">Mensaje</translation>
+    </message>
+    <message>
         <source>Transaction</source>
         <translation>Transacción</translation>
+    </message>
+    <message>
+        <source>Inputs</source>
+        <translation type="unfinished">Entradas</translation>
     </message>
     <message>
         <source>Amount</source>
@@ -1432,20 +1574,20 @@
 <context>
     <name>TransactionView</name>
     <message>
-        <source>Copy address</source>
-        <translation>Copiar dirección</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Copiar dirección</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Copiar etiqueta</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Copiar etiqueta</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Copiar cantidad</translation>
+        <source>Copy &amp;amount</source>
+        <translation>Copiar c&amp;antidad</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Copiar ID de la transacción</translation>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Copiar ID de la transacción</translation>
     </message>
     <message>
         <source>Comma separated file (*.csv)</source>
@@ -1527,6 +1669,10 @@
         <translation>Hubo un error intentando guardar los datos de la billetera al %1</translation>
     </message>
     <message>
+        <source>There was an error trying to save the wallet data to %1: %2</source>
+        <translation>Hubo un error intentando guardar los datos de la billetera al %1: %2</translation>
+    </message>
+    <message>
         <source>Backup Successful</source>
         <translation>Copia de seguridad completada</translation>
     </message>
@@ -1590,6 +1736,10 @@
         <translation>No hay suficientes descriptores de archivo disponibles.</translation>
     </message>
     <message>
+        <source>Unable to bind to %s on this computer. %s is probably already running.</source>
+        <translation>Deshabilitar para enlezar a %s en esta computadora. %s probablemente ya está ejecutándose.</translation>
+    </message>
+    <message>
         <source>Verifying blocks...</source>
         <translation>Verificando bloques...</translation>
     </message>
@@ -1640,10 +1790,6 @@
     <message>
         <source>Loading wallet...</source>
         <translation>Cargando monedero...</translation>
-    </message>
-    <message>
-        <source>Cannot downgrade wallet</source>
-        <translation>No se puede rebajar el monedero</translation>
     </message>
     <message>
         <source>Rescanning...</source>

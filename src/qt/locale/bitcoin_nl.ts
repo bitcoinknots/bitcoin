@@ -2,10 +2,6 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>rechts klikken op adres of label te wijzigen</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
         <translation>Maak een nieuw adres aan</translation>
     </message>
@@ -68,12 +64,6 @@
     <message>
         <source>These are your Bitcoin addresses for sending payments. Always check the amount and the receiving address before sending coins.</source>
         <translation>Dit zijn uw Bitcoinadressen om betalingen mee te verzenden. Controleer altijd het bedrag en het ontvangstadres voordat u uw bitcoins verzendt.</translation>
-    </message>
-    <message>
-        <source>These are your Bitcoin addresses for receiving payments. Use the 'Create new receiving address' button in the receive tab to create new addresses.
-Signing is only possible with addresses of the type 'legacy'.</source>
-        <translation>Dit zijn uw Bitcoin adressen voor het ontvangen van betalingen. Gebruik de 'Nieuw ontvangst adres maken' knop in de ontvangst tab om een nieuwe adres te maken.
-Ondertekenen is alleen mogelijk met adressen van het type 'legacy'.</translation>
     </message>
     <message>
         <source>&amp;Copy Address</source>
@@ -340,16 +330,9 @@ Ondertekenen is alleen mogelijk met adressen van het type 'legacy'.</translation
         <translation>Portemonnee:</translation>
     </message>
     <message>
-        <source>Click to disable network activity.</source>
-        <translation>Klik om de netwerkactiviteit te stoppen.</translation>
-    </message>
-    <message>
         <source>Network activity disabled.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
         <translation>Netwerkactiviteit gestopt.</translation>
-    </message>
-    <message>
-        <source>Click to enable network activity again.</source>
-        <translation>Klik om de netwerkactiviteit opnieuw te starten.</translation>
     </message>
     <message>
         <source>Syncing Headers (%1%)...</source>
@@ -438,10 +421,6 @@ Ondertekenen is alleen mogelijk met adressen van het type 'legacy'.</translation
     <message>
         <source>&amp;Command-line options</source>
         <translation>&amp;Opdrachtregelopties</translation>
-    </message>
-    <message numerus="yes">
-        <source>%n active connection(s) to Bitcoin network</source>
-        <translation><numerusform>%n actieve verbinding met Bitcoinnetwerk</numerusform><numerusform>%n actieve verbindingen met Bitcoinnetwerk</numerusform></translation>
     </message>
     <message>
         <source>Indexing blocks on disk...</source>
@@ -556,10 +535,6 @@ Ondertekenen is alleen mogelijk met adressen van het type 'legacy'.</translation
         <translation>Maskeer de waarden op het tabblad Overzicht</translation>
     </message>
     <message>
-        <source>default wallet</source>
-        <translation>standaard portemonnee</translation>
-    </message>
-    <message>
         <source>No wallets available</source>
         <translation>Geen portefeuilles beschikbaar</translation>
     </message>
@@ -582,6 +557,11 @@ Ondertekenen is alleen mogelijk met adressen van het type 'legacy'.</translation
     <message>
         <source>%1 client</source>
         <translation>%1 client</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n active connection(s) to Bitcoin network.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
+        <translation type="unfinished"><numerusform>%n actieve verbinding met Bitcoinnetwerk</numerusform><numerusform>%n actieve verbindingen met Bitcoinnetwerk</numerusform><numerusform>%n actieve verbinding met Bitcoinnetwerk</numerusform><numerusform>%n actieve verbindingen met Bitcoinnetwerk</numerusform></translation>
     </message>
     <message>
         <source>Connecting to peers...</source>
@@ -743,28 +723,32 @@ Ondertekenen is alleen mogelijk met adressen van het type 'legacy'.</translation
         <translation>Bevestigd</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Kopieer adres</translation>
-    </message>
-    <message>
-        <source>Copy label</source>
-        <translation>Kopieer label</translation>
-    </message>
-    <message>
         <source>Copy amount</source>
         <translation>Kopieer bedrag</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Kopieer transactie-ID</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Kopieer adres</translation>
     </message>
     <message>
-        <source>Lock unspent</source>
-        <translation>Blokeer ongebruikte</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Kopieer label</translation>
     </message>
     <message>
-        <source>Unlock unspent</source>
-        <translation>Deblokkeer ongebruikte</translation>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Kopieer bedrag</translation>
+    </message>
+    <message>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Kopieer transactie-ID</translation>
+    </message>
+    <message>
+        <source>L&amp;ock unspent</source>
+        <translation type="unfinished">&amp;Blokeer ongebruikte</translation>
+    </message>
+    <message>
+        <source>&amp;Unlock unspent</source>
+        <translation type="unfinished">&amp;Deblokkeer ongebruikte</translation>
     </message>
     <message>
         <source>Copy quantity</source>
@@ -845,6 +829,10 @@ Ondertekenen is alleen mogelijk met adressen van het type 'legacy'.</translation
         <translation>Creëer wallet</translation>
     </message>
     <message>
+        <source>Wallet</source>
+        <translation>Portemonnee</translation>
+    </message>
+    <message>
         <source>Wallet Name</source>
         <translation>Wallet Naam</translation>
     </message>
@@ -855,6 +843,10 @@ Ondertekenen is alleen mogelijk met adressen van het type 'legacy'.</translation
     <message>
         <source>Encrypt Wallet</source>
         <translation>Versleutel portemonnee</translation>
+    </message>
+    <message>
+        <source>Advanced Options</source>
+        <translation>Geavanceerde Opties</translation>
     </message>
     <message>
         <source>Disable private keys for this wallet. Wallets with private keys disabled will have no private keys and cannot have an HD seed or imported private keys. This is ideal for watch-only wallets.</source>
@@ -889,7 +881,7 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
         <source>Compiled without sqlite support (required for descriptor wallets)</source>
         <translation>Gecompileerd zonder ondersteuning van sqlite (noodzakelijk voor beschrijvende portemonees)</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>EditAddressDialog</name>
     <message>
@@ -1026,10 +1018,6 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
         <translation>Bitcoin</translation>
     </message>
     <message>
-        <source>Discard blocks after verification, except most recent %1 GB (prune)</source>
-        <translation>Verwijder blokken na verificatie, uitgezonderd de meest recente %1 GB (prune)</translation>
-    </message>
-    <message>
         <source>At least %1 GB of data will be stored in this directory, and it will grow over time.</source>
         <translation>Tenminste %1 GB aan data zal worden opgeslagen in deze map, en dit zal naarmate de tijd voortschrijdt groeien.</translation>
     </message>
@@ -1066,6 +1054,13 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
         <translation><numerusform>(%n GB nodig voor volledige keten)</numerusform><numerusform>(%n GB nodig voor volledige keten)</numerusform></translation>
     </message>
 </context>
+<context>
+    <name>MempoolStats</name>
+    <message>
+        <source>N/A</source>
+        <translation>N.v.t.</translation>
+    </message>
+    </context>
 <context>
     <name>ModalOverlay</name>
     <message>
@@ -1126,6 +1121,14 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
     </message>
 </context>
 <context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation>Adres</translation>
+    </message>
+</context>
+<context>
     <name>OpenURIDialog</name>
     <message>
         <source>Open bitcoin URI</source>
@@ -1134,6 +1137,10 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
     <message>
         <source>URI:</source>
         <translation>URI:</translation>
+    </message>
+    <message>
+        <source>Paste address from clipboard</source>
+        <translation>Plak adres vanuit klembord</translation>
     </message>
 </context>
 <context>
@@ -1232,10 +1239,6 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
     <message>
         <source>Prune &amp;block storage to</source>
         <translation>Prune &amp; block opslag op</translation>
-    </message>
-    <message>
-        <source>GB</source>
-        <translation>GB</translation>
     </message>
     <message>
         <source>Reverting this setting requires re-downloading the entire blockchain.</source>
@@ -1647,20 +1650,8 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
         <translation>'bitcoin://' is niet een geldige URI. Gebruik 'bitcoin:' in plaats daarvan.</translation>
     </message>
     <message>
-        <source>Cannot process payment request because BIP70 is not supported.</source>
-        <translation>Kan het betalingsverzoek niet verwerken omdat BIP70 niet ondersteund is.</translation>
-    </message>
-    <message>
-        <source>Due to widespread security flaws in BIP70 it's strongly recommended that any merchant instructions to switch wallets be ignored.</source>
-        <translation>Gezien de wijdverspreide beveiligingsproblemen in BIP70 is het sterk aanbevolen dat iedere instructie om van portemonnee te wisselen wordt genegeerd.</translation>
-    </message>
-    <message>
-        <source>If you are receiving this error you should request the merchant provide a BIP21 compatible URI.</source>
-        <translation>Als je deze fout krijgt, verzoek dan de verkoper om een BIP21 compatible URI.</translation>
-    </message>
-    <message>
-        <source>Invalid payment address %1</source>
-        <translation>Ongeldig betalingsadres %1</translation>
+        <source>Invalid payment address</source>
+        <translation>Ongeldig betalingsadres</translation>
     </message>
     <message>
         <source>URI cannot be parsed! This can be caused by an invalid Bitcoin address or malformed URI parameters.</source>
@@ -1682,10 +1673,6 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
         <translation>Node/Dienst</translation>
     </message>
     <message>
-        <source>NodeId</source>
-        <translation>Node ID</translation>
-    </message>
-    <message>
         <source>Ping</source>
         <translation>Ping</translation>
     </message>
@@ -1697,7 +1684,7 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
         <source>Received</source>
         <translation>Ontvangen</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>QObject</name>
     <message>
@@ -1707,6 +1694,10 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
     <message>
         <source>Enter a Bitcoin address (e.g. %1)</source>
         <translation>Voer een Bitcoinadres in (bijv. %1)</translation>
+    </message>
+    <message>
+        <source>Inbound</source>
+        <translation>Inkomend</translation>
     </message>
     <message>
         <source>%1 d</source>
@@ -1803,6 +1794,11 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
     <message>
         <source>unknown</source>
         <translation>onbekend</translation>
+    </message>
+    <message>
+        <source>Txn</source>
+        <comment>Tx Watch: Transaction type abbreviation</comment>
+        <translation>Tse</translation>
     </message>
 </context>
 <context>
@@ -1939,10 +1935,6 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
         <translation>Selecteer een peer om gedetailleerde informatie te bekijken.</translation>
     </message>
     <message>
-        <source>Direction</source>
-        <translation>Directie</translation>
-    </message>
-    <message>
         <source>Version</source>
         <translation>Versie</translation>
     </message>
@@ -2047,10 +2039,6 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
         <translation>&amp;Netwerkverkeer</translation>
     </message>
     <message>
-        <source>Totals</source>
-        <translation>Totalen</translation>
-    </message>
-    <message>
         <source>In:</source>
         <translation>In:</translation>
     </message>
@@ -2071,10 +2059,6 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
         <translation>1 &amp;uur</translation>
     </message>
     <message>
-        <source>1 &amp;day</source>
-        <translation>1 &amp;dag</translation>
-    </message>
-    <message>
         <source>1 &amp;week</source>
         <translation>1 &amp;week</translation>
     </message>
@@ -2087,8 +2071,29 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
         <translation>&amp;Verbreek verbinding</translation>
     </message>
     <message>
+        <source>To</source>
+        <translation>Aan</translation>
+    </message>
+    <message>
+        <source>From</source>
+        <translation>Van</translation>
+    </message>
+    <message>
+        <source>No</source>
+        <translation>Nee</translation>
+    </message>
+    <message>
         <source>Ban for</source>
         <translation>Ban Node voor</translation>
+    </message>
+    <message>
+        <source>1 d&amp;ay</source>
+        <translation type="unfinished">1 &amp;dag</translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <extracomment>Context menu action to copy the address of a peer</extracomment>
+        <translation type="unfinished">&amp;Kopieer adres</translation>
     </message>
     <message>
         <source>&amp;Unban</source>
@@ -2135,22 +2140,10 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
         <translation>via %1</translation>
     </message>
     <message>
-        <source>never</source>
-        <translation>nooit</translation>
-    </message>
-    <message>
-        <source>Inbound</source>
-        <translation>Inkomend</translation>
-    </message>
-    <message>
-        <source>Outbound</source>
-        <translation>Uitgaand</translation>
-    </message>
-    <message>
         <source>Unknown</source>
         <translation>Onbekend</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>ReceiveCoinsDialog</name>
     <message>
@@ -2190,8 +2183,8 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
         <translation>Een optioneel bericht dat wordt toegevoegd aan het betalingsverzoek en dat aan de verzender getoond kan worden.</translation>
     </message>
     <message>
-        <source>&amp;Create new receiving address</source>
-        <translation>&amp;Creëer een nieuw ontvangstadres</translation>
+        <source>&amp;Request payment</source>
+        <translation>&amp;Betalingsverzoek</translation>
     </message>
     <message>
         <source>Clear all fields of the form.</source>
@@ -2230,20 +2223,24 @@ Dit is ideaal voor alleen-lezen portommonees.</translation>
         <translation>Verwijder</translation>
     </message>
     <message>
-        <source>Copy URI</source>
-        <translation>Kopieer URI</translation>
+        <source>Copy &amp;URI</source>
+        <translation>Kopieer &amp;URI</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Kopieer label</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Kopieer adres</translation>
     </message>
     <message>
-        <source>Copy message</source>
-        <translation>Kopieer bericht</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Kopieer label</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Kopieer bedrag</translation>
+        <source>Copy &amp;message</source>
+        <translation type="unfinished">&amp;Kopieer bericht</translation>
+    </message>
+    <message>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Kopieer bedrag</translation>
     </message>
     <message>
         <source>Could not unlock wallet.</source>
@@ -3248,10 +3245,6 @@ Vb. een offline %1 portemonee, of een PSBT-combatiebele hardware portemonee.</tr
         <translation>Verzonden aan</translation>
     </message>
     <message>
-        <source>To yourself</source>
-        <translation>Aan uzelf</translation>
-    </message>
-    <message>
         <source>Mined</source>
         <translation>Gedolven</translation>
     </message>
@@ -3268,44 +3261,44 @@ Vb. een offline %1 portemonee, of een PSBT-combatiebele hardware portemonee.</tr
         <translation>Min. bedrag</translation>
     </message>
     <message>
-        <source>Abandon transaction</source>
-        <translation>Doe afstand van transactie</translation>
+        <source>A&amp;bandon transaction</source>
+        <translation type="unfinished">&amp;Doe afstand van transactie</translation>
     </message>
     <message>
-        <source>Increase transaction fee</source>
-        <translation>Toename transactiekosten</translation>
+        <source>Increase transaction &amp;fee</source>
+        <translation type="unfinished">&amp;Toename transactiekosten</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Kopieer adres</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Kopieer adres</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Kopieer label</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Kopieer label</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Kopieer bedrag</translation>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Kopieer bedrag</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Kopieer transactie-ID</translation>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Kopieer transactie-ID</translation>
     </message>
     <message>
-        <source>Copy raw transaction</source>
-        <translation>Kopieer ruwe transactie</translation>
+        <source>Copy &amp;raw transaction</source>
+        <translation type="unfinished">&amp;Kopieer ruwe transactie</translation>
     </message>
     <message>
-        <source>Copy full transaction details</source>
-        <translation>Kopieer volledige transactiedetials</translation>
+        <source>Copy full transaction &amp;details</source>
+        <translation type="unfinished">&amp;Kopieer volledige transactiedetials</translation>
     </message>
     <message>
-        <source>Edit label</source>
-        <translation>Bewerk label</translation>
+        <source>&amp;Edit label</source>
+        <translation type="unfinished">&amp;Bewerk label</translation>
     </message>
     <message>
-        <source>Show transaction details</source>
-        <translation>Toon transactiedetails</translation>
+        <source>&amp;Show transaction details</source>
+        <translation type="unfinished">&amp;Toon transactiedetails</translation>
     </message>
     <message>
         <source>Export Transaction History</source>
@@ -3523,6 +3516,10 @@ Ga naar Bestand &gt; Open portemonee om er één te openen.
         <translation>Er is een fout opgetreden bij het wegschrijven van de portemonneedata naar %1.</translation>
     </message>
     <message>
+        <source>There was an error trying to save the wallet data to %1: %2</source>
+        <translation>Er is een fout opgetreden bij het wegschrijven van de portemonneedata naar %1: %2</translation>
+    </message>
+    <message>
         <source>Backup Successful</source>
         <translation>Backup succesvol</translation>
     </message>
@@ -3694,6 +3691,10 @@ Ga naar Bestand &gt; Open portemonee om er één te openen.
         <translation>Fout bij openen blokkendatabase</translation>
     </message>
     <message>
+        <source>Error</source>
+        <translation>Fout</translation>
+    </message>
+    <message>
         <source>Failed to listen on any port. Use -listen=0 if you want this.</source>
         <translation>Mislukt om op welke poort dan ook te luisteren. Gebruik -listen=0 as u dit wilt.</translation>
     </message>
@@ -3764,6 +3765,12 @@ Ga naar Bestand &gt; Open portemonee om er één te openen.
     <message>
         <source>Specified blocks directory "%s" does not exist.</source>
         <translation>Opgegeven blocks map "%s" bestaat niet.</translation>
+    </message>
+    <message>
+        <source>The specified R/W config file %s does not exist
+</source>
+        <translation>Het opgegeven R/W configuratiebestand %s bestaat niet
+</translation>
     </message>
     <message>
         <source>Unknown address type '%s'</source>
@@ -3848,10 +3855,6 @@ Ga naar Bestand &gt; Open portemonee om er één te openen.
     <message>
         <source>%s corrupt. Try using the wallet tool bitcoin-wallet to salvage or restoring a backup.</source>
         <translation>%s is corrupt. Probeer de portemonnee tool bitcoin-portemonnee om het probleem op te lossen of een backup terug te zetten.</translation>
-    </message>
-    <message>
-        <source>Cannot upgrade a non HD split wallet without upgrading to support pre split keypool. Please use version 169900 or no version specified.</source>
-        <translation>Niet mogelijk om een niet HD gesplitste portefeuille up te daten, zonder de pre split keypool te ondersteunen. Gelieve versie 1699000 of 'geen versie gespecifieerd' te gebruiken.</translation>
     </message>
     <message>
         <source>Invalid amount for -maxtxfee=&lt;amount&gt;: '%s' (must be at least the minrelay fee of %s to prevent stuck transactions)</source>
@@ -4079,10 +4082,6 @@ Indien dit het geval is, gelieve de software te gebruiken waarmee deze portefeui
     <message>
         <source>Loading wallet...</source>
         <translation>Portemonnee aan het laden...</translation>
-    </message>
-    <message>
-        <source>Cannot downgrade wallet</source>
-        <translation>Kan portemonnee niet downgraden</translation>
     </message>
     <message>
         <source>Rescanning...</source>

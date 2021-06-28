@@ -2,10 +2,6 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>Rechtsklick zum Bearbeiten der Adresse oder der Beschreibung</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
         <translation>Neue Adresse erstellen</translation>
     </message>
@@ -68,12 +64,6 @@
     <message>
         <source>These are your Bitcoin addresses for sending payments. Always check the amount and the receiving address before sending coins.</source>
         <translation>Dies sind Ihre Bitcoin-Adressen zum Tätigen von Überweisungen. Bitte prüfen Sie den Betrag und die Adresse des Empfängers, bevor Sie Bitcoins überweisen.</translation>
-    </message>
-    <message>
-        <source>These are your Bitcoin addresses for receiving payments. Use the 'Create new receiving address' button in the receive tab to create new addresses.
-Signing is only possible with addresses of the type 'legacy'.</source>
-        <translation>Dies sind Ihre Bitcoin-Adressen für den Empfang von Zahlungen. Verwenden Sie die 'Neue Empfangsadresse erstellen' Taste auf der Registerkarte "Empfangen", um neue Adressen zu erstellen.
-Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
     </message>
     <message>
         <source>&amp;Copy Address</source>
@@ -223,7 +213,7 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
     </message>
     <message>
         <source>Wallet unlock failed</source>
-        <translation>Wallet-Entsperrung fehlgeschlagen</translation>
+        <translation>Wallet-Entsperrung fehlgeschlagen.</translation>
     </message>
     <message>
         <source>The passphrase entered for the wallet decryption was incorrect.</source>
@@ -340,16 +330,9 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
         <translation>Wallet:</translation>
     </message>
     <message>
-        <source>Click to disable network activity.</source>
-        <translation>Klicken zum Deaktivieren der Netzwerkaktivität.</translation>
-    </message>
-    <message>
         <source>Network activity disabled.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
         <translation>Netzwerkaktivität deaktiviert.</translation>
-    </message>
-    <message>
-        <source>Click to enable network activity again.</source>
-        <translation>Klicken zum Aktivieren der Netzwerkaktivität.</translation>
     </message>
     <message>
         <source>Syncing Headers (%1%)...</source>
@@ -438,10 +421,6 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
     <message>
         <source>&amp;Command-line options</source>
         <translation>&amp;Kommandozeilenoptionen</translation>
-    </message>
-    <message numerus="yes">
-        <source>%n active connection(s) to Bitcoin network</source>
-        <translation><numerusform>%n aktive Verbindung zum Bitcoin-Netzwerk</numerusform><numerusform>%n aktive Verbindungen zum Bitcoin-Netzwerk</numerusform></translation>
     </message>
     <message>
         <source>Indexing blocks on disk...</source>
@@ -556,10 +535,6 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
         <translation>Blende die Werte im Übersichtsreiter aus</translation>
     </message>
     <message>
-        <source>default wallet</source>
-        <translation>Standard Wallet</translation>
-    </message>
-    <message>
         <source>No wallets available</source>
         <translation>Keine Wallets verfügbar</translation>
     </message>
@@ -582,6 +557,11 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
     <message>
         <source>%1 client</source>
         <translation>%1 Client</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n active connection(s) to Bitcoin network.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
+        <translation type="unfinished"><numerusform>%n aktive Verbindung zum Bitcoin-Netzwerk</numerusform><numerusform>%n aktive Verbindungen zum Bitcoin-Netzwerk</numerusform><numerusform>%n aktive Verbindung zum Bitcoin-Netzwerk</numerusform><numerusform>%n aktive Verbindungen zum Bitcoin-Netzwerk</numerusform></translation>
     </message>
     <message>
         <source>Connecting to peers...</source>
@@ -743,28 +723,32 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
         <translation>Bestätigt</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Adresse kopieren</translation>
-    </message>
-    <message>
-        <source>Copy label</source>
-        <translation>Bezeichnung kopieren</translation>
-    </message>
-    <message>
         <source>Copy amount</source>
         <translation>Betrag kopieren</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Transaktionskennung kopieren</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Adresse kopieren</translation>
     </message>
     <message>
-        <source>Lock unspent</source>
-        <translation>Nicht ausgegebenen Betrag sperren</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Bezeichnung kopieren</translation>
     </message>
     <message>
-        <source>Unlock unspent</source>
-        <translation>Nicht ausgegebenen Betrag entsperren</translation>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Betrag kopieren</translation>
+    </message>
+    <message>
+        <source>Copy transaction &amp;ID</source>
+        <translation>&amp;Transaktionskennung kopieren</translation>
+    </message>
+    <message>
+        <source>L&amp;ock unspent</source>
+        <translation type="unfinished">&amp;Nicht ausgegebenen Betrag sperren</translation>
+    </message>
+    <message>
+        <source>&amp;Unlock unspent</source>
+        <translation type="unfinished">&amp;Nicht ausgegebenen Betrag entsperren</translation>
     </message>
     <message>
         <source>Copy quantity</source>
@@ -857,6 +841,11 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
         <translation>Wallet verschlüsseln</translation>
     </message>
     <message>
+        <source>Advanced Options</source>
+        <translation>Erweiterte Optionen
+</translation>
+    </message>
+    <message>
         <source>Disable private keys for this wallet. Wallets with private keys disabled will have no private keys and cannot have an HD seed or imported private keys. This is ideal for watch-only wallets.</source>
         <translation>Deaktiviert private Schlüssel für dieses Wallet. Wallets mit deaktivierten privaten Schlüsseln werden keine privaten Schlüssel haben und können keinen HD Seed oder private Schlüssel importieren. Das ist ideal für Wallets, die nur beobachten.</translation>
     </message>
@@ -888,7 +877,7 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
         <source>Compiled without sqlite support (required for descriptor wallets)</source>
         <translation>Ohne SQLite-Unterstützung (erforderlich für Deskriptor-Brieftaschen) kompiliert</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>EditAddressDialog</name>
     <message>
@@ -1025,10 +1014,6 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
         <translation>Bitcoin</translation>
     </message>
     <message>
-        <source>Discard blocks after verification, except most recent %1 GB (prune)</source>
-        <translation>Verwerfe Blöcke nachdem sie verifiziert worden sind, ausser die %1 GB (prune)</translation>
-    </message>
-    <message>
         <source>At least %1 GB of data will be stored in this directory, and it will grow over time.</source>
         <translation>Mindestens %1 GB Daten werden in diesem Verzeichnis gespeichert, und sie werden mit der Zeit zunehmen.</translation>
     </message>
@@ -1062,9 +1047,16 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
     </message>
     <message numerus="yes">
         <source>(%n GB needed for full chain)</source>
-        <translation><numerusform>(%n GB benötigt für komplette Blockchain)</numerusform><numerusform>(%n GB wird die komplette Blockchain benötigen)</numerusform></translation>
+        <translation><numerusform>(%n GB benötigt für komplette Blockchain)</numerusform><numerusform>(%n GB benötigt für komplette Blockchain)</numerusform></translation>
     </message>
 </context>
+<context>
+    <name>MempoolStats</name>
+    <message>
+        <source>N/A</source>
+        <translation>k.A.</translation>
+    </message>
+    </context>
 <context>
     <name>ModalOverlay</name>
     <message>
@@ -1125,6 +1117,19 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
     </message>
 </context>
 <context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Type</source>
+        <comment>NetWatch: Type header</comment>
+        <translation>Typ</translation>
+    </message>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation>Adresse</translation>
+    </message>
+</context>
+<context>
     <name>OpenURIDialog</name>
     <message>
         <source>Open bitcoin URI</source>
@@ -1133,6 +1138,10 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
     <message>
         <source>URI:</source>
         <translation>URI:</translation>
+    </message>
+    <message>
+        <source>Paste address from clipboard</source>
+        <translation>Adresse aus der Zwischenablage einfügen</translation>
     </message>
 </context>
 <context>
@@ -1231,10 +1240,6 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
     <message>
         <source>Prune &amp;block storage to</source>
         <translation>&amp;Blockspeicher kürzen auf</translation>
-    </message>
-    <message>
-        <source>GB</source>
-        <translation>GB</translation>
     </message>
     <message>
         <source>Reverting this setting requires re-downloading the entire blockchain.</source>
@@ -1363,6 +1368,10 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
     <message>
         <source>Connect to the Bitcoin network through a separate SOCKS5 proxy for Tor onion services.</source>
         <translation>Verbinde mit dem Bitcoin-Netzwerk über einen separaten SOCKS5-Proxy für Tor-Onion-Dienste.</translation>
+    </message>
+    <message>
+        <source>Use separate SOCKS&amp;5 proxy to reach peers via Tor onion services:</source>
+        <translation>Separaten SOCKS5-Proxy verwenden, um Gegenstellen über versteckte Tor-Dienste zu erreichen:</translation>
     </message>
     <message>
         <source>&amp;Third party transaction URLs</source>
@@ -1646,20 +1655,8 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
         <translation>'bitcoin://' ist kein gültiger URL. Bitte 'bitcoin:' nutzen.</translation>
     </message>
     <message>
-        <source>Cannot process payment request because BIP70 is not supported.</source>
-        <translation>Zahlung kann aufgrund fehlender BIP70 Unterstützung nicht bearbeitet werden.</translation>
-    </message>
-    <message>
-        <source>Due to widespread security flaws in BIP70 it's strongly recommended that any merchant instructions to switch wallets be ignored.</source>
-        <translation>Aufgrund der weit verbreiteten Sicherheitsmängel in BIP70 wird dringend empfohlen, dass alle Anweisungen des Händlers zum Wechseln von Wallets ignoriert werden.</translation>
-    </message>
-    <message>
-        <source>If you are receiving this error you should request the merchant provide a BIP21 compatible URI.</source>
-        <translation>Wenn du diese Fehlermeldung erhälst, solltest du Kontakt mit dem Händler aufnehmen und eine mit BIP21 kompatible URL zur Verwendung nachfragen.</translation>
-    </message>
-    <message>
-        <source>Invalid payment address %1</source>
-        <translation>Ungültige Zahlungsadresse %1</translation>
+        <source>Invalid payment address</source>
+        <translation>Ungültige Zahlungsadresse</translation>
     </message>
     <message>
         <source>URI cannot be parsed! This can be caused by an invalid Bitcoin address or malformed URI parameters.</source>
@@ -1681,10 +1678,6 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
         <translation>Knoten/Dienst</translation>
     </message>
     <message>
-        <source>NodeId</source>
-        <translation>Knotenkennung</translation>
-    </message>
-    <message>
         <source>Ping</source>
         <translation>Ping</translation>
     </message>
@@ -1696,7 +1689,11 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
         <source>Received</source>
         <translation>Empfangen</translation>
     </message>
-</context>
+    <message>
+        <source>Type</source>
+        <translation>Typ</translation>
+    </message>
+    </context>
 <context>
     <name>QObject</name>
     <message>
@@ -1706,6 +1703,10 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
     <message>
         <source>Enter a Bitcoin address (e.g. %1)</source>
         <translation>Bitcoin-Adresse eingeben (z.B. %1)</translation>
+    </message>
+    <message>
+        <source>Inbound</source>
+        <translation>Eingehend</translation>
     </message>
     <message>
         <source>%1 d</source>
@@ -1802,6 +1803,11 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
     <message>
         <source>unknown</source>
         <translation>unbekannt</translation>
+    </message>
+    <message>
+        <source>Txn</source>
+        <comment>Tx Watch: Transaction type abbreviation</comment>
+        <translation>Tsn</translation>
     </message>
 </context>
 <context>
@@ -1938,10 +1944,6 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
         <translation>Gegenstelle auswählen, um detaillierte Informationen zu erhalten.</translation>
     </message>
     <message>
-        <source>Direction</source>
-        <translation>Richtung</translation>
-    </message>
-    <message>
         <source>Version</source>
         <translation>Version</translation>
     </message>
@@ -2046,10 +2048,6 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
         <translation>&amp;Netzwerkauslastung</translation>
     </message>
     <message>
-        <source>Totals</source>
-        <translation>Gesamtbetrag:</translation>
-    </message>
-    <message>
         <source>In:</source>
         <translation>Eingehend:</translation>
     </message>
@@ -2070,10 +2068,6 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
         <translation>1 &amp;Stunde</translation>
     </message>
     <message>
-        <source>1 &amp;day</source>
-        <translation>1 &amp;Tag</translation>
-    </message>
-    <message>
         <source>1 &amp;week</source>
         <translation>1 &amp;Woche</translation>
     </message>
@@ -2086,8 +2080,29 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
         <translation>&amp;Trennen</translation>
     </message>
     <message>
+        <source>To</source>
+        <translation>An</translation>
+    </message>
+    <message>
+        <source>From</source>
+        <translation>Von</translation>
+    </message>
+    <message>
+        <source>No</source>
+        <translation>Nein</translation>
+    </message>
+    <message>
         <source>Ban for</source>
         <translation>Sperren für</translation>
+    </message>
+    <message>
+        <source>1 d&amp;ay</source>
+        <translation type="unfinished">1 &amp;Tag</translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <extracomment>Context menu action to copy the address of a peer</extracomment>
+        <translation type="unfinished">&amp;Adresse kopieren</translation>
     </message>
     <message>
         <source>&amp;Unban</source>
@@ -2134,22 +2149,10 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
         <translation>über %1</translation>
     </message>
     <message>
-        <source>never</source>
-        <translation>nie</translation>
-    </message>
-    <message>
-        <source>Inbound</source>
-        <translation>Eingehend</translation>
-    </message>
-    <message>
-        <source>Outbound</source>
-        <translation>ausgehend</translation>
-    </message>
-    <message>
         <source>Unknown</source>
         <translation>Unbekannt</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>ReceiveCoinsDialog</name>
     <message>
@@ -2189,8 +2192,8 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
         <translation>Eine optionale Nachricht, die der Zahlungsanforderung beigefügt wird und dem Absender angezeigt werden kann.</translation>
     </message>
     <message>
-        <source>&amp;Create new receiving address</source>
-        <translation>Neue Empfangsadresse erstellen</translation>
+        <source>&amp;Request payment</source>
+        <translation>&amp;Zahlung anfordern</translation>
     </message>
     <message>
         <source>Clear all fields of the form.</source>
@@ -2229,20 +2232,24 @@ Das Signieren ist nur mit Adressen vom Typ 'Legacy' möglich.</translation>
         <translation>Entfernen</translation>
     </message>
     <message>
-        <source>Copy URI</source>
+        <source>Copy &amp;URI</source>
         <translation>&amp;URI kopieren</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Bezeichnung kopieren</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Adresse kopieren</translation>
     </message>
     <message>
-        <source>Copy message</source>
-        <translation>Nachricht kopieren</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Bezeichnung kopieren</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Betrag kopieren</translation>
+        <source>Copy &amp;message</source>
+        <translation type="unfinished">&amp;Nachricht kopieren</translation>
+    </message>
+    <message>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Betrag kopieren</translation>
     </message>
     <message>
         <source>Could not unlock wallet.</source>
@@ -2570,6 +2577,10 @@ Hinweis: Eine Gebühr von "100 Satoshis pro kB" bei einer Größe der Transaktio
         <translation>Sie können die Gebühr später erhöhen (zeigt Replace-By-Fee, BIP-125).</translation>
     </message>
     <message>
+        <source>Please, review your transaction proposal. This will produce a Partially Signed Bitcoin Transaction (PSBT) which you can save or copy and then sign with e.g. an offline %1 wallet, or a PSBT-compatible hardware wallet.</source>
+        <translation>Bitte überprüfe deinen Transaktionsentwurf. Es wird eine teilsignierte Bitcoin Transaktion (PSBT) erzeugt, die du kopieren und dann mit z.B. einem Offline %1 Wallet oder einem PSBT-kompatiblen Hardware Wallet signieren kannst.</translation>
+    </message>
+    <message>
         <source>Please, review your transaction.</source>
         <translation>Bitte überprüfen sie ihre Transaktion.</translation>
     </message>
@@ -2639,7 +2650,7 @@ Hinweis: Eine Gebühr von "100 Satoshis pro kB" bei einer Größe der Transaktio
     </message>
     <message numerus="yes">
         <source>Estimated to begin confirmation within %n block(s).</source>
-        <translation><numerusform>Voraussichtlicher Beginn der Bestätigung innerhalb von %n Block</numerusform><numerusform>Voraussichtlicher Beginn der Bestätigung innerhalb von %n Blöcken.</numerusform></translation>
+        <translation><numerusform>Voraussichtlicher Beginn der Bestätigung innerhalb von %n Block.</numerusform><numerusform>Voraussichtlicher Beginn der Bestätigung innerhalb von %n Blöcken.</numerusform></translation>
     </message>
     <message>
         <source>Warning: Invalid Bitcoin address</source>
@@ -2824,7 +2835,7 @@ Hinweis: Eine Gebühr von "100 Satoshis pro kB" bei einer Größe der Transaktio
     </message>
     <message>
         <source>Enter the receiver's address, message (ensure you copy line breaks, spaces, tabs, etc. exactly) and signature below to verify the message. Be careful not to read more into the signature than what is in the signed message itself, to avoid being tricked by a man-in-the-middle attack. Note that this only proves the signing party receives with the address, it cannot prove sendership of any transaction!</source>
-        <translation>Geben Sie die Zahlungsadresse des Empfängers, Nachricht (achten Sie darauf Zeilenumbrüche, Leerzeichen, Tabulatoren usw. exakt zu kopieren) und Signatur unten ein, um die Nachricht zu verifizieren. Vorsicht, interpretieren Sie nicht mehr in die Signatur hinein, als in der signierten Nachricht selber enthalten ist, um nicht von einem Man-in-the-middle-Angriff hinters Licht geführt zu werden. Beachten Sie dass dies nur beweist, dass die signierende Partei über diese Adresse Überweisungen empfangen kann.</translation>
+        <translation>Geben Sie die Zahlungsadresse des Empfängers, Nachricht (achten Sie darauf Zeilenumbrüche, Leerzeichen, Tabulatoren usw. exakt zu kopieren) und Signatur unten ein, um die Nachricht zu verifizieren. Vorsicht, interpretieren Sie nicht mehr in die Signatur hinein, als in der signierten Nachricht selber enthalten ist, um nicht von einem Man-in-the-middle-Angriff hinters Licht geführt zu werden. Beachten Sie, dass dies nur beweist, dass die signierende Partei über diese Adresse Überweisungen empfangen kann.</translation>
     </message>
     <message>
         <source>The Bitcoin address the message was signed with</source>
@@ -3242,10 +3253,6 @@ Hinweis: Eine Gebühr von "100 Satoshis pro kB" bei einer Größe der Transaktio
         <translation>Überwiesen an</translation>
     </message>
     <message>
-        <source>To yourself</source>
-        <translation>Eigenüberweisung</translation>
-    </message>
-    <message>
         <source>Mined</source>
         <translation>Erarbeitet</translation>
     </message>
@@ -3262,44 +3269,44 @@ Hinweis: Eine Gebühr von "100 Satoshis pro kB" bei einer Größe der Transaktio
         <translation>Mindestbetrag</translation>
     </message>
     <message>
-        <source>Abandon transaction</source>
-        <translation>Transaktion einstellen</translation>
+        <source>A&amp;bandon transaction</source>
+        <translation type="unfinished">&amp;Transaktion einstellen</translation>
     </message>
     <message>
-        <source>Increase transaction fee</source>
-        <translation>Transaktionsgebühr erhöhen</translation>
+        <source>Increase transaction &amp;fee</source>
+        <translation type="unfinished">&amp;Transaktionsgebühr erhöhen</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Adresse kopieren</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Adresse kopieren</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Bezeichnung kopieren</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Bezeichnung kopieren</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Betrag kopieren</translation>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Betrag kopieren</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Transaktionskennung kopieren</translation>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Transaktionskennung kopieren</translation>
     </message>
     <message>
-        <source>Copy raw transaction</source>
-        <translation>Rohe Transaktion kopieren</translation>
+        <source>Copy &amp;raw transaction</source>
+        <translation type="unfinished">&amp;Rohe Transaktion kopieren</translation>
     </message>
     <message>
-        <source>Copy full transaction details</source>
-        <translation>Vollständige Transaktionsdetails kopieren</translation>
+        <source>Copy full transaction &amp;details</source>
+        <translation type="unfinished">&amp;Vollständige Transaktionsdetails kopieren</translation>
     </message>
     <message>
-        <source>Edit label</source>
-        <translation>Bezeichnung bearbeiten</translation>
+        <source>&amp;Edit label</source>
+        <translation type="unfinished">&amp;Bezeichnung bearbeiten</translation>
     </message>
     <message>
-        <source>Show transaction details</source>
-        <translation>Transaktionsdetails anzeigen</translation>
+        <source>&amp;Show transaction details</source>
+        <translation type="unfinished">&amp;Transaktionsdetails anzeigen</translation>
     </message>
     <message>
         <source>Export Transaction History</source>
@@ -3517,6 +3524,10 @@ Gehen Sie zu Datei &gt; Öffnen Sie die Brieftasche, um eine Brieftasche zu lade
         <translation>Beim Speichern der Wallet-Daten nach %1 ist ein Fehler aufgetreten.</translation>
     </message>
     <message>
+        <source>There was an error trying to save the wallet data to %1: %2</source>
+        <translation>Beim Speichern der Wallet-Daten nach %1 ist ein Fehler aufgetreten: %2</translation>
+    </message>
+    <message>
         <source>Backup Successful</source>
         <translation>Sicherung erfolgreich</translation>
     </message>
@@ -3689,6 +3700,10 @@ Gehen Sie zu Datei &gt; Öffnen Sie die Brieftasche, um eine Brieftasche zu lade
         <translation>Fehler beim Öffnen der Blockdatenbank</translation>
     </message>
     <message>
+        <source>Error</source>
+        <translation>Fehler</translation>
+    </message>
+    <message>
         <source>Failed to listen on any port. Use -listen=0 if you want this.</source>
         <translation>Fehler: Es konnte kein Port abgehört werden. Wenn dies so gewünscht wird -listen=0 verwenden.</translation>
     </message>
@@ -3760,6 +3775,12 @@ Verifikations-Error: %s</translation>
     <message>
         <source>Specified blocks directory "%s" does not exist.</source>
         <translation>Angegebener Blöcke-Ordner "%s" existiert nicht.</translation>
+    </message>
+    <message>
+        <source>The specified R/W config file %s does not exist
+</source>
+        <translation>Die spezifische R/W Konfigurationsdatei %s existiert nicht.
+</translation>
     </message>
     <message>
         <source>Unknown address type '%s'</source>
@@ -3846,12 +3867,8 @@ Verifikations-Error: %s</translation>
         <translation>%s korrupt. Versuche mit dem Wallet-Werkzeug bitcoin-wallet zu retten, oder eine Sicherung wiederherzustellen.</translation>
     </message>
     <message>
-        <source>Cannot upgrade a non HD split wallet without upgrading to support pre split keypool. Please use version 169900 or no version specified.</source>
-        <translation>Ein Upgrade auf eine Nicht-HD-Split-Brieftasche ist nicht möglich, ohne ein Upgrade zur Unterstützung des Pre-Split-Keypools durchzuführen. Verwenden Sie bitte die Version 169900 oder keine angegebene Version.</translation>
-    </message>
-    <message>
         <source>Invalid amount for -maxtxfee=&lt;amount&gt;: '%s' (must be at least the minrelay fee of %s to prevent stuck transactions)</source>
-        <translation>Ungültiger Betrag für -maxtxfee=&lt;amount&gt;: '%s' (muss mindestens die minimale Weiterleitungsgebühr in Höhe von %s sein, um zu verhindern dass Transaktionen nicht bearbeitet werden)</translation>
+        <translation>Ungültiger Betrag für -maxtxfee=&lt;amount&gt;: '%s' (muss mindestens die minimale Weiterleitungsgebühr in Höhe von %s sein, um zu verhindern, dass Transaktionen nicht bearbeitet werden)</translation>
     </message>
     <message>
         <source>The transaction amount is too small to send after the fee has been deducted</source>
@@ -4074,10 +4091,6 @@ Verifikations-Error: %s</translation>
     <message>
         <source>Loading wallet...</source>
         <translation>Lade Wallet...</translation>
-    </message>
-    <message>
-        <source>Cannot downgrade wallet</source>
-        <translation>Wallet kann nicht auf eine ältere Version herabgestuft werden</translation>
     </message>
     <message>
         <source>Rescanning...</source>

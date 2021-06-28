@@ -2,10 +2,6 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>Regsklik om adres of etiket te verander</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
         <translation>Skep ’n nuwe adres</translation>
     </message>
@@ -68,11 +64,6 @@
     <message>
         <source>These are your Bitcoin addresses for sending payments. Always check the amount and the receiving address before sending coins.</source>
         <translation>These are your Bitcoin addresses for sending payments. Always check the amount and the receiving address before sending coins.</translation>
-    </message>
-    <message>
-        <source>These are your Bitcoin addresses for receiving payments. Use the 'Create new receiving address' button in the receive tab to create new addresses.
-Signing is only possible with addresses of the type 'legacy'.</source>
-        <translation>Hierdie is die adresse waar u Bitcoins sal ontvang. Ons beveel aan dat u 'n nuwe adres kies vir elke transaksie</translation>
     </message>
     <message>
         <source>&amp;Copy Address</source>
@@ -339,16 +330,9 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>Wallet:</translation>
     </message>
     <message>
-        <source>Click to disable network activity.</source>
-        <translation>Click to disable network activity.</translation>
-    </message>
-    <message>
         <source>Network activity disabled.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
         <translation>Network activity disabled.</translation>
-    </message>
-    <message>
-        <source>Click to enable network activity again.</source>
-        <translation>Click to enable network activity again.</translation>
     </message>
     <message>
         <source>Syncing Headers (%1%)...</source>
@@ -438,10 +422,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <source>&amp;Command-line options</source>
         <translation>&amp;Command-line options</translation>
     </message>
-    <message numerus="yes">
-        <source>%n active connection(s) to Bitcoin network</source>
-        <translation><numerusform>%n active connection to Bitcoin network</numerusform><numerusform>%n active connections to Bitcoin network</numerusform></translation>
-    </message>
     <message>
         <source>Indexing blocks on disk...</source>
         <translation>Indexing blocks on disk...</translation>
@@ -452,7 +432,7 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </message>
     <message numerus="yes">
         <source>Processed %n block(s) of transaction history.</source>
-        <translation><numerusform>Processed %n block of transaction history.</numerusform><numerusform>Processed %n blocks of transaction history.</numerusform></translation>
+        <translation><numerusform>%n blok van transaksiegeskiedenis geprosesseer.</numerusform><numerusform>%n blokke van transaksiegeskiedenis geprosesseer.</numerusform></translation>
     </message>
     <message>
         <source>%1 behind</source>
@@ -527,10 +507,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>Show the %1 help message to get a list with possible Bitcoin command-line options</translation>
     </message>
     <message>
-        <source>default wallet</source>
-        <translation>default wallet</translation>
-    </message>
-    <message>
         <source>No wallets available</source>
         <translation>No wallets available</translation>
     </message>
@@ -553,6 +529,11 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     <message>
         <source>%1 client</source>
         <translation>%1 client</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n active connection(s) to Bitcoin network.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
+        <translation type="unfinished"><numerusform>%n active connection to Bitcoin network</numerusform><numerusform>%n active connections to Bitcoin network</numerusform><numerusform>%n active connection to Bitcoin network</numerusform><numerusform>%n active connections to Bitcoin network</numerusform></translation>
     </message>
     <message>
         <source>Connecting to peers...</source>
@@ -634,7 +615,11 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <source>Wallet is &lt;b&gt;encrypted&lt;/b&gt; and currently &lt;b&gt;locked&lt;/b&gt;</source>
         <translation>Wallet is &lt;b&gt;encrypted&lt;/b&gt; and currently &lt;b&gt;locked&lt;/b&gt;</translation>
     </message>
-    </context>
+    <message>
+        <source>A fatal error occurred. %1 can no longer continue safely and will quit.</source>
+        <translation>'n Noodlottige fout het voorgekom. %1 kan nie langer voortgaan nie en sal afsluit.</translation>
+    </message>
+</context>
 <context>
     <name>CoinControlDialog</name>
     <message>
@@ -706,28 +691,32 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>Confirmed</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Copy address</translation>
-    </message>
-    <message>
-        <source>Copy label</source>
-        <translation>Copy label</translation>
-    </message>
-    <message>
         <source>Copy amount</source>
         <translation>Copy amount</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Copy transaction ID</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Maak kopie van adres</translation>
     </message>
     <message>
-        <source>Lock unspent</source>
-        <translation>Lock unspent</translation>
+        <source>Copy &amp;label</source>
+        <translation>Kopieer &amp;etiket</translation>
     </message>
     <message>
-        <source>Unlock unspent</source>
-        <translation>Unlock unspent</translation>
+        <source>Copy &amp;amount</source>
+        <translation>Kopieer &amp;bedrag</translation>
+    </message>
+    <message>
+        <source>Copy transaction &amp;ID</source>
+        <translation>Kopieer transaksie &amp;ID</translation>
+    </message>
+    <message>
+        <source>L&amp;ock unspent</source>
+        <translation type="unfinished">&amp;Sluit ongespandeerde</translation>
+    </message>
+    <message>
+        <source>&amp;Unlock unspent</source>
+        <translation type="unfinished">&amp;Onsluit ongespandeerde</translation>
     </message>
     <message>
         <source>Copy quantity</source>
@@ -976,10 +965,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>Bitcoin</translation>
     </message>
     <message>
-        <source>Discard blocks after verification, except most recent %1 GB (prune)</source>
-        <translation>Discard blocks after verification, except most recent %1 GB (prune)</translation>
-    </message>
-    <message>
         <source>At least %1 GB of data will be stored in this directory, and it will grow over time.</source>
         <translation>At least %1 GB of data will be stored in this directory, and it will grow over time.</translation>
     </message>
@@ -1016,6 +1001,13 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation><numerusform>(%n GB needed for full chain)</numerusform><numerusform>(%n GB needed for full chain)</numerusform></translation>
     </message>
 </context>
+<context>
+    <name>MempoolStats</name>
+    <message>
+        <source>N/A</source>
+        <translation>n.v.t.</translation>
+    </message>
+    </context>
 <context>
     <name>ModalOverlay</name>
     <message>
@@ -1076,6 +1068,19 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </message>
 </context>
 <context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Type</source>
+        <comment>NetWatch: Type header</comment>
+        <translation>Tipe</translation>
+    </message>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation>Adres</translation>
+    </message>
+</context>
+<context>
     <name>OpenURIDialog</name>
     <message>
         <source>Open bitcoin URI</source>
@@ -1084,6 +1089,10 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     <message>
         <source>URI:</source>
         <translation>URI:</translation>
+    </message>
+    <message>
+        <source>Paste address from clipboard</source>
+        <translation>Plak adres van aanknipbord af</translation>
     </message>
 </context>
 <context>
@@ -1182,10 +1191,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     <message>
         <source>Prune &amp;block storage to</source>
         <translation>Prune &amp;block storage to</translation>
-    </message>
-    <message>
-        <source>GB</source>
-        <translation>GB</translation>
     </message>
     <message>
         <source>Reverting this setting requires re-downloading the entire blockchain.</source>
@@ -1336,6 +1341,10 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>none</translation>
     </message>
     <message>
+        <source>Bitcoin Core</source>
+        <translation>Bitcoin Kern</translation>
+    </message>
+    <message>
         <source>Confirm options reset</source>
         <translation>Confirm options reset</translation>
     </message>
@@ -1450,6 +1459,10 @@ Signing is only possible with addresses of the type 'legacy'.</source>
 <context>
     <name>PSBTOperationsDialog</name>
     <message>
+        <source>Close</source>
+        <translation type="unfinished">Sluit</translation>
+    </message>
+    <message>
         <source>Total Amount</source>
         <translation>Total Amount</translation>
     </message>
@@ -1477,22 +1490,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>'bitcoin://' is not a valid URI. Use 'bitcoin:' instead.</translation>
     </message>
     <message>
-        <source>Cannot process payment request because BIP70 is not supported.</source>
-        <translation>Cannot process payment request because BIP70 is not supported.</translation>
-    </message>
-    <message>
-        <source>Due to widespread security flaws in BIP70 it's strongly recommended that any merchant instructions to switch wallets be ignored.</source>
-        <translation>Due to widespread security flaws in BIP70 it's strongly recommended that any merchant instructions to switch wallets be ignored.</translation>
-    </message>
-    <message>
-        <source>If you are receiving this error you should request the merchant provide a BIP21 compatible URI.</source>
-        <translation>If you are receiving this error you should request the merchant provide a BIP21 compatible URI.</translation>
-    </message>
-    <message>
-        <source>Invalid payment address %1</source>
-        <translation>Invalid payment address %1</translation>
-    </message>
-    <message>
         <source>URI cannot be parsed! This can be caused by an invalid Bitcoin address or malformed URI parameters.</source>
         <translation>URI cannot be parsed! This can be caused by an invalid Bitcoin address or malformed URI parameters.</translation>
     </message>
@@ -1512,10 +1509,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>Node/Service</translation>
     </message>
     <message>
-        <source>NodeId</source>
-        <translation>NodeId</translation>
-    </message>
-    <message>
         <source>Ping</source>
         <translation>Ping</translation>
     </message>
@@ -1527,7 +1520,11 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <source>Received</source>
         <translation>Received</translation>
     </message>
-</context>
+    <message>
+        <source>Type</source>
+        <translation>Tipe</translation>
+    </message>
+    </context>
 <context>
     <name>QObject</name>
     <message>
@@ -1537,6 +1534,10 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     <message>
         <source>Enter a Bitcoin address (e.g. %1)</source>
         <translation>Enter a Bitcoin address (e.g. %1)</translation>
+    </message>
+    <message>
+        <source>Inbound</source>
+        <translation>Inkomende</translation>
     </message>
     <message>
         <source>%1 d</source>
@@ -1576,15 +1577,15 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </message>
     <message numerus="yes">
         <source>%n hour(s)</source>
-        <translation><numerusform>%n hour</numerusform><numerusform>%n hours</numerusform></translation>
+        <translation><numerusform>%n uur</numerusform><numerusform>%n ure</numerusform></translation>
     </message>
     <message numerus="yes">
         <source>%n day(s)</source>
-        <translation><numerusform>%n day</numerusform><numerusform>%n days</numerusform></translation>
+        <translation><numerusform>%n dag</numerusform><numerusform>%n dae</numerusform></translation>
     </message>
     <message numerus="yes">
         <source>%n week(s)</source>
-        <translation><numerusform>%n week</numerusform><numerusform>%n weeks</numerusform></translation>
+        <translation><numerusform>%n week</numerusform><numerusform>%n weke</numerusform></translation>
     </message>
     <message>
         <source>%1 and %2</source>
@@ -1592,7 +1593,7 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </message>
     <message numerus="yes">
         <source>%n year(s)</source>
-        <translation><numerusform>%n year</numerusform><numerusform>%n years</numerusform></translation>
+        <translation><numerusform>%n jaar</numerusform><numerusform>%n jare</numerusform></translation>
     </message>
     <message>
         <source>%1 B</source>
@@ -1629,6 +1630,11 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     <message>
         <source>unknown</source>
         <translation>unknown</translation>
+    </message>
+    <message>
+        <source>Txn</source>
+        <comment>Tx Watch: Transaction type abbreviation</comment>
+        <translation>Tse</translation>
     </message>
 </context>
 <context>
@@ -1765,10 +1771,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>Select a peer to view detailed information.</translation>
     </message>
     <message>
-        <source>Direction</source>
-        <translation>Direction</translation>
-    </message>
-    <message>
         <source>Version</source>
         <translation>Version</translation>
     </message>
@@ -1865,10 +1867,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>&amp;Network Traffic</translation>
     </message>
     <message>
-        <source>Totals</source>
-        <translation>Totals</translation>
-    </message>
-    <message>
         <source>In:</source>
         <translation>In:</translation>
     </message>
@@ -1889,10 +1887,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>1 &amp;hour</translation>
     </message>
     <message>
-        <source>1 &amp;day</source>
-        <translation>1 &amp;day</translation>
-    </message>
-    <message>
         <source>1 &amp;week</source>
         <translation>1 &amp;week</translation>
     </message>
@@ -1905,8 +1899,29 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>&amp;Disconnect</translation>
     </message>
     <message>
+        <source>To</source>
+        <translation>Na</translation>
+    </message>
+    <message>
+        <source>From</source>
+        <translation>Van</translation>
+    </message>
+    <message>
+        <source>No</source>
+        <translation>Nee</translation>
+    </message>
+    <message>
         <source>Ban for</source>
         <translation>Ban for</translation>
+    </message>
+    <message>
+        <source>1 d&amp;ay</source>
+        <translation type="unfinished">1 &amp;dag</translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <extracomment>Context menu action to copy the address of a peer</extracomment>
+        <translation type="unfinished">&amp;Maak kopie van adres</translation>
     </message>
     <message>
         <source>&amp;Unban</source>
@@ -1953,22 +1968,10 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>via %1</translation>
     </message>
     <message>
-        <source>never</source>
-        <translation>never</translation>
-    </message>
-    <message>
-        <source>Inbound</source>
-        <translation>Inbound</translation>
-    </message>
-    <message>
-        <source>Outbound</source>
-        <translation>Outbound</translation>
-    </message>
-    <message>
         <source>Unknown</source>
         <translation>Unknown</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>ReceiveCoinsDialog</name>
     <message>
@@ -2008,8 +2011,8 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>An optional message that is attached to the payment request and may be displayed to the sender.</translation>
     </message>
     <message>
-        <source>&amp;Create new receiving address</source>
-        <translation>&amp;Create new receiving address</translation>
+        <source>&amp;Request payment</source>
+        <translation>&amp;Versoek betaling</translation>
     </message>
     <message>
         <source>Clear all fields of the form.</source>
@@ -2048,20 +2051,24 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>Remove</translation>
     </message>
     <message>
-        <source>Copy URI</source>
-        <translation>Copy URI</translation>
+        <source>Copy &amp;URI</source>
+        <translation>Kopieer &amp;URI</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Copy label</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Maak kopie van adres</translation>
     </message>
     <message>
-        <source>Copy message</source>
-        <translation>Copy message</translation>
+        <source>Copy &amp;label</source>
+        <translation>Kopieer &amp;etiket</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Copy amount</translation>
+        <source>Copy &amp;message</source>
+        <translation type="unfinished">&amp;Kopieer boodskap</translation>
+    </message>
+    <message>
+        <source>Copy &amp;amount</source>
+        <translation>Kopieer &amp;bedrag</translation>
     </message>
     <message>
         <source>Could not unlock wallet.</source>
@@ -2071,8 +2078,16 @@ Signing is only possible with addresses of the type 'legacy'.</source>
 <context>
     <name>ReceiveRequestDialog</name>
     <message>
+        <source>Address:</source>
+        <translation type="unfinished">Adres:</translation>
+    </message>
+    <message>
         <source>Amount:</source>
         <translation>Amount:</translation>
+    </message>
+    <message>
+        <source>Label:</source>
+        <translation type="unfinished">Etiket:</translation>
     </message>
     <message>
         <source>Message:</source>
@@ -3029,10 +3044,6 @@ Note:  Since the fee is calculated on a per-byte basis, a fee of "100 satoshis p
         <translation>Sent to</translation>
     </message>
     <message>
-        <source>To yourself</source>
-        <translation>To yourself</translation>
-    </message>
-    <message>
         <source>Mined</source>
         <translation>Mined</translation>
     </message>
@@ -3049,44 +3060,44 @@ Note:  Since the fee is calculated on a per-byte basis, a fee of "100 satoshis p
         <translation>Min amount</translation>
     </message>
     <message>
-        <source>Abandon transaction</source>
-        <translation>Abandon transaction</translation>
+        <source>A&amp;bandon transaction</source>
+        <translation type="unfinished">&amp;Abandon transaction</translation>
     </message>
     <message>
-        <source>Increase transaction fee</source>
-        <translation>Increase transaction fee</translation>
+        <source>Increase transaction &amp;fee</source>
+        <translation type="unfinished">&amp;Increase transaction fee</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Copy address</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Maak kopie van adres</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Copy label</translation>
+        <source>Copy &amp;label</source>
+        <translation>Kopieer &amp;etiket</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Copy amount</translation>
+        <source>Copy &amp;amount</source>
+        <translation>Kopieer &amp;bedrag</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Copy transaction ID</translation>
+        <source>Copy transaction &amp;ID</source>
+        <translation>Kopieer transaksie &amp;ID</translation>
     </message>
     <message>
-        <source>Copy raw transaction</source>
-        <translation>Copy raw transaction</translation>
+        <source>Copy &amp;raw transaction</source>
+        <translation type="unfinished">&amp;Copy raw transaction</translation>
     </message>
     <message>
-        <source>Copy full transaction details</source>
-        <translation>Copy full transaction details</translation>
+        <source>Copy full transaction &amp;details</source>
+        <translation type="unfinished">&amp;Copy full transaction details</translation>
     </message>
     <message>
-        <source>Edit label</source>
-        <translation>Edit label</translation>
+        <source>&amp;Edit label</source>
+        <translation type="unfinished">&amp;Edit label</translation>
     </message>
     <message>
-        <source>Show transaction details</source>
-        <translation>Show transaction details</translation>
+        <source>&amp;Show transaction details</source>
+        <translation type="unfinished">&amp;Show transaction details</translation>
     </message>
     <message>
         <source>Export Transaction History</source>
@@ -3423,6 +3434,10 @@ Note:  Since the fee is calculated on a per-byte basis, a fee of "100 satoshis p
         <translation>Error opening block database</translation>
     </message>
     <message>
+        <source>Error</source>
+        <translation>Fout</translation>
+    </message>
+    <message>
         <source>Failed to listen on any port. Use -listen=0 if you want this.</source>
         <translation>Failed to listen on any port. Use -listen=0 if you want this.</translation>
     </message>
@@ -3731,10 +3746,6 @@ Note:  Since the fee is calculated on a per-byte basis, a fee of "100 satoshis p
     <message>
         <source>Loading wallet...</source>
         <translation>Loading wallet...</translation>
-    </message>
-    <message>
-        <source>Cannot downgrade wallet</source>
-        <translation>Cannot downgrade wallet</translation>
     </message>
     <message>
         <source>Rescanning...</source>

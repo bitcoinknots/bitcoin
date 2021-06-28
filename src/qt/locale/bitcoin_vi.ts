@@ -2,10 +2,6 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>Nhấn chuột phải để sửa địa chỉ hoặc nhãn</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
         <translation>Tạo một địa chỉ mới</translation>
     </message>
@@ -334,16 +330,9 @@
         <translation>Ví tiền</translation>
     </message>
     <message>
-        <source>Click to disable network activity.</source>
-        <translation>Click để vô hiệu hoạt động mạng.</translation>
-    </message>
-    <message>
         <source>Network activity disabled.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
         <translation>Hoạt động mạng được vô hiệu.</translation>
-    </message>
-    <message>
-        <source>Click to enable network activity again.</source>
-        <translation>Click để mở hoạt động mạng trở lại.</translation>
     </message>
     <message>
         <source>Syncing Headers (%1%)...</source>
@@ -432,10 +421,6 @@
     <message>
         <source>&amp;Command-line options</source>
         <translation>&amp;Tùy chỉnh Command-line</translation>
-    </message>
-    <message numerus="yes">
-        <source>%n active connection(s) to Bitcoin network</source>
-        <translation><numerusform>%n kết nối đến Bitcoin network</numerusform></translation>
     </message>
     <message>
         <source>Indexing blocks on disk...</source>
@@ -534,8 +519,12 @@
         <translation>Hiển thị %1 tin nhắn hỗ trợ để nhận được danh sách Bitcoin command-line khả dụng</translation>
     </message>
     <message>
-        <source>default wallet</source>
-        <translation>ví mặc định</translation>
+        <source>&amp;Mask values</source>
+        <translation>&amp;Mask values</translation>
+    </message>
+    <message>
+        <source>Mask the values in the Overview tab</source>
+        <translation>Mask the values in the Overview tab</translation>
     </message>
     <message>
         <source>No wallets available</source>
@@ -560,6 +549,11 @@
     <message>
         <source>%1 client</source>
         <translation>%1 khách</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n active connection(s) to Bitcoin network.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
+        <translation type="unfinished"><numerusform>%n kết nối đến hệ thống Bitcoin</numerusform><numerusform>%n kết nối đến hệ thống Bitcoin</numerusform></translation>
     </message>
     <message>
         <source>Connecting to peers...</source>
@@ -717,28 +711,32 @@
         <translation>Đã xác nhận</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Sao chép địa chỉ</translation>
-    </message>
-    <message>
-        <source>Copy label</source>
-        <translation>Sao chép nhãn</translation>
-    </message>
-    <message>
         <source>Copy amount</source>
         <translation>Sao chép số lượng</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Sao chép ID giao dịch</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Sao chép địa chỉ</translation>
     </message>
     <message>
-        <source>Lock unspent</source>
-        <translation>Khóa unspent</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Sao chép nhãn</translation>
     </message>
     <message>
-        <source>Unlock unspent</source>
-        <translation>Mở khóa unspent</translation>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Sao chép số lượng</translation>
+    </message>
+    <message>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Sao chép ID giao dịch</translation>
+    </message>
+    <message>
+        <source>L&amp;ock unspent</source>
+        <translation type="unfinished">&amp;Khóa unspent</translation>
+    </message>
+    <message>
+        <source>&amp;Unlock unspent</source>
+        <translation type="unfinished">&amp;Mở khóa unspent</translation>
     </message>
     <message>
         <source>Copy quantity</source>
@@ -817,6 +815,10 @@
     <message>
         <source>Create Wallet</source>
         <translation>Tạo Ví</translation>
+    </message>
+    <message>
+        <source>Wallet</source>
+        <translation>Ví</translation>
     </message>
     <message>
         <source>Wallet Name</source>
@@ -1012,11 +1014,11 @@
     </message>
     <message numerus="yes">
         <source>%n GB of free space available</source>
-        <translation><numerusform>%n GB of free space available</numerusform></translation>
+        <translation><numerusform>Có %n GB trống</numerusform></translation>
     </message>
     <message numerus="yes">
         <source>(of %n GB needed)</source>
-        <translation><numerusform>(of %n GB cần thiết)</numerusform></translation>
+        <translation><numerusform>(cần %n GB)</numerusform></translation>
     </message>
     <message numerus="yes">
         <source>(%n GB needed for full chain)</source>
@@ -1083,6 +1085,14 @@
     </message>
 </context>
 <context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation>Địa chỉ</translation>
+    </message>
+</context>
+<context>
     <name>OpenURIDialog</name>
     <message>
         <source>Open bitcoin URI</source>
@@ -1091,6 +1101,10 @@
     <message>
         <source>URI:</source>
         <translation>URI:</translation>
+    </message>
+    <message>
+        <source>Paste address from clipboard</source>
+        <translation>Paste address từ clipboard</translation>
     </message>
 </context>
 <context>
@@ -1189,10 +1203,6 @@
     <message>
         <source>Prune &amp;block storage to</source>
         <translation>Cắt tỉa và lưu trữ khối tới</translation>
-    </message>
-    <message>
-        <source>GB</source>
-        <translation>GB</translation>
     </message>
     <message>
         <source>Reverting this setting requires re-downloading the entire blockchain.</source>
@@ -1317,6 +1327,14 @@
     <message>
         <source>Whether to show coin control features or not.</source>
         <translation>Cho hiển thị tính năng coin control hoặc không.</translation>
+    </message>
+    <message>
+        <source>Connect to the Bitcoin network through a separate SOCKS5 proxy for Tor onion services.</source>
+        <translation>Kết nối đến Bitcoin network qua một nhánh rời SOCKS5 proxy của Tor hidden services.</translation>
+    </message>
+    <message>
+        <source>Use separate SOCKS&amp;5 proxy to reach peers via Tor onion services:</source>
+        <translation>Dùng riêng lẻ  proxy  SOCKS&amp;5 để nối tới nốt mạng khác qua dịch vị ẩn Tor:</translation>
     </message>
     <message>
         <source>&amp;Third party transaction URLs</source>
@@ -1453,7 +1471,7 @@
         <source>Current total balance in watch-only addresses</source>
         <translation>Tổng số dư hiện tại trong watch-only addresses</translation>
     </message>
-    </context>
+</context>
 <context>
     <name>PSBTOperationsDialog</name>
     <message>
@@ -1540,22 +1558,6 @@
         <translation>'bitcoin://' không khả dụng URI. Dùng thay vì 'bitcoin:' .</translation>
     </message>
     <message>
-        <source>Cannot process payment request because BIP70 is not supported.</source>
-        <translation>Không thể tiến hần yêu cầu giao dịch vì BIP70 không được hỗ trợ.</translation>
-    </message>
-    <message>
-        <source>Due to widespread security flaws in BIP70 it's strongly recommended that any merchant instructions to switch wallets be ignored.</source>
-        <translation>Do lỗ hổng bảo mật lan rộng của BIP70, bạn được khuyến cáo mạnh mẽ rằng bất kỳ hướng dẫn thương mại để chuyển ví đều bị bỏ qua.</translation>
-    </message>
-    <message>
-        <source>If you are receiving this error you should request the merchant provide a BIP21 compatible URI.</source>
-        <translation>Nếu bạn nhận được lỗi này, bạn nên yêu cầu của hàng cung cấp một BIP21 tương thích URI.</translation>
-    </message>
-    <message>
-        <source>Invalid payment address %1</source>
-        <translation>Invalid payment address %1</translation>
-    </message>
-    <message>
         <source>URI cannot be parsed! This can be caused by an invalid Bitcoin address or malformed URI parameters.</source>
         <translation>URI không thể phân tích cú pháp! Đây có thể gây nên bởi invalid Bitcoin address hoặc URI không đúng định dạng tham số.</translation>
     </message>
@@ -1575,10 +1577,6 @@
         <translation>Node/Dịch vụ</translation>
     </message>
     <message>
-        <source>NodeId</source>
-        <translation>NodeID</translation>
-    </message>
-    <message>
         <source>Ping</source>
         <translation>Ping</translation>
     </message>
@@ -1590,7 +1588,7 @@
         <source>Received</source>
         <translation>Nhận</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>QObject</name>
     <message>
@@ -1600,6 +1598,10 @@
     <message>
         <source>Enter a Bitcoin address (e.g. %1)</source>
         <translation>Nhập một Bitcoin address (e.g. %1)</translation>
+    </message>
+    <message>
+        <source>Inbound</source>
+        <translation>Không giới hạn</translation>
     </message>
     <message>
         <source>%1 d</source>
@@ -1693,7 +1695,7 @@
         <source>unknown</source>
         <translation>unknown</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>QRImageWidget</name>
     <message>
@@ -1828,10 +1830,6 @@
         <translation>Chọn một peer để xem thông tin chi tiết.</translation>
     </message>
     <message>
-        <source>Direction</source>
-        <translation>Direction</translation>
-    </message>
-    <message>
         <source>Version</source>
         <translation>Phiên bản</translation>
     </message>
@@ -1936,10 +1934,6 @@
         <translation>&amp;Network Traffic</translation>
     </message>
     <message>
-        <source>Totals</source>
-        <translation>Totals</translation>
-    </message>
-    <message>
         <source>In:</source>
         <translation>In:</translation>
     </message>
@@ -1960,10 +1954,6 @@
         <translation>1 &amp;hour</translation>
     </message>
     <message>
-        <source>1 &amp;day</source>
-        <translation>1 &amp;day</translation>
-    </message>
-    <message>
         <source>1 &amp;week</source>
         <translation>1 &amp;week</translation>
     </message>
@@ -1978,6 +1968,15 @@
     <message>
         <source>Ban for</source>
         <translation>Ban for</translation>
+    </message>
+    <message>
+        <source>1 d&amp;ay</source>
+        <translation type="unfinished">1 &amp;day</translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <extracomment>Context menu action to copy the address of a peer</extracomment>
+        <translation type="unfinished">&amp;Sao chép địa chỉ</translation>
     </message>
     <message>
         <source>&amp;Unban</source>
@@ -2024,22 +2023,10 @@
         <translation>via %1</translation>
     </message>
     <message>
-        <source>never</source>
-        <translation>không bao giờ</translation>
-    </message>
-    <message>
-        <source>Inbound</source>
-        <translation>Inbound</translation>
-    </message>
-    <message>
-        <source>Outbound</source>
-        <translation>Outbound</translation>
-    </message>
-    <message>
         <source>Unknown</source>
         <translation>Không biết</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>ReceiveCoinsDialog</name>
     <message>
@@ -2079,10 +2066,6 @@
         <translation>Một thông báo tùy chọn được đính kèm với yêu cầu thanh toán và có thể được hiển thị cho người gửi.</translation>
     </message>
     <message>
-        <source>&amp;Create new receiving address</source>
-        <translation>&amp;Tạo địa chỉ nhận mới</translation>
-    </message>
-    <message>
         <source>Clear all fields of the form.</source>
         <translation>Xóa hết các khoảng trống của form.</translation>
     </message>
@@ -2119,20 +2102,24 @@
         <translation>Gỡ bỏ</translation>
     </message>
     <message>
-        <source>Copy URI</source>
-        <translation>Sao chép URI</translation>
+        <source>Copy &amp;URI</source>
+        <translation>Sao chép &amp;URI</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Sao chép nhãn</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Sao chép địa chỉ</translation>
     </message>
     <message>
-        <source>Copy message</source>
-        <translation>Sao chép tin nhắn</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Sao chép nhãn</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Sao chép số lượng</translation>
+        <source>Copy &amp;message</source>
+        <translation type="unfinished">&amp;Sao chép tin nhắn</translation>
+    </message>
+    <message>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Sao chép số lượng</translation>
     </message>
     <message>
         <source>Could not unlock wallet.</source>
@@ -3120,10 +3107,6 @@ Lưu ý: Vì phí được tính trên cơ sở mỗi byte, nên phí "100 satos
         <translation>Sent to</translation>
     </message>
     <message>
-        <source>To yourself</source>
-        <translation>To yourself</translation>
-    </message>
-    <message>
         <source>Mined</source>
         <translation>Mined</translation>
     </message>
@@ -3140,44 +3123,44 @@ Lưu ý: Vì phí được tính trên cơ sở mỗi byte, nên phí "100 satos
         <translation>Min amount</translation>
     </message>
     <message>
-        <source>Abandon transaction</source>
-        <translation>Abandon transaction</translation>
+        <source>A&amp;bandon transaction</source>
+        <translation type="unfinished">&amp;Abandon transaction</translation>
     </message>
     <message>
-        <source>Increase transaction fee</source>
-        <translation>Increase transaction fee</translation>
+        <source>Increase transaction &amp;fee</source>
+        <translation type="unfinished">&amp;Increase transaction fee</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Copy address</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Sao chép địa chỉ</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Sao chép nhãn</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Sao chép nhãn</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Sao chép số lượng</translation>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Sao chép số lượng</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Sao chép ID giao dịch</translation>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Sao chép ID giao dịch</translation>
     </message>
     <message>
-        <source>Copy raw transaction</source>
-        <translation>Copy raw transaction</translation>
+        <source>Copy &amp;raw transaction</source>
+        <translation type="unfinished">&amp;Copy raw transaction</translation>
     </message>
     <message>
-        <source>Copy full transaction details</source>
-        <translation>Copy full transaction details</translation>
+        <source>Copy full transaction &amp;details</source>
+        <translation type="unfinished">&amp;Copy full transaction details</translation>
     </message>
     <message>
-        <source>Edit label</source>
-        <translation>Edit label</translation>
+        <source>&amp;Edit label</source>
+        <translation type="unfinished">&amp;Edit label</translation>
     </message>
     <message>
-        <source>Show transaction details</source>
-        <translation>Show transaction details</translation>
+        <source>&amp;Show transaction details</source>
+        <translation type="unfinished">&amp;Show transaction details</translation>
     </message>
     <message>
         <source>Export Transaction History</source>
@@ -3530,6 +3513,10 @@ Lưu ý: Vì phí được tính trên cơ sở mỗi byte, nên phí "100 satos
         <translation>Error opening block database</translation>
     </message>
     <message>
+        <source>Error</source>
+        <translation>Lỗi</translation>
+    </message>
+    <message>
         <source>Failed to listen on any port. Use -listen=0 if you want this.</source>
         <translation>Failed to listen on any port. Use -listen=0 if you want this.</translation>
     </message>
@@ -3850,10 +3837,6 @@ Lưu ý: Vì phí được tính trên cơ sở mỗi byte, nên phí "100 satos
     <message>
         <source>Loading wallet...</source>
         <translation>Loading wallet...</translation>
-    </message>
-    <message>
-        <source>Cannot downgrade wallet</source>
-        <translation>Không thể downgrade wallet</translation>
     </message>
     <message>
         <source>Rescanning...</source>

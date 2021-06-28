@@ -2,10 +2,6 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>पत्ता किंवा लेबल संपादित करण्यासाठी उजवे बटण क्लिक करा.</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
         <translation>एक नवीन पत्ता तयार करा</translation>
     </message>
@@ -334,16 +330,9 @@
         <translation>Wallet:</translation>
     </message>
     <message>
-        <source>Click to disable network activity.</source>
-        <translation>Click to disable network activity.</translation>
-    </message>
-    <message>
         <source>Network activity disabled.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
         <translation>Network activity disabled.</translation>
-    </message>
-    <message>
-        <source>Click to enable network activity again.</source>
-        <translation>Click to enable network activity again.</translation>
     </message>
     <message>
         <source>Syncing Headers (%1%)...</source>
@@ -508,10 +497,6 @@
     <message>
         <source>Show the %1 help message to get a list with possible Bitcoin command-line options</source>
         <translation>Show the %1 help message to get a list with possible Bitcoin command-line options</translation>
-    </message>
-    <message>
-        <source>default wallet</source>
-        <translation>default wallet</translation>
     </message>
     <message>
         <source>No wallets available</source>
@@ -689,28 +674,32 @@
         <translation>Confirmed</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Copy address</translation>
-    </message>
-    <message>
-        <source>Copy label</source>
-        <translation>Copy label</translation>
-    </message>
-    <message>
         <source>Copy amount</source>
         <translation>Copy amount</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Copy transaction ID</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Copy address</translation>
     </message>
     <message>
-        <source>Lock unspent</source>
-        <translation>Lock unspent</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Copy label</translation>
     </message>
     <message>
-        <source>Unlock unspent</source>
-        <translation>Unlock unspent</translation>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Copy amount</translation>
+    </message>
+    <message>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Copy transaction ID</translation>
+    </message>
+    <message>
+        <source>L&amp;ock unspent</source>
+        <translation type="unfinished">&amp;Lock unspent</translation>
+    </message>
+    <message>
+        <source>&amp;Unlock unspent</source>
+        <translation type="unfinished">&amp;Unlock unspent</translation>
     </message>
     <message>
         <source>Copy quantity</source>
@@ -959,10 +948,6 @@
         <translation>Bitcoin</translation>
     </message>
     <message>
-        <source>Discard blocks after verification, except most recent %1 GB (prune)</source>
-        <translation>Discard blocks after verification, except most recent %1 GB (prune)</translation>
-    </message>
-    <message>
         <source>At least %1 GB of data will be stored in this directory, and it will grow over time.</source>
         <translation>At least %1 GB of data will be stored in this directory, and it will grow over time.</translation>
     </message>
@@ -1044,6 +1029,14 @@
     <message>
         <source>Unknown. Syncing Headers (%1, %2%)...</source>
         <translation>Unknown. Syncing Headers (%1, %2%)...</translation>
+    </message>
+</context>
+<context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation>पत्ता</translation>
     </message>
 </context>
 <context>
@@ -1153,10 +1146,6 @@
     <message>
         <source>Prune &amp;block storage to</source>
         <translation>Prune &amp;block storage to</translation>
-    </message>
-    <message>
-        <source>GB</source>
-        <translation>GB</translation>
     </message>
     <message>
         <source>Reverting this setting requires re-downloading the entire blockchain.</source>
@@ -1421,6 +1410,10 @@
 <context>
     <name>PSBTOperationsDialog</name>
     <message>
+        <source>Close</source>
+        <translation type="unfinished">बंद करा</translation>
+    </message>
+    <message>
         <source>Total Amount</source>
         <translation>Total Amount</translation>
     </message>
@@ -1448,22 +1441,6 @@
         <translation>'bitcoin://' is not a valid URI. Use 'bitcoin:' instead.</translation>
     </message>
     <message>
-        <source>Cannot process payment request because BIP70 is not supported.</source>
-        <translation>Cannot process payment request because BIP70 is not supported.</translation>
-    </message>
-    <message>
-        <source>Due to widespread security flaws in BIP70 it's strongly recommended that any merchant instructions to switch wallets be ignored.</source>
-        <translation>Due to widespread security flaws in BIP70 it's strongly recommended that any merchant instructions to switch wallets be ignored.</translation>
-    </message>
-    <message>
-        <source>If you are receiving this error you should request the merchant provide a BIP21 compatible URI.</source>
-        <translation>If you are receiving this error you should request the merchant provide a BIP21 compatible URI.</translation>
-    </message>
-    <message>
-        <source>Invalid payment address %1</source>
-        <translation>Invalid payment address %1</translation>
-    </message>
-    <message>
         <source>URI cannot be parsed! This can be caused by an invalid Bitcoin address or malformed URI parameters.</source>
         <translation>URI cannot be parsed! This can be caused by an invalid Bitcoin address or malformed URI parameters.</translation>
     </message>
@@ -1483,10 +1460,6 @@
         <translation>Node/Service</translation>
     </message>
     <message>
-        <source>NodeId</source>
-        <translation>NodeId</translation>
-    </message>
-    <message>
         <source>Ping</source>
         <translation>Ping</translation>
     </message>
@@ -1498,7 +1471,7 @@
         <source>Received</source>
         <translation>Received</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>QObject</name>
     <message>
@@ -1577,7 +1550,7 @@
         <source>unknown</source>
         <translation>unknown</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>QRImageWidget</name>
     <message>
@@ -1712,10 +1685,6 @@
         <translation>Select a peer to view detailed information.</translation>
     </message>
     <message>
-        <source>Direction</source>
-        <translation>Direction</translation>
-    </message>
-    <message>
         <source>Version</source>
         <translation>Version</translation>
     </message>
@@ -1812,10 +1781,6 @@
         <translation>&amp;Network Traffic</translation>
     </message>
     <message>
-        <source>Totals</source>
-        <translation>Totals</translation>
-    </message>
-    <message>
         <source>In:</source>
         <translation>In:</translation>
     </message>
@@ -1836,10 +1801,6 @@
         <translation>1 &amp;hour</translation>
     </message>
     <message>
-        <source>1 &amp;day</source>
-        <translation>1 &amp;day</translation>
-    </message>
-    <message>
         <source>1 &amp;week</source>
         <translation>1 &amp;week</translation>
     </message>
@@ -1854,6 +1815,10 @@
     <message>
         <source>Ban for</source>
         <translation>Ban for</translation>
+    </message>
+    <message>
+        <source>1 d&amp;ay</source>
+        <translation type="unfinished">1 &amp;day</translation>
     </message>
     <message>
         <source>&amp;Unban</source>
@@ -1900,22 +1865,10 @@
         <translation>via %1</translation>
     </message>
     <message>
-        <source>never</source>
-        <translation>never</translation>
-    </message>
-    <message>
-        <source>Inbound</source>
-        <translation>Inbound</translation>
-    </message>
-    <message>
-        <source>Outbound</source>
-        <translation>Outbound</translation>
-    </message>
-    <message>
         <source>Unknown</source>
         <translation>Unknown</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>ReceiveCoinsDialog</name>
     <message>
@@ -1955,10 +1908,6 @@
         <translation>An optional message that is attached to the payment request and may be displayed to the sender.</translation>
     </message>
     <message>
-        <source>&amp;Create new receiving address</source>
-        <translation>&amp;Create new receiving address</translation>
-    </message>
-    <message>
         <source>Clear all fields of the form.</source>
         <translation>Clear all fields of the form.</translation>
     </message>
@@ -1995,20 +1944,24 @@
         <translation>Remove</translation>
     </message>
     <message>
-        <source>Copy URI</source>
-        <translation>Copy URI</translation>
+        <source>Copy &amp;URI</source>
+        <translation>Copy &amp;URI</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Copy label</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Copy address</translation>
     </message>
     <message>
-        <source>Copy message</source>
-        <translation>Copy message</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Copy label</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Copy amount</translation>
+        <source>Copy &amp;message</source>
+        <translation type="unfinished">&amp;Copy message</translation>
+    </message>
+    <message>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Copy amount</translation>
     </message>
     <message>
         <source>Could not unlock wallet.</source>
@@ -2018,8 +1971,16 @@
 <context>
     <name>ReceiveRequestDialog</name>
     <message>
+        <source>Address:</source>
+        <translation type="unfinished">पत्ता:</translation>
+    </message>
+    <message>
         <source>Amount:</source>
         <translation>Amount:</translation>
+    </message>
+    <message>
+        <source>Label:</source>
+        <translation type="unfinished">लेबल:</translation>
     </message>
     <message>
         <source>Message:</source>
@@ -2960,10 +2921,6 @@ Note:  Since the fee is calculated on a per-byte basis, a fee of "100 satoshis p
         <translation>Sent to</translation>
     </message>
     <message>
-        <source>To yourself</source>
-        <translation>To yourself</translation>
-    </message>
-    <message>
         <source>Mined</source>
         <translation>Mined</translation>
     </message>
@@ -2980,44 +2937,44 @@ Note:  Since the fee is calculated on a per-byte basis, a fee of "100 satoshis p
         <translation>Min amount</translation>
     </message>
     <message>
-        <source>Abandon transaction</source>
-        <translation>Abandon transaction</translation>
+        <source>A&amp;bandon transaction</source>
+        <translation type="unfinished">&amp;Abandon transaction</translation>
     </message>
     <message>
-        <source>Increase transaction fee</source>
-        <translation>Increase transaction fee</translation>
+        <source>Increase transaction &amp;fee</source>
+        <translation type="unfinished">&amp;Increase transaction fee</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Copy address</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Copy address</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Copy label</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Copy label</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Copy amount</translation>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Copy amount</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Copy transaction ID</translation>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Copy transaction ID</translation>
     </message>
     <message>
-        <source>Copy raw transaction</source>
-        <translation>Copy raw transaction</translation>
+        <source>Copy &amp;raw transaction</source>
+        <translation type="unfinished">&amp;Copy raw transaction</translation>
     </message>
     <message>
-        <source>Copy full transaction details</source>
-        <translation>Copy full transaction details</translation>
+        <source>Copy full transaction &amp;details</source>
+        <translation type="unfinished">&amp;Copy full transaction details</translation>
     </message>
     <message>
-        <source>Edit label</source>
-        <translation>Edit label</translation>
+        <source>&amp;Edit label</source>
+        <translation type="unfinished">&amp;Edit label</translation>
     </message>
     <message>
-        <source>Show transaction details</source>
-        <translation>Show transaction details</translation>
+        <source>&amp;Show transaction details</source>
+        <translation type="unfinished">&amp;Show transaction details</translation>
     </message>
     <message>
         <source>Export Transaction History</source>
@@ -3662,10 +3619,6 @@ Note:  Since the fee is calculated on a per-byte basis, a fee of "100 satoshis p
     <message>
         <source>Loading wallet...</source>
         <translation>Loading wallet...</translation>
-    </message>
-    <message>
-        <source>Cannot downgrade wallet</source>
-        <translation>Cannot downgrade wallet</translation>
     </message>
     <message>
         <source>Rescanning...</source>

@@ -2,10 +2,6 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>Десен клик за уредување на адреса или етикета</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
         <translation>Креирај нова адреса</translation>
     </message>
@@ -41,9 +37,21 @@
         <source>&amp;Delete</source>
         <translation>&amp;Избриши</translation>
     </message>
+    <message>
+        <source>&amp;Copy Address</source>
+        <translation type="unfinished">Копирај &amp;Адреса</translation>
+    </message>
     </context>
 <context>
     <name>AddressTableModel</name>
+    <message>
+        <source>Label</source>
+        <translation type="unfinished">Етикета</translation>
+    </message>
+    <message>
+        <source>Address</source>
+        <translation type="unfinished">Адреса</translation>
+    </message>
     </context>
 <context>
     <name>AskPassphraseDialog</name>
@@ -58,6 +66,10 @@
     <message>
         <source>Repeat new passphrase</source>
         <translation>Повторете ја новата тајна фраза</translation>
+    </message>
+    <message>
+        <source>Encrypt wallet</source>
+        <translation type="unfinished">Криптирање на Паричник</translation>
     </message>
     </context>
 <context>
@@ -94,6 +106,10 @@
         <translation>Напушти ја апликацијата</translation>
     </message>
     <message>
+        <source>Show information about %1</source>
+        <translation>Прикажи информации за %1</translation>
+    </message>
+    <message>
         <source>About &amp;Qt</source>
         <translation>За &amp;Qt</translation>
     </message>
@@ -120,6 +136,10 @@
     <message>
         <source>Open &amp;URI...</source>
         <translation>Отвори &amp;URI...</translation>
+    </message>
+    <message>
+        <source>Wallet:</source>
+        <translation type="unfinished">Паричник:</translation>
     </message>
     <message>
         <source>Reindexing blocks on disk...</source>
@@ -156,6 +176,10 @@
     <message>
         <source>&amp;Help</source>
         <translation>&amp;Помош</translation>
+    </message>
+    <message>
+        <source>Indexing blocks on disk...</source>
+        <translation>Повторно индексирање на блокови од дискот...</translation>
     </message>
     <message numerus="yes">
         <source>Processed %n block(s) of transaction history.</source>
@@ -246,12 +270,24 @@
         <source>Date</source>
         <translation>Дата</translation>
     </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">Копирај &amp;Адреса</translation>
+    </message>
     </context>
 <context>
     <name>CreateWalletActivity</name>
     </context>
 <context>
     <name>CreateWalletDialog</name>
+    <message>
+        <source>Wallet</source>
+        <translation>Паричник</translation>
+    </message>
+    <message>
+        <source>Encrypt Wallet</source>
+        <translation type="unfinished">Криптирање на Паричник</translation>
+    </message>
     </context>
 <context>
     <name>EditAddressDialog</name>
@@ -297,12 +333,20 @@
     <name>ModalOverlay</name>
     </context>
 <context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation type="unfinished">Адреса</translation>
+    </message>
+</context>
+<context>
     <name>OpenURIDialog</name>
     <message>
         <source>URI:</source>
         <translation>URI:</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>OpenWalletActivity</name>
     </context>
@@ -337,6 +381,10 @@
         <translation>нема</translation>
     </message>
     <message>
+        <source>Bitcoin Core</source>
+        <translation>Биткоин Core</translation>
+    </message>
+    <message>
         <source>Error</source>
         <translation>Грешка</translation>
     </message>
@@ -350,6 +398,13 @@
     </context>
 <context>
     <name>PSBTOperationsDialog</name>
+    <message>
+        <source>Close</source>
+        <translation type="unfinished">Затвори</translation>
+    </message>
+    </context>
+<context>
+    <name>PairingPage</name>
     </context>
 <context>
     <name>PaymentServer</name>
@@ -434,6 +489,10 @@
         <translation>Block chain</translation>
     </message>
     <message>
+        <source>Wallet: </source>
+        <translation type="unfinished">Паричник: </translation>
+    </message>
+    <message>
         <source>Sent</source>
         <translation>Испратени</translation>
     </message>
@@ -444,6 +503,11 @@
     <message>
         <source>&amp;Console</source>
         <translation>&amp;Конзола</translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <extracomment>Context menu action to copy the address of a peer</extracomment>
+        <translation type="unfinished">Копирај &amp;Адреса</translation>
     </message>
     </context>
 <context>
@@ -464,16 +528,36 @@
         <source>Show</source>
         <translation>Прикажи</translation>
     </message>
+    <message>
+        <source>Copy &amp;URI</source>
+        <translation>Копирај &amp;URI</translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">Копирај &amp;Адреса</translation>
+    </message>
     </context>
 <context>
     <name>ReceiveRequestDialog</name>
+    <message>
+        <source>Address:</source>
+        <translation type="unfinished">Адреса:</translation>
+    </message>
     <message>
         <source>Amount:</source>
         <translation>Сума:</translation>
     </message>
     <message>
+        <source>Label:</source>
+        <translation type="unfinished">Етикета:</translation>
+    </message>
+    <message>
         <source>Message:</source>
         <translation>Порака:</translation>
+    </message>
+    <message>
+        <source>Wallet:</source>
+        <translation type="unfinished">Паричник:</translation>
     </message>
     <message>
         <source>Copy &amp;URI</source>
@@ -493,6 +577,14 @@
     <message>
         <source>Date</source>
         <translation>Дата</translation>
+    </message>
+    <message>
+        <source>Label</source>
+        <translation type="unfinished">Етикета</translation>
+    </message>
+    <message>
+        <source>Message</source>
+        <translation type="unfinished">Порака</translation>
     </message>
     </context>
 <context>
@@ -520,6 +612,14 @@
     <message>
         <source>Dust:</source>
         <translation>Прашина:</translation>
+    </message>
+    <message>
+        <source>S&amp;end</source>
+        <translation type="unfinished">&amp;Испрати</translation>
+    </message>
+    <message>
+        <source>Send</source>
+        <translation type="unfinished">Испрати</translation>
     </message>
     </context>
 <context>
@@ -553,6 +653,10 @@
         <translation>Дата</translation>
     </message>
     <message>
+        <source>Message</source>
+        <translation type="unfinished">Порака</translation>
+    </message>
+    <message>
         <source>Amount</source>
         <translation>Сума</translation>
     </message>
@@ -566,12 +670,28 @@
         <source>Date</source>
         <translation>Дата</translation>
     </message>
+    <message>
+        <source>Label</source>
+        <translation type="unfinished">Етикета</translation>
+    </message>
     </context>
 <context>
     <name>TransactionView</name>
     <message>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">Копирај &amp;Адреса</translation>
+    </message>
+    <message>
         <source>Date</source>
         <translation>Дата</translation>
+    </message>
+    <message>
+        <source>Label</source>
+        <translation type="unfinished">Етикета</translation>
+    </message>
+    <message>
+        <source>Address</source>
+        <translation type="unfinished">Адреса</translation>
     </message>
     </context>
 <context>
@@ -600,8 +720,20 @@
         <source>Error</source>
         <translation>Грешка</translation>
     </message>
-    </context>
+    <message>
+        <source>Backup Wallet</source>
+        <translation type="unfinished">Бекап на Паричник</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation type="unfinished">Откажи</translation>
+    </message>
+</context>
 <context>
     <name>bitcoin-core</name>
+    <message>
+        <source>Error</source>
+        <translation>Грешка</translation>
+    </message>
     </context>
 </TS>

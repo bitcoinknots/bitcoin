@@ -2,10 +2,6 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>Desni klik za urejanje naslova ali oznake</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
         <translation>Ustvari nov naslov</translation>
     </message>
@@ -68,12 +64,6 @@
     <message>
         <source>These are your Bitcoin addresses for sending payments. Always check the amount and the receiving address before sending coins.</source>
         <translation>To so vaši bitcoin-naslovi za pošiljanje. Pred pošiljanjem vedno preverite količino in prejemnikov naslov.</translation>
-    </message>
-    <message>
-        <source>These are your Bitcoin addresses for receiving payments. Use the 'Create new receiving address' button in the receive tab to create new addresses.
-Signing is only possible with addresses of the type 'legacy'.</source>
-        <translation>To so vaši bitcoin-naslovi, ki jih uporabljate za prejemanje plačil. Za tvorbo novega naslova uporabite gumb "Ustvari nov prejemni naslov" v zavihku Prejmi.
-Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
     </message>
     <message>
         <source>&amp;Copy Address</source>
@@ -340,16 +330,9 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <translation>Denarnica:</translation>
     </message>
     <message>
-        <source>Click to disable network activity.</source>
-        <translation>S klikom onemogočite omrežno aktivnost.</translation>
-    </message>
-    <message>
         <source>Network activity disabled.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
         <translation>Omrežna aktivnost onemogočena.</translation>
-    </message>
-    <message>
-        <source>Click to enable network activity again.</source>
-        <translation>S klikom ponovno vključite omrežno aktivnost.</translation>
     </message>
     <message>
         <source>Syncing Headers (%1%)...</source>
@@ -438,10 +421,6 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
     <message>
         <source>&amp;Command-line options</source>
         <translation>Možnosti &amp;ukazne vrstice</translation>
-    </message>
-    <message numerus="yes">
-        <source>%n active connection(s) to Bitcoin network</source>
-        <translation><numerusform>%n aktivna povezava v omrežje Bitcoin</numerusform><numerusform>%n aktivni povezavi v omrežje Bitcoin</numerusform><numerusform>%n aktivne povezave v omrežje Bitcoin</numerusform><numerusform>%n aktivnih povezav v omrežje Bitcoin</numerusform></translation>
     </message>
     <message>
         <source>Indexing blocks on disk...</source>
@@ -556,10 +535,6 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <translation>Zamaskiraj vrednosti v zavihku Pregled</translation>
     </message>
     <message>
-        <source>default wallet</source>
-        <translation>privzeta denarnica</translation>
-    </message>
-    <message>
         <source>No wallets available</source>
         <translation>Ni denarnic na voljo</translation>
     </message>
@@ -582,6 +557,11 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
     <message>
         <source>%1 client</source>
         <translation>%1 odjemalec</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n active connection(s) to Bitcoin network.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
+        <translation type="unfinished"><numerusform>%n aktivna povezava v omrežje Bitcoin</numerusform><numerusform>%n aktivni povezavi v omrežje Bitcoin</numerusform><numerusform>%n aktivne povezave v omrežje Bitcoin</numerusform><numerusform>%n aktivnih povezav v omrežje Bitcoin</numerusform><numerusform>%n aktivna povezava v omrežje Bitcoin</numerusform><numerusform>%n aktivni povezavi v omrežje Bitcoin</numerusform><numerusform>%n aktivne povezave v omrežje Bitcoin</numerusform><numerusform>%n aktivnih povezav v omrežje Bitcoin</numerusform></translation>
     </message>
     <message>
         <source>Connecting to peers...</source>
@@ -743,28 +723,32 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <translation>Potrjeno</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Kopiraj naslov</translation>
-    </message>
-    <message>
-        <source>Copy label</source>
-        <translation>Kopiraj oznako</translation>
-    </message>
-    <message>
         <source>Copy amount</source>
         <translation>Kopiraj znesek</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Kopiraj ID transakcije</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Kopiraj naslov</translation>
     </message>
     <message>
-        <source>Lock unspent</source>
-        <translation>Zakleni neporabljeno</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Kopiraj oznako</translation>
     </message>
     <message>
-        <source>Unlock unspent</source>
-        <translation>Odkleni neporabljeno</translation>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Kopiraj znesek</translation>
+    </message>
+    <message>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Kopiraj ID transakcije</translation>
+    </message>
+    <message>
+        <source>L&amp;ock unspent</source>
+        <translation type="unfinished">&amp;Zakleni neporabljeno</translation>
+    </message>
+    <message>
+        <source>&amp;Unlock unspent</source>
+        <translation type="unfinished">&amp;Odkleni neporabljeno</translation>
     </message>
     <message>
         <source>Copy quantity</source>
@@ -845,6 +829,10 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <translation>Ustvari denarnico</translation>
     </message>
     <message>
+        <source>Wallet</source>
+        <translation>Denarnica</translation>
+    </message>
+    <message>
         <source>Wallet Name</source>
         <translation>Ime denarnice</translation>
     </message>
@@ -855,6 +843,10 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
     <message>
         <source>Encrypt Wallet</source>
         <translation>Šifriraj denarnico</translation>
+    </message>
+    <message>
+        <source>Advanced Options</source>
+        <translation>Napredne možnosti</translation>
     </message>
     <message>
         <source>Disable private keys for this wallet. Wallets with private keys disabled will have no private keys and cannot have an HD seed or imported private keys. This is ideal for watch-only wallets.</source>
@@ -888,7 +880,7 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <source>Compiled without sqlite support (required for descriptor wallets)</source>
         <translation>Prevedeno brez podpore za SQLite (potrebna za deskriptorske denarnice)</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>EditAddressDialog</name>
     <message>
@@ -1025,10 +1017,6 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <translation>Bitcoin</translation>
     </message>
     <message>
-        <source>Discard blocks after verification, except most recent %1 GB (prune)</source>
-        <translation>Po verifikaciji zavrzite vse bloke, razen zadnjih %1 GB (obrezava)</translation>
-    </message>
-    <message>
         <source>At least %1 GB of data will be stored in this directory, and it will grow over time.</source>
         <translation>Vsaj %1 GB podatkov bo shranjenih v tem direktoriju, velikost podatkov pa bo s časom naraščala.</translation>
     </message>
@@ -1054,7 +1042,7 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
     </message>
     <message numerus="yes">
         <source>%n GB of free space available</source>
-        <translation><numerusform>%n GiB prostega prostora na voljo</numerusform><numerusform>%n GiB prostega prostora na voljo</numerusform><numerusform>%n GiB prostega prostora na voljo</numerusform><numerusform>%n GB prostega prostora na voljo</numerusform></translation>
+        <translation><numerusform>%n GiB prostega prostora na voljo</numerusform><numerusform>%n GiB prostega prostora na voljo</numerusform><numerusform>%n GiB prostega prostora na voljo</numerusform><numerusform>%n GiB prostega prostora na voljo</numerusform></translation>
     </message>
     <message numerus="yes">
         <source>(of %n GB needed)</source>
@@ -1065,6 +1053,13 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <translation><numerusform>(%n GB potreben za celotno verigo blokov)</numerusform><numerusform>(%n GB potrebna za celotno verigo blokov)</numerusform><numerusform>(%n GB potrebni za celotno verigo blokov)</numerusform><numerusform>(%n GB potrebnih za celotno verigo blokov)</numerusform></translation>
     </message>
 </context>
+<context>
+    <name>MempoolStats</name>
+    <message>
+        <source>N/A</source>
+        <translation>Neznano</translation>
+    </message>
+    </context>
 <context>
     <name>ModalOverlay</name>
     <message>
@@ -1125,6 +1120,19 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
     </message>
 </context>
 <context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Type</source>
+        <comment>NetWatch: Type header</comment>
+        <translation>Vrsta</translation>
+    </message>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation>Naslov</translation>
+    </message>
+</context>
+<context>
     <name>OpenURIDialog</name>
     <message>
         <source>Open bitcoin URI</source>
@@ -1133,6 +1141,10 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
     <message>
         <source>URI:</source>
         <translation>URI:</translation>
+    </message>
+    <message>
+        <source>Paste address from clipboard</source>
+        <translation>Prilepite naslov iz odložišča</translation>
     </message>
 </context>
 <context>
@@ -1231,10 +1243,6 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
     <message>
         <source>Prune &amp;block storage to</source>
         <translation>Obreži velikost podatkovne &amp;baze na</translation>
-    </message>
-    <message>
-        <source>GB</source>
-        <translation>GB</translation>
     </message>
     <message>
         <source>Reverting this setting requires re-downloading the entire blockchain.</source>
@@ -1650,20 +1658,8 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <translation>'bitcoin://' ni veljaven URI. Uporabite raje 'bitcoin:' .</translation>
     </message>
     <message>
-        <source>Cannot process payment request because BIP70 is not supported.</source>
-        <translation>Ne morem obdelati plačila, ker BIP70 ni podprt.</translation>
-    </message>
-    <message>
-        <source>Due to widespread security flaws in BIP70 it's strongly recommended that any merchant instructions to switch wallets be ignored.</source>
-        <translation>Zaradi varnostnih napak v BIP70 priporočamo, da se kakršna koli navodila trgovca za zamenjavo denarnic ne upoštevajo.</translation>
-    </message>
-    <message>
-        <source>If you are receiving this error you should request the merchant provide a BIP21 compatible URI.</source>
-        <translation>Če ste prejeli to napako, zaprosite prejemnika za URI, ki je združljiv z BIP21.</translation>
-    </message>
-    <message>
-        <source>Invalid payment address %1</source>
-        <translation>Neveljaven naslov za plačilo %1</translation>
+        <source>Invalid payment address</source>
+        <translation>Neveljaven naslov za plačilo</translation>
     </message>
     <message>
         <source>URI cannot be parsed! This can be caused by an invalid Bitcoin address or malformed URI parameters.</source>
@@ -1685,10 +1681,6 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <translation>Naslov</translation>
     </message>
     <message>
-        <source>NodeId</source>
-        <translation>NodeId</translation>
-    </message>
-    <message>
         <source>Ping</source>
         <translation>Odzivni čas (Ping)</translation>
     </message>
@@ -1700,7 +1692,11 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <source>Received</source>
         <translation>Prejeto</translation>
     </message>
-</context>
+    <message>
+        <source>Type</source>
+        <translation>Vrsta</translation>
+    </message>
+    </context>
 <context>
     <name>QObject</name>
     <message>
@@ -1710,6 +1706,10 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
     <message>
         <source>Enter a Bitcoin address (e.g. %1)</source>
         <translation>Vnesite bitcoin-naslov (npr. %1)</translation>
+    </message>
+    <message>
+        <source>Inbound</source>
+        <translation>Dohodna</translation>
     </message>
     <message>
         <source>%1 d</source>
@@ -1807,7 +1807,7 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <source>unknown</source>
         <translation>neznano</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>QRImageWidget</name>
     <message>
@@ -1942,10 +1942,6 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <translation>Izberite soležnika, o katerem si želite ogledati podrobnejše informacije.</translation>
     </message>
     <message>
-        <source>Direction</source>
-        <translation>Smer povezave</translation>
-    </message>
-    <message>
         <source>Version</source>
         <translation>Različica</translation>
     </message>
@@ -2050,10 +2046,6 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <translation>&amp;Omrežni promet</translation>
     </message>
     <message>
-        <source>Totals</source>
-        <translation>Promet</translation>
-    </message>
-    <message>
         <source>In:</source>
         <translation>Dohodnih:</translation>
     </message>
@@ -2074,10 +2066,6 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <translation>1 &amp;ura</translation>
     </message>
     <message>
-        <source>1 &amp;day</source>
-        <translation>1 &amp;dan</translation>
-    </message>
-    <message>
         <source>1 &amp;week</source>
         <translation>1 &amp;teden</translation>
     </message>
@@ -2090,8 +2078,29 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <translation>&amp;Prekini povezavo</translation>
     </message>
     <message>
+        <source>To</source>
+        <translation>Prejemnik</translation>
+    </message>
+    <message>
+        <source>From</source>
+        <translation>Pošiljatelj</translation>
+    </message>
+    <message>
+        <source>No</source>
+        <translation>Ne</translation>
+    </message>
+    <message>
         <source>Ban for</source>
         <translation>Blokiraj za</translation>
+    </message>
+    <message>
+        <source>1 d&amp;ay</source>
+        <translation type="unfinished">1 &amp;dan</translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <extracomment>Context menu action to copy the address of a peer</extracomment>
+        <translation type="unfinished">&amp;Kopiraj naslov</translation>
     </message>
     <message>
         <source>&amp;Unban</source>
@@ -2138,22 +2147,10 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <translation>preko %1</translation>
     </message>
     <message>
-        <source>never</source>
-        <translation>nikoli</translation>
-    </message>
-    <message>
-        <source>Inbound</source>
-        <translation>Dohodna</translation>
-    </message>
-    <message>
-        <source>Outbound</source>
-        <translation>Odhodna</translation>
-    </message>
-    <message>
         <source>Unknown</source>
         <translation>Neznano</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>ReceiveCoinsDialog</name>
     <message>
@@ -2193,8 +2190,8 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <translation>Neobvezna oznaka, ki se shrani v zahtevek za plačilo in se lahko prikaže plačniku.</translation>
     </message>
     <message>
-        <source>&amp;Create new receiving address</source>
-        <translation>&amp;Ustvari nov prejemni naslov</translation>
+        <source>&amp;Request payment</source>
+        <translation>&amp;Zahtevaj plačilo</translation>
     </message>
     <message>
         <source>Clear all fields of the form.</source>
@@ -2233,20 +2230,24 @@ Podpisovanje je možno le s podedovanimi ("legacy") naslovi.</translation>
         <translation>Odstrani</translation>
     </message>
     <message>
-        <source>Copy URI</source>
-        <translation>Kopiraj URI</translation>
+        <source>Copy &amp;URI</source>
+        <translation>Kopiraj &amp;URl</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Kopiraj oznako</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Kopiraj naslov</translation>
     </message>
     <message>
-        <source>Copy message</source>
-        <translation>Kopiraj sporočilo</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Kopiraj oznako</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Kopiraj znesek</translation>
+        <source>Copy &amp;message</source>
+        <translation type="unfinished">&amp;Kopiraj sporočilo</translation>
+    </message>
+    <message>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Kopiraj znesek</translation>
     </message>
     <message>
         <source>Could not unlock wallet.</source>
@@ -3250,10 +3251,6 @@ Opomba: Ker se provizija izračuna na bajt, bi provizija "100 satoshijev na kB" 
         <translation>Poslano na </translation>
     </message>
     <message>
-        <source>To yourself</source>
-        <translation>Sebi</translation>
-    </message>
-    <message>
         <source>Mined</source>
         <translation>Narudarjeno</translation>
     </message>
@@ -3270,44 +3267,44 @@ Opomba: Ker se provizija izračuna na bajt, bi provizija "100 satoshijev na kB" 
         <translation>Najmanjši znesek</translation>
     </message>
     <message>
-        <source>Abandon transaction</source>
-        <translation>Opusti transakcijo</translation>
+        <source>A&amp;bandon transaction</source>
+        <translation type="unfinished">&amp;Opusti transakcijo</translation>
     </message>
     <message>
-        <source>Increase transaction fee</source>
-        <translation>Povečaj provizijo transakcije</translation>
+        <source>Increase transaction &amp;fee</source>
+        <translation type="unfinished">&amp;Povečaj provizijo transakcije</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Kopiraj naslov</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Kopiraj naslov</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Kopiraj oznako</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Kopiraj oznako</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Kopiraj znesek</translation>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Kopiraj znesek</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Kopiraj ID transakcije</translation>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Kopiraj ID transakcije</translation>
     </message>
     <message>
-        <source>Copy raw transaction</source>
-        <translation>Kopiraj neobdelano (raw) transakcijo</translation>
+        <source>Copy &amp;raw transaction</source>
+        <translation type="unfinished">&amp;Kopiraj neobdelano (raw) transakcijo</translation>
     </message>
     <message>
-        <source>Copy full transaction details</source>
-        <translation>Kopiraj vse detajle transakcije</translation>
+        <source>Copy full transaction &amp;details</source>
+        <translation type="unfinished">&amp;Kopiraj vse detajle transakcije</translation>
     </message>
     <message>
-        <source>Edit label</source>
-        <translation>Uredi oznako</translation>
+        <source>&amp;Edit label</source>
+        <translation type="unfinished">&amp;Uredi oznako</translation>
     </message>
     <message>
-        <source>Show transaction details</source>
-        <translation>Pokaži podrobnosti transakcije</translation>
+        <source>&amp;Show transaction details</source>
+        <translation type="unfinished">&amp;Pokaži podrobnosti transakcije</translation>
     </message>
     <message>
         <source>Export Transaction History</source>
@@ -3525,6 +3522,10 @@ Za odpiranje denarnice kliknite Datoteka &gt; Odpri denarnico
         <translation>Prišlo je do napake pri shranjevanju podatkov denarnice v datoteko %1.</translation>
     </message>
     <message>
+        <source>There was an error trying to save the wallet data to %1: %2</source>
+        <translation>Prišlo je do napake pri shranjevanju podatkov denarnice v datoteko %1: %2</translation>
+    </message>
+    <message>
         <source>Backup Successful</source>
         <translation>Izdelava varnostne kopije uspešna</translation>
     </message>
@@ -3574,6 +3575,10 @@ Za odpiranje denarnice kliknite Datoteka &gt; Odpri denarnico
     <message>
         <source>Error reading %s! All keys read correctly, but transaction data or address book entries might be missing or incorrect.</source>
         <translation>Napaka pri branju %s! Vsi ključi so bili prebrani pravilno, vendar so lahko vnosi o transakcijah ali vnosi naslovov nepravilni ali manjkajo.</translation>
+    </message>
+    <message>
+        <source>More than one onion bind address is provided. Using %s for the automatically created Tor onion service.</source>
+        <translation>Nastavljen je več kot en onion-naslov. Za samodejno ustvarjeno storitev na Toru uporabljam %s.</translation>
     </message>
     <message>
         <source>Please check that your computer's date and time are correct! If your clock is wrong, %s will not work properly.</source>
@@ -3692,6 +3697,10 @@ Za odpiranje denarnice kliknite Datoteka &gt; Odpri denarnico
         <translation>Napaka pri odpiranju podatkovne baze blokov</translation>
     </message>
     <message>
+        <source>Error</source>
+        <translation>Napaka</translation>
+    </message>
+    <message>
         <source>Failed to listen on any port. Use -listen=0 if you want this.</source>
         <translation>Ni mogoče poslušati na nobenih vratih. Če to zares želite, uporabite opcijo -listen=0.</translation>
     </message>
@@ -3702,6 +3711,10 @@ Za odpiranje denarnice kliknite Datoteka &gt; Odpri denarnico
     <message>
         <source>Failed to verify database</source>
         <translation>Preverba podatkovne baze je spodletela.</translation>
+    </message>
+    <message>
+        <source>Ignoring duplicate -wallet %s.</source>
+        <translation>Podvojen -wallet %s -- ne upoštevam.</translation>
     </message>
     <message>
         <source>Importing...</source>
@@ -3758,6 +3771,12 @@ Za odpiranje denarnice kliknite Datoteka &gt; Odpri denarnico
     <message>
         <source>Specified blocks directory "%s" does not exist.</source>
         <translation>Vnešena podatkovna mapa za bloke "%s" ne obstaja.</translation>
+    </message>
+    <message>
+        <source>The specified R/W config file %s does not exist
+</source>
+        <translation>Določena R/W konfiguracijska datoteka %s ne obstaja
+</translation>
     </message>
     <message>
         <source>Unknown address type '%s'</source>
@@ -4064,10 +4083,6 @@ Za odpiranje denarnice kliknite Datoteka &gt; Odpri denarnico
     <message>
         <source>Loading wallet...</source>
         <translation>Nalagam denarnico ...</translation>
-    </message>
-    <message>
-        <source>Cannot downgrade wallet</source>
-        <translation>Ne morem</translation>
     </message>
     <message>
         <source>Rescanning...</source>

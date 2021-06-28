@@ -2,10 +2,6 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>پتہ یا لیبل کی تصیح کیلیئے داہنا کلک</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
         <translation>نیا پتہ تخلیق کریں</translation>
     </message>
@@ -170,8 +166,20 @@
         <translation>%1 کے بارے میں معلومات دکھایں</translation>
     </message>
     <message>
+        <source>&amp;Encrypt Wallet...</source>
+        <translation type="unfinished">&amp;بٹوے کو خفیہ کریں...</translation>
+    </message>
+    <message>
         <source>Error</source>
         <translation>نقص</translation>
+    </message>
+    <message>
+        <source>&amp;Sending addresses</source>
+        <translation type="unfinished">&amp;پتے ارسال کیے جارہے ہیں</translation>
+    </message>
+    <message>
+        <source>&amp;Receiving addresses</source>
+        <translation type="unfinished">&amp;پتے موصول ہورہے ہیں</translation>
     </message>
     </context>
 <context>
@@ -189,6 +197,14 @@
         <translation>تاریخ</translation>
     </message>
     <message>
+        <source>&amp;Copy address</source>
+        <translation>&amp;پتا نقل کریں</translation>
+    </message>
+    <message>
+        <source>Copy &amp;label</source>
+        <translation>&amp;لیبل نقل کریں</translation>
+    </message>
+    <message>
         <source>(no label)</source>
         <translation>(کوئی لیبل نہیں)</translation>
     </message>
@@ -198,6 +214,10 @@
     </context>
 <context>
     <name>CreateWalletDialog</name>
+    <message>
+        <source>Encrypt Wallet</source>
+        <translation>بٹوے کو خفیہ کریں</translation>
+    </message>
     </context>
 <context>
     <name>EditAddressDialog</name>
@@ -215,6 +235,10 @@
     </context>
 <context>
     <name>HelpMessageDialog</name>
+    <message>
+        <source>About %1</source>
+        <translation type="unfinished">معلومات%1</translation>
+    </message>
     </context>
 <context>
     <name>Intro</name>
@@ -226,6 +250,14 @@
 <context>
     <name>ModalOverlay</name>
     </context>
+<context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation>پتہ</translation>
+    </message>
+</context>
 <context>
     <name>OpenURIDialog</name>
     </context>
@@ -244,6 +276,13 @@
     </context>
 <context>
     <name>PSBTOperationsDialog</name>
+    <message>
+        <source>Close</source>
+        <translation type="unfinished">بند</translation>
+    </message>
+    </context>
+<context>
+    <name>PairingPage</name>
     </context>
 <context>
     <name>PaymentServer</name>
@@ -263,15 +302,44 @@
     </context>
 <context>
     <name>RPCConsole</name>
+    <message>
+        <source>&amp;Copy address</source>
+        <extracomment>Context menu action to copy the address of a peer</extracomment>
+        <translation>&amp;پتا نقل کریں</translation>
+    </message>
     </context>
 <context>
     <name>ReceiveCoinsDialog</name>
+    <message>
+        <source>&amp;Amount:</source>
+        <translation type="unfinished">&amp;رقم:</translation>
+    </message>
+    <message>
+        <source>&amp;Label:</source>
+        <translation type="unfinished">&amp;لیبل:</translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <translation>&amp;پتا نقل کریں</translation>
+    </message>
+    <message>
+        <source>Copy &amp;label</source>
+        <translation>&amp;لیبل نقل کریں</translation>
+    </message>
     </context>
 <context>
     <name>ReceiveRequestDialog</name>
     <message>
+        <source>Address:</source>
+        <translation type="unfinished">پتہ:</translation>
+    </message>
+    <message>
         <source>Amount:</source>
         <translation>رقم:</translation>
+    </message>
+    <message>
+        <source>Label:</source>
+        <translation type="unfinished">لیبل:</translation>
     </message>
     <message>
         <source>Copy &amp;Address</source>
@@ -304,6 +372,10 @@
         <translation>رقم:</translation>
     </message>
     <message>
+        <source>Choose...</source>
+        <translation type="unfinished">چننا...</translation>
+    </message>
+    <message>
         <source>Balance:</source>
         <translation>بیلنس:</translation>
     </message>
@@ -314,6 +386,14 @@
 </context>
 <context>
     <name>SendCoinsEntry</name>
+    <message>
+        <source>A&amp;mount:</source>
+        <translation type="unfinished">&amp;رقم:</translation>
+    </message>
+    <message>
+        <source>&amp;Label:</source>
+        <translation type="unfinished">&amp;لیبل:</translation>
+    </message>
     </context>
 <context>
     <name>ShutdownWindow</name>
@@ -358,6 +438,14 @@
     <message>
         <source>Other</source>
         <translation>Other</translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <translation>&amp;پتا نقل کریں</translation>
+    </message>
+    <message>
+        <source>Copy &amp;label</source>
+        <translation>&amp;لیبل نقل کریں</translation>
     </message>
     <message>
         <source>Comma separated file (*.csv)</source>
@@ -409,6 +497,10 @@
     </context>
 <context>
     <name>bitcoin-core</name>
+    <message>
+        <source>Error</source>
+        <translation>نقص</translation>
+    </message>
     <message>
         <source>Insufficient funds</source>
         <translation>ناکافی فنڈز</translation>

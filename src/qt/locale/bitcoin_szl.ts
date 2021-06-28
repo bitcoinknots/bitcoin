@@ -2,10 +2,6 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>Kliknij prawy knefel mysze, coby edytować adresã abo etyketã</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
         <translation>Zrychtuj nowõ adresã</translation>
     </message>
@@ -172,6 +168,14 @@
         <translation>Portmanyj zaszyfrowany</translation>
     </message>
     <message>
+        <source>Enter the new passphrase for the wallet.&lt;br/&gt;Please use a passphrase of &lt;b&gt;ten or more random characters&lt;/b&gt;, or &lt;b&gt;eight or more words&lt;/b&gt;.</source>
+        <translation>Wkludź nowe hasło do portmanyja.&lt;br/&gt;Proszã używać hasła słożōnego z &lt;b&gt;10 abo wiyncyj losowych liter&lt;/b&gt; abo &lt;b&gt;8 abo wiyncyj słōw.&lt;/b&gt;.</translation>
+    </message>
+    <message>
+        <source>Enter the old passphrase and new passphrase for the wallet.</source>
+        <translation>Podej stare i nowe hasło do portmanyja.</translation>
+    </message>
+    <message>
         <source>IMPORTANT: Any previous backups you have made of your wallet file should be replaced with the newly generated, encrypted wallet file. For security reasons, previous backups of the unencrypted wallet file will become useless as soon as you start using the new, encrypted wallet.</source>
         <translation>WŎŻNE: Wszyjske wykōnane wczaśnij kopije zbioru portmanyja winny być umiyniōne na nowe, szyfrowane zbiory. Z powodōw bezpiyczyństwa, piyrwyjsze kopije niyszyfrowanych zbiorōw portmanyja stōnõ sie bezużyteczne jak ino zaczniesz używać nowego, szyfrowanego portmanyja.</translation>
     </message>
@@ -298,16 +302,9 @@
         <translation>Portmanyj:</translation>
     </message>
     <message>
-        <source>Click to disable network activity.</source>
-        <translation>Kliknij coby zastawić aktywność necowõ.</translation>
-    </message>
-    <message>
         <source>Network activity disabled.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
         <translation>Aktywność necowŏ ôstała zastawiōnŏ.</translation>
-    </message>
-    <message>
-        <source>Click to enable network activity again.</source>
-        <translation>Kliknij, coby zaś zapuścić aktywność necowõ.</translation>
     </message>
     <message>
         <source>Syncing Headers (%1%)...</source>
@@ -397,10 +394,6 @@
         <source>&amp;Command-line options</source>
         <translation>Ôp&amp;cyje piski nakŏzań</translation>
     </message>
-    <message numerus="yes">
-        <source>%n active connection(s) to Bitcoin network</source>
-        <translation><numerusform>%n aktywne połōnczynie do necu Bitcoin</numerusform><numerusform>%n aktywnych połōnczyń do necu Bitcoin</numerusform><numerusform>%n aktywnych skuplowań do necu Bitcoin</numerusform></translation>
-    </message>
     <message>
         <source>Indexing blocks on disk...</source>
         <translation>Indeksowanie blokōw na dysku...</translation>
@@ -442,16 +435,20 @@
         <translation>Terŏźny</translation>
     </message>
     <message>
+        <source>Open node debugging and diagnostic console</source>
+        <translation>Ôdewrzij kōnsolã debugowaniŏ i diagnostyki</translation>
+    </message>
+    <message>
         <source>&amp;Sending addresses</source>
         <translation>&amp;Adresy posyłaniŏ</translation>
     </message>
     <message>
-        <source>Show the %1 help message to get a list with possible Bitcoin command-line options</source>
-        <translation>Pokŏż pōmoc %1 coby zobŏczyć wykŏz wszyjskich ôpcyji piski nakŏzań.</translation>
+        <source>&amp;Receiving addresses</source>
+        <translation type="unfinished">&amp;Adresy ôdbiyraniŏ</translation>
     </message>
     <message>
-        <source>default wallet</source>
-        <translation>wychodny portmanyj</translation>
+        <source>Show the %1 help message to get a list with possible Bitcoin command-line options</source>
+        <translation>Pokŏż pōmoc %1 coby zobŏczyć wykŏz wszyjskich ôpcyji piski nakŏzań.</translation>
     </message>
     <message>
         <source>&amp;Window</source>
@@ -460,6 +457,11 @@
     <message>
         <source>%1 client</source>
         <translation>%1 klijynt</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n active connection(s) to Bitcoin network.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
+        <translation type="unfinished"><numerusform>%n aktywne połōnczynie do necu Bitcoin</numerusform><numerusform>%n aktywnych połōnczyń do necu Bitcoin</numerusform><numerusform>%n aktywnych skuplowań do necu Bitcoin</numerusform><numerusform>%n aktywne połōnczynie do necu Bitcoin</numerusform><numerusform>%n aktywnych połōnczyń do necu Bitcoin</numerusform><numerusform>%n aktywnych skuplowań do necu Bitcoin</numerusform></translation>
     </message>
     <message>
         <source>Catching up...</source>
@@ -529,7 +531,11 @@
         <source>Wallet is &lt;b&gt;encrypted&lt;/b&gt; and currently &lt;b&gt;locked&lt;/b&gt;</source>
         <translation>Portmanyj je &lt;b&gt;zaszyfrowany&lt;/b&gt; i terŏźnie &lt;b&gt;zaszperowany&lt;/b&gt;</translation>
     </message>
-    </context>
+    <message>
+        <source>A fatal error occurred. %1 can no longer continue safely and will quit.</source>
+        <translation>Przitrefiōł sie krytyczny feler. %1 niy poradzi kōntynuować bezpiycznie i ôstanie zawrzity.</translation>
+    </message>
+</context>
 <context>
     <name>CoinControlDialog</name>
     <message>
@@ -601,28 +607,32 @@
         <translation>Przituplowany</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Kopiyruj adresã</translation>
-    </message>
-    <message>
-        <source>Copy label</source>
-        <translation>Kopiyruj etyketã</translation>
-    </message>
-    <message>
         <source>Copy amount</source>
         <translation>Kopiyruj kwotã</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Kopiyruj ID transakcyje</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Kopiyruj adresã</translation>
     </message>
     <message>
-        <source>Lock unspent</source>
-        <translation>Zaszperuj niywydane</translation>
+        <source>Copy &amp;label</source>
+        <translation>Kopiyruj &amp;etyketã</translation>
     </message>
     <message>
-        <source>Unlock unspent</source>
-        <translation>Ôdszperuj niywydane</translation>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Kopiyruj kwotã</translation>
+    </message>
+    <message>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Kopiyruj ID transakcyje</translation>
+    </message>
+    <message>
+        <source>L&amp;ock unspent</source>
+        <translation type="unfinished">&amp;Zaszperuj niywydane</translation>
+    </message>
+    <message>
+        <source>&amp;Unlock unspent</source>
+        <translation type="unfinished">&amp;Ôdszperuj niywydane</translation>
     </message>
     <message>
         <source>Copy quantity</source>
@@ -686,6 +696,14 @@
     </context>
 <context>
     <name>CreateWalletDialog</name>
+    <message>
+        <source>Wallet</source>
+        <translation>Portmanyj</translation>
+    </message>
+    <message>
+        <source>Encrypt Wallet</source>
+        <translation type="unfinished">Zaszyfruj Portmanyj</translation>
+    </message>
     </context>
 <context>
     <name>EditAddressDialog</name>
@@ -893,7 +911,24 @@
         <source>Hide</source>
         <translation>Skryj</translation>
     </message>
-    </context>
+    <message>
+        <source>Unknown. Syncing Headers (%1, %2%)...</source>
+        <translation>Niyznōme. Synchrōnizowanie nŏgōwkōw (%1, %2%)...</translation>
+    </message>
+</context>
+<context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Type</source>
+        <comment>NetWatch: Type header</comment>
+        <translation>Zorta</translation>
+    </message>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation>Adresa</translation>
+    </message>
+</context>
 <context>
     <name>OpenURIDialog</name>
     <message>
@@ -969,10 +1004,6 @@
     <message>
         <source>Prune &amp;block storage to</source>
         <translation>Przitnij skłŏd &amp;blokōw do</translation>
-    </message>
-    <message>
-        <source>GB</source>
-        <translation>GB</translation>
     </message>
     <message>
         <source>Reverting this setting requires re-downloading the entire blockchain.</source>
@@ -1063,6 +1094,10 @@
         <translation>Idzie sam nasztalować gŏdka interfejsu używŏcza. Nasztalowanie prziniesie skutki po resztarcie %1.</translation>
     </message>
     <message>
+        <source>Connect to the Bitcoin network through a separate SOCKS5 proxy for Tor onion services.</source>
+        <translation>Skupluj sie z necym Bitcoin ze pōmocōm ôsobnego proxy SOCKS5 dlŏ necu TOR</translation>
+    </message>
+    <message>
         <source>&amp;OK</source>
         <translation>&amp;OK</translation>
     </message>
@@ -1121,6 +1156,10 @@
 <context>
     <name>PSBTOperationsDialog</name>
     <message>
+        <source>Close</source>
+        <translation type="unfinished">Zawrzij</translation>
+    </message>
+    <message>
         <source>or</source>
         <translation>abo</translation>
     </message>
@@ -1154,7 +1193,11 @@
         <source>Received</source>
         <translation>Ôdebrane</translation>
     </message>
-</context>
+    <message>
+        <source>Type</source>
+        <translation>Zorta</translation>
+    </message>
+    </context>
 <context>
     <name>QObject</name>
     <message>
@@ -1164,6 +1207,10 @@
     <message>
         <source>Enter a Bitcoin address (e.g. %1)</source>
         <translation>Wkludź adresã Bitcoin (bp. %1)</translation>
+    </message>
+    <message>
+        <source>Inbound</source>
+        <translation>Wchodowy</translation>
     </message>
     <message>
         <source>%1 d</source>
@@ -1213,7 +1260,7 @@
         <source>unknown</source>
         <translation>niyznōme</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>QRImageWidget</name>
     <message>
@@ -1242,6 +1289,10 @@
     <message>
         <source>Client version</source>
         <translation>Wersyjŏ klijynta</translation>
+    </message>
+    <message>
+        <source>&amp;Information</source>
+        <translation type="unfinished">&amp;Informacyjŏ</translation>
     </message>
     <message>
         <source>Using BerkeleyDB version</source>
@@ -1284,10 +1335,6 @@
         <translation>Ôdebrane</translation>
     </message>
     <message>
-        <source>Direction</source>
-        <translation>Richtōng</translation>
-    </message>
-    <message>
         <source>Version</source>
         <translation>Wersyjŏ</translation>
     </message>
@@ -1324,12 +1371,29 @@
         <translation>Wychōd:</translation>
     </message>
     <message>
-        <source>1 &amp;day</source>
-        <translation>1 &amp;dziyń</translation>
-    </message>
-    <message>
         <source>&amp;Disconnect</source>
         <translation>Ô&amp;dkupluj</translation>
+    </message>
+    <message>
+        <source>To</source>
+        <translation>Do</translation>
+    </message>
+    <message>
+        <source>From</source>
+        <translation>Z</translation>
+    </message>
+    <message>
+        <source>No</source>
+        <translation>Niy</translation>
+    </message>
+    <message>
+        <source>1 d&amp;ay</source>
+        <translation type="unfinished">1 &amp;dziyń</translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <extracomment>Context menu action to copy the address of a peer</extracomment>
+        <translation type="unfinished">&amp;Kopiyruj adresã</translation>
     </message>
     <message>
         <source>Welcome to the %1 RPC console.</source>
@@ -1344,23 +1408,23 @@
         <translation>Aktywność necowŏ zastawiōnŏ</translation>
     </message>
     <message>
-        <source>never</source>
-        <translation>nikej</translation>
-    </message>
-    <message>
-        <source>Inbound</source>
-        <translation>Wchodowy</translation>
-    </message>
-    <message>
-        <source>Outbound</source>
-        <translation>Wychodowy</translation>
+        <source>Unknown</source>
+        <translation type="unfinished">Niyznōme</translation>
     </message>
     </context>
 <context>
     <name>ReceiveCoinsDialog</name>
     <message>
+        <source>&amp;Amount:</source>
+        <translation type="unfinished">&amp;Kwota:</translation>
+    </message>
+    <message>
         <source>&amp;Label:</source>
         <translation>&amp;Etyketa:</translation>
+    </message>
+    <message>
+        <source>&amp;Message:</source>
+        <translation type="unfinished">&amp;Wiadōmość:</translation>
     </message>
     <message>
         <source>An optional message to attach to the payment request, which will be displayed when the request is opened. Note: The message will not be sent with the payment over the Bitcoin network.</source>
@@ -1383,20 +1447,24 @@
         <translation>Wychrōń</translation>
     </message>
     <message>
-        <source>Copy URI</source>
-        <translation>Kopiyruj URI</translation>
+        <source>Copy &amp;URI</source>
+        <translation>Kopiyruj &amp;URI</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Kopiyruj etyketã</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Kopiyruj adresã</translation>
     </message>
     <message>
-        <source>Copy message</source>
-        <translation>Kopiyruj wiadōmość</translation>
+        <source>Copy &amp;label</source>
+        <translation>Kopiyruj &amp;etyketã</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Kopiyruj kwotã</translation>
+        <source>Copy &amp;message</source>
+        <translation type="unfinished">&amp;Kopiyruj wiadōmość</translation>
+    </message>
+    <message>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Kopiyruj kwotã</translation>
     </message>
     <message>
         <source>Could not unlock wallet.</source>
@@ -1406,8 +1474,16 @@
 <context>
     <name>ReceiveRequestDialog</name>
     <message>
+        <source>Address:</source>
+        <translation type="unfinished">Adresa:</translation>
+    </message>
+    <message>
         <source>Amount:</source>
         <translation>Kwota:</translation>
+    </message>
+    <message>
+        <source>Label:</source>
+        <translation type="unfinished">Etyketa:</translation>
     </message>
     <message>
         <source>Message:</source>
@@ -1516,6 +1592,10 @@
         <translation>Saldo:</translation>
     </message>
     <message>
+        <source>S&amp;end</source>
+        <translation type="unfinished">&amp;Poślij</translation>
+    </message>
+    <message>
         <source>Copy quantity</source>
         <translation>Kopiyruj wielość</translation>
     </message>
@@ -1552,6 +1632,10 @@
         <translation>abo</translation>
     </message>
     <message>
+        <source>Send</source>
+        <translation type="unfinished">Poślij</translation>
+    </message>
+    <message>
         <source>Transaction creation failed!</source>
         <translation>Utworzynie transakcyje niy podarziło sie!</translation>
     </message>
@@ -1570,6 +1654,10 @@
 </context>
 <context>
     <name>SendCoinsEntry</name>
+    <message>
+        <source>A&amp;mount:</source>
+        <translation type="unfinished">&amp;Kwota:</translation>
+    </message>
     <message>
         <source>&amp;Label:</source>
         <translation>&amp;Etyketa:</translation>
@@ -1627,6 +1715,10 @@
     <message>
         <source>&amp;Verify Message</source>
         <translation>&amp;Weryfikuj Wiadōmość</translation>
+    </message>
+    <message>
+        <source>Verify &amp;Message</source>
+        <translation type="unfinished">&amp;Weryfikuj Wiadōmość</translation>
     </message>
     <message>
         <source>Message signing failed.</source>
@@ -1752,24 +1844,24 @@
         <translation>Wkludź adresa, idyntyfikatōr transakcyje abo etyketã coby wyszukać</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Kopiyruj adresã</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Kopiyruj adresã</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Kopiyruj etyketã</translation>
+        <source>Copy &amp;label</source>
+        <translation>Kopiyruj &amp;etyketã</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Kopiyruj kwotã</translation>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;Kopiyruj kwotã</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Kopiyruj ID transakcyje</translation>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Kopiyruj ID transakcyje</translation>
     </message>
     <message>
-        <source>Edit label</source>
-        <translation>Edytuj etyketa</translation>
+        <source>&amp;Edit label</source>
+        <translation type="unfinished">&amp;Edytuj etyketa</translation>
     </message>
     <message>
         <source>Comma separated file (*.csv)</source>
@@ -1888,6 +1980,10 @@
     <message>
         <source>Error loading block database</source>
         <translation>Feler wgrŏwaniŏ bazy blokōw</translation>
+    </message>
+    <message>
+        <source>Error</source>
+        <translation>Feler</translation>
     </message>
     <message>
         <source>Loading P2P addresses...</source>

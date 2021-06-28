@@ -2,10 +2,6 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>右击编辑地址或标签</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
         <translation>创建一个新的地址</translation>
     </message>
@@ -68,12 +64,6 @@
     <message>
         <source>These are your Bitcoin addresses for sending payments. Always check the amount and the receiving address before sending coins.</source>
         <translation>这是你的比特币发币地址。发送前请确认发送数量和接收地址</translation>
-    </message>
-    <message>
-        <source>These are your Bitcoin addresses for receiving payments. Use the 'Create new receiving address' button in the receive tab to create new addresses.
-Signing is only possible with addresses of the type 'legacy'.</source>
-        <translation>这是你的比特币接收地址。点击接收选项卡中“创建新的接收地址”按钮来创建新的地址。
-签名只能使用“传统”类型的地址。</translation>
     </message>
     <message>
         <source>&amp;Copy Address</source>
@@ -163,9 +153,38 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </context>
 <context>
     <name>BitcoinGUI</name>
+    <message>
+        <source>&amp;Encrypt Wallet...</source>
+        <translation type="unfinished">&amp;加密钱包...</translation>
+    </message>
+    <message numerus="yes">
+        <source>Processed %n block(s) of transaction history.</source>
+        <translation type="unfinished"><numerusform /></translation>
+    </message>
+    <message>
+        <source>&amp;Sending addresses</source>
+        <translation type="unfinished">&amp;发送地址</translation>
+    </message>
+    <message>
+        <source>&amp;Receiving addresses</source>
+        <translation type="unfinished">&amp;接收地址</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n active connection(s) to Bitcoin network.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
+        <translation type="unfinished"><numerusform /><numerusform /></translation>
+    </message>
     </context>
 <context>
     <name>CoinControlDialog</name>
+    <message>
+        <source>&amp;Copy address</source>
+        <translation>复制地址</translation>
+    </message>
+    <message>
+        <source>Copy &amp;label</source>
+        <translation>复制标签</translation>
+    </message>
     <message>
         <source>(no label)</source>
         <translation>(无标签)</translation>
@@ -176,9 +195,21 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </context>
 <context>
     <name>CreateWalletDialog</name>
+    <message>
+        <source>Encrypt Wallet</source>
+        <translation>加密钱包</translation>
+    </message>
     </context>
 <context>
     <name>EditAddressDialog</name>
+    <message>
+        <source>&amp;Label</source>
+        <translation type="unfinished">&amp;标签</translation>
+    </message>
+    <message>
+        <source>&amp;Address</source>
+        <translation type="unfinished">&amp;地址</translation>
+    </message>
     </context>
 <context>
     <name>FreespaceChecker</name>
@@ -188,10 +219,29 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </context>
 <context>
     <name>Intro</name>
+    <message numerus="yes">
+        <source>%n GB of free space available</source>
+        <translation type="unfinished"><numerusform /></translation>
+    </message>
+    <message numerus="yes">
+        <source>(of %n GB needed)</source>
+        <translation type="unfinished"><numerusform /></translation>
+    </message>
+    </context>
+<context>
+    <name>MempoolStats</name>
     </context>
 <context>
     <name>ModalOverlay</name>
     </context>
+<context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation>地址</translation>
+    </message>
+</context>
 <context>
     <name>OpenURIDialog</name>
     </context>
@@ -206,6 +256,13 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </context>
 <context>
     <name>PSBTOperationsDialog</name>
+    <message>
+        <source>Close</source>
+        <translation type="unfinished">关闭</translation>
+    </message>
+    </context>
+<context>
+    <name>PairingPage</name>
     </context>
 <context>
     <name>PaymentServer</name>
@@ -215,18 +272,71 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </context>
 <context>
     <name>QObject</name>
+    <message numerus="yes">
+        <source>%n second(s)</source>
+        <translation type="unfinished"><numerusform /></translation>
+    </message>
+    <message numerus="yes">
+        <source>%n minute(s)</source>
+        <translation type="unfinished"><numerusform /></translation>
+    </message>
+    <message numerus="yes">
+        <source>%n hour(s)</source>
+        <translation type="unfinished"><numerusform /></translation>
+    </message>
+    <message numerus="yes">
+        <source>%n day(s)</source>
+        <translation type="unfinished"><numerusform /></translation>
+    </message>
+    <message numerus="yes">
+        <source>%n week(s)</source>
+        <translation type="unfinished"><numerusform /></translation>
+    </message>
+    <message numerus="yes">
+        <source>%n year(s)</source>
+        <translation type="unfinished"><numerusform /></translation>
+    </message>
     </context>
 <context>
     <name>QRImageWidget</name>
     </context>
 <context>
     <name>RPCConsole</name>
+    <message>
+        <source>&amp;Copy address</source>
+        <extracomment>Context menu action to copy the address of a peer</extracomment>
+        <translation>复制地址</translation>
+    </message>
     </context>
 <context>
     <name>ReceiveCoinsDialog</name>
+    <message>
+        <source>&amp;Label:</source>
+        <translation type="unfinished">&amp;标签:</translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <translation>复制地址</translation>
+    </message>
+    <message>
+        <source>Copy &amp;label</source>
+        <translation>复制标签</translation>
+    </message>
     </context>
 <context>
     <name>ReceiveRequestDialog</name>
+    <message>
+        <source>Address:</source>
+        <translation type="unfinished">地址:</translation>
+    </message>
+    <message>
+        <source>Label:</source>
+        <translation type="unfinished">标签:</translation>
+    </message>
+    <message>
+        <source>Copy &amp;Address</source>
+        <translation type="unfinished">复制地址</translation>
+    </message>
     </context>
 <context>
     <name>RecentRequestsTableModel</name>
@@ -242,12 +352,24 @@ Signing is only possible with addresses of the type 'legacy'.</source>
 <context>
     <name>SendCoinsDialog</name>
     <message>
+        <source>Choose...</source>
+        <translation type="unfinished">选择...</translation>
+    </message>
+    <message numerus="yes">
+        <source>Estimated to begin confirmation within %n block(s).</source>
+        <translation type="unfinished"><numerusform /></translation>
+    </message>
+    <message>
         <source>(no label)</source>
         <translation>(无标签)</translation>
     </message>
 </context>
 <context>
     <name>SendCoinsEntry</name>
+    <message>
+        <source>&amp;Label:</source>
+        <translation type="unfinished">&amp;标签:</translation>
+    </message>
     </context>
 <context>
     <name>ShutdownWindow</name>
@@ -260,6 +382,14 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </context>
 <context>
     <name>TransactionDesc</name>
+    <message numerus="yes">
+        <source>Open for %n more block(s)</source>
+        <translation type="unfinished"><numerusform /></translation>
+    </message>
+    <message numerus="yes">
+        <source>matures in %n more block(s)</source>
+        <translation type="unfinished"><numerusform /></translation>
+    </message>
     </context>
 <context>
     <name>TransactionDescDialog</name>
@@ -270,6 +400,10 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <source>Label</source>
         <translation>标签</translation>
     </message>
+    <message numerus="yes">
+        <source>Open for %n more block(s)</source>
+        <translation type="unfinished"><numerusform /></translation>
+    </message>
     <message>
         <source>(no label)</source>
         <translation>(无标签)</translation>
@@ -277,6 +411,14 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </context>
 <context>
     <name>TransactionView</name>
+    <message>
+        <source>&amp;Copy address</source>
+        <translation>复制地址</translation>
+    </message>
+    <message>
+        <source>Copy &amp;label</source>
+        <translation>复制标签</translation>
+    </message>
     <message>
         <source>Comma separated file (*.csv)</source>
         <translation>逗号分隔文件(*.csv)</translation>

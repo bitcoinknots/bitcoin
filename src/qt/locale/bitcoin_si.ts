@@ -2,10 +2,6 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>ලිපිනය හෝ ලේබලය සංස්කරණය කිරීමට දකුණු මූසික බොත්තම  ක්ලික් කරන්න</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
         <translation>නව ලිපිනයක් සාදන්න</translation>
     </message>
@@ -222,12 +218,24 @@
         <translation>ගනුදෙනු ඉතිහාසය පිරික්සන්න</translation>
     </message>
     <message>
+        <source>&amp;Encrypt Wallet...</source>
+        <translation type="unfinished">&amp;පසුම්බිය සංකේතනය කරන්න...</translation>
+    </message>
+    <message>
         <source>Warning</source>
         <translation>අවවාදය</translation>
     </message>
     <message>
         <source>Information</source>
         <translation>තොරතුර</translation>
+    </message>
+    <message>
+        <source>&amp;Sending addresses</source>
+        <translation type="unfinished">&amp;යවන ලිපින</translation>
+    </message>
+    <message>
+        <source>&amp;Receiving addresses</source>
+        <translation type="unfinished">&amp;ලබන ලිපින</translation>
     </message>
     </context>
 <context>
@@ -278,9 +286,21 @@
     </context>
 <context>
     <name>CreateWalletDialog</name>
+    <message>
+        <source>Encrypt Wallet</source>
+        <translation>පසුම්බිය සංකේතනය කරන්න</translation>
+    </message>
     </context>
 <context>
     <name>EditAddressDialog</name>
+    <message>
+        <source>&amp;Label</source>
+        <translation type="unfinished">&amp;ලේබලය</translation>
+    </message>
+    <message>
+        <source>&amp;Address</source>
+        <translation type="unfinished">&amp;ලිපිනය</translation>
+    </message>
     </context>
 <context>
     <name>FreespaceChecker</name>
@@ -307,12 +327,20 @@
     </message>
     </context>
 <context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation>ලිපිනය</translation>
+    </message>
+</context>
+<context>
     <name>OpenURIDialog</name>
     <message>
         <source>URI:</source>
         <translation>URI:</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>OpenWalletActivity</name>
     </context>
@@ -336,6 +364,13 @@
     </context>
 <context>
     <name>PSBTOperationsDialog</name>
+    <message>
+        <source>Close</source>
+        <translation type="unfinished">වසා දමන්න</translation>
+    </message>
+    </context>
+<context>
+    <name>PairingPage</name>
     </context>
 <context>
     <name>PaymentServer</name>
@@ -355,15 +390,35 @@
     </context>
 <context>
     <name>RPCConsole</name>
+    <message>
+        <source>&amp;Information</source>
+        <translation type="unfinished">&amp;තොරතුර</translation>
+    </message>
     </context>
 <context>
     <name>ReceiveCoinsDialog</name>
+    <message>
+        <source>&amp;Amount:</source>
+        <translation type="unfinished">&amp;අගය:</translation>
+    </message>
+    <message>
+        <source>&amp;Label:</source>
+        <translation type="unfinished">&amp;ලේබලය:</translation>
+    </message>
     </context>
 <context>
     <name>ReceiveRequestDialog</name>
     <message>
+        <source>Address:</source>
+        <translation type="unfinished">ලිපිනය:</translation>
+    </message>
+    <message>
         <source>Amount:</source>
         <translation>අගය:</translation>
+    </message>
+    <message>
+        <source>Label:</source>
+        <translation type="unfinished">ලේබලය:</translation>
     </message>
     </context>
 <context>
@@ -400,12 +455,24 @@
         <translation>ගාස්තුව:</translation>
     </message>
     <message>
+        <source>Choose...</source>
+        <translation type="unfinished">තෝරන්න...</translation>
+    </message>
+    <message>
         <source>(no label)</source>
         <translation>(ලේබලයක් නැත)</translation>
     </message>
 </context>
 <context>
     <name>SendCoinsEntry</name>
+    <message>
+        <source>A&amp;mount:</source>
+        <translation type="unfinished">&amp;අගය:</translation>
+    </message>
+    <message>
+        <source>&amp;Label:</source>
+        <translation type="unfinished">&amp;ලේබලය:</translation>
+    </message>
     </context>
 <context>
     <name>ShutdownWindow</name>

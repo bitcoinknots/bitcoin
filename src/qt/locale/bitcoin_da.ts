@@ -2,10 +2,6 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>Højreklik for at redigere adresse eller mærkat</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
         <translation>Opret en ny adresse</translation>
     </message>
@@ -68,11 +64,6 @@
     <message>
         <source>These are your Bitcoin addresses for sending payments. Always check the amount and the receiving address before sending coins.</source>
         <translation>Disse er dine Bitcoin-adresser til afsendelse af betalinger. Tjek altid beløb og modtagelsesadresse, inden du sender bitcoins.</translation>
-    </message>
-    <message>
-        <source>These are your Bitcoin addresses for receiving payments. Use the 'Create new receiving address' button in the receive tab to create new addresses.
-Signing is only possible with addresses of the type 'legacy'.</source>
-        <translation>Disse er dine Bitcoin adresser til at modtage betalinger. Benyt 'Opret ny modtager adresse' knappen i modtag fanen for at oprette nye adresser.</translation>
     </message>
     <message>
         <source>&amp;Copy Address</source>
@@ -339,16 +330,9 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>Tegnebog:</translation>
     </message>
     <message>
-        <source>Click to disable network activity.</source>
-        <translation>Klik for at deaktivere netværksaktivitet.</translation>
-    </message>
-    <message>
         <source>Network activity disabled.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
         <translation>Netværksaktivitet deaktiveret.</translation>
-    </message>
-    <message>
-        <source>Click to enable network activity again.</source>
-        <translation>Klik for a aktivere netværksaktivitet igen.</translation>
     </message>
     <message>
         <source>Syncing Headers (%1%)...</source>
@@ -437,10 +421,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     <message>
         <source>&amp;Command-line options</source>
         <translation>Tilvalg for &amp;kommandolinje</translation>
-    </message>
-    <message numerus="yes">
-        <source>%n active connection(s) to Bitcoin network</source>
-        <translation><numerusform>%n aktiv forbindelse til Bitcoin-netværket</numerusform><numerusform>%n aktive forbindelser til Bitcoin-netværket</numerusform></translation>
     </message>
     <message>
         <source>Indexing blocks on disk...</source>
@@ -555,10 +535,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>Maskér værdierne i Oversigt-fanebladet</translation>
     </message>
     <message>
-        <source>default wallet</source>
-        <translation>Standard tegnebog</translation>
-    </message>
-    <message>
         <source>No wallets available</source>
         <translation>Ingen tegnebøger tilgængelige</translation>
     </message>
@@ -581,6 +557,11 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     <message>
         <source>%1 client</source>
         <translation>%1-klient</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n active connection(s) to Bitcoin network.</source>
+        <extracomment>A substring of the tooltip.</extracomment>
+        <translation type="unfinished"><numerusform>%n aktiv forbindelse til Bitcoin-netværket</numerusform><numerusform>%n aktive forbindelser til Bitcoin-netværket</numerusform><numerusform>%n aktiv forbindelse til Bitcoin-netværket</numerusform><numerusform>%n aktive forbindelser til Bitcoin-netværket</numerusform></translation>
     </message>
     <message>
         <source>Connecting to peers...</source>
@@ -742,28 +723,32 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>Bekræftet</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Kopiér adresse</translation>
-    </message>
-    <message>
-        <source>Copy label</source>
-        <translation>Kopiér mærkat</translation>
-    </message>
-    <message>
         <source>Copy amount</source>
         <translation>Kopiér beløb</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Kopiér transaktions-ID</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Kopiér adresse</translation>
     </message>
     <message>
-        <source>Lock unspent</source>
-        <translation>Fastlås ubrugte</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Kopiér mærkat</translation>
     </message>
     <message>
-        <source>Unlock unspent</source>
-        <translation>Lås ubrugte op</translation>
+        <source>Copy &amp;amount</source>
+        <translation>Kopiér &amp;beløb</translation>
+    </message>
+    <message>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Kopiér transaktions-ID</translation>
+    </message>
+    <message>
+        <source>L&amp;ock unspent</source>
+        <translation type="unfinished">&amp;Fastlås ubrugte</translation>
+    </message>
+    <message>
+        <source>&amp;Unlock unspent</source>
+        <translation type="unfinished">&amp;Lås ubrugte op</translation>
     </message>
     <message>
         <source>Copy quantity</source>
@@ -844,6 +829,10 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>Opret tegnebog</translation>
     </message>
     <message>
+        <source>Wallet</source>
+        <translation>Tegnebog</translation>
+    </message>
+    <message>
         <source>Wallet Name</source>
         <translation>Navn på tegnebog</translation>
     </message>
@@ -854,6 +843,10 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     <message>
         <source>Encrypt Wallet</source>
         <translation>Kryptér tegnebog</translation>
+    </message>
+    <message>
+        <source>Advanced Options</source>
+        <translation>Avancerede Indstillinger</translation>
     </message>
     <message>
         <source>Disable private keys for this wallet. Wallets with private keys disabled will have no private keys and cannot have an HD seed or imported private keys. This is ideal for watch-only wallets.</source>
@@ -887,7 +880,7 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <source>Compiled without sqlite support (required for descriptor wallets)</source>
         <translation>Kompileret uden sqlite-understøttelse (krævet til beskriver-punge)</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>EditAddressDialog</name>
     <message>
@@ -1024,10 +1017,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>Bitcoin</translation>
     </message>
     <message>
-        <source>Discard blocks after verification, except most recent %1 GB (prune)</source>
-        <translation>Kassér blokke efter verificering, undtaget de seneste %1 GB (beskær)</translation>
-    </message>
-    <message>
         <source>At least %1 GB of data will be stored in this directory, and it will grow over time.</source>
         <translation>Mindst %1 GB data vil blive gemt i denne mappe, og det vil vokse over tid.</translation>
     </message>
@@ -1124,6 +1113,14 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </message>
 </context>
 <context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation>Adresse</translation>
+    </message>
+</context>
+<context>
     <name>OpenURIDialog</name>
     <message>
         <source>Open bitcoin URI</source>
@@ -1132,6 +1129,10 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     <message>
         <source>URI:</source>
         <translation>URI:</translation>
+    </message>
+    <message>
+        <source>Paste address from clipboard</source>
+        <translation>Indsæt adresse fra udklipsholderen</translation>
     </message>
 </context>
 <context>
@@ -1230,10 +1231,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     <message>
         <source>Prune &amp;block storage to</source>
         <translation>Beskære &amp;blok opbevaring til</translation>
-    </message>
-    <message>
-        <source>GB</source>
-        <translation>GB</translation>
     </message>
     <message>
         <source>Reverting this setting requires re-downloading the entire blockchain.</source>
@@ -1649,20 +1646,8 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>'bitcoin://' er ikke et gyldigt URI. Brug 'bitcoin:' istedet.</translation>
     </message>
     <message>
-        <source>Cannot process payment request because BIP70 is not supported.</source>
-        <translation>Betalingsanmodninger kan ikke behandles mere, da BIP70 ikke længere er understøttet.</translation>
-    </message>
-    <message>
-        <source>Due to widespread security flaws in BIP70 it's strongly recommended that any merchant instructions to switch wallets be ignored.</source>
-        <translation>På grund af vidtstrakte sikkerhedsfejl i BIP70 anbefales det kraftigt, at enhver instruktion fra handlende om at skifte til en BIP70-tegnebog ignoreres.</translation>
-    </message>
-    <message>
-        <source>If you are receiving this error you should request the merchant provide a BIP21 compatible URI.</source>
-        <translation>Hvis du modtager denne fejl, bør du anmode den handlende om at give dig en BIP21-kompatibel URI.</translation>
-    </message>
-    <message>
-        <source>Invalid payment address %1</source>
-        <translation>Ugyldig betalingsadresse %1</translation>
+        <source>Invalid payment address</source>
+        <translation>Ugyldig betalingsadresse</translation>
     </message>
     <message>
         <source>URI cannot be parsed! This can be caused by an invalid Bitcoin address or malformed URI parameters.</source>
@@ -1684,10 +1669,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>Knude/tjeneste</translation>
     </message>
     <message>
-        <source>NodeId</source>
-        <translation>Knude-id</translation>
-    </message>
-    <message>
         <source>Ping</source>
         <translation>Ping</translation>
     </message>
@@ -1699,7 +1680,7 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <source>Received</source>
         <translation>Modtaget</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>QObject</name>
     <message>
@@ -1709,6 +1690,10 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     <message>
         <source>Enter a Bitcoin address (e.g. %1)</source>
         <translation>Indtast en Bitcoin-adresse (fx %1)</translation>
+    </message>
+    <message>
+        <source>Inbound</source>
+        <translation>Indkommende</translation>
     </message>
     <message>
         <source>%1 d</source>
@@ -1805,6 +1790,11 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     <message>
         <source>unknown</source>
         <translation>ukendt</translation>
+    </message>
+    <message>
+        <source>Txn</source>
+        <comment>Tx Watch: Transaction type abbreviation</comment>
+        <translation>Tsn</translation>
     </message>
 </context>
 <context>
@@ -1941,10 +1931,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>Vælg en anden knude for at se detaljeret information.</translation>
     </message>
     <message>
-        <source>Direction</source>
-        <translation>Retning</translation>
-    </message>
-    <message>
         <source>Version</source>
         <translation>Version</translation>
     </message>
@@ -2049,10 +2035,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>&amp;Netværkstrafik</translation>
     </message>
     <message>
-        <source>Totals</source>
-        <translation>Totaler</translation>
-    </message>
-    <message>
         <source>In:</source>
         <translation>Indkommende:</translation>
     </message>
@@ -2073,10 +2055,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>1 &amp;time</translation>
     </message>
     <message>
-        <source>1 &amp;day</source>
-        <translation>1 &amp;dag</translation>
-    </message>
-    <message>
         <source>1 &amp;week</source>
         <translation>1 &amp;uge</translation>
     </message>
@@ -2089,8 +2067,29 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>&amp;Afbryd forbindelse</translation>
     </message>
     <message>
+        <source>To</source>
+        <translation>Til</translation>
+    </message>
+    <message>
+        <source>From</source>
+        <translation>Fra</translation>
+    </message>
+    <message>
+        <source>No</source>
+        <translation>Nej</translation>
+    </message>
+    <message>
         <source>Ban for</source>
         <translation>Bandlys i</translation>
+    </message>
+    <message>
+        <source>1 d&amp;ay</source>
+        <translation type="unfinished">1 &amp;dag</translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <extracomment>Context menu action to copy the address of a peer</extracomment>
+        <translation type="unfinished">&amp;Kopiér adresse</translation>
     </message>
     <message>
         <source>&amp;Unban</source>
@@ -2137,22 +2136,10 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>via %1</translation>
     </message>
     <message>
-        <source>never</source>
-        <translation>aldrig</translation>
-    </message>
-    <message>
-        <source>Inbound</source>
-        <translation>Indkommende</translation>
-    </message>
-    <message>
-        <source>Outbound</source>
-        <translation>Udgående</translation>
-    </message>
-    <message>
         <source>Unknown</source>
         <translation>Ukendt</translation>
     </message>
-</context>
+    </context>
 <context>
     <name>ReceiveCoinsDialog</name>
     <message>
@@ -2192,8 +2179,8 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>En valgfri meddelelse som er indlejret i betalingsanmodningen og som kan blive vist til afsenderen.</translation>
     </message>
     <message>
-        <source>&amp;Create new receiving address</source>
-        <translation>&amp;Opret ny modtager adresse</translation>
+        <source>&amp;Request payment</source>
+        <translation>&amp;Anmod om betaling</translation>
     </message>
     <message>
         <source>Clear all fields of the form.</source>
@@ -2232,20 +2219,24 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation>Fjern</translation>
     </message>
     <message>
-        <source>Copy URI</source>
-        <translation>Kopiér URI</translation>
+        <source>Copy &amp;URI</source>
+        <translation>Kopiér &amp;URI</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Kopiér mærkat</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Kopiér adresse</translation>
     </message>
     <message>
-        <source>Copy message</source>
-        <translation>Kopiér besked</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Kopiér mærkat</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Kopiér beløb</translation>
+        <source>Copy &amp;message</source>
+        <translation type="unfinished">&amp;Kopiér besked</translation>
+    </message>
+    <message>
+        <source>Copy &amp;amount</source>
+        <translation>Kopiér &amp;beløb</translation>
     </message>
     <message>
         <source>Could not unlock wallet.</source>
@@ -2737,7 +2728,7 @@ Note: Siden gebyret er kalkuleret på en per-byte basis, et gebyr på "100 satos
     </message>
     <message>
         <source>A message that was attached to the bitcoin: URI which will be stored with the transaction for your reference. Note: This message will not be sent over the Bitcoin network.</source>
-        <translation>En besked, som blev føjet til “bitcon:”-URI'en, som vil gemmes med transaktionen til din reference. Bemærk: Denne besked vil ikke blive sendt over Bitcoin-netværket.</translation>
+        <translation>En besked, som blev føjet til “bitcoin:”-URI'en, som vil gemmes med transaktionen til din reference. Bemærk: Denne besked vil ikke blive sendt over Bitcoin-netværket.</translation>
     </message>
     <message>
         <source>Pay To:</source>
@@ -3245,10 +3236,6 @@ Note: Siden gebyret er kalkuleret på en per-byte basis, et gebyr på "100 satos
         <translation>Sendt til</translation>
     </message>
     <message>
-        <source>To yourself</source>
-        <translation>Til dig selv</translation>
-    </message>
-    <message>
         <source>Mined</source>
         <translation>Minet</translation>
     </message>
@@ -3265,44 +3252,44 @@ Note: Siden gebyret er kalkuleret på en per-byte basis, et gebyr på "100 satos
         <translation>Minimumsbeløb</translation>
     </message>
     <message>
-        <source>Abandon transaction</source>
-        <translation>Opgiv transaktion</translation>
+        <source>A&amp;bandon transaction</source>
+        <translation type="unfinished">&amp;Opgiv transaktion</translation>
     </message>
     <message>
-        <source>Increase transaction fee</source>
-        <translation>Forøg transaktionsgebyr</translation>
+        <source>Increase transaction &amp;fee</source>
+        <translation type="unfinished">&amp;Forøg transaktionsgebyr</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>Kopiér adresse</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;Kopiér adresse</translation>
     </message>
     <message>
-        <source>Copy label</source>
-        <translation>Kopiér mærkat</translation>
+        <source>Copy &amp;label</source>
+        <translation type="unfinished">&amp;Kopiér mærkat</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>Kopiér beløb</translation>
+        <source>Copy &amp;amount</source>
+        <translation>Kopiér &amp;beløb</translation>
     </message>
     <message>
-        <source>Copy transaction ID</source>
-        <translation>Kopiér transaktions-ID</translation>
+        <source>Copy transaction &amp;ID</source>
+        <translation type="unfinished">&amp;Kopiér transaktions-ID</translation>
     </message>
     <message>
-        <source>Copy raw transaction</source>
-        <translation>Kopiér rå transaktion</translation>
+        <source>Copy &amp;raw transaction</source>
+        <translation type="unfinished">&amp;Kopiér rå transaktion</translation>
     </message>
     <message>
-        <source>Copy full transaction details</source>
-        <translation>Kopiér komplette transaktionsdetaljer</translation>
+        <source>Copy full transaction &amp;details</source>
+        <translation type="unfinished">&amp;Kopiér komplette transaktionsdetaljer</translation>
     </message>
     <message>
-        <source>Edit label</source>
-        <translation>Redigér mærkat</translation>
+        <source>&amp;Edit label</source>
+        <translation type="unfinished">&amp;Redigér mærkat</translation>
     </message>
     <message>
-        <source>Show transaction details</source>
-        <translation>Vis transaktionsdetaljer</translation>
+        <source>&amp;Show transaction details</source>
+        <translation type="unfinished">&amp;Vis transaktionsdetaljer</translation>
     </message>
     <message>
         <source>Export Transaction History</source>
@@ -3520,6 +3507,10 @@ Gå til Fil &gt; Åbn Pung for, at indlæse en pung.
         <translation>Der skete en fejl under gemning af tegnebogsdata til %1.</translation>
     </message>
     <message>
+        <source>There was an error trying to save the wallet data to %1: %2</source>
+        <translation>Der skete en fejl under gemning af tegnebogsdata til %1: %2</translation>
+    </message>
+    <message>
         <source>Backup Successful</source>
         <translation>Sikkerhedskopiering problemfri</translation>
     </message>
@@ -3691,6 +3682,10 @@ Gå til Fil &gt; Åbn Pung for, at indlæse en pung.
         <translation>Åbning af blokdatabase mislykkedes</translation>
     </message>
     <message>
+        <source>Error</source>
+        <translation>Fejl</translation>
+    </message>
+    <message>
         <source>Failed to listen on any port. Use -listen=0 if you want this.</source>
         <translation>Lytning på enhver port mislykkedes. Brug -listen=0, hvis du ønsker dette.</translation>
     </message>
@@ -3753,6 +3748,12 @@ Gå til Fil &gt; Åbn Pung for, at indlæse en pung.
     <message>
         <source>Specified blocks directory "%s" does not exist.</source>
         <translation>Angivet blokmappe “%s” eksisterer ikke.</translation>
+    </message>
+    <message>
+        <source>The specified R/W config file %s does not exist
+</source>
+        <translation>Den specificerede R/W konfigurationsfil %s eksisterer ikke.
+</translation>
     </message>
     <message>
         <source>Unknown address type '%s'</source>
@@ -3837,10 +3838,6 @@ Gå til Fil &gt; Åbn Pung for, at indlæse en pung.
     <message>
         <source>%s corrupt. Try using the wallet tool bitcoin-wallet to salvage or restoring a backup.</source>
         <translation>%s beskadiget. Prøv at bruge pung-værktøjet bitcoin-wallet til, at bjærge eller gendanne en sikkerhedskopi.</translation>
-    </message>
-    <message>
-        <source>Cannot upgrade a non HD split wallet without upgrading to support pre split keypool. Please use version 169900 or no version specified.</source>
-        <translation>Kan ikke opgradere en ikke-HD-splittet pung, uden at opgradere  for, at understøtte præ-split-nøglepøl. Brug venligst version 169900 eller ingen specificeret version.</translation>
     </message>
     <message>
         <source>Invalid amount for -maxtxfee=&lt;amount&gt;: '%s' (must be at least the minrelay fee of %s to prevent stuck transactions)</source>
@@ -4067,10 +4064,6 @@ Gå til Fil &gt; Åbn Pung for, at indlæse en pung.
     <message>
         <source>Loading wallet...</source>
         <translation>Indlæser tegnebog…</translation>
-    </message>
-    <message>
-        <source>Cannot downgrade wallet</source>
-        <translation>Kan ikke nedgradere tegnebog</translation>
     </message>
     <message>
         <source>Rescanning...</source>

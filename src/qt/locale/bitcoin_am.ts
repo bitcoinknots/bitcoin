@@ -2,10 +2,6 @@
 <context>
     <name>AddressBookPage</name>
     <message>
-        <source>Right-click to edit address or label</source>
-        <translation>አድራሻ ወይም መለያ ስም ለመቀየር ቀኙን ጠቅ ያድርጉ</translation>
-    </message>
-    <message>
         <source>Create a new address</source>
         <translation>አዲስ አድራሻ ፍጠር</translation>
     </message>
@@ -168,6 +164,14 @@
         <translation>ቦርሳዎ ምስጢር ተደርጓል</translation>
     </message>
     <message>
+        <source>Enter the new passphrase for the wallet.&lt;br/&gt;Please use a passphrase of &lt;b&gt;ten or more random characters&lt;/b&gt;, or &lt;b&gt;eight or more words&lt;/b&gt;.</source>
+        <translation>አዲስ የይለፍ ሐረግዎን ወደ ቢትኮይን ቦርሳዎ ያስገቡ:: &lt;br/&gt;እባክዎ ለየይለፍ ሐረግዎ&lt;b&gt;አስር ወይም ከዚያ በላይ የዘፈቀደ ዓይነተ-ፊደላት&lt;/b&gt;, ወይም&lt;b&gt;ስምንት ወይም ከዚያ በላይ ቃላት&lt;/b&gt; ይጠቀሙ ::</translation>
+    </message>
+    <message>
+        <source>Enter the old passphrase and new passphrase for the wallet.</source>
+        <translation>የድሮውን የይለፍ-ሐረግ እና አዲሱን የይለፍ-ሐረግ ወደ ቢትኮይን ቦርሳዎ ያስገቡ::</translation>
+    </message>
+    <message>
         <source>IMPORTANT: Any previous backups you have made of your wallet file should be replaced with the newly generated, encrypted wallet file. For security reasons, previous backups of the unencrypted wallet file will become useless as soon as you start using the new, encrypted wallet.</source>
         <translation>አስፈላጊ: ከ ቦርሳ ፋይልዎ ያከናወኗቸው ቀደም ያሉ ምትኬዎች በአዲስ በተፈጠረ የማመስጠሪያ ፋይል ውስጥ መተካት አለባቸው. ለደህንነት ሲባል, አዲሱን የተመሰጠ የቦርሳ ፋይል መጠቀም ሲጀመሩ ወዲያውኑ ቀደም ሲል ያልተመሰጠሩ የቦርሳ ፋይል ቅጂዎች ዋጋ ቢስ ይሆናሉ::</translation>
     </message>
@@ -270,6 +274,10 @@
         <translation>&amp;አማራጮች...</translation>
     </message>
     <message>
+        <source>&amp;Encrypt Wallet...</source>
+        <translation type="unfinished">&amp;የቢትኮይን ቦርሳውን አመስጥር...</translation>
+    </message>
+    <message>
         <source>Create Wallet...</source>
         <translation>ዋሌት ፍጠር</translation>
     </message>
@@ -318,6 +326,14 @@
         <translation>መረጃ</translation>
     </message>
     <message>
+        <source>&amp;Sending addresses</source>
+        <translation type="unfinished">&amp;የመላኪያ አድራሻዎች</translation>
+    </message>
+    <message>
+        <source>&amp;Receiving addresses</source>
+        <translation type="unfinished">&amp;የመቀበያ አድራሻዎች</translation>
+    </message>
+    <message>
         <source>Open Wallet</source>
         <translation>ዋሌት ክፈት</translation>
     </message>
@@ -332,10 +348,6 @@
     <message>
         <source>Close wallet</source>
         <translation>ዋሌት ዝጋ</translation>
-    </message>
-    <message>
-        <source>default wallet</source>
-        <translation>መደበኛ ዋሌት</translation>
     </message>
     <message>
         <source>Minimize</source>
@@ -395,12 +407,20 @@
         <translation>ቀን</translation>
     </message>
     <message>
-        <source>Copy address</source>
-        <translation>አድራሻ ቅዳ</translation>
-    </message>
-    <message>
         <source>Copy amount</source>
         <translation>መጠኑ ገልብጥ</translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;አድራሻ ቅዳ</translation>
+    </message>
+    <message>
+        <source>Copy &amp;label</source>
+        <translation>ቅዳ &amp;መለያ ስም</translation>
+    </message>
+    <message>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;መጠኑ ገልብጥ</translation>
     </message>
     <message>
         <source>Copy fee</source>
@@ -429,12 +449,24 @@
         <translation>ዋሌት ስም</translation>
     </message>
     <message>
+        <source>Encrypt Wallet</source>
+        <translation>የቢትኮይን ቦርሳውን አመስጥር</translation>
+    </message>
+    <message>
         <source>Create</source>
         <translation>ፍጠር</translation>
     </message>
     </context>
 <context>
     <name>EditAddressDialog</name>
+    <message>
+        <source>&amp;Label</source>
+        <translation type="unfinished">&amp;መለያ ስም</translation>
+    </message>
+    <message>
+        <source>&amp;Address</source>
+        <translation type="unfinished">&amp;አድራሻ</translation>
+    </message>
     </context>
 <context>
     <name>FreespaceChecker</name>
@@ -489,6 +521,14 @@
     </message>
     </context>
 <context>
+    <name>NetWatchLogModel</name>
+    <message>
+        <source>Address</source>
+        <comment>NetWatch: Address header</comment>
+        <translation>አድራሻ</translation>
+    </message>
+</context>
+<context>
     <name>OpenURIDialog</name>
     </context>
 <context>
@@ -500,6 +540,10 @@
     </context>
 <context>
     <name>OptionsDialog</name>
+    <message>
+        <source>Options</source>
+        <translation type="unfinished">አማራጮች</translation>
+    </message>
     <message>
         <source>Error</source>
         <translation>ስህተት</translation>
@@ -514,6 +558,13 @@
     </context>
 <context>
     <name>PSBTOperationsDialog</name>
+    <message>
+        <source>Close</source>
+        <translation type="unfinished">ዝጋ</translation>
+    </message>
+    </context>
+<context>
+    <name>PairingPage</name>
     </context>
 <context>
     <name>PaymentServer</name>
@@ -537,23 +588,68 @@
     </context>
 <context>
     <name>RPCConsole</name>
+    <message>
+        <source>&amp;Information</source>
+        <translation type="unfinished">&amp;መረጃ</translation>
+    </message>
+    <message>
+        <source>Wallet: </source>
+        <translation type="unfinished">ዋሌት </translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <extracomment>Context menu action to copy the address of a peer</extracomment>
+        <translation type="unfinished">&amp;አድራሻ ቅዳ</translation>
+    </message>
+    <message>
+        <source>Unknown</source>
+        <translation type="unfinished">የማይታወቅ</translation>
+    </message>
     </context>
 <context>
     <name>ReceiveCoinsDialog</name>
     <message>
-        <source>Copy amount</source>
-        <translation>መጠኑ ገልብጥ</translation>
+        <source>&amp;Amount:</source>
+        <translation type="unfinished">&amp;መጠን:</translation>
+    </message>
+    <message>
+        <source>&amp;Label:</source>
+        <translation type="unfinished">&amp;መለያ ስም:</translation>
+    </message>
+    <message>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;አድራሻ ቅዳ</translation>
+    </message>
+    <message>
+        <source>Copy &amp;label</source>
+        <translation>ቅዳ &amp;መለያ ስም</translation>
+    </message>
+    <message>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;መጠኑ ገልብጥ</translation>
     </message>
     </context>
 <context>
     <name>ReceiveRequestDialog</name>
     <message>
+        <source>Address:</source>
+        <translation type="unfinished">አድራሻ:</translation>
+    </message>
+    <message>
         <source>Amount:</source>
         <translation>መጠን፥</translation>
     </message>
     <message>
+        <source>Label:</source>
+        <translation type="unfinished">መለያ ስም:</translation>
+    </message>
+    <message>
         <source>Wallet:</source>
         <translation>ዋሌት</translation>
+    </message>
+    <message>
+        <source>Copy &amp;Address</source>
+        <translation type="unfinished">&amp;አድራሻ ቅዳ</translation>
     </message>
     </context>
 <context>
@@ -586,8 +682,16 @@
         <translation>ክፍያ፥</translation>
     </message>
     <message>
+        <source>Choose...</source>
+        <translation type="unfinished">ምረጥ...</translation>
+    </message>
+    <message>
         <source>Hide</source>
         <translation>ደብቅ</translation>
+    </message>
+    <message>
+        <source>S&amp;end</source>
+        <translation type="unfinished">&amp;ላክ</translation>
     </message>
     <message>
         <source>Copy amount</source>
@@ -598,12 +702,24 @@
         <translation>ክፍያው ቅዳ</translation>
     </message>
     <message>
+        <source>Send</source>
+        <translation type="unfinished">ላክ</translation>
+    </message>
+    <message>
         <source>(no label)</source>
         <translation>(መለያ ስም የለም)</translation>
     </message>
 </context>
 <context>
     <name>SendCoinsEntry</name>
+    <message>
+        <source>A&amp;mount:</source>
+        <translation type="unfinished">&amp;መጠን:</translation>
+    </message>
+    <message>
+        <source>&amp;Label:</source>
+        <translation type="unfinished">&amp;መለያ ስም:</translation>
+    </message>
     </context>
 <context>
     <name>ShutdownWindow</name>
@@ -646,12 +762,16 @@
 <context>
     <name>TransactionView</name>
     <message>
-        <source>Copy address</source>
-        <translation>አድራሻ ቅዳ</translation>
+        <source>&amp;Copy address</source>
+        <translation type="unfinished">&amp;አድራሻ ቅዳ</translation>
     </message>
     <message>
-        <source>Copy amount</source>
-        <translation>መጠኑ ገልብጥ</translation>
+        <source>Copy &amp;label</source>
+        <translation>ቅዳ &amp;መለያ ስም</translation>
+    </message>
+    <message>
+        <source>Copy &amp;amount</source>
+        <translation type="unfinished">&amp;መጠኑ ገልብጥ</translation>
     </message>
     <message>
         <source>Comma separated file (*.csv)</source>
@@ -715,5 +835,9 @@
     </context>
 <context>
     <name>bitcoin-core</name>
+    <message>
+        <source>Error</source>
+        <translation>ስህተት</translation>
+    </message>
     </context>
 </TS>
