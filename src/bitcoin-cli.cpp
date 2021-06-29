@@ -42,6 +42,7 @@ static const int DEFAULT_HTTP_CLIENT_TIMEOUT=900;
 static constexpr int DEFAULT_WAIT_CLIENT_TIMEOUT = 0;
 static const bool DEFAULT_NAMED=false;
 static const int CONTINUE_EXECUTION=-1;
+static constexpr int8_t UNKNOWN_NETWORK{-1};
 
 /** Default number of blocks to generate for RPC generatetoaddress. */
 static const std::string DEFAULT_NBLOCKS = "1";
@@ -59,6 +60,7 @@ static void SetupCliArgs(ArgsManager& argsman)
     argsman.AddArg("-conf=<file>", strprintf("Specify configuration file. Relative paths will be prefixed by datadir location. (default: %s)", BITCOIN_CONF_FILENAME), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-datadir=<dir>", "Specify data directory", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-generate", strprintf("Generate blocks immediately, equivalent to RPC getnewaddress followed by RPC generatetoaddress. Optional positional integer arguments are number of blocks to generate (default: %s) and maximum iterations to try (default: %s), equivalent to RPC generatetoaddress nblocks and maxtries arguments. Example: bitcoin-cli -generate 4 1000", DEFAULT_NBLOCKS, DEFAULT_MAX_TRIES), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-addrinfo", "Get the number of addresses known to the node, per network and total.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-getinfo", "Get general information from the remote server. Note that unlike server-side RPC calls, the results of -getinfo is the result of multiple non-atomic requests. Some entries in the result may represent results from different states (e.g. wallet balance may be as of a different block from the chain state reported)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-netinfo", "Get network peer connection information from the remote server. An optional integer argument from 0 to 4 can be passed for different peers listings (default: 0).", ArgsManager::ALLOW_INT, OptionsCategory::OPTIONS);
 
@@ -229,6 +231,61 @@ public:
     virtual UniValue ProcessReply(const UniValue &batch_in) = 0;
 };
 
+/** Process addrinfo requests */
+class AddrinfoRequestHandler : public BaseRequestHandler
+{
+private:
+    static constexpr uint8_t m_networks_size{5};
+    const std::array<std::string, m_networks_size> m_networks{{"ipv4", "ipv6", "torv2", "torv3", "i2p"}};
+    int8_t NetworkStringToId(const std::string& str) const
+    {
+        for (uint8_t i = 0; i < m_networks_size; ++i) {
+            if (str == m_networks.at(i)) return i;
+        }
+        return UNKNOWN_NETWORK;
+    }
+
+public:
+    UniValue PrepareRequest(const std::string& method, const std::vector<std::string>& args) override
+    {
+        if (!args.empty()) {
+            throw std::runtime_error("-addrinfo takes no arguments");
+        }
+        UniValue params{RPCConvertValues("getnodeaddresses", std::vector<std::string>{{"0"}})};
+        return JSONRPCRequestObj("getnodeaddresses", params, 1);
+    }
+
+    UniValue ProcessReply(const UniValue& reply) override
+    {
+        if (!reply["error"].isNull()) return reply;
+        const std::vector<UniValue>& nodes{reply["result"].getValues()};
+        if (!nodes.empty() && nodes.at(0)["network"].isNull()) {
+            throw std::runtime_error("-addrinfo requires bitcoind server to be running v0.21.1.knots or newer");
+        }
+        // Count the number of peers we know by network, including torv2 versus torv3.
+        std::array<uint64_t, m_networks_size> counts{{}};
+        for (const UniValue& node : nodes) {
+            std::string network_name{node["network"].get_str()};
+            if (network_name == "onion") {
+                network_name = node["address"].get_str().size() > 22 ? "torv3" : "torv2";
+            }
+            const int8_t network_id{NetworkStringToId(network_name)};
+            if (network_id == UNKNOWN_NETWORK) continue;
+            ++counts.at(network_id);
+        }
+        // Prepare result to return to user.
+        UniValue result{UniValue::VOBJ}, addresses{UniValue::VOBJ};
+        uint64_t total{0}; // Total address count
+        for (uint8_t i = 0; i < m_networks_size; ++i) {
+            addresses.pushKV(m_networks.at(i), counts.at(i));
+            total += counts.at(i);
+        }
+        addresses.pushKV("total", total);
+        result.pushKV("addresses_known", addresses);
+        return JSONRPCReplyObj(result, NullUniValue, 1);
+    }
+};
+
 /** Process getinfo requests */
 class GetinfoRequestHandler: public BaseRequestHandler
 {
@@ -300,7 +357,6 @@ public:
 class NetinfoRequestHandler : public BaseRequestHandler
 {
 private:
-    static constexpr int8_t UNKNOWN_NETWORK{-1};
     static constexpr uint8_t m_networks_size{3};
     const std::array<std::string, m_networks_size> m_networks{{"ipv4", "ipv6", "onion"}};
     std::array<std::array<uint16_t, m_networks_size + 2>, 3> m_counts{{{}}}; //!< Peer counts by (in/out/total, networks/total/block-relay)
@@ -827,6 +883,8 @@ static int CommandLineRPC(int argc, char *argv[])
             } else {
                 ParseError(error, strPrint, nRet);
             }
+        } else if (gArgs.GetBoolArg("-addrinfo", false)) {
+            rh.reset(new AddrinfoRequestHandler());
         } else {
             rh.reset(new DefaultRequestHandler());
             if (args.size() < 1) {
