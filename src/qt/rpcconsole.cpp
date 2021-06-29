@@ -35,6 +35,7 @@
 
 #include <QAbstractButton>
 #include <QFont>
+#include <QFontMetrics>
 #include <QKeyEvent>
 #include <QLatin1String>
 #include <QLocale>
@@ -626,13 +627,21 @@ void RPCConsole::setClientModel(ClientModel *model, int bestblock_height, int64_
         connect(model, &ClientModel::mempoolSizeChanged, this, &RPCConsole::setMempoolSize);
 
         // set up peer table
+        clientModel->getPeerTableModel()->updatePalette();
         ui->peerWidget->setModel(model->getPeerTableModel());
         ui->peerWidget->verticalHeader()->hide();
         ui->peerWidget->setEditTriggers(QAbstractItemView::NoEditTriggers);
         ui->peerWidget->setSelectionBehavior(QAbstractItemView::SelectRows);
         ui->peerWidget->setSelectionMode(QAbstractItemView::ExtendedSelection);
         ui->peerWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+
+        const QFontMetrics fm = ui->peerWidget->fontMetrics();
+        ui->peerWidget->setColumnWidth(PeerTableModel::NetNodeId, GUIUtil::TextWidth(fm, "99999"));
+        ui->peerWidget->setColumnWidth(PeerTableModel::Direction, DIRECTION_COLUMN_WIDTH);
         ui->peerWidget->setColumnWidth(PeerTableModel::Address, ADDRESS_COLUMN_WIDTH);
+        ui->peerWidget->setColumnWidth(PeerTableModel::ConnectionType, GUIUtil::TextWidth(fm, "Address Fetch"));
+        ui->peerWidget->setColumnWidth(PeerTableModel::Sent, GUIUtil::TextWidth(fm, "1023 GBx"));
+        ui->peerWidget->setColumnWidth(PeerTableModel::Received, GUIUtil::TextWidth(fm, "1023 GBx"));
         ui->peerWidget->setColumnWidth(PeerTableModel::Subversion, SUBVERSION_COLUMN_WIDTH);
         ui->peerWidget->setColumnWidth(PeerTableModel::Ping, PING_COLUMN_WIDTH);
         ui->peerWidget->horizontalHeader()->setStretchLastSection(true);
@@ -876,6 +885,10 @@ void RPCConsole::changeEvent(QEvent* e)
                 QTextDocument::ImageResource,
                 QUrl(ICON_MAPPING[i].url),
                 platformStyle->SingleColorImage(ICON_MAPPING[i].source).scaled(QSize(consoleFontSize * 2, consoleFontSize * 2), Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
+        }
+
+        if (clientModel && clientModel->getPeerTableModel()) {
+            clientModel->getPeerTableModel()->updatePalette();
         }
     }
 

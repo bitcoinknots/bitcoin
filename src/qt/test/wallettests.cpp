@@ -182,7 +182,7 @@ void TestGUI(interfaces::Node& node)
     SendCoinsDialog sendCoinsDialog(platformStyle.get());
     TransactionView transactionView(platformStyle.get());
     OptionsModel optionsModel;
-    ClientModel clientModel(node, &optionsModel);
+    ClientModel clientModel(node, &optionsModel, *platformStyle);
     AddWallet(wallet);
     WalletModel walletModel(interfaces::MakeWallet(wallet), clientModel, platformStyle.get());
     RemoveWallet(wallet, nullopt);

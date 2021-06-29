@@ -11,9 +11,11 @@
 #include <memory>
 
 #include <QAbstractTableModel>
+#include <QIcon>
 #include <QStringList>
 
 class PeerTablePriv;
+class PlatformStyle;
 
 namespace interfaces {
 class Node;
@@ -50,17 +52,18 @@ class PeerTableModel : public QAbstractTableModel
     Q_OBJECT
 
 public:
-    explicit PeerTableModel(interfaces::Node& node, QObject* parent);
+    explicit PeerTableModel(interfaces::Node& node, const PlatformStyle&, QObject* parent);
     ~PeerTableModel();
     const CNodeCombinedStats *getNodeStats(int idx);
     int getRowByNodeId(NodeId nodeid);
     void startAutoRefresh();
     void stopAutoRefresh();
 
+    // See also RPCConsole::ColumnWidths in rpcconsole.h
     enum ColumnIndex {
         NetNodeId = 0,
-        Address = 1,
         Direction,
+        Address,
         ConnectionType,
         Ping,
         Sent,
@@ -81,9 +84,13 @@ public:
 
 public Q_SLOTS:
     void refresh();
+    void updatePalette();
 
 private:
     interfaces::Node& m_node;
+    const PlatformStyle& m_platform_style;
+    void DrawIcons();
+    QIcon m_icon_conn_in, m_icon_conn_out;
     QStringList columns;
     std::unique_ptr<PeerTablePriv> priv;
     QTimer *timer;
