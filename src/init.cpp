@@ -92,6 +92,9 @@ static const bool DEFAULT_PROXYRANDOMIZE = true;
 static const bool DEFAULT_REST_ENABLE = false;
 static const bool DEFAULT_STOPAFTERBLOCKIMPORT = false;
 
+//! Check if initial sync is done with no change in block height or queued downloads every 30s
+static constexpr std::chrono::seconds SYNC_CHECK_INTERVAL{30};
+
 #ifdef WIN32
 // Win32 LevelDB doesn't use filedescriptors, and the ones used for
 // accessing block files don't count towards the fd_set size limit
@@ -777,6 +780,34 @@ static void ThreadImport(ChainstateManager& chainman, std::vector<fs::path> vImp
     }
     } // End scope of CImportingNow
     chainman.ActiveChainstate().LoadMempool(args);
+}
+
+/**
+ * Once initial sync is finished and no change in block height or queued downloads,
+ * flush state to protect against data loss
+ */
+static void FlushAfterSync(NodeContext& node)
+{
+    if (::ChainstateActive().IsInitialBlockDownload()) {
+        node.scheduler->scheduleFromNow([&node]{ FlushAfterSync(node); }, SYNC_CHECK_INTERVAL);
+        return;
+    }
+
+    static int last_chain_height = -1;
+    LOCK(cs_main);
+    int current_height = ::ChainActive().Height();
+    if (last_chain_height == -1 || last_chain_height != current_height) {
+        last_chain_height = current_height;
+        node.scheduler->scheduleFromNow([&node]{ FlushAfterSync(node); }, SYNC_CHECK_INTERVAL);
+        return;
+    }
+
+    if (GetNumberOfPeersWithValidatedDownloads() > 0) {
+        node.scheduler->scheduleFromNow([&node]{ FlushAfterSync(node); }, SYNC_CHECK_INTERVAL);
+        return;
+    }
+
+    ::ChainstateActive().ForceFlushStateToDisk();
 }
 
 /** Sanity checks
@@ -2103,6 +2134,8 @@ bool AppInitMain(const util::Ref& context, NodeContext& node, interfaces::BlockA
     node.scheduler->scheduleEvery([banman]{
         banman->DumpBanlist();
     }, DUMP_BANS_INTERVAL);
+
+    node.scheduler->scheduleFromNow([&node]{ FlushAfterSync(node); }, SYNC_CHECK_INTERVAL);
 
 #if HAVE_SYSTEM
     StartupNotify(args);

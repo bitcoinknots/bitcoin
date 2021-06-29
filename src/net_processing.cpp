@@ -928,6 +928,11 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
     return true;
 }
 
+int GetNumberOfPeersWithValidatedDownloads()
+{
+    return nPeersWithValidatedDownloads;
+}
+
 //////////////////////////////////////////////////////////////////////////////
 //
 // mapOrphanTransactions
