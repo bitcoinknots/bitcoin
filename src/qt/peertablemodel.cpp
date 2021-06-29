@@ -35,6 +35,7 @@ bool NodeLessThan::operator()(const CNodeCombinedStats &left, const CNodeCombine
     case PeerTableModel::NetNodeId:
         return pLeft->nodeid < pRight->nodeid;
     case PeerTableModel::Address:
+        if (pLeft->m_network < pRight->m_network) return true;
         return pLeft->addrName.compare(pRight->addrName) < 0;
     case PeerTableModel::Direction:
         return pLeft->fInbound > pRight->fInbound;
