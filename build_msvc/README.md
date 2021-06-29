@@ -5,7 +5,7 @@ Introduction
 ---------------------
 Solution and project files to build the Bitcoin Core applications `msbuild` or Visual Studio can be found in the `build_msvc` directory. The build has been tested with Visual Studio 2017 and 2019.
 
-Building with Visual Studio is an alternative to the Linux based [cross-compiler build](https://github.com/bitcoin/bitcoin/blob/master/doc/build-windows.md).
+Building Knots with Visual Studio is NOT supported, and it is recommended to instead use the Linux based [cross-compiler build](https://github.com/bitcoin/bitcoin/blob/master/doc/build-windows.md).
 
 Quick Start
 ---------------------
