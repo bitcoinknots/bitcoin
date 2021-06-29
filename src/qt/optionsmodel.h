@@ -47,6 +47,7 @@ public:
         StartAtStartup,         // bool
         HideTrayIcon,           // bool
         MinimizeToTray,         // bool
+        NetworkPort,            // int
         MapPortUPnP,            // bool
         MinimizeOnClose,        // bool
         ProxyUse,               // bool

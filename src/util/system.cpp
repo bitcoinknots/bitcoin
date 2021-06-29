@@ -509,6 +509,11 @@ void ArgsManager::ForceSetArg(const std::string& strArg, const std::string& strV
     m_settings.forced_settings[SettingName(strArg)] = strValue;
 }
 
+void ArgsManager::ForceSetArg(const std::string& strArg, int64_t nValue)
+{
+    ForceSetArg(strArg, ToString(nValue));
+}
+
 void ArgsManager::AddArg(const std::string& name, const std::string& help, unsigned int flags, const OptionsCategory& cat)
 {
     // Split arg name from its help param
