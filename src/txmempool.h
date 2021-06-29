@@ -493,6 +493,7 @@ private:
     CBlockPolicyEstimator* minerPolicyEstimator;
 
     uint64_t totalTxSize;      //!< sum of all mempool tx's virtual sizes. Differs from serialized tx size since witness data is discounted. Defined in BIP 141.
+    CAmount m_total_fee GUARDED_BY(cs);       //!< sum of all mempool tx's fees (NOT modified fee)
     uint64_t cachedInnerUsage; //!< sum of dynamic memory usage of all the map elements (NOT the maps themselves)
 
     mutable int64_t lastRollingFeeUpdate;
@@ -733,6 +734,12 @@ public:
     {
         AssertLockHeld(cs);
         return totalTxSize;
+    }
+
+    CAmount GetTotalFee() const EXCLUSIVE_LOCKS_REQUIRED(cs)
+    {
+        AssertLockHeld(cs);
+        return m_total_fee;
     }
 
     bool exists(const GenTxid& gtxid) const

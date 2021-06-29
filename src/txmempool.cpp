@@ -401,6 +401,7 @@ void CTxMemPool::addUnchecked(const CTxMemPoolEntry &entry, setEntries &setAnces
 
     nTransactionsUpdated++;
     totalTxSize += entry.GetTxSize();
+    m_total_fee += entry.GetFee();
     if (minerPolicyEstimator) {minerPolicyEstimator->processTransaction(entry, validFeeEstimate);}
 
     vTxHashes.emplace_back(tx.GetWitnessHash(), newit);
@@ -437,6 +438,7 @@ void CTxMemPool::removeUnchecked(txiter it, MemPoolRemovalReason reason)
         vTxHashes.clear();
 
     totalTxSize -= it->GetTxSize();
+    m_total_fee -= it->GetFee();
     cachedInnerUsage -= it->DynamicMemoryUsage();
     cachedInnerUsage -= memusage::DynamicUsage(it->GetMemPoolParentsConst()) + memusage::DynamicUsage(it->GetMemPoolChildrenConst());
     mapTx.erase(it);
@@ -595,6 +597,7 @@ void CTxMemPool::_clear()
     mapTx.clear();
     mapNextTx.clear();
     totalTxSize = 0;
+    m_total_fee = 0;
     cachedInnerUsage = 0;
     lastRollingFeeUpdate = GetTime();
     blockSinceLastRollingFeeBump = false;
@@ -629,6 +632,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
     LogPrint(BCLog::MEMPOOL, "Checking mempool with %u transactions and %u inputs\n", (unsigned int)mapTx.size(), (unsigned int)mapNextTx.size());
 
     uint64_t checkTotal = 0;
+    CAmount check_total_fee{0};
     uint64_t innerUsage = 0;
 
     CCoinsViewCache mempoolDuplicate(const_cast<CCoinsViewCache*>(pcoins));
@@ -637,6 +641,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
     std::list<const CTxMemPoolEntry*> waitingOnDependants;
     for (indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++) {
         unsigned int i = 0;
+        check_total_fee += it->GetFee();
         checkTotal += it->GetTxSize();
         innerUsage += it->DynamicMemoryUsage();
         const CTransaction& tx = it->GetTx();
@@ -732,6 +737,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
     }
 
     assert(totalTxSize == checkTotal);
+    assert(m_total_fee == check_total_fee);
     assert(innerUsage == cachedInnerUsage);
 }
 
