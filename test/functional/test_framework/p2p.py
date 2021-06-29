@@ -79,6 +79,9 @@ from test_framework.util import (
 
 logger = logging.getLogger("TestFramework.p2p")
 
+# Delay after receiving a tx inv before requesting transactions from non-preferred peers, in seconds
+NONPREF_PEER_TX_DELAY = 2
+
 MESSAGEMAP = {
     b"addr": msg_addr,
     b"addrv2": msg_addrv2,
