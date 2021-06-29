@@ -11,6 +11,7 @@
 
 #include <qt/bantablemodel.h>
 #include <qt/clientmodel.h>
+#include <qt/optionsmodel.h>
 #include <qt/platformstyle.h>
 #include <qt/walletmodel.h>
 #include <chainparams.h>
@@ -642,6 +643,11 @@ void RPCConsole::setClientModel(ClientModel *model, int bestblock_height, int64_
 
         connect(model, &ClientModel::mempoolSizeChanged, this, &RPCConsole::setMempoolSize);
 
+        connect(model->getOptionsModel(), &OptionsModel::peersTabAlternatingRowColorsChanged, [this](bool alternating_row_colors) {
+            ui->peerWidget->setAlternatingRowColors(alternating_row_colors);
+            ui->banlistWidget->setAlternatingRowColors(alternating_row_colors);
+        });
+
         // set up peer table
         clientModel->getPeerTableModel()->updatePalette();
         ui->peerWidget->setModel(model->getPeerTableModel());
@@ -662,6 +668,8 @@ void RPCConsole::setClientModel(ClientModel *model, int bestblock_height, int64_
         ui->peerWidget->setColumnWidth(PeerTableModel::Ping, PING_COLUMN_WIDTH);
         ui->peerWidget->horizontalHeader()->setStretchLastSection(true);
         ui->peerWidget->setItemDelegateForColumn(PeerTableModel::NetNodeId, new PeerIdViewDelegate(this));
+        const bool alternating_row_colors{clientModel->getOptionsModel()->data(clientModel->getOptionsModel()->index(OptionsModel::PeersTabAlternatingRowColors, 0), Qt::EditRole).toBool()};
+        ui->peerWidget->setAlternatingRowColors(alternating_row_colors);
 
         // create peer table context menu actions
         QAction* disconnectAction = new QAction(tr("&Disconnect"), this);
@@ -704,6 +712,7 @@ void RPCConsole::setClientModel(ClientModel *model, int bestblock_height, int64_
         ui->banlistWidget->setColumnWidth(BanTableModel::Address, BANSUBNET_COLUMN_WIDTH);
         ui->banlistWidget->setColumnWidth(BanTableModel::Bantime, BANTIME_COLUMN_WIDTH);
         ui->banlistWidget->horizontalHeader()->setStretchLastSection(true);
+        ui->banlistWidget->setAlternatingRowColors(alternating_row_colors);
 
         // create ban table context menu action
         QAction* unbanAction = new QAction(tr("&Unban"), this);

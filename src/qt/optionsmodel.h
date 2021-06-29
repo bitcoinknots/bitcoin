@@ -58,6 +58,7 @@ public:
         DisplayUnit,            // BitcoinUnits::Unit
         ThirdPartyTxUrls,       // QString
         Language,               // QString
+        PeersTabAlternatingRowColors, // bool
         CoinControlFeatures,    // bool
         ThreadsScriptVerif,     // int
         Prune,                  // bool
@@ -119,6 +120,7 @@ Q_SIGNALS:
     void displayUnitChanged(int unit);
     void coinControlFeaturesChanged(bool);
     void hideTrayIconChanged(bool);
+    void peersTabAlternatingRowColorsChanged(bool);
 };
 
 #endif // BITCOIN_QT_OPTIONSMODEL_H
