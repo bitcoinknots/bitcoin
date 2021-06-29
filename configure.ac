@@ -635,6 +635,7 @@ case $host in
      AC_CHECK_LIB([ws2_32],   [main],, AC_MSG_ERROR(libws2_32 missing))
      AC_CHECK_LIB([shlwapi],  [main],, AC_MSG_ERROR(libshlwapi missing))
      AC_CHECK_LIB([iphlpapi], [main],, AC_MSG_ERROR(libiphlpapi missing))
+     AC_CHECK_LIB([dwmapi],   [main],[have_dwmapi=yes],[have_dwmapi=no])
 
      dnl -static is interpreted by libtool, where it has a different meaning.
      dnl In libtool-speak, it's -all-static.
