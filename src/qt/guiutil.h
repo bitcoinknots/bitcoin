@@ -231,6 +231,9 @@ namespace GUIUtil
     /** Convert enum ConnectionType to QString */
     QString ConnectionTypeToQString(ConnectionType conn_type);
 
+    /** Convert enum ConnectionType to short QString (type only, without direction) */
+    QString ConnectionTypeToShortQString(ConnectionType conn_type, bool relay_txes);
+
     /* Convert seconds into a QString with days, hours, mins, secs */
     QString formatDurationStr(int secs);
 

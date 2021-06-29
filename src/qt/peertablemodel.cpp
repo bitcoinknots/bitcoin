@@ -29,6 +29,10 @@ bool NodeLessThan::operator()(const CNodeCombinedStats &left, const CNodeCombine
         return pLeft->nodeid < pRight->nodeid;
     case PeerTableModel::Address:
         return pLeft->addrName.compare(pRight->addrName) < 0;
+    case PeerTableModel::Direction:
+        return pLeft->fInbound > pRight->fInbound;
+    case PeerTableModel::ConnectionType:
+        return pLeft->m_conn_type < pRight->m_conn_type;
     case PeerTableModel::Subversion:
         return pLeft->cleanSubVer.compare(pRight->cleanSubVer) < 0;
     case PeerTableModel::Ping:
@@ -104,7 +108,7 @@ PeerTableModel::PeerTableModel(interfaces::Node& node, QObject* parent) :
     m_node(node),
     timer(nullptr)
 {
-    columns << tr("NodeId") << tr("Node/Service") << tr("Ping") << tr("Sent") << tr("Received") << tr("User Agent");
+    columns << tr("NodeId") << tr("Node/Service") << tr("Direction") << tr("Type") << tr("Ping") << tr("Sent") << tr("Received") << tr("User Agent");
     priv.reset(new PeerTablePriv());
 
     // set up timer for auto refresh
@@ -156,8 +160,11 @@ QVariant PeerTableModel::data(const QModelIndex &index, int role) const
         case NetNodeId:
             return (qint64)rec->nodeStats.nodeid;
         case Address:
-            // prepend to peer address down-arrow symbol for inbound connection and up-arrow for outbound connection
-            return QString(rec->nodeStats.fInbound ? "↓ " : "↑ ") + QString::fromStdString(rec->nodeStats.addrName);
+            return QString::fromStdString(rec->nodeStats.addrName);
+        case Direction:
+            return QString(rec->nodeStats.fInbound ? "Inbound" : "Outbound");
+        case ConnectionType:
+            return GUIUtil::ConnectionTypeToShortQString(rec->nodeStats.m_conn_type, rec->nodeStats.fRelayTxes);
         case Subversion:
             return QString::fromStdString(rec->nodeStats.cleanSubVer);
         case Ping:
@@ -170,6 +177,8 @@ QVariant PeerTableModel::data(const QModelIndex &index, int role) const
     } else if (role == Qt::TextAlignmentRole) {
         switch (index.column()) {
             case NetNodeId:
+            case Direction:
+            case ConnectionType:
             case Ping:
             case Sent:
             case Received:

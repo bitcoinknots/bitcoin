@@ -774,6 +774,19 @@ QString ConnectionTypeToQString(ConnectionType conn_type)
     assert(false);
 }
 
+QString ConnectionTypeToShortQString(ConnectionType conn_type, bool relay_txes)
+{
+    switch (conn_type) {
+    case ConnectionType::INBOUND: return relay_txes ? QObject::tr("Full Relay") : QObject::tr("Block Relay");
+    case ConnectionType::OUTBOUND_FULL_RELAY: return QObject::tr("Full Relay");
+    case ConnectionType::BLOCK_RELAY: return QObject::tr("Block Relay");
+    case ConnectionType::MANUAL: return QObject::tr("Manual");
+    case ConnectionType::FEELER: return QObject::tr("Feeler");
+    case ConnectionType::ADDR_FETCH: return QObject::tr("Address Fetch");
+    } // no default case, so the compiler can warn about missing cases
+    assert(false);
+}
+
 QString formatDurationStr(int secs)
 {
     QStringList strList;
