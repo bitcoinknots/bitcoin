@@ -30,6 +30,7 @@
 #include <shlwapi.h>
 #endif
 
+#include <QAbstractButton>
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QClipboard>
@@ -393,6 +394,11 @@ void bringToFront(QWidget* w)
         w->activateWindow();
         w->raise();
     }
+}
+
+void AddButtonShortcut(QAbstractButton* button, const QKeySequence& shortcut)
+{
+    QObject::connect(new QShortcut(shortcut, button), &QShortcut::activated, [button]() { button->animateClick(); });
 }
 
 void handleCloseWindowShortcut(QWidget* w)
