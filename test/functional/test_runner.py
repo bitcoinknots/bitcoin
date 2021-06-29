@@ -166,6 +166,7 @@ BASE_SCRIPTS = [
     'rpc_psbt.py --descriptors',
     'rpc_users.py',
     'rpc_whitelist.py',
+    'rpc_getrpcwhitelist.py',
     'feature_proxy.py',
     'rpc_signrawtransaction.py',
     'rpc_signrawtransaction.py --descriptors',
