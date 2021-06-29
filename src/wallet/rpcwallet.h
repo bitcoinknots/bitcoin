@@ -22,6 +22,8 @@ struct WalletContext;
 
 Span<const CRPCCommand> GetWalletRPCCommands();
 
+bool GetWalletRestrictionFromJSONRPCRequest(const JSONRPCRequest&, std::string& out_wallet_allowed);
+
 /**
  * Figures out what wallet, if any, to use for a JSONRPCRequest.
  *
