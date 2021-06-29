@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <netaddress.h>
+#include <netbase.h>
 
 #include <string>
 #include <vector>
@@ -72,7 +73,11 @@ public:
 class NetWhitelistPermissions : public NetPermissions
 {
 public:
-    static bool TryParse(const std::string str, NetWhitelistPermissions& output, bilingual_str& error);
+    static bool TryParse(const std::string str, NetWhitelistPermissions& output, ConnectionDirection& output_connection_direction, bilingual_str& error);
+    static inline bool TryParse(const std::string str, NetWhitelistPermissions& output, bilingual_str& error) {
+        ConnectionDirection connection_direction_ignored;
+        return TryParse(str, output, connection_direction_ignored, error);
+    }
     CSubNet m_subnet;
 };
 

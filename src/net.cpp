@@ -488,12 +488,24 @@ CNode* CConnman::ConnectNode(CAddress addrConnect, const char *pszDest, bool fCo
         return nullptr;
     }
 
+    NetPermissionFlags permission_flags = NetPermissionFlags::PF_NONE;
+    ServiceFlags node_services = nLocalServices;
+    AddWhitelistPermissionFlags(permission_flags, addrConnect, vWhitelistedRangeOutgoing);
+    bool legacyWhitelisted = false;
+    if (NetPermissions::HasFlag(permission_flags, NetPermissionFlags::PF_ISIMPLICIT)) {
+        legacyWhitelisted = true;
+    }
+    InitializePermissionFlags(permission_flags, node_services);
+
     // Add node
     NodeId id = GetNewNodeId();
     uint64_t nonce = GetDeterministicRandomizer(RANDOMIZER_ID_LOCALHOSTNONCE).Write(id).Finalize();
     CAddress addr_bind = GetBindAddress(hSocket);
-    CNode* pnode = new CNode(id, nLocalServices, GetBestHeight(), hSocket, addrConnect, CalculateKeyedNetGroup(addrConnect), nonce, addr_bind, pszDest ? pszDest : "", conn_type);
+    CNode* pnode = new CNode(id, node_services, GetBestHeight(), hSocket, addrConnect, CalculateKeyedNetGroup(addrConnect), nonce, addr_bind, pszDest ? pszDest : "", conn_type);
     pnode->AddRef();
+
+    pnode->m_permissionFlags = permission_flags;
+    pnode->m_legacyWhitelisted = legacyWhitelisted;
 
     // We're making a new connection, harvest entropy from the time (and our peer count)
     RandAddEvent((uint32_t)id);
@@ -512,9 +524,25 @@ void CNode::CloseSocketDisconnect()
     }
 }
 
-void CConnman::AddWhitelistPermissionFlags(NetPermissionFlags& flags, const CNetAddr &addr) const {
-    for (const auto& subnet : vWhitelistedRange) {
+void CConnman::AddWhitelistPermissionFlags(NetPermissionFlags& flags, const CNetAddr &addr, const std::vector<NetWhitelistPermissions>& ranges) const {
+    for (const auto& subnet : ranges) {
         if (subnet.m_subnet.Match(addr)) NetPermissions::AddFlag(flags, subnet.m_flags);
+    }
+}
+
+void CConnman::InitializePermissionFlags(NetPermissionFlags& flags, ServiceFlags& service_flags) {
+    if (NetPermissions::HasFlag(flags, NetPermissionFlags::PF_ISIMPLICIT)) {
+        if (gArgs.GetBoolArg("-whitelistforcerelay", DEFAULT_WHITELISTFORCERELAY)) NetPermissions::AddFlag(flags, PF_FORCERELAY);
+        if (gArgs.GetBoolArg("-whitelistrelay", DEFAULT_WHITELISTRELAY)) NetPermissions::AddFlag(flags, PF_RELAY);
+        NetPermissions::AddFlag(flags, PF_MEMPOOL);
+        NetPermissions::AddFlag(flags, PF_NOBAN);
+    }
+
+    if (NetPermissions::HasFlag(flags, PF_BLOOMFILTER)) {
+        service_flags = static_cast<ServiceFlags>(service_flags | NODE_BLOOM);
+    }
+    if (NetPermissions::HasFlag(flags, PF_BLOCKFILTERS)) {
+        service_flags = static_cast<ServiceFlags>(service_flags | NODE_COMPACT_FILTERS);
     }
 }
 
@@ -1072,17 +1100,14 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket) {
     }
 
     NetPermissionFlags permissionFlags = NetPermissionFlags::PF_NONE;
+    ServiceFlags nodeServices = nLocalServices;
     hListenSocket.AddSocketPermissionFlags(permissionFlags);
-    AddWhitelistPermissionFlags(permissionFlags, addr);
+    AddWhitelistPermissionFlags(permissionFlags, addr, vWhitelistedRange);
     bool legacyWhitelisted = false;
     if (NetPermissions::HasFlag(permissionFlags, NetPermissionFlags::PF_ISIMPLICIT)) {
-        NetPermissions::ClearFlag(permissionFlags, PF_ISIMPLICIT);
-        if (gArgs.GetBoolArg("-whitelistforcerelay", DEFAULT_WHITELISTFORCERELAY)) NetPermissions::AddFlag(permissionFlags, PF_FORCERELAY);
-        if (gArgs.GetBoolArg("-whitelistrelay", DEFAULT_WHITELISTRELAY)) NetPermissions::AddFlag(permissionFlags, PF_RELAY);
-        NetPermissions::AddFlag(permissionFlags, PF_MEMPOOL);
-        NetPermissions::AddFlag(permissionFlags, PF_NOBAN);
         legacyWhitelisted = true;
     }
+    InitializePermissionFlags(permissionFlags, nodeServices);
 
     {
         LOCK(cs_vNodes);
@@ -1147,14 +1172,6 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket) {
     NodeId id = GetNewNodeId();
     uint64_t nonce = GetDeterministicRandomizer(RANDOMIZER_ID_LOCALHOSTNONCE).Write(id).Finalize();
     CAddress addr_bind = GetBindAddress(hSocket);
-
-    ServiceFlags nodeServices = nLocalServices;
-    if (NetPermissions::HasFlag(permissionFlags, PF_BLOOMFILTER)) {
-        nodeServices = static_cast<ServiceFlags>(nodeServices | NODE_BLOOM);
-    }
-    if (NetPermissions::HasFlag(permissionFlags, PF_BLOCKFILTERS)) {
-        nodeServices = static_cast<ServiceFlags>(nodeServices | NODE_COMPACT_FILTERS);
-    }
 
     const bool inbound_onion = std::find(m_onion_binds.begin(), m_onion_binds.end(), addr_bind) != m_onion_binds.end();
     CNode* pnode = new CNode(id, nodeServices, GetBestHeight(), hSocket, addr, CalculateKeyedNetGroup(addr), nonce, addr_bind, "", ConnectionType::INBOUND, inbound_onion);
