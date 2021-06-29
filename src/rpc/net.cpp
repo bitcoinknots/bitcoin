@@ -331,7 +331,12 @@ static RPCHelpMan addnode()
         if (strCommand == "remove") {
             throw std::runtime_error(self.ToString());
         }
-        connection_type = ConnectionTypeFromValue(request.params[2]);
+        if (request.params[2].isBool()) {
+            // Backward compatibility with v0.16.0.knots20180322-v0.20.1.knots20200815
+            connection_type = request.params[2].get_bool() ? ConnectionType::MANUAL : ConnectionType::OUTBOUND_FULL_RELAY;
+        } else {
+            connection_type = ConnectionTypeFromValue(request.params[2]);
+        }
     }
 
     if (strCommand == "onetry")
@@ -1005,7 +1010,7 @@ static const CRPCCommand commands[] =
     { "network",            "getconnectioncount",     &getconnectioncount,     {} },
     { "network",            "ping",                   &ping,                   {} },
     { "network",            "getpeerinfo",            &getpeerinfo,            {} },
-    { "network",            "addnode",                &addnode,                {"node","command","connection_type"} },
+    { "network",            "addnode",                &addnode,                {"node","command","connection_type||privileged"} },
     { "network",            "disconnectnode",         &disconnectnode,         {"address", "nodeid"} },
     { "network",            "getaddednodeinfo",       &getaddednodeinfo,       {"node"} },
     { "network",            "getnettotals",           &getnettotals,           {} },
