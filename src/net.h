@@ -744,8 +744,8 @@ public:
     CAddress addr;
     // Bind address of our side of the connection
     CAddress addrBind;
-    // Name of the network the peer connected through
-    std::string m_network;
+    // Network the peer connected through
+    Network m_network;
     uint32_t m_mapped_as;
     ConnectionType m_conn_type;
     std::string m_conn_type_string;

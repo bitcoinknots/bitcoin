@@ -8,6 +8,7 @@
 #include <amount.h>
 #include <fs.h>
 #include <net.h>
+#include <netaddress.h>
 
 #include <QEvent>
 #include <QHeaderView>
@@ -227,6 +228,9 @@ namespace GUIUtil
 
     /* Convert OS specific boost path to QString through UTF-8 */
     QString boostPathToQString(const fs::path &path);
+
+    /** Convert enum Network to QString */
+    QString NetworkToQString(Network net);
 
     /** Convert enum ConnectionType to QString */
     QString ConnectionTypeToQString(ConnectionType conn_type);
