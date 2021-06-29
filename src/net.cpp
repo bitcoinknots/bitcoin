@@ -536,6 +536,7 @@ void CConnman::InitializePermissionFlags(NetPermissionFlags& flags, ServiceFlags
         if (gArgs.GetBoolArg("-whitelistrelay", DEFAULT_WHITELISTRELAY)) NetPermissions::AddFlag(flags, PF_RELAY);
         NetPermissions::AddFlag(flags, PF_MEMPOOL);
         NetPermissions::AddFlag(flags, PF_NOBAN);
+        NetPermissions::AddFlag(flags, PF_ADDR);
     }
 
     if (NetPermissions::HasFlag(flags, PF_BLOOMFILTER)) {
