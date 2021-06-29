@@ -194,6 +194,9 @@ void OptionsModel::Reset()
     QString dataDir = GUIUtil::getDefaultDataDirectory();
     dataDir = settings.value("strDataDir", dataDir).toString();
 
+    // Remove rw config file
+    gArgs.EraseRWConfigFile();
+
     // Remove all entries from our QSettings object
     settings.clear();
 
