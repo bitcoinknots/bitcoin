@@ -10,17 +10,10 @@
 static const std::string DUMP_MAGIC = "BITCOIN_CORE_WALLET_DUMP";
 uint32_t DUMP_VERSION = 1;
 
-bool DumpWallet(CWallet& wallet, bilingual_str& error)
+bool DumpWallet(CWallet& wallet, bilingual_str& error, const std::string& dump_filename)
 {
     if (wallet.GetDatabase().Format() == "bdb") {
         error = _("This wallet is BDB-backed, which is not supported yet.");
-        return false;
-    }
-
-    // Get the dumpfile
-    std::string dump_filename = gArgs.GetArg("-dumpfile", "");
-    if (dump_filename.empty()) {
-        error = _("No dump file provided. To use dump, -dumpfile=<filename> must be provided.");
         return false;
     }
 
