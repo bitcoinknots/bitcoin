@@ -28,6 +28,8 @@ public:
     Optional<OutputType> m_change_type;
     //! If false, only selected inputs are used
     bool m_add_inputs;
+    //! If false, only safe inputs will be used
+    bool m_include_unsafe_inputs = false;
     //! If false, allows unselected inputs, but requires all selected inputs be used
     bool fAllowOtherInputs;
     //! Includes watch only addresses which are solvable
