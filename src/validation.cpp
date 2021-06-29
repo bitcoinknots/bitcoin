@@ -1162,6 +1162,8 @@ bool ReadBlockFromDisk(CBlock& block, const FlatFilePos& pos, const Consensus::P
     if (filein.IsNull())
         return error("ReadBlockFromDisk: OpenBlockFile failed for %s", pos.ToString());
 
+    ioprio_set_file_idle(filein.Get());
+
     // Read block
     try {
         filein >> block;
