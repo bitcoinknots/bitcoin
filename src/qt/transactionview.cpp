@@ -31,6 +31,7 @@
 #include <QMenu>
 #include <QPoint>
 #include <QScrollBar>
+#include <QSettings>
 #include <QTableView>
 #include <QTimer>
 #include <QUrl>
@@ -203,6 +204,15 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     });
 }
 
+TransactionView::~TransactionView()
+{
+    if (this->model) {
+        // Only save if it would have been already initialised/loaded by setModel
+        QSettings settings;
+        settings.setValue("TransactionViewHeaderState", transactionView->horizontalHeader()->saveState());
+    }
+}
+
 void TransactionView::setModel(WalletModel *_model)
 {
     this->model = _model;
@@ -220,17 +230,22 @@ void TransactionView::setModel(WalletModel *_model)
         transactionView->setAlternatingRowColors(true);
         transactionView->setSelectionBehavior(QAbstractItemView::SelectRows);
         transactionView->setSelectionMode(QAbstractItemView::ExtendedSelection);
-        transactionView->horizontalHeader()->setSortIndicator(TransactionTableModel::Date, Qt::DescendingOrder);
         transactionView->setSortingEnabled(true);
         transactionView->verticalHeader()->hide();
+        transactionView->horizontalHeader()->setMinimumSectionSize(MINIMUM_COLUMN_WIDTH);
+        transactionView->horizontalHeader()->setStretchLastSection(true);
+
+        QSettings settings;
+        if (!transactionView->horizontalHeader()->restoreState(settings.value("TransactionViewHeaderState").toByteArray())) {
 
         transactionView->setColumnWidth(TransactionTableModel::Status, STATUS_COLUMN_WIDTH);
         transactionView->setColumnWidth(TransactionTableModel::Watchonly, WATCHONLY_COLUMN_WIDTH);
         transactionView->setColumnWidth(TransactionTableModel::Date, DATE_COLUMN_WIDTH);
         transactionView->setColumnWidth(TransactionTableModel::Type, TYPE_COLUMN_WIDTH);
         transactionView->setColumnWidth(TransactionTableModel::Amount, AMOUNT_MINIMUM_COLUMN_WIDTH);
-        transactionView->horizontalHeader()->setMinimumSectionSize(MINIMUM_COLUMN_WIDTH);
-        transactionView->horizontalHeader()->setStretchLastSection(true);
+
+        }
+        transactionView->horizontalHeader()->setSortIndicator(TransactionTableModel::Date, Qt::DescendingOrder);
 
         if (_model->getOptionsModel())
         {
