@@ -256,7 +256,7 @@ static bool InitRPCAuthentication()
         for (std::string rpcauth : gArgs.GetArgs("-rpcauth")) {
             std::vector<std::string> fields;
             boost::split(fields, rpcauth, boost::is_any_of(":$"));
-            if (fields.size() == 3) g_rpcauth.push_back(fields);
+            if (fields.size() >= 3 && fields.size() <= 4) g_rpcauth.push_back(fields);
         }
         for (std::string path : gArgs.GetArgs("-rpcauthfile")) {
             fsbridge::ifstream file;
@@ -266,7 +266,7 @@ static bool InitRPCAuthentication()
             while (std::getline(file, rpcauth)) {
                 std::vector<std::string> fields;
                 boost::split(fields, rpcauth, boost::is_any_of(":$"));
-                if (fields.size() == 3) g_rpcauth.push_back(fields);
+                if (fields.size() >= 3 && fields.size() <= 4) g_rpcauth.push_back(fields);
             }
         }
     }
