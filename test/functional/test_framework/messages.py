@@ -583,6 +583,9 @@ class CTransaction:
     def serialize(self):
         return self.serialize_with_witness()
 
+    def getwtxid(self):
+        return hash256(self.serialize())[::-1].hex()
+
     # Recalculate the txid (transaction hash without witness)
     def rehash(self):
         self.sha256 = None
