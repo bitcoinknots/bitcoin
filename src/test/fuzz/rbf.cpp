@@ -22,6 +22,8 @@ void test_one_input(const std::vector<uint8_t>& buffer)
     if (!mtx) {
         return;
     }
+    const CTransaction tx{*mtx};
+    if (!SanityCheckForConsumeTxMemPoolEntry(tx)) return;
     CTxMemPool pool;
     while (fuzzed_data_provider.ConsumeBool()) {
         const std::optional<CMutableTransaction> another_mtx = ConsumeDeserializable<CMutableTransaction>(fuzzed_data_provider);
@@ -29,13 +31,13 @@ void test_one_input(const std::vector<uint8_t>& buffer)
             break;
         }
         const CTransaction another_tx{*another_mtx};
+        if (!SanityCheckForConsumeTxMemPoolEntry(another_tx)) break;
         if (fuzzed_data_provider.ConsumeBool() && !mtx->vin.empty()) {
             mtx->vin[0].prevout = COutPoint{another_tx.GetHash(), 0};
         }
         LOCK2(cs_main, pool.cs);
         pool.addUnchecked(ConsumeTxMemPoolEntry(fuzzed_data_provider, another_tx));
     }
-    const CTransaction tx{*mtx};
     if (fuzzed_data_provider.ConsumeBool()) {
         LOCK2(cs_main, pool.cs);
         pool.addUnchecked(ConsumeTxMemPoolEntry(fuzzed_data_provider, tx));

@@ -240,8 +240,10 @@ CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CMutableTransaction& tx)
 
 CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransactionRef& tx)
 {
-    return CTxMemPoolEntry(tx, nFee, nTime, nHeight,
-                           spendsCoinbase, sigOpCost, lp);
+    const double dPriority = 0;
+    const CAmount inChainValue = 0;
+    return CTxMemPoolEntry(tx, nFee, nTime, dPriority, nHeight,
+                           inChainValue, spendsCoinbase, sigOpCost, lp);
 }
 
 /**

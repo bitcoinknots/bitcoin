@@ -4,6 +4,7 @@
 
 #include <bench/bench.h>
 #include <rpc/blockchain.h>
+#include <test/util/setup_common.h>
 #include <txmempool.h>
 
 #include <univalue.h>
@@ -12,11 +13,19 @@
 static void AddTx(const CTransactionRef& tx, const CAmount& fee, CTxMemPool& pool) EXCLUSIVE_LOCKS_REQUIRED(cs_main, pool.cs)
 {
     LockPoints lp;
-    pool.addUnchecked(CTxMemPoolEntry(tx, fee, /* time */ 0, /* height */ 1, /* spendsCoinbase */ false, /* sigOpCost */ 4, lp));
+    pool.addUnchecked(CTxMemPoolEntry(tx, fee, /* time */ 0, /* priority */ 0, /* height */ 0, /* in chain input value */ 0, /* spendsCoinbase */ false, /* sigOpCost */ 4, lp));
 }
 
 static void RpcMempool(benchmark::Bench& bench)
 {
+    TestingSetup test_setup{
+        CBaseChainParams::REGTEST,
+        /* extra_args */ {
+            "-nodebuglogfile",
+            "-nodebug",
+        },
+    };
+
     CTxMemPool pool;
     LOCK2(cs_main, pool.cs);
 
