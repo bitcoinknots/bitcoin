@@ -209,6 +209,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, TxValidationState &state, const CTrans
                         std::list<CTransactionRef>* plTxnReplaced,
                         bool bypass_limits, bool test_accept=false, CAmount* fee_out=nullptr) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
+void LimitMempoolSize(CTxMemPool& pool);
+
 /** Get the BIP9 state for a given deployment at the current tip. */
 ThresholdState VersionBitsTipState(const Consensus::Params& params, Consensus::DeploymentPos pos);
 

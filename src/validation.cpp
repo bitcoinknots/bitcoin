@@ -344,6 +344,11 @@ static void LimitMempoolSize(CTxMemPool& pool, size_t limit, std::chrono::second
         ::ChainstateActive().CoinsTip().Uncache(removed);
 }
 
+void LimitMempoolSize(CTxMemPool& pool) {
+    LOCK2(cs_main, pool.cs);
+    LimitMempoolSize(pool, gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000, std::chrono::hours{gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY)});
+}
+
 static bool IsCurrentForFeeEstimation() EXCLUSIVE_LOCKS_REQUIRED(cs_main)
 {
     AssertLockHeld(cs_main);

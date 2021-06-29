@@ -550,6 +550,36 @@ UniValue MempoolToJSON(const CTxMemPool& pool, bool verbose, bool include_mempoo
     }
 }
 
+static RPCHelpMan maxmempool()
+{
+    return RPCHelpMan{"maxmempool",
+                "\nSets the allocated memory for the memory pool.\n",
+                {
+                    {"megabytes", RPCArg::Type::NUM, RPCArg::Optional::NO, "The memory allocated in MB"},
+                },
+                RPCResult{
+                    RPCResult::Type::NONE, "", ""},
+                RPCExamples{
+                    HelpExampleCli("maxmempool", "150") + HelpExampleRpc("maxmempool", "150")
+                },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    int64_t nSize = request.params[0].get_int64();
+    int64_t nMempoolSizeMax = nSize * 1000000;
+    int64_t nMempoolSizeMin = maxmempoolMinimum(gArgs.GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT)) * 1000000;
+    if (nMempoolSizeMax < 0 || nMempoolSizeMax < nMempoolSizeMin)
+        throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("MaxMempool size %d is too small", nSize));
+    gArgs.ForceSetArg("-maxmempool", strprintf("%d", nSize));
+
+    if (request.context.Has<NodeContext>() && request.context.Get<NodeContext>().mempool) {
+        LimitMempoolSize(*request.context.Get<NodeContext>().mempool);
+    }
+
+    return NullUniValue;
+}
+    };
+}
+
 static RPCHelpMan getrawmempool()
 {
     return RPCHelpMan{"getrawmempool",
@@ -3139,6 +3169,7 @@ static const CRPCCommand commands[] =
     { "blockchain",         "setprunelock",           &setprunelock,           {"id", "lock_info"} },
     { "blockchain",         "pruneblockchain",        &pruneblockchain,        {"height"} },
     { "blockchain",         "savemempool",            &savemempool,            {} },
+    { "blockchain",         "maxmempool",             &maxmempool,             {"megabytes"} },
     { "blockchain",         "verifychain",            &verifychain,            {"checklevel","nblocks"} },
 
     { "blockchain",         "preciousblock",          &preciousblock,          {"blockhash"} },
