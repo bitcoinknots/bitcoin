@@ -5216,6 +5216,7 @@ int VersionBitsTipStateSinceHeight(const Consensus::Params& params, Consensus::D
 }
 
 static const uint64_t MEMPOOL_DUMP_VERSION = 1;
+static const uint64_t MEMPOOL_DUMP_VERSION_KNOTS_014 = 2;  // Knots 0.14-0.21.0
 static constexpr uint64_t MEMPOOL_KNOTS_DUMP_VERSION = 0;
 
 bool LoadMempoolKnots(CTxMemPool& pool)
@@ -5247,6 +5248,129 @@ bool LoadMempoolKnots(CTxMemPool& pool)
     return true;
 }
 
+bool LoadMempoolKnots014(CTxMemPool& pool, CAutoFile& file)
+{
+    const CChainParams& chainparams = Params();
+    int64_t nExpiryTimeout = gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
+
+    int64_t count = 0;
+    int64_t expired = 0;
+    int64_t failed = 0;
+    int64_t already_there = 0;
+    int64_t unbroadcast = 0;
+    int64_t nNow = GetTime();
+
+    try {
+        std::map<std::string, std::vector<unsigned char>> mapData;
+        {
+            // Manually deserialise mapData to avoid limiting value data (which includes the entire mempool) to <= 32 MiB
+            unsigned int mapData_size = ReadCompactSize(file);
+            std::string key;
+            for (unsigned int i = 0; i < mapData_size; ++i) {
+                file >> key;
+                auto& value = mapData[key];
+                const unsigned int value_size = ReadCompactSize(file, /* range_check */ false);
+                if (value_size > gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000 * 2) {
+                    // 2x the configured maxmempool size should be more than enough
+                    throw std::ios_base::failure("ReadCompactSize(): size too large");
+                }
+                value.resize(value_size);
+                file.read((char*)value.data(), value_size);
+            }
+        }
+
+        auto it = mapData.find("deltas");
+        if (it != mapData.end()) {
+            try {
+                CDataStream ss(it->second, SER_DISK, CLIENT_VERSION);
+                LOCK(pool.cs);
+                ss >> pool.mapDeltas;
+            } catch (const std::exception& e) {
+                LogPrintf("Failed to deserialize mempool %s from disk: %s. Continuing anyway.\n", "deltas", e.what());
+            }
+        }
+
+        it = mapData.find("txs");
+        if (it != mapData.end()) {
+            std::vector<std::map<std::string, std::vector<unsigned char>>> txMapDatas;
+            try {
+                CDataStream(it->second, SER_DISK, CLIENT_VERSION) >> txMapDatas;
+            } catch (const std::exception& e) {
+                LogPrintf("Failed to deserialize mempool %s from disk: %s. Continuing anyway.\n", "transactions", e.what());
+            }
+            for (auto mapTxData : txMapDatas) {
+                try {
+                    it = mapTxData.find("t");
+                    if (it == mapTxData.end()) {
+                        throw std::runtime_error("mapTxData \"t\" key missing");
+                    }
+                    int64_t nTime;
+                    CDataStream(it->second, SER_DISK, CLIENT_VERSION) >> nTime;
+                    if (nTime <= nNow - nExpiryTimeout) {
+                        ++expired;
+                        continue;
+                    }
+
+                    it = mapTxData.find("");
+                    if (it == mapTxData.end()) {
+                        throw std::runtime_error("mapTxData null key missing");
+                    }
+                    CDataStream ssTx(it->second, SER_DISK, CLIENT_VERSION);
+                    CTransactionRef tx;
+                    ssTx >> tx;
+
+                    // mempool may contain the transaction already, e.g. from
+                    // wallet(s) having loaded it while we were processing
+                    // mempool transactions; consider these as valid, instead of
+                    // failing, but mark them as 'already there'
+                    if (pool.exists(tx->GetHash())) {
+                        ++count;
+                        ++already_there;
+                        continue;
+                    }
+
+                    TxValidationState state;
+                    LOCK(cs_main);
+                    AcceptToMemoryPoolWithTime(chainparams, pool, state, tx, nTime,
+                                               nullptr /* plTxnReplaced */, empty_ignore_rejects,
+                                               false /* test_accept */);
+                    if (!state.IsValid()) {
+                        throw std::runtime_error(state.GetRejectReason());
+                    }
+                    ++count;
+                } catch (const std::exception& e) {
+                    ++failed;
+                }
+            }
+            if (ShutdownRequested())
+                return false;
+        }
+
+        it = mapData.find("unbroadcast_txids");
+        if (it != mapData.end()) {
+            std::set<uint256> unbroadcast_txids;
+            try {
+                CDataStream ss(it->second, SER_DISK, CLIENT_VERSION);
+                ss >> unbroadcast_txids;
+                unbroadcast = unbroadcast_txids.size();
+            } catch (const std::exception& e) {
+                LogPrintf("Failed to deserialize mempool %s from disk: %s. Continuing anyway.\n", "unbroadcast txids", e.what());
+            }
+            for (const auto& txid : unbroadcast_txids) {
+                // Ensure transactions were accepted to mempool then add to
+                // unbroadcast set.
+                if (pool.get(txid) != nullptr) pool.AddUnbroadcastTx(txid);
+            }
+        }
+    } catch (const std::exception& e) {
+        LogPrintf("Failed to deserialize mempool data on disk: %s. Continuing anyway.\n", e.what());
+        return false;
+    }
+
+    LogPrintf("Imported mempool transactions from disk: %i succeeded, %i failed, %i expired, %i already there, %i waiting for initial broadcast\n", count, failed, expired, already_there, unbroadcast);
+    return true;
+}
+
 bool LoadMempool(CTxMemPool& pool)
 {
     const CChainParams& chainparams = Params();
@@ -5269,6 +5393,9 @@ bool LoadMempool(CTxMemPool& pool)
         uint64_t version;
         file >> version;
         if (version != MEMPOOL_DUMP_VERSION) {
+            if (version == MEMPOOL_DUMP_VERSION_KNOTS_014) {
+                return LoadMempoolKnots014(pool, file);
+            }
             return false;
         }
         uint64_t num;
