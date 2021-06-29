@@ -97,7 +97,8 @@ void test_one_input(const std::vector<uint8_t>& buffer)
     const CCoinsViewCache coins_view_cache(&coins_view);
     (void)AreInputsStandard(tx, coins_view_cache, false);
     (void)AreInputsStandard(tx, coins_view_cache, true);
-    (void)IsWitnessStandard(tx, coins_view_cache);
+    std::string reject_reason;
+    (void)IsWitnessStandard(tx, coins_view_cache, "fuzz", reject_reason);
 
     UniValue u(UniValue::VOBJ);
     // ValueFromAmount(i) not defined when i == std::numeric_limits<int64_t>::min()

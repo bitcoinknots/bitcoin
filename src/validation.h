@@ -16,6 +16,7 @@
 #include <fs.h>
 #include <optional.h>
 #include <policy/feerate.h>
+#include <policy/policy.h>
 #include <protocol.h> // For CMessageHeader::MessageStartChars
 #include <script/script_error.h>
 #include <sync.h>
@@ -204,12 +205,23 @@ bool DeletePruneLock(const std::string& lockid) EXCLUSIVE_LOCKS_REQUIRED(g_prune
 /** Prune block files up to a given height */
 void PruneBlockFilesManual(int nManualPruneHeight);
 
+static const std::string rejectmsg_lowfee_mempool = "mempool min fee not met";
+static const std::string rejectmsg_lowfee_relay = "min relay fee not met";
+static const std::string rejectmsg_mempoolfull = "mempool full";
+
 /** (try to) add transaction to memory pool
  * plTxnReplaced will be appended to with all transactions replaced from mempool
  * @param[out] fee_out optional argument to return tx fee to the caller **/
 bool AcceptToMemoryPool(CTxMemPool& pool, TxValidationState &state, const CTransactionRef &tx,
                         std::list<CTransactionRef>* plTxnReplaced,
-                        bool bypass_limits, bool test_accept=false, CAmount* fee_out=nullptr) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+                        const ignore_rejects_type&, bool test_accept=false, CAmount* fee_out=nullptr) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+
+static inline bool AcceptToMemoryPool(CTxMemPool& pool, TxValidationState &state, const CTransactionRef &tx,
+                        std::list<CTransactionRef>* plTxnReplaced,
+                        bool bypass_limits, bool test_accept=false, CAmount* fee_out=nullptr) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
+    static const ignore_rejects_type ignore_rejects_legacy{rejectmsg_lowfee_mempool, rejectmsg_lowfee_relay, rejectmsg_mempoolfull};
+    return AcceptToMemoryPool(pool, state, tx, plTxnReplaced, (bypass_limits ? ignore_rejects_legacy : empty_ignore_rejects), test_accept, fee_out);
+}
 
 void LimitMempoolSize(CTxMemPool& pool);
 
