@@ -51,12 +51,12 @@ CoinControlDialog::CoinControlDialog(CCoinControl& coin_control, WalletModel* _m
     ui->setupUi(this);
 
     // context menu actions
-    QAction *copyAddressAction = new QAction(tr("Copy address"), this);
-    QAction *copyLabelAction = new QAction(tr("Copy label"), this);
-    QAction *copyAmountAction = new QAction(tr("Copy amount"), this);
-             copyTransactionHashAction = new QAction(tr("Copy transaction ID"), this);  // we need to enable/disable this
-             lockAction = new QAction(tr("Lock unspent"), this);                        // we need to enable/disable this
-             unlockAction = new QAction(tr("Unlock unspent"), this);                    // we need to enable/disable this
+    QAction *copyAddressAction = new QAction(tr("&Copy address"), this);
+    QAction *copyLabelAction = new QAction(tr("Copy &label"), this);
+    QAction *copyAmountAction = new QAction(tr("Copy &amount"), this);
+             copyTransactionHashAction = new QAction(tr("Copy transaction &ID"), this);  // we need to enable/disable this
+             lockAction = new QAction(tr("L&ock unspent"), this);                        // we need to enable/disable this
+             unlockAction = new QAction(tr("&Unlock unspent"), this);                    // we need to enable/disable this
 
     // context menu
     contextMenu = new QMenu(this);

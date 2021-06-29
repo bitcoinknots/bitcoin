@@ -149,17 +149,17 @@ TransactionView::TransactionView(const PlatformStyle *platformStyle, QWidget *pa
     transactionView->setObjectName("transactionView");
 
     // Actions
-    abandonAction = new QAction(tr("Abandon transaction"), this);
-    bumpFeeAction = new QAction(tr("Increase transaction fee"), this);
+    abandonAction = new QAction(tr("A&bandon transaction"), this);
+    bumpFeeAction = new QAction(tr("Increase transaction &fee"), this);
     bumpFeeAction->setObjectName("bumpFeeAction");
-    copyAddressAction = new QAction(tr("Copy address"), this);
-    copyLabelAction = new QAction(tr("Copy label"), this);
-    QAction *copyAmountAction = new QAction(tr("Copy amount"), this);
-    QAction *copyTxIDAction = new QAction(tr("Copy transaction ID"), this);
-    QAction *copyTxHexAction = new QAction(tr("Copy raw transaction"), this);
-    QAction *copyTxPlainText = new QAction(tr("Copy full transaction details"), this);
-    QAction *editLabelAction = new QAction(tr("Edit label"), this);
-    QAction *showDetailsAction = new QAction(tr("Show transaction details"), this);
+    copyAddressAction = new QAction(tr("&Copy address"), this);
+    copyLabelAction = new QAction(tr("Copy &label"), this);
+    QAction *copyAmountAction = new QAction(tr("Copy &amount"), this);
+    QAction *copyTxIDAction = new QAction(tr("Copy transaction &ID"), this);
+    QAction *copyTxHexAction = new QAction(tr("Copy &raw transaction"), this);
+    QAction *copyTxPlainText = new QAction(tr("Copy full transaction &details"), this);
+    QAction *editLabelAction = new QAction(tr("&Edit label"), this);
+    QAction *showDetailsAction = new QAction(tr("&Show transaction details"), this);
 
     contextMenu = new QMenu(this);
     contextMenu->setObjectName("contextMenu");

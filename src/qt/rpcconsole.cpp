@@ -674,7 +674,7 @@ void RPCConsole::setClientModel(ClientModel *model, int bestblock_height, int64_
         // create peer table context menu actions
         QAction* disconnectAction = new QAction(tr("&Disconnect"), this);
         QAction* banAction1h      = new QAction(tr("Ban for") + " " + tr("1 &hour"), this);
-        QAction* banAction24h     = new QAction(tr("Ban for") + " " + tr("1 &day"), this);
+        QAction* banAction24h     = new QAction(tr("Ban for") + " " + tr("1 d&ay"), this);
         QAction* banAction7d      = new QAction(tr("Ban for") + " " + tr("1 &week"), this);
         QAction* banAction365d    = new QAction(tr("Ban for") + " " + tr("1 &year"), this);
 

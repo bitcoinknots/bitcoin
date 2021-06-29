@@ -43,11 +43,11 @@ ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, QWid
     }
 
     // context menu actions
-    QAction *copyURIAction = new QAction(tr("Copy URI"), this);
-    QAction* copyAddressAction = new QAction(tr("Copy address"), this);
-    copyLabelAction = new QAction(tr("Copy label"), this);
-    copyMessageAction = new QAction(tr("Copy message"), this);
-    copyAmountAction = new QAction(tr("Copy amount"), this);
+    QAction *copyURIAction = new QAction(tr("Copy &URI"), this);
+    QAction* copyAddressAction = new QAction(tr("&Copy address"), this);
+    copyLabelAction = new QAction(tr("Copy &label"), this);
+    copyMessageAction = new QAction(tr("Copy &message"), this);
+    copyAmountAction = new QAction(tr("Copy &amount"), this);
 
     // context menu
     contextMenu = new QMenu(this);
