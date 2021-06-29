@@ -4370,7 +4370,7 @@ static RPCHelpMan sethdseed()
 
     // Do not do anything to non-HD wallets
     if (!pwallet->CanSupportFeature(FEATURE_HD)) {
-        throw JSONRPCError(RPC_WALLET_ERROR, "Cannot set an HD seed on a non-HD wallet. Use the upgradewallet RPC in order to upgrade a non-HD wallet to HD");
+        throw JSONRPCError(RPC_WALLET_ERROR, "Cannot set a HD seed on a non-HD wallet. Use the upgradewallet RPC in order to upgrade a non-HD wallet to HD");
     }
 
     EnsureWalletIsUnlocked(pwallet);
@@ -4610,10 +4610,10 @@ static RPCHelpMan walletcreatefundedpsbt()
 static RPCHelpMan upgradewallet()
 {
     return RPCHelpMan{"upgradewallet",
-        "\nUpgrade the wallet. Upgrades to the latest version if no version number is specified.\n"
+        "\nUpgrade the wallet. Upgrades to the latest version if no version number is specified\n"
         "New keys may be generated and a new wallet backup will need to be made.",
         {
-            {"version", RPCArg::Type::NUM, /* default */ strprintf("%d", FEATURE_LATEST), "The version number to upgrade to. Default is the latest wallet version."}
+            {"version", RPCArg::Type::NUM, /* default */ strprintf("%d", FEATURE_LATEST), "The version number to upgrade to. Default is the latest wallet version"}
         },
         RPCResult{
             RPCResult::Type::OBJ, "", "",
