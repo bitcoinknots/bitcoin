@@ -10,6 +10,7 @@ export HOST=i686-pc-linux-gnu
 export CONTAINER_NAME=ci_i686_centos_7
 export DOCKER_NAME_TAG=centos:7
 export DOCKER_PACKAGES="gcc-c++ glibc-devel.x86_64 libstdc++-devel.x86_64 glibc-devel.i686 libstdc++-devel.i686 ccache libtool make git python3 python36-zmq which patch lbzip2 dash"
+DOCKER_PACKAGES+=" libicns-utils librsvg2-tools ImageMagick"
 export GOAL="install"
 export BITCOIN_CONFIG="--enable-zmq --with-gui=qt5 --enable-reduce-exports --with-boost-process"
 export CONFIG_SHELL="/bin/dash"

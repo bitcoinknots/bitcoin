@@ -61,10 +61,10 @@ fi
 
 if [[ $DOCKER_NAME_TAG == centos* ]]; then
   ${CI_RETRY_EXE} DOCKER_EXEC yum -y install epel-release
-  ${CI_RETRY_EXE} DOCKER_EXEC yum -y install $DOCKER_PACKAGES $PACKAGES
+  ${CI_RETRY_EXE} DOCKER_EXEC yum -y install $DOCKER_PACKAGES $PACKAGES $COMMON_PACKAGES
 elif [ "$CI_USE_APT_INSTALL" != "no" ]; then
   ${CI_RETRY_EXE} DOCKER_EXEC apt-get update
-  ${CI_RETRY_EXE} DOCKER_EXEC apt-get install --no-install-recommends --no-upgrade -y $PACKAGES $DOCKER_PACKAGES
+  ${CI_RETRY_EXE} DOCKER_EXEC apt-get install --no-install-recommends --no-upgrade -y $COMMON_PACKAGES $PACKAGES $DOCKER_PACKAGES
 fi
 
 if [ "$CI_OS_NAME" == "macos" ]; then
