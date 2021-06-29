@@ -17,6 +17,7 @@
 #include <QLabel>
 #include <QMainWindow>
 #include <QMap>
+#include <QMenu>
 #include <QPoint>
 #include <QSystemTrayIcon>
 
@@ -173,6 +174,8 @@ private:
     RPCConsole* rpcConsole = nullptr;
     HelpMessageDialog* helpMessageDialog = nullptr;
     ModalOverlay* modalOverlay = nullptr;
+
+    QMenu* m_network_context_menu = new QMenu(this);
 
 #ifdef Q_OS_MAC
     CAppNapInhibitor* m_app_nap_inhibitor = nullptr;
