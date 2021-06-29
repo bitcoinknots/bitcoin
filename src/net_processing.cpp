@@ -18,6 +18,7 @@
 #include <netmessagemaker.h>
 #include <policy/fees.h>
 #include <policy/policy.h>
+#include <pow.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
 #include <random.h>
@@ -113,8 +114,6 @@ static const int64_t BLOCK_DOWNLOAD_TIMEOUT_BASE = 1000000;
 static const int64_t BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 500000;
 /** Maximum number of headers to announce when relaying blocks with headers message.*/
 static const unsigned int MAX_BLOCKS_TO_ANNOUNCE = 8;
-/** Maximum number of unconnecting headers announcements before DoS score */
-static const int MAX_UNCONNECTING_HEADERS = 10;
 /** Minimum blocks required to signal NODE_NETWORK_LIMITED */
 static const unsigned int NODE_NETWORK_LIMITED_MIN_BLOCKS = 288;
 /** Average delay between local address broadcasts */
@@ -1083,6 +1082,20 @@ void PeerManager::Misbehaving(const NodeId pnode, const int howmuch, const std::
     }
 }
 
+static void HandleDoSPunishment(CConnman& connman, NodeId node_id, const int nDoS, const char * const what_is_it) {
+    // We never actually DoS ban for invalid blocks, merely disconnect nodes if we're relying on them as a primary node
+    const std::string msg = strprintf("peer=%d got DoS score %d on invalid %s", node_id, nDoS, what_is_it);
+    connman.ForNode(node_id, [msg](CNode* node) {
+        if (node->PunishInvalidBlocks()) {
+            LogPrint(BCLog::NET, "%s; simply disconnecting\n", msg);
+            node->fDisconnect = true;
+        } else {
+            LogPrint(BCLog::NET, "%s; tolerating\n", msg);
+        }
+        return true;
+    });
+}
+
 bool PeerManager::MaybePunishNodeForBlock(NodeId nodeid, const BlockValidationState& state,
                                           bool via_compact_block, const std::string& message)
 {
@@ -1093,7 +1106,7 @@ bool PeerManager::MaybePunishNodeForBlock(NodeId nodeid, const BlockValidationSt
     case BlockValidationResult::BLOCK_CONSENSUS:
     case BlockValidationResult::BLOCK_MUTATED:
         if (!via_compact_block) {
-            Misbehaving(nodeid, 100, message);
+            HandleDoSPunishment(m_connman, nodeid, 100, "block");
             return true;
         }
         break;
@@ -1108,7 +1121,7 @@ bool PeerManager::MaybePunishNodeForBlock(NodeId nodeid, const BlockValidationSt
             // Discourage outbound (but not inbound) peers if on an invalid chain.
             // Exempt HB compact block peers and manual connections.
             if (!via_compact_block && !node_state->m_is_inbound && !node_state->m_is_manual_connection) {
-                Misbehaving(nodeid, 100, message);
+                HandleDoSPunishment(m_connman, nodeid, 100, "block");
                 return true;
             }
             break;
@@ -1116,12 +1129,12 @@ bool PeerManager::MaybePunishNodeForBlock(NodeId nodeid, const BlockValidationSt
     case BlockValidationResult::BLOCK_INVALID_HEADER:
     case BlockValidationResult::BLOCK_CHECKPOINT:
     case BlockValidationResult::BLOCK_INVALID_PREV:
-        Misbehaving(nodeid, 100, message);
+        HandleDoSPunishment(m_connman, nodeid, 100, "block header");
         return true;
     // Conflicting (but not necessarily invalid) data or different policy:
     case BlockValidationResult::BLOCK_MISSING_PREV:
         // TODO: Handle this much more gracefully (10 DoS points is super arbitrary)
-        Misbehaving(nodeid, 10, message);
+        HandleDoSPunishment(m_connman, nodeid, 10, "block header");
         return true;
     case BlockValidationResult::BLOCK_RECENT_CONSENSUS_CHANGE:
     case BlockValidationResult::BLOCK_TIME_FUTURE:
@@ -1140,7 +1153,7 @@ bool PeerManager::MaybePunishNodeForTx(NodeId nodeid, const TxValidationState& s
         break;
     // The node is providing invalid data:
     case TxValidationResult::TX_CONSENSUS:
-        Misbehaving(nodeid, 100, message);
+        HandleDoSPunishment(m_connman, nodeid, 100, "transaction");
         return true;
     // Conflicting (but not necessarily invalid) data or different policy:
     case TxValidationResult::TX_RECENT_CONSENSUS_CHANGE:
@@ -1871,12 +1884,23 @@ void PeerManager::ProcessHeadersMessage(CNode& pfrom, const std::vector<CBlockHe
         LOCK(cs_main);
         CNodeState *nodestate = State(pfrom.GetId());
 
+        uint256 hashLastBlock;
+        for (const CBlockHeader& header : headers) {
+            if (!hashLastBlock.IsNull() && header.hashPrevBlock != hashLastBlock) {
+                Misbehaving(pfrom.GetId(), 20, "non-continuous headers sequence");
+                return;
+            }
+            hashLastBlock = header.GetHash();
+            if (!CheckProofOfWork(header.GetHash(), header.nBits, m_chainparams.GetConsensus())) {
+                Misbehaving(pfrom.GetId(), 50, "proof of work failed");
+                return;
+            }
+        }
+
         // If this looks like it could be a block announcement (nCount <
         // MAX_BLOCKS_TO_ANNOUNCE), use special logic for handling headers that
         // don't connect:
         // - Send a getheaders message in response to try to connect the chain.
-        // - The peer can send up to MAX_UNCONNECTING_HEADERS in a row that
-        //   don't connect before giving DoS points
         // - Once a headers message is received that is valid and does connect,
         //   nUnconnectingHeaders gets reset back to 0.
         if (!LookupBlockIndex(headers[0].hashPrevBlock) && nCount < MAX_BLOCKS_TO_ANNOUNCE) {
@@ -1892,19 +1916,10 @@ void PeerManager::ProcessHeadersMessage(CNode& pfrom, const std::vector<CBlockHe
             // we can use this peer to download.
             UpdateBlockAvailability(pfrom.GetId(), headers.back().GetHash());
 
-            if (nodestate->nUnconnectingHeaders % MAX_UNCONNECTING_HEADERS == 0) {
-                Misbehaving(pfrom.GetId(), 20, strprintf("%d non-connecting headers", nodestate->nUnconnectingHeaders));
+            if (pfrom.PunishInvalidBlocks()) {
+                pfrom.fDisconnect = true;
             }
             return;
-        }
-
-        uint256 hashLastBlock;
-        for (const CBlockHeader& header : headers) {
-            if (!hashLastBlock.IsNull() && header.hashPrevBlock != hashLastBlock) {
-                Misbehaving(pfrom.GetId(), 20, "non-continuous headers sequence");
-                return;
-            }
-            hashLastBlock = header.GetHash();
         }
 
         // If we don't have the last header, then they'll have given us
