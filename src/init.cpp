@@ -90,6 +90,7 @@
 #endif
 
 static bool fFeeEstimatesInitialized = false;
+static const bool DEFAULT_COREPOLICY = false;
 static const bool DEFAULT_PROXYRANDOMIZE = true;
 static const bool DEFAULT_REST_ENABLE = false;
 static const bool DEFAULT_STOPAFTERBLOCKIMPORT = false;
@@ -412,6 +413,7 @@ void SetupServerArgs(NodeContext& node)
     argsman.AddArg("-blocksonly", strprintf("Whether to reject transactions from network peers. Automatic broadcast and rebroadcast of any transactions from peers is disabled, unless the peer has the 'forcerelay' permission. RPC transactions are not affected. (default: %u)", DEFAULT_BLOCKSONLY), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-conf=<file>", strprintf("Specify path to read-only configuration file. Relative paths will be prefixed by datadir location. (default: %s)", BITCOIN_CONF_FILENAME), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-confrw=<file>", strprintf("Specify read/write configuration file. Relative paths will be prefixed by the network-specific datadir location. (default: %s)", BITCOIN_RW_CONF_FILENAME), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-corepolicy", strprintf("Use Bitcoin Core policy defaults (default: %s)", DEFAULT_COREPOLICY), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-datadir=<dir>", "Specify data directory", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-dbbatchsize", strprintf("Maximum database write batch size in bytes (default: %u)", nDefaultDbBatchSize), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::OPTIONS);
     argsman.AddArg("-dbcache=<n>", strprintf("Maximum database cache size <n> MiB (%d to %d, default: %d). In addition, unused mempool memory is shared for this cache (see -maxmempool).", nMinDbCache, nMaxDbCache, nDefaultDbCache), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
@@ -867,6 +869,18 @@ static bool AppInitServers(const util::Ref& context, NodeContext& node)
 // Parameter interaction based on rules
 void InitParameterInteraction(ArgsManager& args)
 {
+    if (gArgs.GetBoolArg("-corepolicy", DEFAULT_COREPOLICY)) {
+        gArgs.SoftSetArg("-bytespersigopstrict", "0");
+        gArgs.SoftSetArg("-permitbaremultisig", "1");
+        gArgs.SoftSetArg("-datacarriersize", "83");
+
+        gArgs.SoftSetArg("-mempoolreplacement", "fee,optin");
+        gArgs.SoftSetArg("-spkreuse", "allow");
+        gArgs.SoftSetArg("-blockprioritysize", "0");
+        gArgs.SoftSetArg("-blockmaxsize", "4000000");
+        gArgs.SoftSetArg("-blockmaxweight", "3996000");
+    }
+
     // when specifying an explicit binding address, you want to listen on it
     // even when -connect or -proxy is specified
     if (args.IsArgSet("-bind")) {
@@ -1284,7 +1298,7 @@ bool AppInitParameterInteraction(const ArgsManager& args)
         boost::split(vstrReplacementModes, strReplacementModeList, boost::is_any_of(",+"));
         fEnableReplacement = (std::find(vstrReplacementModes.begin(), vstrReplacementModes.end(), "fee") != vstrReplacementModes.end());
         if (fEnableReplacement) {
-            fReplacementHonourOptOut = (std::find(vstrReplacementModes.begin(), vstrReplacementModes.end(), "-optin") == vstrReplacementModes.end());
+            fReplacementHonourOptOut = (std::find(vstrReplacementModes.begin(), vstrReplacementModes.end(), "optin") != vstrReplacementModes.end());
             if (!fReplacementHonourOptOut) {
                 nLocalServices = ServiceFlags(nLocalServices | NODE_REPLACE_BY_FEE);
             }
