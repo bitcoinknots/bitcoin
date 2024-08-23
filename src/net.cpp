@@ -463,8 +463,10 @@ CNode* CConnman::ConnectNode(CAddress addrConnect, const char *pszDest, bool fCo
     std::unique_ptr<i2p::sam::Session> i2p_transient_session;
 
     for (auto& target_addr: connect_to) {
-        if (RequiresV2ForOutbound(target_addr, pszDest ? pszDest : "") && !use_v2transport) {
-            LogDebug(BCLog::NET, "skipping v1 connection to %s (-v2onlyclearnet)\n", target_addr.ToStringAddrPort());
+        const std::string_view dest_name{pszDest ? pszDest : ""};
+        if (RequiresV2Dest(target_addr, dest_name) && !use_v2transport) {
+            LogDebug(BCLog::NET, "skipping v1 connection to %s (-v2onlyclearnet)\n",
+                     target_addr.IsValid() ? target_addr.ToStringAddrPort() : std::string{dest_name});
             continue;
         }
         if (target_addr.IsValid()) {
@@ -1951,14 +1953,18 @@ void CConnman::DisconnectNodes()
                 // Add to reconnection list if appropriate. We don't reconnect right here, because
                 // the creation of a connection is a blocking operation (up to several seconds),
                 // and we don't want to hold up the socket handler thread for that long.
-                if (network_active && !RequiresV2ForOutbound(pnode->addr, pnode->m_dest) && pnode->m_transport->ShouldReconnectV1()) {
-                    reconnections_to_add.push_back({
-                        .addr_connect = pnode->addr,
-                        .grant = std::move(pnode->grantOutbound),
-                        .destination = pnode->m_dest,
-                        .conn_type = pnode->m_conn_type,
-                        .use_v2transport = false});
-                    LogDebug(BCLog::NET, "retrying with v1 transport protocol for peer=%d\n", pnode->GetId());
+                if (network_active && pnode->m_transport->ShouldReconnectV1()) {
+                    if (RequiresV2Dest(pnode->addr, pnode->m_dest)) {
+                        LogDebug(BCLog::NET, "not retrying with v1 transport protocol for peer=%d (-v2onlyclearnet)\n", pnode->GetId());
+                    } else {
+                        reconnections_to_add.push_back({
+                            .addr_connect = pnode->addr,
+                            .grant = std::move(pnode->grantOutbound),
+                            .destination = pnode->m_dest,
+                            .conn_type = pnode->m_conn_type,
+                            .use_v2transport = false});
+                        LogDebug(BCLog::NET, "retrying with v1 transport protocol for peer=%d\n", pnode->GetId());
+                    }
                 }
 
                 // release outbound grant (if any)
@@ -2515,11 +2521,17 @@ bool CConnman::MultipleManualOrFullOutboundConns(Network net) const
     return m_network_conn_counts[net] > 1;
 }
 
-bool CConnman::RequiresV2ForOutbound(const CNetAddr& addr, std::string_view dest_name) const
+bool CConnman::RequiresV2Peer(Network net) const
 {
-    if (!m_v2only_clearnet) return false;
-    if (IsClearnet(addr.GetNetClass())) return true;
-    return !addr.IsValid() && !dest_name.empty();
+    return m_v2only_clearnet && IsClearnet(net);
+}
+
+bool CConnman::RequiresV2Dest(const CNetAddr& addr, std::string_view dest_name) const
+{
+    // A name proxy resolves the destination for us, so we can't tell locally which
+    // network it belongs to. Assume clearnet, the worst case.
+    if (!addr.IsValid() && !dest_name.empty()) return m_v2only_clearnet;
+    return RequiresV2Peer(addr.GetNetClass());
 }
 
 bool CConnman::MaybePickPreferredNetwork(std::optional<Network>& network)

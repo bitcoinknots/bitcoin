@@ -74,7 +74,7 @@ static const int MAX_FEELER_CONNECTIONS = 1;
 /** -listen default */
 static const bool DEFAULT_LISTEN = true;
 /** -v2onlyclearnet default */
-static constexpr bool DEFAULT_V2_ONLY_CLEARNET{false};
+inline constexpr bool DEFAULT_V2_ONLY_CLEARNET{false};
 /** The maximum number of peer connections to maintain. */
 static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
 /** The default for -maxuploadtarget. 0 = Unlimited */
@@ -1286,7 +1286,34 @@ public:
 
     bool MultipleManualOrFullOutboundConns(Network net) const EXCLUSIVE_LOCKS_REQUIRED(m_nodes_mutex);
 
+    /**
+     * Whether a connection with a peer on this network must be v2 only.
+     *
+     * Returns true when -v2onlyclearnet is set and the peer is reached over
+     * clearnet (IPv4/IPv6), whose traffic is visible to passive network
+     * observers. Tor/I2P/CJDNS peers are already encrypted, and non-routable
+     * (local/loopback) traffic never leaves the LAN, so both can be v1.
+     *
+     * @param net network the peer is connected through. Use RequiresV2Dest()
+     * when opening one, since the destination network may not be known locally.
+     */
+    bool RequiresV2Peer(Network net) const;
+
 private:
+    /**
+     * Whether an outbound connection to this destination must be v2 only.
+     *
+     * Same as RequiresV2Peer(), except that when bitcoind delegates DNS to a
+     * name proxy (ex: Tor) the destination is left unresolved for the proxy to
+     * look up, so its network isn't known locally. Assume the worst case there
+     * and require v2, rather than send plaintext to what is most likely a
+     * clearnet peer.
+     *
+     * @param addr      target address, invalid if left for a name proxy to resolve
+     * @param dest_name destination string, empty if connecting by resolved address
+     */
+    bool RequiresV2Dest(const CNetAddr& addr, std::string_view dest_name) const;
+
     struct ListenSocket {
     public:
         std::shared_ptr<Sock> sock;
@@ -1415,24 +1442,6 @@ private:
      * @return           bool        Whether a preferred network was found.
      */
     bool MaybePickPreferredNetwork(std::optional<Network>& network);
-
-    /**
-     * Whether an outbound connection to this destination must be v2 only.
-     *
-     * Returns true when -v2onlyclearnet is set AND either:
-     *   - the resolved address is clearnet (IPv4/IPv6) OR
-     *   - the address is unresolved and a destination string was supplied.
-     *     if bitcoind delegates DNS to a name proxy (ex: Tor), we can't tell
-     *     locally whether the name resolves to clearnet or not, so we assume
-     *     the worst case and require v2 to avoid sending plaintext.
-     *
-     * Connections to non-routable (local/loopback) addresses can be v1 since
-     * their traffic never leaves the LAN.
-     *
-     * @param addr      target address (maybe unresolved)
-     * @param dest_name destination string (or empty if connecting by resolved address)
-     */
-    bool RequiresV2ForOutbound(const CNetAddr& addr, std::string_view dest_name) const;
 
     // Whether the node should be passed out in ForEach* callbacks
     static bool NodeFullyConnected(const CNode* pnode);
@@ -1629,9 +1638,9 @@ private:
     bool m_capture_messages{false};
 
     /**
-     * option for restricting outbound clearnet connections (IPv4/IPv6) to v2 only.
-     * outbound connections to IPv4/IPv6 need to be v2 connections.
-     * outbound connections to Tor/I2P/CJDNS can be v1 or v2 connections.
+     * option for restricting outbound and inbound clearnet connections (IPv4/IPv6) to v2 only.
+     * connections to IPv4/IPv6 need to be v2 connections.
+     * connections to Tor/I2P/CJDNS can be v1 or v2 connections.
      */
     bool m_v2only_clearnet{DEFAULT_V2_ONLY_CLEARNET};
 
