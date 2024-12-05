@@ -1812,6 +1812,35 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         }
     }
 
+#ifdef __APPLE__
+    // Warn about exFAT filesystem usage on macOS
+    std::vector<std::string> exfat_paths;
+    std::vector<std::string> error_paths;
+
+    auto check_fs = [&](const fs::path& path, std::string_view desc) {
+        FSType fs_type = GetFilesystemType(path);
+        std::string path_desc = strprintf("%s (\"%s\")", desc, fs::PathToString(path));
+        if (fs_type == FSType::EXFAT) {
+            exfat_paths.push_back(path_desc);
+        } else if (fs_type == FSType::ERROR) {
+            error_paths.push_back(path_desc);
+        }
+    };
+
+    check_fs(args.GetDataDirNet(), "data directory");
+    check_fs(args.GetBlocksDirPath(), "blocks directory");
+
+    if (!exfat_paths.empty()) {
+        InitWarning(strprintf(_("The following paths are on exFAT which is known to have intermittent corruption problems on macOS: %s. "
+            "Move these directories to a non-exFAT formatted drive to avoid corruption."),
+            util::Join(exfat_paths, ", ")));
+    }
+
+    if (!error_paths.empty()) {
+        LogInfo("Failed to detect filesystem type for: %s\n", util::Join(error_paths, ", "));
+    }
+#endif
+
 #if HAVE_SYSTEM
     const std::string block_notify = args.GetArg("-blocknotify", "");
     if (!block_notify.empty()) {
