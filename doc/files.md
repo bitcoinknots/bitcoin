@@ -18,6 +18,8 @@
 
 - [Notes](#notes)
 
+- [Filesystem recommendations](#filesystem-recommendations)
+
 ## Data directory location
 
 The data directory is the default location where the Bitcoin Core files are stored.
@@ -128,3 +130,7 @@ Path           | Description | Repository notes
 <a name="note1">1</a>. The `/` (slash, U+002F) is used as the platform-independent path component separator in this document.
 
 <a name="note2">2</a>. `NNNNN` matches `[0-9]{5}` regex.
+
+## Filesystem recommendations
+When choosing a filesystem for the data directory (`datadir`) or blocks directory (`blocksdir`) on **macOS**,the `exFAT` filesystem should be avoided.
+There have been multiple reports of database corruption and data loss when using this filesystem with Bitcoin Core, see [Issue #31454](https://github.com/bitcoin/bitcoin/issues/31454) for more details.
