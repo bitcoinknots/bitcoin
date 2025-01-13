@@ -42,7 +42,7 @@ If you want to build the windows installer with `make deploy` you need [NSIS](ht
 
 Acquire the source in the usual way:
 
-    git clone https://github.com/bitcoin/bitcoin.git
+    git clone https://github.com/bitcoinknots/bitcoin.git
     cd bitcoin
 
 ## Building for 64-bit Windows
