@@ -110,7 +110,10 @@ util::Result<void> ApplyArgsManOptions(const ArgsManager& argsman, const CChainP
     }
 
     if (argsman.IsArgSet("-minrelaytxfee")) {
-        if (std::optional<CAmount> min_relay_feerate = ParseMoney(argsman.GetArg("-minrelaytxfee", ""))) {
+        std::optional<CAmount> min_relay_feerate = ParseMoney(argsman.GetArg("-minrelaytxfee", ""));
+        if (min_relay_feerate >= 100000000 && (std::string(1, std::string(argsman.GetArg("-minrelaytxfee", "")).at(0)) != "f")) {
+            return util::Error{_("-minrelaytxfee is very high! Prefix with f to force this fee rate")};
+        } else if (min_relay_feerate) {
             // High fee check is done afterward in CWallet::Create()
             mempool_opts.min_relay_feerate = CFeeRate{min_relay_feerate.value()};
         } else {

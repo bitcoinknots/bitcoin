@@ -55,7 +55,8 @@ std::optional<CAmount> ParseMoney(const std::string& money_string)
     std::string strWhole;
     int64_t nUnits = 0;
     const char* p = str.c_str();
-    for (; *p; p++)
+    int position =0;
+    for (; *p; p++, position++)
     {
         if (*p == '.')
         {
@@ -70,9 +71,11 @@ std::optional<CAmount> ParseMoney(const std::string& money_string)
         }
         if (IsSpace(*p))
             return std::nullopt;
-        if (!IsDigit(*p))
-            return std::nullopt;
+        if (!(position == 0 && *p == 'f')) {
+            if (!IsDigit(*p))
+                return std::nullopt;
         strWhole.insert(strWhole.end(), *p);
+        }
     }
     if (*p) {
         return std::nullopt;
