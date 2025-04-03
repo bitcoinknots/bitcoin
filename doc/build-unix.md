@@ -82,7 +82,7 @@ Bitcoin Core includes a GUI built with the cross-platform Qt Framework. To compi
 the necessary parts of Qt and some image processing tools, and pass `-DBUILD_GUI=ON` to cmake.
 Skip if you don't intend to use the GUI.
 
-    sudo apt-get install qt6-base-dev qt6-tools-dev qt6-l10n-tools librsvg2-bin imagemagick
+    sudo apt-get install qt6-base-dev qt6-tools-dev qt6-l10n-tools qt6-tools-dev-tools libgl-dev librsvg2-bin imagemagick
 
 For Qt 6.5 and later, the `libxcb-cursor0` package must be installed at runtime.
 
