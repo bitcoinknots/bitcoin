@@ -91,7 +91,9 @@ public:
 
 void GuiBlockView::updateBestBlock(const int height)
 {
-    m_block_chooser->setItemText(1, tr("Newest block (%1)").arg(height));
+    QMetaObject::invokeMethod(m_block_chooser, [this, height]() {
+        m_block_chooser->setItemText(1, tr("Newest block (%1)").arg(height));
+    }, Qt::QueuedConnection);
 }
 
 GuiBlockView::GuiBlockView(const PlatformStyle *platformStyle, const NetworkStyle *networkStyle, QWidget *parent) :
