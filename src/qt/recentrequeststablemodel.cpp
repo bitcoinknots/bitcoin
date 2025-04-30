@@ -96,7 +96,8 @@ QVariant RecentRequestsTableModel::data(const QModelIndex &index, int role) cons
     }
     else if (role == Qt::FontRole) {
         if (index.column() == Amount) {
-            return walletModel->getOptionsModel()->getFontForMoney();
+            const BitcoinUnit display_unit = walletModel->getOptionsModel()->getDisplayUnit();
+            return walletModel->getOptionsModel()->getFontForMoney(display_unit);
         }
     }
     else if (role == Qt::TextAlignmentRole)
