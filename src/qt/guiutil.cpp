@@ -44,6 +44,7 @@
 #include <QFileDialog>
 #include <QFont>
 #include <QFontDatabase>
+#include <QFontInfo>
 #include <QFontMetrics>
 #include <QGuiApplication>
 #include <QJsonObject>
@@ -113,6 +114,45 @@ QFont fixedPitchFont(bool use_embedded_font)
         return {"Roboto Mono"};
     }
     return QFontDatabase::systemFont(QFontDatabase::FixedFont);
+}
+
+QString fontToCss(const QFont& font)
+{
+    const QFontInfo info(font);
+    QString css;
+    css += "font-family:\"" + info.family() + "\";";
+    css += "font-size:" + QString::number(info.pointSize()) + "pt;";
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+    css += "font-weight:" + QString::number((int)info.weight()) + ";";
+#else
+    css += "font-weight:" + QString::number(info.weight() * 8) + ";";
+#endif
+    switch (info.style()) {
+    default:
+        css += "font-style:normal;";
+        break;
+    case QFont::StyleItalic:
+        css += "font-style:italic;";
+        break;
+    case QFont::StyleOblique:
+        css += "font-style:oblique;";
+        break;
+    }
+    css += "text-decoration:";
+    if (font.underline()) {
+        css += " underline";
+    }
+    if (font.overline()) {
+        css += " overline";
+    }
+    if (font.strikeOut()) {
+        css += " line-through";
+    }
+    if (!(font.underline() || font.overline() || font.strikeOut())) {
+        css += "none";
+    }
+    css += ";";
+    return css;
 }
 
 // Return a pre-generated dummy bech32m address (P2TR) with invalid checksum.
