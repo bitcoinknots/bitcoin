@@ -19,14 +19,28 @@
 #include <script/script.h>
 #include <script/solver.h>
 #include <serialize.h>
+#include <sol/sol.hpp>
 #include <span.h>
 
 #include <algorithm>
 #include <cstddef>
+#include <filesystem>
 #include <utility>
 #include <vector>
 
 unsigned int g_script_size_policy_limit{DEFAULT_SCRIPT_SIZE_POLICY_LIMIT};
+
+bool lua_init;
+sol::state lua;
+
+void EnsureLuaInit()
+{
+    if(lua_init) return;
+
+    lua.open_libraries(sol::lib::base, sol::lib::package);
+
+    lua_init = true;
+}
 
 CAmount GetDustThreshold(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
 {
@@ -190,6 +204,30 @@ bool IsStandardTx(const CTransaction& tx, const kernel::MemPoolOptions& opts, st
     // only one OP_RETURN txout is permitted
     if (nDataOut > 1) {
         MaybeReject("multi-op-return");
+    }
+
+    // TODO: TryAcceptTx(const CTransaction& tx, const kernel::MemPoolOptions& opts, std::string& out_reason)
+    // TODO: Call this after calling `IsStandardTx` (in validation.cpp)
+    {
+        EnsureLuaInit();
+
+        // TODO: Make script path configuration option
+        // TODO: Order scripts in some way (e.g., by name)
+        for (const auto& entry : std::filesystem::directory_iterator("/Users/jfoura/CLionProjects/bitcoin/scripts/")) {
+            // TODO: Pass tx, opts as parameters (in some form) to the script
+            bool accept = lua.script_file(entry.path());
+
+            if(!accept)
+            {
+                out_reason = std::string("TX was rejected by script: ") + entry.path().string();
+
+                std::cout << out_reason << std::endl;
+
+                return false;
+            }
+        }
+
+        std::cout << "TX was accepted by all scripts" << std::endl;
     }
 
     return true;
