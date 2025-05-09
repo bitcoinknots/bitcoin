@@ -1465,6 +1465,9 @@ AM_CONDITIONAL([EMBEDDED_LIBSECP256K1],[test x$system_libsecp256k1 = xno])
 AC_SUBST(libsecp256k1_CFLAGS)
 AC_SUBST(libsecp256k1_LIBS)
 
+CPPFLAGS="-I/opt/homebrew/opt/lua/include/lua $CPPFLAGS"
+LIBS="-L/opt/homebrew/opt/lua/lib -llua -lm $LIBS"
+
 if test "$enable_wallet" != "no"; then
     dnl Check for libdb_cxx only if wallet enabled
     if test "$use_bdb" != "no"; then

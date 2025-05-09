@@ -24,7 +24,7 @@ bool Clang_IndVarSimplify_Bug_SanityCheck() {
         }
         last = *it;
     }
-    return false;
+    return true;
 }
 
 util::Result<void> SanityChecks(const Context&)
