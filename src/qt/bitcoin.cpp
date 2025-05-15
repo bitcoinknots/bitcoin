@@ -655,7 +655,9 @@ int GuiMain(int argc, char* argv[])
     initTranslations(qtTranslatorBase, qtTranslator, translatorBase, translator);
 
     g_software_expiry = gArgs.GetIntArg("-softwareexpiry", DEFAULT_SOFTWARE_EXPIRY);
-    if (IsThisSoftwareExpired(GetTime())) {
+    if (IsThisSoftwareExpiringSoon(GetTime())) {
+        QMessageBox::warning(nullptr, QObject::tr("Software expires soon"), QObject::tr("This software expires soon, and may fall out of consensus. You must choose to upgrade, or override this expiration with the 'softwareexpiry' option (Unix datetime, or 0 for no expiry)."));
+    } else if (IsThisSoftwareExpired(GetTime())) {
         bool override_expiry_ok;
         QString override_expiry = QInputDialog::getText(
             nullptr,
