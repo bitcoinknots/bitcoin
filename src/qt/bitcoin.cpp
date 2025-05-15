@@ -53,6 +53,7 @@
 
 #include <QApplication>
 #include <QDebug>
+#include <QInputDialog>
 #include <QLatin1String>
 #include <QLibraryInfo>
 #include <QLocale>
@@ -655,8 +656,20 @@ int GuiMain(int argc, char* argv[])
 
     g_software_expiry = gArgs.GetIntArg("-softwareexpiry", DEFAULT_SOFTWARE_EXPIRY);
     if (IsThisSoftwareExpired(GetTime())) {
-        QMessageBox::critical(nullptr, QObject::tr("Software expired"), QObject::tr("This software is expired, and may be out of consensus. You must choose to upgrade or override this expiration."));
-        return EXIT_FAILURE;
+        bool override_expiry_ok;
+        QString override_expiry = QInputDialog::getText(
+            nullptr,
+            QObject::tr("Software Expired"),
+            QObject::tr("This software is expired, and may be out of consensus.\nYou must choose to upgrade, or override this expiration by typing:\nI accept this software may be unsafe."),
+            QLineEdit::Normal,
+            "",
+            &override_expiry_ok);
+        if (!override_expiry_ok || override_expiry != QObject::tr("I accept this software may be unsafe.")) {
+            return EXIT_FAILURE;
+        }
+
+        gArgs.ModifyRWConfigFile("softwareexpiry", "0");
+        g_software_expiry = 0;
     }
 
 #ifdef ENABLE_WALLET
