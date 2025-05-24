@@ -4458,12 +4458,13 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     if (IsThisSoftwareExpired(block.nTime)) {
         // Wait an extra day before we start rejecting blocks
         CBlockIndex const *blockindex_old = pindexPrev;
-        for (int i = 0; i < 144; ++i) {
+        for (int i = 0; i < std::min(144, pindexPrev->nHeight); ++i) {
             assert(blockindex_old);
             blockindex_old = blockindex_old->pprev;
         }
         assert(blockindex_old);
         if (IsThisSoftwareExpired(blockindex_old->GetMedianTimePast())) {
+            chainman.GetNotifications().fatalError(_("This software is expired, and may be out of consensus. You must choose to upgrade, or override this expiration with the 'softwareexpiry' option (Unix datetime, or 0 for no expiry)."));
             return state.Invalid(BlockValidationResult::BLOCK_TIME_FUTURE, "node-expired", "node software has expired");
         }
     }

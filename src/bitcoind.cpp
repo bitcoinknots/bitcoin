@@ -130,8 +130,10 @@ static bool ParseArgs(ArgsManager& args, int argc, char* argv[])
     }
 
     g_software_expiry = args.GetIntArg("-softwareexpiry", DEFAULT_SOFTWARE_EXPIRY);
-    if (IsThisSoftwareExpired(GetTime())) {
-        tfm::format(std::cerr, "This software is expired, and may be out of consensus. You must choose to upgrade or override this expiration.\n");
+    if (IsThisSoftwareExpiringSoon(GetTime())) {
+        tfm::format(std::cerr, "Warning: This software expires soon, and may fall out of consensus. You must choose to upgrade, or override this expiration with the 'softwareexpiry' option (Unix datetime, or 0 for no expiry).\n");
+    } else if (IsThisSoftwareExpired(GetTime())) {
+        tfm::format(std::cerr, "This software is expired, and may be out of consensus. You must choose to upgrade, or override this expiration with the 'softwareexpiry' option (Unix datetime, or 0 for no expiry).\n");
         exit(EXIT_FAILURE);
     }
 

@@ -113,3 +113,12 @@ bool IsThisSoftwareExpired(int64_t nTime)
     }
     return (nTime > g_software_expiry);
 }
+
+bool IsThisSoftwareExpiringSoon(int64_t ntime)
+{
+    if (g_software_expiry <= 0) {
+        return false;
+    }
+
+    return (ntime <= g_software_expiry && ntime > g_software_expiry - SOFTWARE_EXPIRY_WARN_PERIOD);
+}
