@@ -45,6 +45,8 @@ std::string CopyrightHolders(const std::string& strPrefix);
 /** Returns licensing information (for -version) */
 std::string LicenseInfo();
 
+static constexpr bool DEFAULT_UA_HIDE_KNOTS = false;
+
 static constexpr int64_t SECONDS_PER_YEAR = 31558060;
 static constexpr int POSIX_EPOCH_YEAR = 1970;
 static constexpr int64_t DEFAULT_SOFTWARE_EXPIRY_OFFSET = 26784000;  // Around Nov 7

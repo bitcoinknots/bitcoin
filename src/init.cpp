@@ -669,6 +669,7 @@ void SetupServerArgs(ArgsManager& argsman)
     argsman.AddArg("-printpriority", strprintf("Log transaction priority and fee rate in " + CURRENCY_UNIT + "/kvB when mining blocks (default: %u)", DEFAULT_PRINT_MODIFIED_FEE), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::DEBUG_TEST);
     argsman.AddArg("-uaappend=<cmt>", "Append literal to the user agent string (should only be used for software embedding)", ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
     argsman.AddArg("-uacomment=<cmt>", "Append comment to the user agent string", ArgsManager::ALLOW_ANY, OptionsCategory::DEBUG_TEST);
+    argsman.AddArg("-uahideknots", strprintf("Hide Knots from the user agent string (default: %u)", DEFAULT_UA_HIDE_KNOTS), ArgsManager::ALLOW_ANY, OptionsCategory::DEBUG_TEST);
 
     SetupChainParamsBaseOptions(argsman);
 
@@ -1508,7 +1509,8 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
             return InitError(strprintf(_("User Agent comment (%s) contains unsafe characters."), cmt));
         uacomments.push_back(cmt);
     }
-    strSubVersion = FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, uacomments);
+    bool base_name_only = args.GetBoolArg("-uahideknots", DEFAULT_UA_HIDE_KNOTS);
+    strSubVersion = FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, uacomments, base_name_only);
     for (auto append : gArgs.GetArgs("-uaappend")) {
         if (append.back() != '/') append += '/';
         strSubVersion += append;
@@ -1700,10 +1702,6 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     }
     if (g_low_memory_threshold > 0) {
         LogPrintf("* Flushing caches if available system memory drops below %s MiB\n", g_low_memory_threshold / 1024 / 1024);
-    }
-
-    if (mempool_opts.rbf_policy == RBFPolicy::Always) {
-        nLocalServices = ServiceFlags(nLocalServices | NODE_REPLACE_BY_FEE);
     }
 
     for (bool fLoaded = false; !fLoaded && !ShutdownRequested(node);) {
