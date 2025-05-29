@@ -1222,6 +1222,18 @@ CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const {
     return std::max(CFeeRate(llround(rollingMinimumFeeRate)), m_opts.incremental_relay_feerate);
 }
 
+CFeeRate CTxMemPool::GetMaxFee(size_t sizelimit) const {
+    LOCK(cs);
+    CFeeRate maxFeeRate(0);
+    for (const auto& entry : mapTx) {
+        CFeeRate entryFeeRate(entry.GetModifiedFee(), entry.GetTxSize());
+        if (entryFeeRate > maxFeeRate) {
+            maxFeeRate = entryFeeRate;
+        }
+    }
+    return maxFeeRate;
+}
+
 void CTxMemPool::trackPackageRemoved(const CFeeRate& rate) {
     AssertLockHeld(cs);
     if (rate.GetFeePerK() > rollingMinimumFeeRate) {
@@ -1236,12 +1248,15 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint>* pvNoSpends
     unsigned nTxnRemoved = 0;
     CFeeRate maxFeeRateRemoved(0);
     while (!mapTx.empty() && DynamicMemoryUsage() > sizelimit) {
-        indexed_transaction_set::index<descendant_score>::type::iterator it = mapTx.get<descendant_score>().begin();
+        indexed_transaction_set::index<descendant_score>::type& index = mapTx.get<descendant_score>();
+        indexed_transaction_set::index<descendant_score>::type::iterator it;
 
-        // We set the new mempool min fee to the feerate of the removed set, plus the
-        // "minimum reasonable fee rate" (ie some value under which we consider txn
-        // to have 0 fee). This way, we don't allow txn to enter mempool with feerate
-        // equal to txn which were removed with no block in between.
+        if (m_opts.invert_mempool) {
+            it = std::prev(index.end());
+        } else {
+            it = index.begin();
+        }
+
         CFeeRate removed(it->GetModFeesWithDescendants(), it->GetSizeWithDescendants());
         removed += m_opts.incremental_relay_feerate;
         trackPackageRemoved(removed);
@@ -1268,8 +1283,12 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint>* pvNoSpends
         }
     }
 
-    if (maxFeeRateRemoved > CFeeRate(0)) {
+    if (maxFeeRateRemoved > CFeeRate(0) && !m_opts.invert_mempool) {
         LogPrint(BCLog::MEMPOOL, "Removed %u txn, rolling minimum fee bumped to %s\n", nTxnRemoved, maxFeeRateRemoved.ToString());
+    }
+    
+    if (m_opts.invert_mempool) {
+        LogPrint(BCLog::MEMPOOL, "Removed %u txn, rolling maxmimum fee bumped to %s\n", nTxnRemoved, GetMaxFee().ToString());
     }
 }
 

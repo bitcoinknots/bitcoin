@@ -336,6 +336,8 @@ protected:
     bool m_load_tried GUARDED_BY(cs){false};
 
     CFeeRate GetMinFee(size_t sizelimit) const;
+    
+    CFeeRate GetMaxFee(size_t sizelimit) const;
 
 public:
 
@@ -638,6 +640,10 @@ public:
      */
     CFeeRate GetMinFee() const {
         return GetMinFee(m_opts.max_size_bytes);
+    }
+    
+    CFeeRate GetMaxFee() const {
+        return GetMaxFee(m_opts.max_size_bytes);
     }
 
     /** Remove transactions from the mempool until its dynamic size is <= sizelimit.
