@@ -58,13 +58,6 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOUIC_SEARCH_PATHS forms)
 
-# TODO: The file(GLOB ...) command should be replaced with an explicit
-# file list. Such a change must be synced with the corresponding change
-# to https://github.com/bitcoin-core/bitcoin-maintainer-tools/blob/main/update-translations.py
-file(GLOB ts_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} locale/*.ts)
-set_source_files_properties(${ts_files} PROPERTIES OUTPUT_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/locale)
-cmake_language(CALL "qt${WITH_QT_VERSION}_add_translation" qm_files ${ts_files})
-
 set(FONT_PATH "res/fonts/OCR-Bitcoin.ttf")
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/res/fonts")
 add_custom_command(
@@ -393,6 +386,17 @@ if(qt_lib_type STREQUAL "STATIC_LIBRARY")
       tls
   )
 endif()
+
+file(GLOB ts_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} locale/*.ts)
+set_source_files_properties(${ts_files} PROPERTIES OUTPUT_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/locale)
+if("${WITH_QT_VERSION}" STREQUAL "5")
+  qt5_add_translation(qm_files ${ts_files})
+else()  # Qt 6
+  qt6_add_lrelease(bitcoinqt
+    TS_FILES ${ts_files}
+    OPTIONS -silent
+  )
+endif()  # Qt version
 
 add_executable(bitcoin-qt
   main.cpp
