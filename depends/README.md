@@ -92,6 +92,10 @@ For linux S390X cross compilation:
 
     pkg install bash cmake curl gmake
 
+Skip the following packages if you don't intend to use the GUI and will build with [`NO_QT=1`](#dependency-options):
+
+    pkg install bison ninja pkgconf python3
+
 ### Install the required dependencies: NetBSD
 
     pkgin install bash cmake curl gmake perl
