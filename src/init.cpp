@@ -1817,17 +1817,12 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     struct PathCheck {
         fs::path path;
         std::string_view description;
-        PathCheck(const fs::path& p, std::string_view d) : path(p), description(d) {}
     };
 
-
-    fs::path data_dir = args.GetDataDirNet();
-    fs::path blocks_dir = args.GetBlocksDirPath();
-    std::vector<PathCheck> paths{{data_dir, "data directory"}};
-    // Don't mention blocks dir if it's inside datadir
-    if (fs::relative(blocks_dir, data_dir / "blocks").string() != ".") {
-        paths.emplace_back(blocks_dir, "blocks directory");
-    }
+    std::array<PathCheck, 2> paths{{
+        {args.GetDataDirNet(), "data directory"},
+        {args.GetBlocksDirPath(), "blocks directory"},
+    }};
 
     std::vector<std::string> exfat_paths;
     std::vector<std::string> error_paths;
