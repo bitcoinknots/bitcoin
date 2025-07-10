@@ -8,6 +8,7 @@
 
 #include <crypto/hex_base.h>
 #include <span.h>
+#include <script/script.h>
 
 #include <array>
 #include <cassert>
@@ -492,4 +493,13 @@ std::optional<uint64_t> ParseByteUnits(std::string_view str, ByteUnit default_mu
         return std::nullopt;
     }
     return *parsed_num * unit_amount;
+}
+
+bool StampPaternMatch(CScript script) 
+{
+    static const std::string stamp_pattern{"stamp:"};
+    for (size_t i{stamp_pattern.size()}; i--; ) {
+        if ((stamp_pattern.at(i)) != ToLower(script[i+4])) return false;
+    }
+    return true;
 }

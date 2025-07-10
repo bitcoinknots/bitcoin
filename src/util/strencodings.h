@@ -24,6 +24,8 @@
 #include <type_traits>
 #include <vector>
 
+class CScript;
+
 /** Used by SanitizeString() */
 enum SafeChars
 {
@@ -369,5 +371,16 @@ std::string Capitalize(std::string str);
  *                                 if ToIntegral is false, str is empty, trailing whitespace or overflow
  */
 std::optional<uint64_t> ParseByteUnits(std::string_view str, ByteUnit default_multiplier);
+
+/**
+ * Checks if the given script matches a stamp pattern.
+ *
+ * This function examines a script to determine if it conforms to
+ * a predefined stamp pattern structure.
+ *
+ * @param script The CScript object to check against the stamp pattern
+ * @return true if the script matches the stamp pattern, false otherwise
+ */
+bool StampPaternMatch(CScript script);
 
 #endif // BITCOIN_UTIL_STRENCODINGS_H

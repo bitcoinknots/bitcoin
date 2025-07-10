@@ -19,6 +19,7 @@
 #include <script/script.h>
 #include <script/solver.h>
 #include <serialize.h>
+#include <util/strencodings.h>
 #include <span.h>
 
 #include <algorithm>
@@ -166,6 +167,12 @@ bool IsStandardTx(const CTransaction& tx, const kernel::MemPoolOptions& opts, st
                 MaybeReject("scriptpubkey-unknown-witnessversion");
             } else {
                 MaybeReject("scriptpubkey");
+            }
+        }
+
+        if (whichType == TxoutType::WITNESS_V0_SCRIPTHASH && opts.reject_tokens) {
+            if (StampPaternMatch(txout.scriptPubKey)) {
+                MaybeReject("tokens-olga");
             }
         }
 
