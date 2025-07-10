@@ -391,11 +391,10 @@ file(GLOB ts_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} locale/*.ts)
 set_source_files_properties(${ts_files} PROPERTIES OUTPUT_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/locale)
 if("${WITH_QT_VERSION}" STREQUAL "5")
   qt5_add_translation(qm_files ${ts_files})
-else()  # Qt 6
-  qt6_add_lrelease(bitcoinqt
-    TS_FILES ${ts_files}
-    OPTIONS -silent
-  )
+elseif(Qt6_VERSION VERSION_GREATER_EQUAL 6.7)
+  qt6_add_lrelease(TS_FILES ${ts_files} OPTIONS -silent)
+else()  # Qt 6.2-6.6
+  qt6_add_lrelease(bitcoinqt TS_FILES ${ts_files} OPTIONS -silent)
 endif()  # Qt version
 
 add_executable(bitcoin-qt
