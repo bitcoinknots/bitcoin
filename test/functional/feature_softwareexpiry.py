@@ -3,6 +3,9 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+import re
+import time
+
 from test_framework.blocktools import (
     NORMAL_GBT_REQUEST_PARAMS,
     create_block,
@@ -13,7 +16,8 @@ from test_framework.util import (
     assert_raises_rpc_error,
 )
 
-ONE_WEEK = 604800
+SECONDS_PER_WEEK = 604800
+SOFTWARE_EXPIRY_WARN_PERIOD = SECONDS_PER_WEEK * 4
 EXPIRED_BLOCKS_ACCEPTED = 144
 
 class SoftwareExpiryTest(BitcoinTestFramework):
@@ -23,6 +27,7 @@ class SoftwareExpiryTest(BitcoinTestFramework):
     def run_test(self):
         nodes = self.nodes
         addr = nodes[0].get_deterministic_priv_key().address  # what address is irrelevant
+        alerts_path = self.nodes[0].datadir_path / 'alerts'
 
         def setmocktime(t):
             self.mocktime = t
@@ -31,12 +36,41 @@ class SoftwareExpiryTest(BitcoinTestFramework):
 
         blocktime = nodes[0].getblock(nodes[0].getbestblockhash(), 1)['time']
         self.mocktime = blocktime + 300
-        expirytime = self.mocktime + ONE_WEEK + 1
-        self.restart_node(0, extra_args=[f'-mocktime={self.mocktime}', f'-softwareexpiry={expirytime}'])
+        expirytime = self.mocktime + SOFTWARE_EXPIRY_WARN_PERIOD + 60
+        self.restart_node(0, extra_args=[
+            f'-mocktime={self.mocktime}',
+            f'-softwareexpiry={expirytime}',
+            f"-alertnotify=echo %s >> {alerts_path}",
+        ])
         self.restart_node(1, extra_args=[f'-mocktime={self.mocktime}',])
         self.connect_nodes(1, 0)
 
-        self.log.info("Checking everything works normal exactly at expiry time")
+        self.log.info("Everything normal and no alerts over 4 weeks prior to expiry")
+        nodes[0].mockscheduler(5)
+        time.sleep(1)
+        block = create_block(tmpl=nodes[0].getblocktemplate(NORMAL_GBT_REQUEST_PARAMS))
+        block.solve()
+        nodes[0].submitblock(block.serialize().hex())
+        self.sync_blocks(nodes)
+        assert_equal(nodes[0].getnetworkinfo()['warnings'], [])
+        nodes[0].stderr.seek(0)
+        assert_equal(nodes[0].stderr.read().decode('utf-8').strip(), '')
+        assert not alerts_path.exists()
+
+        self.log.info("Once we're within 4 weeks, warnings should trigger")
+        nodes[0].mockscheduler(60)
+        time.sleep(1)
+        warnings = "\n".join(nodes[0].getnetworkinfo()['warnings'])
+        re_expected_warning = r'This software expires soon, and may fall out of consensus. Before .*, you must choose to upgrade or override this expiration.$'
+        assert re.match(re_expected_warning, warnings)
+        nodes[0].stderr.seek(0)
+        stderr = nodes[0].stderr.read().decode('utf-8').strip()
+        assert re.match(r'Warning: ' + re_expected_warning, stderr)
+        assert alerts_path.exists()
+        with open(alerts_path, 'r', encoding='utf8') as f:
+            assert re.match(re_expected_warning, f.read())
+
+        self.log.info("Checking everything still works normal exactly at expiry time")
         setmocktime(expirytime)
         block = create_block(tmpl=nodes[0].getblocktemplate(NORMAL_GBT_REQUEST_PARAMS))
         block.solve()
@@ -61,7 +95,7 @@ class SoftwareExpiryTest(BitcoinTestFramework):
 
         self.log.info("Restarting the node should fail")
         assert self.mocktime > expirytime
-        self.stop_node(0)
+        self.stop_node(0, expected_stderr=stderr)
         msg = 'Error: This software is expired, and may be out of consensus. You must choose to upgrade or override this expiration.'
         nodes[0].assert_start_raises_init_error(extra_args=[f'-mocktime={self.mocktime}', f'-softwareexpiry={expirytime}'], expected_msg=msg)
 
@@ -70,6 +104,11 @@ class SoftwareExpiryTest(BitcoinTestFramework):
         self.restart_node(0, extra_args=[f'-mocktime={self.mocktime}', f'-softwareexpiry={expirytime}'])
         self.connect_nodes(1, 0)
         self.sync_blocks(nodes)
+
+        self.stop_node(0)
+        self.log.info("Checking no unexpected alerts were triggered")
+        with open(alerts_path, 'r', encoding='utf8') as f:
+            assert re.match(re_expected_warning, f.read())
 
 
 if __name__ == "__main__":
