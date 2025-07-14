@@ -129,6 +129,7 @@ private:
     QSpinBox *mempoolexpiry;
 
     QCheckBox *rejectunknownscripts;
+    QCheckBox *rejectunknownwitness;
     QCheckBox *rejectparasites;
     QCheckBox *rejecttokens;
     QCheckBox *rejectspkreuse;
