@@ -134,6 +134,8 @@ private:
     QCheckBox *rejecttokens;
     QCheckBox *rejectspkreuse;
     BitcoinAmountField *minrelaytxfee;
+    BitcoinAmountField *minrelaycoinblocks;
+    QSpinBox *minrelaymaturity;
     QSpinBox *bytespersigop, *bytespersigopstrict;
     QSpinBox *limitancestorcount;
     QSpinBox *limitancestorsize;
