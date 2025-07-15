@@ -141,6 +141,7 @@ private:
     QSpinBox *limitdescendantsize;
     QCheckBox *rejectbarepubkey;
     QCheckBox *rejectbaremultisig;
+    QValueComboBox *permitephemeral;
     QCheckBox *rejectbareanchor;
     QCheckBox *rejectbaredatacarrier;
     QSpinBox *maxscriptsize;
