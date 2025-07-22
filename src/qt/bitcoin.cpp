@@ -395,8 +395,8 @@ void BitcoinApplication::initializeResult(bool success, interfaces::BlockAndHead
     qDebug() << __func__ << ": Initialization result: " << success;
 
     if (success) {
-        delete m_splash;
-        m_splash = nullptr;
+        // delete m_splash;
+        // m_splash = nullptr;
 
         // Log this only after AppInitMain finishes, as then logging setup is guaranteed complete
         qInfo() << "Platform customization:" << platformStyle->getName();
