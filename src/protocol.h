@@ -337,6 +337,8 @@ enum ServiceFlags : uint64_t {
     // do not actually support. Other service bits should be allocated via the
     // BIP process.
 
+    NODE_REPLACE_BY_FEE = (1 << 26),
+
     NODE_MALICIOUS = (1 << 29),
 };
 
