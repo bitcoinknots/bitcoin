@@ -24,6 +24,18 @@ class SoftwareExpiryTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
 
+    def check_warning(self, node, alerts_path, re_warning_stderr_prefix, re_expected_warning):
+        warnings = "\n".join(node.getnetworkinfo()['warnings'])
+        assert re.match(re_expected_warning, warnings)
+        node.stderr.seek(0)
+        stderr = node.stderr.read().decode('utf-8').strip()
+        assert re.match(re_warning_stderr_prefix + re_expected_warning, stderr)
+        assert alerts_path.exists()
+        with open(alerts_path, 'r', encoding='utf8') as f:
+            assert re.match('^' + re_expected_warning, f.read())
+        alerts_path.unlink()
+        return stderr
+
     def run_test(self):
         nodes = self.nodes
         addr = nodes[0].get_deterministic_priv_key().address  # what address is irrelevant
@@ -60,15 +72,8 @@ class SoftwareExpiryTest(BitcoinTestFramework):
         self.log.info("Once we're within 4 weeks, warnings should trigger")
         nodes[0].mockscheduler(60)
         time.sleep(1)
-        warnings = "\n".join(nodes[0].getnetworkinfo()['warnings'])
         re_expected_warning = r'This software expires soon, and may fall out of consensus. Before .*, you must choose to upgrade or override this expiration.$'
-        assert re.match(re_expected_warning, warnings)
-        nodes[0].stderr.seek(0)
-        stderr = nodes[0].stderr.read().decode('utf-8').strip()
-        assert re.match(r'Warning: ' + re_expected_warning, stderr)
-        assert alerts_path.exists()
-        with open(alerts_path, 'r', encoding='utf8') as f:
-            assert re.match(re_expected_warning, f.read())
+        stderr = self.check_warning(nodes[0], alerts_path, r'^Warning: ', re_expected_warning)
 
         self.log.info("Checking everything still works normal exactly at expiry time")
         setmocktime(expirytime)
@@ -101,14 +106,23 @@ class SoftwareExpiryTest(BitcoinTestFramework):
 
         self.log.info("Restarting the node with a later expiry should succeed and accept the newer block")
         expirytime = nodes[1].getblock(new_blockhash, 1)['time']
-        self.restart_node(0, extra_args=[f'-mocktime={self.mocktime}', f'-softwareexpiry={expirytime}'])
+        assert expirytime - SOFTWARE_EXPIRY_WARN_PERIOD < self.mocktime <= expirytime
+        self.restart_node(0, extra_args=[
+            f'-mocktime={self.mocktime}',
+            f'-softwareexpiry={expirytime}',
+            f"-alertnotify=echo %s >> {alerts_path}",
+        ])
         self.connect_nodes(1, 0)
+        nodes[0].mockscheduler(5)
+        time.sleep(1)
         self.sync_blocks(nodes)
 
-        self.stop_node(0)
+        # But we're still close enough to get warned
+        stderr = self.check_warning(nodes[0], alerts_path, r'^Warning: ', re_expected_warning)
+
+        self.stop_node(0, expected_stderr=stderr)
         self.log.info("Checking no unexpected alerts were triggered")
-        with open(alerts_path, 'r', encoding='utf8') as f:
-            assert re.match(re_expected_warning, f.read())
+        assert not alerts_path.exists()
 
 
 if __name__ == "__main__":
