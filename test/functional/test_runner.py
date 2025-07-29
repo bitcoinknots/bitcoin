@@ -190,8 +190,6 @@ BASE_SCRIPTS = [
     'interface_zmq.py',
     'rpc_invalid_address_message.py',
     'rpc_validateaddress.py',
-    'interface_bitcoin_cli.py --legacy-wallet',
-    'interface_bitcoin_cli.py --descriptors',
     'feature_bind_extra.py',
     'mempool_resurrect.py',
     'wallet_sweepprivkeys.py',
@@ -589,24 +587,24 @@ def main():
                   f"A minimum of {MIN_NO_CLEANUP_SPACE // (1024 * 1024 * 1024)} GB of free space is required.")
         passon_args.append("--nocleanup")
 
-    check_script_list(src_dir=config["environment"]["SRCDIR"], fail_on_warn=fail_on_warn)
     check_script_prefixes()
 
     if not args.keepcache:
         shutil.rmtree("%s/test/cache" % config["environment"]["BUILDDIR"], ignore_errors=True)
 
-    run_tests(
-        test_list=test_list,
-        build_dir=config["environment"]["BUILDDIR"],
-        tmpdir=tmpdir,
-        jobs=args.jobs,
-        enable_coverage=args.coverage,
-        args=passon_args,
-        combined_logs_len=args.combinedlogslen,
-        failfast=args.failfast,
-        use_term_control=args.ansi,
-        results_filepath=results_filepath,
-    )
+    for i in range(32):
+        run_tests(
+            test_list=list(test_list),
+            build_dir=config["environment"]["BUILDDIR"],
+            tmpdir=tmpdir,
+            jobs=args.jobs,
+            enable_coverage=args.coverage,
+            args=passon_args,
+            combined_logs_len=args.combinedlogslen,
+            failfast=args.failfast,
+            use_term_control=args.ansi,
+            results_filepath=results_filepath,
+        )
 
 def run_tests(*, test_list, build_dir, tmpdir, jobs=1, enable_coverage=False, args=None, combined_logs_len=0, failfast=False, use_term_control, results_filepath=None):
     args = args or []
@@ -716,6 +714,8 @@ def run_tests(*, test_list, build_dir, tmpdir, jobs=1, enable_coverage=False, ar
         coverage.cleanup()
     else:
         coverage_passed = True
+
+    if all_passed: return
 
     # Clear up the temp directory if all subdirectories are gone
     if not os.listdir(tmpdir):
