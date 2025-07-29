@@ -129,6 +129,7 @@ static bool ParseArgs(NodeContext& node, int argc, char* argv[])
             return InitError(Untranslated(strprintf("Command line contains unexpected token '%s', see bitcoind -h for a list of options.", argv[i])));
         }
     }
+
     return true;
 }
 
