@@ -408,7 +408,7 @@ class CompactBlocksBlockReconstructionLimitTest(BitcoinTestFramework):
         # Ensure segwit is active
         assert softfork_active(self.nodes[0], "segwit")
 
-       # Test policy rejection types first
+        # Test policy rejection types first
         self.test_policy_rejection_types()
 
         # Extra Txn capacity tests
