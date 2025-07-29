@@ -60,6 +60,32 @@ time-machine() {
                       -- "$@"
 }
 
+################
+guix-prefetch() {
+    local hash="$1" uri="$2"
+    guix build -f /dev/stdin --source << EOF
+(use-modules (guix packages)
+             (guix download)
+             (guix build-system trivial)
+             (guix licenses))
+
+(define-public dummy
+  (package
+    (name "dummy")
+    (version "0")
+    (source (origin
+              (method url-fetch)
+              (uri "${uri}")
+              (sha256 (base32 "${hash}"))))
+    (build-system trivial-build-system)
+    (synopsis "")
+    (description "")
+    (home-page "")
+    (license gpl3+)))
+
+dummy
+EOF
+}
 
 ################
 # Set common variables
