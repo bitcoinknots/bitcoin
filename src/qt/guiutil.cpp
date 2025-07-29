@@ -44,6 +44,7 @@
 #include <QFileDialog>
 #include <QFont>
 #include <QFontDatabase>
+#include <QFontInfo>
 #include <QFontMetrics>
 #include <QGuiApplication>
 #include <QJsonObject>
@@ -87,9 +88,19 @@ using namespace std::chrono_literals;
 
 namespace GUIUtil {
 
+QString dateStr(const QDate &date)
+{
+    return QLocale::system().toString(date, QLocale::ShortFormat);
+}
+
+QString dateStr(qint64 nTime)
+{
+    return dateStr(QDateTime::fromSecsSinceEpoch(nTime).date());
+}
+
 QString dateTimeStr(const QDateTime &date)
 {
-    return QLocale::system().toString(date.date(), QLocale::ShortFormat) + QString(" ") + date.toString("hh:mm");
+    return dateStr(date.date()) + QString(" ") + date.toString("hh:mm");
 }
 
 QString dateTimeStr(qint64 nTime)
@@ -100,9 +111,49 @@ QString dateTimeStr(qint64 nTime)
 QFont fixedPitchFont(bool use_embedded_font)
 {
     if (use_embedded_font) {
-        return {"Roboto Mono"};
+        // If we don't specify a size, various contexts will initialize it differently
+        return {"Embedded variant of Roboto Mono", QFont().pointSize()};
     }
     return QFontDatabase::systemFont(QFontDatabase::FixedFont);
+}
+
+QString fontToCss(const QFont& font)
+{
+    const QFontInfo info(font);
+    QString css;
+    css += "font-family:\"" + info.family() + "\";";
+    css += "font-size:" + QString::number(info.pointSize()) + "pt;";
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+    css += "font-weight:" + QString::number((int)info.weight()) + ";";
+#else
+    css += "font-weight:" + QString::number(info.weight() * 8) + ";";
+#endif
+    switch (info.style()) {
+    default:
+        css += "font-style:normal;";
+        break;
+    case QFont::StyleItalic:
+        css += "font-style:italic;";
+        break;
+    case QFont::StyleOblique:
+        css += "font-style:oblique;";
+        break;
+    }
+    css += "text-decoration:";
+    if (font.underline()) {
+        css += " underline";
+    }
+    if (font.overline()) {
+        css += " overline";
+    }
+    if (font.strikeOut()) {
+        css += " line-through";
+    }
+    if (!(font.underline() || font.overline() || font.strikeOut())) {
+        css += "none";
+    }
+    css += ";";
+    return css;
 }
 
 // Return a pre-generated dummy bech32m address (P2TR) with invalid checksum.
