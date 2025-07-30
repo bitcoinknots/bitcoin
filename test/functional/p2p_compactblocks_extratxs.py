@@ -463,7 +463,7 @@ class CompactBlocksBlockReconstructionLimitTest(BitcoinTestFramework):
         result_large = self.send_compact_block(rejected_txs, indices)
 
         # Should have NO evictions with 2MB limit
-        assert result_large["missing_indices"] == [], f"2MB limit should store all transactions"
+        assert result_large["missing_indices"] == [], "2MB limit should store all transactions"
         self.log.info(f"✓ 2MB limit successfully stores all {buffersize} large transactions (~1.2MB)")
 
     def test_extratxn_memorylimit_boundary(self):
@@ -498,8 +498,8 @@ class CompactBlocksBlockReconstructionLimitTest(BitcoinTestFramework):
 
         # Check original transactions again
         result2 = self.send_compact_block(rejected_txs, indices)
-        assert len(result2["missing_indices"]) == 1, f"Expected exactly 1 eviction at boundary"
-        assert result2["missing_indices"] == [0], f"Expected oldest transaction (0) to be evicted"
+        assert len(result2["missing_indices"]) == 1, "Expected exactly 1 eviction at boundary"
+        assert result2["missing_indices"] == [0], "Expected oldest transaction (0) to be evicted"
 
         self.log.info("Memory limit boundary behavior verified - one transaction evicted when limit exceeded")
 
