@@ -61,9 +61,13 @@ time-machine() {
 }
 
 ################
+guix_prefetch_temp=
+trap 'test -n "$guix_prefetch_temp" && rm -rf -- "$guix_prefetch_temp"' EXIT
+
 guix-prefetch() {
     local hash="$1" uri="$2"
-    guix build -f /dev/stdin --source << EOF
+    test -n "$guix_prefetch_temp" || guix_prefetch_temp="$(mktemp)"
+    cat > "$guix_prefetch_temp" << EOF
 (use-modules (guix packages)
              (guix download)
              (guix build-system trivial)
@@ -85,6 +89,7 @@ guix-prefetch() {
 
 dummy
 EOF
+    guix build -f "$guix_prefetch_temp" --source
 }
 
 ################
