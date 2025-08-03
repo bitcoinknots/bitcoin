@@ -5075,15 +5075,16 @@ bool Chainstate::LoadChainTip()
 
     // Make sure our chain tip before shutting down scores better than any other candidate
     // to maintain a consistent best tip over reboots
+    // Block index candidates are loaded before the chain tip, so we need to replace this entry
+    // Otherwise the scoring will be based on the memory address location instead of the nSequenceId
+    assert(setBlockIndexCandidates.contains(tip));
+    setBlockIndexCandidates.erase(tip);
     auto target = tip;
     while (target) {
         target->nSequenceId = SEQ_ID_BEST_CHAIN_FROM_DISK;
         target = target->pprev;
     }
 
-    // Block index candidates are loaded before the chain tip, so we need to replace this entry
-    // Otherwise the scoring will be based on the memory address location instead of the nSequenceId
-    setBlockIndexCandidates.erase(tip);
     TryAddBlockIndexCandidate(tip);
     PruneBlockIndexCandidates();
 
