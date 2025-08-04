@@ -13,6 +13,7 @@
 #include <consensus/validation.h>
 #include <kernel/mempool_options.h>
 #include <policy/feerate.h>
+#include <policy/settings.h>
 #include <primitives/transaction.h>
 #include <script/interpreter.h>
 #include <script/script.h>
@@ -23,6 +24,8 @@
 #include <algorithm>
 #include <cstddef>
 #include <vector>
+
+unsigned int g_script_size_policy_limit{DEFAULT_SCRIPT_SIZE_POLICY_LIMIT};
 
 CAmount GetDustThreshold(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
 {
@@ -147,7 +150,7 @@ bool IsStandardTx(const CTransaction& tx, const kernel::MemPoolOptions& opts, st
         // some minor future-proofing. That's also enough to spend a
         // 20-of-20 CHECKMULTISIG scriptPubKey, though such a scriptPubKey
         // is not considered standard.
-        if (txin.scriptSig.size() > MAX_STANDARD_SCRIPTSIG_SIZE) {
+        if (txin.scriptSig.size() > std::min(MAX_STANDARD_SCRIPTSIG_SIZE, g_script_size_policy_limit)) {
             MaybeReject("scriptsig-size");
         }
         if (!txin.scriptSig.IsPushOnly()) {
@@ -160,6 +163,10 @@ bool IsStandardTx(const CTransaction& tx, const kernel::MemPoolOptions& opts, st
     unsigned int n_monetary{0};
     TxoutType whichType;
     for (const CTxOut& txout : tx.vout) {
+        if (txout.scriptPubKey.size() > g_script_size_policy_limit) {
+            MaybeReject("scriptpubkey-size");
+        }
+
         if (!::IsStandard(txout.scriptPubKey, opts.max_datacarrier_bytes, whichType)) {
             MaybeReject("scriptpubkey");
         }
@@ -280,6 +287,10 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
     for (unsigned int i = 0; i < tx.vin.size(); i++) {
         const CTxOut& prev = mapInputs.AccessCoin(tx.vin[i].prevout).out;
 
+        if (prev.scriptPubKey.size() > g_script_size_policy_limit) {
+            MaybeReject("script-size");
+        }
+
         std::vector<std::vector<unsigned char> > vSolutions;
         TxoutType whichType = Solver(prev.scriptPubKey, vSolutions);
         if (whichType == TxoutType::NONSTANDARD) {
@@ -312,6 +323,9 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
                 return false;
             }
             CScript subscript(stack.back().begin(), stack.back().end());
+            if (subscript.size() > g_script_size_policy_limit) {
+                MaybeReject("scriptcheck-size");
+            }
             if (subscript.GetSigOpCount(true) > MAX_P2SH_SIGOPS) {
                 MaybeReject("scriptcheck-sigops");
             }
@@ -371,6 +385,10 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
         {
             out_reason = reason_prefix + "nonwitness-input";
             return false;
+        }
+
+        if (GetSerializeSize(tx.vin[i].scriptWitness.stack) > g_script_size_policy_limit) {
+            MaybeReject("witness-size");
         }
 
         // Check P2WSH standard limits
