@@ -201,6 +201,7 @@ util::Result<void> ApplyArgsManOptions(const ArgsManager& argsman, const CChainP
         mempool_opts.max_datacarrier_bytes = std::nullopt;
     }
     mempool_opts.datacarrier_fullcount = argsman.GetBoolArg("-datacarrierfullcount", DEFAULT_DATACARRIER_FULLCOUNT);
+    mempool_opts.accept_non_std_datacarrier = argsman.GetBoolArg("-acceptnonstddatacarrier", DEFAULT_ACCEPT_NON_STD_DATACARRIER);
 
     mempool_opts.permitbaredatacarrier = argsman.GetBoolArg("-permitbaredatacarrier", mempool_opts.permitbaredatacarrier);
 
