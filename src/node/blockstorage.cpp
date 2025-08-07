@@ -29,6 +29,7 @@
 #include <uint256.h>
 #include <undo.h>
 #include <util/batchpriority.h>
+#include <util/byte_units.h>
 #include <util/check.h>
 #include <util/fs.h>
 #include <util/ioprio.h>
@@ -361,19 +362,32 @@ void BlockManager::FindFilesToPruneManual(
         chain.GetRole(), last_block_can_prune, count);
 }
 
-uint64_t BlockManager::GetPruneTargetForChainstate(const Chainstate& chain, ChainstateManager& chainman) const
+uint64_t BlockManager::GetPruneTargetForChainstate(const Chainstate& chain, ChainstateManager& chainman, const uint64_t current_disk_usage) const
 {
     const auto number_of_chainstates{chainman.GetAll().size()};
     const uint64_t min_overall_target{MIN_DISK_SPACE_FOR_BLOCK_FILES * number_of_chainstates};
     auto target = std::max(min_overall_target, GetPruneTarget());
     uint64_t target_boost{0};
     if (m_opts.prune_target_during_init > -1 && chainman.IsInitialBlockDownload()) {
-        if ((uint64_t)m_opts.prune_target_during_init <= target) {
+        uint64_t prune_target_temporarily{(uint64_t)m_opts.prune_target_during_init};
+        if (prune_target_temporarily <= target) {
             target = std::max(min_overall_target, (uint64_t)m_opts.prune_target_during_init);
         } else if (chain.GetRole() != ChainstateRole::ASSUMEDVALID) {
+            static constexpr uint64_t disk_space_buffer{100_MiB};
+            const auto disk_space_available{current_disk_usage + fs::space(m_opts.blocks_dir).available};
+            if (disk_space_available < prune_target_temporarily + disk_space_buffer) {
+                // If
+                if (disk_space_available <= target + disk_space_buffer) {
+                    // Simply ignore prune_target_during_init
+                    prune_target_temporarily = target;
+                } else {
+                    prune_target_temporarily = disk_space_available - disk_space_buffer;
+                }
+            }
+
             // Only the background/normal gets the benefit
             // NOTE: This assumes only one such chainstate exists
-            target_boost = m_opts.prune_target_during_init - target;
+            target_boost = prune_target_temporarily - target;
         }
     }
     // Distribute our -prune budget over all chainstates.
@@ -388,7 +402,14 @@ void BlockManager::FindFilesToPrune(
     ChainstateManager& chainman)
 {
     LOCK2(cs_main, cs_LastBlockFile);
-    const auto target{GetPruneTargetForChainstate(chain, chainman)};
+
+    uint64_t nCurrentUsage = CalculateCurrentUsage();
+    // We don't check to prune until after we've allocated new space for files
+    // So we should leave a buffer under our target to account for another allocation
+    // before the next pruning.
+    uint64_t nBuffer = BLOCKFILE_CHUNK_SIZE + UNDOFILE_CHUNK_SIZE;
+
+    const auto target{GetPruneTargetForChainstate(chain, chainman, nCurrentUsage + nBuffer)};
     const uint64_t target_sync_height = chainman.m_best_header->nHeight;
 
     if (chain.m_chain.Height() < 0 || target == 0) {
@@ -400,11 +421,6 @@ void BlockManager::FindFilesToPrune(
 
     const auto [min_block_to_prune, last_block_can_prune] = chainman.GetPruneRange(chain, last_prune);
 
-    uint64_t nCurrentUsage = CalculateCurrentUsage();
-    // We don't check to prune until after we've allocated new space for files
-    // So we should leave a buffer under our target to account for another allocation
-    // before the next pruning.
-    uint64_t nBuffer = BLOCKFILE_CHUNK_SIZE + UNDOFILE_CHUNK_SIZE;
     uint64_t nBytesToPrune;
     int count = 0;
 
