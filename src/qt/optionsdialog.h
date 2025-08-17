@@ -19,6 +19,7 @@ class QBoxLayout;
 class QCheckBox;
 class QDataWidgetMapper;
 class QDoubleSpinBox;
+class QEvent;
 class QBoxLayout;
 class QRadioButton;
 class QSpinBox;
@@ -104,6 +105,9 @@ Q_SIGNALS:
     void proxyIpChecks(QValidatedLineEdit *pUiProxyIp, uint16_t nProxyPort);
     void quitOnReset();
 
+protected:
+    void changeEvent(QEvent *e) override;
+
 private:
     Ui::OptionsDialog *ui;
     ClientModel* m_client_model{nullptr};
@@ -161,6 +165,8 @@ private:
 
     BitcoinAmountField *blockmintxfee;
     QSpinBox *blockmaxsize, *blockprioritysize, *blockmaxweight;
+
+    void updateThemeColors();
 };
 
 #endif // BITCOIN_QT_OPTIONSDIALOG_H

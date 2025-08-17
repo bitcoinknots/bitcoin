@@ -246,12 +246,13 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
 
     ui->verticalLayout->setStretchFactor(ui->tabWidget, 1);
 
+    updateThemeColors();
+
     /* Main elements init */
     ui->databaseCache->setRange(MIN_DB_CACHE >> 20, std::numeric_limits<int>::max());
     ui->threadsScriptVerif->setMinimum(-GetNumCores());
     ui->threadsScriptVerif->setMaximum(MAX_SCRIPTCHECK_THREADS);
     ui->pruneWarning->setVisible(false);
-    ui->pruneWarning->setStyleSheet("QLabel { color: red; }");
 
     ui->pruneSizeMiB->setEnabled(false);
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 7, 0))
@@ -994,7 +995,10 @@ void OptionsDialog::checkLineEdit()
     if (lineedit->hasAcceptableInput()) {
         lineedit->setStyleSheet("");
     } else {
-        lineedit->setStyleSheet("color: red;");
+        // Check the line edit's actual background to choose appropriate warning color
+        const bool lineedit_dark = GUIUtil::isDarkMode(lineedit->palette().color(lineedit->backgroundRole()));
+        const QColor lineedit_warning = lineedit_dark ? QColor("#FF8080") : QColor("#FF0000");
+        lineedit->setStyleSheet(QStringLiteral("color: %1;").arg(lineedit_warning.name()));
     }
 }
 
@@ -1168,6 +1172,15 @@ void OptionsDialog::on_showTrayIcon_stateChanged(int state)
     }
 }
 
+void OptionsDialog::changeEvent(QEvent* e)
+{
+    if (e->type() == QEvent::PaletteChange) {
+        updateThemeColors();
+    }
+
+    QWidget::changeEvent(e);
+}
+
 void OptionsDialog::togglePruneWarning(bool enabled)
 {
     ui->pruneWarning->setVisible(!ui->pruneWarning->isVisible());
@@ -1175,8 +1188,6 @@ void OptionsDialog::togglePruneWarning(bool enabled)
 
 void OptionsDialog::showRestartWarning(bool fPersistent)
 {
-    ui->statusLabel->setStyleSheet("QLabel { color: red; }");
-
     if(fPersistent)
     {
         ui->statusLabel->setText(tr("Client restart required to activate changes."));
@@ -1210,7 +1221,6 @@ void OptionsDialog::updateProxyValidationState()
     else
     {
         setOkButtonState(false);
-        ui->statusLabel->setStyleSheet("QLabel { color: red; }");
         ui->statusLabel->setText(tr("The supplied proxy address is invalid."));
     }
 }
@@ -1235,6 +1245,25 @@ void OptionsDialog::updateDefaultProxyNets()
 
     has_proxy = model->node().getProxy(NET_ONION, proxy);
     ui->proxyReachTor->setChecked(has_proxy && proxy.ToString() == proxyIpText);
+}
+
+void OptionsDialog::updateThemeColors()
+{
+    // Detect dark mode for color palette selection
+    const bool dark_mode = GUIUtil::isDarkMode(palette().color(backgroundRole()));
+
+    // set message warning color based on dark mode
+    const QColor warning_color = dark_mode ? QColor("#FF8080") : QColor("#FF0000");
+    ui->pruneWarning->setStyleSheet(QStringLiteral("QLabel { color: %1; }").arg(warning_color.name()));
+    ui->statusLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; }").arg(warning_color.name()));
+
+    // Update networkPort line edit color if it has validation errors
+    if (!ui->networkPort->hasAcceptableInput()) {
+        // Check networkPort's actual background for appropriate warning color
+        const bool networkport_dark = GUIUtil::isDarkMode(ui->networkPort->palette().color(ui->networkPort->backgroundRole()));
+        const QColor networkport_warning = networkport_dark ? QColor("#FF8080") : QColor("#FF0000");
+        ui->networkPort->setStyleSheet(QStringLiteral("color: %1;").arg(networkport_warning.name()));
+    }
 }
 
 ProxyAddressValidator::ProxyAddressValidator(QObject *parent) :
