@@ -82,7 +82,7 @@ set(ICNS_SPECS
   1024 512 256 128 32 16
 )
 set(EXTRA_ICON_SPECS
-  1024 290
+  290 256
 )
 
 set(ICON_SPECS ${ICO_SPECS} ${ICNS_SPECS} ${EXTRA_ICON_SPECS})
@@ -145,11 +145,22 @@ add_custom_command(
 )
 add_custom_target(generate_ico DEPENDS "${bitcoin_ico}" "${testnet_ico}")
 
+set(logo_svg "res/src/bitcoinknots-logo.svg")
+set(png "${ICON_PATH}/bitcoinknots-logo.png")
+set(size 960)
+add_custom_command(
+  OUTPUT ${png}
+  COMMAND "${RSVG_CONVERT}" -f png -d ${size} -p ${size} --output "${png}" "${CMAKE_CURRENT_SOURCE_DIR}/${logo_svg}"
+  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${logo_svg}"
+  COMMENT "Generating ${png} from ${logo_svg}"
+  VERBATIM
+)
+
 set(nsis_wizard_input "${ICON_PATH}/bitcoin290.png")
 set(nsis_wizard_bmp "${ICON_PATH}/nsis-wizard.bmp")
 add_custom_command(
   OUTPUT "${nsis_wizard_bmp}"
-  COMMAND "${IMAGEMAGICK_CONVERT}" ${nsis_wizard_input} -crop 164x290+62+0 -border 0x12 -colorspace HSL -channel Saturation -separate -negate -auto-level -strip BMP3:${nsis_wizard_bmp}
+  COMMAND "${IMAGEMAGICK_CONVERT}" ${nsis_wizard_input} -crop 164x290+68+0 -border 0x12 -strip BMP3:${nsis_wizard_bmp}
   DEPENDS ${nsis_wizard_input}
   COMMENT "Generating ${nsis_wizard_bmp} from ${nsis_wizard_input}"
   VERBATIM
