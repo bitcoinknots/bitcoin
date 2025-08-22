@@ -116,7 +116,7 @@ list(TRANSFORM ICNS_SRC_FILES PREPEND "${ICON_PATH}/bitcoin")
 list(TRANSFORM ICNS_SRC_FILES APPEND ".png")
 add_custom_command(
   OUTPUT "${bitcoin_icns}"
-  COMMAND "${PNG2ICNS}" "${bitcoin_icns}" ${ICNS_SRC_FILES}
+  COMMAND "${PNG2ICNS}" ${ICNS_SRC_FILES} -o "${bitcoin_icns}"
   DEPENDS ${ICNS_SRC_FILES}
   COMMENT "Generating ${bitcoin_icns} from individual images"
   VERBATIM
