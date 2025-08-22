@@ -115,7 +115,7 @@ bool GenerateAuthCookie(std::string* cookie_out, const std::pair<std::optional<f
     }
     try {
         fs::remove(filepath_tmp);
-    } catch (const fs::filesystem_error& e) {
+    } catch (const fs::filesystem_error&) {
         // ignore
     }
     file.open(filepath_tmp);
