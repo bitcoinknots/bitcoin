@@ -139,7 +139,7 @@ bool GenerateAuthCookie(std::string* cookie_out, const std::pair<std::optional<f
     fs::path filepath = GetAuthCookieFile(false);
     try {
         fs::remove(filepath);
-    } catch (const fs::filesystem_error& e) {
+    } catch (const fs::filesystem_error&) {
         // ignore
     }
     if (!RenameOver(filepath_tmp, filepath)) {
