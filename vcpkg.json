@@ -32,6 +32,8 @@
       "dependencies": [
         "qt5-base",
         "qt5-tools",
+        "librsvg",
+        "graphicsmagick",
         "libqrencode"
       ]
     },
