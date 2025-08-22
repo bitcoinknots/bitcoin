@@ -10,11 +10,18 @@
 #include <QGraphicsPixmapItem>
 
 #include <QCheckBox>
+#include <QColor>
 #include <QGraphicsProxyWidget>
 
 #include <QEvent>
 
 class ClientModel;
+
+struct ThemeColors {
+    QColor orange;
+    QColor green;
+    QColor blue;
+};
 
 class ClickableTextItem : public QGraphicsTextItem
 {
@@ -51,6 +58,13 @@ private:
 
     virtual void resizeEvent(QResizeEvent *event) override;
     virtual void showEvent(QShowEvent *event) override;
+    void changeEvent(QEvent* e) override;
+    void updateThemeColors();
+
+    // Theme Colors
+    const ThemeColors *m_theme_colors;
+    QColor m_bg_color;  // Background color for gradient
+    QColor m_text_color;  // System text color
 
     QGraphicsTextItem *titleItem{nullptr};
     QGraphicsLineItem *titleLine;
