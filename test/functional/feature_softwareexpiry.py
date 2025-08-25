@@ -46,7 +46,9 @@ class SoftwareExpiryTest(BitcoinTestFramework):
         assert re.match(re_warning_stderr_prefix + re_expected_warning, check_stderr)
         assert alerts_path.exists()
         with open(alerts_path, 'r', encoding='utf8') as f:
-            assert re.match('^' + re_expected_warning, f.read())
+            f_read = f.read()
+            self.log.info(">>>>>>>>>> %s" % (f_read,))
+            assert re.match('^' + re_expected_warning, f_read)
         alerts_path.unlink()
         return stderr.rstrip()
 
