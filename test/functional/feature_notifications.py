@@ -17,7 +17,7 @@ from test_framework.util import (
 # Windows disallow control characters (0-31) and /\?%:|"<>
 FILE_CHAR_START = 43 if platform.system() == 'Windows' else 1
 FILE_CHAR_END = 128
-FILE_CHARS_DISALLOWED = '/:;<>?@[\\]^`{|}\x7f' if platform.system() == 'Windows' else '/'
+FILE_CHARS_DISALLOWED = '/:;<>?@[\\]^`{|}' if platform.system() == 'Windows' else '/'
 UNCONFIRMED_HASH_STRING = 'unconfirmed'
 
 def notify_outputname(walletname, txid):
