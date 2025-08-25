@@ -54,11 +54,15 @@ RUN git clone https://github.com/bitcoinknots/bitcoin.git && \
 # Back to root for running the daemon
 USER root
 
+# ✅ Add to root user's PATH as well (affects docker exec)
+ENV PATH="/home/bitcoin/bitcoin/bin:${PATH}"
+
 # Expose standard Bitcoin ports
 EXPOSE 8333 8332
 
 # Data directory as a volume
 VOLUME ["/bitcoin/.bitcoin"]
+
 
 # Run bitcoind on container start
 ENTRYPOINT ["/home/bitcoin/bitcoin/bin/bitcoind", "-datadir=/bitcoin/.bitcoin", "-printtoconsole"]
