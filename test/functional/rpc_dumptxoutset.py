@@ -72,7 +72,7 @@ class DumptxoutsetTest(BitcoinTestFramework):
         if {'format'} == set(params) - {'show_header', 'separator'}:
             # Test backward compatibility
             def test_dump_file_compat(*a, **ka):
-                os.rename(expected_path, node.chain_path / (filename + ".old"))
+                os.replace(expected_path, node.chain_path / (filename + ".old"))
                 out2 = node.dumptxoutset(filename, *a, **ka)
                 assert_equal(out, out2)
                 self.check_output_file(expected_path, is_human_readable, expected_digest)
