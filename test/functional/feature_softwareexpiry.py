@@ -3,6 +3,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+import platform
 import re
 import time
 
@@ -46,9 +47,12 @@ class SoftwareExpiryTest(BitcoinTestFramework):
         assert re.match(re_warning_stderr_prefix + re_expected_warning, check_stderr)
         assert alerts_path.exists()
         with open(alerts_path, 'r', encoding='utf8') as f:
-            f_read = f.read()
-            self.log.info(">>>>>>>>>> %s" % (f_read,))
-            assert re.match('^' + re_expected_warning, f_read)
+            alerts_data = f.read()
+            if platform.system() == 'Windows':
+                # The echo command on Windows includes the quotes and space in the output
+                assert alerts_data[0] == '"' and alerts_data[-2:] == '" '
+                alerts_data = alerts_data[1:-2]
+            assert re.match('^' + re_expected_warning, alerts_data)
         alerts_path.unlink()
         return stderr.rstrip()
 
