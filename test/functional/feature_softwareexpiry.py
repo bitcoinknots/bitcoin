@@ -50,9 +50,8 @@ class SoftwareExpiryTest(BitcoinTestFramework):
             alerts_data = f.read()
             if platform.system() == 'Windows':
                 # The echo command on Windows includes the quotes and space in the output
-                self.log.info(">>>>>>>> %s" %(repr(alerts_data),))
-                assert alerts_data[0] == '"' and alerts_data[-2:] == '" '
-                alerts_data = alerts_data[1:-2]
+                assert alerts_data[0] == '"' and alerts_data[-3:] == "\" \n"
+                alerts_data = alerts_data[1:-3]
             assert re.match('^' + re_expected_warning, alerts_data)
         alerts_path.unlink()
         return stderr.rstrip()
