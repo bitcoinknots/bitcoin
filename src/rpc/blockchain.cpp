@@ -1501,6 +1501,8 @@ RPCHelpMan getblockchaininfo()
                 {RPCResult::Type::NUM_TIME, "mediantime", "The median block time expressed in " + UNIX_EPOCH_TIME},
                 {RPCResult::Type::NUM, "verificationprogress", "estimate of verification progress [0..1]"},
                 {RPCResult::Type::BOOL, "initialblockdownload", "(debug information) estimate of whether this node is in Initial Block Download mode"},
+                {RPCResult::Type::BOOL, "backgroundvalidation", "(debug information) estimate of wheter this node is doing background validation"},
+                {RPCResult::Type::NUM, "backgroundvalidationprogress", /*optional=*/true, "estimate of background validation progress [0..1]"},
                 {RPCResult::Type::STR_HEX, "chainwork", "total amount of work in active chain, in hexadecimal"},
                 {RPCResult::Type::NUM, "size_on_disk", "the estimated size of the block and undo files on disk"},
                 {RPCResult::Type::BOOL, "pruned", "if the blocks are subject to pruning"},
@@ -1541,6 +1543,8 @@ RPCHelpMan getblockchaininfo()
     obj.pushKV("mediantime", tip.GetMedianTimePast());
     obj.pushKV("verificationprogress", chainman.GuessVerificationProgress(&tip));
     obj.pushKV("initialblockdownload", chainman.IsInitialBlockDownload());
+    obj.pushKV("backgroundvalidation", chainman.BackgroundSyncInProgress());
+    if(chainman.BackgroundSyncInProgress()) obj.pushKV("backgroundvalidationprogress", chainman.GuessVerificationProgress(chainman.GetBackgroundSyncTip()));
     obj.pushKV("chainwork", tip.nChainWork.GetHex());
     obj.pushKV("size_on_disk", chainman.m_blockman.CalculateCurrentUsage());
     obj.pushKV("pruned", chainman.m_blockman.IsPruneMode());
