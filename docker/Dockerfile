@@ -1,6 +1,6 @@
 FROM ubuntu:22.04
 
-LABEL maintainer="you@example.com"
+
 LABEL description="Bitcoin Knots built from source with --disable-wallet"
 
 # Build args
