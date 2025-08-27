@@ -32,13 +32,13 @@ static const int GRAPH_PADDING_TOP_LABEL = 150;
 static const int GRAPH_PADDING_BOTTOM = 50;
 static const int LABEL_HEIGHT = 15;
 
-static const ThemeColors LIGHT_THEME_COLORS = {
+static const MempoolStats::ThemeColors LIGHT_THEME_COLORS = {
     .orange = QColor(216, 92, 1, 250),
     .green = QColor(0, 125, 50, 250),
     .blue = QColor(2, 61, 204, 250),
 };
 
-static const ThemeColors DARK_THEME_COLORS = {
+static const MempoolStats::ThemeColors DARK_THEME_COLORS = {
     .orange = QColor(247, 147, 26, 250),
     .green = QColor(69, 222, 181, 250),
     .blue = QColor(137, 170, 255, 250),

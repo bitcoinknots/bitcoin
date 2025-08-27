@@ -17,12 +17,6 @@
 
 class ClientModel;
 
-struct ThemeColors {
-    QColor orange;
-    QColor green;
-    QColor blue;
-};
-
 class ClickableTextItem : public QGraphicsTextItem
 {
     Q_OBJECT
@@ -44,6 +38,11 @@ class MempoolStats : public QWidget
     Q_OBJECT
 
 public:
+    struct ThemeColors {
+        QColor orange;
+        QColor green;
+        QColor blue;
+    };
     MempoolStats(QWidget *parent = nullptr);
     ~MempoolStats();
 
