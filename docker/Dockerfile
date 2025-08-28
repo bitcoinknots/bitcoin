@@ -81,7 +81,10 @@ EXPOSE 8333 8332
 # Volume for blockchain data
 VOLUME ["/bitcoin/.bitcoin"]
 
-USER root
+RUN mkdir -p /bitcoin/.bitcoin && \
+    chown -R bitcoin:bitcoin /bitcoin
+
+USER bitcoin
 
 ENTRYPOINT ["bitcoind", "-datadir=/bitcoin/.bitcoin", "-printtoconsole"]
 
