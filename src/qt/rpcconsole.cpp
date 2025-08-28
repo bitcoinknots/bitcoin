@@ -495,6 +495,7 @@ RPCConsole::RPCConsole(interfaces::Node& node, const PlatformStyle *_platformSty
     platformStyle(_platformStyle)
 {
     ui->setupUi(this);
+    updateThemeColors();
 
     // Default tabs are identified by their UI index
     for (int i = ui->tabWidget->count(); i--; ) {
@@ -675,7 +676,6 @@ RPCConsole::RPCConsole(interfaces::Node& node, const PlatformStyle *_platformSty
     QObject::connect(new QShortcut(QKeySequence(QStringLiteral("Ctrl+D")), ui->tab_console), &QShortcut::activated, this, &QWidget::close);
 
     updateWindowTitle();
-    updateThemeColors();
 }
 
 void RPCConsole::WriteCommandHistory()
