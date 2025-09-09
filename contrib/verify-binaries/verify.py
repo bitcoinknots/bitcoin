@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020-2021 The Bitcoin Core developers
+# Modified for Bitcoin Knots Support
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Script for verifying Bitcoin Core release binaries.
+"""Script for verifying Bitcoin Knots release binaries.
 
 This script attempts to download the sum file SHA256SUMS and corresponding
-signature file SHA256SUMS.asc from bitcoincore.org and bitcoin.org and
-compares them.
+signature file SHA256SUMS.asc from bitcoinknots.org.
 
 The sum-signature file is signed by a number of builder keys. This script
 ensures that there is a minimum threshold of signatures from pubkeys that
@@ -15,7 +15,7 @@ here, but by default is based upon local GPG trust settings.
 
 The builder keys are available in the guix.sigs repo:
 
-    https://github.com/bitcoin-core/guix.sigs/tree/main/builder-keys
+    https://github.com/bitcoinknots/guix.sigs/tree/knots/builder-keys
 
 If a minimum good, trusted signature threshold is met on the sum file, we then
 download the files specified in SHA256SUMS, and check if the hashes of these
@@ -46,9 +46,9 @@ from hashlib import sha256
 from pathlib import PurePath, Path
 
 # The primary host; this will fail if we can't retrieve files from here.
-HOST1 = "https://bitcoincore.org"
-HOST2 = "https://bitcoin.org"
-VERSIONPREFIX = "bitcoin-core-"
+HOST1 = "https://bitcoinknots.org"
+HOST2 = "https://bitcoinknots.org"
+VERSIONPREFIX = "bitcoin-"
 SUMS_FILENAME = 'SHA256SUMS'
 SIGNATUREFILENAME = f"{SUMS_FILENAME}.asc"
 
@@ -96,8 +96,8 @@ def bool_from_env(key, default=False) -> bool:
     raise ValueError(f"Unrecognized environment value {key}={raw!r}")
 
 
-VERSION_FORMAT = "<major>.<minor>[.<patch>][-rc[0-9]][-platform]"
-VERSION_EXAMPLE = "22.0 or 23.1-rc1-darwin.dmg or 27.0-x86_64-linux-gnu"
+VERSION_FORMAT = "<major>.<minor>[.<patch>].knots<date>[-rc[0-9]][-platform]"
+VERSION_EXAMPLE = "29.1.knots20250903 or 29.1.knots20250903-arm64-apple-darwin or 27.1.knots20240801-x86_64-linux-gnu"
 
 def parse_version_string(version_str):
     # "<version>[-rcN][-platform]"
@@ -106,8 +106,9 @@ def parse_version_string(version_str):
     if platform.startswith("rc"): # "<version>-rcN[-platform]"
         rc, _, platform = platform.partition('-')
     # else "<version>" or "<version>-platform"
+    version_base, _, version_date = version_base.partition('.knots')
 
-    return version_base, rc, platform
+    return version_base, version_date, rc, platform
 
 
 def download_with_wget(remote_file, local_file):
@@ -462,7 +463,7 @@ def verify_published_handler(args: argparse.Namespace) -> ReturnCode:
 
     # determine remote dir dependent on provided version string
     try:
-        version_base, version_rc, os_filter = parse_version_string(args.version)
+        version_base, version_date, version_rc, os_filter = parse_version_string(args.version)
         version_tuple = [int(i) for i in version_base.split('.')]
     except Exception as e:
         log.debug(e)
@@ -470,7 +471,9 @@ def verify_published_handler(args: argparse.Namespace) -> ReturnCode:
         log.error(f"  e.g. {VERSION_EXAMPLE}")
         return ReturnCode.BAD_VERSION
 
-    remote_dir = f"/bin/{VERSIONPREFIX}{version_base}/"
+    major_version_dir = f"{version_tuple[0]}.x"
+    exact_version_dir=f"{version_base}.knots{version_date}"
+    remote_dir = f"/files/{major_version_dir}/{exact_version_dir}/"
     if version_rc:
         remote_dir += f"test.{version_rc}/"
     remote_sigs_path = remote_dir + SIGNATUREFILENAME
@@ -512,17 +515,6 @@ def verify_published_handler(args: argparse.Namespace) -> ReturnCode:
         closest_match = difflib.get_close_matches(os_filter, available_versions, cutoff=0, n=1)[0]
         log.error(f"No files matched the platform specified. Did you mean: {closest_match}")
         return ReturnCode.NO_BINARIES_MATCH
-
-    # remove binaries that are known not to be hosted by bitcoincore.org
-    fragments_to_remove = ['-unsigned', '-debug', '-codesignatures']
-    for fragment in fragments_to_remove:
-        nobinaries = [i for i in hashes_to_verify if fragment in i[1]]
-        if nobinaries:
-            remove_str = ', '.join(i[1] for i in nobinaries)
-            log.info(
-                f"removing *{fragment} binaries ({remove_str}) from verification "
-                f"since {HOST1} does not host *{fragment} binaries")
-            hashes_to_verify = [i for i in hashes_to_verify if fragment not in i[1]]
 
     # download binaries
     for _, binary_filename in hashes_to_verify:
@@ -685,8 +677,7 @@ def main():
         '--require-all-hosts', action='store_true',
         default=bool_from_env('BINVERIFY_REQUIRE_ALL_HOSTS'),
         help=(
-            f'If set, require all hosts ({HOST1}, {HOST2}) to provide signatures. '
-            '(Sometimes bitcoin.org lags behind bitcoincore.org.)')
+            f'If set, require all hosts ({HOST1}, {HOST2}) to provide signatures.')
     )
 
     bin_parser = subparsers.add_parser("bin", help="Verify local binaries.")
