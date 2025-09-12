@@ -6,7 +6,8 @@
 """Script for verifying Bitcoin Knots release binaries.
 
 This script attempts to download the sum file SHA256SUMS and corresponding
-signature file SHA256SUMS.asc from bitcoinknots.org.
+signature file SHA256SUMS.asc from bitcoinknots.org and github.com and compares
+them.
 
 The sum-signature file is signed by a number of builder keys. This script
 ensures that there is a minimum threshold of signatures from pubkeys that
@@ -47,7 +48,7 @@ from pathlib import PurePath, Path
 
 # The primary host; this will fail if we can't retrieve files from here.
 HOST1 = "https://bitcoinknots.org"
-HOST2 = "https://bitcoinknots.org"
+HOST2 = "https://github.com/bitcoinknots/bitcoin/releases"
 VERSIONPREFIX = "bitcoin-"
 SUMS_FILENAME = 'SHA256SUMS'
 SIGNATUREFILENAME = f"{SUMS_FILENAME}.asc"
@@ -260,7 +261,7 @@ def files_are_equal(filename1, filename2):
 
 
 def get_files_from_hosts_and_compare(
-    hosts: list[str], path: str, filename: str, require_all: bool = False
+    hosts: list[str], paths: list[str], filename: str, require_all: bool = False
 ) -> ReturnCode:
     """
     Retrieve the same file from a number of hosts and ensure they have the same contents.
@@ -272,12 +273,14 @@ def get_files_from_hosts_and_compare(
     assert len(hosts) > 1
     primary_host = hosts[0]
     other_hosts = hosts[1:]
+    primary_path = paths[0]
+    other_paths = paths[1:]
     got_files = []
 
-    def join_url(host: str) -> str:
+    def join_url(host: str, path: str) -> str:
         return host.rstrip('/') + '/' + path.lstrip('/')
 
-    url = join_url(primary_host)
+    url = join_url(primary_host, primary_path)
     success, output = download_with_wget(url, filename)
     if not success:
         log.error(
@@ -291,8 +294,8 @@ def get_files_from_hosts_and_compare(
         log.info(f"got file {url} as {filename}")
         got_files.append(filename)
 
-    for i, host in enumerate(other_hosts):
-        url = join_url(host)
+    for i, (host, path) in enumerate(zip(other_hosts, other_paths)):
+        url = join_url(host, path)
         fname = filename + f'.{i + 2}'
         success, output = download_with_wget(url, fname)
 
@@ -473,11 +476,12 @@ def verify_published_handler(args: argparse.Namespace) -> ReturnCode:
 
     major_version_dir = f"{version_tuple[0]}.x"
     exact_version_dir=f"{version_base}.knots{version_date}"
-    remote_dir = f"/files/{major_version_dir}/{exact_version_dir}/"
+    host1_remote_dir = f"/files/{major_version_dir}/{exact_version_dir}/"
+    host2_remote_dir = f"download/v{exact_version_dir}/"
     if version_rc:
         remote_dir += f"test.{version_rc}/"
-    remote_sigs_path = remote_dir + SIGNATUREFILENAME
-    remote_sums_path = remote_dir + SUMS_FILENAME
+    remote_sigs_paths = [ host1_remote_dir + SIGNATUREFILENAME, host2_remote_dir + SIGNATUREFILENAME ]
+    remote_sums_paths = [ host1_remote_dir + SUMS_FILENAME, host2_remote_dir + SUMS_FILENAME ]
 
     # create working directory
     os.makedirs(WORKINGDIR, exist_ok=True)
@@ -486,7 +490,7 @@ def verify_published_handler(args: argparse.Namespace) -> ReturnCode:
     hosts = [HOST1, HOST2]
 
     got_sig_status = get_files_from_hosts_and_compare(
-        hosts, remote_sigs_path, SIGNATUREFILENAME, args.require_all_hosts)
+        hosts, remote_sigs_paths, SIGNATUREFILENAME, args.require_all_hosts)
     if got_sig_status != ReturnCode.SUCCESS:
         return got_sig_status
 
@@ -497,7 +501,7 @@ def verify_published_handler(args: argparse.Namespace) -> ReturnCode:
         return ReturnCode.BAD_VERSION
 
     got_sums_status = get_files_from_hosts_and_compare(
-        hosts, remote_sums_path, SUMS_FILENAME, args.require_all_hosts)
+        hosts, remote_sums_paths, SUMS_FILENAME, args.require_all_hosts)
     if got_sums_status != ReturnCode.SUCCESS:
         return got_sums_status
 
@@ -520,7 +524,7 @@ def verify_published_handler(args: argparse.Namespace) -> ReturnCode:
     for _, binary_filename in hashes_to_verify:
         log.info(f"downloading {binary_filename} to {WORKINGDIR}")
         success, output = download_with_wget(
-            HOST1 + remote_dir + binary_filename, binary_filename)
+            HOST1 + host1_remote_dir + binary_filename, binary_filename)
 
         if not success:
             log.error(

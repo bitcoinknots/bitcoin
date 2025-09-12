@@ -2,15 +2,15 @@
 
 #### Preparation
 
-As of Bitcoin Core v22.0, releases are signed by a number of public keys on the basis
-of the [guix.sigs repository](https://github.com/bitcoin-core/guix.sigs/). When
+As of Bitcoin Knots v21.x, releases are signed by a number of public keys on the basis
+of the [guix.sigs repository](https://github.com/bitcoinknots/guix.sigs/). When
 verifying binary downloads, you (the end user) decide which of these public keys you
 trust and then use that trust model to evaluate the signature on a file that contains
 hashes of the release binaries. The downloaded binaries are then hashed and compared to
 the signed checksum file.
 
 First, you have to figure out which public keys to recognize. Browse the [list of frequent
-builder-keys](https://github.com/bitcoin-core/guix.sigs/tree/main/builder-keys) and
+builder-keys](https://github.com/bitcoinknots/guix.sigs/tree/knots/builder-keys) and
 decide which of these keys you would like to trust. For each key you want to trust, you
 must obtain that key for your local GPG installation.
 
@@ -23,7 +23,8 @@ You can obtain these keys by
 #### Usage
 
 This script attempts to download the checksum file (`SHA256SUMS`) and corresponding
-signature file `SHA256SUMS.asc` from https://bitcoincore.org and https://bitcoin.org.
+signature file `SHA256SUMS.asc` from https://bitcoinknots.org and
+https://github.com/bitcoinknots/bitcoin/releases.
 
 It first checks if the checksum file is valid based upon a plurality of signatures, and
 then downloads the release files specified in the checksum file, and checks if the
@@ -42,37 +43,45 @@ See the `Config` object for various options.
 
 Validate releases with default settings:
 ```sh
-./contrib/verify-binaries/verify.py pub 22.0
-./contrib/verify-binaries/verify.py pub 22.0-rc3
+./contrib/verify-binaries/verify.py pub 29.1.knots20250903
+./contrib/verify-binaries/verify.py pub 27.1.knots20240801
 ```
 
 Get JSON output and don't prompt for user input (no auto key import):
 
 ```sh
-./contrib/verify-binaries/verify.py --json pub 22.0-x86
-./contrib/verify-binaries/verify.py --json pub 23.0-rc5-linux-gnu
+./contrib/verify-binaries/verify.py --json pub 29.1.knots20250903-x86
+./contrib/verify-binaries/verify.py --json pub 27.1.knots20240801-win64
+```
+
+Require all hosts (bitcoinknots.org / github.com) to provide identical
+checksums and signature files:
+
+```sh
+./contrib/verify-binaries/verify.py --json pub --require-all-hosts 29.1.knots20250903-x86
+./contrib/verify-binaries/verify.py --json pub --require-all-hosts 27.1.knots20240801-win64
 ```
 
 Rely only on local GPG state and manually specified keys, while requiring a
 threshold of at least 10 trusted signatures:
 ```sh
 ./contrib/verify-binaries/verify.py \
-    --trusted-keys 74E2DEF5D77260B98BC19438099BAD163C70FBFA,9D3CC86A72F8494342EA5FD10A41BDC3F4FAFF1C \
-    --min-good-sigs 10 pub 22.0-linux
+    --trusted-keys 1A3E761F19D2CC7785C5502EA291A2C45D0C504A,F4FC70F07310028424EFC20A8E4256593F177720 \
+    --min-good-sigs 10 pub 29.1.knots20250903-linux
 ```
 
 If you only want to download the binaries for a certain architecture and/or platform, add the corresponding suffix, e.g.:
 
 ```sh
-./contrib/verify-binaries/verify.py pub 25.2-x86_64-linux
-./contrib/verify-binaries/verify.py pub 24.1-rc1-darwin
-./contrib/verify-binaries/verify.py pub 27.0-win64-setup.exe
+./contrib/verify-binaries/verify.py pub 25.1.knots20231115-x86_64-linux
+./contrib/verify-binaries/verify.py pub 23.0.knots20220529-darwin
+./contrib/verify-binaries/verify.py pub 27.1.knots20240801-win64-setup.exe
 ```
 
 If you do not want to keep the downloaded binaries, specify the cleanup option.
 
 ```sh
-./contrib/verify-binaries/verify.py pub --cleanup 22.0
+./contrib/verify-binaries/verify.py pub --cleanup 29.1.knots20250903
 ```
 
 Use the bin subcommand to verify all files listed in a local checksum file
@@ -85,6 +94,6 @@ Verify only a subset of the files listed in a local checksum file
 
 ```sh
 ./contrib/verify-binaries/verify.py bin ~/Downloads/SHA256SUMS \
-    ~/Downloads/bitcoin-24.0.1-x86_64-linux-gnu.tar.gz \
-    ~/Downloads/bitcoin-24.0.1-arm-linux-gnueabihf.tar.gz
+    ~/Downloads/bitcoin-23.0.knots20220529-x86_64-linux-gnu.tar.gz \
+    ~/Downloads/bitcoin-23.0.knots20220529-arm-linux-gnueabihf.tar.gz
 ```

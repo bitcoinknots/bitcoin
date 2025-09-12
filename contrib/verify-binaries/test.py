@@ -13,7 +13,7 @@ def main():
     expect_code(run_verify('--min-good-sigs 20', "pub", "29.1.knots20250903"), 9, "--min-good-sigs 20 should fail")
 
     print("- testing verification (29.1.knots20250903-x86_64-linux-gnu.tar.gz)", flush=True)
-    _291knots_x86_64_linux_gnu = run_verify("--json", "pub", "29.1.knots20250903-x86_64-linux-gnu.tar.gz")
+    _291knots_x86_64_linux_gnu = run_verify("--json", "pub --require-all-hosts", "29.1.knots20250903-x86_64-linux-gnu.tar.gz")
     try:
         result = json.loads(_291knots_x86_64_linux_gnu.stdout.decode())
     except Exception:
