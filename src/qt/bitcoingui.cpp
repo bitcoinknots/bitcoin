@@ -175,29 +175,28 @@ BitcoinGUI::BitcoinGUI(interfaces::Node& node, const PlatformStyle *_platformSty
     labelProxyIcon = new GUIUtil::ClickableLabel(platformStyle);
     connectionsControl = new GUIUtil::ClickableLabel(platformStyle);
     labelBlocksIcon = new GUIUtil::ClickableLabel(platformStyle);
+    // Add stretch at the beginning to push all items to the right
+    frameBlocksLayout->addStretch();
     if(enableWallet)
     {
-        frameBlocksLayout->addStretch();
         frameBlocksLayout->addWidget(unitDisplayControl);
-        frameBlocksLayout->addStretch();
         frameBlocksLayout->addWidget(labelWalletEncryptionIcon);
         labelWalletEncryptionIcon->hide();
         frameBlocksLayout->addWidget(labelWalletHDStatusIcon);
         labelWalletHDStatusIcon->hide();
     }
     frameBlocksLayout->addWidget(labelProxyIcon);
-    frameBlocksLayout->addStretch();
     frameBlocksLayout->addWidget(connectionsControl);
-    frameBlocksLayout->addStretch();
     frameBlocksLayout->addWidget(labelBlocksIcon);
-    frameBlocksLayout->addStretch();
 
     // Progress bar and label for blocks download
-    progressBarLabel = new QLabel();
-    progressBarLabel->setVisible(false);
+    syncStatusLabel = new QLabel();
+    syncStatusLabel->setVisible(false);
     progressBar = new GUIUtil::ProgressBar();
     progressBar->setAlignment(Qt::AlignCenter);
     progressBar->setVisible(false);
+    progressTextLabel = new QLabel();
+    progressTextLabel->setVisible(false);
 
     // Override style sheet for progress bar for styles that have a segmented progress bar,
     // as they make the text unreadable (workaround for issue #1071)
@@ -208,9 +207,39 @@ BitcoinGUI::BitcoinGUI(interfaces::Node& node, const PlatformStyle *_platformSty
         progressBar->setStyleSheet("QProgressBar { background-color: #e8e8e8; border: 1px solid grey; border-radius: 7px; padding: 1px; text-align: center; } QProgressBar::chunk { background: QLinearGradient(x1: 0, y1: 0, x2: 1, y2: 0, stop: 0 #FF8000, stop: 1 orange); border-radius: 7px; margin: 0px; }");
     }
 
-    statusBar()->addWidget(progressBarLabel);
-    statusBar()->addWidget(progressBar);
-    statusBar()->addPermanentWidget(frameBlocks);
+    // Create two-row status bar layout
+    statusBar()->setFixedHeight(50);
+    
+    // Create container widget
+    statusBarContainer = new QWidget();
+    QVBoxLayout* containerLayout = new QVBoxLayout(statusBarContainer);
+    containerLayout->setContentsMargins(3, 2, 3, 2);
+    containerLayout->setSpacing(2);
+    
+    // Create first row
+    statusBarFirstRow = new QWidget();
+    QHBoxLayout* firstRowLayout = new QHBoxLayout(statusBarFirstRow);
+    firstRowLayout->setContentsMargins(0, 0, 0, 0);    
+    syncStatusLabel->setMinimumWidth(250);
+    frameBlocks->setMinimumWidth(250);
+    firstRowLayout->addWidget(syncStatusLabel, 0);
+    firstRowLayout->addStretch(1);
+    firstRowLayout->addWidget(progressTextLabel, 0, Qt::AlignCenter);
+    firstRowLayout->addStretch(1);
+    firstRowLayout->addWidget(frameBlocks, 0);
+    
+    // Create second row widget
+    statusBarSecondRow = new QWidget();
+    QHBoxLayout* secondRowLayout = new QHBoxLayout(statusBarSecondRow);
+    secondRowLayout->setContentsMargins(0, 0, 0, 0);
+    secondRowLayout->addWidget(progressBar);
+    
+    // Add rows to container
+    containerLayout->addWidget(statusBarFirstRow);
+    containerLayout->addWidget(statusBarSecondRow);
+    
+    // Add container to status bar
+    statusBar()->addWidget(statusBarContainer, 1);
 
     // Install event filter to be able to catch status tip events (QEvent::StatusTip)
     this->installEventFilter(this);
@@ -1152,14 +1181,14 @@ void BitcoinGUI::updateHeadersSyncProgressLabel()
     int headersTipHeight = clientModel->getHeaderTipHeight();
     int estHeadersLeft = (GetTime() - headersTipTime) / Params().GetConsensus().nPowTargetSpacing;
     if (estHeadersLeft > HEADER_HEIGHT_DELTA_SYNC)
-        progressBarLabel->setText(tr("Syncing Headers (%1%)…").arg(QString::number(100.0 / (headersTipHeight+estHeadersLeft)*headersTipHeight, 'f', 1)));
+        syncStatusLabel->setText(tr("Syncing Headers (%1%)…").arg(QString::number(100.0 / (headersTipHeight+estHeadersLeft)*headersTipHeight, 'f', 1)));
 }
 
 void BitcoinGUI::updateHeadersPresyncProgressLabel(int64_t height, const QDateTime& blockDate)
 {
     int estHeadersLeft = blockDate.secsTo(QDateTime::currentDateTime()) / Params().GetConsensus().nPowTargetSpacing;
     if (estHeadersLeft > HEADER_HEIGHT_DELTA_SYNC)
-        progressBarLabel->setText(tr("Pre-syncing Headers (%1%)…").arg(QString::number(100.0 / (height+estHeadersLeft)*height, 'f', 1)));
+        syncStatusLabel->setText(tr("Pre-syncing Headers (%1%)…").arg(QString::number(100.0 / (height+estHeadersLeft)*height, 'f', 1)));
 }
 
 void BitcoinGUI::openOptionsDialogWithTab(OptionsDialog::Tab tab)
@@ -1210,21 +1239,21 @@ void BitcoinGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVer
                 updateHeadersSyncProgressLabel();
                 return;
             }
-            progressBarLabel->setText(tr("Synchronizing with network…"));
+            syncStatusLabel->setText(tr("Synchronizing with network…"));
             updateHeadersSyncProgressLabel();
             break;
         case BlockSource::DISK:
             if (synctype != SyncType::BLOCK_SYNC) {
-                progressBarLabel->setText(tr("Indexing blocks on disk…"));
+                syncStatusLabel->setText(tr("Indexing blocks on disk…"));
             } else {
-                progressBarLabel->setText(tr("Processing blocks on disk…"));
+                syncStatusLabel->setText(tr("Processing blocks on disk…"));
             }
             break;
         case BlockSource::NONE:
             if (synctype != SyncType::BLOCK_SYNC) {
                 return;
             }
-            progressBarLabel->setText(tr("Connecting to peers…"));
+            syncStatusLabel->setText(tr("Connecting to peers…"));
             break;
     }
 
@@ -1253,7 +1282,8 @@ void BitcoinGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVer
         }
 #endif // ENABLE_WALLET
 
-        progressBarLabel->setVisible(false);
+        syncStatusLabel->setVisible(false);
+        progressTextLabel->setVisible(false);
         progressBar->setVisible(false);
 #ifdef BITCOIN_QT_WIN_TASKBAR
         taskbar_progress->setVisible(false);
@@ -1263,12 +1293,16 @@ void BitcoinGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVer
     {
         QString timeBehindText = GUIUtil::formatNiceTimeOffset(secs);
 
-        progressBarLabel->setVisible(true);
-        progressBar->setFormat(tr("%1 behind").arg(timeBehindText));
-        const auto min_width = GUIUtil::TextWidth(progressBar->fontMetrics(), progressBar->format() + "00");
-        if (progressBar->minimumWidth() < min_width) {
-            progressBar->setMinimumWidth(min_width);
-        }
+        syncStatusLabel->setVisible(true);
+        
+        // Set text on separate label with percentage prefix
+        double percentage = nVerificationProgress * 100;
+        progressTextLabel->setText(tr("%1 - %2%").arg(timeBehindText).arg(QString::number(percentage, 'f', 2)));
+        progressTextLabel->setVisible(true);
+        
+        // Remove text from progress bar - make it a plain progress bar
+        progressBar->setFormat("");
+        progressBar->setTextVisible(false);
         progressBar->setMaximum(1000000000);
         progressBar->setValue(nVerificationProgress * 1000000000.0 + 0.5);
         progressBar->setVisible(true);
@@ -1305,7 +1339,8 @@ void BitcoinGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVer
     tooltip = QString("<nobr>") + tooltip + QString("</nobr>");
 
     labelBlocksIcon->setToolTip(tooltip);
-    progressBarLabel->setToolTip(tooltip);
+    syncStatusLabel->setToolTip(tooltip);
+    progressTextLabel->setToolTip(tooltip);
     progressBar->setToolTip(tooltip);
 }
 
@@ -1491,7 +1526,7 @@ bool BitcoinGUI::eventFilter(QObject *object, QEvent *event)
     if (event->type() == QEvent::StatusTip)
     {
         // Prevent adding text from setStatusTip(), if we currently use the status bar for displaying other stuff
-        if (progressBarLabel->isVisible() || progressBar->isVisible())
+        if (syncStatusLabel->isVisible() || progressTextLabel->isVisible() || progressBar->isVisible())
             return true;
     }
     return QMainWindow::eventFilter(object, event);

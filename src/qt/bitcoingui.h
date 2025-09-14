@@ -129,9 +129,15 @@ private:
     GUIUtil::ClickableLabel* labelProxyIcon = nullptr;
     GUIUtil::ClickableLabel* connectionsControl = nullptr;
     GUIUtil::ClickableLabel* labelBlocksIcon = nullptr;
-    QLabel* progressBarLabel = nullptr;
+    QLabel* syncStatusLabel = nullptr;
     GUIUtil::ClickableProgressBar* progressBar = nullptr;
+    QLabel* progressTextLabel = nullptr;
     QProgressDialog* progressDialog = nullptr;
+    
+    // Two-row status bar components
+    QWidget* statusBarContainer = nullptr;
+    QWidget* statusBarFirstRow = nullptr;
+    QWidget* statusBarSecondRow = nullptr;
 
     QMenuBar* appMenuBar = nullptr;
     QToolBar* appToolBar = nullptr;
