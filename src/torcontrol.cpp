@@ -437,10 +437,20 @@ void TorController::get_socks_cb(TorControlConnection& _conn, const TorControlRe
     }
 }
 
-void TorController::add_onion_cb(TorControlConnection& _conn, const TorControlReply& reply)
+static std::string MakeAddOnionCmd(const std::string& private_key, const std::string& target, bool enable_pow)
+{
+    // Note that the 'virtual' port is always the default port to avoid decloaking nodes using other ports.
+    return strprintf("ADD_ONION %s%s Port=%i,%s",
+                     private_key,
+                     enable_pow ? " PoWDefensesEnabled=1" : "",
+                     Params().GetDefaultPort(),
+                     target);
+}
+
+void TorController::add_onion_cb(TorControlConnection& _conn, const TorControlReply& reply, bool pow_was_enabled)
 {
     if (reply.code == 250) {
-        LogDebug(BCLog::TOR, "ADD_ONION successful\n");
+        LogDebug(BCLog::TOR, "ADD_ONION successful (PoW defenses %s)", pow_was_enabled ? "enabled" : "disabled");
         for (const std::string &s : reply.lines) {
             std::map<std::string,std::string> m = ParseTorReplyMapping(s);
             std::map<std::string,std::string>::iterator i;
@@ -467,6 +477,12 @@ void TorController::add_onion_cb(TorControlConnection& _conn, const TorControlRe
         // ... onion requested - keep connection open
     } else if (reply.code == 510) { // 510 Unrecognized command
         LogWarning("tor: Add onion failed with unrecognized command (You probably need to upgrade Tor)");
+    } else if (pow_was_enabled && reply.code == TOR_REPLY_SYNTAX_ERROR) {
+        LogDebug(BCLog::TOR, "ADD_ONION failed with PoW defenses, retrying without");
+        _conn.Command(MakeAddOnionCmd(private_key, m_target.ToStringAddrPort(), /*enable_pow=*/false),
+                      [this](TorControlConnection& conn, const TorControlReply& reply) {
+                          add_onion_cb(conn, reply, /*pow_was_enabled=*/false);
+                      });
     } else {
         LogWarning("tor: Add onion failed; error code %d", reply.code);
     }
@@ -488,9 +504,10 @@ void TorController::auth_cb(TorControlConnection& _conn, const TorControlReply& 
             private_key = "NEW:ED25519-V3"; // Explicitly request key type - see issue #9214
         }
         // Request onion service, redirect port.
-        // Note that the 'virtual' port is always the default port to avoid decloaking nodes using other ports.
-        _conn.Command(strprintf("ADD_ONION %s Port=%i,%s", private_key, Params().GetDefaultPort(), m_target.ToStringAddrPort()),
-            std::bind(&TorController::add_onion_cb, this, std::placeholders::_1, std::placeholders::_2));
+        _conn.Command(MakeAddOnionCmd(private_key, m_target.ToStringAddrPort(), /*enable_pow=*/true),
+                      [this](TorControlConnection& conn, const TorControlReply& reply) {
+                          add_onion_cb(conn, reply, /*pow_was_enabled=*/true);
+                      });
     } else {
         LogWarning("tor: Authentication failed");
     }
