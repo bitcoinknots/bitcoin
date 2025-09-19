@@ -84,8 +84,6 @@ Skip if you don't intend to use the GUI.
 
     sudo apt-get install qt6-base-dev qt6-tools-dev qt6-l10n-tools qt6-tools-dev-tools libgl-dev librsvg2-bin imagemagick
 
-For Qt 6.5 and later, the `libxcb-cursor0` package must be installed at runtime.
-
 Additionally, to support Wayland protocol for modern desktop environments:
 
     sudo apt install qt6-wayland
@@ -140,8 +138,6 @@ the necessary parts of Qt and some image processing tools, and pass `-DBUILD_GUI
 Skip if you don't intend to use the GUI.
 
     sudo dnf install qt6-qtbase-devel qt6-qttools-devel librsvg2-tools ImageMagick
-
-For Qt 6.5 and later, the `xcb-util-cursor` package must be installed at runtime.
 
 Additionally, to support Wayland protocol for modern desktop environments:
 
