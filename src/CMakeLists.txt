@@ -414,6 +414,7 @@ if(BUILD_CLI)
       COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/test/functional/tool_cli_completion.py
               --zsh-completion=${ZSH_COMPLETION_FILE}
               --overwrite
+              --configfile=${PROJECT_BINARY_DIR}/test/config.ini
               --cachedir=${PROJECT_BINARY_DIR}/test/cache
               --tmpdir=${PROJECT_BINARY_DIR}/test/tmp_zsh_completion
       DEPENDS bitcoin-cli bitcoind
