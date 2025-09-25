@@ -405,7 +405,27 @@ if(BUILD_CLI)
     libevent::core
     libevent::extra
   )
-  install_binary_component(bitcoin-cli HAS_MANPAGE)
+
+  # Generate zsh completion file
+  if(INSTALL_ZSH_COMPLETION)
+    set(ZSH_COMPLETION_FILE ${PROJECT_SOURCE_DIR}/contrib/completions/zsh/bitcoin-cli.zsh)
+    add_custom_command(
+      OUTPUT ${ZSH_COMPLETION_FILE}
+      COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/test/functional/tool_cli_completion.py
+              --zsh-completion=${ZSH_COMPLETION_FILE}
+              --overwrite
+              --cachedir=${PROJECT_BINARY_DIR}/test/cache
+              --tmpdir=${PROJECT_BINARY_DIR}/test/tmp_zsh_completion
+      DEPENDS bitcoin-cli bitcoind
+      COMMENT "Generating zsh completion for bitcoin-cli"
+      VERBATIM
+    )
+    add_custom_target(generate_zsh_completion ALL
+      DEPENDS ${ZSH_COMPLETION_FILE}
+    )
+  endif()
+
+  install_binary_component(bitcoin-cli HAS_MANPAGE HAS_ZSH_COMPLETION)
 endif()
 
 
