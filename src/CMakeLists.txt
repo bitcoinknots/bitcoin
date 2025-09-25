@@ -411,13 +411,13 @@ if(BUILD_CLI)
     set(ZSH_COMPLETION_FILE ${PROJECT_SOURCE_DIR}/contrib/completions/zsh/bitcoin-cli.zsh)
     add_custom_command(
       OUTPUT ${ZSH_COMPLETION_FILE}
-      COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/test/functional/tool_cli_completion.py
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_SOURCE_DIR}/contrib/completions/zsh
+      COMMAND ${Python3_EXECUTABLE} ${PROJECT_BINARY_DIR}/test/functional/test_runner.py
+              tool_cli_completion
               --zsh-completion=${ZSH_COMPLETION_FILE}
               --overwrite
-              --configfile=${PROJECT_BINARY_DIR}/test/config.ini
-              --cachedir=${PROJECT_BINARY_DIR}/test/cache
-              --tmpdir=${PROJECT_BINARY_DIR}/test/tmp_zsh_completion
       DEPENDS bitcoin-cli bitcoind
+      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
       COMMENT "Generating zsh completion for bitcoin-cli"
       VERBATIM
     )
