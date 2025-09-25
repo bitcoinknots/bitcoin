@@ -24,6 +24,7 @@
 #include <rpc/server.h>
 #include <rpc/server_util.h>
 #include <rpc/util.h>
+#include <validation.h>
 #include <scheduler.h>
 #include <univalue.h>
 #include <util/any.h>
@@ -192,6 +193,33 @@ static RPCHelpMan getmemoryinfo()
     } else {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "unknown mode " + mode);
     }
+},
+    };
+}
+
+static RPCHelpMan getextratxinfo()
+{
+    return RPCHelpMan{"getextratxinfo",
+                "Returns data about the extra tx cache.\n",
+                {},
+                RPCResult{
+                    RPCResult::Type::OBJ, "", "",
+                    {
+                        {RPCResult::Type::BOOL, "cache_enabled", "Is the extra tx cache enabled"},
+                    }
+                },
+                RPCExamples{
+                    HelpExampleCli("getextratxinfo", "")
+            + HelpExampleRpc("getextratxinfo", "")
+                },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+        NodeContext& node = EnsureAnyNodeContext(request.context);
+        ChainstateManager& chainman = EnsureChainman(node);
+
+        UniValue obj(UniValue::VOBJ);
+        obj.pushKV("cache_enabled", chainman.node_is_mining.load());
+        return obj;
 },
     };
 }
@@ -470,6 +498,7 @@ void RegisterNodeRPCCommands(CRPCTable& t)
         {"control", &getmemoryinfo},
         {"control", &getgeneralinfo},
         {"control", &logging},
+        {"util", &getextratxinfo},
         {"util", &getindexinfo},
         {"hidden", &setmocktime},
         {"hidden", &mockscheduler},
