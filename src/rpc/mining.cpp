@@ -926,6 +926,8 @@ static RPCHelpMan getblocktemplate()
     }
     CHECK_NONFATAL(pindexPrev);
 
+    chainman.node_is_mining = true;
+
     return TemplateToJSON(consensusParams, chainman, &*block_template, pindexPrev, setClientRules, nTransactionsUpdatedLast);
 },
     };

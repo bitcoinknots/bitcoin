@@ -1773,6 +1773,8 @@ void PeerManagerImpl::LimitOrphanTxSize(uint32_t nMaxOrphans)
 
 void PeerManagerImpl::AddToCompactExtraTransactions(const CTransactionRef& tx, const size_t tx_dynamic_usage)
 {
+    if (!m_chainman.node_is_mining)
+        return;
     if (m_opts.max_extra_txs <= 0)
         return;
     if (!vExtraTxnForCompact.size())

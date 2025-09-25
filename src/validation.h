@@ -1048,6 +1048,8 @@ public:
     int32_t nBlockReverseSequenceId = -1;
     /** chainwork for the last block that preciousblock has been applied to. */
     arith_uint256 nLastPreciousChainwork = 0;
+    
+    std::atomic<bool> node_is_mining{false};
 
     // Reset the memory-only sequence counters we use to track block arrival
     // (used by tests to reset state)
