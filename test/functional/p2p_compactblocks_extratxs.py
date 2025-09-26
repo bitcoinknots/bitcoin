@@ -128,6 +128,9 @@ class CompactBlocksBlockReconstructionLimitTest(BitcoinTestFramework):
         self.segwit_node = self.nodes[0].add_p2p_connection(TestP2PConn())
         self.segwit_node.send_and_ping(msg_sendcmpct(announce=True, version=2))
 
+        # Ensure extra txn pool is enable by calling gbt
+        create_block(tmpl=self.nodes[0].getblocktemplate(NORMAL_GBT_REQUEST_PARAMS))
+
     def create_policy_rejected_tx(self, rejection_type="dust", target_size=None):
         """Create a transaction that will be rejected for policy reasons but added to extra pool."""
 
