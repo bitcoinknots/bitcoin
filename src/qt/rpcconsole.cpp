@@ -100,7 +100,8 @@ const QStringList historyFilter = QStringList()
     << "sweepprivkeys"
     << "walletpassphrase"
     << "walletpassphrasechange"
-    << "encryptwallet";
+    << "encryptwallet"
+    << "migratewallet";
 
 }
 
