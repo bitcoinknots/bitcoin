@@ -1956,7 +1956,7 @@ static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, 
         if (stack.size() >= 2 && !stack.back().empty() && stack.back()[0] == ANNEX_TAG) {
             // Drop annex (this is non-standard; see IsWitnessStandard)
             const valtype& annex = SpanPopBack(stack);
-            if ((flags & SCRIPT_VERIFY_REDUCED_DATA) && annex.size() > MAX_SCRIPT_ELEMENT_SIZE_REDUCED) {
+            if (flags & SCRIPT_VERIFY_REDUCED_DATA) {
                 return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
             }
             execdata.m_annex_hash = (HashWriter{} << annex).GetSHA256();

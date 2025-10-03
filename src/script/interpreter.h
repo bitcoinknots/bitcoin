@@ -145,7 +145,7 @@ enum : uint32_t {
 
     // Enforce MAX_SCRIPT_ELEMENT_SIZE_REDUCED instead of MAX_SCRIPT_ELEMENT_SIZE
     // The P2SH redeemScript push is exempted
-    // Taproot annex is also limited to MAX_SCRIPT_ELEMENT_SIZE_REDUCED
+    // Taproot annex is also invalid
     SCRIPT_VERIFY_REDUCED_DATA = (1U << 21),
 
     // Constants to point to the highest flag in use. Add new flags above this line.
