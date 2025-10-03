@@ -396,14 +396,16 @@ void TestSatisfy(const KeyConverter& converter, const std::string& testcase, con
                 // Non-malleable satisfactions are guaranteed to be valid if ValidSatisfactions(), unless REDUCED_DATA rules are violated.
                 if (node->ValidSatisfactions()) {
                     BOOST_CHECK(res ||
-                                serror == ScriptError::SCRIPT_ERR_PUSH_SIZE);
+                                serror == ScriptError::SCRIPT_ERR_PUSH_SIZE ||
+                                serror == ScriptError::SCRIPT_ERR_TAPSCRIPT_MINIMALIF);
                 }
                 // More detailed: non-malleable satisfactions must be valid, or could fail with ops count error (if CheckOpsLimit failed),
                 // or with a stack size error (if CheckStackSize check fails), or with REDUCED_DATA-related errors.
                 BOOST_CHECK(res ||
                             (!node->CheckOpsLimit() && serror == ScriptError::SCRIPT_ERR_OP_COUNT) ||
                             (!node->CheckStackSize() && serror == ScriptError::SCRIPT_ERR_STACK_SIZE) ||
-                            (serror == ScriptError::SCRIPT_ERR_PUSH_SIZE));
+                            (serror == ScriptError::SCRIPT_ERR_PUSH_SIZE) ||
+                            (serror == ScriptError::SCRIPT_ERR_TAPSCRIPT_MINIMALIF));
             }
 
             if (mal_success && (!nonmal_success || witness_mal.stack != witness_nonmal.stack)) {
@@ -415,7 +417,8 @@ void TestSatisfy(const KeyConverter& converter, const std::string& testcase, con
                 BOOST_CHECK(res ||
                             serror == ScriptError::SCRIPT_ERR_OP_COUNT ||
                             serror == ScriptError::SCRIPT_ERR_STACK_SIZE ||
-                            serror == ScriptError::SCRIPT_ERR_PUSH_SIZE);
+                            serror == ScriptError::SCRIPT_ERR_PUSH_SIZE ||
+                            serror == ScriptError::SCRIPT_ERR_TAPSCRIPT_MINIMALIF);
             }
 
             if (node->IsSane()) {
