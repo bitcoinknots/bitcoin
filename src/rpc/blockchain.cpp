@@ -1662,6 +1662,9 @@ static void SoftForkDescPushBack(const CBlockIndex* blockindex, UniValue& softfo
     // one below the activation height
     rv.pushKV("active", DeploymentActiveAfter(blockindex, chainman, dep));
     rv.pushKV("height", chainman.GetConsensus().DeploymentHeight(dep));
+    if (const auto height_end{chainman.GetConsensus().DeploymentHeightEnd(dep)}; height_end != std::numeric_limits<int>::max()) {
+        rv.pushKV("height_end", chainman.GetConsensus().DeploymentHeightEnd(dep));
+    }
     softforks.pushKV(DeploymentName(dep), std::move(rv));
 }
 
@@ -1827,6 +1830,7 @@ namespace {
 const std::vector<RPCResult> RPCHelpForDeployment{
     {RPCResult::Type::STR, "type", "one of \"buried\", \"bip9\""},
     {RPCResult::Type::NUM, "height", /*optional=*/true, "height of the first block which the rules are or will be enforced (only for \"buried\" type, or \"bip9\" type with \"active\" status)"},
+    {RPCResult::Type::NUM, "height_end", /*optional=*/true, "height of the last block which the rules are or will be enforced (only for temporary deployments with a known end height"},
     {RPCResult::Type::BOOL, "active", "true if the rules are enforced for the mempool and the next block"},
     {RPCResult::Type::OBJ, "bip9", /*optional=*/true, "status of bip9 softforks (only for \"bip9\" type)",
     {

@@ -14,7 +14,8 @@
 inline bool DeploymentActiveAfter(const CBlockIndex* pindexPrev, const Consensus::Params& params, Consensus::BuriedDeployment dep, [[maybe_unused]] VersionBitsCache& versionbitscache)
 {
     assert(Consensus::ValidDeployment(dep));
-    return (pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1) >= params.DeploymentHeight(dep);
+    const auto next_block_height = (pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1);
+    return next_block_height >= params.DeploymentHeight(dep) && next_block_height <= params.DeploymentHeightEnd(dep);
 }
 
 inline bool DeploymentActiveAfter(const CBlockIndex* pindexPrev, const Consensus::Params& params, Consensus::DeploymentPos dep, VersionBitsCache& versionbitscache)
@@ -27,7 +28,7 @@ inline bool DeploymentActiveAfter(const CBlockIndex* pindexPrev, const Consensus
 inline bool DeploymentActiveAt(const CBlockIndex& index, const Consensus::Params& params, Consensus::BuriedDeployment dep, [[maybe_unused]] VersionBitsCache& versionbitscache)
 {
     assert(Consensus::ValidDeployment(dep));
-    return index.nHeight >= params.DeploymentHeight(dep);
+    return index.nHeight >= params.DeploymentHeight(dep) && index.nHeight <= params.DeploymentHeightEnd(dep);
 }
 
 inline bool DeploymentActiveAt(const CBlockIndex& index, const Consensus::Params& params, Consensus::DeploymentPos dep, VersionBitsCache& versionbitscache)

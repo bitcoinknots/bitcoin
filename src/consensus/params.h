@@ -149,6 +149,20 @@ struct Params {
         } // no default case, so the compiler can warn about missing cases
         return std::numeric_limits<int>::max();
     }
+
+    int DeploymentHeightEnd(BuriedDeployment dep) const
+    {
+        switch (dep) {
+        case DEPLOYMENT_HEIGHTINCB:
+        case DEPLOYMENT_CLTV:
+        case DEPLOYMENT_DERSIG:
+        case DEPLOYMENT_CSV:
+        case DEPLOYMENT_SEGWIT:
+            // These are forever
+            break;
+        } // no default case, so the compiler can warn about missing cases
+        return std::numeric_limits<int>::max();
+    }
 };
 
 } // namespace Consensus
