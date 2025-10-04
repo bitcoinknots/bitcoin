@@ -29,6 +29,9 @@
 #include <util/time.h>
 #include <util/threadnames.h>
 
+#include <core_io.h>
+#include <primitives/transaction.h>
+
 #include <univalue.h>
 
 #include <Qt>
@@ -42,10 +45,12 @@
 #include <QKeyEvent>
 #include <QKeySequence>
 #include <QLabel>
+#include <QInputDialog>
 #include <QLatin1String>
 #include <QLocale>
 #include <QMenu>
 #include <QMessageBox>
+#include <QRegularExpression>
 #include <QScreen>
 #include <QScrollBar>
 #include <QSettings>
@@ -830,6 +835,7 @@ void RPCConsole::setClientModel(ClientModel *model, int bestblock_height, int64_
         });
         peersTableContextMenu->addSeparator();
         peersTableContextMenu->addAction(tr("&Disconnect"), this, &RPCConsole::disconnectSelectedNode);
+        peersTableContextMenu->addAction(tr("Send Raw &Transaction"), this, &RPCConsole::sendTransactionToPeer);
         peersTableContextMenu->addAction(ts.ban_for + " " + tr("1 &hour"), [this] { banSelectedNode(60 * 60); });
         peersTableContextMenu->addAction(ts.ban_for + " " + tr("1 d&ay"), [this] { banSelectedNode(60 * 60 * 24); });
         peersTableContextMenu->addAction(ts.ban_for + " " + tr("1 &week"), [this] { banSelectedNode(60 * 60 * 24 * 7); });
@@ -1636,4 +1642,113 @@ void RPCConsole::updateConsoleStyleSheet()
     ui->messagesWidget->setHtml(str);
     scrollbar->setValue(oldScrollValue);
 #endif
+}
+
+void RPCConsole::sendTransactionToPeer()
+{
+    if (!clientModel)
+        return;
+    
+    if (!m_executor) {
+        QMessageBox::warning(this, tr("Error"),
+            tr("m_executor not initialized"));
+        return;
+    }
+    
+    QList<QModelIndex> nodes = GUIUtil::getEntryData(ui->peerWidget, PeerTableModel::NetNodeId);
+    if (nodes.isEmpty()) {
+        return;
+    }
+    
+    bool ok;
+    QString txHex = QInputDialog::getText(
+        this,
+        tr("Send Transaction to Peer(s)"),
+        tr("Raw Transaction (hex):"),
+        QLineEdit::Normal,
+        QString(),
+        &ok
+    );
+    
+    if (!ok || txHex.isEmpty()) {
+        return;
+    }
+    
+    txHex = txHex.replace(QRegularExpression("\\s+"), "");
+    
+    const int MAX_TX_SIZE = 4000000;
+    if (txHex.size() > MAX_TX_SIZE) {
+        QMessageBox::warning(this, tr("Error"),
+            tr("Transaction hex exceeds size limit of %1 bytes").arg(MAX_TX_SIZE));
+        return;
+    }
+    
+    CMutableTransaction mtx;
+    if (!DecodeHexTx(mtx, txHex.toStdString())) {
+        QMessageBox::warning(this, tr("Error"),
+            tr("Invalid raw transaction hex"));
+        return;
+    }
+    
+    QStringList peerIds;
+    for (const QModelIndex& idx : nodes) {
+        NodeId peerId = idx.data().toLongLong();
+        peerIds << QString::number(peerId);
+    }
+    
+    struct SendStatus {
+        std::atomic<int> completed{0};
+        int total;
+        std::atomic<bool> hasError{false};
+        QString errorMessage;
+        QStringList peerIds;
+        std::mutex errorMutex;
+    };
+    
+    auto status = std::make_shared<SendStatus>();
+    status->total = peerIds.size();
+    status->peerIds = peerIds;
+    
+    auto replyConnection = std::make_shared<QMetaObject::Connection>();
+    *replyConnection = connect(m_executor, &RPCExecutor::reply,
+        this, [this, status, replyConnection](int category, const QString &command) {
+        
+        if (category == 4 || command.contains("Error:", Qt::CaseInsensitive)) {
+            status->hasError = true;
+            std::lock_guard<std::mutex> lock(status->errorMutex);
+            if (status->errorMessage.isEmpty()) {
+                status->errorMessage = command;
+            }
+        }
+        
+        int completedNow = ++status->completed;
+        
+        if (completedNow >= status->total) {
+            disconnect(*replyConnection);
+            
+            if (status->hasError) {
+                QString errorMsg;
+                {
+                    std::lock_guard<std::mutex> lock(status->errorMutex);
+                    errorMsg = status->errorMessage;
+                }
+                QMessageBox::warning(this, tr("Error"), errorMsg);
+            } else {
+                if (status->peerIds.size() == 1) {
+                    QMessageBox::information(this, tr("Success"),
+                        tr("Transaction sent to peer %1").arg(status->peerIds.first()));
+                } else {
+                    QMessageBox::information(this, tr("Success"),
+                        tr("Transaction sent to peers: %1").arg(status->peerIds.join(", ")));
+                }
+            }
+        }
+    });
+    
+    for (const QString& peerId : peerIds) {
+        QString rpcCommand = QString("sendmsgtopeer %1 \"tx\" \"%2\"").arg(peerId).arg(txHex);
+        QMetaObject::invokeMethod(m_executor, [this, rpcCommand] {
+            m_executor->request(rpcCommand, nullptr);
+        }, Qt::QueuedConnection);
+    }
 }

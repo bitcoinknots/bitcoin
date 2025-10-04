@@ -147,6 +147,8 @@ public Q_SLOTS:
     void banSelectedNode(int bantime);
     /** Unban a selected node on the Bans tab */
     void unbanSelectedNode();
+    /** Send transaction to selected peer */
+    void sendTransactionToPeer();
     /** set which tab has the focus (is visible) */
     void setTabFocus(enum TabTypes tabType);
 #ifdef ENABLE_WALLET
