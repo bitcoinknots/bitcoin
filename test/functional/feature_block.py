@@ -25,6 +25,7 @@ from test_framework.messages import (
     SEQUENCE_FINAL,
     uint256_from_compact,
     uint256_from_str,
+    msg_block,
 )
 from test_framework.p2p import P2PDataStore
 from test_framework.script import (
@@ -1308,8 +1309,18 @@ class FullBlockTest(BitcoinTestFramework):
         self.send_blocks([block], True, timeout=2440)
 
         self.log.info("Reject a block with an invalid block header version")
+        tip = self.tip.sha256
         b_v1 = self.next_block('b_v1', version=1)
-        self.send_blocks([b_v1], success=False, force_send=True, reject_reason='bad-version(0x00000001)', reconnect=True)
+
+        with self.nodes[0].assert_debug_log(expected_msgs=[f'{b_v1.hash}, bad-version(0x00000001)']):
+            self.helper_peer.send_message(msg_block(b_v1))
+            # Wait for the peer to be disconnected after sending the invalid block
+            self.helper_peer.wait_for_disconnect()
+
+        assert_equal(int(self.nodes[0].getbestblockhash(), 16), tip)
+
+        # Reconnect after peer disconnection due to invalid block
+        self.reconnect_p2p()
 
         self.move_tip(chain1_tip + 2)
         b_cb34 = self.next_block('b_cb34')
