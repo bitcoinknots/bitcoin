@@ -621,6 +621,11 @@ public:
             case Consensus::BuriedDeployment::DEPLOYMENT_CSV:
                 consensus.CSVHeight = int{height};
                 break;
+            case Consensus::BuriedDeployment::DEPLOYMENT_REDUCED_DATA:
+                consensus.ReducedDataHeightBegin = int(height);
+                // TODO: Make end height configurable
+                consensus.ReducedDataHeightEnd = consensus.ReducedDataHeightBegin + consensus.nPowTargetTimespan;
+                break;
             }
         }
 

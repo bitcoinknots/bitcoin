@@ -1018,6 +1018,9 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
         // when attempting to mine with this template
         aRules.push_back("!signet");
     }
+    if (DeploymentActiveAfter(pindexPrev, consensusParams, Consensus::BuriedDeployment::DEPLOYMENT_REDUCED_DATA, chainman.m_versionbitscache)) {
+        aRules.push_back("reduced_data");
+    }
 
     UniValue vbavailable(UniValue::VOBJ);
     for (int j = 0; j < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; ++j) {
