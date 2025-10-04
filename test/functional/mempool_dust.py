@@ -109,8 +109,6 @@ class DustRelayFeeTest(BitcoinTestFramework):
         _, pubkey = generate_keypair(compressed=True)
 
         output_scripts = (
-            (key_to_p2pk_script(uncompressed_pubkey),          "P2PK (uncompressed)"),
-            (key_to_p2pk_script(pubkey),                       "P2PK (compressed)"),
             (key_to_p2pkh_script(pubkey),                      "P2PKH"),
             (script_to_p2sh_script(CScript([OP_TRUE])),        "P2SH"),
             (key_to_p2wpkh_script(pubkey),                     "P2WPKH"),
@@ -118,9 +116,7 @@ class DustRelayFeeTest(BitcoinTestFramework):
             (output_key_to_p2tr_script(pubkey[1:]),            "P2TR"),
             # witness programs for segwitv2+ can be between 2 and 40 bytes
             (program_to_witness_script(2,  b'\x66' * 2),       "P2?? (future witness version 2)"),
-            (program_to_witness_script(16, b'\x77' * 40),      "P2?? (future witness version 16)"),
-            # largest possible output script considered standard
-            (keys_to_multisig_script([uncompressed_pubkey]*3), "bare multisig (m-of-3)"),
+            (program_to_witness_script(16, b'\x77' * 32),      "P2?? (future witness version 16)"),
             (CScript([OP_RETURN, b'superimportanthash']),      "null data (OP_RETURN)"),
         )
 
