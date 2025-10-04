@@ -2677,7 +2677,10 @@ static unsigned int GetBlockScriptFlags(const CBlockIndex& block_index, const Ch
     }
 
     if (DeploymentActiveAt(block_index, chainman, Consensus::DEPLOYMENT_REDUCED_DATA)) {
-        flags |= SCRIPT_VERIFY_REDUCED_DATA;
+        flags |= SCRIPT_VERIFY_REDUCED_DATA |
+            SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM |
+            SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_TAPROOT_VERSION |
+            SCRIPT_VERIFY_DISCOURAGE_OP_SUCCESS;
     }
 
     return flags;
