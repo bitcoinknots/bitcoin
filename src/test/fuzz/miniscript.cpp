@@ -1136,6 +1136,9 @@ void TestNode(const MsCtx script_ctx, const NodeRef& node, FuzzedDataProvider& p
         if (node->ValidSatisfactions()) {
             assert(res ||
                    serror == ScriptError::SCRIPT_ERR_PUSH_SIZE ||
+                   serror == ScriptError::SCRIPT_ERR_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM ||
+                   serror == ScriptError::SCRIPT_ERR_DISCOURAGE_UPGRADABLE_TAPROOT_VERSION ||
+                   serror == ScriptError::SCRIPT_ERR_DISCOURAGE_OP_SUCCESS ||
                    serror == ScriptError::SCRIPT_ERR_TAPSCRIPT_MINIMALIF);
         }
         // More detailed: non-malleable satisfactions must be valid, or could fail with ops count error (if CheckOpsLimit failed),
@@ -1144,6 +1147,9 @@ void TestNode(const MsCtx script_ctx, const NodeRef& node, FuzzedDataProvider& p
                (!node->CheckOpsLimit() && serror == ScriptError::SCRIPT_ERR_OP_COUNT) ||
                (!node->CheckStackSize() && serror == ScriptError::SCRIPT_ERR_STACK_SIZE) ||
                serror == ScriptError::SCRIPT_ERR_PUSH_SIZE ||
+               serror == ScriptError::SCRIPT_ERR_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM ||
+               serror == ScriptError::SCRIPT_ERR_DISCOURAGE_UPGRADABLE_TAPROOT_VERSION ||
+               serror == ScriptError::SCRIPT_ERR_DISCOURAGE_OP_SUCCESS ||
                serror == ScriptError::SCRIPT_ERR_TAPSCRIPT_MINIMALIF);
     }
 
@@ -1159,6 +1165,9 @@ void TestNode(const MsCtx script_ctx, const NodeRef& node, FuzzedDataProvider& p
                serror == ScriptError::SCRIPT_ERR_OP_COUNT ||
                serror == ScriptError::SCRIPT_ERR_STACK_SIZE ||
                serror == ScriptError::SCRIPT_ERR_PUSH_SIZE ||
+               serror == ScriptError::SCRIPT_ERR_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM ||
+               serror == ScriptError::SCRIPT_ERR_DISCOURAGE_UPGRADABLE_TAPROOT_VERSION ||
+               serror == ScriptError::SCRIPT_ERR_DISCOURAGE_OP_SUCCESS ||
                serror == ScriptError::SCRIPT_ERR_TAPSCRIPT_MINIMALIF);
     }
 
