@@ -24,6 +24,7 @@ class CheckTxInputsRules {
 
     enum class Rule {
         None = 0,
+        OutputSizeLimit = 1 << 0,
     };
 
 public:
