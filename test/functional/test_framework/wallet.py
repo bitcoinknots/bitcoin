@@ -78,7 +78,7 @@ class MiniWalletMode(Enum):
     ----------------+-------------------+-----------+----------+------------+----------
     ADDRESS_OP_TRUE | anyone-can-spend  |  bech32m  |   yes    |    no      |   no
     RAW_OP_TRUE     | anyone-can-spend  |  - (raw)  |   no     |    yes     |   no
-    RAW_P2PK        | pay-to-public-key |  - (raw)  |   yes    |    yes     |   yes
+    RAW_P2PK        | p2pkh             |  base58   |   yes    |    yes     |   yes
     """
     ADDRESS_OP_TRUE = 1
     RAW_OP_TRUE = 2
@@ -101,7 +101,7 @@ class MiniWallet:
             self._priv_key = ECKey()
             self._priv_key.set((1).to_bytes(32, 'big'), True)
             pub_key = self._priv_key.get_pubkey()
-            self._scriptPubKey = key_to_p2pk_script(pub_key.get_bytes())
+            self._scriptPubKey = key_to_p2pkh_script(pub_key.get_bytes())
         elif mode == MiniWalletMode.ADDRESS_OP_TRUE:
             internal_key = None if tag_name is None else compute_xonly_pubkey(hash256(tag_name.encode()))[0]
             self._address, self._taproot_info = create_deterministic_address_bcrt1_p2tr_op_true(internal_key)
@@ -182,8 +182,9 @@ class MiniWallet:
             # with the DER header/skeleton data of 6 bytes added, plus 2 bytes scriptSig overhead
             # (OP_PUSHn and SIGHASH_ALL), this leads to a scriptSig target size of 73 bytes
             tx.vin[0].scriptSig = b''
-            while not len(tx.vin[0].scriptSig) == 73:
-                tx.vin[0].scriptSig = b''
+            while not len(tx.vin[0].scriptSig) == 107:
+                pub_key = self._priv_key.get_pubkey()
+                tx.vin[0].scriptSig = CScript([pub_key.get_bytes()])
                 sign_input_legacy(tx, 0, self._scriptPubKey, self._priv_key)
                 if not fixed_length:
                     break
@@ -375,7 +376,7 @@ class MiniWallet:
         if self._mode in (MiniWalletMode.RAW_OP_TRUE, MiniWalletMode.ADDRESS_OP_TRUE):
             vsize = Decimal(104)  # anyone-can-spend
         elif self._mode == MiniWalletMode.RAW_P2PK:
-            vsize = Decimal(168)  # P2PK (73 bytes scriptSig + 35 bytes scriptPubKey + 60 bytes other)
+            vsize = Decimal(192)  # P2PK (73+34 bytes scriptSig + 25 bytes scriptPubKey + 60 bytes other)
         else:
             assert False
         if target_vsize and not fee:  # respect fee_rate if target vsize is passed
