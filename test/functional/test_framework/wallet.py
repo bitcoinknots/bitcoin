@@ -33,6 +33,7 @@ from test_framework.messages import (
     CTxInWitness,
     CTxOut,
     hash256,
+    MAX_OP_RETURN_RELAY,
     ser_compact_size,
 )
 from test_framework.script import (
@@ -124,13 +125,25 @@ class MiniWallet:
         if target_vsize < tx.get_vsize():
             raise RuntimeError(f"target_vsize {target_vsize} is less than transaction virtual size {tx.get_vsize()}")
 
-        tx.vout.append(CTxOut(nValue=0, scriptPubKey=CScript([OP_RETURN])))
-        # determine number of needed padding bytes
         dummy_vbytes = target_vsize - tx.get_vsize()
-        # compensate for the increase of the compact-size encoded script length
-        # (note that the length encoding of the unpadded output script needs one byte)
-        dummy_vbytes -= len(ser_compact_size(dummy_vbytes)) - 1
-        tx.vout[-1].scriptPubKey = CScript([OP_RETURN] + [OP_1] * dummy_vbytes)
+        if dummy_vbytes > 0:
+            # determine number of needed padding bytes
+            min_output_size = 8 + 1 + 1
+            max_output_size = 8 + 1 + MAX_OP_RETURN_RELAY
+            n_max_outputs = (dummy_vbytes - min_output_size) // max_output_size
+            last_output_size = dummy_vbytes - (n_max_outputs * max_output_size)
+            n_outputs_before = len(tx.vout)
+
+            tx.vout.extend([CTxOut(nValue=0, scriptPubKey=CScript([OP_RETURN] + [OP_1] * (MAX_OP_RETURN_RELAY - 1)))] * n_max_outputs)
+            tx.vout.append(CTxOut(nValue=0, scriptPubKey=CScript([OP_RETURN] + [OP_1] * (last_output_size - 8 - 1 - 1))))
+
+            # compensate for the increase of the compact-size encoded script length
+            # (note that the length encoding of the unpadded output script needs one byte)
+            extra_len_size = len(ser_compact_size(len(tx.vout))) - 1
+            if extra_len_size:
+                assert tx.vout[n_outputs_before].scriptPubKey[-extra_len_size:] == bytes([OP_1] * extra_len_size)
+                tx.vout[n_outputs_before] = CTxOut(nValue=0, scriptPubKey = CScript(tx.vout[n_outputs_before].scriptPubKey[:-extra_len_size]))
+
         assert_equal(tx.get_vsize(), target_vsize)
 
     def get_balance(self):

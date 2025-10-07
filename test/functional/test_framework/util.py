@@ -571,7 +571,8 @@ def check_node_connections(*, node, num_in, num_out):
 def gen_return_txouts():
     from .messages import CTxOut
     from .script import CScript, OP_RETURN
-    txouts = [CTxOut(nValue=0, scriptPubKey=CScript([OP_RETURN, b'\x01'*67437]))]
+    txouts = [CTxOut(nValue=0, scriptPubKey=CScript([OP_RETURN, b'\x01'*80]))] * 733
+    txouts.append(CTxOut(nValue=0, scriptPubKey=CScript([OP_RETURN, b'\x01'*9])))
     assert_equal(sum([len(txout.serialize()) for txout in txouts]), 67456)
     return txouts
 
