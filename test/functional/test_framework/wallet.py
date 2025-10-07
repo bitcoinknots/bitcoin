@@ -397,6 +397,8 @@ class MiniWallet:
         return tx
 
     def sendrawtransaction(self, *, from_node, tx_hex, maxfeerate=0, **kwargs):
+        if self._mode == MiniWalletMode.RAW_OP_TRUE and 'ignore_rejects' not in kwargs:
+            kwargs['ignore_rejects'] = ('scriptsig-not-pushonly', 'scriptpubkey', 'bad-txns-input-script-unknown')
         txid = from_node.sendrawtransaction(hexstring=tx_hex, maxfeerate=maxfeerate, **kwargs)
         self.scan_tx(from_node.decoderawtransaction(tx_hex))
         return txid
