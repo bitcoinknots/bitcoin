@@ -2136,6 +2136,27 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
             return;
         }
 
+        constexpr uint256 bad_block_hash{"0000000000000000000000000000000000000000000000000000000000000000"};
+        BlockValidationState state;
+        CBlockIndex* pblockindex;
+        {
+            LOCK(chainman.GetMutex());
+            pblockindex = chainman.m_blockman.LookupBlockIndex(bad_block_hash);
+            if (pblockindex && !pblockindex->IsValid(BLOCK_VALID_UNKNOWN)) {
+                // Already marked invalid
+                pblockindex = nullptr;
+            }
+        }
+        if (pblockindex) {
+            if (!chainman.ActiveChainstate().InvalidateBlock(state, pblockindex)) {
+                state.Error("InvalidateBlock failed (is your node too pruned?)");
+            }
+            if (state.IsValid()) {
+                chainman.ActiveChainstate().ActivateBestChain(state);
+            }
+            Assert(state.IsValid());
+        }
+
         // Start indexes initial sync
         if (!StartIndexBackgroundSync(node)) {
             bilingual_str err_str = _("Failed to start indexes, shutting down..");
