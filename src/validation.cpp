@@ -1036,7 +1036,7 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     }
 
     // Check for non-standard witnesses.
-    if (tx.HasWitness() && m_pool.m_opts.require_standard && !IsWitnessStandard(tx, m_view, "bad-witness-", reason, ignore_rejects)) {
+    if (tx.HasWitness() && m_pool.m_opts.require_standard && !IsWitnessStandard(tx, m_view, m_pool.m_opts, "bad-witness-", reason, ignore_rejects)) {
         return state.Invalid(TxValidationResult::TX_WITNESS_MUTATED, reason);
     }
 

@@ -348,7 +348,7 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
     return true;
 }
 
-bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs, const std::string& reason_prefix, std::string& out_reason, const ignore_rejects_type& ignore_rejects)
+bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs, const kernel::MemPoolOptions& opts, const std::string& reason_prefix, std::string& out_reason, const ignore_rejects_type& ignore_rejects)
 {
     if (tx.IsCoinBase())
         return true; // Coinbases are skipped
@@ -425,7 +425,7 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
             // Policy: per-input total witness size budget to prevent data-splitting across elements
             size_t per_input_bytes_total{0};
             for (const auto& elem : tx.vin[i].scriptWitness.stack) per_input_bytes_total += elem.size();
-            if (per_input_bytes_total > 1024) {
+            if (per_input_bytes_total > opts.policy_max_v1_perinput_witness) {
                 MaybeReject("taproot-perinput-witness");
             }
             Span stack{tx.vin[i].scriptWitness.stack};
@@ -454,30 +454,95 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
                             }
                         }
                     }
-                    // Policy: reject large push-only witness elements (any version), checked here for v1 path for efficiency
-                    for (const auto& item : stack) {
-                        if (item.size() > 0) {
-                            // Attempt to parse as push-only element
-                            size_t j = 0, n = item.size();
-                            uint64_t pushed_sum = 0;
-                            bool push_only = true;
-                            while (j < n) {
-                                uint8_t op = item[j++];
-                                size_t push_len = 0;
-                                if (op >= 0x01 && op <= 0x4b) { push_len = op; }
-                                else if (op == OP_PUSHDATA1) { if (j >= n) { push_only = false; break; } push_len = item[j++]; }
-                                else if (op == OP_PUSHDATA2) { if (j + 1 >= n) { push_only = false; break; } push_len = item[j] | (item[j+1] << 8); j += 2; }
-                                else if (op == OP_PUSHDATA4) { if (j + 3 >= n) { push_only = false; break; } push_len = item[j] | (item[j+1] << 8) | (item[j+2] << 16) | (item[j+3] << 24); j += 4; }
-                                else { push_only = false; break; }
-                                if (j + push_len > n) { push_only = false; break; }
-                                pushed_sum += push_len;
-                                j += push_len;
+                    // Policy: tapscript-level analysis
+                    // 1) Reject push-only IF/NOTIF branch bodies exceeding 80 bytes total pushed
+                    // 2) Reject large contiguous push-only runs exceeding 256 bytes total pushed
+                    const std::vector<unsigned char> leaf(script_bytes.begin(), script_bytes.end());
+                    // Helper lambdas to scan
+                    auto parse_push = [&](const std::vector<unsigned char>& s, size_t& j, uint64_t& sum)->bool{
+                        uint8_t op = s[j++];
+                        size_t push_len = 0;
+                        if (op >= 0x01 && op <= 0x4b) { push_len = op; }
+                        else if (op == OP_PUSHDATA1) { if (j >= s.size()) return false; push_len = s[j++]; }
+                        else if (op == OP_PUSHDATA2) { if (j + 1 >= s.size()) return false; push_len = s[j] | (s[j+1] << 8); j += 2; }
+                        else if (op == OP_PUSHDATA4) { if (j + 3 >= s.size()) return false; push_len = s[j] | (s[j+1] << 8) | (s[j+2] << 16) | (s[j+3] << 24); j += 4; }
+                        else { return false; }
+                        if (j + push_len > s.size()) return false;
+                        sum += push_len;
+                        j += push_len;
+                        return true;
+                    };
+                    // Max push-only run
+                    uint64_t max_run_sum{0};
+                    for (size_t k = 0; k < leaf.size();) {
+                        size_t j = k;
+                        uint64_t sum = 0;
+                        while (j < leaf.size()) {
+                            size_t before = j;
+                            if (!parse_push(leaf, j, sum)) { j = before; break; }
+                        }
+                        if (sum > max_run_sum) max_run_sum = sum;
+                        // advance by one opcode (skip any push data if present)
+                        if (j == k) {
+                            if (j >= leaf.size()) break;
+                            uint8_t op = leaf[j++];
+                            if (op >= 0x01 && op <= 0x4b) { if (j + op > leaf.size()) break; j += op; }
+                            else if (op == OP_PUSHDATA1) { if (j >= leaf.size()) break; size_t l = leaf[j++]; if (j + l > leaf.size()) break; j += l; }
+                            else if (op == OP_PUSHDATA2) { if (j + 1 >= leaf.size()) break; size_t l = leaf[j] | (leaf[j+1] << 8); j += 2; if (j + l > leaf.size()) break; j += l; }
+                            else if (op == OP_PUSHDATA4) { if (j + 3 >= leaf.size()) break; size_t l = leaf[j] | (leaf[j+1] << 8) | (leaf[j+2] << 16) | (leaf[j+3] << 24); j += 4; if (j + l > leaf.size()) break; j += l; }
+                        }
+                        k = j;
+                    }
+                    if (max_run_sum > 256) {
+                        MaybeReject("taproot-pushrun");
+                    }
+                    // IF/NOTIF branch bodies scan (simple linear scan with stack for OP_IF/OP_NOTIF ... OP_ENDIF)
+                    struct Branch { size_t start; size_t end; };
+                    std::vector<Branch> branches;
+                    std::vector<size_t> if_stack;
+                    for (size_t j = 0; j < leaf.size();) {
+                        uint8_t op = leaf[j++];
+                        if (op == OP_IF || op == OP_NOTIF) {
+                            if_stack.push_back(j);
+                            continue;
+                        }
+                        if (op == OP_ELSE) {
+                            if (!if_stack.empty()) {
+                                size_t body_start = if_stack.back();
+                                size_t body_end = j - 1; // before OP_ELSE
+                                branches.push_back({body_start, body_end});
+                                if_stack.back() = j; // else-body starts now
                             }
-                            if (push_only) {
-                                if (pushed_sum > MAX_STANDARD_TAPSCRIPT_STACK_ITEM_SIZE) { // 80 bytes
-                                    MaybeReject("taproot-pushonly-witness-elem");
-                                }
+                            continue;
+                        }
+                        if (op == OP_ENDIF) {
+                            if (!if_stack.empty()) {
+                                size_t body_start = if_stack.back();
+                                size_t body_end = j - 1; // before ENDIF
+                                branches.push_back({body_start, body_end});
+                                if_stack.pop_back();
                             }
+                            continue;
+                        }
+                        // skip pushdata payloads
+                        size_t push_len = 0;
+                        if (op >= 0x01 && op <= 0x4b) { push_len = op; }
+                        else if (op == OP_PUSHDATA1) { if (j >= leaf.size()) break; push_len = leaf[j++]; }
+                        else if (op == OP_PUSHDATA2) { if (j + 1 >= leaf.size()) break; push_len = leaf[j] | (leaf[j+1] << 8); j += 2; }
+                        else if (op == OP_PUSHDATA4) { if (j + 3 >= leaf.size()) break; push_len = leaf[j] | (leaf[j+1] << 8) | (leaf[j+2] << 16) | (leaf[j+3] << 24); j += 4; }
+                        if (push_len) { if (j + push_len > leaf.size()) break; j += push_len; }
+                    }
+                    for (const auto& b : branches) {
+                        uint64_t sum = 0;
+                        bool push_only = true;
+                        for (size_t j = b.start; j < b.end;) {
+                            size_t before = j;
+                            if (!parse_push(leaf, j, sum)) { push_only = false; break; }
+                            if (j == before) break;
+                        }
+                        if (push_only && sum > 80) {
+                            MaybeReject("taproot-if-pushonly");
+                            break;
                         }
                     }
                 }
