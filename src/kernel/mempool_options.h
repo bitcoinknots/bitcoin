@@ -41,7 +41,7 @@ static constexpr bool DEFAULT_ACCEPT_NON_STD_DATACARRIER{false};
 /** Default for -acceptnonstdtxn */
 static constexpr bool DEFAULT_ACCEPT_NON_STD_TXN{false};
 /** Default for -acceptunknownwitness */
-static constexpr bool DEFAULT_ACCEPTUNKNOWNWITNESS{true};
+static constexpr bool DEFAULT_ACCEPTUNKNOWNWITNESS{false};
 
 namespace kernel {
 /**
