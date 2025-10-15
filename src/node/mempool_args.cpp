@@ -307,6 +307,15 @@ util::Result<void> ApplyArgsManOptions(const ArgsManager& argsman, const CChainP
 
     mempool_opts.persist_v1_dat = argsman.GetBoolArg("-persistmempoolv1", mempool_opts.persist_v1_dat);
 
+    // Policy flags to constrain per-input witness size for segwit v1
+    if (auto lim = argsman.GetIntArg("-v1perinputwitnesslimit")) {
+        // Enforce reasonable bounds to avoid footguns
+        unsigned val = *lim;
+        if (val < 128) val = 128;
+        if (val > 8192) val = 8192;
+        mempool_opts.policy_max_v1_perinput_witness = val;
+    }
+
     ApplyArgsManOptions(argsman, mempool_opts.limits);
 
     return {};

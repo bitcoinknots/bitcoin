@@ -28,6 +28,137 @@
 
 unsigned int g_script_size_policy_limit{DEFAULT_SCRIPT_SIZE_POLICY_LIMIT};
 
+// BIP-0444 policy limits (documented in BIP-0444):
+// - 34 bytes max for non-NULL_DATA scriptPubKey (keeps UTXOs small)
+// - 256 bytes max for any single push payload in scriptPubKey
+// - 257 bytes max Taproot control block size (33-byte base + up to 7 * 32-byte merkle path)
+// - 256 bytes max contiguous push-only run in Tapscript leaves
+// - 80 bytes max push-only IF/NOTIF branch body in Tapscript leaves
+static constexpr unsigned int POLICY_MAX_SPK_SIZE_NON_NULLDATA{34};
+static constexpr unsigned int POLICY_MAX_SCRIPT_PUSH_LEN{256};
+static constexpr unsigned int POLICY_MAX_TAPROOT_CONTROL_BLOCK{257};
+static constexpr unsigned int POLICY_MAX_TAPSCRIPT_PUSH_RUN{256};
+static constexpr unsigned int POLICY_MAX_TAPSCRIPT_IF_BODY{80};
+
+// Helpers for script parsing to avoid duplication and bugs
+namespace {
+
+// Return true if op is a small integer push (OP_0, OP_1NEGATE, OP_1..OP_16)
+inline bool IsSmallIntPush(uint8_t op) {
+    return op == OP_0 || op == OP_1NEGATE || (op >= OP_1 && op <= OP_16);
+}
+
+// Parse a data push starting at s[pos]. Supports OP_0/OP_1NEGATE/OP_1..OP_16 as pushes of length 0.
+// On success, advances pos to the byte after the payload and sets pushed_len to the payload size (0 for small-int pushes).
+// Returns false on malformed/incomplete encoding or if a non-push opcode is encountered.
+inline bool ParsePush(const std::vector<unsigned char>& s, size_t& pos, uint64_t& pushed_len) {
+    if (pos >= s.size()) return false;
+    uint8_t op = s[pos++];
+    pushed_len = 0;
+    if (IsSmallIntPush(op)) {
+        // Small integer push has no explicit payload
+        return true;
+    }
+    size_t need = 0;
+    if (op >= 0x01 && op <= 0x4b) {
+        pushed_len = op;
+    } else if (op == OP_PUSHDATA1) {
+        if (pos >= s.size()) return false;
+        pushed_len = s[pos++];
+    } else if (op == OP_PUSHDATA2) {
+        if (pos + 1 >= s.size()) return false;
+        pushed_len = s[pos] | (uint32_t(s[pos+1]) << 8);
+        pos += 2;
+    } else if (op == OP_PUSHDATA4) {
+        if (pos + 3 >= s.size()) return false;
+        pushed_len = s[pos] | (uint32_t(s[pos+1]) << 8) | (uint32_t(s[pos+2]) << 16) | (uint32_t(s[pos+3]) << 24);
+        pos += 4;
+    } else {
+        return false; // non-push opcode
+    }
+    if (pushed_len > 0) {
+        if (pos + pushed_len > s.size()) return false;
+        pos += pushed_len;
+    }
+    return true;
+}
+
+// Advance across exactly one opcode (including its payload if a push), without interpreting it.
+inline bool AdvanceOneOp(const std::vector<unsigned char>& s, size_t& pos) {
+    if (pos >= s.size()) return false;
+    uint8_t op = s[pos++];
+    if (IsSmallIntPush(op)) return true;
+    size_t payload = 0;
+    if (op >= 0x01 && op <= 0x4b) payload = op;
+    else if (op == OP_PUSHDATA1) { if (pos >= s.size()) return false; payload = s[pos++]; }
+    else if (op == OP_PUSHDATA2) { if (pos + 1 >= s.size()) return false; payload = s[pos] | (uint32_t(s[pos+1]) << 8); pos += 2; }
+    else if (op == OP_PUSHDATA4) { if (pos + 3 >= s.size()) return false; payload = s[pos] | (uint32_t(s[pos+1]) << 8) | (uint32_t(s[pos+2]) << 16) | (uint32_t(s[pos+3]) << 24); pos += 4; }
+    // Non-push opcode: nothing to skip
+    if (payload) {
+        if (pos + payload > s.size()) return false;
+        pos += payload;
+    }
+    return true;
+}
+
+struct Branch { size_t start; size_t end; };
+
+// Single-pass scan over a Tapscript leaf to compute:
+// - max contiguous push-only run total payload (max_run)
+// - IF/NOTIF branch bodies (branches) with [start,end) byte ranges
+// - presence of any OP_IF/OP_NOTIF opcodes (if_found)
+inline bool ScanTapscriptLeaf(const std::vector<unsigned char>& leaf, uint64_t& max_run, std::vector<Branch>& branches, bool& if_found) {
+    max_run = 0;
+    if_found = false;
+    branches.clear();
+    std::vector<size_t> if_stack;
+    for (size_t k = 0; k < leaf.size();) {
+        // Count a push-only run starting at k
+        size_t j = k;
+        uint64_t sum = 0;
+        while (j < leaf.size()) {
+            size_t before = j;
+            uint8_t op = leaf[j];
+            if (op == OP_IF || op == OP_NOTIF) { if_found = true; break; }
+            uint64_t pushed = 0;
+            if (!ParsePush(leaf, j, pushed)) { j = before; break; }
+            sum += pushed;
+        }
+        if (sum > max_run) max_run = sum;
+        // If no progress, consume one opcode and update IF/ELSE/ENDIF bookkeeping
+        if (j == k) {
+            if (j >= leaf.size()) break;
+            uint8_t op = leaf[j++];
+            if (op == OP_IF || op == OP_NOTIF) {
+                if_found = true;
+                if_stack.push_back(j);
+            } else if (op == OP_ELSE) {
+                if (!if_stack.empty()) {
+                    size_t body_start = if_stack.back();
+                    size_t body_end = j - 1;
+                    if (body_end > body_start) branches.push_back({body_start, body_end});
+                    if_stack.back() = j; // else-branch starts now
+                }
+            } else if (op == OP_ENDIF) {
+                if (!if_stack.empty()) {
+                    size_t body_start = if_stack.back();
+                    size_t body_end = j - 1;
+                    if (body_end > body_start) branches.push_back({body_start, body_end});
+                    if_stack.pop_back();
+                }
+            } else {
+                // Non-push non-IF opcode: if it has data payload, skip it
+                j--; // step back to opcode position for AdvanceOneOp
+                if (!AdvanceOneOp(leaf, j)) return false;
+            }
+        }
+        k = j;
+    }
+    return true;
+}
+
+} // namespace
+
 CAmount GetDustThreshold(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
 {
     // "Dust" is defined in terms of dustRelayFee,
@@ -166,7 +297,6 @@ bool IsStandardTx(const CTransaction& tx, const kernel::MemPoolOptions& opts, st
     unsigned int nDataOut = 0;
     unsigned int n_dust{0};
     unsigned int n_monetary{0};
-    TxoutType whichType;
     for (size_t i{tx.vout.size()}; i; ) {
         const CTxOut& txout = tx.vout[--i];
 
@@ -174,8 +304,25 @@ bool IsStandardTx(const CTransaction& tx, const kernel::MemPoolOptions& opts, st
             MaybeReject("scriptpubkey-size");
         }
 
+        TxoutType whichType;
         if (!::IsStandard(txout.scriptPubKey, opts.max_datacarrier_bytes, whichType)) {
             MaybeReject("scriptpubkey");
+        }
+
+        // New policy: limit new scriptPubKeys to POLICY_MAX_SPK_SIZE_NON_NULLDATA bytes (except NULL_DATA)
+        if (whichType != TxoutType::NULL_DATA && txout.scriptPubKey.size() > POLICY_MAX_SPK_SIZE_NON_NULLDATA) {
+            MaybeReject("scriptpubkey-size-34");
+        }
+
+        // Enforce max push length in scriptPubKey (policy), excluding NULL_DATA which already has its own size limit.
+        if (whichType != TxoutType::NULL_DATA) {
+            const std::vector<unsigned char>& s = txout.scriptPubKey;
+            for (size_t p = 0; p < s.size();) {
+                size_t before = p;
+                uint64_t pushed = 0;
+                if (!ParsePush(s, p, pushed)) { p = before; if (!AdvanceOneOp(s, p)) break; continue; }
+                if (pushed > POLICY_MAX_SCRIPT_PUSH_LEN) { MaybeReject("scriptpubkey-pushlen"); }
+            }
         }
 
         if (whichType == TxoutType::WITNESS_UNKNOWN && !opts.acceptunknownwitness) {
@@ -348,7 +495,7 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
     return true;
 }
 
-bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs, const std::string& reason_prefix, std::string& out_reason, const ignore_rejects_type& ignore_rejects)
+bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs, const kernel::MemPoolOptions& opts, const std::string& reason_prefix, std::string& out_reason, const ignore_rejects_type& ignore_rejects)
 {
     if (tx.IsCoinBase())
         return true; // Coinbases are skipped
@@ -422,6 +569,12 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
         // - No annexes
         if (witnessversion == 1 && witnessprogram.size() == WITNESS_V1_TAPROOT_SIZE && !p2sh) {
             // Taproot spend (non-P2SH-wrapped, version 1, witness program size 32; see BIP 341)
+            // Policy: per-input total witness size budget to prevent data-splitting across elements
+            size_t per_input_bytes_total{0};
+            for (const auto& elem : tx.vin[i].scriptWitness.stack) per_input_bytes_total += elem.size();
+            if (per_input_bytes_total > opts.policy_max_v1_perinput_witness) {
+                MaybeReject("taproot-perinput-witness");
+            }
             Span stack{tx.vin[i].scriptWitness.stack};
             if (stack.size() >= 2 && !stack.back().empty() && stack.back()[0] == ANNEX_TAG) {
                 // Annexes are nonstandard as long as no semantics are defined for them.
@@ -432,7 +585,11 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
             if (stack.size() >= 2) {
                 // Script path spend (2 or more stack elements after removing optional annex)
                 const auto& control_block = SpanPopBack(stack);
-                SpanPopBack(stack); // Ignore script
+                // Policy: limit Taproot control block size
+                if (control_block.size() > POLICY_MAX_TAPROOT_CONTROL_BLOCK) {
+                    MaybeReject("taproot-controlblock-size");
+                }
+                const auto& script_bytes = SpanPopBack(stack); // revealed leaf script
                 if (control_block.empty()) {
                     // Empty control block is invalid
                     out_reason = reason_prefix + "taproot-control-missing";
@@ -446,6 +603,38 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
                                 out_reason = reason_prefix + "taproot-stackitem-size";
                                 return false;
                             }
+                        }
+                    }
+                    // Policy: tapscript-level analysis (single pass)
+                    // - Disallow OP_IF/OP_NOTIF entirely (temporary policy)
+                    // - Cap contiguous push-only run total payload
+                    // - Cap push-only IF/NOTIF branch body total payload
+                    const std::vector<unsigned char> leaf(script_bytes.begin(), script_bytes.end());
+                    uint64_t max_run_sum{0};
+                    std::vector<Branch> branches;
+                    bool if_found{false};
+                    if (!ScanTapscriptLeaf(leaf, max_run_sum, branches, if_found)) {
+                        MaybeReject("taproot-malformed");
+                    }
+                    if (if_found) {
+                        MaybeReject("taproot-if-disallowed");
+                    }
+                    if (max_run_sum > POLICY_MAX_TAPSCRIPT_PUSH_RUN) {
+                        MaybeReject("taproot-pushrun");
+                    }
+                    for (const auto& b : branches) {
+                        uint64_t sum = 0;
+                        bool push_only = true;
+                        for (size_t j = b.start; j < b.end;) {
+                            size_t before = j;
+                            uint64_t pushed = 0;
+                            if (!ParsePush(leaf, j, pushed)) { push_only = false; break; }
+                            sum += pushed;
+                            if (j == before) break;
+                        }
+                        if (push_only && sum > POLICY_MAX_TAPSCRIPT_IF_BODY) {
+                            MaybeReject("taproot-if-pushonly");
+                            break;
                         }
                     }
                 }
