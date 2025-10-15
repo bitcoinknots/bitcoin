@@ -28,6 +28,137 @@
 
 unsigned int g_script_size_policy_limit{DEFAULT_SCRIPT_SIZE_POLICY_LIMIT};
 
+// BIP-0444 policy limits (documented in BIP-0444):
+// - 34 bytes max for non-NULL_DATA scriptPubKey (keeps UTXOs small)
+// - 256 bytes max for any single push payload in scriptPubKey
+// - 257 bytes max Taproot control block size (33-byte base + up to 7 * 32-byte merkle path)
+// - 256 bytes max contiguous push-only run in Tapscript leaves
+// - 80 bytes max push-only IF/NOTIF branch body in Tapscript leaves
+static constexpr unsigned int POLICY_MAX_SPK_SIZE_NON_NULLDATA{34};
+static constexpr unsigned int POLICY_MAX_SCRIPT_PUSH_LEN{256};
+static constexpr unsigned int POLICY_MAX_TAPROOT_CONTROL_BLOCK{257};
+static constexpr unsigned int POLICY_MAX_TAPSCRIPT_PUSH_RUN{256};
+static constexpr unsigned int POLICY_MAX_TAPSCRIPT_IF_BODY{80};
+
+// Helpers for script parsing to avoid duplication and bugs
+namespace {
+
+// Return true if op is a small integer push (OP_0, OP_1NEGATE, OP_1..OP_16)
+inline bool IsSmallIntPush(uint8_t op) {
+    return op == OP_0 || op == OP_1NEGATE || (op >= OP_1 && op <= OP_16);
+}
+
+// Parse a data push starting at s[pos]. Supports OP_0/OP_1NEGATE/OP_1..OP_16 as pushes of length 0.
+// On success, advances pos to the byte after the payload and sets pushed_len to the payload size (0 for small-int pushes).
+// Returns false on malformed/incomplete encoding or if a non-push opcode is encountered.
+inline bool ParsePush(const std::vector<unsigned char>& s, size_t& pos, uint64_t& pushed_len) {
+    if (pos >= s.size()) return false;
+    uint8_t op = s[pos++];
+    pushed_len = 0;
+    if (IsSmallIntPush(op)) {
+        // Small integer push has no explicit payload
+        return true;
+    }
+    size_t need = 0;
+    if (op >= 0x01 && op <= 0x4b) {
+        pushed_len = op;
+    } else if (op == OP_PUSHDATA1) {
+        if (pos >= s.size()) return false;
+        pushed_len = s[pos++];
+    } else if (op == OP_PUSHDATA2) {
+        if (pos + 1 >= s.size()) return false;
+        pushed_len = s[pos] | (uint32_t(s[pos+1]) << 8);
+        pos += 2;
+    } else if (op == OP_PUSHDATA4) {
+        if (pos + 3 >= s.size()) return false;
+        pushed_len = s[pos] | (uint32_t(s[pos+1]) << 8) | (uint32_t(s[pos+2]) << 16) | (uint32_t(s[pos+3]) << 24);
+        pos += 4;
+    } else {
+        return false; // non-push opcode
+    }
+    if (pushed_len > 0) {
+        if (pos + pushed_len > s.size()) return false;
+        pos += pushed_len;
+    }
+    return true;
+}
+
+// Advance across exactly one opcode (including its payload if a push), without interpreting it.
+inline bool AdvanceOneOp(const std::vector<unsigned char>& s, size_t& pos) {
+    if (pos >= s.size()) return false;
+    uint8_t op = s[pos++];
+    if (IsSmallIntPush(op)) return true;
+    size_t payload = 0;
+    if (op >= 0x01 && op <= 0x4b) payload = op;
+    else if (op == OP_PUSHDATA1) { if (pos >= s.size()) return false; payload = s[pos++]; }
+    else if (op == OP_PUSHDATA2) { if (pos + 1 >= s.size()) return false; payload = s[pos] | (uint32_t(s[pos+1]) << 8); pos += 2; }
+    else if (op == OP_PUSHDATA4) { if (pos + 3 >= s.size()) return false; payload = s[pos] | (uint32_t(s[pos+1]) << 8) | (uint32_t(s[pos+2]) << 16) | (uint32_t(s[pos+3]) << 24); pos += 4; }
+    // Non-push opcode: nothing to skip
+    if (payload) {
+        if (pos + payload > s.size()) return false;
+        pos += payload;
+    }
+    return true;
+}
+
+struct Branch { size_t start; size_t end; };
+
+// Single-pass scan over a Tapscript leaf to compute:
+// - max contiguous push-only run total payload (max_run)
+// - IF/NOTIF branch bodies (branches) with [start,end) byte ranges
+// - presence of any OP_IF/OP_NOTIF opcodes (if_found)
+inline bool ScanTapscriptLeaf(const std::vector<unsigned char>& leaf, uint64_t& max_run, std::vector<Branch>& branches, bool& if_found) {
+    max_run = 0;
+    if_found = false;
+    branches.clear();
+    std::vector<size_t> if_stack;
+    for (size_t k = 0; k < leaf.size();) {
+        // Count a push-only run starting at k
+        size_t j = k;
+        uint64_t sum = 0;
+        while (j < leaf.size()) {
+            size_t before = j;
+            uint8_t op = leaf[j];
+            if (op == OP_IF || op == OP_NOTIF) { if_found = true; break; }
+            uint64_t pushed = 0;
+            if (!ParsePush(leaf, j, pushed)) { j = before; break; }
+            sum += pushed;
+        }
+        if (sum > max_run) max_run = sum;
+        // If no progress, consume one opcode and update IF/ELSE/ENDIF bookkeeping
+        if (j == k) {
+            if (j >= leaf.size()) break;
+            uint8_t op = leaf[j++];
+            if (op == OP_IF || op == OP_NOTIF) {
+                if_found = true;
+                if_stack.push_back(j);
+            } else if (op == OP_ELSE) {
+                if (!if_stack.empty()) {
+                    size_t body_start = if_stack.back();
+                    size_t body_end = j - 1;
+                    if (body_end > body_start) branches.push_back({body_start, body_end});
+                    if_stack.back() = j; // else-branch starts now
+                }
+            } else if (op == OP_ENDIF) {
+                if (!if_stack.empty()) {
+                    size_t body_start = if_stack.back();
+                    size_t body_end = j - 1;
+                    if (body_end > body_start) branches.push_back({body_start, body_end});
+                    if_stack.pop_back();
+                }
+            } else {
+                // Non-push non-IF opcode: if it has data payload, skip it
+                j--; // step back to opcode position for AdvanceOneOp
+                if (!AdvanceOneOp(leaf, j)) return false;
+            }
+        }
+        k = j;
+    }
+    return true;
+}
+
+} // namespace
+
 CAmount GetDustThreshold(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
 {
     // "Dust" is defined in terms of dustRelayFee,
@@ -166,7 +297,6 @@ bool IsStandardTx(const CTransaction& tx, const kernel::MemPoolOptions& opts, st
     unsigned int nDataOut = 0;
     unsigned int n_dust{0};
     unsigned int n_monetary{0};
-    TxoutType whichType;
     for (size_t i{tx.vout.size()}; i; ) {
         const CTxOut& txout = tx.vout[--i];
 
@@ -174,29 +304,24 @@ bool IsStandardTx(const CTransaction& tx, const kernel::MemPoolOptions& opts, st
             MaybeReject("scriptpubkey-size");
         }
 
-        // New policy: limit new scriptPubKeys to 34 bytes (except NULL_DATA)
-        if (whichType != TxoutType::NULL_DATA && txout.scriptPubKey.size() > 34) {
-            MaybeReject("scriptpubkey-size-34");
-        }
-
+        TxoutType whichType;
         if (!::IsStandard(txout.scriptPubKey, opts.max_datacarrier_bytes, whichType)) {
             MaybeReject("scriptpubkey");
         }
 
-        // Enforce max push length 256 bytes in scriptPubKey (policy), excluding NULL_DATA which already has its own size limit.
+        // New policy: limit new scriptPubKeys to POLICY_MAX_SPK_SIZE_NON_NULLDATA bytes (except NULL_DATA)
+        if (whichType != TxoutType::NULL_DATA && txout.scriptPubKey.size() > POLICY_MAX_SPK_SIZE_NON_NULLDATA) {
+            MaybeReject("scriptpubkey-size-34");
+        }
+
+        // Enforce max push length in scriptPubKey (policy), excluding NULL_DATA which already has its own size limit.
         if (whichType != TxoutType::NULL_DATA) {
             const std::vector<unsigned char>& s = txout.scriptPubKey;
             for (size_t p = 0; p < s.size();) {
-                uint8_t op = s[p++];
-                size_t push_len = 0;
-                if (op >= 0x01 && op <= 0x4b) { push_len = op; }
-                else if (op == OP_PUSHDATA1) { if (p >= s.size()) break; push_len = s[p++]; }
-                else if (op == OP_PUSHDATA2) { if (p + 1 >= s.size()) break; push_len = s[p] | (s[p+1] << 8); p += 2; }
-                else if (op == OP_PUSHDATA4) { if (p + 3 >= s.size()) break; push_len = s[p] | (s[p+1] << 8) | (s[p+2] << 16) | (s[p+3] << 24); p += 4; }
-                if (push_len) {
-                    if (push_len > 256) { MaybeReject("scriptpubkey-pushlen"); }
-                    if (p + push_len > s.size()) break; p += push_len;
-                }
+                size_t before = p;
+                uint64_t pushed = 0;
+                if (!ParsePush(s, p, pushed)) { p = before; if (!AdvanceOneOp(s, p)) break; continue; }
+                if (pushed > POLICY_MAX_SCRIPT_PUSH_LEN) { MaybeReject("scriptpubkey-pushlen"); }
             }
         }
 
@@ -460,8 +585,8 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
             if (stack.size() >= 2) {
                 // Script path spend (2 or more stack elements after removing optional annex)
                 const auto& control_block = SpanPopBack(stack);
-                // Policy: limit Taproot control block size to 257 bytes
-                if (control_block.size() > 257) {
+                // Policy: limit Taproot control block size
+                if (control_block.size() > POLICY_MAX_TAPROOT_CONTROL_BLOCK) {
                     MaybeReject("taproot-controlblock-size");
                 }
                 const auto& script_bytes = SpanPopBack(stack); // revealed leaf script
@@ -480,99 +605,34 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
                             }
                         }
                     }
-                    // Policy: tapscript-level analysis
-                    // 1) Reject push-only IF/NOTIF branch bodies exceeding 80 bytes total pushed
-                    // 2) Reject large contiguous push-only runs exceeding 256 bytes total pushed
-                    // 3) Disallow OP_IF/OP_NOTIF entirely inside Tapscript (temporarily, per policy)
+                    // Policy: tapscript-level analysis (single pass)
+                    // - Disallow OP_IF/OP_NOTIF entirely (temporary policy)
+                    // - Cap contiguous push-only run total payload
+                    // - Cap push-only IF/NOTIF branch body total payload
                     const std::vector<unsigned char> leaf(script_bytes.begin(), script_bytes.end());
-                    // Helper lambdas to scan
-                    auto parse_push = [&](const std::vector<unsigned char>& s, size_t& j, uint64_t& sum)->bool{
-                        uint8_t op = s[j++];
-                        size_t push_len = 0;
-                        if (op >= 0x01 && op <= 0x4b) { push_len = op; }
-                        else if (op == OP_PUSHDATA1) { if (j >= s.size()) return false; push_len = s[j++]; }
-                        else if (op == OP_PUSHDATA2) { if (j + 1 >= s.size()) return false; push_len = s[j] | (s[j+1] << 8); j += 2; }
-                        else if (op == OP_PUSHDATA4) { if (j + 3 >= s.size()) return false; push_len = s[j] | (s[j+1] << 8) | (s[j+2] << 16) | (s[j+3] << 24); j += 4; }
-                        else { return false; }
-                        if (j + push_len > s.size()) return false;
-                        sum += push_len;
-                        j += push_len;
-                        return true;
-                    };
-                    // Max push-only run
                     uint64_t max_run_sum{0};
-                    for (size_t k = 0; k < leaf.size();) {
-                        size_t j = k;
-                        uint64_t sum = 0;
-                        while (j < leaf.size()) {
-                            size_t before = j;
-                            uint8_t op = leaf[j];
-                            if (op == OP_IF || op == OP_NOTIF) {
-                                MaybeReject("taproot-if-disallowed");
-                                break;
-                            }
-                            if (!parse_push(leaf, j, sum)) { j = before; break; }
-                        }
-                        if (sum > max_run_sum) max_run_sum = sum;
-                        // advance by one opcode (skip any push data if present)
-                        if (j == k) {
-                            if (j >= leaf.size()) break;
-                            uint8_t op = leaf[j++];
-                            if (op >= 0x01 && op <= 0x4b) { if (j + op > leaf.size()) break; j += op; }
-                            else if (op == OP_PUSHDATA1) { if (j >= leaf.size()) break; size_t l = leaf[j++]; if (j + l > leaf.size()) break; j += l; }
-                            else if (op == OP_PUSHDATA2) { if (j + 1 >= leaf.size()) break; size_t l = leaf[j] | (leaf[j+1] << 8); j += 2; if (j + l > leaf.size()) break; j += l; }
-                            else if (op == OP_PUSHDATA4) { if (j + 3 >= leaf.size()) break; size_t l = leaf[j] | (leaf[j+1] << 8) | (leaf[j+2] << 16) | (leaf[j+3] << 24); j += 4; if (j + l > leaf.size()) break; j += l; }
-                        }
-                        k = j;
-                    }
-                    if (max_run_sum > 256) {
-                        MaybeReject("taproot-pushrun");
-                    }
-                    // IF/NOTIF branch bodies scan (simple linear scan with stack for OP_IF/OP_NOTIF ... OP_ENDIF)
-                    struct Branch { size_t start; size_t end; };
                     std::vector<Branch> branches;
-                    std::vector<size_t> if_stack;
-                    for (size_t j = 0; j < leaf.size();) {
-                        uint8_t op = leaf[j++];
-                        if (op == OP_IF || op == OP_NOTIF) {
-                            if_stack.push_back(j);
-                            continue;
-                        }
-                        if (op == OP_ELSE) {
-                            if (!if_stack.empty()) {
-                                size_t body_start = if_stack.back();
-                                size_t body_end = j - 1; // before OP_ELSE
-                                branches.push_back({body_start, body_end});
-                                if_stack.back() = j; // else-body starts now
-                            }
-                            continue;
-                        }
-                        if (op == OP_ENDIF) {
-                            if (!if_stack.empty()) {
-                                size_t body_start = if_stack.back();
-                                size_t body_end = j - 1; // before ENDIF
-                                branches.push_back({body_start, body_end});
-                                if_stack.pop_back();
-                            }
-                            continue;
-                        }
-                        // skip pushdata payloads
-                        size_t push_len = 0;
-                        if (op >= 0x01 && op <= 0x4b) { push_len = op; }
-                        else if (op == OP_PUSHDATA1) { if (j >= leaf.size()) break; push_len = leaf[j++]; }
-                        else if (op == OP_PUSHDATA2) { if (j + 1 >= leaf.size()) break; push_len = leaf[j] | (leaf[j+1] << 8); j += 2; }
-                        else if (op == OP_PUSHDATA4) { if (j + 3 >= leaf.size()) break; push_len = leaf[j] | (leaf[j+1] << 8) | (leaf[j+2] << 16) | (leaf[j+3] << 24); j += 4; }
-                        if (push_len) { if (j + push_len > leaf.size()) break; j += push_len; }
+                    bool if_found{false};
+                    if (!ScanTapscriptLeaf(leaf, max_run_sum, branches, if_found)) {
+                        MaybeReject("taproot-malformed");
+                    }
+                    if (if_found) {
+                        MaybeReject("taproot-if-disallowed");
+                    }
+                    if (max_run_sum > POLICY_MAX_TAPSCRIPT_PUSH_RUN) {
+                        MaybeReject("taproot-pushrun");
                     }
                     for (const auto& b : branches) {
                         uint64_t sum = 0;
                         bool push_only = true;
                         for (size_t j = b.start; j < b.end;) {
                             size_t before = j;
-                            if (!parse_push(leaf, j, sum)) { push_only = false; break; }
+                            uint64_t pushed = 0;
+                            if (!ParsePush(leaf, j, pushed)) { push_only = false; break; }
+                            sum += pushed;
                             if (j == before) break;
                         }
-                        if (push_only && sum > 80) {
+                        if (push_only && sum > POLICY_MAX_TAPSCRIPT_IF_BODY) {
                             MaybeReject("taproot-if-pushonly");
                             break;
                         }
