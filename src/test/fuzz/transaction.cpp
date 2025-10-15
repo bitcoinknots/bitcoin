@@ -93,7 +93,6 @@ FUZZ_TARGET(transaction, .init = initialize_transaction)
     (void)AreInputsStandard(tx, coins_view_cache);
     std::string reject_reason;
     {
-        #include <kernel/mempool_options.h>
         kernel::MemPoolOptions opts;
         (void)IsWitnessStandard(tx, coins_view_cache, opts, "fuzz", reject_reason);
     }

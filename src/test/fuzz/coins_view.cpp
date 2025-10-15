@@ -287,7 +287,6 @@ FUZZ_TARGET(coins_view, .init = initialize_coins_view)
             [&] {
                 std::string reason;
                 {
-                    #include <kernel/mempool_options.h>
                     kernel::MemPoolOptions opts;
                     (void)IsWitnessStandard(CTransaction{random_mutable_transaction}, coins_view_cache, opts, "bad-witness-", reason);
                 }
