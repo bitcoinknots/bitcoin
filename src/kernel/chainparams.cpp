@@ -393,7 +393,7 @@ public:
 
         // BIP-0444 Taproot and Script Limits (parameters TBD)
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].bit = 3; // TBD
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE; // allow testing
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE; // ALWAYS_ACTIVE for easy signet testing
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].min_activation_height = 0;
 
