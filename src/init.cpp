@@ -717,7 +717,6 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
                    strprintf("Maximum size of data in data carrier transactions we relay and mine, in bytes (default: %u)",
                              MAX_OP_RETURN_RELAY),
                    ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
-    argsman.AddArg("-datacarrierwitnesslimit", "Set maximum bytes allowed in any single push-only witness element for policy (default: 80)", ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-v1perinputwitnesslimit", "Set maximum total witness bytes per segwit v1 input for policy (default: 1024)", ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-maxscriptsize", strprintf("Maximum size of scripts (including the entire witness stack) we relay and mine, in bytes (default: %s)", DEFAULT_SCRIPT_SIZE_POLICY_LIMIT), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-maxtxlegacysigops",
@@ -858,6 +857,14 @@ void InitParameterInteraction(ArgsManager& args)
         args.SoftSetArg("-datacarriercost", "0.25");
         args.SoftSetArg("-datacarrierfullcount", "0");
         args.SoftSetArg("-datacarriersize", "83");
+        args.SoftSetArg("-maxtxlegacysigops", strprintf("%s", std::numeric_limits<unsigned int>::max()));
+        args.SoftSetArg("-maxscriptsize", strprintf("%s", std::numeric_limits<unsigned int>::max()));
+        args.SoftSetArg("-mempooltruc", "enforce");
+        args.SoftSetArg("-permitephemeral", "anchor,send,dust");
+        args.SoftSetArg("-spkreuse", "allow");
+        args.SoftSetArg("-blockprioritysize", "0");
+        args.SoftSetArg("-blockmaxsize", "4000000");
+        args.SoftSetArg("-blockmaxweight", "4000000");
     }
 
     

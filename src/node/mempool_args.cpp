@@ -308,7 +308,6 @@ util::Result<void> ApplyArgsManOptions(const ArgsManager& argsman, const CChainP
     mempool_opts.persist_v1_dat = argsman.GetBoolArg("-persistmempoolv1", mempool_opts.persist_v1_dat);
 
     // Policy flags to constrain push-only witness elements and per-input size for segwit v1
-    mempool_opts.policy_max_pushonly_witness_elem = argsman.GetIntArg("-datacarrierwitnesslimit", mempool_opts.policy_max_pushonly_witness_elem);
     mempool_opts.policy_max_v1_perinput_witness = argsman.GetIntArg("-v1perinputwitnesslimit", mempool_opts.policy_max_v1_perinput_witness);
 
     ApplyArgsManOptions(argsman, mempool_opts.limits);
