@@ -460,6 +460,10 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
             if (stack.size() >= 2) {
                 // Script path spend (2 or more stack elements after removing optional annex)
                 const auto& control_block = SpanPopBack(stack);
+                // Policy: limit Taproot control block size to 257 bytes
+                if (control_block.size() > 257) {
+                    MaybeReject("taproot-controlblock-size");
+                }
                 const auto& script_bytes = SpanPopBack(stack); // revealed leaf script
                 if (control_block.empty()) {
                     // Empty control block is invalid
