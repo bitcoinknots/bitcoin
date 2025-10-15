@@ -18,7 +18,7 @@ const struct VBDeploymentInfo VersionBitsDeploymentInfo[Consensus::MAX_VERSION_B
         /*.gbt_force =*/ true,
     },
     {
-        /*.name =*/ "taproot_pushonly_limits",
+        /*.name =*/ "taproot_script_limits",
         /*.gbt_force =*/ true,
     },
 };

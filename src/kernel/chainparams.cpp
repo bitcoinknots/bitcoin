@@ -117,11 +117,11 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = 1628640000; // August 11th, 2021
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 709632; // Approximately November 12th, 2021
 
-        // Deployment of BIP-0444 Taproot Push-Only Limits (parameters TBD)
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS].bit = 3; // TBD: select final bit
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE; // set via -vbparams or when finalized
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;     // set via -vbparams or when finalized
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS].min_activation_height = 0; // set to Timeout+period when finalized
+        // Deployment of BIP-0444 Taproot and Script Limits (parameters TBD)
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].bit = 3; // TBD: select final bit
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE; // set via -vbparams or when finalized
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;     // set via -vbparams or when finalized
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].min_activation_height = 0; // set to Timeout+period when finalized
 
         consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000dee8e2a309ad8a9820433c68"};
         consensus.defaultAssumeValid = uint256{"00000000000000000000611fd22f2df7c8fbd0688745c3a6c3bb5109cc2a12cb"}; // 912683
@@ -286,11 +286,11 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = 1628640000; // August 11th, 2021
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
 
-        // BIP-0444 Taproot Push-Only Limits (parameters TBD)
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS].bit = 3; // TBD
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS].min_activation_height = 0;
+        // BIP-0444 Taproot and Script Limits (parameters TBD)
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].bit = 3; // TBD
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].min_activation_height = 0;
 
         consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000015f5e0c9f13455b0eb17"};
         consensus.defaultAssumeValid = uint256{"00000000000003fc7967410ba2d0a8a8d50daedc318d43e8baf1a9782c236a57"}; // 3974606
@@ -391,11 +391,11 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
 
-        // BIP-0444 Taproot Push-Only Limits (parameters TBD)
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS].bit = 3; // TBD
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE; // allow testing
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS].min_activation_height = 0;
+        // BIP-0444 Taproot and Script Limits (parameters TBD)
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].bit = 3; // TBD
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE; // allow testing
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].min_activation_height = 0;
 
         consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000001d6dce8651b6094e4c1"};
         consensus.defaultAssumeValid = uint256{"0000000000003ed4f08dbdf6f7d6b271a6bcffce25675cb40aa9fa43179a89f3"}; // 72600
@@ -535,11 +535,11 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
 
-        // BIP-0444 Taproot Push-Only Limits (parameters overridable via -vbparams)
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS].bit = 3; // TBD
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS].min_activation_height = 0;
+        // BIP-0444 Taproot and Script Limits (parameters overridable via -vbparams)
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].bit = 3; // TBD
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT_SCRIPT_LIMITS].min_activation_height = 0;
 
         // message start is defined as the first 4 bytes of the sha256d of the block script
         HashWriter h{};

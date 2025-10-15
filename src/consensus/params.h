@@ -32,7 +32,7 @@ constexpr bool ValidDeployment(BuriedDeployment dep) { return dep <= DEPLOYMENT_
 enum DeploymentPos : uint16_t {
     DEPLOYMENT_TESTDUMMY,
     DEPLOYMENT_TAPROOT, // Deployment of Schnorr/Taproot (BIPs 340-342)
-    DEPLOYMENT_TAPROOT_PUSHONLY_LIMITS, // BIP-0444: Taproot Push-Only Limits
+    DEPLOYMENT_TAPROOT_SCRIPT_LIMITS, // BIP-0444: Taproot and Script Limits
     // NOTE: Also add new deployments to VersionBitsDeploymentInfo in deploymentinfo.cpp
     MAX_VERSION_BITS_DEPLOYMENTS
 };
