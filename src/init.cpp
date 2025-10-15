@@ -856,6 +856,11 @@ void InitParameterInteraction(ArgsManager& args)
         args.SoftSetArg("-datacarriercost", "0.25");
         args.SoftSetArg("-datacarrierfullcount", "0");
         args.SoftSetArg("-datacarriersize", "83");
+    }
+
+    {
+        argsman.AddArg("-datacarrierwitnesslimit", "Set maximum bytes allowed in any single push-only witness element for policy (default: 80)", ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
+        argsman.AddArg("-v1perinputwitnesslimit", "Set maximum total witness bytes per segwit v1 input for policy (default: 1024)", ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
         args.SoftSetArg("-maxtxlegacysigops", strprintf("%s", std::numeric_limits<unsigned int>::max()));
         args.SoftSetArg("-maxscriptsize", strprintf("%s", std::numeric_limits<unsigned int>::max()));
         args.SoftSetArg("-mempooltruc", "enforce");

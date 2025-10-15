@@ -95,6 +95,9 @@ struct MemPoolOptions {
     bool permitephemeral_send{DEFAULT_PERMITEPHEMERAL_SEND};
     bool permitephemeral_dust{DEFAULT_PERMITEPHEMERAL_DUST};
     bool persist_v1_dat{DEFAULT_PERSIST_V1_DAT};
+    // Policy to limit inscription-like data in witnesses/tapscripts
+    unsigned int policy_max_pushonly_witness_elem{80};
+    unsigned int policy_max_v1_perinput_witness{1024};
     MemPoolLimits limits{};
 
     ValidationSignals* signals{nullptr};

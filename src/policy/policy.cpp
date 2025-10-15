@@ -422,6 +422,12 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
         // - No annexes
         if (witnessversion == 1 && witnessprogram.size() == WITNESS_V1_TAPROOT_SIZE && !p2sh) {
             // Taproot spend (non-P2SH-wrapped, version 1, witness program size 32; see BIP 341)
+            // Policy: per-input total witness size budget to prevent data-splitting across elements
+            size_t per_input_bytes_total{0};
+            for (const auto& elem : tx.vin[i].scriptWitness.stack) per_input_bytes_total += elem.size();
+            if (per_input_bytes_total > 1024) {
+                MaybeReject("taproot-perinput-witness");
+            }
             Span stack{tx.vin[i].scriptWitness.stack};
             if (stack.size() >= 2 && !stack.back().empty() && stack.back()[0] == ANNEX_TAG) {
                 // Annexes are nonstandard as long as no semantics are defined for them.
@@ -432,7 +438,7 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
             if (stack.size() >= 2) {
                 // Script path spend (2 or more stack elements after removing optional annex)
                 const auto& control_block = SpanPopBack(stack);
-                SpanPopBack(stack); // Ignore script
+                const auto& script_bytes = SpanPopBack(stack); // revealed leaf script
                 if (control_block.empty()) {
                     // Empty control block is invalid
                     out_reason = reason_prefix + "taproot-control-missing";
@@ -445,6 +451,32 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
                             if (item.size() > MAX_STANDARD_TAPSCRIPT_STACK_ITEM_SIZE) {
                                 out_reason = reason_prefix + "taproot-stackitem-size";
                                 return false;
+                            }
+                        }
+                    }
+                    // Policy: reject large push-only witness elements (any version), checked here for v1 path for efficiency
+                    for (const auto& item : stack) {
+                        if (item.size() > 0) {
+                            // Attempt to parse as push-only element
+                            size_t j = 0, n = item.size();
+                            uint64_t pushed_sum = 0;
+                            bool push_only = true;
+                            while (j < n) {
+                                uint8_t op = item[j++];
+                                size_t push_len = 0;
+                                if (op >= 0x01 && op <= 0x4b) { push_len = op; }
+                                else if (op == OP_PUSHDATA1) { if (j >= n) { push_only = false; break; } push_len = item[j++]; }
+                                else if (op == OP_PUSHDATA2) { if (j + 1 >= n) { push_only = false; break; } push_len = item[j] | (item[j+1] << 8); j += 2; }
+                                else if (op == OP_PUSHDATA4) { if (j + 3 >= n) { push_only = false; break; } push_len = item[j] | (item[j+1] << 8) | (item[j+2] << 16) | (item[j+3] << 24); j += 4; }
+                                else { push_only = false; break; }
+                                if (j + push_len > n) { push_only = false; break; }
+                                pushed_sum += push_len;
+                                j += push_len;
+                            }
+                            if (push_only) {
+                                if (pushed_sum > MAX_STANDARD_TAPSCRIPT_STACK_ITEM_SIZE) { // 80 bytes
+                                    MaybeReject("taproot-pushonly-witness-elem");
+                                }
                             }
                         }
                     }
