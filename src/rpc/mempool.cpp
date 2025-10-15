@@ -1064,6 +1064,39 @@ static RPCHelpMan getmempoolinfo()
     };
 }
 
+static RPCHelpMan getextrapoolinfo()
+{
+    return RPCHelpMan{"getextrapoolinfo",
+        "Returns details about the extra pool used for compact block reconstruction.\n"
+        "This pool stores recent transactions to help reconstruct compact blocks without requesting missing transactions from peers.\n",
+        {},
+        RPCResult{
+            RPCResult::Type::OBJ, "", "",
+            {
+                {RPCResult::Type::NUM, "size", "Number of transactions in the extra pool"},
+                {RPCResult::Type::NUM, "bytes", "Sum of virtual transaction size for all transactions in the extra pool"},
+                {RPCResult::Type::NUM, "usage", "Total memory usage in bytes for the extra pool"},
+            }},
+        RPCExamples{
+            HelpExampleCli("getextrapoolinfo", "") +
+            HelpExampleRpc("getextrapoolinfo", "")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+        {
+            const NodeContext& node = EnsureAnyNodeContext(request.context);
+            PeerManager& peerman = EnsurePeerman(node);
+            LOCK(::cs_main);
+
+            UniValue ret(UniValue::VOBJ);
+            ret.pushKV("size", (int64_t)peerman.ExtraTxnForCompactCount());
+            ret.pushKV("bytes", (int64_t)peerman.ExtraTxnForCompactBytes()); 
+            ret.pushKV("usage", (int64_t)peerman.ExtraTxnForCompactMemoryUsage());
+
+            return ret;
+        },
+    };
+}
+
 static RPCHelpMan importmempool()
 {
     return RPCHelpMan{
@@ -1480,6 +1513,7 @@ void RegisterMempoolRPCCommands(CRPCTable& t)
         {"blockchain", &getmempoolentry},
         {"blockchain", &gettxspendingprevout},
         {"blockchain", &getmempoolinfo},
+        {"blockchain", &getextrapoolinfo},
         {"blockchain", &getrawmempool},
         {"blockchain", &importmempool},
         {"blockchain", &savemempool},

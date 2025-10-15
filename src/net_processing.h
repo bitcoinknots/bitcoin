@@ -113,6 +113,19 @@ public:
     /** Get peer manager info. */
     virtual PeerManagerInfo GetInfo() const = 0;
 
+    /**
+     * Get the number of transactions currently stored in the extra pool.
+     */
+    virtual size_t ExtraTxnForCompactCount() const = 0;
+    /**
+     * Get the total size of transactions in extra pool.
+     */
+    virtual size_t ExtraTxnForCompactBytes() const = 0;    
+    /**
+     * Get the total memory usage of the extra pool.
+     */
+    virtual size_t ExtraTxnForCompactMemoryUsage() const = 0;
+
     /** Relay transaction to all peers. */
     virtual void RelayTransaction(const uint256& txid, const uint256& wtxid) = 0;
 

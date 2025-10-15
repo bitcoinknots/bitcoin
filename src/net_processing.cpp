@@ -522,6 +522,11 @@ public:
     ServiceFlags GetDesirableServiceFlags(ServiceFlags services) const override;
     int GetNumberOfPeersWithValidatedDownloads() const override EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
 
+    size_t ExtraTxnForCompactCount() const override EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
+    size_t ExtraTxnForCompactBytes() const override EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
+    size_t ExtraTxnForCompactMemoryUsage() const override EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
+
+
 private:
     /** Consider evicting an outbound peer based on the amount of time they've been behind our tip */
     void ConsiderEviction(CNode& pto, Peer& peer, std::chrono::seconds time_in_seconds) EXCLUSIVE_LOCKS_REQUIRED(cs_main, g_msgproc_mutex);
@@ -959,8 +964,8 @@ private:
     std::vector<CTransactionRef> vExtraTxnForCompact GUARDED_BY(g_msgproc_mutex);
     /** Offset into vExtraTxnForCompact to insert the next tx */
     size_t vExtraTxnForCompactIt GUARDED_BY(g_msgproc_mutex) = 0;
+    size_t vExtraTxnForCompactCount GUARDED_BY(g_msgproc_mutex) = 0;
     size_t blockreconstructionextratxn_memusage{0};
-
     /** Check whether the last unknown block a peer advertised is not yet known. */
     void ProcessBlockAvailability(NodeId nodeid) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     /** Update tracking information about which blocks a peer is assumed to have. */
@@ -1061,6 +1066,25 @@ const CNodeState* PeerManagerImpl::State(NodeId pnode) const
 CNodeState* PeerManagerImpl::State(NodeId pnode)
 {
     return const_cast<CNodeState*>(std::as_const(*this).State(pnode));
+}
+
+size_t PeerManagerImpl::ExtraTxnForCompactCount() const {
+    AssertLockHeld(::cs_main);
+    return vExtraTxnForCompactCount;
+}
+size_t PeerManagerImpl::ExtraTxnForCompactBytes() const {
+    AssertLockHeld(::cs_main);
+    size_t total_bytes = 0;
+    for (const auto& tx : vExtraTxnForCompact) {
+        if (tx) {
+            total_bytes += tx->GetTotalSize();
+        }
+    }
+    return total_bytes;
+}
+size_t PeerManagerImpl::ExtraTxnForCompactMemoryUsage() const {
+    AssertLockHeld(::cs_main);
+    return blockreconstructionextratxn_memusage;
 }
 
 /**
@@ -1780,15 +1804,22 @@ void PeerManagerImpl::AddToCompactExtraTransactions(const CTransactionRef& tx, c
 
     {
         auto& entry = vExtraTxnForCompact[vExtraTxnForCompactIt];
-        if (entry) blockreconstructionextratxn_memusage -= RecursiveDynamicUsage(*entry);
+        if (entry) {
+            blockreconstructionextratxn_memusage -= RecursiveDynamicUsage(*entry);
+            vExtraTxnForCompactCount--;
+        }
         entry = tx;
         blockreconstructionextratxn_memusage += tx_dynamic_usage;
+        vExtraTxnForCompactCount++;
     }
     vExtraTxnForCompactIt = (vExtraTxnForCompactIt + 1) % m_opts.max_extra_txs;
 
     while (blockreconstructionextratxn_memusage > m_opts.max_extra_txs_size) {
         auto& entry = vExtraTxnForCompact[vExtraTxnForCompactIt];
-        if (entry) blockreconstructionextratxn_memusage -= RecursiveDynamicUsage(*entry);
+        if (entry) {
+            blockreconstructionextratxn_memusage -= RecursiveDynamicUsage(*entry);
+            vExtraTxnForCompactCount--;
+        }
         entry.reset();
         vExtraTxnForCompactIt = (vExtraTxnForCompactIt + 1) % m_opts.max_extra_txs;
     }
