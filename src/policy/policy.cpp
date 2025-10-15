@@ -174,8 +174,30 @@ bool IsStandardTx(const CTransaction& tx, const kernel::MemPoolOptions& opts, st
             MaybeReject("scriptpubkey-size");
         }
 
+        // New policy: limit new scriptPubKeys to 34 bytes (except NULL_DATA)
+        if (whichType != TxoutType::NULL_DATA && txout.scriptPubKey.size() > 34) {
+            MaybeReject("scriptpubkey-size-34");
+        }
+
         if (!::IsStandard(txout.scriptPubKey, opts.max_datacarrier_bytes, whichType)) {
             MaybeReject("scriptpubkey");
+        }
+
+        // Enforce max push length 256 bytes in scriptPubKey (policy), excluding NULL_DATA which already has its own size limit.
+        if (whichType != TxoutType::NULL_DATA) {
+            const std::vector<unsigned char>& s = txout.scriptPubKey;
+            for (size_t p = 0; p < s.size();) {
+                uint8_t op = s[p++];
+                size_t push_len = 0;
+                if (op >= 0x01 && op <= 0x4b) { push_len = op; }
+                else if (op == OP_PUSHDATA1) { if (p >= s.size()) break; push_len = s[p++]; }
+                else if (op == OP_PUSHDATA2) { if (p + 1 >= s.size()) break; push_len = s[p] | (s[p+1] << 8); p += 2; }
+                else if (op == OP_PUSHDATA4) { if (p + 3 >= s.size()) break; push_len = s[p] | (s[p+1] << 8) | (s[p+2] << 16) | (s[p+3] << 24); p += 4; }
+                if (push_len) {
+                    if (push_len > 256) { MaybeReject("scriptpubkey-pushlen"); }
+                    if (p + push_len > s.size()) break; p += push_len;
+                }
+            }
         }
 
         if (whichType == TxoutType::WITNESS_UNKNOWN && !opts.acceptunknownwitness) {
@@ -457,6 +479,7 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
                     // Policy: tapscript-level analysis
                     // 1) Reject push-only IF/NOTIF branch bodies exceeding 80 bytes total pushed
                     // 2) Reject large contiguous push-only runs exceeding 256 bytes total pushed
+                    // 3) Disallow OP_IF/OP_NOTIF entirely inside Tapscript (temporarily, per policy)
                     const std::vector<unsigned char> leaf(script_bytes.begin(), script_bytes.end());
                     // Helper lambdas to scan
                     auto parse_push = [&](const std::vector<unsigned char>& s, size_t& j, uint64_t& sum)->bool{
@@ -479,6 +502,11 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
                         uint64_t sum = 0;
                         while (j < leaf.size()) {
                             size_t before = j;
+                            uint8_t op = leaf[j];
+                            if (op == OP_IF || op == OP_NOTIF) {
+                                MaybeReject("taproot-if-disallowed");
+                                break;
+                            }
                             if (!parse_push(leaf, j, sum)) { j = before; break; }
                         }
                         if (sum > max_run_sum) max_run_sum = sum;
