@@ -1135,6 +1135,34 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     CheckIsNotStandard(t, "dust-nonanchor");
     g_mempool_opts.permitephemeral_send = true;
     CheckIsStandard(t);
+
+    // Policy: non-NULL_DATA scriptPubKey size cap (34)
+    t.vout[0].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << std::vector<unsigned char>(20, 0) << OP_EQUALVERIFY << OP_CHECKSIG;
+    CheckIsStandard(t);
+    // Pad scriptPubKey beyond 34 bytes (append a small push)
+    CScript spk_pad = t.vout[0].scriptPubKey;
+    spk_pad << std::vector<unsigned char>(3, 0);
+    t.vout[0].scriptPubKey = spk_pad;
+    CheckIsNotStandard(t, "scriptpubkey-size-34");
+
+    // Policy: scriptPubKey push length cap (256)
+    CScript spk_push;
+    std::vector<unsigned char> payload_256(256, 0);
+    std::vector<unsigned char> payload_257(257, 0);
+    spk_push << OP_RETURN; // NULL_DATA is excluded; use non-NULL_DATA to test cap
+    t.vout[0].scriptPubKey = CScript() << payload_256 << OP_DROP;
+    CheckIsStandard(t);
+    t.vout[0].scriptPubKey = CScript() << payload_257 << OP_DROP;
+    CheckIsNotStandard(t, "scriptpubkey-pushlen");
+
+    // Policy: unknown witness versions default rejected (scriptPubKey witness unknown)
+    // OP_16 with 32-byte program is WITNESS_UNKNOWN; ensure default rejects when value is dust (exercise path)
+    t.vout[0].scriptPubKey = CScript() << OP_16 << std::vector<unsigned char>(32, 0);
+    CheckIsNotStandard(t, "scriptpubkey-unknown-witnessversion");
+
+    // Placeholders for tapscript policy checks would be added in dedicated tests
+    // (taproot IF-ban, push-run cap, IF-body cap, control block cap, per-input witness cap)
+    // using a test harness that constructs valid taproot spends.
 }
 
 BOOST_AUTO_TEST_CASE(max_standard_legacy_sigops)
