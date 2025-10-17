@@ -1686,7 +1686,7 @@ MempoolAcceptResult MemPoolAccept::AcceptSingleTransaction(const CTransactionRef
     AssertLockHeld(cs_main);
     LOCK(m_pool.cs); // mempool "read lock" (held through m_pool.m_opts.signals->TransactionAddedToMempool())
 
-    const CFeeRate mempool_min_fee_rate = m_pool.GetMinFee();
+    const CFeeRate mempool_min_fee_rate = std::max(m_pool.GetMinFee(), m_pool.m_opts.min_relay_feerate);
 
     Workspace ws(ptx);
     const std::vector<Wtxid> single_wtxid{ws.m_ptx->GetWitnessHash()};
