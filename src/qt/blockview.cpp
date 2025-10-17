@@ -26,6 +26,8 @@
 #include <cmath>
 #include <numbers>
 
+#include <QApplication>
+#include <QClipboard>
 #include <QColor>
 #include <QComboBox>
 #include <QLabel>
@@ -103,6 +105,28 @@ bool ScalingGraphicsView::viewportEvent(QEvent * const event)
         return true;
     }
     return QGraphicsView::viewportEvent(event);
+}
+
+void ScalingGraphicsView::mousePressEvent(QMouseEvent * const event)
+{
+    if (event->button() == Qt::LeftButton) {
+        auto * const gi = itemAt(event->pos());
+        const auto tx = gi ? gi->data(0).value<CTransactionRef>() : CTransactionRef();
+        if (tx) {
+            QString txid = QString::fromStdString(tx->GetHash().ToString());
+            QApplication::clipboard()->setText(txid);
+            
+            #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+                const QPoint event_global_pos = event->globalPosition().toPoint();
+            #else
+                const QPoint event_global_pos = event->globalPos();
+            #endif
+            QToolTip::showText(event_global_pos, tr("Copied: %1").arg(txid), this, {}, -1);
+            
+            return;
+        }
+    }
+    QGraphicsView::mousePressEvent(event);
 }
 
 class BlockViewValidationInterface final : public CValidationInterface

@@ -50,6 +50,7 @@ public:
     void mouseMoveEvent(QMouseEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     bool viewportEvent(QEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
 
     GuiBlockView *m_bv;
 };
