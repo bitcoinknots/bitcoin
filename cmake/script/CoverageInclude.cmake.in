@@ -11,9 +11,6 @@ endif()
 separate_arguments(LCOV_OPTS)
 separate_arguments(GENHTML_OPTS)
 
-set(LCOV_COMMAND ${LCOV_EXECUTABLE} --gcov-tool ${CMAKE_CURRENT_LIST_DIR}/cov_tool_wrapper.sh ${LCOV_OPTS})
-set(GENHTML_COMMAND ${GENHTML_EXECUTABLE} --show-details ${GENHTML_OPTS})
-
 list(APPEND LCOV_FILTER_COMMAND -p "CMakeFiles/")
 
 if("@CMAKE_CXX_COMPILER_ID@" STREQUAL "Clang")
