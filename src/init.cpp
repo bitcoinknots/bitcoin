@@ -1605,6 +1605,12 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         }
     }, std::chrono::minutes{5});
 
+    // Check system memory pressure every 10 seconds.
+    // Updates g_system_needs_memory_released flag used by FlushStateToDisk.
+    scheduler.scheduleEvery([]{
+        CheckMemoryPressure();
+    }, std::chrono::seconds{10});
+
     if (args.GetBoolArg("-logratelimit", BCLog::DEFAULT_LOGRATELIMIT)) {
         LogInstance().SetRateLimiting(BCLog::LogRateLimiter::Create(
             [&scheduler](auto func, auto window) { scheduler.scheduleEvery(std::move(func), window); },

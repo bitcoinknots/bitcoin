@@ -3190,7 +3190,18 @@ bool Chainstate::FlushStateToDisk(
 
             if (!CoinsTip().GetBestBlock().IsNull()) {
 
-            if (coins_mem_usage >= WARN_FLUSH_COINS_SIZE) LogWarning("Flushing large (%d GiB) UTXO set to disk, it may take several minutes", coins_mem_usage >> 30);
+            // Flush the chainstate (which may refer to block index entries).
+            const auto empty_cache{(mode == FlushStateMode::ALWAYS) || fCacheLarge || fCacheCritical};
+
+            if (coins_mem_usage >= WARN_FLUSH_COINS_SIZE) {
+                LogWarning("%s: Flushing large (%.2f MiB) UTXO set to disk, it may take several minutes",
+                           empty_cache ? "FLUSH" : "SYNC",
+                           coins_mem_usage / (1024.0 * 1024.0));
+            }
+
+            // Pause memory pressure checks during the flush/sync operation
+            PauseMemoryPressureChecks();
+
             LOG_TIME_MILLIS_WITH_CATEGORY(strprintf("write coins cache to disk (%d coins, %.2fKiB)",
                 coins_count, coins_mem_usage >> 10), BCLog::BENCH);
 
@@ -3202,8 +3213,6 @@ bool Chainstate::FlushStateToDisk(
             if (!CheckDiskSpace(m_chainman.m_options.datadir, 48 * 2 * 2 * CoinsTip().GetCacheSize())) {
                 return FatalError(m_chainman.GetNotifications(), state, _("Disk space is too low!"));
             }
-            // Flush the chainstate (which may refer to block index entries).
-            const auto empty_cache{(mode == FlushStateMode::ALWAYS) || fCacheLarge || fCacheCritical};
             if (empty_cache ? !CoinsTip().Flush() : !CoinsTip().Sync()) {
                 return FatalError(m_chainman.GetNotifications(), state, _("Failed to write to coin database."));
             }
@@ -3215,6 +3224,8 @@ bool Chainstate::FlushStateToDisk(
                    (uint64_t)coins_mem_usage,
                    (bool)fFlushForPrune);
 
+            // Resume memory pressure checks after the flush/sync completes
+            ResumeMemoryPressureChecks();
             }
         }
 

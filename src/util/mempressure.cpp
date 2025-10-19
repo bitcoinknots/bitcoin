@@ -9,48 +9,454 @@
 #include <logging.h>
 #include <util/byte_units.h>
 
-#ifdef HAVE_LINUX_SYSINFO
-#include <sys/sysinfo.h>
-#endif
 #ifdef WIN32
 #include <windows.h>
+#include <psapi.h>
 #endif
 
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#include <mach/mach.h>
+#include <mach/mach_host.h>
+#endif
+
+#include <algorithm>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
+#include <fstream>
+#include <string>
 
 size_t g_low_memory_threshold{64_MiB};
+std::atomic<bool> g_system_needs_memory_released{false};
+
+// File-local state variables
+static std::atomic<bool> checks_paused{false};
+
+// Container detection state
+enum class ContainerState {
+    UNKNOWN,
+    SYSTEM,
+    CONTAINERIZED
+};
+static std::atomic<ContainerState> container_state{ContainerState::UNKNOWN};
+
+namespace {
+#ifdef WIN32
+    MemoryPressureInfo GetWindowsMemoryInfo();
+#elif defined(__linux__)
+    MemoryPressureInfo GetLinuxMemoryInfo();
+#elif defined(__APPLE__)
+    MemoryPressureInfo GetMacOSMemoryInfo();
+#endif
+}
+
+void CheckMemoryPressure()
+{
+    if (checks_paused.load(std::memory_order_relaxed)) {
+        return;
+    }
+
+    if (g_low_memory_threshold <= 0) {
+        g_system_needs_memory_released.store(false, std::memory_order_relaxed);
+        return;
+    }
+
+#ifdef WIN32
+    MemoryPressureInfo info = GetWindowsMemoryInfo();
+#elif defined(__linux__)
+    MemoryPressureInfo info = GetLinuxMemoryInfo();
+#elif defined(__APPLE__)
+    MemoryPressureInfo info = GetMacOSMemoryInfo();
+#else
+    // Unsupported platform - disable pressure detection
+    g_system_needs_memory_released.store(false, std::memory_order_relaxed);
+    return;
+#endif
+
+    LogDebug(BCLog::MEMPRESSURE, "%sMemAvailable=%.2f MB, MemUsed=%.2f MB, threshold=%.2f MB, trigger=%s\n",
+             info.is_containerized ? "Container " : "",
+             info.mem_available / (1024.0 * 1024.0),
+             info.mem_used / (1024.0 * 1024.0),
+             g_low_memory_threshold / (1024.0 * 1024.0),
+             info.under_pressure ? "YES" : "NO");
+
+    if (info.under_pressure) {
+        LogPrintf("Mempressure detected - available: %.2f MB, threshold: %.2f MB\n",
+                  info.mem_available / (1024.0 * 1024.0),
+                  g_low_memory_threshold / (1024.0 * 1024.0));
+    }
+
+    g_system_needs_memory_released.store(info.under_pressure, std::memory_order_relaxed);
+}
 
 bool SystemNeedsMemoryReleased()
 {
     if (g_low_memory_threshold <= 0) {
-        // Intentionally bypass other metrics when disabled entirely
         return false;
     }
-#ifdef WIN32
-    MEMORYSTATUSEX mem_status;
-    mem_status.dwLength = sizeof(mem_status);
-    if (GlobalMemoryStatusEx(&mem_status)) {
-        if (mem_status.dwMemoryLoad >= 99 ||
-            mem_status.ullAvailPhys < g_low_memory_threshold ||
-            mem_status.ullAvailVirtual < g_low_memory_threshold) {
-            LogPrintf("%s: YES: %s%% memory load; %s available physical memory; %s available virtual memory\n", __func__, int(mem_status.dwMemoryLoad), size_t(mem_status.ullAvailPhys), size_t(mem_status.ullAvailVirtual));
-            return true;
-        }
-    }
-#endif
-#ifdef HAVE_LINUX_SYSINFO
-    struct sysinfo sys_info;
-    if (!sysinfo(&sys_info)) {
-        // Explicitly 64-bit in case of 32-bit userspace on 64-bit kernel
-        const uint64_t free_ram = uint64_t(sys_info.freeram) * sys_info.mem_unit;
-        const uint64_t buffer_ram = uint64_t(sys_info.bufferram) * sys_info.mem_unit;
-        if (free_ram + buffer_ram < g_low_memory_threshold) {
-            LogPrintf("%s: YES: %s free RAM + %s buffer RAM\n", __func__, free_ram, buffer_ram);
-            return true;
-        }
-    }
-#endif
-    // NOTE: sysconf(_SC_AVPHYS_PAGES) doesn't account for caches on at least Linux, so not safe to use here
-    return false;
+
+    return g_system_needs_memory_released.load(std::memory_order_relaxed);
 }
+
+void PauseMemoryPressureChecks()
+{
+    checks_paused.store(true, std::memory_order_relaxed);
+}
+
+void ResumeMemoryPressureChecks()
+{
+    checks_paused.store(false, std::memory_order_relaxed);
+    g_system_needs_memory_released.store(false, std::memory_order_relaxed);
+}
+
+#ifdef WIN32
+namespace {
+    // Check Windows container memory status (Job Object)
+    // Docker, etc on Windows use Job Objects to enforce memory limits.
+    MemoryPressureInfo GetWindowsContainerMemoryInfo()
+    {
+        MemoryPressureInfo info;
+
+        // Query information about the job object the current process belongs to
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION job_info = {};
+        if (!QueryInformationJobObject(nullptr, JobObjectExtendedLimitInformation,
+                                       &job_info, sizeof(job_info), nullptr)) {
+            return info;
+        }
+
+        if (!(job_info.BasicLimitInformation.LimitFlags & JOB_OBJECT_LIMIT_JOB_MEMORY)) {
+            return info;
+        }
+
+        info.is_containerized = true;
+        size_t container_limit = static_cast<size_t>(job_info.JobMemoryLimit);
+
+        PROCESS_MEMORY_COUNTERS_EX pmc;
+        if (!GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
+            return info;
+        }
+
+        info.mem_used = pmc.PrivateUsage;
+        info.mem_available = (info.mem_used < container_limit)
+                           ? (container_limit - info.mem_used)
+                           : 0;
+
+        // Windows container pressure: check threshold
+        if (info.mem_available < g_low_memory_threshold) {
+            info.under_pressure = true;
+        }
+
+        return info;
+    }
+
+    // Check system (non-container) Windows memory status
+    MemoryPressureInfo GetWindowsSystemMemoryInfo()
+    {
+        MemoryPressureInfo info;
+
+        MEMORYSTATUSEX mem_status;
+        mem_status.dwLength = sizeof(mem_status);
+        if (!GlobalMemoryStatusEx(&mem_status)) {
+            return info;
+        }
+
+        // Use the lesser of available physical or virtual memory
+        info.mem_available = std::min(static_cast<size_t>(mem_status.ullAvailPhys),
+                                      static_cast<size_t>(mem_status.ullAvailVirtual));
+        info.mem_used = static_cast<size_t>(mem_status.ullTotalPhys) - static_cast<size_t>(mem_status.ullAvailPhys);
+
+        // Windows low memory detection: high memory usage (99%+) AND below threshold
+        // This will be supplemented with Pages/sec pressure detection in the future
+        if (mem_status.dwMemoryLoad >= 99 && info.mem_available < g_low_memory_threshold) {
+            info.under_pressure = true;
+        }
+
+        return info;
+    }
+
+    MemoryPressureInfo GetWindowsMemoryInfo()
+    {
+        ContainerState state = container_state.load(std::memory_order_relaxed);
+        if (state == ContainerState::UNKNOWN || state == ContainerState::CONTAINERIZED) {
+            MemoryPressureInfo info = GetWindowsContainerMemoryInfo();
+            if (info.is_containerized) {
+                container_state.store(ContainerState::CONTAINERIZED, std::memory_order_relaxed);
+                return info;
+            }
+        }
+        if (state == ContainerState::UNKNOWN) {
+            container_state.store(ContainerState::SYSTEM, std::memory_order_relaxed);
+        }
+
+        return GetWindowsSystemMemoryInfo();
+    }
+}
+#endif
+
+#ifdef __linux__
+namespace {
+    // Helper function to parse memory statistics with error handling
+    std::optional<uint64_t> ParseMemoryStat(const std::string& value_str, const char* stat_name)
+    {
+        try {
+            return std::stoull(value_str);
+        } catch (const std::exception& e) {
+            return std::nullopt;
+        }
+    }
+
+    MemoryPressureInfo GetCgroupV2MemoryInfo()
+    {
+        MemoryPressureInfo info;
+
+        std::ifstream v2_check("/sys/fs/cgroup/memory.max");
+        std::string limit_str;
+        if (!v2_check.is_open() || !std::getline(v2_check, limit_str)) {
+            return info;
+        }
+
+        size_t container_limit = 0;
+        if (limit_str != "max") {
+            auto limit = ParseMemoryStat(limit_str, "memory.max");
+            if (!limit) return info;
+            if (*limit < UINT64_MAX / 2) { // sanity check
+                container_limit = static_cast<size_t>(*limit);
+            }
+        }
+
+        if (container_limit == 0) {
+            return info;
+        }
+
+        size_t inactive_file = 0;
+        std::ifstream stat_file("/sys/fs/cgroup/memory.stat");
+        if (!stat_file.is_open()) {
+            return info;
+        }
+
+        std::string stat_line;
+        while (std::getline(stat_file, stat_line)) {
+            if (stat_line.compare(0, 14, "inactive_file ") == 0) {
+                auto value = ParseMemoryStat(stat_line.substr(14), "inactive_file");
+                if (!value) return info;
+                inactive_file = *value;
+                break;
+            }
+        }
+
+        size_t total = 0;
+        std::ifstream current_file("/sys/fs/cgroup/memory.current");
+        std::string current_str;
+        if (!current_file.is_open() || !std::getline(current_file, current_str)) {
+            return info;
+        }
+
+        auto value = ParseMemoryStat(current_str, "memory.current");
+        if (!value) return info;
+        total = *value;
+
+        info.is_containerized = true;
+        info.mem_used = (total > inactive_file) ? (total - inactive_file) : 0;
+        info.mem_available = (info.mem_used < container_limit) ? (container_limit - info.mem_used) : 0;
+
+        // Linux pressure detection: low available memory threshold
+        if (info.mem_available < g_low_memory_threshold) {
+            info.under_pressure = true;
+        }
+
+        return info;
+    }
+
+    MemoryPressureInfo GetCgroupV1MemoryInfo()
+    {
+        MemoryPressureInfo info;
+
+        std::ifstream limit_file("/sys/fs/cgroup/memory/memory.limit_in_bytes");
+        std::string limit_str;
+        if (!limit_file.is_open() || !std::getline(limit_file, limit_str)) {
+            return info;
+        }
+
+        size_t limit = 0, usage = 0, cache = 0;
+
+        auto limit_val = ParseMemoryStat(limit_str, "memory.limit_in_bytes");
+        if (!limit_val) return info;
+        limit = *limit_val;
+        if (limit >= UINT64_MAX / 2) {
+            return info;
+        }
+
+        std::ifstream usage_file("/sys/fs/cgroup/memory/memory.usage_in_bytes");
+        std::string usage_str;
+        if (!usage_file.is_open() || !std::getline(usage_file, usage_str)) {
+            return info;
+        }
+
+        auto usage_val = ParseMemoryStat(usage_str, "memory.usage_in_bytes");
+        if (!usage_val) return info;
+        usage = *usage_val;
+
+        std::ifstream stat_file("/sys/fs/cgroup/memory/memory.stat");
+        if (!stat_file.is_open()) {
+            return info;
+        }
+
+        std::string line;
+        while (std::getline(stat_file, line)) {
+            if (line.compare(0, 6, "cache ") == 0) {
+                auto cache_val = ParseMemoryStat(line.substr(6), "cache");
+                if (cache_val) cache = *cache_val;
+                break;
+            }
+        }
+
+        info.is_containerized = true;
+        info.mem_used = usage - cache;
+        info.mem_available = (info.mem_used < limit) ? (limit - info.mem_used) : 0;
+
+        // Linux pressure detection: low available memory threshold
+        if (info.mem_available < g_low_memory_threshold) {
+            info.under_pressure = true;
+        }
+
+        return info;
+    }
+
+    // Check system (non-container) Linux memory status
+    MemoryPressureInfo GetLinuxSystemMemoryInfo()
+    {
+        MemoryPressureInfo info;
+
+        std::ifstream meminfo("/proc/meminfo");
+        if (!meminfo.is_open()) {
+            return info;
+        }
+
+        std::string line;
+        uint64_t mem_total_kb = 0;
+        uint64_t mem_available_kb = 0;
+
+        while (std::getline(meminfo, line)) {
+            if (line.compare(0, 9, "MemTotal:") == 0) {
+                size_t pos = line.find_first_of("0123456789");
+                if (pos != std::string::npos) {
+                    auto value = ParseMemoryStat(line.substr(pos), "MemTotal");
+                    if (value) mem_total_kb = *value;
+                }
+            } else if (line.compare(0, 13, "MemAvailable:") == 0) {
+                size_t pos = line.find_first_of("0123456789");
+                if (pos != std::string::npos) {
+                    auto value = ParseMemoryStat(line.substr(pos), "MemAvailable");
+                    if (value) mem_available_kb = *value;
+                }
+            }
+
+            if (mem_total_kb > 0 && mem_available_kb > 0) {
+                break;
+            }
+        }
+
+        if (mem_total_kb > 0 && mem_available_kb > 0) {
+            // Check for overflow before multiplication
+            if (mem_available_kb > UINT64_MAX / 1024 || mem_total_kb > UINT64_MAX / 1024) {
+                // huge value is "plenty of memory"
+                return info;
+            }
+
+            info.mem_available = mem_available_kb * 1024;
+            size_t total_memory = mem_total_kb * 1024;
+            info.mem_used = total_memory - info.mem_available;
+        }
+
+        // Linux pressure detection: low available memory threshold
+        if (info.mem_available < g_low_memory_threshold) {
+            info.under_pressure = true;
+        }
+
+        return info;
+    }
+
+    // Unified Linux memory info - tries cgroup v2, then v1, then system
+    MemoryPressureInfo GetLinuxMemoryInfo()
+    {
+        ContainerState state = container_state.load(std::memory_order_relaxed);
+        if (state == ContainerState::UNKNOWN || state == ContainerState::CONTAINERIZED) {
+            // Try cgroup v2 first
+            MemoryPressureInfo info = GetCgroupV2MemoryInfo();
+            if (!info.is_containerized) {
+                info = GetCgroupV1MemoryInfo();
+            }
+
+            if (info.is_containerized) {
+                container_state.store(ContainerState::CONTAINERIZED, std::memory_order_relaxed);
+                return info;
+            }
+        }
+        if (state == ContainerState::UNKNOWN) {
+            container_state.store(ContainerState::SYSTEM, std::memory_order_relaxed);
+        }
+
+        return GetLinuxSystemMemoryInfo();
+    }
+}
+#endif
+
+#ifdef __APPLE__
+namespace {
+    // TODO: Determine if kern.memorystatus_vm_pressure_level is useful for pressure detection,
+    // or if we should just use mem_available < threshold like Linux.
+    // PSI on Linux created a feedback loop where flushing triggered more pressure.
+    // macOS pressure_level may have the same issue - needs testing.
+    MemoryPressureInfo GetMacOSMemoryInfo()
+    {
+        MemoryPressureInfo info;
+
+        vm_statistics64_data_t vm_stats;
+        mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+        kern_return_t kr = host_statistics64(mach_host_self(), HOST_VM_INFO64,
+                                            (host_info64_t)&vm_stats, &count);
+
+        if (kr == KERN_SUCCESS) {
+            vm_size_t page_size = 0;
+            host_page_size(mach_host_self(), &page_size);
+
+            // Calculate memory in bytes
+            // Available = free + inactive pages (can be reclaimed)
+            uint64_t free_pages = vm_stats.free_count;
+            uint64_t inactive_pages = vm_stats.inactive_count;
+            uint64_t active_pages = vm_stats.active_count;
+            uint64_t wired_pages = vm_stats.wire_count;
+
+            info.mem_available = (free_pages + inactive_pages) * page_size;
+            info.mem_used = (active_pages + wired_pages) * page_size;
+        }
+
+        // macOS memory pressure levels:
+        // - NORMAL (1): System is fine
+        // - WARN (2): System experiencing pressure - should free memory if possible
+        // - CRITICAL (4): System actively paging to disk - aggressive reclamation needed
+        int pressure_level = 0;
+        size_t size = sizeof(pressure_level);
+
+        if (sysctlbyname("kern.memorystatus_vm_pressure_level", &pressure_level, &size, nullptr, 0) == 0) {
+            // Trigger memory release at WARN level or higher
+            if (pressure_level >= 2) {
+                LogPrintf("CheckMemoryPressure: macOS memory pressure level %d (WARN or CRITICAL)\n", pressure_level);
+                info.under_pressure = true;
+            }
+        }
+
+        // macOS pressure detection: OS pressure level OR low available memory
+        if (!info.under_pressure && info.mem_available < g_low_memory_threshold) {
+            info.under_pressure = true;
+        }
+
+        return info;
+    }
+}
+#endif
+
+
+
