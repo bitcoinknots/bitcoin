@@ -508,8 +508,12 @@ enabled by setting `LCOV_OPTS="--rc branch_coverage=1"`:
 cmake -DLCOV_OPTS="--rc branch_coverage=1" -P build/Coverage.cmake
 ```
 
-GENHTML_OPTS can be specified to provide options to genhtml, the program that generates the
-html report from lcov: `GENHTML_OPTS="--exclude boost"`.
+HTML_OPTS can be specified to provide options to genhtml, the program that generates the
+html report from lcov: `HTML_OPTS="--exclude boost"`.
+
+```
+cmake -DHTML_OPTS="--exclude boost" -P build/Coverage.cmake
+```
 
 To enable test parallelism:
 ```
