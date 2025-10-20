@@ -74,6 +74,7 @@ std::string FormatSubVersion(const std::string& name, int nClientVersion, const 
             return "Knots:" + CLIENT_BUILD.substr(pos + 6) + "/";
         }();
         ua += ua_knots;
+        ua += "UASF-ReducedData:0.1/";
     }
     return ua;
 }
