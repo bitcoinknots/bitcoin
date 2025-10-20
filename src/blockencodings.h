@@ -150,6 +150,9 @@ public:
     ReadStatus InitData(const CBlockHeaderAndShortTxIDs& cmpctblock, const std::vector<CTransactionRef>& extra_txn);
     bool IsTxAvailable(size_t index) const;
     ReadStatus FillBlock(CBlock& block, const std::vector<CTransactionRef>& vtx_missing);
+
+    std::vector<CTransactionRef> used_extra_txns;
+    size_t initial_extra_count = 0;
 };
 
 #endif // BITCOIN_BLOCKENCODINGS_H

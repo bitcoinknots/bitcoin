@@ -3477,6 +3477,30 @@ void PeerManagerImpl::ProcessCompactBlockTxns(CNode& pfrom, Peer& peer, const Bl
         // protections in the compact block handler -- see related comment
         // in compact block optimistic reconstruction handling.
         ProcessBlock(pfrom, pblock, /*force_processing=*/true, /*min_pow_checked=*/true);
+
+        if (pblock && !pblock->vtx.empty()) {
+            std::set<uint256> block_tx_hashes;
+            for (const auto& tx : pblock->vtx) {
+                block_tx_hashes.insert(tx->GetHash());
+            }
+            
+            // Remove matching transactions from extra pool
+            size_t removed_count = 0;
+            for (auto& extra_tx : vExtraTxnForCompact) {
+                if (extra_tx && block_tx_hashes.count(extra_tx->GetHash())) {
+                    blockreconstructionextratxn_memusage -= RecursiveDynamicUsage(*extra_tx);
+                    vExtraTxnForCompactCount--;
+                    extra_tx.reset();
+                    removed_count++;
+                }
+            }
+            
+            size_t final_extra_count = 0;
+            for (const auto& tx : vExtraTxnForCompact) {
+                if (tx) final_extra_count++;
+            }
+            LogDebug(BCLog::CMPCTBLOCK, "Extra pool contains %zu transactions after block reconstruction (removed %zu)\n", final_extra_count, removed_count);
+        }
     }
     return;
 }
@@ -4515,6 +4539,13 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
                 }
 
                 PartiallyDownloadedBlock& partialBlock = *(*queuedBlockIt)->partialBlock;
+                
+                size_t initial_extra_count = 0;
+                for (const auto& tx : vExtraTxnForCompact) {
+                    if (tx) initial_extra_count++;
+                }
+                LogDebug(BCLog::CMPCTBLOCK, "Extra pool contains %zu transactions before block reconstruction\n", initial_extra_count);
+                
                 ReadStatus status = partialBlock.InitData(cmpctblock, vExtraTxnForCompact);
                 if (status == READ_STATUS_INVALID) {
                     RemoveBlockRequest(pindex->GetBlockHash(), pfrom.GetId()); // Reset in-flight state in case Misbehaving does not result in a disconnect

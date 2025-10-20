@@ -133,6 +133,9 @@ ReadStatus PartiallyDownloadedBlock::InitData(const CBlockHeaderAndShortTxIDs& c
     }
     }
 
+    std::set<uint256> logged_extra_txns;
+    used_extra_txns.clear();
+
     for (size_t i = 0; i < extra_txn.size(); i++) {
         if (extra_txn[i] == nullptr) {
             continue;
@@ -145,6 +148,14 @@ ReadStatus PartiallyDownloadedBlock::InitData(const CBlockHeaderAndShortTxIDs& c
                 have_txn[idit->second]  = true;
                 mempool_count++;
                 extra_count++;
+
+                used_extra_txns.push_back(extra_txn[i]);
+                
+                uint256 tx_hash = extra_txn[i]->GetHash();
+                if (logged_extra_txns.find(tx_hash) == logged_extra_txns.end()) {
+                    LogDebug(BCLog::CMPCTBLOCK, "Added tx from extra pool: %s\n", tx_hash.ToString());
+                    logged_extra_txns.insert(tx_hash);
+                }
             } else {
                 // If we find two mempool/extra txn that match the short id, just
                 // request it.
@@ -187,6 +198,8 @@ ReadStatus PartiallyDownloadedBlock::FillBlock(CBlock& block, const std::vector<
     uint256 hash = header.GetHash();
     block = header;
     block.vtx.resize(txn_available.size());
+
+    std::vector<CTransactionRef> used_extra_txns;
 
     size_t tx_missing_offset = 0;
     for (size_t i = 0; i < txn_available.size(); i++) {
