@@ -160,8 +160,8 @@ void SQLiteBatch::SetupSQLStatements()
         if (*stmt_prepared == nullptr) {
             int res = sqlite3_prepare_v2(m_database.m_db, stmt_text, -1, stmt_prepared, nullptr);
             if (res != SQLITE_OK) {
-                throw std::runtime_error(strprintf(
-                    "SQLiteDatabase: Failed to setup SQL statements: %s\n", sqlite3_errstr(res)));
+                LogPrintf("SQLiteDatabase: Warning - Failed to setup SQL statement: %s\n", sqlite3_errstr(res));
+                *stmt_prepared = nullptr;
             }
         }
     }
@@ -483,7 +483,10 @@ bool SQLiteBatch::ReadKey(DataStream&& key, DataStream& value)
 bool SQLiteBatch::WriteKey(DataStream&& key, DataStream&& value, bool overwrite)
 {
     if (!m_database.m_db) return false;
-    assert(m_insert_stmt && m_overwrite_stmt);
+    if (!m_insert_stmt || !m_overwrite_stmt) {
+        LogPrintf("SQLiteDatabase: Cannot write - SQL statements not prepared\n");
+        return false;
+    }
 
     sqlite3_stmt* stmt;
     if (overwrite) {

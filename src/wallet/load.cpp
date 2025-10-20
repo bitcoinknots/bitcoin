@@ -152,23 +152,28 @@ bool LoadWallets(WalletContext& context)
             options.verify = false; // No need to verify, assuming verified earlier in VerifyWallets()
             bilingual_str error;
             std::vector<bilingual_str> warnings;
-            std::unique_ptr<WalletDatabase> database = MakeWalletDatabase(name, options, status, error);
-            if (!database && status == DatabaseStatus::FAILED_NOT_FOUND) {
+            
+            try {
+                std::unique_ptr<WalletDatabase> database = MakeWalletDatabase(name, options, status, error);
+                if (!database && status == DatabaseStatus::FAILED_NOT_FOUND) {
+                    continue;
+                }
+                chain.initMessage(_("Loading wallet…"));
+                std::shared_ptr<CWallet> pwallet = database ? CWallet::Create(context, name, std::move(database), options.create_flags, error, warnings) : nullptr;
+                if (!warnings.empty()) chain.initWarning(Join(warnings, Untranslated("\n")));
+                if (!pwallet) {
+                    // Skip corrupted wallets
+                    LogPrintf("Skipping corrupted wallet %s: %s\n", name, error.original);
+                    continue;
+                }
+
+                NotifyWalletLoaded(context, pwallet);
+                AddWallet(context, pwallet);
+            } catch (const std::runtime_error& e) {
+                // Skip wallets that throw exceptions
+                LogPrintf("Skipping wallet %s due to error: %s\n", name, e.what());
                 continue;
             }
-            chain.initMessage(_("Loading wallet…"));
-            std::shared_ptr<CWallet> pwallet = database ? CWallet::Create(context, name, std::move(database), options.create_flags, error, warnings) : nullptr;
-            if (!warnings.empty()) chain.initWarning(Join(warnings, Untranslated("\n")));
-            if (!pwallet) {
-                if (HandleWalletLoadError(chain, name, error)) {
-                    continue;
-                } else {
-                    return false;
-                }
-            }
-
-            NotifyWalletLoaded(context, pwallet);
-            AddWallet(context, pwallet);
         }
         return true;
     } catch (const std::runtime_error& e) {
