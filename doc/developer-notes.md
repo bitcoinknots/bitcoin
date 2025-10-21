@@ -508,7 +508,7 @@ enabled by setting `LCOV_OPTS="--rc branch_coverage=1"`:
 cmake -DLCOV_OPTS="--rc branch_coverage=1" -P build/Coverage.cmake
 ```
 
-HTML_OPTS can be specified to provide options to genhtml, the program that generates the
+HTML_OPTS can be specified to provide an options override to genhtml from the default LCOV_OPTS, the program that generates the
 html report from lcov: `HTML_OPTS="--exclude boost"`.
 
 ```
