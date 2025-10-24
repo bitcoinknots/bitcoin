@@ -14,7 +14,7 @@
 #include <test/util/setup_common.h>
 #include <uint256.h>
 #include <util/check.h>
-#include <util/mempressure.h>
+#include <util/systemmemory.h>
 #include <validation.h>
 
 #include <vector>

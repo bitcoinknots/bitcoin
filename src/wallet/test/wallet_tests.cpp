@@ -19,7 +19,7 @@
 #include <test/util/logging.h>
 #include <test/util/random.h>
 #include <test/util/setup_common.h>
-#include <util/mempressure.h>
+#include <util/systemmemory.h>
 #include <util/translation.h>
 #include <validation.h>
 #include <validationinterface.h>

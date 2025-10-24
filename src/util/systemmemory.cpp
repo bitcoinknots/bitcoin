@@ -4,10 +4,11 @@
 
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
-#include <util/mempressure.h>
+#include <util/systemmemory.h>
 
 #include <logging.h>
 #include <util/byte_units.h>
+#include <util/memory_profiler.h>
 
 #ifdef WIN32
 #include <windows.h>
@@ -24,14 +25,17 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <exception>
 #include <fstream>
 #include <string>
 
-size_t g_low_memory_threshold{64_MiB};
+// Memory pressure threshold - initialized based on leveldb batch size
+// Default will be set by InitializeMemoryThreshold()
+size_t g_low_memory_threshold{0};
 std::atomic<bool> g_system_needs_memory_released{false};
 
-// File-local state variables
+// If our periodic memory pressure checks are paused
 static std::atomic<bool> checks_paused{false};
 
 // Container detection state
@@ -44,12 +48,23 @@ static std::atomic<ContainerState> container_state{ContainerState::UNKNOWN};
 
 namespace {
 #ifdef WIN32
-    MemoryPressureInfo GetWindowsMemoryInfo();
+    MemoryInfo GetWindowsMemoryInfo();
 #elif defined(__linux__)
-    MemoryPressureInfo GetLinuxMemoryInfo();
+    MemoryInfo GetLinuxMemoryInfo();
 #elif defined(__APPLE__)
-    MemoryPressureInfo GetMacOSMemoryInfo();
+    MemoryInfo GetMacOSMemoryInfo();
 #endif
+}
+
+void InitializeMemoryThreshold(size_t batch_size_bytes)
+{
+    // Calculate memory pressure threshold based on leveldb batch size
+    // Formula uses moderate multiplier (2.9x) plus buffer (330 MB)
+    // Based on empirical testing across platforms (Windows/Linux/VM) and batch sizes (64/128/256 MB)
+    size_t batch_size_mb = batch_size_bytes / (1024 * 1024);
+    size_t overhead_mb = static_cast<size_t>(batch_size_mb * 2.9);
+    size_t threshold_mb = overhead_mb + 330;
+    g_low_memory_threshold = threshold_mb * 1024 * 1024;
 }
 
 void CheckMemoryPressure()
@@ -64,23 +79,23 @@ void CheckMemoryPressure()
     }
 
 #ifdef WIN32
-    MemoryPressureInfo info = GetWindowsMemoryInfo();
+    MemoryInfo info = GetWindowsMemoryInfo();
 #elif defined(__linux__)
-    MemoryPressureInfo info = GetLinuxMemoryInfo();
+    MemoryInfo info = GetLinuxMemoryInfo();
 #elif defined(__APPLE__)
-    MemoryPressureInfo info = GetMacOSMemoryInfo();
+    MemoryInfo info = GetMacOSMemoryInfo();
 #else
     // Unsupported platform - disable pressure detection
     g_system_needs_memory_released.store(false, std::memory_order_relaxed);
     return;
 #endif
 
-    LogDebug(BCLog::MEMPRESSURE, "%sMemAvailable=%.2f MB, MemUsed=%.2f MB, threshold=%.2f MB, trigger=%s\n",
-             info.is_containerized ? "Container " : "",
-             info.mem_available / (1024.0 * 1024.0),
-             info.mem_used / (1024.0 * 1024.0),
-             g_low_memory_threshold / (1024.0 * 1024.0),
-             info.under_pressure ? "YES" : "NO");
+    // LogDebug(BCLog::MEMPRESSURE, "%sMemAvailable=%.2f MB, MemUsed=%.2f MB, threshold=%.2f MB, trigger=%s\n",
+    //          info.is_containerized ? "Container " : "",
+    //          info.mem_available / (1024.0 * 1024.0),
+    //          info.mem_used / (1024.0 * 1024.0),
+    //          g_low_memory_threshold / (1024.0 * 1024.0),
+    //          info.under_pressure ? "YES" : "NO");
 
     if (info.under_pressure) {
         LogPrintf("Mempressure detected - available: %.2f MB, threshold: %.2f MB\n",
@@ -100,6 +115,11 @@ bool SystemNeedsMemoryReleased()
     return g_system_needs_memory_released.load(std::memory_order_relaxed);
 }
 
+void ResetMemoryPressure()
+{
+    g_system_needs_memory_released.store(false, std::memory_order_relaxed);
+}
+
 void PauseMemoryPressureChecks()
 {
     checks_paused.store(true, std::memory_order_relaxed);
@@ -111,13 +131,27 @@ void ResumeMemoryPressureChecks()
     g_system_needs_memory_released.store(false, std::memory_order_relaxed);
 }
 
+MemoryInfo GetMemoryInfo()
+{
+#ifdef WIN32
+    return GetWindowsMemoryInfo();
+#elif defined(__linux__)
+    return GetLinuxMemoryInfo();
+#elif defined(__APPLE__)
+    return GetMacOSMemoryInfo();
+#else
+    // Unsupported platform - return empty info
+    return MemoryInfo{};
+#endif
+}
+
 #ifdef WIN32
 namespace {
     // Check Windows container memory status (Job Object)
     // Docker, etc on Windows use Job Objects to enforce memory limits.
-    MemoryPressureInfo GetWindowsContainerMemoryInfo()
+    MemoryInfo GetWindowsContainerMemoryInfo()
     {
-        MemoryPressureInfo info;
+        MemoryInfo info;
 
         // Query information about the job object the current process belongs to
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION job_info = {};
@@ -152,35 +186,38 @@ namespace {
     }
 
     // Check system (non-container) Windows memory status
-    MemoryPressureInfo GetWindowsSystemMemoryInfo()
+    MemoryInfo GetWindowsSystemMemoryInfo()
     {
-        MemoryPressureInfo info;
+        MemoryInfo info;
 
-        MEMORYSTATUSEX mem_status;
-        mem_status.dwLength = sizeof(mem_status);
-        if (!GlobalMemoryStatusEx(&mem_status)) {
+        PERFORMANCE_INFORMATION perf_info;
+        if (!GetPerformanceInfo(&perf_info, sizeof(perf_info))) {
             return info;
         }
 
-        // Use the lesser of available physical or virtual memory
-        info.mem_available = std::min(static_cast<size_t>(mem_status.ullAvailPhys),
-                                      static_cast<size_t>(mem_status.ullAvailVirtual));
-        info.mem_used = static_cast<size_t>(mem_status.ullTotalPhys) - static_cast<size_t>(mem_status.ullAvailPhys);
+        size_t page_size = perf_info.PageSize;
+        size_t commit_limit = static_cast<size_t>(perf_info.CommitLimit) * page_size;
+        size_t commit_total = static_cast<size_t>(perf_info.CommitTotal) * page_size;
+        size_t physical_available = static_cast<size_t>(perf_info.PhysicalAvailable) * page_size;
 
-        // Windows low memory detection: high memory usage (99%+) AND below threshold
-        // This will be supplemented with Pages/sec pressure detection in the future
-        if (mem_status.dwMemoryLoad >= 99 && info.mem_available < g_low_memory_threshold) {
+        size_t commit_available = (commit_total < commit_limit) ? (commit_limit - commit_total) : 0;
+
+        // Use the minimum of commit available and physical available
+        info.mem_available = std::min(commit_available, physical_available);
+        info.mem_used = commit_total;
+
+        if (info.mem_available < g_low_memory_threshold) {
             info.under_pressure = true;
         }
 
         return info;
     }
 
-    MemoryPressureInfo GetWindowsMemoryInfo()
+    MemoryInfo GetWindowsMemoryInfo()
     {
         ContainerState state = container_state.load(std::memory_order_relaxed);
         if (state == ContainerState::UNKNOWN || state == ContainerState::CONTAINERIZED) {
-            MemoryPressureInfo info = GetWindowsContainerMemoryInfo();
+            MemoryInfo info = GetWindowsContainerMemoryInfo();
             if (info.is_containerized) {
                 container_state.store(ContainerState::CONTAINERIZED, std::memory_order_relaxed);
                 return info;
@@ -207,9 +244,9 @@ namespace {
         }
     }
 
-    MemoryPressureInfo GetCgroupV2MemoryInfo()
+    MemoryInfo GetCgroupV2MemoryInfo()
     {
-        MemoryPressureInfo info;
+        MemoryInfo info;
 
         std::ifstream v2_check("/sys/fs/cgroup/memory.max");
         std::string limit_str;
@@ -269,9 +306,9 @@ namespace {
         return info;
     }
 
-    MemoryPressureInfo GetCgroupV1MemoryInfo()
+    MemoryInfo GetCgroupV1MemoryInfo()
     {
-        MemoryPressureInfo info;
+        MemoryInfo info;
 
         std::ifstream limit_file("/sys/fs/cgroup/memory/memory.limit_in_bytes");
         std::string limit_str;
@@ -325,9 +362,9 @@ namespace {
     }
 
     // Check system (non-container) Linux memory status
-    MemoryPressureInfo GetLinuxSystemMemoryInfo()
+    MemoryInfo GetLinuxSystemMemoryInfo()
     {
-        MemoryPressureInfo info;
+        MemoryInfo info;
 
         std::ifstream meminfo("/proc/meminfo");
         if (!meminfo.is_open()) {
@@ -379,12 +416,12 @@ namespace {
     }
 
     // Unified Linux memory info - tries cgroup v2, then v1, then system
-    MemoryPressureInfo GetLinuxMemoryInfo()
+    MemoryInfo GetLinuxMemoryInfo()
     {
         ContainerState state = container_state.load(std::memory_order_relaxed);
         if (state == ContainerState::UNKNOWN || state == ContainerState::CONTAINERIZED) {
             // Try cgroup v2 first
-            MemoryPressureInfo info = GetCgroupV2MemoryInfo();
+            MemoryInfo info = GetCgroupV2MemoryInfo();
             if (!info.is_containerized) {
                 info = GetCgroupV1MemoryInfo();
             }
@@ -409,9 +446,9 @@ namespace {
     // or if we should just use mem_available < threshold like Linux.
     // PSI on Linux created a feedback loop where flushing triggered more pressure.
     // macOS pressure_level may have the same issue - needs testing.
-    MemoryPressureInfo GetMacOSMemoryInfo()
+    MemoryInfo GetMacOSMemoryInfo()
     {
-        MemoryPressureInfo info;
+        MemoryInfo info;
 
         vm_statistics64_data_t vm_stats;
         mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
@@ -458,5 +495,26 @@ namespace {
 }
 #endif
 
+void ReportFlushProfile(std::unique_ptr<MemoryProfiler::FlushProfile> profile, size_t cache_size_bytes)
+{
+    if (!profile) return;
 
+    size_t cache_size_mb = cache_size_bytes / (1024 * 1024);
 
+    // Calculate overhead from peak - pre_flush
+    size_t overhead_mb = (profile->peak_memory_mb >= profile->pre_flush_memory_mb)
+        ? (profile->peak_memory_mb - profile->pre_flush_memory_mb)
+        : 0;
+
+    int64_t duration_ms = profile->GetDurationMs();
+
+    // Get current system memory state
+    MemoryInfo mem_info = GetMemoryInfo();
+    size_t sys_memavail_mb = mem_info.mem_available / (1024 * 1024);
+
+    // Log the flush profile
+    LogDebug(BCLog::MEMPRESSURE, "Flush profile: cache_size=%zu MB, overhead=%zu MB, duration=%lld ms, "
+             "pre_flush=%zu MB, peak=%zu MB, post_flush=%zu MB, sys_memavail=%zu MB\n",
+             cache_size_mb, overhead_mb, (long long)duration_ms,
+             profile->pre_flush_memory_mb, profile->peak_memory_mb, profile->post_flush_memory_mb, sys_memavail_mb);
+}

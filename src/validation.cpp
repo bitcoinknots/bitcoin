@@ -56,7 +56,7 @@
 #include <util/fs_helpers.h>
 #include <util/hasher.h>
 #include <util/ioprio.h>
-#include <util/mempressure.h>
+#include <util/systemmemory.h>
 #include <util/moneystr.h>
 #include <util/rbf.h>
 #include <util/result.h>
@@ -3148,20 +3148,28 @@ bool Chainstate::FlushStateToDisk(
             if (cache_state >= CoinsCacheSizeState::CRITICAL) {
                 // The cache is over the limit, we have to write now.
                 fCacheCritical = true;
-            } else if (SystemNeedsMemoryReleased()) {
-                fCacheCritical = true;
             }
         }
         // It's been a while since we wrote the block index and chain state to disk. Do this frequently, so we don't need to redownload or reindex after a crash.
         bool fPeriodicWrite = mode == FlushStateMode::PERIODIC && nNow >= m_next_write;
         // Combine all conditions that result in a write to disk.
         bool should_write = (mode == FlushStateMode::ALWAYS) || fCacheLarge || fCacheCritical || fPeriodicWrite || fFlushForPrune;
+
         // Write blocks, block index and best chain related state to disk.
         if (should_write) {
             // Ensure we can write block index
             if (!CheckDiskSpace(m_blockman.m_opts.blocks_dir)) {
                 return FatalError(m_chainman.GetNotifications(), state, _("Disk space is too low!"));
             }
+
+            // Pause memory pressure checks during the flush operation
+            PauseMemoryPressureChecks();
+
+            // Start profiling memory usage during entire flush operation
+            if (g_memory_profiler) {
+                g_memory_profiler->StartFlushProfiling();
+            }
+
             {
                 LOG_TIME_MILLIS_WITH_CATEGORY("write block and undo data to disk", BCLog::BENCH);
 
@@ -3199,9 +3207,6 @@ bool Chainstate::FlushStateToDisk(
                            coins_mem_usage / (1024.0 * 1024.0));
             }
 
-            // Pause memory pressure checks during the flush/sync operation
-            PauseMemoryPressureChecks();
-
             LOG_TIME_MILLIS_WITH_CATEGORY(strprintf("write coins cache to disk (%d coins, %.2fKiB)",
                 coins_count, coins_mem_usage >> 10), BCLog::BENCH);
 
@@ -3223,6 +3228,14 @@ bool Chainstate::FlushStateToDisk(
                    (uint64_t)coins_count,
                    (uint64_t)coins_mem_usage,
                    (bool)fFlushForPrune);
+
+            // Stop profiling and report flush overhead to mempressure
+            if (g_memory_profiler) {
+                auto profile = g_memory_profiler->StopFlushProfiling();
+                if (profile) {
+                    ReportFlushProfile(std::move(profile), coins_mem_usage);
+                }
+            }
 
             // Resume memory pressure checks after the flush/sync completes
             ResumeMemoryPressureChecks();

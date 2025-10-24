@@ -81,7 +81,7 @@
 #include <util/check.h>
 #include <util/fs.h>
 #include <util/fs_helpers.h>
-#include <util/mempressure.h>
+#include <util/systemmemory.h>
 #include <util/moneystr.h>
 #include <util/result.h>
 #include <util/signalinterrupt.h>
@@ -403,6 +403,7 @@ void Shutdown(NodeContext& node)
     node.chainman.reset();
     node.validation_signals.reset();
     node.scheduler.reset();
+    g_memory_profiler.reset();
     node.ecc_context.reset();
     node.kernel.reset();
 
@@ -1453,7 +1454,11 @@ static ChainstateLoadResult InitAndLoadChainstate(
     }
     LogPrintf("* Using %.1f MiB for in-memory UTXO set (plus up to %.1f MiB of unused mempool space)\n", cache_sizes.coins * (1.0 / 1024 / 1024), mempool_opts.max_size_bytes * (1.0 / 1024 / 1024));
 
-    if (gArgs.IsArgSet("-lowmem")) {
+    // Initialize memory pressure threshold
+    if (!gArgs.IsArgSet("-lowmem")) {
+        size_t batch_size_bytes = gArgs.GetIntArg("-dbbatchsize", nDefaultDbBatchSize);
+        InitializeMemoryThreshold(batch_size_bytes);
+    } else {
         g_low_memory_threshold = gArgs.GetIntArg("-lowmem", 0 /* not used */) * 1024 * 1024;
     }
     if (g_low_memory_threshold > 0) {
@@ -1605,11 +1610,21 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         }
     }, std::chrono::minutes{5});
 
-    // Check system memory pressure every 10 seconds.
-    // Updates g_system_needs_memory_released flag used by FlushStateToDisk.
-    scheduler.scheduleEvery([]{
+    // Initialize memory profiler for tracking flush overhead
+    assert(!g_memory_profiler);
+    g_memory_profiler = std::make_unique<MemoryProfiler>();
+
+    // Check system memory pressure every 5 seconds.
+    // If pressure detected, directly force flush to avoid OOM.
+    scheduler.scheduleEvery([&node]{
         CheckMemoryPressure();
-    }, std::chrono::seconds{10});
+        if (!node.chainman) return;  // Safety check during startup/shutdown
+        if (SystemNeedsMemoryReleased()) {
+            LogDebug(BCLog::MEMPRESSURE, "Memory pressure detected by scheduler - forcing immediate flush\n");
+            ResetMemoryPressure();
+            node.chainman->ActiveChainstate().ForceFlushStateToDisk();
+        }
+    }, std::chrono::seconds{5});
 
     if (args.GetBoolArg("-logratelimit", BCLog::DEFAULT_LOGRATELIMIT)) {
         LogInstance().SetRateLimiting(BCLog::LogRateLimiter::Create(
