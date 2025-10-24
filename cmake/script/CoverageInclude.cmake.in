@@ -26,10 +26,17 @@ set(LCOV_COMMAND ${LCOV_EXECUTABLE} --gcov-tool ${CMAKE_CURRENT_LIST_DIR}/cov_to
 find_program(GENHTML_EXECUTABLE genhtml REQUIRED)
 
 # HTML_OPTS is optionally passed via -D flag.
-# If HTML_OPTS is not provided, implicitly pass LCOV_OPTS to genhtml.
+# If HTML_OPTS is not provided at all, implicitly pass LCOV_OPTS to genhtml.
+# If HTML_OPTS is provided but empty (e.g. -DHTML_OPTS=""), use an empty list
+# and do NOT inherit LCOV_OPTS.
+set(_HTML_OPTS_WAS_DEFINED FALSE)
+if(DEFINED HTML_OPTS)
+  set(_HTML_OPTS_WAS_DEFINED TRUE)
+endif()
 separate_arguments(HTML_OPTS)
-set(GENHTML_OPTS ${HTML_OPTS})
-if(NOT GENHTML_OPTS)
+if(_HTML_OPTS_WAS_DEFINED)
+  set(GENHTML_OPTS ${HTML_OPTS})
+else()
   set(GENHTML_OPTS ${LCOV_OPTS})
 endif()
 set(GENHTML_COMMAND ${GENHTML_EXECUTABLE} --show-details ${GENHTML_OPTS})
