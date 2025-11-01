@@ -51,6 +51,9 @@ std::optional<Consensus::BuriedDeployment> GetBuriedDeployment(const std::string
         return Consensus::BuriedDeployment::DEPLOYMENT_CLTV;
     } else if (name == "csv") {
         return Consensus::BuriedDeployment::DEPLOYMENT_CSV;
+    } else if (name == "reduced_data") {
+        return Consensus::BuriedDeployment::DEPLOYMENT_REDUCED_DATA;
     }
+
     return std::nullopt;
 }
