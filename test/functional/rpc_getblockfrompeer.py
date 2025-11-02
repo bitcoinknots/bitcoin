@@ -6,6 +6,7 @@
 
 from test_framework.authproxy import JSONRPCException
 from test_framework.messages import (
+    NODE_BIP148,
     CBlock,
     from_hex,
     msg_block,

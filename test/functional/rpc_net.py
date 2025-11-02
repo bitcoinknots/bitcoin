@@ -13,6 +13,10 @@ import platform
 import time
 
 import test_framework.messages
+from test_framework.messages import (
+    NODE_NETWORK,
+    NODE_WITNESS,
+)
 from test_framework.p2p import (
     P2PInterface,
     P2P_SERVICES,
@@ -315,7 +319,8 @@ class NetTest(BitcoinTestFramework):
         assert_greater_than(10000, len(node_addresses))
         for a in node_addresses:
             assert_greater_than(a["time"], 1527811200)  # 1st June 2018
-            assert_equal(a["services"], P2P_SERVICES)
+            # addpeeraddress stores addresses with default services (NODE_NETWORK | NODE_WITNESS)
+            assert_equal(a["services"], NODE_NETWORK | NODE_WITNESS)
             assert a["address"] in imported_addrs
             assert_equal(a["port"], 8333)
             assert_equal(a["network"], "ipv4")
@@ -326,7 +331,8 @@ class NetTest(BitcoinTestFramework):
         assert_equal(res[0]["address"], ipv6_addr)
         assert_equal(res[0]["network"], "ipv6")
         assert_equal(res[0]["port"], 8333)
-        assert_equal(res[0]["services"], P2P_SERVICES)
+        # addpeeraddress stores addresses with default services (NODE_NETWORK | NODE_WITNESS)
+        assert_equal(res[0]["services"], NODE_NETWORK | NODE_WITNESS)
 
         # Test for the absence of onion, I2P and CJDNS addresses.
         for network in ["onion", "i2p", "cjdns"]:
