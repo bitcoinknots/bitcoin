@@ -155,6 +155,13 @@ enum : uint32_t {
     SCRIPT_VERIFY_END_MARKER
 };
 
+static constexpr unsigned int REDUCED_DATA_MANDATORY_VERIFY_FLAGS{0
+    | SCRIPT_VERIFY_REDUCED_DATA
+    | SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM
+    | SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_TAPROOT_VERSION
+    | SCRIPT_VERIFY_DISCOURAGE_OP_SUCCESS
+};
+
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError* serror);
 
 struct PrecomputedTransactionData
