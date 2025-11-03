@@ -17,7 +17,6 @@ from test_framework.blocktools import (
         create_coinbase
 )
 from test_framework.messages import (
-    NODE_BIP148,
     CBlockHeader,
     from_hex,
     msg_headers,

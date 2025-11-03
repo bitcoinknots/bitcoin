@@ -8,7 +8,6 @@ import random
 import time
 
 from test_framework.messages import (
-    NODE_BIP148,
     CBlockHeader,
     CInv,
     MAX_HEADERS_RESULTS,

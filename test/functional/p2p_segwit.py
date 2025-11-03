@@ -13,7 +13,6 @@ from test_framework.blocktools import (
     create_coinbase,
 )
 from test_framework.messages import (
-    NODE_BIP148,
     MAX_BIP125_RBF_SEQUENCE,
     CBlockHeader,
     CInv,
