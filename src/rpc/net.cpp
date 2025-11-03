@@ -1057,7 +1057,7 @@ static RPCHelpMan addpeeraddress()
 
     if (net_addr.has_value()) {
         CService service{net_addr.value(), port};
-        CAddress address{MaybeFlipIPv6toCJDNS(service), ServiceFlags{NODE_NETWORK | NODE_WITNESS | NODE_BIP148}};
+        CAddress address{MaybeFlipIPv6toCJDNS(service), ServiceFlags{NODE_NETWORK | NODE_WITNESS | NODE_BIP444}};
         address.nTime = Now<NodeSeconds>();
         // The source address is set equal to the address. This is equivalent to the peer
         // announcing itself.

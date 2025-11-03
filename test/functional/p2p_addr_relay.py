@@ -11,7 +11,7 @@ import time
 
 from test_framework.messages import (
     CAddress,
-    NODE_BIP148,
+    NODE_BIP444,
     NODE_NETWORK,
     NODE_WITNESS,
     msg_addr,
@@ -55,7 +55,7 @@ class AddrReceiver(P2PInterface):
             if self.test_addr_contents:
                 # relay_tests checks the content of the addr messages match
                 # expectations based on the message creation in setup_addr_msg
-                assert_equal(addr.nServices, NODE_NETWORK | NODE_WITNESS | NODE_BIP148)
+                assert_equal(addr.nServices, NODE_NETWORK | NODE_WITNESS | NODE_BIP444)
                 if not 8333 <= addr.port < 8343:
                     raise AssertionError("Invalid addr.port of {} (8333-8342 expected)".format(addr.port))
                 assert addr.ip.startswith('123.123.')

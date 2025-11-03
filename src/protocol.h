@@ -347,8 +347,8 @@ enum ServiceFlags : uint64_t {
 
     NODE_REPLACE_BY_FEE = (1 << 26),
 
-    // NODE_BIP148 means the node enforces BIP 148's mandatory Segwit activation beginning August 1, 2017
-    NODE_BIP148 = (1 << 27),
+    // NODE_BIP444 means the node enforces BIP 444 rules as applicable
+    NODE_BIP444 = (1 << 27),
 
     NODE_MALICIOUS = (1 << 29),
 };
