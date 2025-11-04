@@ -91,7 +91,8 @@ class TestNode():
         self.stderr_dir = self.datadir_path / "stderr"
         self.chain = chain
         self.rpchost = rpchost
-        self.rpc_timeout = timewait
+        self.rpc_timeout = timewait  # Already multiplied by timeout_factor
+        self.timeout_factor = timeout_factor
         self.binary = bitcoind
         self.coverage_dir = coverage_dir
         self.cwd = cwd
@@ -151,7 +152,11 @@ class TestNode():
                 self.args.append("-v2transport=0")
         # if v2transport is requested via global flag but not supported for node version, ignore it
 
-        self.cli = TestNodeCLI(bitcoin_cli, self.datadir_path)
+        self.cli = TestNodeCLI(
+            bitcoin_cli,
+            self.datadir_path,
+            self.rpc_timeout // 2,  # timeout identical to the one used in self._rpc
+        )
         self.use_cli = use_cli
         self.start_perf = start_perf
 
@@ -165,7 +170,6 @@ class TestNode():
         self.perf_subprocesses = {}
 
         self.p2ps = []
-        self.timeout_factor = timeout_factor
 
         self.mocktime = None
 
@@ -878,16 +882,17 @@ def arg_to_cli(arg):
 
 class TestNodeCLI():
     """Interface to bitcoin-cli for an individual node"""
-    def __init__(self, binary, datadir):
+    def __init__(self, binary, datadir, rpc_timeout):
         self.options = []
         self.binary = binary
         self.datadir = datadir
+        self.rpc_timeout = rpc_timeout
         self.input = None
         self.log = logging.getLogger('TestFramework.bitcoincli')
 
     def __call__(self, *options, input=None):
         # TestNodeCLI is callable with bitcoin-cli command-line options
-        cli = TestNodeCLI(self.binary, self.datadir)
+        cli = TestNodeCLI(self.binary, self.datadir, self.rpc_timeout)
         cli.options = [str(o) for o in options]
         cli.input = input
         return cli
@@ -908,7 +913,11 @@ class TestNodeCLI():
         """Run bitcoin-cli command. Deserializes returned string as python object."""
         pos_args = [arg_to_cli(arg) for arg in args]
         named_args = [str(key) + "=" + arg_to_cli(value) for (key, value) in kwargs.items()]
-        p_args = [self.binary, f"-datadir={self.datadir}"] + self.options
+        p_args = [
+            self.binary,
+            f"-datadir={self.datadir}",
+            f"-rpcclienttimeout={int(self.rpc_timeout)}",
+        ] + self.options
         if named_args:
             p_args += ["-named"]
         if clicommand is not None:
