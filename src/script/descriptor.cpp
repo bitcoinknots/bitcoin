@@ -1968,7 +1968,7 @@ std::vector<std::unique_ptr<DescriptorImpl>> ParseScript(uint32_t& key_exp_index
                 while (Const("{", expr)) {
                     branches.push_back(false); // new left branch
                     if (branches.size() > TAPROOT_CONTROL_MAX_NODE_COUNT_REDUCED) {
-                        error = strprintf("tr() supports at most %i nesting levels", TAPROOT_CONTROL_MAX_NODE_COUNT);
+                        error = strprintf("tr() supports at most %i nesting levels", TAPROOT_CONTROL_MAX_NODE_COUNT_REDUCED);
                         return {};
                     }
                 }
