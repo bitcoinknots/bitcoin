@@ -150,6 +150,7 @@ BASE_SCRIPTS = [
     'p2p_headers_sync_with_minchainwork.py',
     'p2p_feefilter.py',
     'feature_csv_activation.py',
+    'feature_reduced_data_utxo_height.py',
     'p2p_sendheaders.py',
     'feature_config_args.py',
     'wallet_listtransactions.py --legacy-wallet',
