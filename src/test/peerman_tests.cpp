@@ -36,7 +36,7 @@ BOOST_AUTO_TEST_CASE(connections_desirable_service_flags)
 
     // Check we start connecting to full nodes
     ServiceFlags peer_flags{NODE_WITNESS | NODE_NETWORK_LIMITED};
-    BOOST_CHECK(peerman->GetDesirableServiceFlags(peer_flags) == ServiceFlags(NODE_NETWORK | NODE_WITNESS));
+    BOOST_CHECK(peerman->GetDesirableServiceFlags(peer_flags) == ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_BIP444));
 
     // Make peerman aware of the initial best block and verify we accept limited peers when we start close to the tip time.
     auto tip = WITH_LOCK(::cs_main, return m_node.chainman->ActiveChain().Tip());
@@ -45,15 +45,15 @@ BOOST_AUTO_TEST_CASE(connections_desirable_service_flags)
     peerman->SetBestBlock(tip_block_height, std::chrono::seconds{tip_block_time});
 
     SetMockTime(tip_block_time + 1); // Set node time to tip time
-    BOOST_CHECK(peerman->GetDesirableServiceFlags(peer_flags) == ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS));
+    BOOST_CHECK(peerman->GetDesirableServiceFlags(peer_flags) == ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_BIP444));
 
     // Check we don't disallow limited peers connections when we are behind but still recoverable (below the connection safety window)
     SetMockTime(GetTime<std::chrono::seconds>() + std::chrono::seconds{consensus.nPowTargetSpacing * (NODE_NETWORK_LIMITED_ALLOW_CONN_BLOCKS - 1)});
-    BOOST_CHECK(peerman->GetDesirableServiceFlags(peer_flags) == ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS));
+    BOOST_CHECK(peerman->GetDesirableServiceFlags(peer_flags) == ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_BIP444));
 
     // Check we disallow limited peers connections when we are further than the limited peers safety window
     SetMockTime(GetTime<std::chrono::seconds>() + std::chrono::seconds{consensus.nPowTargetSpacing * 2});
-    BOOST_CHECK(peerman->GetDesirableServiceFlags(peer_flags) == ServiceFlags(NODE_NETWORK | NODE_WITNESS));
+    BOOST_CHECK(peerman->GetDesirableServiceFlags(peer_flags) == ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_BIP444));
 
     // By now, we tested that the connections desirable services flags change based on the node's time proximity to the tip.
     // Now, perform the same tests for when the node receives a block.
@@ -62,15 +62,15 @@ BOOST_AUTO_TEST_CASE(connections_desirable_service_flags)
     // First, verify a block in the past doesn't enable limited peers connections
     // At this point, our time is (NODE_NETWORK_LIMITED_ALLOW_CONN_BLOCKS + 1) * 10 minutes ahead the tip's time.
     mineBlock(m_node, /*block_time=*/std::chrono::seconds{tip_block_time + 1});
-    BOOST_CHECK(peerman->GetDesirableServiceFlags(peer_flags) == ServiceFlags(NODE_NETWORK | NODE_WITNESS));
+    BOOST_CHECK(peerman->GetDesirableServiceFlags(peer_flags) == ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_BIP444));
 
     // Verify a block close to the tip enables limited peers connections
     mineBlock(m_node, /*block_time=*/GetTime<std::chrono::seconds>());
-    BOOST_CHECK(peerman->GetDesirableServiceFlags(peer_flags) == ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS));
+    BOOST_CHECK(peerman->GetDesirableServiceFlags(peer_flags) == ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_BIP444));
 
     // Lastly, verify the stale tip checks can disallow limited peers connections after not receiving blocks for a prolonged period.
     SetMockTime(GetTime<std::chrono::seconds>() + std::chrono::seconds{consensus.nPowTargetSpacing * NODE_NETWORK_LIMITED_ALLOW_CONN_BLOCKS + 1});
-    BOOST_CHECK(peerman->GetDesirableServiceFlags(peer_flags) == ServiceFlags(NODE_NETWORK | NODE_WITNESS));
+    BOOST_CHECK(peerman->GetDesirableServiceFlags(peer_flags) == ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_BIP444));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
