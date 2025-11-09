@@ -2,7 +2,7 @@
 # Copyright (c) 2024 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Test UASF-ReducedData consensus rules (BIP444).
+"""Test UASF-ReducedData consensus rules.
 
 This test verifies all 7 consensus rules enforced by DEPLOYMENT_REDUCED_DATA:
 
@@ -97,7 +97,7 @@ from io import BytesIO
 import struct
 
 
-# Constants from BIP444
+# Constants from UASF-ReducedData specification
 MAX_OUTPUT_SCRIPT_SIZE = 34
 MAX_OUTPUT_DATA_SIZE = 83
 MAX_SCRIPT_ELEMENT_SIZE_REDUCED = 256

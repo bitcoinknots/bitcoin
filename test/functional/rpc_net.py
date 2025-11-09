@@ -14,7 +14,7 @@ import time
 
 import test_framework.messages
 from test_framework.messages import (
-    NODE_BIP444,
+    NODE_UASF_REDUCED_DATA,
     NODE_NETWORK,
     NODE_WITNESS,
 )
@@ -320,8 +320,8 @@ class NetTest(BitcoinTestFramework):
         assert_greater_than(10000, len(node_addresses))
         for a in node_addresses:
             assert_greater_than(a["time"], 1527811200)  # 1st June 2018
-            # addpeeraddress stores addresses with default services (NODE_NETWORK | NODE_WITNESS | NODE_BIP444)
-            assert_equal(a["services"], NODE_NETWORK | NODE_WITNESS | NODE_BIP444)
+            # addpeeraddress stores addresses with default services (NODE_NETWORK | NODE_WITNESS | NODE_UASF_REDUCED_DATA)
+            assert_equal(a["services"], NODE_NETWORK | NODE_WITNESS | NODE_UASF_REDUCED_DATA)
             assert a["address"] in imported_addrs
             assert_equal(a["port"], 8333)
             assert_equal(a["network"], "ipv4")
@@ -332,8 +332,8 @@ class NetTest(BitcoinTestFramework):
         assert_equal(res[0]["address"], ipv6_addr)
         assert_equal(res[0]["network"], "ipv6")
         assert_equal(res[0]["port"], 8333)
-        # addpeeraddress stores addresses with default services (NODE_NETWORK | NODE_WITNESS | NODE_BIP444)
-        assert_equal(res[0]["services"], NODE_NETWORK | NODE_WITNESS | NODE_BIP444)
+        # addpeeraddress stores addresses with default services (NODE_NETWORK | NODE_WITNESS | NODE_UASF_REDUCED_DATA)
+        assert_equal(res[0]["services"], NODE_NETWORK | NODE_WITNESS | NODE_UASF_REDUCED_DATA)
 
         # Test for the absence of onion, I2P and CJDNS addresses.
         for network in ["onion", "i2p", "cjdns"]:
@@ -511,7 +511,7 @@ class NetTest(BitcoinTestFramework):
                         "bucket_position": "82/8",
                         "address": "2.0.0.0",
                         "port": 8333,
-                        "services": NODE_NETWORK | NODE_WITNESS | NODE_BIP444,
+                        "services": NODE_NETWORK | NODE_WITNESS | NODE_UASF_REDUCED_DATA,
                         "network": "ipv4",
                         "source": "2.0.0.0",
                         "source_network": "ipv4",
@@ -520,7 +520,7 @@ class NetTest(BitcoinTestFramework):
                         "bucket_position": "336/24",
                         "address": "fc00:1:2:3:4:5:6:7",
                         "port": 8333,
-                        "services": NODE_NETWORK | NODE_WITNESS | NODE_BIP444,
+                        "services": NODE_NETWORK | NODE_WITNESS | NODE_UASF_REDUCED_DATA,
                         "network": "cjdns",
                         "source": "fc00:1:2:3:4:5:6:7",
                         "source_network": "cjdns",
@@ -529,7 +529,7 @@ class NetTest(BitcoinTestFramework):
                         "bucket_position": "963/46",
                         "address": "c4gfnttsuwqomiygupdqqqyy5y5emnk5c73hrfvatri67prd7vyq.b32.i2p",
                         "port": 8333,
-                        "services": NODE_NETWORK | NODE_WITNESS | NODE_BIP444,
+                        "services": NODE_NETWORK | NODE_WITNESS | NODE_UASF_REDUCED_DATA,
                         "network": "i2p",
                         "source": "c4gfnttsuwqomiygupdqqqyy5y5emnk5c73hrfvatri67prd7vyq.b32.i2p",
                         "source_network": "i2p",
@@ -537,7 +537,7 @@ class NetTest(BitcoinTestFramework):
                     {
                         "bucket_position": "613/6",
                         "address": "2803:0:1234:abcd::1",
-                        "services": NODE_NETWORK | NODE_WITNESS | NODE_BIP444,
+                        "services": NODE_NETWORK | NODE_WITNESS | NODE_UASF_REDUCED_DATA,
                         "network": "ipv6",
                         "source": "2803:0:1234:abcd::1",
                         "source_network": "ipv6",
@@ -549,7 +549,7 @@ class NetTest(BitcoinTestFramework):
                         "bucket_position": "6/33",
                         "address": "1.2.3.4",
                         "port": 8333,
-                        "services": NODE_NETWORK | NODE_WITNESS | NODE_BIP444,
+                        "services": NODE_NETWORK | NODE_WITNESS | NODE_UASF_REDUCED_DATA,
                         "network": "ipv4",
                         "source": "1.2.3.4",
                         "source_network": "ipv4",
@@ -558,7 +558,7 @@ class NetTest(BitcoinTestFramework):
                         "bucket_position": "197/34",
                         "address": "1233:3432:2434:2343:3234:2345:6546:4534",
                         "port": 8333,
-                        "services": NODE_NETWORK | NODE_WITNESS | NODE_BIP444,
+                        "services": NODE_NETWORK | NODE_WITNESS | NODE_UASF_REDUCED_DATA,
                         "network": "ipv6",
                         "source": "1233:3432:2434:2343:3234:2345:6546:4534",
                         "source_network": "ipv6",
@@ -567,7 +567,7 @@ class NetTest(BitcoinTestFramework):
                         "bucket_position": "72/61",
                         "address": "pg6mmjiyjmcrsslvykfwnntlaru7p5svn6y2ymmju6nubxndf4pscryd.onion",
                         "port": 8333,
-                        "services": NODE_NETWORK | NODE_WITNESS | NODE_BIP444,
+                        "services": NODE_NETWORK | NODE_WITNESS | NODE_UASF_REDUCED_DATA,
                         "network": "onion",
                         "source": "pg6mmjiyjmcrsslvykfwnntlaru7p5svn6y2ymmju6nubxndf4pscryd.onion",
                         "source_network": "onion"
@@ -575,7 +575,7 @@ class NetTest(BitcoinTestFramework):
                     {
                         "bucket_position": "139/46",
                         "address": "nrfj6inpyf73gpkyool35hcmne5zwfmse3jl3aw23vk7chdemalyaqad.onion",
-                        "services": NODE_NETWORK | NODE_WITNESS | NODE_BIP444,
+                        "services": NODE_NETWORK | NODE_WITNESS | NODE_UASF_REDUCED_DATA,
                         "network": "onion",
                         "source": "nrfj6inpyf73gpkyool35hcmne5zwfmse3jl3aw23vk7chdemalyaqad.onion",
                         "source_network": "onion",
