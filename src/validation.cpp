@@ -2896,7 +2896,10 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
     CCheckQueueControl<CScriptCheck> control(fScriptChecks && parallel_script_checks ? &m_chainman.GetCheckQueue() : nullptr);
     std::vector<PrecomputedTransactionData> txsdata(block.vtx.size());
 
-    const auto reduced_data_start_height{params.GetConsensus().ReducedDataHeightBegin};
+    // For BIP9 deployments, get the activation height dynamically
+    const auto reduced_data_start_height = DeploymentActiveAt(*pindex, m_chainman, Consensus::DEPLOYMENT_REDUCED_DATA)
+        ? m_chainman.m_versionbitscache.StateSinceHeight(pindex->pprev, params.GetConsensus(), Consensus::DEPLOYMENT_REDUCED_DATA)
+        : std::numeric_limits<int>::max();
 
     const auto chk_input_rules{DeploymentActiveAt(*pindex, m_chainman, Consensus::DEPLOYMENT_REDUCED_DATA) ? CheckTxInputsRules::OutputSizeLimit : CheckTxInputsRules::None};
 

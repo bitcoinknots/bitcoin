@@ -1018,7 +1018,7 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
         // when attempting to mine with this template
         aRules.push_back("!signet");
     }
-    if (DeploymentActiveAfter(pindexPrev, consensusParams, Consensus::BuriedDeployment::DEPLOYMENT_REDUCED_DATA, chainman.m_versionbitscache)) {
+    if (DeploymentActiveAfter(pindexPrev, consensusParams, Consensus::DEPLOYMENT_REDUCED_DATA, chainman.m_versionbitscache)) {
         aRules.push_back("reduced_data");
     }
 

@@ -26,13 +26,13 @@ enum BuriedDeployment : int16_t {
     DEPLOYMENT_DERSIG,
     DEPLOYMENT_CSV,
     DEPLOYMENT_SEGWIT,
-    DEPLOYMENT_REDUCED_DATA,
 };
-constexpr bool ValidDeployment(BuriedDeployment dep) { return dep <= DEPLOYMENT_REDUCED_DATA; }
+constexpr bool ValidDeployment(BuriedDeployment dep) { return dep <= DEPLOYMENT_SEGWIT; }
 
 enum DeploymentPos : uint16_t {
     DEPLOYMENT_TESTDUMMY,
     DEPLOYMENT_TAPROOT, // Deployment of Schnorr/Taproot (BIPs 340-342)
+    DEPLOYMENT_REDUCED_DATA, // Temporary deployment of UASF-ReducedData
     // NOTE: Also add new deployments to VersionBitsDeploymentInfo in deploymentinfo.cpp
     MAX_VERSION_BITS_DEPLOYMENTS
 };
@@ -53,6 +53,9 @@ struct BIP9Deployment {
      *  boundary.
      */
     int min_activation_height{0};
+    /** For temporary softforks: number of blocks the deployment remains active after activation.
+     *  0 means permanent (never expires). */
+    int active_duration{0};
 
     /** Constant for nTimeout very far in the future. */
     static constexpr int64_t NO_TIMEOUT = std::numeric_limits<int64_t>::max();
@@ -150,8 +153,6 @@ struct Params {
             return CSVHeight;
         case DEPLOYMENT_SEGWIT:
             return SegwitHeight;
-        case DEPLOYMENT_REDUCED_DATA:
-            return ReducedDataHeightBegin;
         } // no default case, so the compiler can warn about missing cases
         return std::numeric_limits<int>::max();
     }
@@ -166,8 +167,6 @@ struct Params {
         case DEPLOYMENT_SEGWIT:
             // These are forever
             break;
-        case DEPLOYMENT_REDUCED_DATA:
-            return ReducedDataHeightEnd;
         } // no default case, so the compiler can warn about missing cases
         return std::numeric_limits<int>::max();
     }

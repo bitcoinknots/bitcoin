@@ -77,8 +77,8 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
 
     for (const std::string& strDeployment : args.GetArgs("-vbparams")) {
         std::vector<std::string> vDeploymentParams = SplitString(strDeployment, ':');
-        if (vDeploymentParams.size() < 3 || 4 < vDeploymentParams.size()) {
-            throw std::runtime_error("Version bits parameters malformed, expecting deployment:start:end[:min_activation_height]");
+        if (vDeploymentParams.size() < 3 || 5 < vDeploymentParams.size()) {
+            throw std::runtime_error("Version bits parameters malformed, expecting deployment:start:end[:min_activation_height[:active_duration]]");
         }
         CChainParams::VersionBitsParameters vbparams{};
         if (!ParseInt64(vDeploymentParams[1], &vbparams.start_time)) {
@@ -94,12 +94,19 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         } else {
             vbparams.min_activation_height = 0;
         }
+        if (vDeploymentParams.size() >= 5) {
+            if (!ParseInt32(vDeploymentParams[4], &vbparams.active_duration)) {
+                throw std::runtime_error(strprintf("Invalid active_duration (%s)", vDeploymentParams[4]));
+            }
+        } else {
+            vbparams.active_duration = 0;
+        }
         bool found = false;
         for (int j=0; j < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; ++j) {
             if (vDeploymentParams[0] == VersionBitsDeploymentInfo[j].name) {
                 options.version_bits_parameters[Consensus::DeploymentPos(j)] = vbparams;
                 found = true;
-                LogPrintf("Setting version bits activation parameters for %s to start=%ld, timeout=%ld, min_activation_height=%d\n", vDeploymentParams[0], vbparams.start_time, vbparams.timeout, vbparams.min_activation_height);
+                LogPrintf("Setting version bits activation parameters for %s to start=%ld, timeout=%ld, min_activation_height=%d, active_duration=%d\n", vDeploymentParams[0], vbparams.start_time, vbparams.timeout, vbparams.min_activation_height, vbparams.active_duration);
                 break;
             }
         }
