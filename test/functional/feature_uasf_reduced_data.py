@@ -112,11 +112,11 @@ class UASFReducedDataTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        # Activate DEPLOYMENT_REDUCED_DATA at height 1
-        # This ensures all tests run with REDUCED_DATA rules enforced
+        # Make DEPLOYMENT_REDUCED_DATA always active (from block 0)
+        # Using start_time=-1 (ALWAYS_ACTIVE) bypasses BIP9 state machine
         self.extra_args = [[
+            '-vbparams=reduced_data:-1:999999999999:0',
             '-acceptnonstdtxn=1',
-            '-testactivationheight=reduced_data@1',
         ]]
 
     def init_test(self):
@@ -336,7 +336,7 @@ class UASFReducedDataTest(BitcoinTestFramework):
         result = node.testmempoolaccept([spending_tx.serialize().hex()])[0]
         assert_equal(result['allowed'], False)
         # Rejection happens during script verification
-        assert any(x in result['reject-reason'] for x in ['mandatory-script-verify-flag', 'witness-program', 'bad-witness', 'discouraged'])
+        assert any(x in result['reject-reason'] for x in ['mempool-script-verify-flag', 'witness-program', 'bad-witness', 'discouraged'])
         self.log.info(f"  ✓ Witness v{version} spending correctly rejected ({result['reject-reason']})")
 
         # All undefined versions (v2-v16) are validated identically
