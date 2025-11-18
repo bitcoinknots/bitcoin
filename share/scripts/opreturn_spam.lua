@@ -1,9 +1,9 @@
 -- Chained OP_RETURN Spam Detector for Bitcoin Knots
--- Detects data embedding via chained OP_RETURN outputs with 0x01bc magic prefix
+-- Detects data embedding via chained OP_RETURN outputs with "444" magic prefix
 -- Compatible with Bitcoin Knots PR #119 modular filter system
 
--- Knotwork/444 magic prefix
-local KNOTWORK_MAGIC = {0x01, 0xbc}
+-- Knotwork/444 magic prefix (ASCII "444" = 0x34 0x34 0x34)
+local KNOTWORK_MAGIC = {0x34, 0x34, 0x34}
 
 local function extract_opreturn_data(script_pubkey)
     if #script_pubkey < 2 then
@@ -46,24 +46,25 @@ local function extract_opreturn_data(script_pubkey)
 end
 
 local function has_magic_prefix(data)
-    if not data or #data < 2 then
+    if not data or #data < 3 then
         return false
     end
-    
+
     local byte1 = string.byte(data, 1)
     local byte2 = string.byte(data, 2)
-    
-    return byte1 == KNOTWORK_MAGIC[1] and byte2 == KNOTWORK_MAGIC[2]
+    local byte3 = string.byte(data, 3)
+
+    return byte1 == KNOTWORK_MAGIC[1] and byte2 == KNOTWORK_MAGIC[2] and byte3 == KNOTWORK_MAGIC[3]
 end
 
 local function get_chunk_info(data)
-    if not data or #data < 4 then
+    if not data or #data < 5 then
         return nil
     end
-    
+
     return {
-        chunk_index = string.byte(data, 3),
-        total_chunks = string.byte(data, 4)
+        chunk_index = string.byte(data, 4),
+        total_chunks = string.byte(data, 5)
     }
 end
 

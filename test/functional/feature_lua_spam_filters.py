@@ -122,9 +122,9 @@ class LuaSpamFiltersTest(BitcoinTestFramework):
         tx_info = wallet.create_self_transfer()
         tx = tx_info['tx']
 
-        # Knotwork magic prefix: 0x01bc (which is "444" in some encoding)
+        # Knotwork magic prefix: ASCII "444" = 0x34 0x34 0x34
         # This is the magic number that the Lua filter looks for
-        knotwork_magic = bytes([0x01, 0xbc])
+        knotwork_magic = bytes([0x34, 0x34, 0x34])
         spam_data = knotwork_magic + b"some spam data here" * 3
 
         # Add an OP_RETURN output with spam data
