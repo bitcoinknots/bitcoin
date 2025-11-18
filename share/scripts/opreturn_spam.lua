@@ -73,7 +73,6 @@ function validate(tx, ctx)
     local outputs = tx:get_outputs()
     local opreturn_outputs = {}
     local has_magic = false
-    local has_chain_pattern = false
     local largest_opreturn = 0
     local details = {}
     
@@ -129,36 +128,12 @@ function validate(tx, ctx)
         end
     end
     
-    -- Check for continuation output pattern (small value output for chaining)
-    local has_continuation = false
-    for _, output in ipairs(outputs) do
-        local value = output:get_value()
-        if value > 0 and value < 15000 then
-            has_continuation = true
-            break
-        end
-    end
-    
-    if has_continuation and #opreturn_outputs > 0 then
-        has_chain_pattern = true
-        details.has_continuation = true
-    end
-    
     -- Detect knotwork magic prefix (high confidence)
     if has_magic then
         return {
             accept = false,
             score = 95,
             reason = "Knotwork magic prefix (444) detected in OP_RETURN data"
-        }
-    end
-    
-    -- Detect chained OP_RETURN pattern (medium confidence)
-    if has_chain_pattern then
-        return {
-            accept = false,
-            score = 60,
-            reason = "Chained OP_RETURN pattern with continuation output"
         }
     end
     
