@@ -1465,8 +1465,33 @@ AM_CONDITIONAL([EMBEDDED_LIBSECP256K1],[test x$system_libsecp256k1 = xno])
 AC_SUBST(libsecp256k1_CFLAGS)
 AC_SUBST(libsecp256k1_LIBS)
 
-CPPFLAGS="-I/opt/homebrew/opt/lua/include/lua $CPPFLAGS"
-LIBS="-L/opt/homebrew/opt/lua/lib -llua -lm $LIBS"
+dnl Check for Lua using pkg-config
+PKG_CHECK_MODULES([LUA], [lua5.4], [
+  CPPFLAGS="$LUA_CFLAGS $CPPFLAGS"
+  LIBS="$LUA_LIBS $LIBS"
+], [
+  PKG_CHECK_MODULES([LUA], [lua5.3], [
+    CPPFLAGS="$LUA_CFLAGS $CPPFLAGS"
+    LIBS="$LUA_LIBS $LIBS"
+  ], [
+    dnl Fallback: Try homebrew on macOS, system paths on Linux
+    case $host_os in
+      darwin*)
+        dnl macOS - try homebrew
+        CPPFLAGS="-I/opt/homebrew/opt/lua/include/lua $CPPFLAGS"
+        LIBS="-L/opt/homebrew/opt/lua/lib -llua -lm $LIBS"
+        ;;
+      linux*)
+        dnl Linux - try common system paths
+        CPPFLAGS="-I/usr/include/lua5.4 $CPPFLAGS"
+        LIBS="-llua5.4 -lm $LIBS"
+        ;;
+      *)
+        AC_MSG_ERROR([Lua not found. Please install lua5.4-dev or lua5.3-dev])
+        ;;
+    esac
+  ])
+])
 
 if test "$enable_wallet" != "no"; then
     dnl Check for libdb_cxx only if wallet enabled

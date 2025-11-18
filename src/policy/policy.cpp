@@ -8,6 +8,7 @@
 #include <policy/policy.h>
 
 #include <coins.h>
+#include <common/args.h>
 #include <consensus/amount.h>
 #include <consensus/consensus.h>
 #include <consensus/validation.h>
@@ -20,6 +21,7 @@
 #include <script/solver.h>
 #include <serialize.h>
 #include <sol/sol.hpp>
+#include <policy/lua_bindings.h>
 #include <span.h>
 
 #include <algorithm>
@@ -37,7 +39,10 @@ void EnsureLuaInit()
 {
     if(lua_init) return;
 
-    lua.open_libraries(sol::lib::base, sol::lib::package);
+    lua.open_libraries(sol::lib::base, sol::lib::package, sol::lib::string, sol::lib::math, sol::lib::table);
+
+    // Register Bitcoin transaction bindings for Lua scripts
+    LuaBindings::RegisterBindings(lua);
 
     lua_init = true;
 }
@@ -213,16 +218,49 @@ bool IsStandardTx(const CTransaction& tx, const kernel::MemPoolOptions& opts, st
 
         // TODO: Make script path configuration option
         // TODO: Order scripts in some way (e.g., by name)
-        for (const auto& entry : std::filesystem::directory_iterator("/Users/jfoura/CLionProjects/bitcoin/scripts/")) {
-            // TODO: Pass tx, opts as parameters (in some form) to the script
-            bool accept = lua.script_file(entry.path());
+        std::filesystem::path scripts_dir = gArgs.GetDataDirNet() / "scripts";
+        if (!std::filesystem::exists(scripts_dir)) {
+            out_reason = std::string("Lua scripts directory does not exist: ") + scripts_dir.string();
+            return false;
+        }
 
-            if(!accept)
-            {
-                out_reason = std::string("TX was rejected by script: ") + entry.path().string();
+        // Create transaction and context wrappers to pass to Lua scripts
+        LuaBindings::TransactionWrapper tx_wrapper(tx);
+        LuaBindings::ContextWrapper ctx_wrapper;
 
+        for (const auto& entry : std::filesystem::directory_iterator(scripts_dir)) {
+            // Skip non-Lua files
+            if (entry.path().extension() != ".lua") {
+                continue;
+            }
+
+            try {
+                // Load the Lua module
+                sol::table module = lua.script_file(entry.path());
+
+                // Get the validate function from the module
+                sol::optional<sol::function> validate_func = module["validate"];
+                if (!validate_func) {
+                    out_reason = std::string("Lua script missing validate function: ") + entry.path().string();
+                    return false;
+                }
+
+                // Call validate(tx, ctx)
+                sol::table result = (*validate_func)(tx_wrapper, ctx_wrapper);
+
+                // Check if transaction was accepted
+                sol::optional<bool> accept = result["accept"];
+                if (!accept || !*accept) {
+                    sol::optional<std::string> reason = result["reason"];
+                    out_reason = reason ? *reason : "rejected by script";
+                    out_reason = std::string("Rejected by script (") + entry.path().filename().string() + "): " + out_reason;
+
+                    std::cout << out_reason << std::endl;
+                    return false;
+                }
+            } catch (const sol::error& e) {
+                out_reason = std::string("Lua script error in ") + entry.path().string() + ": " + e.what();
                 std::cout << out_reason << std::endl;
-
                 return false;
             }
         }
