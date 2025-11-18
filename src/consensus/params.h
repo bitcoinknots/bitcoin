@@ -52,6 +52,10 @@ struct BIP9Deployment {
      *  boundary.
      */
     int min_activation_height{0};
+    /** Maximum height for activation. If less than INT_MAX, the deployment will activate
+     *  at this height regardless of signaling (similar to BIP8 flag day).
+     *  std::numeric_limits<int>::max() means no maximum (activation only via signaling). */
+    int max_activation_height{std::numeric_limits<int>::max()};
     /** For temporary softforks: number of blocks the deployment remains active after activation.
      *  std::numeric_limits<int>::max() means permanent (never expires). */
     int active_duration{std::numeric_limits<int>::max()};

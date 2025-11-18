@@ -11,6 +11,7 @@ ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex*
     int nPeriod = Period(params);
     int nThreshold = Threshold(params);
     int min_activation_height = MinActivationHeight(params);
+    int max_activation_height = MaxActivationHeight(params);
     int64_t nTimeStart = BeginTime(params);
     int64_t nTimeTimeout = EndTime(params);
 
@@ -74,8 +75,15 @@ ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex*
                     pindexCount = pindexCount->pprev;
                 }
                 if (count >= nThreshold) {
+                    // Normal BIP9 activation via signaling
+                    stateNext = ThresholdState::LOCKED_IN;
+                } else if (max_activation_height < std::numeric_limits<int>::max() && pindexPrev->nHeight + 1 >= max_activation_height - nPeriod) {
+                    // Force LOCKED_IN one period before max_activation_height
+                    // This ensures activation happens AT max_activation_height (not one period later)
+                    // Overrides timeout to guarantee activation
                     stateNext = ThresholdState::LOCKED_IN;
                 } else if (pindexPrev->GetMedianTimePast() >= nTimeTimeout) {
+                    // Timeout without activation
                     stateNext = ThresholdState::FAILED;
                 }
                 break;
@@ -185,6 +193,7 @@ protected:
     int64_t BeginTime(const Consensus::Params& params) const override { return params.vDeployments[id].nStartTime; }
     int64_t EndTime(const Consensus::Params& params) const override { return params.vDeployments[id].nTimeout; }
     int MinActivationHeight(const Consensus::Params& params) const override { return params.vDeployments[id].min_activation_height; }
+    int MaxActivationHeight(const Consensus::Params& params) const override { return params.vDeployments[id].max_activation_height; }
     int Period(const Consensus::Params& params) const override { return params.nMinerConfirmationWindow; }
     int Threshold(const Consensus::Params& params) const override { return params.nRuleChangeActivationThreshold; }
 
