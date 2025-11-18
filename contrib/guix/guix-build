@@ -82,7 +82,8 @@ check_source_date_epoch
 # Default to building for all supported HOSTs (overridable by environment)
 export HOSTS="${HOSTS:-x86_64-linux-gnu arm-linux-gnueabihf aarch64-linux-gnu riscv64-linux-gnu powerpc64-linux-gnu powerpc64le-linux-gnu
                        x86_64-w64-mingw32
-                       x86_64-apple-darwin arm64-apple-darwin}"
+                       x86_64-apple-darwin arm64-apple-darwin
+                       docker-x86_64-linux docker-aarch64-linux}"
 
 # Usage: distsrc_for_host HOST
 #
@@ -301,6 +302,12 @@ mkdir -p "$OUTDIR_BASE"
 # Download the depends sources now as we won't have internet access in the build
 # container
 for host in $HOSTS; do
+    case "$host" in
+        docker*)
+            # No need to download depends sources for docker builds
+            continue
+            ;;
+    esac
     make -C "${PWD}/depends" -j"$JOBS" download-"$(host_to_commonname "$host")" ${V:+V=1} ${SOURCES_PATH:+SOURCES_PATH="$SOURCES_PATH"}
 done
 
@@ -352,6 +359,33 @@ for host in $HOSTS; do
     # Display proper warning when the user interrupts the build
     trap 'int_trap ${host}' INT
 
+    if [[ "$host" == docker* ]]; then
+        mkdir -p "$OUTDIR_BASE/docker"
+    fi
+
+    case "$host" in
+        docker*)
+            echo "Building docker image for ${host#docker-}"
+            dockerpath=$(VERSION="${VERSION}" \
+                guix time-machine -C "${PWD}"/contrib/guix/docker/channels.scm -- \
+                pack -L "${PWD}"/contrib/guix/docker \
+                -f docker \
+                --system="${host#docker-}" \
+                --entry-point=bin/bitcoind \
+                --with-git-url=bitcoin-knots=file://"${PWD}" \
+                bitcoin-knots \
+                | tee /dev/tty | tail -n1)
+            if [ -n "$dockerpath" ]; then
+                cp "$dockerpath" "$OUTDIR_BASE/docker/${DISTNAME}-${host}.tar.gz"
+                chmod 644 "$OUTDIR_BASE/docker/${DISTNAME}-${host}.tar.gz"
+                sha256sum "$OUTDIR_BASE/docker/${DISTNAME}-${host}.tar.gz" >> "$OUTDIR_BASE/docker/SHA256SUMS.part"
+            else
+                echo "Failed to build docker image for ${host#docker-}, exiting..."
+                exit 1
+            fi
+            continue
+            ;;
+        *)
     (
         # Required for 'contrib/guix/manifest.scm' to output the right manifest
         # for the particular $HOST we're building for
@@ -471,5 +505,6 @@ EOF
                                         DIST_ARCHIVE_BASE=/outdir-base/dist-archive \
                                       bash -c "cd /bitcoin && bash contrib/guix/libexec/build.sh"
     )
-
+        ;;
+        esac
 done
