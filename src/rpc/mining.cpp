@@ -1020,6 +1020,7 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
     }
 
     UniValue vbavailable(UniValue::VOBJ);
+    uint32_t vbrequired = 0;
     for (int j = 0; j < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; ++j) {
         Consensus::DeploymentPos pos = Consensus::DeploymentPos(j);
         ThresholdState state = chainman.m_versionbitscache.State(pindexPrev, consensusParams, pos);
@@ -1037,6 +1038,9 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
             {
                 const struct VBDeploymentInfo& vbinfo = VersionBitsDeploymentInfo[pos];
                 vbavailable.pushKV(gbt_vb_name(pos), consensusParams.vDeployments[pos].bit);
+                if (DeploymentMustSignalAfter(pindexPrev, consensusParams, pos, state)) {
+                    vbrequired |= chainman.m_versionbitscache.Mask(consensusParams, pos);
+                }
                 if (setClientRules.find(vbinfo.name) == setClientRules.end()) {
                     if (!vbinfo.gbt_force) {
                         // If the client doesn't support this, don't indicate it in the [default] version
@@ -1063,7 +1067,7 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
     result.pushKV("version", block_header.nVersion);
     result.pushKV("rules", std::move(aRules));
     result.pushKV("vbavailable", std::move(vbavailable));
-    result.pushKV("vbrequired", int(0));
+    result.pushKV("vbrequired", vbrequired);
 
     result.pushKV("previousblockhash", block.hashPrevBlock.GetHex());
     result.pushKV("transactions", std::move(transactions));

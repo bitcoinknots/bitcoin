@@ -57,4 +57,17 @@ inline bool DeploymentEnabled(const Consensus::Params& params, Consensus::Deploy
     return params.vDeployments[dep].nStartTime != Consensus::BIP9Deployment::NEVER_ACTIVE;
 }
 
+/** Determine if mandatory signaling is required for a deployment at the next block */
+inline bool DeploymentMustSignalAfter(const CBlockIndex* pindexPrev, const Consensus::Params& params, Consensus::DeploymentPos dep, ThresholdState state)
+{
+    assert(Consensus::ValidDeployment(dep));
+    const auto& deployment = params.vDeployments[dep];
+    if (deployment.max_activation_height >= std::numeric_limits<int>::max()) return false;
+    if (state != ThresholdState::STARTED) return false;  // If must_signal height is reached before start time, abstain from enforcement
+    const int nPeriod = params.nMinerConfirmationWindow;
+    const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
+    return nHeight >= deployment.max_activation_height - (2 * nPeriod)
+        && nHeight < deployment.max_activation_height - nPeriod;
+}
+
 #endif // BITCOIN_DEPLOYMENTSTATUS_H
