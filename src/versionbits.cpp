@@ -195,7 +195,11 @@ protected:
     int MinActivationHeight(const Consensus::Params& params) const override { return params.vDeployments[id].min_activation_height; }
     int MaxActivationHeight(const Consensus::Params& params) const override { return params.vDeployments[id].max_activation_height; }
     int Period(const Consensus::Params& params) const override { return params.nMinerConfirmationWindow; }
-    int Threshold(const Consensus::Params& params) const override { return params.nRuleChangeActivationThreshold; }
+    int Threshold(const Consensus::Params& params) const override {
+        // Use per-deployment threshold if set, otherwise fall back to global
+        int deploymentThreshold = params.vDeployments[id].threshold;
+        return deploymentThreshold > 0 ? deploymentThreshold : params.nRuleChangeActivationThreshold;
+    }
 
     bool Condition(const CBlockIndex* pindex, const Consensus::Params& params) const override
     {

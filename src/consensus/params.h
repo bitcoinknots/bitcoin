@@ -59,6 +59,9 @@ struct BIP9Deployment {
     /** For temporary softforks: number of blocks the deployment remains active after activation.
      *  std::numeric_limits<int>::max() means permanent (never expires). */
     int active_duration{std::numeric_limits<int>::max()};
+    /** Per-deployment activation threshold. If 0, uses the global nRuleChangeActivationThreshold.
+     *  Otherwise, specifies the number of blocks required for this specific deployment. */
+    int threshold{0};
 
     /** Constant for nTimeout very far in the future. */
     static constexpr int64_t NO_TIMEOUT = std::numeric_limits<int64_t>::max();
