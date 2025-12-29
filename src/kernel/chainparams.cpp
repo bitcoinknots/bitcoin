@@ -630,6 +630,7 @@ public:
             consensus.vDeployments[deployment_pos].min_activation_height = version_bits_params.min_activation_height;
             consensus.vDeployments[deployment_pos].max_activation_height = version_bits_params.max_activation_height;
             consensus.vDeployments[deployment_pos].active_duration = version_bits_params.active_duration;
+            consensus.vDeployments[deployment_pos].threshold = version_bits_params.threshold;
         }
 
         genesis = CreateGenesisBlock(1296688602, 2, 0x207fffff, 1, 50 * COIN);

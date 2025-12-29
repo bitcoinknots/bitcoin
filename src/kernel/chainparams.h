@@ -149,6 +149,7 @@ public:
         int min_activation_height;
         int max_activation_height{std::numeric_limits<int>::max()};
         int active_duration{std::numeric_limits<int>::max()};
+        int threshold{0};  // 0 means use global nRuleChangeActivationThreshold
     };
 
     /**
