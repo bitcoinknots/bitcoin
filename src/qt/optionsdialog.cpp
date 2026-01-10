@@ -378,7 +378,7 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
 
     rejectunknownwitness = new QCheckBox(groupBox_Spamfiltering);
     rejectunknownwitness->setText(tr("Reject unknown witness script versions"));
-    rejectunknownwitness->setToolTip(tr("Some attempts to spam Bitcoin intentionally use undefined witness script formats reserved for future use. By enabling this option, your node will reject transactions using these undefined/future versions. Note that if you send to many addressses in a single transaction, the entire transaction may be rejected if any single one of them attempts to use an undefined format."));
+    rejectunknownwitness->setToolTip(tr("Some attempts to spam Bitcoin intentionally use undefined witness script formats reserved for future use. By enabling this option, your node will reject transactions using these undefined/future versions. Note that if you send to many addresses in a single transaction, the entire transaction may be rejected if any single one of them attempts to use an undefined format."));
     verticalLayout_Spamfiltering->addWidget(rejectunknownwitness);
     FixTabOrder(rejectunknownwitness);
 
