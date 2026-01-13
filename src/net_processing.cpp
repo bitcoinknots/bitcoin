@@ -798,6 +798,9 @@ private:
     /** Number of peers with wtxid relay. */
     std::atomic<int> m_wtxid_relay_peers{0};
 
+    /** Number of outbound peers without NODE_REDUCED_DATA (BIP-110). Limited to 2. */
+    std::atomic<int> m_num_non_bip110_outbound{0};
+
     /** Number of outbound peers with m_chain_sync.m_protect. */
     int m_outbound_peers_with_protect_from_disconnect GUARDED_BY(cs_main) = 0;
 
@@ -1592,6 +1595,11 @@ void PeerManagerImpl::FinalizeNode(const CNode& node)
         assert(peer != nullptr);
         m_wtxid_relay_peers -= peer->m_wtxid_relay;
         assert(m_wtxid_relay_peers >= 0);
+        // Decrement non-BIP110 counter if this was a non-BIP110 outbound peer
+        if (node.m_is_non_bip110_outbound) {
+            --m_num_non_bip110_outbound;
+            assert(m_num_non_bip110_outbound >= 0);
+        }
     }
     CNodeState *state = State(nodeid);
     assert(state != nullptr);
@@ -1655,14 +1663,13 @@ bool PeerManagerImpl::HasAllDesirableServiceFlags(ServiceFlags services) const
 
 ServiceFlags PeerManagerImpl::GetDesirableServiceFlags(ServiceFlags services) const
 {
-    // We want to preferentially peer with other nodes that enforce UASF-ReducedData, in case of a chain split
     if (services & NODE_NETWORK_LIMITED) {
         // Limited peers are desirable when we are close to the tip.
         if (ApproximateBestBlockDepth() < NODE_NETWORK_LIMITED_ALLOW_CONN_BLOCKS) {
-            return ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_REDUCED_DATA);
+            return ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS);
         }
     }
-    return ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA);
+    return ServiceFlags(NODE_NETWORK | NODE_WITNESS);
 }
 
 PeerRef PeerManagerImpl::GetPeerRef(NodeId id) const
@@ -3510,6 +3517,19 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         }
 
         pfrom.m_has_all_wanted_services = HasAllDesirableServiceFlags(nServices);
+        // BIP-110: Allow up to 2 non-BIP110 outbound peers.
+        if (pfrom.ExpectServicesFromConn() && !(nServices & NODE_REDUCED_DATA)) {
+            if (m_num_non_bip110_outbound >= 2) {
+                LogDebug(BCLog::NET, "peer lacks NODE_REDUCED_DATA and already have 2 non-BIP110 outbound peers, %s\n",
+                         pfrom.DisconnectMsg(fLogIPs));
+                pfrom.fDisconnect = true;
+                return;
+            }
+            ++m_num_non_bip110_outbound;
+            pfrom.m_is_non_bip110_outbound = true;
+            LogDebug(BCLog::NET, "connected to non-BIP110 outbound peer (%d/2), %s\n",
+                     m_num_non_bip110_outbound.load(), pfrom.ConnectionTypeAsString());
+        }
         peer->m_their_services = nServices;
         pfrom.SetAddrLocal(addrMe);
         peer->m_starting_height = starting_height;
