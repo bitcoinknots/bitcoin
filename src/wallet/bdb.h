@@ -69,7 +69,7 @@ public:
     bool Open(bilingual_str& error);
     void Close();
     void Flush(bool fShutdown);
-    void CheckpointLSN(const std::string& strFile);
+    [[nodiscard]] bool CheckpointLSN(const std::string& strFile);
 
     void CloseDb(const fs::path& filename);
     void ReloadDbEnv();
@@ -131,6 +131,8 @@ public:
 
     /** Return path to main database filename */
     std::string Filename() override { return fs::PathToString(env->Directory() / m_filename); }
+
+    std::vector<fs::path> Files() override;
 
     std::string Format() override { return "bdb"; }
     /**
