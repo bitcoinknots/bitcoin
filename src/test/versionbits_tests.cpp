@@ -461,4 +461,264 @@ BOOST_FIXTURE_TEST_CASE(versionbits_computeblockversion, BlockVersionTest)
     }
 }
 
+/**
+ * Test condition checker with max_activation_height for mandatory activation deadline.
+ * When max_activation_height is set, the deployment forces LOCKED_IN one period before
+ * max_activation_height, even if threshold signaling was not met.
+ */
+class TestMaxActivationHeightConditionChecker : public AbstractThresholdConditionChecker
+{
+private:
+    mutable ThresholdConditionCache cache;
+    int m_max_activation_height;
+
+public:
+    explicit TestMaxActivationHeightConditionChecker(int max_height) : m_max_activation_height(max_height) {}
+
+    int64_t BeginTime(const Consensus::Params& params) const override { return 0; } // Start immediately
+    int64_t EndTime(const Consensus::Params& params) const override { return Consensus::BIP9Deployment::NO_TIMEOUT; }
+    int Period(const Consensus::Params& params) const override { return 144; }
+    int Threshold(const Consensus::Params& params) const override { return 108; } // 75%
+    int MaxActivationHeight(const Consensus::Params& params) const override { return m_max_activation_height; }
+    bool Condition(const CBlockIndex* pindex, const Consensus::Params& params) const override { return (pindex->nVersion & 0x100); }
+
+    ThresholdState GetStateFor(const CBlockIndex* pindexPrev) const { return AbstractThresholdConditionChecker::GetStateFor(pindexPrev, paramsDummy, cache); }
+    int GetStateSinceHeightFor(const CBlockIndex* pindexPrev) const { return AbstractThresholdConditionChecker::GetStateSinceHeightFor(pindexPrev, paramsDummy, cache); }
+    void ClearCache() { cache.clear(); }
+};
+
+BOOST_AUTO_TEST_CASE(versionbits_max_activation_height)
+{
+    // Test that max_activation_height forces LOCKED_IN one period before max_activation_height
+    // even without sufficient signaling.
+    //
+    // Timeline with period=144, max_activation_height=432:
+    // - Period 0 (0-143): DEFINED
+    // - Period 1 (144-287): STARTED (no signaling -> normally would stay STARTED)
+    // - Period 2 (288-431): LOCKED_IN (forced because 288 >= 432 - 144)
+    // - Period 3 (432+): ACTIVE
+
+    std::vector<CBlockIndex*> blocks;
+    auto cleanup = [&blocks]() {
+        for (auto* b : blocks) delete b;
+        blocks.clear();
+    };
+
+    // max_activation_height = 432 (period 3 start)
+    TestMaxActivationHeightConditionChecker checker(432);
+
+    // Helper to create blocks
+    auto mine_block = [&blocks](int32_t nVersion) -> CBlockIndex* {
+        CBlockIndex* pindex = new CBlockIndex();
+        pindex->nHeight = blocks.size();
+        pindex->pprev = blocks.empty() ? nullptr : blocks.back();
+        pindex->nTime = 1415926536 + 600 * pindex->nHeight;
+        pindex->nVersion = nVersion;
+        pindex->BuildSkip();
+        blocks.push_back(pindex);
+        return pindex;
+    };
+
+    // Mine through period 0 (DEFINED) - 144 blocks (0-143)
+    for (int i = 0; i < 144; i++) {
+        mine_block(0); // No signaling
+    }
+    BOOST_CHECK_EQUAL(blocks.back()->nHeight, 143);
+    // At tip 143, next block (144) would be STARTED
+    BOOST_CHECK(checker.GetStateFor(blocks.back()) == ThresholdState::STARTED);
+    BOOST_CHECK_EQUAL(checker.GetStateSinceHeightFor(blocks.back()), 144);
+
+    // Mine through period 1 (STARTED) without signaling - blocks 144-287
+    for (int i = 0; i < 144; i++) {
+        mine_block(0); // No signaling
+    }
+    BOOST_CHECK_EQUAL(blocks.back()->nHeight, 287);
+    // At tip 287, next block (288) would be LOCKED_IN due to max_activation_height
+    // 288 >= 432 - 144, so forced LOCKED_IN
+    BOOST_CHECK(checker.GetStateFor(blocks.back()) == ThresholdState::LOCKED_IN);
+    BOOST_CHECK_EQUAL(checker.GetStateSinceHeightFor(blocks.back()), 288);
+
+    // Mine through period 2 (LOCKED_IN) - blocks 288-431
+    for (int i = 0; i < 144; i++) {
+        mine_block(0);
+    }
+    BOOST_CHECK_EQUAL(blocks.back()->nHeight, 431);
+    // At tip 431, next block (432) would be ACTIVE
+    BOOST_CHECK(checker.GetStateFor(blocks.back()) == ThresholdState::ACTIVE);
+    BOOST_CHECK_EQUAL(checker.GetStateSinceHeightFor(blocks.back()), 432);
+
+    // Mine into period 3 (ACTIVE) - blocks 432+
+    for (int i = 0; i < 10; i++) {
+        mine_block(0);
+    }
+    BOOST_CHECK_EQUAL(blocks.back()->nHeight, 441);
+    BOOST_CHECK(checker.GetStateFor(blocks.back()) == ThresholdState::ACTIVE);
+    BOOST_CHECK_EQUAL(checker.GetStateSinceHeightFor(blocks.back()), 432);
+
+    cleanup();
+
+    // Test 2: Verify that signaling still works to activate earlier than max_activation_height
+    TestMaxActivationHeightConditionChecker checker2(1000); // max_activation_height far in future
+
+    // Period 0: DEFINED
+    for (int i = 0; i < 144; i++) {
+        mine_block(0);
+    }
+    BOOST_CHECK(checker2.GetStateFor(blocks.back()) == ThresholdState::STARTED);
+
+    // Period 1: Signal 108+ blocks (threshold)
+    for (int i = 0; i < 108; i++) {
+        mine_block(0x100); // Signal
+    }
+    for (int i = 0; i < 36; i++) {
+        mine_block(0); // No signal
+    }
+    BOOST_CHECK_EQUAL(blocks.back()->nHeight, 287);
+    // Should be LOCKED_IN via signaling, not via max_activation_height
+    BOOST_CHECK(checker2.GetStateFor(blocks.back()) == ThresholdState::LOCKED_IN);
+    BOOST_CHECK_EQUAL(checker2.GetStateSinceHeightFor(blocks.back()), 288);
+
+    // Period 2: LOCKED_IN -> ACTIVE
+    for (int i = 0; i < 144; i++) {
+        mine_block(0);
+    }
+    BOOST_CHECK(checker2.GetStateFor(blocks.back()) == ThresholdState::ACTIVE);
+    BOOST_CHECK_EQUAL(checker2.GetStateSinceHeightFor(blocks.back()), 432);
+
+    cleanup();
+}
+
+BOOST_AUTO_TEST_CASE(versionbits_max_activation_height_boundary)
+{
+    // Test edge case: verify exact boundary where LOCKED_IN is forced
+    // With period=144 and max_activation_height=432:
+    // - At height 287, next block is 288, which is >= 432-144=288, so LOCKED_IN
+    // - At height 286, next block is 287, which is < 288, so would stay STARTED
+
+    std::vector<CBlockIndex*> blocks;
+    auto cleanup = [&blocks]() {
+        for (auto* b : blocks) delete b;
+        blocks.clear();
+    };
+
+    TestMaxActivationHeightConditionChecker checker(432);
+
+    auto mine_block = [&blocks](int32_t nVersion) -> CBlockIndex* {
+        CBlockIndex* pindex = new CBlockIndex();
+        pindex->nHeight = blocks.size();
+        pindex->pprev = blocks.empty() ? nullptr : blocks.back();
+        pindex->nTime = 1415926536 + 600 * pindex->nHeight;
+        pindex->nVersion = nVersion;
+        pindex->BuildSkip();
+        blocks.push_back(pindex);
+        return pindex;
+    };
+
+    // Mine to height 143 (end of period 0)
+    for (int i = 0; i < 144; i++) {
+        mine_block(0);
+    }
+    BOOST_CHECK_EQUAL(blocks.back()->nHeight, 143);
+    // State for block 144 is STARTED
+    BOOST_CHECK(checker.GetStateFor(blocks.back()) == ThresholdState::STARTED);
+
+    // Mine period 1 without signaling (blocks 144-287)
+    // But stop at block 286 first to check boundary
+    for (int i = 0; i < 143; i++) {
+        mine_block(0);
+    }
+    BOOST_CHECK_EQUAL(blocks.back()->nHeight, 286);
+    // At tip 286, next block 287 is still in STARTED period
+    // State is still STARTED
+    BOOST_CHECK(checker.GetStateFor(blocks.back()) == ThresholdState::STARTED);
+
+    // Mine block 287 (last block of period 1)
+    mine_block(0);
+    BOOST_CHECK_EQUAL(blocks.back()->nHeight, 287);
+    // At tip 287, state for next block (288) is computed
+    // 288 >= 432 - 144 = 288, so LOCKED_IN
+    BOOST_CHECK(checker.GetStateFor(blocks.back()) == ThresholdState::LOCKED_IN);
+    BOOST_CHECK_EQUAL(checker.GetStateSinceHeightFor(blocks.back()), 288);
+
+    cleanup();
+}
+
+BOOST_FIXTURE_TEST_CASE(versionbits_active_duration, BasicTestingSetup)
+{
+    // Test active_duration parameter via -vbparams
+    // Format: deployment:start:timeout:min_activation_height:max_activation_height:active_duration
+    //
+    // This tests that the parameter is parsed correctly. The actual expiry logic
+    // is tested in DeploymentActiveAt/DeploymentActiveAfter which use active_duration.
+
+    {
+        ArgsManager args;
+        // start=0, timeout=never, min_height=0, max_height=INT_MAX (disabled), active_duration=144
+        args.ForceSetArg("-vbparams", "testdummy:0:999999999999:0:2147483647:144");
+        const auto chainParams = CreateChainParams(args, ChainType::REGTEST);
+        const auto& deployment = chainParams->GetConsensus().vDeployments[Consensus::DEPLOYMENT_TESTDUMMY];
+
+        BOOST_CHECK_EQUAL(deployment.nStartTime, 0);
+        BOOST_CHECK_EQUAL(deployment.nTimeout, 999999999999);
+        BOOST_CHECK_EQUAL(deployment.min_activation_height, 0);
+        BOOST_CHECK_EQUAL(deployment.max_activation_height, std::numeric_limits<int>::max());
+        BOOST_CHECK_EQUAL(deployment.active_duration, 144);
+    }
+
+    {
+        ArgsManager args;
+        // Test with max_activation_height set
+        // start=0, timeout=NO_TIMEOUT, min_height=288, max_height=432, active_duration=1000
+        // NO_TIMEOUT = INT64_MAX = 9223372036854775807
+        args.ForceSetArg("-vbparams", "testdummy:0:9223372036854775807:288:432:1000");
+        const auto chainParams = CreateChainParams(args, ChainType::REGTEST);
+        const auto& deployment = chainParams->GetConsensus().vDeployments[Consensus::DEPLOYMENT_TESTDUMMY];
+
+        BOOST_CHECK_EQUAL(deployment.min_activation_height, 288);
+        BOOST_CHECK_EQUAL(deployment.max_activation_height, 432);
+        BOOST_CHECK_EQUAL(deployment.active_duration, 1000);
+    }
+
+    {
+        ArgsManager args;
+        // Test permanent deployment (active_duration = INT_MAX)
+        args.ForceSetArg("-vbparams", "testdummy:0:999999999999:0:2147483647:2147483647");
+        const auto chainParams = CreateChainParams(args, ChainType::REGTEST);
+        const auto& deployment = chainParams->GetConsensus().vDeployments[Consensus::DEPLOYMENT_TESTDUMMY];
+
+        BOOST_CHECK_EQUAL(deployment.active_duration, std::numeric_limits<int>::max());
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE(versionbits_max_activation_height_parsing, BasicTestingSetup)
+{
+    // Test max_activation_height parameter via -vbparams
+
+    {
+        ArgsManager args;
+        // Test with max_activation_height=432 (mandatory activation deadline)
+        // NO_TIMEOUT = INT64_MAX = 9223372036854775807
+        args.ForceSetArg("-vbparams", "testdummy:0:9223372036854775807:0:432:2147483647");
+        const auto chainParams = CreateChainParams(args, ChainType::REGTEST);
+        const auto& deployment = chainParams->GetConsensus().vDeployments[Consensus::DEPLOYMENT_TESTDUMMY];
+
+        BOOST_CHECK_EQUAL(deployment.max_activation_height, 432);
+        // active_duration should be permanent when not specified differently
+        BOOST_CHECK_EQUAL(deployment.active_duration, std::numeric_limits<int>::max());
+    }
+
+    {
+        ArgsManager args;
+        // Test combined: max_activation_height + active_duration (RDTS)
+        // NO_TIMEOUT = INT64_MAX = 9223372036854775807
+        args.ForceSetArg("-vbparams", "testdummy:0:9223372036854775807:288:576:144");
+        const auto chainParams = CreateChainParams(args, ChainType::REGTEST);
+        const auto& deployment = chainParams->GetConsensus().vDeployments[Consensus::DEPLOYMENT_TESTDUMMY];
+
+        BOOST_CHECK_EQUAL(deployment.min_activation_height, 288);
+        BOOST_CHECK_EQUAL(deployment.max_activation_height, 576);
+        BOOST_CHECK_EQUAL(deployment.active_duration, 144);
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
