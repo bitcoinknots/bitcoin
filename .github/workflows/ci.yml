@@ -358,6 +358,12 @@ jobs:
             timeout-minutes: 120
             file-env: './ci/test/00_setup_env_native_centos.sh'
 
+          - name: 'CentOS, Qt 5'
+            cirrus-runner: 'ghcr.io/cirruslabs/ubuntu-runner-amd64:24.04-lg'
+            fallback-runner: 'ubuntu-24.04'
+            timeout-minutes: 120
+            file-env: './ci/test/00_setup_env_native_centos_qt5.sh'
+
           - name: 'tidy'
             cirrus-runner: 'ghcr.io/cirruslabs/ubuntu-runner-amd64:24.04-md'
             fallback-runner: 'ubuntu-24.04'
