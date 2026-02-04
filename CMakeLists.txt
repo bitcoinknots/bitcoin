@@ -98,7 +98,7 @@ include(CMakeDependentOption)
 # When adding a new option, end the <help_text> with a full stop for consistency.
 option(BUILD_DAEMON "Build bitcoind executable." ON)
 option(BUILD_GUI "Build bitcoin-qt executable." OFF)
-set(WITH_QT_VERSION "5" CACHE STRING "Choose 5 or 6.")
+set(WITH_QT_VERSION "6" CACHE STRING "Choose 5 or 6.")
 set_property(CACHE WITH_QT_VERSION PROPERTY STRINGS "5" "6")
 option(BUILD_CLI "Build bitcoin-cli executable." ON)
 option(BUILD_BITCOINCONSENSUS_LIB "Build libbitcoinconsensus library." OFF)

@@ -94,7 +94,7 @@ The GUI will be able to encode addresses in QR codes unless this feature is expl
 
 Otherwise, if you don't need QR encoding support, use the `-DWITH_QRENCODE=OFF` option to disable this feature in order to compile the GUI.
 
-Note: You can also build with Qt 6 (instead of Qt 5) by passing `-DWITH_QT_VERSION=6` to cmake.
+Note: You can also build with Qt 5 (instead of Qt 6) by passing `-DWITH_QT_VERSION=5` to cmake.
 
 
 ### Fedora
