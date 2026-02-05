@@ -1,15 +1,15 @@
-qt_details_version := 6.10.1
+qt_details_version := 6.10.2
 qt_details_download_path := https://download.qt.io/archive/qt/6.10/$(qt_details_version)/submodules
 qt_details_suffix := everywhere-src-$(qt_details_version).tar.xz
 
 qt_details_qtbase_file_name := qtbase-$(qt_details_suffix)
-qt_details_qtbase_sha256_hash := 5a6226f7e23db51fdc3223121eba53f3f5447cf0cc4d6cb82a3a2df7a65d265d
+qt_details_qtbase_sha256_hash := aeb78d29291a2b5fd53cb55950f8f5065b4978c25fb1d77f627d695ab9adf21e
 
 qt_details_qttranslations_file_name := qttranslations-$(qt_details_suffix)
-qt_details_qttranslations_sha256_hash := 8e49a2df88a12c376a479ae7bd272a91cf57ebb4e7c0cf7341b3565df99d2314
+qt_details_qttranslations_sha256_hash := b3b3813bc9d76b545716dc8b6e659fa71b6e2bc14569e9fab6dab8b30650a644
 
 qt_details_qttools_file_name := qttools-$(qt_details_suffix)
-qt_details_qttools_sha256_hash := 8148408380ffea03101a26305c812b612ea30dbc07121e58707601522404d49b
+qt_details_qttools_sha256_hash := 1e3d2c07c1fd76d2425c6eaeeaa62ffaff5f79210c4e1a5bc2a6a9db668d5b24
 
 qt_details_patches_path := $(PATCHES_PATH)/qt
 
