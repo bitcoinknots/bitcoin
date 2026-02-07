@@ -175,7 +175,7 @@ if(WITH_BDB)
                     "BDB (legacy) wallets opened by this build will not be portable!"
     )
     if(WARN_INCOMPATIBLE_BDB)
-      message(WARNING "If this is intended, pass \"-DWARN_INCOMPATIBLE_BDB=OFF\".\n"
+      message(FATAL_ERROR "If this is intended, pass \"-DWARN_INCOMPATIBLE_BDB=OFF\".\n"
                       "Passing \"-DWITH_BDB=OFF\" will suppress this warning."
       )
     endif()
