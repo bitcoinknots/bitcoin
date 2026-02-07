@@ -2332,7 +2332,7 @@ OutputType CWallet::TransactionChangeType(const std::optional<OutputType>& chang
     }
 
     // if m_default_address_type is legacy, use legacy address as change.
-    if (m_default_address_type == OutputType::LEGACY) {
+    if (m_default_address_type == OutputType::LEGACY && GetScriptPubKeyMan(OutputType::LEGACY, /*internal=*/true)) {
         return OutputType::LEGACY;
     }
 
