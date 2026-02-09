@@ -44,6 +44,7 @@ class MiningMainnetTest(BitcoinTestFramework):
         self.num_nodes = 1
         self.setup_clean_chain = True
         self.chain = "" # main
+        self.extra_args = [['-consensusrules=rdts']] * self.num_nodes
 
     def add_options(self, parser):
         parser.add_argument(
