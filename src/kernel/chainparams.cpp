@@ -630,6 +630,10 @@ public:
             consensus.vDeployments[deployment_pos].min_activation_height = version_bits_params.min_activation_height;
             consensus.vDeployments[deployment_pos].max_activation_height = version_bits_params.max_activation_height;
             consensus.vDeployments[deployment_pos].active_duration = version_bits_params.active_duration;
+            // Validated here rather than in src/chainparams.cpp because nMinerConfirmationWindow is not yet available at parse time
+            if (version_bits_params.active_duration != std::numeric_limits<int>::max() && version_bits_params.active_duration % consensus.nMinerConfirmationWindow != 0) {
+                throw std::runtime_error(strprintf("active_duration (%d) must be a multiple of nMinerConfirmationWindow (%d)", version_bits_params.active_duration, consensus.nMinerConfirmationWindow));
+            }
             consensus.vDeployments[deployment_pos].threshold = version_bits_params.threshold;
         }
 

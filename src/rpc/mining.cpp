@@ -1026,6 +1026,7 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
         switch (state) {
             case ThresholdState::DEFINED:
             case ThresholdState::FAILED:
+            case ThresholdState::EXPIRED:
                 // Not exposed to GBT at all
                 break;
             case ThresholdState::LOCKED_IN:

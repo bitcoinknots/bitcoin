@@ -1679,6 +1679,7 @@ static void SoftForkDescPushBack(const CBlockIndex* blockindex, UniValue& softfo
         case ThresholdState::LOCKED_IN: return "locked_in";
         case ThresholdState::ACTIVE: return "active";
         case ThresholdState::FAILED: return "failed";
+        case ThresholdState::EXPIRED: return "expired";
         }
         return "invalid";
     };
@@ -1845,7 +1846,7 @@ const std::vector<RPCResult> RPCHelpForDeployment{
         {RPCResult::Type::NUM_TIME, "timeout", "the median time past of a block at which the deployment is considered failed if not yet locked in"},
         {RPCResult::Type::NUM, "min_activation_height", "minimum height of blocks for which the rules may be enforced"},
         {RPCResult::Type::NUM, "max_activation_height", /*optional=*/true, "height at which the deployment will unconditionally activate (absent for miner-vetoable deployments)"},
-        {RPCResult::Type::STR, "status", "status of deployment at specified block (one of \"defined\", \"started\", \"locked_in\", \"active\", \"failed\")"},
+        {RPCResult::Type::STR, "status", "status of deployment at specified block (one of \"defined\", \"started\", \"locked_in\", \"active\", \"failed\", \"expired\")"},
         {RPCResult::Type::NUM, "since", "height of the first block to which the status applies"},
         {RPCResult::Type::STR, "status_next", "status of deployment at the next block"},
         {RPCResult::Type::OBJ, "statistics", /*optional=*/true, "numeric statistics about signalling for a softfork (only for \"started\" and \"locked_in\" status)",
