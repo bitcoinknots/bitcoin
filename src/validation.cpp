@@ -3053,6 +3053,14 @@ CoinsCacheSizeState Chainstate::GetCoinsCacheSizeState(
     int64_t nTotalSpace =
         max_coins_cache_size_bytes + std::max<int64_t>(int64_t(max_mempool_size_bytes) - nMempoolUsage, 0);
 
+    //! Reserve headroom for LevelDB write batch allocations during flush.
+    //! Matches nDefaultDbBatchSize (64 MiB) from txdb.h.
+    //! Only applied when cache is large enough for this to matter.
+    static constexpr int64_t LEVELDB_FLUSH_HEADROOM = 64 * 1024 * 1024;
+    if (nTotalSpace > LEVELDB_FLUSH_HEADROOM * 2) {
+        nTotalSpace -= LEVELDB_FLUSH_HEADROOM;
+    }
+
     //! No need to periodic flush if at least this much space still available.
     static constexpr int64_t MAX_BLOCK_COINSDB_USAGE_BYTES = 10 * 1024 * 1024;  // 10MB
     int64_t large_threshold =
@@ -3115,19 +3123,15 @@ bool Chainstate::FlushStateToDisk(
         const auto nNow{NodeClock::now()};
         // The cache is large and we're within 10% and 10 MiB of the limit, but we have time now (not in the middle of a block processing).
         bool fCacheLarge = mode == FlushStateMode::PERIODIC && cache_state >= CoinsCacheSizeState::LARGE;
-        bool fCacheCritical = false;
-        if (mode == FlushStateMode::IF_NEEDED) {
-            if (cache_state >= CoinsCacheSizeState::CRITICAL) {
-                // The cache is over the limit, we have to write now.
-                fCacheCritical = true;
-            } else if (SystemNeedsMemoryReleased()) {
-                fCacheCritical = true;
-            }
+        bool fCacheCritical = mode == FlushStateMode::IF_NEEDED && cache_state >= CoinsCacheSizeState::CRITICAL;
+        bool fMemoryPressure = false;
+        if (!fCacheLarge && !fCacheCritical && (mode == FlushStateMode::IF_NEEDED || mode == FlushStateMode::PERIODIC)) {
+            fMemoryPressure = SystemNeedsMemoryReleased();
         }
         // It's been a while since we wrote the block index and chain state to disk. Do this frequently, so we don't need to redownload or reindex after a crash.
         bool fPeriodicWrite = mode == FlushStateMode::PERIODIC && nNow >= m_next_write;
         // Combine all conditions that result in a write to disk.
-        bool should_write = (mode == FlushStateMode::ALWAYS) || fCacheLarge || fCacheCritical || fPeriodicWrite || fFlushForPrune;
+        bool should_write = (mode == FlushStateMode::ALWAYS) || fCacheLarge || fCacheCritical || fMemoryPressure || fPeriodicWrite || fFlushForPrune;
         // Write blocks, block index and best chain related state to disk.
         if (should_write) {
             // Ensure we can write block index
@@ -3175,7 +3179,9 @@ bool Chainstate::FlushStateToDisk(
                 return FatalError(m_chainman.GetNotifications(), state, _("Disk space is too low!"));
             }
             // Flush the chainstate (which may refer to block index entries).
-            const auto empty_cache{(mode == FlushStateMode::ALWAYS) || fCacheLarge || fCacheCritical};
+            // Memory pressure requires Flush() (not Sync()) because the pool
+            // allocator only releases memory to the OS via ReallocateCache().
+            const auto empty_cache{(mode == FlushStateMode::ALWAYS) || fCacheLarge || fCacheCritical || fMemoryPressure};
             if (empty_cache ? !CoinsTip().Flush() : !CoinsTip().Sync()) {
                 return FatalError(m_chainman.GetNotifications(), state, _("Failed to write to coin database."));
             }

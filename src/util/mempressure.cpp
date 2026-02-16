@@ -7,7 +7,6 @@
 #include <util/mempressure.h>
 
 #include <logging.h>
-#include <util/byte_units.h>
 
 #ifdef HAVE_LINUX_SYSINFO
 #include <sys/sysinfo.h>
@@ -16,15 +15,50 @@
 #include <windows.h>
 #endif
 
+#include <cinttypes>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 
 size_t g_low_memory_threshold{0};
 
+uint64_t GetAvailableSystemMemory()
+{
+#ifdef __linux__
+    FILE* f = fopen("/proc/meminfo", "r");
+    if (f) {
+        char line[256];
+        while (fgets(line, sizeof(line), f)) {
+            uint64_t val;
+            if (sscanf(line, "MemAvailable: %" PRIu64 " kB", &val) == 1) {
+                fclose(f);
+                return val * 1024;
+            }
+        }
+        fclose(f);
+    }
+#endif
+#ifdef HAVE_LINUX_SYSINFO
+    struct sysinfo sys_info;
+    if (!sysinfo(&sys_info)) {
+        const uint64_t free_ram = uint64_t(sys_info.freeram) * sys_info.mem_unit;
+        const uint64_t buffer_ram = uint64_t(sys_info.bufferram) * sys_info.mem_unit;
+        return free_ram + buffer_ram;
+    }
+#endif
+#ifdef WIN32
+    MEMORYSTATUSEX mem_status;
+    mem_status.dwLength = sizeof(mem_status);
+    if (GlobalMemoryStatusEx(&mem_status)) {
+        return mem_status.ullAvailPhys;
+    }
+#endif
+    return 0;
+}
+
 bool SystemNeedsMemoryReleased()
 {
-    if (g_low_memory_threshold <= 0) {
-        // Intentionally bypass other metrics when disabled entirely
+    if (g_low_memory_threshold == 0) {
         return false;
     }
 #ifdef WIN32
@@ -34,23 +68,16 @@ bool SystemNeedsMemoryReleased()
         if (mem_status.dwMemoryLoad >= 99 ||
             mem_status.ullAvailPhys < g_low_memory_threshold ||
             mem_status.ullAvailVirtual < g_low_memory_threshold) {
-            LogPrintf("%s: YES: %s%% memory load; %s available physical memory; %s available virtual memory\n", __func__, int(mem_status.dwMemoryLoad), size_t(mem_status.ullAvailPhys), size_t(mem_status.ullAvailVirtual));
+            LogPrintf("%s: YES: %s%% memory load; %" PRIu64 " available physical memory; %" PRIu64 " available virtual memory\n", __func__, int(mem_status.dwMemoryLoad), uint64_t(mem_status.ullAvailPhys), uint64_t(mem_status.ullAvailVirtual));
             return true;
         }
     }
+    return false;
 #endif
-#ifdef HAVE_LINUX_SYSINFO
-    struct sysinfo sys_info;
-    if (!sysinfo(&sys_info)) {
-        // Explicitly 64-bit in case of 32-bit userspace on 64-bit kernel
-        const uint64_t free_ram = uint64_t(sys_info.freeram) * sys_info.mem_unit;
-        const uint64_t buffer_ram = uint64_t(sys_info.bufferram) * sys_info.mem_unit;
-        if (free_ram + buffer_ram < g_low_memory_threshold) {
-            LogPrintf("%s: YES: %s free RAM + %s buffer RAM\n", __func__, free_ram, buffer_ram);
-            return true;
-        }
+    const uint64_t avail = GetAvailableSystemMemory();
+    if (avail > 0 && avail < g_low_memory_threshold) {
+        LogPrintf("%s: YES: %" PRIu64 " bytes available memory\n", __func__, avail);
+        return true;
     }
-#endif
-    // NOTE: sysconf(_SC_AVPHYS_PAGES) doesn't account for caches on at least Linux, so not safe to use here
     return false;
 }
