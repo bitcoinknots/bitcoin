@@ -212,6 +212,7 @@ add_library(bitcoinqt STATIC EXCLUDE_FROM_ALL
   $<$<PLATFORM_ID:Darwin>:macnotificationhandler.mm>
   $<$<PLATFORM_ID:Darwin>:macos_appnap.h>
   $<$<PLATFORM_ID:Darwin>:macos_appnap.mm>
+  $<$<AND:$<PLATFORM_ID:Darwin>,$<NOT:$<BOOL:${CMAKE_HOST_APPLE}>>>:${PROJECT_SOURCE_DIR}/src/compat/apple_availability.c>
   modaloverlay.cpp
   mempoolstats.cpp
   modaloverlay.h

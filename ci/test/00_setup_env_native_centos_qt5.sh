@@ -11,6 +11,6 @@ export CI_IMAGE_NAME_TAG="quay.io/centos/centos:stream9"
 export CI_BASE_PACKAGES="gcc-c++ glibc-devel libstdc++-devel ccache make git python3 python3-pip which patch xz procps-ng rsync coreutils bison e2fsprogs cmake dash qt5-qtbase-devel qt5-qttools-devel qrencode-devel libicns-utils librsvg2-tools ImageMagick"
 export PIP_PACKAGES="pyzmq"
 export DEP_OPTS="DEBUG=1"  # Temporarily enable a DEBUG=1 build to check for GCC-bug-117966 regressions. This can be removed once the minimum GCC version is bumped to 12 in the previous releases task, see https://github.com/bitcoin/bitcoin/issues/31436#issuecomment-2530717875
-export DEP_OPTS="$DEP_OPTS NO_QT=1"
+export DEP_OPTS="$DEP_OPTS NO_QT=1 NO_QR=1"
 export GOAL="install"
 export BITCOIN_CONFIG="-DWITH_ZMQ=ON -DBUILD_GUI=ON -DWITH_QT_VERSION=5 -DREDUCE_EXPORTS=ON -DCMAKE_BUILD_TYPE=Debug"
