@@ -19,6 +19,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 
 size_t g_low_memory_threshold{0};
 
@@ -29,8 +30,14 @@ uint64_t GetAvailableSystemMemory()
     if (f) {
         char line[256];
         while (fgets(line, sizeof(line), f)) {
-            uint64_t val;
-            if (sscanf(line, "MemAvailable: %" PRIu64 " kB", &val) == 1) {
+            if (strncmp(line, "MemAvailable:", 13) == 0) {
+                const char* p = line + 13;
+                while (*p == ' ') ++p;
+                uint64_t val = 0;
+                while (*p >= '0' && *p <= '9') {
+                    val = val * 10 + (*p - '0');
+                    ++p;
+                }
                 fclose(f);
                 return val * 1024;
             }
