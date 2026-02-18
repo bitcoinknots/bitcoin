@@ -593,7 +593,8 @@ if(ENABLE_HARDENING)
     # otherwise it does nothing and just creates a compiler warning.
     try_append_cxx_flags("-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3"
       RESULT_VAR cxx_supports_fortify_source
-      SOURCE "int main() {
+      SOURCE "#include <cstdlib>
+              int main() {
               # if !defined __OPTIMIZE__ || __OPTIMIZE__ <= 0
                 #error
               #endif
