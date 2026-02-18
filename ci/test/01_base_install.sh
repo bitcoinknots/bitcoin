@@ -53,6 +53,12 @@ fi
 if [ -n "$PIP_PACKAGES" ]; then
   # shellcheck disable=SC2086
   ${CI_RETRY_EXE} pip3 install --user $PIP_PACKAGES
+  if command -v python3.12 > /dev/null; then
+    # Also install for python3.12 when available (CentOS Stream 9 ships python 3.9
+    # but cmake requires >= 3.10).
+    # shellcheck disable=SC2086
+    ${CI_RETRY_EXE} python3.12 -m pip install --user $PIP_PACKAGES
+  fi
 fi
 
 if [[ -n "${USE_INSTRUMENTED_LIBCPP}" ]]; then
