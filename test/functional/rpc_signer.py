@@ -72,6 +72,20 @@ class RPCSignerTest(BitcoinTestFramework):
         )
         self.clear_mock_result(self.nodes[1])
 
+        # Malicious fingerprint with shell metacharacters must be rejected
+        self.set_mock_result(self.nodes[1], '0 [{"type": "trezor", "model": "trezor_t", "fingerprint": "00000001; rm -rf /"}]')
+        assert_raises_rpc_error(-1, 'received invalid fingerprint',
+            self.nodes[1].enumeratesigners
+        )
+        self.clear_mock_result(self.nodes[1])
+
+        # Empty fingerprint must be rejected
+        self.set_mock_result(self.nodes[1], '0 [{"type": "trezor", "model": "trezor_t", "fingerprint": ""}]')
+        assert_raises_rpc_error(-1, 'received invalid fingerprint',
+            self.nodes[1].enumeratesigners
+        )
+        self.clear_mock_result(self.nodes[1])
+
         assert_equal({'fingerprint': '00000001', 'name': 'trezor_t'} in self.nodes[1].enumeratesigners()['signers'], True)
 
 if __name__ == '__main__':
