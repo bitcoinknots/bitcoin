@@ -76,7 +76,7 @@ endif()
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(Qt
-  REQUIRED_VARS Qt${Qt_FIND_VERSION_MAJOR}_DIR
+  REQUIRED_VARS Qt${Qt_FIND_VERSION_MAJOR}_DIR Qt${Qt_FIND_VERSION_MAJOR}_FOUND
   VERSION_VAR Qt${Qt_FIND_VERSION_MAJOR}_VERSION
 )
 
