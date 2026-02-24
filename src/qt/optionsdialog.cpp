@@ -535,7 +535,7 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     datacarriercost->setStepType(QAbstractSpinBox::DefaultStepType);
     datacarriercost->setSingleStep(0.25);
     datacarriercost->setMinimum(0.25);
-    datacarriercost->setMaximum(MAX_BLOCK_SERIALIZED_SIZE);
+    datacarriercost->setMaximum(1024);
     datacarriercost->setToolTip(tr("As an alternative to, or in addition to, limiting the size of disguised data, you can also configure how it is accounted for in comparison to legitimate transaction data. For example, 1 vbyte per actual byte would count it as equivalent to ordinary transaction data; 0.25 vB/B would allow it to benefit from the so-called \"segwit discount\"; or 2 vB/B would establish a bias toward legitimate transactions."));
     CreateOptionUI(verticalLayout_Spamfiltering, datacarriercost, tr("Weigh embedded data as %s virtual bytes per actual byte."));
     connect(datacarriercost, QOverload<double>::of(&QDoubleSpinBox::valueChanged), [&](double d){
