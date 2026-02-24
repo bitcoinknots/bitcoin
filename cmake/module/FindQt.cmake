@@ -33,12 +33,23 @@ if(DEFINED CMAKE_FIND_ROOT_PATH_MODE_LIBRARY)
   set(_qt_find_root_path_mode_library_saved ${CMAKE_FIND_ROOT_PATH_MODE_LIBRARY})
 endif()
 
+# Save CMAKE_FIND_ROOT_PATH_MODE_PACKAGE state.
+unset(_qt_find_root_path_mode_package_saved)
+if(DEFINED CMAKE_FIND_ROOT_PATH_MODE_PACKAGE)
+  set(_qt_find_root_path_mode_package_saved ${CMAKE_FIND_ROOT_PATH_MODE_PACKAGE})
+endif()
+
 # The Qt config files internally use find_library() calls for all
 # dependencies to ensure their availability. In turn, the find_library()
 # inspects the well-known locations on the file system; therefore, it must
 # be able to find platform-specific system libraries, for example:
 # /usr/x86_64-w64-mingw32/lib/libm.a or /usr/arm-linux-gnueabihf/lib/libm.a.
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY BOTH)
+
+# When using the depends toolchain with NO_QT=1, Qt is not in the
+# depends prefix. Allow find_package to search system paths so that
+# system-installed Qt (e.g., qt5-qtbase-devel on CentOS) can be found.
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE BOTH)
 
 find_package(Qt${Qt_FIND_VERSION_MAJOR} ${Qt_FIND_VERSION}
   COMPONENTS ${Qt_FIND_COMPONENTS}
@@ -55,9 +66,17 @@ else()
   unset(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY)
 endif()
 
+# Restore CMAKE_FIND_ROOT_PATH_MODE_PACKAGE state.
+if(DEFINED _qt_find_root_path_mode_package_saved)
+  set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ${_qt_find_root_path_mode_package_saved})
+  unset(_qt_find_root_path_mode_package_saved)
+else()
+  unset(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE)
+endif()
+
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(Qt
-  REQUIRED_VARS Qt${Qt_FIND_VERSION_MAJOR}_DIR
+  REQUIRED_VARS Qt${Qt_FIND_VERSION_MAJOR}_DIR Qt${Qt_FIND_VERSION_MAJOR}_FOUND
   VERSION_VAR Qt${Qt_FIND_VERSION_MAJOR}_VERSION
 )
 

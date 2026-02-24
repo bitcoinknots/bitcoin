@@ -17,6 +17,7 @@
              ((gnu packages linux) #:select (linux-libre-headers-6.1))
              (gnu packages llvm)
              (gnu packages mingw)
+             (gnu packages ninja)
              (gnu packages pkg-config)
              ((gnu packages python) #:select (python-minimal))
              ((gnu packages python-build) #:select (python-tomli python-poetry-core))
@@ -561,6 +562,7 @@ inspecting signatures in Mach-O binaries.")
         gcc-toolchain-13
         cmake-minimal
         gnu-make
+        ninja
         pkg-config
         imagemagick
         libicns

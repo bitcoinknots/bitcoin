@@ -1,6 +1,6 @@
 # FreeBSD Build Guide
 
-**Updated for FreeBSD [14.0](https://www.freebsd.org/releases/14.0R/announce/)**
+**Updated for FreeBSD [14.3](https://www.freebsd.org/releases/14.3R/announce/)**
 
 This guide describes how to build bitcoind, command-line utilities, and GUI on FreeBSD.
 
@@ -62,13 +62,13 @@ sh/bash: export BDB_PREFIX=[path displayed above]
 ```
 
 #### GUI Dependencies
-###### Qt5
+###### Qt6
 
 Bitcoin Core includes a GUI built with the cross-platform Qt Framework. To compile the GUI, we need to install
 the necessary parts of Qt, the libqrencode and pass `-DBUILD_GUI=ON`. Skip if you don't intend to use the GUI.
 
 ```bash
-pkg install qt5-buildtools qt5-core qt5-gui qt5-linguisttools qt5-testlib qt5-widgets
+pkg install qt6-base qt6-tools
 ```
 
 ###### libqrencode

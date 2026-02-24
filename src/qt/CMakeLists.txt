@@ -16,7 +16,7 @@ get_target_property(qt_lib_type "Qt${WITH_QT_VERSION}::Core" TYPE)
 function(import_plugins target)
   if(qt_lib_type STREQUAL "STATIC_LIBRARY")
     set(plugins "Qt${WITH_QT_VERSION}::QMinimalIntegrationPlugin")
-    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$")
       list(APPEND plugins "Qt${WITH_QT_VERSION}::QXcbIntegrationPlugin")
     elseif(WIN32)
       if("${WITH_QT_VERSION}" STREQUAL "5")
@@ -57,13 +57,6 @@ set(CMAKE_AUTOMOC_MOC_OPTIONS "-p${CMAKE_CURRENT_SOURCE_DIR}")
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOUIC_SEARCH_PATHS forms)
-
-# TODO: The file(GLOB ...) command should be replaced with an explicit
-# file list. Such a change must be synced with the corresponding change
-# to https://github.com/bitcoin-core/bitcoin-maintainer-tools/blob/main/update-translations.py
-file(GLOB ts_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} locale/*.ts)
-set_source_files_properties(${ts_files} PROPERTIES OUTPUT_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/locale)
-cmake_language(CALL "qt${WITH_QT_VERSION}_add_translation" qm_files ${ts_files})
 
 set(FONT_PATH "res/fonts/OCR-Bitcoin.ttf")
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/res/fonts")
@@ -219,6 +212,7 @@ add_library(bitcoinqt STATIC EXCLUDE_FROM_ALL
   $<$<PLATFORM_ID:Darwin>:macnotificationhandler.mm>
   $<$<PLATFORM_ID:Darwin>:macos_appnap.h>
   $<$<PLATFORM_ID:Darwin>:macos_appnap.mm>
+  $<$<AND:$<PLATFORM_ID:Darwin>,$<NOT:$<BOOL:${CMAKE_HOST_APPLE}>>>:${PROJECT_SOURCE_DIR}/src/compat/apple_availability.c>
   modaloverlay.cpp
   mempoolstats.cpp
   modaloverlay.h
@@ -393,6 +387,16 @@ if(qt_lib_type STREQUAL "STATIC_LIBRARY")
       tls
   )
 endif()
+
+file(GLOB ts_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} locale/*.ts)
+set_source_files_properties(${ts_files} PROPERTIES OUTPUT_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/locale)
+if("${WITH_QT_VERSION}" STREQUAL "5")
+  qt5_add_translation(qm_files ${ts_files})
+elseif(Qt6_VERSION VERSION_GREATER_EQUAL 6.7)
+  qt6_add_lrelease(TS_FILES ${ts_files} OPTIONS -silent)
+else()  # Qt 6.2-6.6
+  qt6_add_lrelease(bitcoinqt TS_FILES ${ts_files} OPTIONS -silent)
+endif()  # Qt version
 
 add_executable(bitcoin-qt
   main.cpp

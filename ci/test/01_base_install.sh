@@ -34,7 +34,8 @@ fi
 
 if [[ $CI_IMAGE_NAME_TAG == *centos* ]]; then
   bash -c "dnf -y install epel-release"
-  bash -c "dnf -y --allowerasing install $CI_BASE_PACKAGES $PACKAGES"
+  # The ninja-build package is available in the CRB repository.
+  bash -c "dnf -y --allowerasing --enablerepo crb install $CI_BASE_PACKAGES $PACKAGES"
 elif [ "$CI_OS_NAME" != "macos" ]; then
   if [[ -n "${APPEND_APT_SOURCES_LIST}" ]]; then
     echo "${APPEND_APT_SOURCES_LIST}" >> /etc/apt/sources.list
@@ -52,6 +53,12 @@ fi
 if [ -n "$PIP_PACKAGES" ]; then
   # shellcheck disable=SC2086
   ${CI_RETRY_EXE} pip3 install --user $PIP_PACKAGES
+  if command -v python3.12 > /dev/null; then
+    # Also install for python3.12 when available (CentOS Stream 9 ships python 3.9
+    # but cmake requires >= 3.10).
+    # shellcheck disable=SC2086
+    ${CI_RETRY_EXE} python3.12 -m pip install --user $PIP_PACKAGES
+  fi
 fi
 
 if [[ -n "${USE_INSTRUMENTED_LIBCPP}" ]]; then

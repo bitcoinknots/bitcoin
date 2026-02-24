@@ -82,11 +82,11 @@ Bitcoin Core includes a GUI built with the cross-platform Qt Framework. To compi
 the necessary parts of Qt and some image processing tools, and pass `-DBUILD_GUI=ON` to cmake.
 Skip if you don't intend to use the GUI.
 
-    sudo apt-get install qtbase5-dev qttools5-dev qttools5-dev-tools librsvg2-bin imagemagick
+    sudo apt-get install qt6-base-dev qt6-tools-dev qt6-l10n-tools qt6-tools-dev-tools libgl-dev librsvg2-bin imagemagick
 
 Additionally, to support Wayland protocol for modern desktop environments:
 
-    sudo apt install qtwayland5
+    sudo apt install qt6-wayland
 
 The GUI will be able to encode addresses in QR codes unless this feature is explicitly disabled. To install libqrencode, run:
 
@@ -94,7 +94,7 @@ The GUI will be able to encode addresses in QR codes unless this feature is expl
 
 Otherwise, if you don't need QR encoding support, use the `-DWITH_QRENCODE=OFF` option to disable this feature in order to compile the GUI.
 
-Note: You can also build with Qt 6 (instead of Qt 5) by passing `-DWITH_QT_VERSION=6` to cmake.
+Note: You can also build with Qt 5 (instead of Qt 6) by passing `-DWITH_QT_VERSION=5` to cmake.
 
 
 ### Fedora
@@ -137,11 +137,11 @@ Bitcoin Core includes a GUI built with the cross-platform Qt Framework. To compi
 the necessary parts of Qt and some image processing tools, and pass `-DBUILD_GUI=ON` to cmake.
 Skip if you don't intend to use the GUI.
 
-    sudo dnf install qt5-qttools-devel qt5-qtbase-devel librsvg2-tools ImageMagick
+    sudo dnf install qt6-qtbase-devel qt6-qttools-devel librsvg2-tools ImageMagick
 
 Additionally, to support Wayland protocol for modern desktop environments:
 
-    sudo dnf install qt5-qtwayland
+    sudo dnf install qt6-qtwayland
 
 The GUI will be able to encode addresses in QR codes unless this feature is explicitly disabled. To install libqrencode, run:
 

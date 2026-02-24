@@ -98,7 +98,7 @@ include(CMakeDependentOption)
 # When adding a new option, end the <help_text> with a full stop for consistency.
 option(BUILD_DAEMON "Build bitcoind executable." ON)
 option(BUILD_GUI "Build bitcoin-qt executable." OFF)
-set(WITH_QT_VERSION "5" CACHE STRING "Choose 5 or 6.")
+set(WITH_QT_VERSION "6" CACHE STRING "Choose 5 or 6.")
 set_property(CACHE WITH_QT_VERSION PROPERTY STRINGS "5" "6")
 option(BUILD_CLI "Build bitcoin-cli executable." ON)
 option(BUILD_BITCOINCONSENSUS_LIB "Build libbitcoinconsensus library." OFF)
@@ -218,7 +218,7 @@ endif()
 
 cmake_dependent_option(WITH_DBUS "Enable DBus support." ON "NOT CMAKE_SYSTEM_NAME MATCHES \"(Windows|Darwin)\" AND BUILD_GUI" OFF)
 
-cmake_dependent_option(WITH_TASKBAR_PROGRESS "Enable GUI taskbar progress." ON "CMAKE_SYSTEM_NAME STREQUAL \"Windows\" AND BUILD_GUI" OFF)
+cmake_dependent_option(WITH_TASKBAR_PROGRESS "Enable GUI taskbar progress." ON "CMAKE_SYSTEM_NAME STREQUAL \"Windows\" AND BUILD_GUI AND NOT WITH_QT_VERSION STREQUAL \"6\"" OFF)
 
 set(WITH_MULTIPROCESS OFF)
 if(WITH_MULTIPROCESS)
@@ -593,7 +593,8 @@ if(ENABLE_HARDENING)
     # otherwise it does nothing and just creates a compiler warning.
     try_append_cxx_flags("-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3"
       RESULT_VAR cxx_supports_fortify_source
-      SOURCE "int main() {
+      SOURCE "#include <cstdlib>
+              int main() {
               # if !defined __OPTIMIZE__ || __OPTIMIZE__ <= 0
                 #error
               #endif

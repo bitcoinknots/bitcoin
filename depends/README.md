@@ -47,7 +47,7 @@ The paths are automatically configured and no other options are needed.
 
 Skip the following packages if you don't intend to use the GUI and will build with [`NO_QT=1`](#dependency-options):
 
-    apt install bison g++ pkgconf python3 xz-utils
+    apt install bison g++ ninja-build pkgconf python3 xz-utils
 
 #### For macOS cross compilation
 
@@ -91,6 +91,10 @@ For linux S390X cross compilation:
 ### Install the required dependencies: FreeBSD
 
     pkg install bash cmake curl gmake
+
+Skip the following packages if you don't intend to use the GUI and will build with [`NO_QT=1`](#dependency-options):
+
+    pkg install bison ninja pkgconf python3
 
 ### Install the required dependencies: NetBSD
 
