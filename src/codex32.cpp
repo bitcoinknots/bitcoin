@@ -390,6 +390,8 @@ Result::Result(const std::vector<Result>& shares, char output_idx) {
         }
     }
 
+    if (m_valid != OK) return;
+
     m_hrp = shares[0].m_hrp;
     m_data.reserve(shares[0].m_data.size());
     for (size_t j = 0; j < shares[0].m_data.size(); ++j) {
