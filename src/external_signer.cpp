@@ -45,7 +45,7 @@ bool ExternalSigner::Enumerate(const std::string& command, std::vector<ExternalS
         }
         const std::string& fingerprintStr{fingerprint.get_str()};
         if (fingerprintStr.empty() || !IsHex(fingerprintStr)) {
-            throw std::runtime_error(strprintf("'%s' received invalid fingerprint '%s'", command, fingerprintStr));
+            throw std::runtime_error(strprintf("'%s' received invalid fingerprint", command));
         }
         // Skip duplicate signer
         bool duplicate = false;
