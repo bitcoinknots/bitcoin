@@ -409,23 +409,45 @@ if(BUILD_CLI)
   # Generate zsh completion file
   if(INSTALL_ZSH_COMPLETION)
     set(ZSH_COMPLETION_FILE ${PROJECT_SOURCE_DIR}/contrib/completions/zsh/bitcoin-cli.zsh)
-    add_custom_command(
-      OUTPUT ${ZSH_COMPLETION_FILE}
-      COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_SOURCE_DIR}/contrib/completions/zsh
-      COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/test/functional/tool_cli_completion.py
-              --configfile=${PROJECT_BINARY_DIR}/test/config.ini
-              --zsh-completion=${ZSH_COMPLETION_FILE}
-              --overwrite
-              --cachedir=${PROJECT_BINARY_DIR}/test/cache
-              --tmpdir=${PROJECT_BINARY_DIR}/test/tmp_zsh_completion
-      DEPENDS bitcoin-cli bitcoind
-      WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/src
-      COMMENT "Generating zsh completion for bitcoin-cli"
-      VERBATIM
-    )
-    add_custom_target(generate_zsh_completion ALL
-      DEPENDS ${ZSH_COMPLETION_FILE}
-    )
+
+    # Zsh completion generation requires running the built binaries to query
+    # available RPC commands. This doesn't work during cross-compilation since
+    # the target binaries won't execute on the build host.
+    if(CMAKE_CROSSCOMPILING)
+      # When cross-compiling, check if a pre-generated completion file exists
+      if(EXISTS ${ZSH_COMPLETION_FILE})
+        message(STATUS "Cross-compiling: Using pre-generated zsh completion file")
+        # Create a dummy target that doesn't regenerate the file
+        add_custom_target(generate_zsh_completion)
+      else()
+        message(WARNING "Cross-compiling: Cannot generate zsh completion file because "
+                        "target binaries cannot be executed on the build host. "
+                        "To include zsh completion:\n"
+                        "  1. Generate it in a native build first, or\n"
+                        "  2. Set -DINSTALL_ZSH_COMPLETION=OFF to disable")
+        # Create a dummy target to avoid build errors
+        add_custom_target(generate_zsh_completion)
+      endif()
+    else()
+      # Native build: generate completion file by running the binaries
+      add_custom_command(
+        OUTPUT ${ZSH_COMPLETION_FILE}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_SOURCE_DIR}/contrib/completions/zsh
+        COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/test/functional/tool_cli_completion.py
+                --configfile=${PROJECT_BINARY_DIR}/test/config.ini
+                --zsh-completion=${ZSH_COMPLETION_FILE}
+                --overwrite
+                --cachedir=${PROJECT_BINARY_DIR}/test/cache
+                --tmpdir=${PROJECT_BINARY_DIR}/test/tmp_zsh_completion
+        DEPENDS bitcoin-cli bitcoind
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/src
+        COMMENT "Generating zsh completion for bitcoin-cli"
+        VERBATIM
+      )
+      add_custom_target(generate_zsh_completion ALL
+        DEPENDS ${ZSH_COMPLETION_FILE}
+      )
+    endif()
   endif()
 
   install_binary_component(bitcoin-cli HAS_MANPAGE HAS_ZSH_COMPLETION)
