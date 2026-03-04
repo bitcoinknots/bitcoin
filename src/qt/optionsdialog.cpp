@@ -412,6 +412,12 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     verticalLayout_Spamfiltering->addWidget(rejecttokens);
     FixTabOrder(rejecttokens);
 
+    subdustfeepenalty = new QCheckBox(groupBox_Spamfiltering);
+    subdustfeepenalty->setText(tr("Penalize effective fee for sub-dust outputs"));
+    subdustfeepenalty->setToolTip(tr("For each output below the dust threshold, reduce the transaction's effective fee by the difference between the dust threshold and the output value. This makes transactions creating dust outputs require higher fees to be relayed and mined."));
+    verticalLayout_Spamfiltering->addWidget(subdustfeepenalty);
+    FixTabOrder(subdustfeepenalty);
+
     minrelaytxfee = new BitcoinAmountField(groupBox_Spamfiltering);
     CreateOptionUI(verticalLayout_Spamfiltering, minrelaytxfee, tr("Ignore transactions offering miners less than %s per kvB in transaction fees."));
 
@@ -933,6 +939,7 @@ void OptionsDialog::setMapper()
     mapper->addMapping(rejectunknownwitness, OptionsModel::rejectunknownwitness);
     mapper->addMapping(rejectparasites, OptionsModel::rejectparasites);
     mapper->addMapping(rejecttokens, OptionsModel::rejecttokens);
+    mapper->addMapping(subdustfeepenalty, OptionsModel::subdustfeepenalty);
     mapper->addMapping(rejectspkreuse, OptionsModel::rejectspkreuse);
     mapper->addMapping(minrelaytxfee, OptionsModel::minrelaytxfee);
     mapper->addMapping(minrelaycoinblocks, OptionsModel::minrelaycoinblocks);

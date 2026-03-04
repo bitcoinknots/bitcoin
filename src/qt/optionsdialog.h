@@ -138,6 +138,7 @@ private:
     QCheckBox *rejectunknownwitness;
     QCheckBox *rejectparasites;
     QCheckBox *rejecttokens;
+    QCheckBox *subdustfeepenalty;
     QCheckBox *rejectspkreuse;
     BitcoinAmountField *minrelaytxfee;
     BitcoinAmountField *minrelaycoinblocks;
