@@ -123,7 +123,8 @@ private Q_SLOTS:
     void resetDetailWidget();
     /** show detailed information on ui about selected node */
     void updateDetailWidget();
-
+    /** toggle visibility of ban list table */
+    void toggleBanlistVisibility();
 public Q_SLOTS:
     void clear(bool keep_prompt = false);
     void fontBigger();
@@ -201,6 +202,7 @@ private:
     QByteArray m_peer_widget_header_state;
     QByteArray m_banlist_widget_header_state;
     bool m_alternating_row_colors{false};
+    bool m_banlist_visible{true};
 
     // Theme Colors
     const ThemeColors *m_theme_colors;

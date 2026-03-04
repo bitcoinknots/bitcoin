@@ -524,6 +524,10 @@ RPCConsole::RPCConsole(interfaces::Node& node, const PlatformStyle *_platformSty
     m_peer_widget_header_state = settings.value("PeersTabPeerHeaderState_Knots23").toByteArray();
     m_banlist_widget_header_state = settings.value("PeersTabBanlistHeaderState").toByteArray();
     m_alternating_row_colors = settings.value("PeersTabAlternatingRowColors").toBool();
+    
+    // Set up ban list toggle button
+    m_banlist_visible = settings.value("PeersTabBanlistVisible", true).toBool();
+    connect(ui->banToggleButton, &QPushButton::clicked, this, &RPCConsole::toggleBanlistVisibility);
 
     {
         // Move everything down a row to make room
@@ -1514,8 +1518,27 @@ void RPCConsole::showOrHideBanTableIfRequired()
         return;
 
     bool visible = clientModel->getBanTableModel()->shouldShow();
-    ui->banlistWidget->setVisible(visible);
     ui->banHeading->setVisible(visible);
+    ui->banToggleButton->setVisible(visible);
+            
+    // Show table only if criteria says we should and user has selected to see it
+    ui->banlistWidget->setVisible(visible && m_banlist_visible);
+
+    // Update button text based on current state
+    if (visible) {
+        ui->banToggleButton->setText(m_banlist_visible ? tr("Hide") : tr("Show"));
+    }
+}
+
+void RPCConsole::toggleBanlistVisibility()
+{
+    m_banlist_visible = !m_banlist_visible;
+
+    // Save state to settings
+    QSettings settings;
+    settings.setValue("PeersTabBanlistVisible", m_banlist_visible);
+
+    showOrHideBanTableIfRequired();
 }
 
 std::vector<RPCConsole::TabTypes> RPCConsole::tabs() const
