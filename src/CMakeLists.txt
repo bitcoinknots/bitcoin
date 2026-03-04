@@ -181,6 +181,7 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   script/descriptor.cpp
   script/miniscript.cpp
   script/parsing.cpp
+  script/policy.cpp
   script/sign.cpp
   script/signingprovider.cpp
   script/solver.cpp
