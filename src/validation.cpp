@@ -1259,6 +1259,8 @@ bool MemPoolAccept::ReplacementChecks(ATMPArgs& args, Workspace& ws)
     const uint256& hash = ws.m_hash;
     TxValidationState& state = ws.m_state;
 
+    const bool feerate_mode = m_pool.m_opts.rbf_feerate_mode;
+
     CFeeRate newFeeRate(ws.m_modified_fees, ws.m_vsize);
     // Enforce Rule #6. The replacement transaction must have a higher feerate than its direct conflicts.
     // - The motivation for this check is to ensure that the replacement transaction is preferable for
@@ -1303,7 +1305,8 @@ bool MemPoolAccept::ReplacementChecks(ATMPArgs& args, Workspace& ws)
     }
     if (!args.m_ignore_rejects.count("insufficient fee")) {
     if (const auto err_string{PaysForRBF(m_subpackage.m_conflicting_fees, ws.m_modified_fees, ws.m_vsize,
-                                         m_pool.m_opts.incremental_relay_feerate, hash)}) {
+                                         m_pool.m_opts.incremental_relay_feerate, hash,
+                                         /*skip_absolute_fee_check=*/feerate_mode)}) {
         // Result may change in a package context
         return state.Invalid(TxValidationResult::TX_RECONSIDERABLE,
                              strprintf("insufficient fee%s", ws.m_sibling_eviction ? " (including sibling eviction)" : ""), *err_string);
@@ -1314,6 +1317,15 @@ bool MemPoolAccept::ReplacementChecks(ATMPArgs& args, Workspace& ws)
     for (auto it : all_conflicts) {
         m_subpackage.m_changeset->StageRemoval(it);
     }
+
+    if (feerate_mode) {
+        if (const auto err_tup{ImprovesFeerateDiagram(*m_subpackage.m_changeset)}) {
+            return state.Invalid(TxValidationResult::TX_RECONSIDERABLE,
+                                 "insufficient feerate: does not improve feerate diagram",
+                                 err_tup->second);
+        }
+    }
+
     return true;
 }
 
@@ -1389,10 +1401,12 @@ bool MemPoolAccept::PackageMempoolChecks(const ATMPArgs& args, const std::vector
 
     // Use the child as the transaction for attributing errors to.
     const Txid& child_hash = child_ws.m_ptx->GetHash();
+    const bool feerate_mode = m_pool.m_opts.rbf_feerate_mode;
     if (const auto err_string{PaysForRBF(/*original_fees=*/m_subpackage.m_conflicting_fees,
                                          /*replacement_fees=*/m_subpackage.m_total_modified_fees,
                                          /*replacement_vsize=*/m_subpackage.m_total_vsize,
-                                         m_pool.m_opts.incremental_relay_feerate, child_hash)}) {
+                                         m_pool.m_opts.incremental_relay_feerate, child_hash,
+                                         /*skip_absolute_fee_check=*/feerate_mode)}) {
         return package_state.Invalid(PackageValidationResult::PCKG_POLICY,
                                      "package RBF failed: insufficient anti-DoS fees", *err_string);
     }

@@ -90,6 +90,7 @@ struct MemPoolOptions {
     bool require_standard{true};
     bool acceptunknownwitness{DEFAULT_ACCEPTUNKNOWNWITNESS};
     RBFPolicy rbf_policy{DEFAULT_MEMPOOL_RBF_POLICY};
+    bool rbf_feerate_mode{false};
     TRUCPolicy truc_policy{DEFAULT_MEMPOOL_TRUC_POLICY};
     bool permitephemeral_anchor{DEFAULT_PERMITEPHEMERAL_ANCHOR};
     bool permitephemeral_send{DEFAULT_PERMITEPHEMERAL_SEND};

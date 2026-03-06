@@ -254,9 +254,9 @@ OptionsModel::FontChoice OptionsModel::FontChoiceFromString(const QString& s)
 static QString CanonicalMempoolReplacement(const OptionsModel& model)
 {
     switch (model.node().mempool().m_opts.rbf_policy) {
-    case RBFPolicy::Never:  return "never";
-    case RBFPolicy::OptIn:  return "fee,optin";
-    case RBFPolicy::Always: return "fee,-optin";
+    case RBFPolicy::Never:   return "never";
+    case RBFPolicy::OptIn:   return model.node().mempool().m_opts.rbf_feerate_mode ? "feerate,optin" : "fee,optin";
+    case RBFPolicy::Always:  return model.node().mempool().m_opts.rbf_feerate_mode ? "feerate,-optin" : "fee,-optin";
     }
     assert(0);
 }
@@ -1124,12 +1124,23 @@ bool OptionsModel::setOption(OptionID option, const QVariant& value, const std::
             QString nv = value.toString();
             if (nv == "never") {
                 node().mempool().m_opts.rbf_policy = RBFPolicy::Never;
+                node().mempool().m_opts.rbf_feerate_mode = false;
                 node().updateRwSetting("mempoolfullrbf", "0");
             } else if (nv == "fee,optin") {
                 node().mempool().m_opts.rbf_policy = RBFPolicy::OptIn;
+                node().mempool().m_opts.rbf_feerate_mode = false;
                 node().updateRwSetting("mempoolfullrbf", "0");
+            } else if (nv == "feerate,optin") {
+                node().mempool().m_opts.rbf_policy = RBFPolicy::OptIn;
+                node().mempool().m_opts.rbf_feerate_mode = true;
+                node().updateRwSetting("mempoolfullrbf", "0");
+            } else if (nv == "feerate,-optin") {
+                node().mempool().m_opts.rbf_policy = RBFPolicy::Always;
+                node().mempool().m_opts.rbf_feerate_mode = true;
+                node().updateRwSetting("mempoolfullrbf", "1");
             } else {  // "fee,-optin"
                 node().mempool().m_opts.rbf_policy = RBFPolicy::Always;
+                node().mempool().m_opts.rbf_feerate_mode = false;
                 node().updateRwSetting("mempoolfullrbf", "1");
             }
             gArgs.ModifyRWConfigFile("mempoolreplacement", nv.toStdString());

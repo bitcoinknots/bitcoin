@@ -223,6 +223,7 @@ util::Result<void> ApplyArgsManOptions(const ArgsManager& argsman, const CChainP
         // Generally, mempoolreplacement overrides mempoolfullrbf, but the latter is used to infer intent in some cases
         std::optional<bool> optin_flag;
         bool fee_flag{false};
+        bool feerate_flag{false};
         if (argsman.GetBoolArg("-mempoolreplacement", false)) {
             fee_flag = true;
         } else {
@@ -233,9 +234,13 @@ util::Result<void> ApplyArgsManOptions(const ArgsManager& argsman, const CChainP
                     optin_flag = false;
                 } else if (opt == "fee") {
                     fee_flag = true;
+                } else if (opt == "feerate") {
+                    feerate_flag = true;
                 }
             }
         }
+        mempool_opts.rbf_feerate_mode = feerate_flag;
+        if (feerate_flag) fee_flag = true;
         if (optin_flag.value_or(false)) {
             // "optin" is explicitly specified
             mempool_opts.rbf_policy = RBFPolicy::OptIn;

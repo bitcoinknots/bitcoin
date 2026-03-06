@@ -345,6 +345,8 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     mempoolreplacement->addItem(QString("never"), QVariant("never"));
     mempoolreplacement->addItem(QString("with a higher mining fee, and opt-in"), QVariant("fee,optin"));
     mempoolreplacement->addItem(QString("with a higher mining fee (no opt-out)"), QVariant("fee,-optin"));
+    mempoolreplacement->addItem(QString("with a higher mining feerate, and opt-in"), QVariant("feerate,optin"));
+    mempoolreplacement->addItem(QString("with a higher mining feerate (no opt-out)"), QVariant("feerate,-optin"));
     CreateOptionUI(verticalLayout_Mempool, mempoolreplacement, tr("Transaction &replacement: %s"));
 
     incrementalrelayfee = new BitcoinAmountField(tabMempool);
