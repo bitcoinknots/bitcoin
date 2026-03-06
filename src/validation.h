@@ -990,6 +990,12 @@ private:
     SteadyClock::duration GUARDED_BY(::cs_main) time_post_connect{};
 
 public:
+    static constexpr int CALIBRATION_SAMPLE_BLOCKS{100};
+    std::atomic<int> m_calibration_blocks{0};
+    std::atomic<int64_t> m_calibration_inputs{0};
+    std::atomic<int64_t> m_calibration_time_us{0};
+    std::atomic<bool> m_calibration_done{false};
+
     using Options = kernel::ChainstateManagerOpts;
 
     explicit ChainstateManager(const util::SignalInterrupt& interrupt, Options options, node::BlockManager::Options blockman_options);

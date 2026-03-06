@@ -2993,6 +2993,24 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
              Ticks<SecondsDouble>(m_chainman.time_verify),
              Ticks<MillisecondsDouble>(m_chainman.time_verify) / m_chainman.num_blocks_total);
 
+    if (fScriptChecks && nInputs > 1 && !m_chainman.m_calibration_done.load(std::memory_order_relaxed)) {
+        int64_t verify_us = Ticks<std::chrono::microseconds>(time_4 - time_2);
+        m_chainman.m_calibration_inputs.fetch_add(nInputs - 1, std::memory_order_relaxed);
+        m_chainman.m_calibration_time_us.fetch_add(verify_us, std::memory_order_relaxed);
+        int blocks = m_chainman.m_calibration_blocks.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (blocks >= ChainstateManager::CALIBRATION_SAMPLE_BLOCKS) {
+            bool expected = false;
+            if (m_chainman.m_calibration_done.compare_exchange_strong(expected, true, std::memory_order_release)) {
+                int64_t total_inputs = m_chainman.m_calibration_inputs.load(std::memory_order_relaxed);
+                int64_t total_us = m_chainman.m_calibration_time_us.load(std::memory_order_relaxed);
+                double us_per_input = total_inputs > 0 ? static_cast<double>(total_us) / total_inputs : 0.0;
+                size_t thread_count = parallel_script_checks ? m_chainman.GetCheckQueue().ThreadCount() + 1 : 1;
+                LogInfo("Script verification calibration complete: %.1f us/input with %d threads (%d blocks, %d inputs)",
+                        us_per_input, thread_count, blocks, total_inputs);
+            }
+        }
+    }
+
     if (fJustCheck) {
         return true;
     }

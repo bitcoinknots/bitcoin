@@ -1597,6 +1597,13 @@ static RPCHelpMan scriptthreadsinfo()
                     {
                         {RPCResult::Type::BOOL, "enabled", "true if script verification threads are enabled (see setscriptthreadsenabled)."},
                         {RPCResult::Type::NUM, "num_script_check_threads", "The total number of script verification threads, when enabled."},
+                        {RPCResult::Type::OBJ, "calibration", "Script verification calibration data.",
+                        {
+                            {RPCResult::Type::BOOL, "complete", "Whether calibration has finished."},
+                            {RPCResult::Type::NUM, "blocks", "Number of blocks sampled."},
+                            {RPCResult::Type::NUM, "inputs", "Total inputs verified during calibration."},
+                            {RPCResult::Type::NUM, "us_per_input", "Average microseconds per input verification."},
+                        }},
                     },
                 },
                 RPCExamples{
@@ -1610,6 +1617,18 @@ static RPCHelpMan scriptthreadsinfo()
     size_t thread_count{chainman.m_script_check_queue_enabled ? chainman.GetCheckQueue().ThreadCount() : 0};
     ret.pushKV("enabled", (bool)thread_count);
     ret.pushKV("num_script_check_threads", (int64_t)thread_count + 1);
+
+    UniValue calibration(UniValue::VOBJ);
+    bool cal_done = chainman.m_calibration_done.load(std::memory_order_acquire);
+    int cal_blocks = chainman.m_calibration_blocks.load(std::memory_order_relaxed);
+    int64_t cal_inputs = chainman.m_calibration_inputs.load(std::memory_order_relaxed);
+    int64_t cal_time_us = chainman.m_calibration_time_us.load(std::memory_order_relaxed);
+    calibration.pushKV("complete", cal_done);
+    calibration.pushKV("blocks", cal_blocks);
+    calibration.pushKV("inputs", cal_inputs);
+    calibration.pushKV("us_per_input", cal_inputs > 0 ? static_cast<double>(cal_time_us) / cal_inputs : 0.0);
+    ret.pushKV("calibration", calibration);
+
     return ret;
 },
     };
