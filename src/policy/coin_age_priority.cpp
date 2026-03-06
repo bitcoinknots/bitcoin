@@ -4,6 +4,9 @@
 
 #include <policy/coin_age_priority.h>
 
+#include <algorithm>
+#include <cmath>
+
 #include <coins.h>
 #include <common/args.h>
 #include <consensus/validation.h>
@@ -114,6 +117,22 @@ CTxMemPoolEntry::GetPriority(unsigned int currentHeight) const
     if (dResult < 0) // This should only happen if it was called with an invalid height
         dResult = 0;
     return dResult;
+}
+
+int32_t CalculatePriorityWeightDiscount(double inputs_coin_age, int32_t tx_weight, int32_t min_weight)
+{
+    if (tx_weight <= min_weight || inputs_coin_age <= 0.0) return 0;
+
+    const double vsize = static_cast<double>(tx_weight) / WITNESS_SCALE_FACTOR;
+    const double priority = inputs_coin_age / vsize;
+    static constexpr double PRIORITY_DISCOUNT_LOG_DIVISOR{8.0};
+    const double discount_ratio = std::min(0.5, std::log2(1.0 + priority / MINIMUM_TX_PRIORITY) / PRIORITY_DISCOUNT_LOG_DIVISOR);
+
+    int32_t weight_discount = static_cast<int32_t>(-discount_ratio * tx_weight);
+    weight_discount = std::max(weight_discount, min_weight - tx_weight);
+
+    Assume(weight_discount <= 0);
+    return weight_discount;
 }
 
 #ifndef BUILDING_FOR_LIBBITCOINKERNEL
