@@ -10,3 +10,4 @@
 unsigned int nBytesPerSigOp = DEFAULT_BYTES_PER_SIGOP;
 unsigned int nBytesPerSigOpStrict = DEFAULT_BYTES_PER_SIGOP_STRICT;
 unsigned int g_weight_per_data_byte = DEFAULT_WEIGHT_PER_DATA_BYTE;
+bool g_priority_vsize_discount = DEFAULT_PRIORITY_VSIZE_DISCOUNT;
