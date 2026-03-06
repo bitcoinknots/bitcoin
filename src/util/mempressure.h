@@ -6,9 +6,11 @@
 #define BITCOIN_UTIL_MEMPRESSURE_H
 
 #include <cstddef>
+#include <cstdint>
 
 extern size_t g_low_memory_threshold;
 
 bool SystemNeedsMemoryReleased();
+uint64_t GetTotalSystemMemory();
 
 #endif // BITCOIN_UTIL_MEMPRESSURE_H
