@@ -1031,6 +1031,7 @@ void RPCConsole::clear(bool keep_prompt)
             they are not space separated from the rest of the text intentionally. */
         tr("Welcome to the %1 RPC console.\n"
            "Use up and down arrows to navigate history, and %2 to clear screen.\n"
+           "Type %9 to permanently clear command history.\n"
            "Use %3 and %4 to increase or decrease the font size.\n"
            "Type %5 for an overview of available commands.\n"
            "For more information on using this console, type %6.\n"
@@ -1045,7 +1046,8 @@ void RPCConsole::clear(bool keep_prompt)
                  "<b>help</b>",
                  "<b>help-console</b>",
                  "<span class=\"secwarning\">",
-                 "<span>");
+                 "<span>",
+                 "<b>/clearhistory</b>");
 
     message(CMD_REPLY, welcome_message, true);
 }
@@ -1162,6 +1164,32 @@ void RPCConsole::on_lineEdit_returnPressed()
     QString cmd = ui->lineEdit->text().trimmed();
 
     if (cmd.isEmpty()) {
+        return;
+    }
+
+    // Handle /clearhistory command before RPC parsing
+    if (cmd == QLatin1String("/clearhistory")) {
+        ui->lineEdit->clear();
+        QMessageBox::StandardButton reply = QMessageBox::warning(this,
+            tr("Clear Console History"),
+            tr("This will permanently clear your console command history and output. "
+               "This action is irreversible but is not guaranteed to be irrecoverable."),
+            QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+        if (reply == QMessageBox::Yes) {
+            // Overwrite saved history with dummy data before clearing
+            for (int i = 0; i < history.size(); ++i) {
+                history[i] = QString(history[i].size(), 'x');
+            }
+            WriteCommandHistory();
+
+            // Clear in-memory history and overwrite saved history again
+            history.clear();
+            historyPtr = 0;
+            WriteCommandHistory();
+
+            // Clear console output
+            clear();
+        }
         return;
     }
 
