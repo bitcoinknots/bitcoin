@@ -9,6 +9,7 @@
 #include <kernel/caches.h>
 #include <logging.h>
 #include <util/byte_units.h>
+#include <util/mempressure.h>
 
 #include <algorithm>
 #include <string>
@@ -32,6 +33,13 @@ CacheSizes CalculateCacheSizes(const ArgsManager& args, size_t n_indexes)
         uint64_t db_cache_bytes = SaturatingLeftShift<uint64_t>(*db_cache, 20);
         constexpr auto max_db_cache{sizeof(void*) == 4 ? MAX_32BIT_DBCACHE : std::numeric_limits<size_t>::max()};
         total_cache = std::max<size_t>(MIN_DB_CACHE, std::min<uint64_t>(db_cache_bytes, max_db_cache));
+    } else {
+        uint64_t total_mem = GetTotalSystemMemory();
+        if (total_mem > 0) {
+            constexpr uint64_t max_auto_cache{sizeof(void*) == 4 ? MAX_32BIT_DBCACHE : uint64_t{16} * 1024 * 1024 * 1024};
+            uint64_t auto_cache = std::min(total_mem / 2, max_auto_cache);
+            total_cache = std::max<size_t>(MIN_DB_CACHE, static_cast<size_t>(auto_cache));
+        }
     }
 
     IndexCacheSizes index_sizes;

@@ -28,6 +28,7 @@
 #include <node/mempool_args.h> // for ParseDustDynamicOpt
 #include <outputtype.h>
 #include <policy/settings.h>
+#include <util/mempressure.h>
 #include <util/moneystr.h> // for FormatMoney
 #include <util/string.h>
 #include <validation.h>    // For DEFAULT_SCRIPTCHECK_THREADS
@@ -37,7 +38,9 @@
 #include <interfaces/wallet.h>
 #endif
 
+#include <algorithm>
 #include <chrono>
+#include <limits>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -694,7 +697,12 @@ QVariant OptionsModel::getOption(OptionID option, const std::string& suffix) con
                suffix.empty()          ? getOption(option, "-prev") :
                                          DEFAULT_PRUNE_TARGET_MiB;
     case DatabaseCache:
-        return qlonglong(SettingToInt(setting(), DEFAULT_DB_CACHE >> 20));
+    {
+        uint64_t total_mem = GetTotalSystemMemory();
+        constexpr uint64_t max_auto_cache{sizeof(void*) == 4 ? uint64_t{1024} : uint64_t{16} * 1024};
+        int default_mib = total_mem > 0 ? static_cast<int>(std::min(total_mem / 2 >> 20, max_auto_cache)) : static_cast<int>(DEFAULT_DB_CACHE >> 20);
+        return qlonglong(SettingToInt(setting(), default_mib));
+    }
     case ThreadsScriptVerif:
         return qlonglong(SettingToInt(setting(), DEFAULT_SCRIPTCHECK_THREADS));
     case Listen:

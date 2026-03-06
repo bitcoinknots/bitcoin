@@ -12,6 +12,9 @@
 #ifdef HAVE_LINUX_SYSINFO
 #include <sys/sysinfo.h>
 #endif
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#endif
 #ifdef WIN32
 #include <windows.h>
 #endif
@@ -19,7 +22,7 @@
 #include <cstddef>
 #include <cstdint>
 
-size_t g_low_memory_threshold{0};
+size_t g_low_memory_threshold{256_MiB};
 
 bool SystemNeedsMemoryReleased()
 {
@@ -53,4 +56,29 @@ bool SystemNeedsMemoryReleased()
 #endif
     // NOTE: sysconf(_SC_AVPHYS_PAGES) doesn't account for caches on at least Linux, so not safe to use here
     return false;
+}
+
+uint64_t GetTotalSystemMemory()
+{
+#ifdef WIN32
+    MEMORYSTATUSEX mem_status;
+    mem_status.dwLength = sizeof(mem_status);
+    if (GlobalMemoryStatusEx(&mem_status)) {
+        return mem_status.ullTotalPhys;
+    }
+#endif
+#ifdef HAVE_LINUX_SYSINFO
+    struct sysinfo sys_info;
+    if (!sysinfo(&sys_info)) {
+        return uint64_t(sys_info.totalram) * sys_info.mem_unit;
+    }
+#endif
+#ifdef __APPLE__
+    int64_t memsize = 0;
+    size_t len = sizeof(memsize);
+    if (!sysctlbyname("hw.memsize", &memsize, &len, nullptr, 0) && memsize > 0) {
+        return static_cast<uint64_t>(memsize);
+    }
+#endif
+    return 0;
 }
