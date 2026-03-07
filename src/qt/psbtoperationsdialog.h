@@ -33,6 +33,9 @@ public Q_SLOTS:
     void copyToClipboard();
     void saveTransaction();
 
+protected:
+    void changeEvent(QEvent* e) override;
+
 private:
     Ui::PSBTOperationsDialog* m_ui;
     PartiallySignedTransaction m_transaction_data;
@@ -44,6 +47,7 @@ private:
         WARN,
         ERR
     };
+    StatusLevel m_status_level{StatusLevel::INFO};
 
     size_t couldSignInputs(const PartiallySignedTransaction &psbtx);
     void updateTransactionDisplay();

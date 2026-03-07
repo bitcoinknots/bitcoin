@@ -71,6 +71,7 @@ SendCoinsDialog::SendCoinsDialog(const PlatformStyle *_platformStyle, QWidget *p
     platformStyle(_platformStyle)
 {
     ui->setupUi(this);
+    updateThemeStyles();
 
     if (!_platformStyle->getImagesOnButtons()) {
         ui->addButton->setIcon(QIcon());
@@ -147,6 +148,15 @@ void SendCoinsDialog::setClientModel(ClientModel *_clientModel)
     if (_clientModel) {
         connect(_clientModel, &ClientModel::numBlocksChanged, this, &SendCoinsDialog::updateNumberOfBlocks);
     }
+}
+
+void SendCoinsDialog::changeEvent(QEvent* e)
+{
+    if (e->type() == QEvent::PaletteChange) {
+        updateThemeStyles();
+    }
+
+    QDialog::changeEvent(e);
 }
 
 void SendCoinsDialog::setModel(WalletModel *_model)
@@ -1085,7 +1095,7 @@ void SendCoinsDialog::coinControlChangeEdited(const QString& text)
     {
         // Default to no change address until verified
         m_coin_control->destChange = CNoDestination();
-        ui->labelCoinControlChangeLabel->setStyleSheet("QLabel{color:red;}");
+        ui->labelCoinControlChangeLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; }").arg(GUIUtil::getThemedErrorColor(palette()).name()));
 
         const CTxDestination dest = DecodeDestination(text.toStdString());
 
@@ -1111,13 +1121,13 @@ void SendCoinsDialog::coinControlChangeEdited(const QString& text)
                 else
                 {
                     ui->lineEditCoinControlChange->setText("");
-                    ui->labelCoinControlChangeLabel->setStyleSheet("QLabel{color:black;}");
+                    ui->labelCoinControlChangeLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; }").arg(palette().color(QPalette::WindowText).name()));
                     ui->labelCoinControlChangeLabel->setText("");
                 }
             }
             else // Known change address
             {
-                ui->labelCoinControlChangeLabel->setStyleSheet("QLabel{color:black;}");
+                ui->labelCoinControlChangeLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; }").arg(palette().color(QPalette::WindowText).name()));
 
                 // Query label
                 QString associatedLabel = model->getAddressTableModel()->labelForAddress(text);
@@ -1130,6 +1140,19 @@ void SendCoinsDialog::coinControlChangeEdited(const QString& text)
             }
         }
     }
+}
+
+void SendCoinsDialog::updateThemeStyles()
+{
+    ui->labelCoinControlInsuffFunds->setStyleSheet(
+        QStringLiteral("color:%1;font-weight:bold;").arg(GUIUtil::getThemedErrorColor(palette()).name()));
+
+    const QColor change_label_color =
+        (!ui->labelCoinControlChangeLabel->text().isEmpty() && std::holds_alternative<CNoDestination>(m_coin_control->destChange))
+            ? GUIUtil::getThemedErrorColor(palette())
+            : palette().color(QPalette::WindowText);
+    ui->labelCoinControlChangeLabel->setStyleSheet(
+        QStringLiteral("QLabel { color: %1; }").arg(change_label_color.name()));
 }
 
 // Coin Control: update labels

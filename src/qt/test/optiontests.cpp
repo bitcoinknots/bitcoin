@@ -141,6 +141,33 @@ void OptionTests::parametersInteraction()
     gArgs.ClearPathCache();
 }
 
+void OptionTests::themePreference()
+{
+    QSettings settings;
+    settings.remove("ThemePreference");
+
+    {
+        OptionsModel options{m_node};
+        bilingual_str error;
+        QVERIFY(options.Init(error));
+        QCOMPARE(OptionsModel::ThemePreferenceToInt(options.getTheme()),
+                 OptionsModel::ThemePreferenceToInt(OptionsModel::ThemePreference::System));
+
+        QVERIFY(options.setOption(OptionsModel::Theme,
+                                  OptionsModel::ThemePreferenceToInt(OptionsModel::ThemePreference::Dark)));
+        QCOMPARE(settings.value("ThemePreference").toInt(),
+                 OptionsModel::ThemePreferenceToInt(OptionsModel::ThemePreference::Dark));
+    }
+
+    {
+        OptionsModel options{m_node};
+        bilingual_str error;
+        QVERIFY(options.Init(error));
+        QCOMPARE(OptionsModel::ThemePreferenceToInt(options.getTheme()),
+                 OptionsModel::ThemePreferenceToInt(OptionsModel::ThemePreference::Dark));
+    }
+}
+
 void OptionTests::extractFilter()
 {
     QString filter = QString("Partially Signed Transaction (Binary) (*.psbt)");

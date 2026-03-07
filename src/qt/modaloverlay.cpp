@@ -36,7 +36,6 @@ ModalOverlay::ModalOverlay(bool enable_wallet, const PlatformStyle& platform_sty
         raise();
     }
     ui->closeButton->installEventFilter(this);
-
     blockProcessTime.clear();
     setVisible(false);
     if (!enable_wallet) {

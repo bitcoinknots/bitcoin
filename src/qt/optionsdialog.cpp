@@ -252,7 +252,7 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     ui->threadsScriptVerif->setMinimum(-GetNumCores());
     ui->threadsScriptVerif->setMaximum(MAX_SCRIPTCHECK_THREADS);
     ui->pruneWarning->setVisible(false);
-    ui->pruneWarning->setStyleSheet("QLabel { color: red; }");
+    ui->pruneWarning->setStyleSheet(QStringLiteral("QLabel { color: %1; }").arg(GUIUtil::getThemedErrorColor(palette()).name()));
 
     ui->pruneSizeMiB->setEnabled(false);
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 7, 0))
@@ -721,6 +721,9 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
             ui->lang->addItem(locale.nativeLanguageName() + QString(" (") + langStr + QString(")"), QVariant(langStr));
         }
     }
+    ui->theme->addItem(tr("System default"), OptionsModel::ThemePreferenceToInt(OptionsModel::ThemePreference::System));
+    ui->theme->addItem(tr("Light"), OptionsModel::ThemePreferenceToInt(OptionsModel::ThemePreference::Light));
+    ui->theme->addItem(tr("Dark"), OptionsModel::ThemePreferenceToInt(OptionsModel::ThemePreference::Dark));
     ui->unit->setModel(new BitcoinUnits(this));
 
     /* Widget-to-option mapper */
@@ -999,6 +1002,7 @@ void OptionsDialog::setMapper()
     /* Display */
     mapper->addMapping(ui->peersTabAlternatingRowColors, OptionsModel::PeersTabAlternatingRowColors);
     mapper->addMapping(ui->lang, OptionsModel::Language);
+    mapper->addMapping(ui->theme, OptionsModel::Theme);
     mapper->addMapping(ui->unit, OptionsModel::DisplayUnit);
     mapper->addMapping(ui->displayAddresses, OptionsModel::DisplayAddresses);
     mapper->addMapping(ui->thirdPartyTxUrls, OptionsModel::ThirdPartyTxUrls);
@@ -1010,10 +1014,7 @@ void OptionsDialog::checkLineEdit()
     if (lineedit->hasAcceptableInput()) {
         lineedit->setStyleSheet("");
     } else {
-        // Check the line edit's actual background to choose appropriate warning color
-        const bool lineedit_dark = GUIUtil::isDarkMode(lineedit->palette().color(lineedit->backgroundRole()));
-        const QColor lineedit_warning = lineedit_dark ? QColor("#FF8080") : QColor("#FF0000");
-        lineedit->setStyleSheet(QStringLiteral("color: %1;").arg(lineedit_warning.name()));
+        lineedit->setStyleSheet(QStringLiteral("color: %1;").arg(GUIUtil::getThemedErrorColor(lineedit->palette()).name()));
     }
 }
 
@@ -1264,20 +1265,13 @@ void OptionsDialog::updateDefaultProxyNets()
 
 void OptionsDialog::updateThemeColors()
 {
-    // Detect dark mode for color palette selection
-    const bool dark_mode = GUIUtil::isDarkMode(palette().color(backgroundRole()));
-
-    // set message warning color based on dark mode
-    const QColor warning_color = dark_mode ? QColor("#FF8080") : QColor("#FF0000");
+    const QColor warning_color = GUIUtil::getThemedErrorColor(palette());
     ui->pruneWarning->setStyleSheet(QStringLiteral("QLabel { color: %1; }").arg(warning_color.name()));
     ui->statusLabel->setStyleSheet(QStringLiteral("QLabel { color: %1; }").arg(warning_color.name()));
 
     // Update networkPort line edit color if it has validation errors
     if (!ui->networkPort->hasAcceptableInput()) {
-        // Check networkPort's actual background for appropriate warning color
-        const bool networkport_dark = GUIUtil::isDarkMode(ui->networkPort->palette().color(ui->networkPort->backgroundRole()));
-        const QColor networkport_warning = networkport_dark ? QColor("#FF8080") : QColor("#FF0000");
-        ui->networkPort->setStyleSheet(QStringLiteral("color: %1;").arg(networkport_warning.name()));
+        ui->networkPort->setStyleSheet(QStringLiteral("color: %1;").arg(GUIUtil::getThemedErrorColor(ui->networkPort->palette()).name()));
     }
 }
 

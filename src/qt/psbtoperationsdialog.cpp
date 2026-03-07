@@ -232,22 +232,32 @@ QString PSBTOperationsDialog::renderTransaction(const PartiallySignedTransaction
 }
 
 void PSBTOperationsDialog::showStatus(const QString &msg, StatusLevel level) {
+    m_status_level = level;
     m_ui->statusBar->setText(msg);
     switch (level) {
         case StatusLevel::INFO: {
-            m_ui->statusBar->setStyleSheet("QLabel { background-color : lightgreen }");
+            m_ui->statusBar->setStyleSheet(GUIUtil::getStatusLabelStyle(GUIUtil::getThemedSuccessColor(palette())));
             break;
         }
         case StatusLevel::WARN: {
-            m_ui->statusBar->setStyleSheet("QLabel { background-color : orange }");
+            m_ui->statusBar->setStyleSheet(GUIUtil::getStatusLabelStyle(QColor("#D98B00")));
             break;
         }
         case StatusLevel::ERR: {
-            m_ui->statusBar->setStyleSheet("QLabel { background-color : red }");
+            m_ui->statusBar->setStyleSheet(GUIUtil::getStatusLabelStyle(GUIUtil::getThemedErrorColor(palette())));
             break;
         }
     }
     m_ui->statusBar->show();
+}
+
+void PSBTOperationsDialog::changeEvent(QEvent* e)
+{
+    if (e->type() == QEvent::PaletteChange && m_ui->statusBar->isVisible()) {
+        showStatus(m_ui->statusBar->text(), m_status_level);
+    }
+
+    QDialog::changeEvent(e);
 }
 
 size_t PSBTOperationsDialog::couldSignInputs(const PartiallySignedTransaction &psbtx) {

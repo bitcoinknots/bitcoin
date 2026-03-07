@@ -16,6 +16,7 @@ class WalletModel;
 class WalletView;
 
 QT_BEGIN_NAMESPACE
+class QEvent;
 class QLabel;
 class QStackedWidget;
 QT_END_NAMESPACE
@@ -106,8 +107,14 @@ public Q_SLOTS:
     /** Show used receiving addresses */
     void usedReceivingAddresses();
 
+protected:
+    void changeEvent(QEvent* e) override;
+
 private Q_SLOTS:
     void updateAlerts(const QString &warnings);
+
+private:
+    void updateAlertStyle();
 };
 
 #endif // BITCOIN_QT_WALLETFRAME_H

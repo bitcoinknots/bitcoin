@@ -26,6 +26,7 @@ namespace Ui {
 }
 
 QT_BEGIN_NAMESPACE
+class QEvent;
 class QUrl;
 QT_END_NAMESPACE
 
@@ -63,6 +64,9 @@ public Q_SLOTS:
 Q_SIGNALS:
     void coinsSent(const uint256& txid);
 
+protected:
+    void changeEvent(QEvent* e) override;
+
 private:
     Ui::SendCoinsDialog *ui;
     ClientModel* clientModel{nullptr};
@@ -80,6 +84,7 @@ private:
     // Additional parameter msgArg can be used via .arg(msgArg).
     void processSendCoinsReturn(const WalletModel::SendCoinsReturn &sendCoinsReturn, const QString &msgArg = QString());
     void minimizeFeeSection(bool fMinimize);
+    void updateThemeStyles();
     // Format confirmation message
     bool PrepareSendText(QString& question_string, QString& informative_text, QString& detailed_text);
     /* Sign PSBT using external signer.

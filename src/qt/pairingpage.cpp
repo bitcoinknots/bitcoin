@@ -5,9 +5,11 @@
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
 #include <qt/clientmodel.h>
+#include <qt/guiutil.h>
 #include <qt/pairingpage.h>
 #include <qt/qrimagewidget.h>
 
+#include <QEvent>
 #include <QFormLayout>
 #include <QLabel>
 #include <QLayout>
@@ -18,13 +20,13 @@ PairingPage::PairingPage(QWidget *parent) :
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
 
-    QLabel *label_experimental = new QLabel(this);
-    label_experimental->setStyleSheet("QLabel { background-color: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop:0 #F0D0A0, stop:1 #F8D488); color:#000000; }");
-    label_experimental->setMargin(3);
-    label_experimental->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    label_experimental->setWordWrap(true);
-    label_experimental->setText(tr("Pairing is an experimental feature that currently only works when Tor is enabled. It is expected that the pairing address below will change with future updates, and you may need to re-pair after upgrading."));
-    layout->addWidget(label_experimental);
+    m_label_experimental = new QLabel(this);
+    m_label_experimental->setMargin(3);
+    m_label_experimental->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    m_label_experimental->setWordWrap(true);
+    m_label_experimental->setText(tr("Pairing is an experimental feature that currently only works when Tor is enabled. It is expected that the pairing address below will change with future updates, and you may need to re-pair after upgrading."));
+    layout->addWidget(m_label_experimental);
+    updateThemeStyles();
 
     QLabel *label_summary = new QLabel(this);
     label_summary->setText(tr("Below you will find information to pair other software or devices with this node:"));
@@ -45,6 +47,15 @@ PairingPage::PairingPage(QWidget *parent) :
     layout->addStretch();
 
     refresh();
+}
+
+void PairingPage::changeEvent(QEvent* e)
+{
+    if (e->type() == QEvent::PaletteChange) {
+        updateThemeStyles();
+    }
+
+    QWidget::changeEvent(e);
 }
 
 void PairingPage::setClientModel(ClientModel *client_model)
@@ -72,5 +83,12 @@ void PairingPage::refresh()
         m_onion_address->setText(tr("(not connected)"));
         m_onion_address->setEnabled(false);
         m_qrcode->setVisible(false);
+    }
+}
+
+void PairingPage::updateThemeStyles()
+{
+    if (m_label_experimental) {
+        m_label_experimental->setStyleSheet(GUIUtil::getThemedWarningLabelStyle(palette()));
     }
 }

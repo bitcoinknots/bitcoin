@@ -11,12 +11,16 @@
 #include <qt/bitcoin.h>
 #include <qt/bitcoingui.h>
 #include <qt/networkstyle.h>
+#include <qt/optionsmodel.h>
 #include <qt/rpcconsole.h>
 #include <test/util/setup_common.h>
 #include <validation.h>
 
 #include <QAction>
+#include <QCoreApplication>
+#include <QEvent>
 #include <QLineEdit>
+#include <QPalette>
 #include <QRegularExpression>
 #include <QScopedPointer>
 #include <QSignalSpy>
@@ -26,6 +30,7 @@
 #include <QtGlobal>
 #include <QtTest/QtTestWidgets>
 #include <QtTest/QtTestGui>
+#include <QWidget>
 
 namespace {
 //! Regex find a string group inside of the console output
@@ -49,6 +54,29 @@ void TestRpcCommand(RPCConsole* console)
     const QString output = messagesWidget->toPlainText();
     const QString pattern = QStringLiteral("\"chain\": \"(\\w+)\"");
     QCOMPARE(FindInConsole(output, pattern), QString("regtest"));
+}
+
+void ProcessEvents()
+{
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::ApplicationPaletteChange);
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::PaletteChange);
+    QCoreApplication::processEvents();
+}
+
+void CheckLightPalette(const QPalette& palette)
+{
+    QCOMPARE(palette.color(QPalette::Window), QColor(245, 245, 245));
+    QCOMPARE(palette.color(QPalette::Base), QColor(255, 255, 255));
+    QCOMPARE(palette.color(QPalette::Highlight), QColor(247, 147, 26));
+    QCOMPARE(palette.color(QPalette::HighlightedText), QColor(32, 32, 32));
+}
+
+void CheckDarkPalette(const QPalette& palette)
+{
+    QCOMPARE(palette.color(QPalette::Window), QColor(53, 53, 53));
+    QCOMPARE(palette.color(QPalette::Base), QColor(35, 35, 35));
+    QCOMPARE(palette.color(QPalette::Highlight), QColor(247, 147, 26));
+    QCOMPARE(palette.color(QPalette::HighlightedText), QColor(24, 24, 24));
 }
 } // namespace
 
@@ -97,6 +125,7 @@ void AppTests::appTests()
 void AppTests::guiTests(BitcoinGUI* window)
 {
     HandleCallback callback{"guiTests", *this};
+    themeTests(window);
     connect(window, &BitcoinGUI::consoleShown, this, &AppTests::consoleTests);
     expectCallback("consoleTests");
     QAction* action = window->findChild<QAction*>("openRPCConsoleAction");
@@ -108,6 +137,37 @@ void AppTests::consoleTests(RPCConsole* console)
 {
     HandleCallback callback{"consoleTests", *this};
     TestRpcCommand(console);
+}
+
+void AppTests::themeTests(QWidget* widget)
+{
+    const QPalette initial_palette = m_app.palette();
+    const bool system_is_dark = GUIUtil::isDarkMode(initial_palette.color(QPalette::Window));
+    if (system_is_dark) {
+        CheckDarkPalette(initial_palette);
+    } else {
+        CheckLightPalette(initial_palette);
+    }
+
+    m_app.setThemePreference(OptionsModel::ThemePreferenceToInt(OptionsModel::ThemePreference::Light));
+    ProcessEvents();
+    CheckLightPalette(m_app.palette());
+    QCOMPARE(widget->palette().color(QPalette::Window), QColor(245, 245, 245));
+
+    m_app.setThemePreference(OptionsModel::ThemePreferenceToInt(OptionsModel::ThemePreference::Dark));
+    ProcessEvents();
+    CheckDarkPalette(m_app.palette());
+    QCOMPARE(widget->palette().color(QPalette::Window), QColor(53, 53, 53));
+
+    m_app.setThemePreference(OptionsModel::ThemePreferenceToInt(OptionsModel::ThemePreference::System));
+    ProcessEvents();
+    if (system_is_dark) {
+        CheckDarkPalette(m_app.palette());
+        QCOMPARE(widget->palette().color(QPalette::Window), QColor(53, 53, 53));
+    } else {
+        CheckLightPalette(m_app.palette());
+        QCOMPARE(widget->palette().color(QPalette::Window), QColor(245, 245, 245));
+    }
 }
 
 //! Destructor to shut down after the last expected callback completes.

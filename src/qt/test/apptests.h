@@ -13,6 +13,7 @@
 class BitcoinApplication;
 class BitcoinGUI;
 class RPCConsole;
+class QWidget;
 
 class AppTests : public QObject
 {
@@ -26,6 +27,8 @@ private Q_SLOTS:
     void consoleTests(RPCConsole* console);
 
 private:
+    void themeTests(QWidget* widget);
+
     //! Add expected callback name to list of pending callbacks.
     void expectCallback(std::string callback) { m_callbacks.emplace(std::move(callback)); }
 

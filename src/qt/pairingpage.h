@@ -11,6 +11,8 @@ class ClientModel;
 class QRImageWidget;
 
 QT_BEGIN_NAMESPACE
+class QEvent;
+class QLabel;
 class QLineEdit;
 QT_END_NAMESPACE
 
@@ -26,8 +28,14 @@ public:
 public Q_SLOTS:
     void refresh();
 
+protected:
+    void changeEvent(QEvent* e) override;
+
 private:
+    void updateThemeStyles();
+
     ClientModel *m_client_model{nullptr};
+    QLabel* m_label_experimental{nullptr};
     QLineEdit *m_onion_address{nullptr};
     QRImageWidget *m_qrcode{nullptr};
 };

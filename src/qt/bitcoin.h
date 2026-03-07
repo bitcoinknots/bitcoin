@@ -16,6 +16,8 @@
 #include <optional>
 
 #include <QApplication>
+#include <QPalette>
+#include <QString>
 
 class BitcoinGUI;
 class ClientModel;
@@ -66,6 +68,8 @@ public:
 
     /// Setup platform style
     void setupPlatformStyle();
+    /// Apply the UI theme preference.
+    void setThemePreference(int theme_preference);
 
     interfaces::Node& node() const { assert(m_node); return *m_node; }
 
@@ -104,6 +108,8 @@ private:
     std::unique_ptr<QWidget> shutdownWindow;
     SplashScreen* m_splash = nullptr;
     std::unique_ptr<interfaces::Node> m_node;
+    QString m_system_style_name;
+    QPalette m_system_palette;
 
     void startThread();
 };

@@ -1120,6 +1120,40 @@ bool isDarkMode(const QColor& color) {
     return ColourLuminosity(color) < .36;
 }
 
+static QColor ContrastingTextColor(const QColor& color)
+{
+    return isDarkMode(color) ? QColor("#FFFFFF") : QColor("#000000");
+}
+
+QColor getThemedErrorColor(const QPalette& palette)
+{
+    return isDarkMode(palette.color(QPalette::Window)) ? QColor("#FF8080") : QColor("#FF0000");
+}
+
+QColor getThemedSuccessColor(const QPalette& palette)
+{
+    return isDarkMode(palette.color(QPalette::Window)) ? QColor("#45DEB5") : QColor("#007D32");
+}
+
+QString getThemedWarningLabelStyle(const QPalette& palette)
+{
+    const bool dark_mode = isDarkMode(palette.color(QPalette::Window));
+    const QColor gradient_start = dark_mode ? QColor("#5C4215") : QColor("#F0D0A0");
+    const QColor gradient_end = dark_mode ? QColor("#8A6728") : QColor("#F8D488");
+    const QColor text_color = dark_mode ? QColor("#FFF3D6") : QColor("#000000");
+    return QStringLiteral(
+        "QLabel { background-color: qlineargradient("
+        "x1: 0, y1: 0, x2: 1, y2: 0, "
+        "stop:0 %1, stop:1 %2); color:%3; }")
+        .arg(gradient_start.name(), gradient_end.name(), text_color.name());
+}
+
+QString getStatusLabelStyle(const QColor& background_color)
+{
+    return QStringLiteral("QLabel { background-color: %1; color: %2; }")
+        .arg(background_color.name(), ContrastingTextColor(background_color).name());
+}
+
 qreal calculateIdealFontSize(int width, const QString& text, QFont font, qreal minPointSize, qreal font_size) {
     while(font_size >= minPointSize) {
         font.setPointSizeF(font_size);

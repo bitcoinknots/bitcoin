@@ -43,6 +43,14 @@ class OptionsModel : public QAbstractListModel
 public:
     explicit OptionsModel(interfaces::Node& node, QObject *parent = nullptr);
 
+    enum class ThemePreference {
+        System = 0,
+        Light = 1,
+        Dark = 2,
+    };
+    static ThemePreference ThemePreferenceFromInt(int value);
+    static constexpr int ThemePreferenceToInt(ThemePreference value) { return static_cast<int>(value); }
+
     enum OptionID {
         StartAtStartup,         // bool
         ShowTrayIcon,           // bool
@@ -64,6 +72,7 @@ public:
         FontForMoney,           // FontChoice
         FontForQRCodes,         // FontChoice
         PeersTabAlternatingRowColors, // bool
+        Theme,
         walletrbf,              // bool
         CoinControlFeatures,    // bool
         SubFeeFromAmount,       // bool
@@ -152,6 +161,7 @@ public:
     QFont getFontForMoney(BitcoinUnit) const;
     FontChoice getFontChoiceForQRCodes() const { return m_font_qrcodes; }
     bool getPeersTabAlternatingRowColors() const { return m_peers_tab_alternating_row_colors; }
+    ThemePreference getTheme() const { return m_theme; }
     bool getCoinControlFeatures() const { return fCoinControlFeatures; }
     bool getSubFeeFromAmount() const { return m_sub_fee_from_amount; }
     bool getEnablePSBTControls() const { return m_enable_psbt_controls; }
@@ -183,6 +193,7 @@ private:
     bool m_font_money_supports_tonal;
     FontChoice m_font_qrcodes{FontChoiceAbstract::EmbeddedFont};
     bool m_peers_tab_alternating_row_colors;
+    ThemePreference m_theme{ThemePreference::System};
     bool fCoinControlFeatures;
     bool m_sub_fee_from_amount;
     bool m_enable_psbt_controls;
@@ -213,6 +224,7 @@ Q_SIGNALS:
     void fontForMoneyChanged(const QFont&);
     void fontForQRCodesChanged(const FontChoice&);
     void peersTabAlternatingRowColorsChanged(bool);
+    void themeChanged(int theme_preference);
 };
 
 Q_DECLARE_METATYPE(OptionsModel::FontChoice)

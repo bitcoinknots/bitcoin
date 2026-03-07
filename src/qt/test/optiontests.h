@@ -22,6 +22,7 @@ private Q_SLOTS:
     void migrateSettings();
     void integerGetArgBug();
     void parametersInteraction();
+    void themePreference();
     void extractFilter();
 
 private:

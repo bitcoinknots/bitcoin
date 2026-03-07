@@ -149,6 +149,7 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     txdelegate(new TxViewDelegate(platformStyle, this))
 {
     ui->setupUi(this);
+    ui->labelAlerts->setStyleSheet(GUIUtil::getThemedWarningLabelStyle(palette()));
 
     // use a SingleColorIcon for the "out of sync warning" icon
     QIcon icon = m_platform_style->SingleColorIcon(QStringLiteral(":/icons/warning"));
@@ -303,6 +304,7 @@ void OverviewPage::changeEvent(QEvent* e)
         QIcon icon = m_platform_style->SingleColorIcon(QStringLiteral(":/icons/warning"));
         ui->labelTransactionsStatus->setIcon(icon);
         ui->labelWalletStatus->setIcon(icon);
+        ui->labelAlerts->setStyleSheet(GUIUtil::getThemedWarningLabelStyle(palette()));
     }
 
     QWidget::changeEvent(e);

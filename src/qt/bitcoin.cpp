@@ -57,12 +57,15 @@
 #include <QLibraryInfo>
 #include <QLocale>
 #include <QMessageBox>
+#include <QPalette>
 #include <QSettings>
 #include <QString>
+#include <QStyle>
 #include <QThread>
 #include <QTimer>
 #include <QTranslator>
 #include <QWindow>
+#include <QStyleFactory>
 
 // Declare meta types used for QMetaObject::invokeMethod
 Q_DECLARE_METATYPE(bool*)
@@ -211,12 +214,93 @@ void DebugMessageHandler(QtMsgType type, const QMessageLogContext& context, cons
 static int qt_argc = 1;
 static const char* qt_argv = "bitcoin-qt";
 
+namespace {
+
+QStyle* CreateStyle(const QString& style_name)
+{
+    if (!style_name.isEmpty()) {
+        if (QStyle* style = QStyleFactory::create(style_name)) {
+            return style;
+        }
+    }
+    return QStyleFactory::create(QStringLiteral("Fusion"));
+}
+
+QPalette MakeLightPalette(const QPalette& base)
+{
+    QPalette palette{base};
+    const QColor window(245, 245, 245);
+    const QColor base_color(255, 255, 255);
+    const QColor alternate_base(235, 235, 235);
+    const QColor text(32, 32, 32);
+    const QColor disabled(140, 140, 140);
+    const QColor highlight(247, 147, 26);
+    const QColor link(210, 122, 15);
+
+    palette.setColor(QPalette::Window, window);
+    palette.setColor(QPalette::WindowText, text);
+    palette.setColor(QPalette::Base, base_color);
+    palette.setColor(QPalette::AlternateBase, alternate_base);
+    palette.setColor(QPalette::ToolTipBase, base_color);
+    palette.setColor(QPalette::ToolTipText, text);
+    palette.setColor(QPalette::Text, text);
+    palette.setColor(QPalette::Button, window);
+    palette.setColor(QPalette::ButtonText, text);
+    palette.setColor(QPalette::BrightText, Qt::white);
+    palette.setColor(QPalette::Link, link);
+    palette.setColor(QPalette::Highlight, highlight);
+    palette.setColor(QPalette::HighlightedText, text);
+    palette.setColor(QPalette::Disabled, QPalette::WindowText, disabled);
+    palette.setColor(QPalette::Disabled, QPalette::Text, disabled);
+    palette.setColor(QPalette::Disabled, QPalette::ButtonText, disabled);
+    palette.setColor(QPalette::Disabled, QPalette::Highlight, QColor(180, 180, 180));
+    palette.setColor(QPalette::Disabled, QPalette::HighlightedText, QColor(245, 245, 245));
+    return palette;
+}
+
+QPalette MakeDarkPalette(const QPalette& base)
+{
+    QPalette palette{base};
+    const QColor window(53, 53, 53);
+    const QColor base_color(35, 35, 35);
+    const QColor alternate_base(64, 64, 64);
+    const QColor text(240, 240, 240);
+    const QColor disabled(127, 127, 127);
+    const QColor highlight(247, 147, 26);
+    const QColor link(247, 147, 26);
+    const QColor highlighted_text(24, 24, 24);
+
+    palette.setColor(QPalette::Window, window);
+    palette.setColor(QPalette::WindowText, text);
+    palette.setColor(QPalette::Base, base_color);
+    palette.setColor(QPalette::AlternateBase, alternate_base);
+    palette.setColor(QPalette::ToolTipBase, window);
+    palette.setColor(QPalette::ToolTipText, text);
+    palette.setColor(QPalette::Text, text);
+    palette.setColor(QPalette::Button, window);
+    palette.setColor(QPalette::ButtonText, text);
+    palette.setColor(QPalette::BrightText, QColor(255, 128, 128));
+    palette.setColor(QPalette::Link, link);
+    palette.setColor(QPalette::Highlight, highlight);
+    palette.setColor(QPalette::HighlightedText, highlighted_text);
+    palette.setColor(QPalette::Disabled, QPalette::WindowText, disabled);
+    palette.setColor(QPalette::Disabled, QPalette::Text, disabled);
+    palette.setColor(QPalette::Disabled, QPalette::ButtonText, disabled);
+    palette.setColor(QPalette::Disabled, QPalette::Highlight, QColor(80, 80, 80));
+    palette.setColor(QPalette::Disabled, QPalette::HighlightedText, QColor(180, 180, 180));
+    return palette;
+}
+
+} // namespace
+
 BitcoinApplication::BitcoinApplication()
     : QApplication(qt_argc, const_cast<char**>(&qt_argv))
 {
     // Qt runs setlocale(LC_ALL, "") on initialization.
     RegisterMetaTypes();
     setQuitOnLastWindowClosed(false);
+    m_system_style_name = style()->objectName();
+    m_system_palette = palette();
 }
 
 void BitcoinApplication::setupPlatformStyle()
@@ -268,7 +352,33 @@ bool BitcoinApplication::createOptionsModel(bool resetSettings)
         QMessageBox::critical(nullptr, CLIENT_NAME, QString::fromStdString(error.translated));
         return false;
     }
+    connect(optionsModel, &OptionsModel::themeChanged, this, &BitcoinApplication::setThemePreference);
+    setThemePreference(OptionsModel::ThemePreferenceToInt(optionsModel->getTheme()));
     return true;
+}
+
+void BitcoinApplication::setThemePreference(const int theme_preference)
+{
+    const auto preference = OptionsModel::ThemePreferenceFromInt(theme_preference);
+    if (QStyle* style = CreateStyle(QStringLiteral("Fusion"))) {
+        QApplication::setStyle(style);
+    }
+    QApplication::setStyleSheet(QString());
+    switch (preference) {
+    case OptionsModel::ThemePreference::System:
+        if (GUIUtil::isDarkMode(m_system_palette.color(QPalette::Window))) {
+            QApplication::setPalette(MakeDarkPalette(m_system_palette));
+        } else {
+            QApplication::setPalette(MakeLightPalette(m_system_palette));
+        }
+        break;
+    case OptionsModel::ThemePreference::Light:
+        QApplication::setPalette(MakeLightPalette(m_system_palette));
+        break;
+    case OptionsModel::ThemePreference::Dark:
+        QApplication::setPalette(MakeDarkPalette(m_system_palette));
+        break;
+    }
 }
 
 void BitcoinApplication::createWindow(const NetworkStyle *networkStyle)
@@ -587,6 +697,7 @@ int GuiMain(int argc, char* argv[])
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, QString::fromStdString(qt_settings_path));
     }
+    app.setThemePreference(QSettings().value("ThemePreference", OptionsModel::ThemePreferenceToInt(OptionsModel::ThemePreference::System)).toInt());
 
     /// 4. Initialization of translations, so that intro dialog is in user's language
     // Now that QSettings are accessible, initialize translations

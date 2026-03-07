@@ -283,6 +283,18 @@ static QString CanonicalPermitEphemeral(const OptionsModel& model)
         (opts.permitephemeral_dust ? "" : "-") + "dust";
 }
 
+OptionsModel::ThemePreference OptionsModel::ThemePreferenceFromInt(const int value)
+{
+    switch (value) {
+    case ThemePreferenceToInt(ThemePreference::Light):
+        return ThemePreference::Light;
+    case ThemePreferenceToInt(ThemePreference::Dark):
+        return ThemePreference::Dark;
+    default:
+        return ThemePreference::System;
+    }
+}
+
 OptionsModel::OptionsModel(interfaces::Node& node, QObject *parent) :
     QAbstractListModel(parent), m_node{node}
 {
@@ -446,6 +458,12 @@ bool OptionsModel::Init(bilingual_str& error)
     }
     m_peers_tab_alternating_row_colors = settings.value("PeersTabAlternatingRowColors").toBool();
     Q_EMIT peersTabAlternatingRowColorsChanged(m_peers_tab_alternating_row_colors);
+
+    if (!settings.contains("ThemePreference")) {
+        settings.setValue("ThemePreference", ThemePreferenceToInt(ThemePreference::System));
+    }
+    m_theme = ThemePreferenceFromInt(settings.value("ThemePreference").toInt());
+    Q_EMIT themeChanged(ThemePreferenceToInt(m_theme));
 
     m_mask_values = settings.value("mask_values", false).toBool();
 
@@ -679,6 +697,8 @@ QVariant OptionsModel::getOption(OptionID option, const std::string& suffix) con
         return QVariant::fromValue(m_font_qrcodes);
     case PeersTabAlternatingRowColors:
         return m_peers_tab_alternating_row_colors;
+    case Theme:
+        return ThemePreferenceToInt(m_theme);
 #ifdef ENABLE_WALLET
     case walletrbf:
         return gArgs.GetBoolArg("-walletrbf", wallet::DEFAULT_WALLET_RBF);
@@ -1012,6 +1032,15 @@ bool OptionsModel::setOption(OptionID option, const QVariant& value, const std::
         settings.setValue("PeersTabAlternatingRowColors", m_peers_tab_alternating_row_colors);
         Q_EMIT peersTabAlternatingRowColorsChanged(m_peers_tab_alternating_row_colors);
         break;
+    case Theme:
+    {
+        const ThemePreference new_theme = ThemePreferenceFromInt(value.toInt());
+        if (m_theme == new_theme) break;
+        m_theme = new_theme;
+        settings.setValue("ThemePreference", ThemePreferenceToInt(m_theme));
+        Q_EMIT themeChanged(ThemePreferenceToInt(m_theme));
+        break;
+    }
 #ifdef ENABLE_WALLET
     case walletrbf:
         if (changed()) {

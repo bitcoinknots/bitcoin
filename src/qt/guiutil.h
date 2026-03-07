@@ -20,6 +20,7 @@
 #include <QMessageBox>
 #include <QMetaObject>
 #include <QObject>
+#include <QPalette>
 #include <QProgressBar>
 #include <QString>
 #include <QTableView>
@@ -296,6 +297,10 @@ namespace GUIUtil
 
     /** Check if a background color indicates dark mode */
     bool isDarkMode(const QColor& color);
+    QColor getThemedErrorColor(const QPalette& palette);
+    QColor getThemedSuccessColor(const QPalette& palette);
+    QString getThemedWarningLabelStyle(const QPalette& palette);
+    QString getStatusLabelStyle(const QColor& background_color);
 
     qreal calculateIdealFontSize(int width, const QString& text, QFont font, qreal minPointSize = 4, qreal startPointSize = 14);
 

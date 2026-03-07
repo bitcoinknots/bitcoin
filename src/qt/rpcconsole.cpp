@@ -1590,6 +1590,7 @@ void RPCConsole::updateThemeColors()
         ui->openDebugLogfileButton->setIcon(platformStyle->SingleColorIcon(":/icons/export"));
     }
     ui->hidePeersDetailButton->setIcon(platformStyle->SingleColorIcon(QStringLiteral(":/icons/remove")));
+    ui->label_alerts->setStyleSheet(GUIUtil::getThemedWarningLabelStyle(palette()));
 
     // Update console stylesheet with new colors
     updateConsoleStyleSheet();
