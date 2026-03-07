@@ -3,10 +3,12 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <node/caches.h>
+
 #include <common/args.h>
 #include <common/system_ram.h>
 #include <index/txindex.h>
 #include <kernel/caches.h>
+#include <logging.h>
 #include <node/dbcache.h>
 #include <node/interface_ui.h>
 #include <tinyformat.h>
@@ -29,9 +31,10 @@ static constexpr size_t MAX_FILTER_INDEX_CACHE{1024_MiB};
 namespace node {
 size_t CalculateDbCacheBytes(const ArgsManager& args)
 {
-    if (auto db_cache{args.GetIntArg("-dbcache")}) {
+    // Convert -dbcache from MiB units to bytes. The total cache is floored by MIN_DB_CACHE and capped by max size_t value.
+    if (std::optional<int64_t> db_cache = args.GetIntArg("-dbcache")) {
         if (*db_cache < 0) db_cache = 0;
-        const uint64_t db_cache_bytes{SaturatingLeftShift<uint64_t>(*db_cache, 20)};
+        uint64_t db_cache_bytes = SaturatingLeftShift<uint64_t>(*db_cache, 20);
         return std::max<size_t>(MIN_DB_CACHE, std::min<uint64_t>(db_cache_bytes, MAX_DBCACHE_BYTES));
     }
     return GetDefaultDBCache();
