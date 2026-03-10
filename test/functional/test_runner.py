@@ -409,6 +409,7 @@ BASE_SCRIPTS = [
     'feature_logging.py',
     'feature_anchors.py',
     'mempool_datacarrier.py',
+    'mempool_reject_opnet.py',
     'feature_coinstatsindex.py',
     'wallet_orphanedreward.py',
     'wallet_timelock.py',

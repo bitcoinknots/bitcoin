@@ -215,6 +215,9 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
 * Also enforce a maximum stack item size limit and no annexes for tapscript spends.
 */
 bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs, const std::string& reason_prefix, std::string& out_reason, const ignore_rejects_type& ignore_rejects=empty_ignore_rejects);
+
+/** Check if a witness stack matches the OP_NET overlay protocol fingerprint. */
+int OPNetWitnessSize(const CScriptWitness& witness);
 /**
  * Check whether this transaction spends any witness program but P2A, including not-yet-defined ones.
  * May return `false` early for consensus-invalid transactions.
