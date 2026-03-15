@@ -147,6 +147,15 @@ bool ArgsManager::ReadConfigFiles(std::string& error, bool ignore_invalid_keys)
             error = strprintf("specified config file \"%s\" could not be opened.", fs::PathToString(conf_path));
             return false;
         }
+        // Warn if the default config file doesn't exist at the resolved path,
+        // which can happen when a custom datadir moves the base path away from
+        // the default location where the user's bitcoin.conf actually lives.
+        if (!IsArgSet("-conf") && !stream.good()) {
+            LogWarning("Config file %s not found; settings from it will not be applied. "
+                       "If your configuration is at the default data directory, consider "
+                       "copying it or using the -conf option to specify its location.",
+                       fs::PathToString(conf_path));
+        }
     }
     // ok to not have a config file
     if (stream.good()) {
