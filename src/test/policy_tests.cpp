@@ -431,6 +431,114 @@ BOOST_AUTO_TEST_CASE(standard_depth_allows_more_leaves)
     BOOST_CHECK_EQUAL(scripts.size(), 129U);
 }
 
+BOOST_AUTO_TEST_CASE(policy_is_valid)
+{
+    BOOST_CHECK(Parse("pk(A)")->IsValid());
+    BOOST_CHECK(Parse("older(100)")->IsValid());
+    BOOST_CHECK(Parse("after(500000)")->IsValid());
+    BOOST_CHECK(Parse("and(pk(A),pk(B))")->IsValid());
+    BOOST_CHECK(Parse("or(pk(A),pk(B))")->IsValid());
+    BOOST_CHECK(Parse("thresh(2,pk(A),pk(B),pk(C))")->IsValid());
+
+    {
+        auto p = std::make_shared<policy::Policy<std::string>>();
+        p->type = policy::PolicyType::AND;
+        p->subs.push_back(policy::Policy<std::string>::MakePk("A"));
+        BOOST_CHECK(!p->IsValid());
+    }
+
+    {
+        auto p = std::make_shared<policy::Policy<std::string>>();
+        p->type = policy::PolicyType::OR;
+        p->subs.push_back(policy::Policy<std::string>::MakePk("A"));
+        p->weights.push_back(1.0);
+        BOOST_CHECK(!p->IsValid());
+    }
+
+    {
+        auto p = std::make_shared<policy::Policy<std::string>>();
+        p->type = policy::PolicyType::OR;
+        p->subs.push_back(policy::Policy<std::string>::MakePk("A"));
+        p->subs.push_back(policy::Policy<std::string>::MakePk("B"));
+        p->weights.push_back(0.0);
+        p->weights.push_back(1.0);
+        BOOST_CHECK(!p->IsValid());
+    }
+
+    {
+        auto p = std::make_shared<policy::Policy<std::string>>();
+        p->type = policy::PolicyType::THRESH;
+        p->k = 0;
+        p->subs.push_back(policy::Policy<std::string>::MakePk("A"));
+        BOOST_CHECK(!p->IsValid());
+    }
+
+    {
+        auto p = std::make_shared<policy::Policy<std::string>>();
+        p->type = policy::PolicyType::THRESH;
+        p->k = 3;
+        p->subs.push_back(policy::Policy<std::string>::MakePk("A"));
+        p->subs.push_back(policy::Policy<std::string>::MakePk("B"));
+        BOOST_CHECK(!p->IsValid());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(policy_timelock_mix)
+{
+    auto valid_and = Parse("and(pk(A),older(100))");
+    BOOST_REQUIRE(valid_and);
+    BOOST_CHECK(valid_and->CheckTimelockMix());
+
+    auto valid_or_mix = Parse("or(older(100),after(500000001))");
+    BOOST_REQUIRE(valid_or_mix);
+    BOOST_CHECK(valid_or_mix->CheckTimelockMix());
+
+    auto bad_and = Parse("and(older(100),after(500000001))");
+    BOOST_REQUIRE(bad_and);
+    BOOST_CHECK(!bad_and->CheckTimelockMix());
+
+    auto nested_bad = Parse("and(pk(A),and(older(100),after(500000001)))");
+    BOOST_REQUIRE(nested_bad);
+    BOOST_CHECK(!nested_bad->CheckTimelockMix());
+
+    auto thresh_bad = Parse("thresh(2,older(100),after(500000001),pk(A))");
+    BOOST_REQUIRE(thresh_bad);
+    BOOST_CHECK(!thresh_bad->CheckTimelockMix());
+
+    auto thresh_1_ok = policy::Policy<std::string>::MakeThresh(1, {
+        policy::Policy<std::string>::MakeOlder(100),
+        policy::Policy<std::string>::MakeAfter(500000001),
+    });
+    BOOST_CHECK(thresh_1_ok->CheckTimelockMix());
+}
+
+BOOST_AUTO_TEST_CASE(compile_rejects_invalid_policy)
+{
+    {
+        auto bad_and = Parse("and(older(100),after(500000001))");
+        BOOST_REQUIRE(bad_and);
+        auto result = policy::CompileTrNative<std::string>(*bad_and);
+        BOOST_CHECK(!result.has_value());
+    }
+
+    {
+        policy::Policy<std::string> bad;
+        bad.type = policy::PolicyType::AND;
+        bad.subs.push_back(policy::Policy<std::string>::MakePk("A"));
+        auto result = policy::CompileTrNative<std::string>(bad);
+        BOOST_CHECK(!result.has_value());
+    }
+
+    {
+        policy::Policy<std::string> bad;
+        bad.type = policy::PolicyType::THRESH;
+        bad.k = 0;
+        bad.subs.push_back(policy::Policy<std::string>::MakePk("A"));
+        auto result = policy::CompileTrNative<std::string>(bad);
+        BOOST_CHECK(!result.has_value());
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 } // namespace policy_tests
