@@ -133,6 +133,111 @@ struct Policy {
         p->subs = std::move(children);
         return p;
     }
+
+    enum TimelockKind : uint8_t {
+        TL_NONE = 0,
+        TL_HEIGHT = 1,
+        TL_TIME = 2,
+        TL_BOTH = 3,
+    };
+
+    TimelockKind GetTimelockKind() const {
+        switch (type) {
+        case PolicyType::OLDER:
+        case PolicyType::AFTER:
+            return (k < 500000000UL) ? TL_HEIGHT : TL_TIME;
+        case PolicyType::AND: {
+            uint8_t combined = TL_NONE;
+            for (const auto& sub : subs) combined |= sub->GetTimelockKind();
+            return static_cast<TimelockKind>(combined);
+        }
+        case PolicyType::OR: {
+            uint8_t combined = TL_NONE;
+            for (const auto& sub : subs) combined |= sub->GetTimelockKind();
+            return static_cast<TimelockKind>(combined);
+        }
+        case PolicyType::THRESH: {
+            uint8_t combined = TL_NONE;
+            for (const auto& sub : subs) combined |= sub->GetTimelockKind();
+            return static_cast<TimelockKind>(combined);
+        }
+        default:
+            return TL_NONE;
+        }
+    }
+
+    bool CheckTimelockMix(size_t depth = 0) const {
+        if (depth > MAX_POLICY_DEPTH) return false;
+        switch (type) {
+        case PolicyType::AND: {
+            uint8_t combined = TL_NONE;
+            for (const auto& sub : subs) {
+                if (!sub->CheckTimelockMix(depth + 1)) return false;
+                combined |= sub->GetTimelockKind();
+            }
+            return combined != TL_BOTH;
+        }
+        case PolicyType::OR:
+            for (const auto& sub : subs) {
+                if (!sub->CheckTimelockMix(depth + 1)) return false;
+            }
+            return true;
+        case PolicyType::THRESH: {
+            for (const auto& sub : subs) {
+                if (!sub->CheckTimelockMix(depth + 1)) return false;
+            }
+            if (k >= 2) {
+                uint8_t combined = TL_NONE;
+                for (const auto& sub : subs) combined |= sub->GetTimelockKind();
+                return combined != TL_BOTH;
+            }
+            return true;
+        }
+        default:
+            return true;
+        }
+    }
+
+    bool IsValid(size_t depth = 0) const {
+        if (depth > MAX_POLICY_DEPTH) return false;
+        switch (type) {
+        case PolicyType::PK:
+            return keys.size() == 1;
+        case PolicyType::OLDER:
+        case PolicyType::AFTER:
+            return k >= 1 && k < 0x80000000UL;
+        case PolicyType::SHA256:
+        case PolicyType::HASH256:
+            return data.size() == 32;
+        case PolicyType::RIPEMD160:
+        case PolicyType::HASH160:
+            return data.size() == 20;
+        case PolicyType::AND:
+            if (subs.size() < 2) return false;
+            for (const auto& sub : subs) {
+                if (!sub || !sub->IsValid(depth + 1)) return false;
+            }
+            return true;
+        case PolicyType::OR:
+            if (subs.size() < 2) return false;
+            if (weights.size() != subs.size()) return false;
+            for (double w : weights) {
+                if (w <= 0) return false;
+            }
+            for (const auto& sub : subs) {
+                if (!sub || !sub->IsValid(depth + 1)) return false;
+            }
+            return true;
+        case PolicyType::THRESH:
+            if (subs.empty()) return false;
+            if (k < 1 || k > subs.size()) return false;
+            for (const auto& sub : subs) {
+                if (!sub || !sub->IsValid(depth + 1)) return false;
+            }
+            return true;
+        }
+        return false;
+    }
 };
 
 template<typename Key>
@@ -580,6 +685,8 @@ inline std::vector<std::pair<int, int>> HuffmanTree(const std::vector<double>& w
 template<typename Key>
 std::optional<std::pair<std::vector<miniscript::NodeRef<Key>>, std::vector<int>>>
 CompileTrNative(const Policy<Key>& pol, size_t max_depth = TAPROOT_CONTROL_MAX_NODE_COUNT, size_t max_leaves = 1024) {
+    if (!pol.IsValid() || !pol.CheckTimelockMix()) return std::nullopt;
+
     size_t effective_max_leaves = std::min(max_leaves, size_t{1} << std::min(max_depth, size_t{20}));
     auto leaves = EnumerateLeaves(pol, effective_max_leaves);
     if (leaves.empty()) return std::nullopt;
