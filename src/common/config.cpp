@@ -151,7 +151,7 @@ bool ArgsManager::ReadConfigFiles(std::string& error, bool ignore_invalid_keys)
         // which can happen when a custom datadir moves the base path away from
         // the default location where the user's bitcoin.conf actually lives.
         if (!IsArgSet("-conf") && !stream.good()) {
-            LogWarning("Config file %s not found; settings from it will not be applied. "
+            LogWarning("Config file %s doesn't exist or cannot be read. "
                        "If your configuration is at the default data directory, consider "
                        "copying it or using the -conf option to specify its location.",
                        fs::PathToString(conf_path));
