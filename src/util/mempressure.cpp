@@ -34,11 +34,14 @@ uint64_t GetAvailableSystemMemory()
                 const char* p = line + 13;
                 while (*p == ' ') ++p;
                 uint64_t val = 0;
+                bool overflow = false;
                 while (*p >= '0' && *p <= '9') {
+                    if (val > UINT64_MAX / 10) { overflow = true; break; }
                     val = val * 10 + (*p - '0');
                     ++p;
                 }
                 fclose(f);
+                if (overflow || val > UINT64_MAX / 1024) return UINT64_MAX;
                 return val * 1024;
             }
         }
@@ -80,11 +83,12 @@ bool SystemNeedsMemoryReleased()
         }
     }
     return false;
-#endif
+#else
     const uint64_t avail = GetAvailableSystemMemory();
     if (avail > 0 && avail < g_low_memory_threshold) {
         LogPrintf("%s: YES: %" PRIu64 " bytes available memory\n", __func__, avail);
         return true;
     }
     return false;
+#endif
 }

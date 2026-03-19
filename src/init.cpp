@@ -1465,7 +1465,9 @@ static ChainstateLoadResult InitAndLoadChainstate(
         if (lowmem_val < 0) {
             return {ChainstateLoadStatus::FAILURE_FATAL, _("-lowmem must be non-negative")};
         }
-        g_low_memory_threshold = lowmem_val * 1024 * 1024;
+        const uint64_t lowmem_mib = static_cast<uint64_t>(lowmem_val);
+        const uint64_t lowmem_bytes = (lowmem_mib > SIZE_MAX / (1024 * 1024)) ? SIZE_MAX : lowmem_mib * 1024 * 1024;
+        g_low_memory_threshold = static_cast<size_t>(lowmem_bytes);
     } else {
 #if defined(__linux__) || defined(WIN32)
         g_low_memory_threshold = 200 * 1024 * 1024;
