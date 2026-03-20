@@ -415,6 +415,9 @@ public:
     }
     std::unique_ptr<Handler> handleBannedListChanged(BannedListChangedFn fn) override
     {
+        if (m_context->banman) {
+            m_context->banman->EnsureSweepScheduled();
+        }
         return MakeSignalHandler(::uiInterface.BannedListChanged_connect(fn));
     }
     std::unique_ptr<Handler> handleNotifyBlockTip(NotifyBlockTipFn fn) override

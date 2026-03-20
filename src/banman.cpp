@@ -9,9 +9,13 @@
 #include <logging.h>
 #include <netaddress.h>
 #include <node/interface_ui.h>
+#include <scheduler.h>
 #include <sync.h>
 #include <util/time.h>
 #include <util/translation.h>
+
+#include <algorithm>
+#include <limits>
 
 
 BanMan::BanMan(fs::path ban_file, CClientUIInterface* client_interface, int64_t default_ban_time)
@@ -24,6 +28,53 @@ BanMan::BanMan(fs::path ban_file, CClientUIInterface* client_interface, int64_t 
 BanMan::~BanMan()
 {
     DumpBanlist();
+}
+
+void BanMan::SetScheduler(CScheduler& scheduler)
+{
+    LOCK(m_banned_mutex);
+    m_scheduler = &scheduler;
+}
+
+void BanMan::EnsureSweepScheduled()
+{
+    LOCK(m_banned_mutex);
+    if (!m_scheduler) return;
+    if (m_sweep_started) return;
+    m_sweep_started = true;
+    SweepBanned();
+    m_next_sweep_time = std::numeric_limits<int64_t>::max();
+    ScheduleNextSweep();
+}
+
+void BanMan::SweepBannedAndSchedule(uint64_t expected_seq)
+{
+    LOCK(m_banned_mutex);
+    if (expected_seq != m_sweep_seq) return;
+    SweepBanned();
+    m_next_sweep_time = std::numeric_limits<int64_t>::max();
+    ScheduleNextSweep();
+}
+
+void BanMan::ScheduleNextSweep()
+{
+    AssertLockHeld(m_banned_mutex);
+
+    if (!m_scheduler) return;
+    if (m_banned.empty()) return;
+
+    int64_t earliest = std::numeric_limits<int64_t>::max();
+    for (const auto& [subnet, entry] : m_banned) {
+        if (entry.nBanUntil < earliest) {
+            earliest = entry.nBanUntil;
+        }
+    }
+
+    m_next_sweep_time = earliest;
+    uint64_t seq = ++m_sweep_seq;
+    int64_t now = GetTime();
+    auto delay = std::chrono::seconds(std::max<int64_t>(0, earliest - now));
+    m_scheduler->scheduleFromNow([this, seq] { SweepBannedAndSchedule(seq); }, delay);
 }
 
 void BanMan::LoadBanlist()
@@ -144,6 +195,13 @@ void BanMan::Ban(const CSubNet& sub_net, int64_t ban_time_offset, bool since_uni
         if (m_banned[sub_net].nBanUntil < ban_entry.nBanUntil) {
             m_banned[sub_net] = ban_entry;
             m_is_dirty = true;
+            if (m_sweep_started && ban_entry.nBanUntil < m_next_sweep_time) {
+                m_next_sweep_time = ban_entry.nBanUntil;
+                uint64_t seq = ++m_sweep_seq;
+                int64_t now = GetTime();
+                auto delay = std::chrono::seconds(std::max<int64_t>(0, m_next_sweep_time - now));
+                m_scheduler->scheduleFromNow([this, seq] { SweepBannedAndSchedule(seq); }, delay);
+            }
         } else
             return;
     }
