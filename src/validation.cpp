@@ -3054,12 +3054,12 @@ CoinsCacheSizeState Chainstate::GetCoinsCacheSizeState(
         max_coins_cache_size_bytes + std::max<int64_t>(int64_t(max_mempool_size_bytes) - nMempoolUsage, 0);
 
     //! Reserve headroom for LevelDB write batch allocations during flush.
-    //! A 64 MiB batch (nDefaultDbBatchSize) uses ~200 MiB in practice due to
-    //! Arena/MemTable allocations, serialization buffers, and dual write buffers.
+    //! A batch uses ~3x its nominal size in practice due to Arena/MemTable
+    //! allocations, serialization buffers, and dual write buffers.
     //! Only applied when cache is large enough for this to matter.
-    static constexpr int64_t LEVELDB_FLUSH_HEADROOM = 200 * 1024 * 1024;
-    if (nTotalSpace > LEVELDB_FLUSH_HEADROOM * 2) {
-        nTotalSpace -= LEVELDB_FLUSH_HEADROOM;
+    const int64_t leveldb_flush_headroom = static_cast<int64_t>(CoinsDB().GetBatchWriteBytes()) * 3;
+    if (nTotalSpace > leveldb_flush_headroom * 2) {
+        nTotalSpace -= leveldb_flush_headroom;
     }
 
     //! No need to periodic flush if at least this much space still available.

@@ -45,6 +45,8 @@ protected:
 public:
     explicit CCoinsViewDB(DBParams db_params, CoinsViewOptions options);
 
+    size_t GetBatchWriteBytes() const { return m_options.batch_write_bytes; }
+
     std::optional<Coin> GetCoin(const COutPoint& outpoint) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
     uint256 GetBestBlock() const override;
