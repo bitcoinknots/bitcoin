@@ -35,7 +35,7 @@ public:
     explicit TrafficGraphWidget(QWidget* parent = nullptr);
     void setClientModel(ClientModel* model);
     bool GraphRangeBump() const { return m_bump_value; }
-    unsigned int getCurrentRangeIndex() const { return m_value; }
+    unsigned int getCurrentRangeIndex() const { return m_new_value; }
     quint64 getBaselineBytesRecv() const { return m_baseline_bytes_recv; }
     quint64 getBaselineBytesSent() const { return m_baseline_bytes_sent; }
 
@@ -58,6 +58,7 @@ private:
     bool loadData();
     void updateRates(int value);
     void updateFmax();
+    int findClosestPointByTimestamp(int sourceRange, int sourcePoint, int targetRange) const;
     void focusSlider(Qt::FocusReason reason);
     void drawTooltipPoint(QPainter& painter);
 
@@ -79,7 +80,9 @@ private:
     quint64 m_baseline_bytes_sent{0};
     int64_t m_last_save_ms{0};
 
+    float m_new_fmax{0.0f};
     int m_value{0};
+    int m_new_value{0};
     bool m_bump_value{false};
     bool m_toggle{true};
     int m_tt_point{-1};

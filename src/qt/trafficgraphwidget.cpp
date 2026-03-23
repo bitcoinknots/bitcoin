@@ -25,6 +25,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <limits>
 
 #define DESIRED_SAMPLES         800
 
@@ -66,6 +67,10 @@ void TrafficGraphWidget::setClientModel(ClientModel* model)
         m_last_bytes_out[i] = bytes_out;
         m_last_time[i] = now - m_timer->interval();
     }
+    m_new_value = m_value;
+    m_range = m_values[m_value];
+    updateFmax();
+    fMax = m_new_fmax;
     m_last_save_ms = now;
 }
 
@@ -266,13 +271,48 @@ void TrafficGraphWidget::paintEvent(QPaintEvent*)
 void TrafficGraphWidget::updateFmax()
 {
     float tmax = 0.0f;
-    for (const float f : m_samples_in[m_value]) {
+    for (const float f : m_samples_in[m_new_value]) {
         if (f > tmax) tmax = f;
     }
-    for (const float f : m_samples_out[m_value]) {
+    for (const float f : m_samples_out[m_new_value]) {
         if (f > tmax) tmax = f;
     }
-    fMax = tmax;
+    m_new_fmax = tmax;
+}
+
+static bool update_num(float new_val, float& current, float& increment, int length)
+{
+    if (new_val <= 0 || current == new_val || length <= 0) return false;
+
+    if (std::abs(increment) <= std::abs(0.8f * current) / length) {
+        if (new_val > current) {
+            increment = 1.0f * (current + 1) / length;
+        } else {
+            increment = -1.0f * (current + 1) / length;
+        }
+        if (std::abs(increment) > std::abs(new_val - current)) {
+            increment = 0;
+            current = new_val;
+            return true;
+        }
+    } else {
+        if ((increment > 0 && current + increment * 2 > new_val) || (increment < 0 && current + increment * 2 < new_val)) {
+            increment = increment / 2;
+        } else if ((increment > 0 && current + increment * 8 < new_val) || (increment < 0 && current + increment * 8 > new_val)) {
+            increment = increment * 2;
+        }
+    }
+
+    if (std::abs(increment) < 0.8f * current / length) {
+        if ((increment >= 0 && new_val > current) || (increment <= 0 && new_val < current)) {
+            current = new_val;
+            increment = 0;
+        }
+    } else {
+        current += increment;
+    }
+    if (current <= 0.0f) current = 0.0001f;
+    return true;
 }
 
 void TrafficGraphWidget::updateStuff()
@@ -311,7 +351,38 @@ void TrafficGraphWidget::updateStuff()
                 }
                 update_needed = true;
             }
+            if (i == m_new_value) {
+                updateFmax();
+            }
         }
+    }
+
+    static float y_increment = 0.0f;
+    static float x_increment = 0.0f;
+    if (update_num(m_new_fmax, fMax, y_increment, height() - YMARGIN * 2)) {
+        update_needed = true;
+    }
+
+    int next_value = m_value;
+    if (update_num(m_values[m_new_value], m_range, x_increment, width() - XMARGIN * 2)) {
+        if (m_values[m_new_value] > m_range && m_values[m_value] < m_range) {
+            next_value = m_value + 1;
+        } else if (m_value > 0 && m_values[m_new_value] <= m_range && m_values[m_value - 1] > m_range * 0.99f) {
+            next_value = m_value - 1;
+        }
+        update_needed = true;
+    } else if (m_value != m_new_value) {
+        next_value = m_new_value;
+        update_needed = true;
+    }
+
+    if (next_value != m_value) {
+        if (m_tt_point >= 0 && m_tt_point < m_time_stamp[m_value].size()) {
+            m_tt_point = findClosestPointByTimestamp(m_value, m_tt_point, next_value);
+        } else {
+            m_tt_point = -1;
+        }
+        m_value = next_value;
     }
 
     if (!QToolTip::isVisible() || !isVisible() || window()->isMinimized()) {
@@ -323,10 +394,7 @@ void TrafficGraphWidget::updateStuff()
         update_needed = true;
     }
 
-    if (update_needed) {
-        updateFmax();
-        update();
-    }
+    if (update_needed) update();
 
     if (!m_data_dir.empty() && now - m_last_save_ms >= 60000) {
         saveData();
@@ -382,13 +450,61 @@ int TrafficGraphWidget::setGraphRange(int value)
     }
 
     value--;
-    m_value = std::min(value, VALUES_SIZE - 1);
-    m_range = m_values[m_value];
-    m_tt_point = -1;
-    updateFmax();
-    update();
+    int old_value = m_new_value;
+    m_new_value = std::min(value, VALUES_SIZE - 1);
+    if (m_new_value != old_value) {
+        updateFmax();
+    }
 
-    return m_values[m_value];
+    return m_values[m_new_value];
+}
+
+int TrafficGraphWidget::findClosestPointByTimestamp(int sourceRange, int sourcePoint, int targetRange) const
+{
+    if (sourcePoint < 0 || sourcePoint >= m_time_stamp[sourceRange].size() || m_time_stamp[targetRange].empty()) {
+        return -1;
+    }
+
+    bool is_peak = false;
+    bool is_dip = false;
+    float source_value = m_tt_in_series ? m_samples_in[sourceRange].at(sourcePoint) : m_samples_out[sourceRange].at(sourcePoint);
+    if (sourcePoint > 0 && sourcePoint < m_time_stamp[sourceRange].size() - 1) {
+        float prev = m_tt_in_series ? m_samples_in[sourceRange].at(sourcePoint - 1) : m_samples_out[sourceRange].at(sourcePoint - 1);
+        float next = m_tt_in_series ? m_samples_in[sourceRange].at(sourcePoint + 1) : m_samples_out[sourceRange].at(sourcePoint + 1);
+        is_peak = source_value > prev && source_value > next;
+        is_dip = source_value < prev && source_value < next;
+    }
+
+    int64_t source_timestamp = m_time_stamp[sourceRange].at(sourcePoint);
+    int closest_point = -1;
+    int64_t min_difference = std::numeric_limits<int64_t>::max();
+    for (int i = 0; i < m_time_stamp[targetRange].size(); ++i) {
+        int64_t diff = std::abs(m_time_stamp[targetRange].at(i) - source_timestamp);
+        if (diff < min_difference) {
+            min_difference = diff;
+            closest_point = i;
+        }
+    }
+
+    if (closest_point >= 0 && (is_peak || is_dip)) {
+        int best_point = closest_point;
+        float best_value = m_tt_in_series ? m_samples_in[targetRange].at(closest_point) : m_samples_out[targetRange].at(closest_point);
+        uint64_t avg_sample_interval = (m_values[targetRange] * 60 * 1000) / DESIRED_SAMPLES;
+        uint64_t time_window = avg_sample_interval * 3;
+        for (int i = 0; i < m_time_stamp[targetRange].size(); ++i) {
+            uint64_t time_diff = static_cast<uint64_t>(std::abs(m_time_stamp[targetRange].at(i) - source_timestamp));
+            if (time_diff <= time_window) {
+                float current_value = m_tt_in_series ? m_samples_in[targetRange].at(i) : m_samples_out[targetRange].at(i);
+                if ((is_peak && current_value > best_value) || (is_dip && current_value < best_value)) {
+                    best_point = i;
+                    best_value = current_value;
+                }
+            }
+        }
+        closest_point = best_point;
+    }
+
+    return closest_point;
 }
 
 void TrafficGraphWidget::saveData()
