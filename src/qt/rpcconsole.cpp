@@ -1308,8 +1308,11 @@ void RPCConsole::updateTrafficStats(quint64 totalBytesIn, quint64 totalBytesOut)
     if (!m_slider_in_use && ui->trafficGraph->GraphRangeBump())
         setTrafficGraphRange(0); // bump it up
 
-    ui->lblBytesIn->setText(GUIUtil::formatBytes(totalBytesIn));
-    ui->lblBytesOut->setText(GUIUtil::formatBytes(totalBytesOut));
+    const quint64 total_in = totalBytesIn + ui->trafficGraph->getBaselineBytesRecv();
+    const quint64 total_out = totalBytesOut + ui->trafficGraph->getBaselineBytesSent();
+
+    ui->lblBytesIn->setText(GUIUtil::formatBytes(total_in));
+    ui->lblBytesOut->setText(GUIUtil::formatBytes(total_out));
 }
 
 void RPCConsole::resetDetailWidget()
