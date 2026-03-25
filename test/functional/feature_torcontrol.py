@@ -190,8 +190,6 @@ class TorControlTest(BitcoinTestFramework):
     def test_pow_fallback(self):
         self.log.info("Test that ADD_ONION retries without PoW on 512 error")
 
-        tor_port = p2p_port(self.num_nodes + 3)
-
         class NoPowServer(MockTorControlServer):
             def _get_response(self, command):
                 if command.startswith("ADD_ONION"):
@@ -204,15 +202,8 @@ class TorControlTest(BitcoinTestFramework):
                         )
                 return super()._get_response(command)
 
-        mock_tor = NoPowServer(tor_port)
-        mock_tor.start()
-
-        self.restart_node(0, extra_args=[
-            f"-torcontrol=127.0.0.1:{tor_port}",
-            f'-bind=127.0.0.1:{self.tor_p2p_port}=onion',
-            "-listenonion=1",
-            "-debug=tor",
-        ])
+        mock_tor = NoPowServer(self.next_port())
+        self.restart_with_mock(mock_tor)
 
         # Expect: PROTOCOLINFO, AUTHENTICATE, GETINFO, ADD_ONION (with PoW), ADD_ONION (without PoW)
         self.wait_until(lambda: len(mock_tor.received_commands) >= 5, timeout=10)
