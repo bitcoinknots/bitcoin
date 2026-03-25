@@ -1064,9 +1064,9 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     // reorg to be marked earlier than any child txs that were already in the mempool.
     const uint64_t entry_sequence = args.m_ignore_rejects.count(rejectmsg_zero_mempool_entry_seq) ? 0 : m_pool.GetSequence();
     int32_t extra_weight = CalculateExtraTxWeight(*ptx, m_view, ::g_weight_per_data_byte);
-    if (::g_priority_vsize_discount) {
+    if (::g_coinblocks_vsize_discount) {
         static constexpr int32_t min_weight = MIN_STANDARD_TX_NONWITNESS_SIZE * WITNESS_SCALE_FACTOR;
-        extra_weight += CalculatePriorityWeightDiscount(coin_age.inputs_coin_age, GetTransactionWeight(tx), min_weight);
+        extra_weight += CalculateCoinblocksWeightDiscount(coin_age.inputs_coin_age, GetTransactionWeight(tx), min_weight);
     }
     if (!m_subpackage.m_changeset) {
         m_subpackage.m_changeset = m_pool.GetChangeSet();

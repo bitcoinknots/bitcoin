@@ -37,6 +37,6 @@ double ReversePriority2(double coin_age_priority, unsigned int mod_vsize);
  */
 CoinAgeCache GetCoinAge(const CTransaction &tx, const CCoinsViewCache& view, int nHeight);
 
-int32_t CalculatePriorityWeightDiscount(double inputs_coin_age, int32_t tx_weight, int32_t min_weight);
+int32_t CalculateCoinblocksWeightDiscount(double inputs_coin_age, int32_t tx_weight, int32_t min_weight);
 
 #endif // BITCOIN_POLICY_COIN_AGE_PRIORITY_H

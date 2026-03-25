@@ -10,6 +10,6 @@ extern unsigned int g_script_size_policy_limit;
 extern unsigned int nBytesPerSigOp;
 extern unsigned int nBytesPerSigOpStrict;
 extern unsigned int g_weight_per_data_byte;
-extern bool g_priority_vsize_discount;
+extern bool g_coinblocks_vsize_discount;
 
 #endif // BITCOIN_POLICY_SETTINGS_H

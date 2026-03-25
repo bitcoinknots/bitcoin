@@ -29,10 +29,10 @@ static const CAmount low_fee_amt{200};
 
 struct TxPackageTest : TestChain100Setup {
 TxPackageTest() {
-    g_priority_vsize_discount = false;
+    g_coinblocks_vsize_discount = false;
 }
 ~TxPackageTest() {
-    g_priority_vsize_discount = DEFAULT_PRIORITY_VSIZE_DISCOUNT;
+    g_coinblocks_vsize_discount = DEFAULT_COINBLOCKS_VSIZE_DISCOUNT;
 }
 // Create placeholder transactions that have no meaning.
 inline CTransactionRef create_placeholder_tx(size_t num_inputs, size_t num_outputs)

@@ -714,7 +714,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-bytespersigopstrict", strprintf("Minimum bytes per sigop in transactions we relay and mine (default: %u)", DEFAULT_BYTES_PER_SIGOP_STRICT), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-datacarrier", strprintf("Relay and mine data carrier transactions (default: %u)", DEFAULT_ACCEPT_DATACARRIER), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-datacarriercost", strprintf("Treat extra data in transactions as at least N vbytes per actual byte (default: %s)", DEFAULT_WEIGHT_PER_DATA_BYTE / 4.0), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
-    argsman.AddArg("-priorityvsizediscount", strprintf("Discount vsize for transactions with coin-age priority (default: %u)", DEFAULT_PRIORITY_VSIZE_DISCOUNT), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
+    argsman.AddArg("-coinblocksvsizediscount", strprintf("Discount vsize for transactions with high coinblocks (default: %u)", DEFAULT_COINBLOCKS_VSIZE_DISCOUNT), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-datacarrierfullcount", strprintf("Apply datacarriersize limit to all known datacarrier methods (default: %u)", DEFAULT_DATACARRIER_FULLCOUNT), ArgsManager::ALLOW_ANY | (DEFAULT_DATACARRIER_FULLCOUNT ? uint32_t{ArgsManager::DEBUG_ONLY} : 0), OptionsCategory::NODE_RELAY);
     argsman.AddArg("-datacarriersize",
                    strprintf("Maximum size of data in data carrier transactions we relay and mine, in bytes (default: %u)",
@@ -867,7 +867,7 @@ void InitParameterInteraction(ArgsManager& args)
         args.SoftSetArg("-permitephemeral", "anchor,send,dust");
         args.SoftSetArg("-spkreuse", "allow");
         args.SoftSetArg("-blockprioritysize", "0");
-        args.SoftSetArg("-priorityvsizediscount", "0");
+        args.SoftSetArg("-coinblocksvsizediscount", "0");
         args.SoftSetArg("-blockmaxsize", "4000000");
         args.SoftSetArg("-blockmaxweight", "4000000");
     }
@@ -1200,7 +1200,7 @@ bool AppInitParameterInteraction(const ArgsManager& args)
         g_weight_per_data_byte = ((*parsed * WITNESS_SCALE_FACTOR) + 99) / 100;
     }
 
-    g_priority_vsize_discount = args.GetBoolArg("-priorityvsizediscount", DEFAULT_PRIORITY_VSIZE_DISCOUNT);
+    g_coinblocks_vsize_discount = args.GetBoolArg("-coinblocksvsizediscount", DEFAULT_COINBLOCKS_VSIZE_DISCOUNT);
 
     g_script_size_policy_limit = args.GetIntArg("-maxscriptsize", g_script_size_policy_limit);
 

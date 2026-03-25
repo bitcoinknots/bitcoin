@@ -192,11 +192,11 @@ class PriorityTest(BitcoinTestFramework):
         self.test_vsize_discount_disabled()
 
     def test_vsize_discount(self):
-        self.testmsg('vsize discount is applied for aged UTXOs (priorityvsizediscount=1)')
+        self.testmsg('vsize discount is applied for aged UTXOs (coinblocksvsizediscount=1)')
 
-        self.restart_node(0, extra_args=['-priorityvsizediscount=1'])
-        self.restart_node(1, extra_args=['-blockprioritysize=1000000', '-blockmaxsize=1000000', '-priorityvsizediscount=1'])
-        self.restart_node(2, extra_args=['-priorityvsizediscount=1'])
+        self.restart_node(0, extra_args=['-coinblocksvsizediscount=1'])
+        self.restart_node(1, extra_args=['-blockprioritysize=1000000', '-blockmaxsize=1000000', '-coinblocksvsizediscount=1'])
+        self.restart_node(2, extra_args=['-coinblocksvsizediscount=1'])
         self.connect_nodes(0, 1)
         self.connect_nodes(1, 2)
 
@@ -228,9 +228,9 @@ class PriorityTest(BitcoinTestFramework):
         WITNESS_SCALE_FACTOR = 4
         min_weight = MIN_STANDARD_TX_NONWITNESS_SIZE * WITNESS_SCALE_FACTOR
         inputs_coin_age = float(amt * BTC) * 144
-        priority = inputs_coin_age / raw_vsize
+        coinblocks = inputs_coin_age / raw_vsize
         MINIMUM_TX_PRIORITY = float(Decimal('100000000') * 144 / 250)
-        expected_ratio = min(0.5, math.log2(1.0 + priority / MINIMUM_TX_PRIORITY) / 8.0)
+        expected_ratio = min(0.5, math.log2(1.0 + coinblocks / MINIMUM_TX_PRIORITY) / 8.0)
         weight_discount = int(-(expected_ratio * raw_weight))
         effective_weight = max(raw_weight + weight_discount, min_weight)
         expected_vsize = (effective_weight + WITNESS_SCALE_FACTOR - 1) // WITNESS_SCALE_FACTOR
@@ -239,11 +239,11 @@ class PriorityTest(BitcoinTestFramework):
         assert abs(mempool_vsize - expected_vsize) <= 1
 
     def test_vsize_discount_disabled(self):
-        self.testmsg('vsize discount is NOT applied when priorityvsizediscount=0')
+        self.testmsg('vsize discount is NOT applied when coinblocksvsizediscount=0')
 
         self.stop_node(1)
         self.stop_node(2)
-        self.restart_node(0, extra_args=['-priorityvsizediscount=0'])
+        self.restart_node(0, extra_args=['-coinblocksvsizediscount=0'])
         node = self.nodes[0]
 
         self.generatetoaddress(node, 250, node.getnewaddress(), sync_fun=self.no_op)
