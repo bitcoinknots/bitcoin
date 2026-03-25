@@ -912,9 +912,9 @@ UniValue MempoolInfoToJSON(const CTxMemPool& pool, const std::optional<MempoolHi
     ret.pushKV("unbroadcastcount", uint64_t{pool.GetUnbroadcastTxs().size()});
     ret.pushKV("fullrbf", (pool.m_opts.rbf_policy == RBFPolicy::Always));
     switch (pool.m_opts.rbf_policy) {
-    case RBFPolicy::Never  : ret.pushKV("rbf_policy", "never"); break;
-    case RBFPolicy::OptIn  : ret.pushKV("rbf_policy", "optin"); break;
-    case RBFPolicy::Always : ret.pushKV("rbf_policy", "always"); break;
+    case RBFPolicy::Never : ret.pushKV("rbf_policy", "never"); break;
+    case RBFPolicy::OptIn : ret.pushKV("rbf_policy", "optin"); break;
+    case RBFPolicy::Always: ret.pushKV("rbf_policy", "always"); break;
     }
     ret.pushKV("rbf_feerate", pool.m_opts.rbf_feerate_mode);
     switch (pool.m_opts.truc_policy) {
