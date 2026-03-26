@@ -1597,12 +1597,12 @@ static RPCHelpMan scriptthreadsinfo()
                     {
                         {RPCResult::Type::BOOL, "enabled", "true if script verification threads are enabled (see setscriptthreadsenabled)."},
                         {RPCResult::Type::NUM, "num_script_check_threads", "The total number of script verification threads, when enabled."},
-                        {RPCResult::Type::OBJ, "calibration", "Script verification calibration data.",
+                        {RPCResult::Type::OBJ, "calibration", "Startup calibration from sampled ConnectBlock() verification intervals.",
                         {
                             {RPCResult::Type::BOOL, "complete", "Whether calibration has finished."},
                             {RPCResult::Type::NUM, "blocks", "Number of blocks sampled."},
                             {RPCResult::Type::NUM, "inputs", "Total inputs verified during calibration."},
-                            {RPCResult::Type::NUM, "us_per_input", "Average microseconds per input verification."},
+                            {RPCResult::Type::NUM, "us_per_input", "Approximate microseconds per input (includes UTXO and script verification)."},
                         }},
                     },
                 },

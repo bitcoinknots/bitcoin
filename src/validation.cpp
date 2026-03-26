@@ -3005,7 +3005,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
                 int64_t total_us = m_chainman.m_calibration_time_us.load(std::memory_order_relaxed);
                 double us_per_input = total_inputs > 0 ? static_cast<double>(total_us) / total_inputs : 0.0;
                 size_t thread_count = parallel_script_checks ? m_chainman.GetCheckQueue().ThreadCount() + 1 : 1;
-                LogInfo("Script verification calibration complete: %.1f us/input with %d threads (%d blocks, %d inputs)",
+                LogInfo("Verification calibration complete: ~%.1f us/input with %d threads (%d blocks, %d inputs)",
                         us_per_input, thread_count, blocks, total_inputs);
             }
         }
