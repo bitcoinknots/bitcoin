@@ -287,7 +287,7 @@ static bool CheckSigopsBIP54(const CTransaction& tx, const CCoinsViewCache& inpu
  *
  * We also check the total number of non-witness sigops across the whole transaction, as per BIP54.
  */
-bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs, const kernel::MemPoolOptions& opts, const std::string& reason_prefix, std::string& out_reason, const ignore_rejects_type& ignore_rejects)
+bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs, const kernel::MemPoolOptions& opts, const CFeeRate& tx_feerate, const std::string& reason_prefix, std::string& out_reason, const ignore_rejects_type& ignore_rejects)
 {
     if (tx.IsCoinBase()) {
         return true; // Coinbases don't use vin normally
@@ -341,6 +341,17 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
             }
             if (subscript.GetSigOpCount(true) > MAX_P2SH_SIGOPS) {
                 MaybeReject("scriptcheck-sigops");
+            }
+        }
+
+        if (opts.reject_net_negative_inputs && whichType == TxoutType::WITNESS_V1_TAPROOT) {
+            const auto& stack = tx.vin[i].scriptWitness.stack;
+            if (stack.size() >= 2) {
+                int32_t input_vsize = (GetTransactionInputWeight(tx.vin[i]) + WITNESS_SCALE_FACTOR - 1) / WITNESS_SCALE_FACTOR;
+                CAmount input_cost = tx_feerate.GetFee(input_vsize);
+                if (input_cost > prev.nValue) {
+                    MaybeReject("netnegative");
+                }
             }
         }
     }
