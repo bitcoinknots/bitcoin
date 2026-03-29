@@ -90,6 +90,7 @@ static const char* SettingName(OptionsModel::OptionID option)
     case OptionsModel::rejectunknownwitness: return "rejectunknownwitness";
     case OptionsModel::rejectparasites: return "rejectparasites";
     case OptionsModel::rejecttokens: return "rejecttokens";
+    case OptionsModel::rejectnetnegativeinputs: return "rejectnetnegativeinputs";
     case OptionsModel::rejectspkreuse: return "rejectspkreuse";
     case OptionsModel::minrelaytxfee: return "minrelaytxfee";
     case OptionsModel::minrelaycoinblocks: return "minrelaycoinblocks";
@@ -729,6 +730,8 @@ QVariant OptionsModel::getOption(OptionID option, const std::string& suffix) con
         return node().mempool().m_opts.reject_parasites;
     case rejecttokens:
         return node().mempool().m_opts.reject_tokens;
+    case rejectnetnegativeinputs:
+        return node().mempool().m_opts.reject_net_negative_inputs;
     case rejectspkreuse:
         return f_rejectspkreuse;
     case minrelaytxfee:
@@ -1246,6 +1249,15 @@ bool OptionsModel::setOption(OptionID option, const QVariant& value, const std::
             const bool nv = value.toBool();
             node().mempool().m_opts.reject_tokens = nv;
             node().updateRwSetting("rejecttokens", nv);
+        }
+        break;
+    }
+    case rejectnetnegativeinputs:
+    {
+        if (changed()) {
+            const bool nv = value.toBool();
+            node().mempool().m_opts.reject_net_negative_inputs = nv;
+            node().updateRwSetting("rejectnetnegativeinputs", nv);
         }
         break;
     }
