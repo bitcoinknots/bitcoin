@@ -1021,7 +1021,8 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
         }
     }
 
-    if (m_pool.m_opts.require_standard && !AreInputsStandard(tx, m_view, m_pool.m_opts, "bad-txns-input-", reason, ignore_rejects)) {
+    const CFeeRate tx_feerate(ws.m_base_fees, GetVirtualTransactionSize(tx));
+    if (m_pool.m_opts.require_standard && !AreInputsStandard(tx, m_view, m_pool.m_opts, tx_feerate, "bad-txns-input-", reason, ignore_rejects)) {
         return state.Invalid(TxValidationResult::TX_INPUTS_NOT_STANDARD, reason);
     }
 
