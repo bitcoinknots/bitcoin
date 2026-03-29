@@ -412,6 +412,12 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     verticalLayout_Spamfiltering->addWidget(rejecttokens);
     FixTabOrder(rejecttokens);
 
+    rejectnetnegativeinputs = new QCheckBox(groupBox_Spamfiltering);
+    rejectnetnegativeinputs->setText(tr("Reject overly net-negative value inputs"));
+    rejectnetnegativeinputs->setToolTip(tr("Reject transactions containing inputs whose spending cost (at the transaction's feerate) exceeds the value of the input being spent. Key-path spends are always allowed."));
+    verticalLayout_Spamfiltering->addWidget(rejectnetnegativeinputs);
+    FixTabOrder(rejectnetnegativeinputs);
+
     minrelaytxfee = new BitcoinAmountField(groupBox_Spamfiltering);
     CreateOptionUI(verticalLayout_Spamfiltering, minrelaytxfee, tr("Ignore transactions offering miners less than %s per kvB in transaction fees."));
 
@@ -933,6 +939,7 @@ void OptionsDialog::setMapper()
     mapper->addMapping(rejectunknownwitness, OptionsModel::rejectunknownwitness);
     mapper->addMapping(rejectparasites, OptionsModel::rejectparasites);
     mapper->addMapping(rejecttokens, OptionsModel::rejecttokens);
+    mapper->addMapping(rejectnetnegativeinputs, OptionsModel::rejectnetnegativeinputs);
     mapper->addMapping(rejectspkreuse, OptionsModel::rejectspkreuse);
     mapper->addMapping(minrelaytxfee, OptionsModel::minrelaytxfee);
     mapper->addMapping(minrelaycoinblocks, OptionsModel::minrelaycoinblocks);
