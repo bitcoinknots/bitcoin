@@ -12,6 +12,7 @@
 #include <consensus/validation.h>
 #include <node/miner.h>
 #include <policy/policy.h>
+#include <policy/settings.h>
 #include <primitives/transaction.h>
 #include <txmempool.h>
 #include <util/check.h>
@@ -68,28 +69,43 @@ CoinAgeCache GetCoinAge(const CTransaction &tx, const CCoinsViewCache& view, int
     return r;
 }
 
-void CTxMemPoolEntry::UpdateCachedPriority(unsigned int currentHeight, CAmount valueInCurrentBlock)
+int32_t CTxMemPoolEntry::UpdateCachedPriority(unsigned int currentHeight, CAmount valueInCurrentBlock)
 {
     int heightDiff = int(currentHeight) - int(cachedHeight);
     double deltaPriority = ((double)heightDiff*inChainInputValue)/nModSize;
     cachedPriority += deltaPriority;
     cachedHeight = currentHeight;
+
+    m_cached_coin_age += (double)heightDiff * inChainInputValue;
     inChainInputValue += valueInCurrentBlock;
     assert(MoneyRange(inChainInputValue));
+
+    if (!::g_coinblocks_vsize_discount) return 0;
+
+    const int32_t old_size = GetTxSize();
+    static constexpr int32_t min_weight = MIN_STANDARD_TX_NONWITNESS_SIZE * WITNESS_SCALE_FACTOR;
+    m_coinblocks_weight_discount = CalculateCoinblocksWeightDiscount(m_cached_coin_age, nTxWeight, min_weight);
+    const int32_t new_size = GetTxSize();
+
+    if (new_size != old_size) {
+        nModSize = CalculateModifiedSize(GetTx(), new_size);
+    }
+
+    return new_size - old_size;
 }
 
 struct update_priority
 {
     update_priority(unsigned int _height, CAmount _value) :
-        height(_height), value(_value)
+        height(_height), value(_value), size_delta(0)
     {}
 
     void operator() (CTxMemPoolEntry &e)
-    { e.UpdateCachedPriority(height, value); }
+    { size_delta = e.UpdateCachedPriority(height, value); }
 
-    private:
-        unsigned int height;
-        CAmount value;
+    unsigned int height;
+    CAmount value;
+    int32_t size_delta;
 };
 
 void CTxMemPool::UpdateDependentPriorities(const CTransaction &tx, unsigned int nBlockHeight, bool addToChain)

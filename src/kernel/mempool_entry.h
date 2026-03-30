@@ -96,12 +96,14 @@ private:
     const int64_t nTime;            //!< Local time when entering the mempool
     const uint64_t entry_sequence;  //!< Sequence number used to determine whether this transaction is too recent for relay
     const int64_t sigOpCost;        //!< Total sigop cost
-    const int32_t m_extra_weight;   //!< Policy-only additional transaction weight beyond nTxWeight
-    const size_t nModSize;          //!< Cached modified size for priority
+    const int32_t m_base_extra_weight;       //!< Policy-only extra weight (e.g. datacarrier), never changes
+    int32_t m_coinblocks_weight_discount;    //!< Coinblocks vsize discount (negative or zero), updated as coin age increases
+    size_t nModSize;                //!< Cached modified size for priority
     const double entryPriority;     //!< Priority when entering the mempool
     const unsigned int entryHeight; //!< Chain height when entering the mempool
     double cachedPriority;          //!< Last calculated priority
     unsigned int cachedHeight;      //!< Height at which priority was last calculated
+    double m_cached_coin_age;       //!< Cached sum coin-age of confirmed inputs (satoshi-blocks)
     CAmount inChainInputValue;      //!< Sum of all txin values that are already in blockchain
     const bool spendsCoinbase;      //!< keep track of transactions that spend a coinbase
     CAmount m_modified_fee;         //!< Used for determining the priority of the transaction for mining in a block
@@ -136,13 +138,17 @@ public:
           nTime{time},
           entry_sequence{entry_sequence},
           sigOpCost{sigops_cost},
-          m_extra_weight{extra_weight},
+          m_base_extra_weight{extra_weight},
+          m_coinblocks_weight_discount{::g_coinblocks_vsize_discount ?
+              CalculateCoinblocksWeightDiscount(coin_age_cache.inputs_coin_age, GetTransactionWeight(*tx),
+                  MIN_STANDARD_TX_NONWITNESS_SIZE * WITNESS_SCALE_FACTOR) : 0},
           nModSize{CalculateModifiedSize(*tx, GetTxSize())},
           entryPriority{ComputePriority2(coin_age_cache.inputs_coin_age, nModSize)},
           entryHeight{entry_height},
           cachedPriority{entryPriority},
           // Since entries arrive *after* the tip's height, their entry priority is for the height+1
           cachedHeight{entry_height + 1},
+          m_cached_coin_age{coin_age_cache.inputs_coin_age},
           inChainInputValue{coin_age_cache.in_chain_input_value},
           spendsCoinbase{spends_coinbase},
           m_modified_fee{nFee},
@@ -168,7 +174,7 @@ public:
     double GetStartingPriority() const {return entryPriority; }
     CoinAgeCache GetInternalCoinAgeCache() const {
         return {
-            .inputs_coin_age = ReversePriority2(cachedPriority, nModSize),
+            .inputs_coin_age = m_cached_coin_age,
             .in_chain_input_value = inChainInputValue,
         };
     }
@@ -180,18 +186,20 @@ public:
     /**
      * Recalculate the cached priority as of currentHeight and adjust inChainInputValue by
      * valueInCurrentBlock which represents input that was just added to or removed from the blockchain.
+     * Also recalculates the coinblocks weight discount based on updated coin age.
+     * @return The change in GetTxSize() caused by the discount update (0 if unchanged).
      */
-    void UpdateCachedPriority(unsigned int currentHeight, CAmount valueInCurrentBlock);
+    int32_t UpdateCachedPriority(unsigned int currentHeight, CAmount valueInCurrentBlock);
     const CAmount& GetFee() const { return nFee; }
     int32_t GetTxSize() const
     {
-        return GetVirtualTransactionSize(nTxWeight + m_extra_weight, sigOpCost, ::nBytesPerSigOp);
+        return GetVirtualTransactionSize(nTxWeight + m_base_extra_weight + m_coinblocks_weight_discount, sigOpCost, ::nBytesPerSigOp);
     }
     int32_t GetTxWeight() const { return nTxWeight; }
     std::chrono::seconds GetTime() const { return std::chrono::seconds{nTime}; }
     unsigned int GetHeight() const { return entryHeight; }
     uint64_t GetSequence() const { return entry_sequence; }
-    int32_t GetExtraWeight() const { return m_extra_weight; }
+    int32_t GetExtraWeight() const { return m_base_extra_weight + m_coinblocks_weight_discount; }
     int64_t GetSigOpCost() const { return sigOpCost; }
     CAmount GetModifiedFee() const { return m_modified_fee; }
     size_t DynamicMemoryUsage() const { return nUsageSize; }
