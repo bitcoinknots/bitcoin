@@ -400,13 +400,13 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     mempoolButtonLayout->addStretch(1);
     verticalLayout_Mempool->addLayout(mempoolButtonLayout);
 
+    QVBoxLayout * const grpReplacementPolicy = createCollapsibleGroup(verticalLayout_Mempool, tr("Replacement Policy"), tabMempool, &mempoolToggles);
+
     rejectspkreuse = new QCheckBox(tabMempool);
     rejectspkreuse->setText(tr("Disallow most address reuse"));
     rejectspkreuse->setToolTip(tr("With this option enabled, your memory pool will only allow each unique payment destination to be used once, effectively deprioritising address reuse. Address reuse is not technically supported, and harms the privacy of all Bitcoin users. It also has limited real-world utility, and has been known to be common with spam."));
-    verticalLayout_Mempool->addWidget(rejectspkreuse);
+    grpReplacementPolicy->addWidget(rejectspkreuse);
     FixTabOrder(rejectspkreuse);
-
-    QVBoxLayout * const grpReplacementPolicy = createCollapsibleGroup(verticalLayout_Mempool, tr("Replacement Policy"), tabMempool, &mempoolToggles);
 
     mempoolreplacement = new QValueComboBox(tabMempool);
     mempoolreplacement->addItem(QString("never"), QVariant("never"));
@@ -441,6 +441,55 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     mempoolexpiry->setMinimum(1);
     mempoolexpiry->setMaximum(std::numeric_limits<int>::max());
     CreateOptionUI(grpResourceLimits, mempoolexpiry, tr("Do not keep transactions in memory more than %s hours"));
+
+    QVBoxLayout * const grpChainLimits = createCollapsibleGroup(verticalLayout_Mempool, tr("Chain Limits"), tabMempool, &mempoolToggles);
+
+    limitancestorcount = new QSpinBox(tabMempool);
+    limitancestorcount->setMinimum(1);
+    limitancestorcount->setMaximum(std::numeric_limits<int>::max());
+    CreateOptionUI(grpChainLimits, limitancestorcount, tr("Ignore transactions with %s or more unconfirmed ancestors."));
+
+    limitancestorsize = new QSpinBox(tabMempool);
+    limitancestorsize->setMinimum(1);
+    limitancestorsize->setMaximum(std::numeric_limits<int>::max());
+    CreateOptionUI(grpChainLimits, limitancestorsize, tr("Ignore transactions whose size with all unconfirmed ancestors exceeds %s kilobytes."));
+
+    limitdescendantcount = new QSpinBox(tabMempool);
+    limitdescendantcount->setMinimum(1);
+    limitdescendantcount->setMaximum(std::numeric_limits<int>::max());
+    CreateOptionUI(grpChainLimits, limitdescendantcount, tr("Ignore transactions if any ancestor would have %s or more unconfirmed descendants."));
+
+    limitdescendantsize = new QSpinBox(tabMempool);
+    limitdescendantsize->setMinimum(1);
+    limitdescendantsize->setMaximum(std::numeric_limits<int>::max());
+    CreateOptionUI(grpChainLimits, limitdescendantsize, tr("Ignore transactions if any ancestor would have more than %s kilobytes of unconfirmed descendants."));
+
+    connect(maxmempool, &QSpinBox::editingFinished, [&]() {
+        const int64_t limitdescendantsize_max_kvB = limitdescendantsizeMaximumVBytes(int64_t{maxmempool->value()} * 1'000'000) / 1'000;
+        if (limitdescendantsize_max_kvB < limitdescendantsize->value()) {
+            if (QMessageBox::question(this, tr("Confirm change"), tr("Decreasing your mempool size to %1 MB requires also decreasing your unconfirmed descendants size limit to %2 kB (currently %3 kB, on the Spam filtering tab).<br><br>Do you wish to make these changes?").arg(maxmempool->value()).arg(limitdescendantsize_max_kvB).arg(limitdescendantsize->value()), QMessageBox::Apply | QMessageBox::Cancel) == QMessageBox::Apply) {
+                limitdescendantsize->setValue(limitdescendantsize_max_kvB);
+                limitdescendantsize->setProperty("pv", (int)limitdescendantsize_max_kvB);
+            } else {  // Cancel
+                maxmempool->setValue(maxmempool->property("pv").toInt());
+                return;
+            }
+        }
+        maxmempool->setProperty("pv", maxmempool->value());
+    });
+    connect(limitdescendantsize, &QSpinBox::editingFinished, [&]() {
+        const int maxmempool_min_MB = std::ceil(maxmempoolMinimumBytes(int64_t{limitdescendantsize->value()} * 1'000) / 1'000'000.0);
+        if (maxmempool_min_MB > maxmempool->value()) {
+            if (QMessageBox::question(this, tr("Confirm change"), tr("Increasing your descendant size limit to %1 kB requires also increasing your mempool size to %2 MB (currently %3 MB, on the Mempool tab).<br><br>Do you wish to make these changes?").arg(limitdescendantsize->value()).arg(maxmempool_min_MB).arg(maxmempool->value()), QMessageBox::Apply | QMessageBox::Cancel) == QMessageBox::Apply) {
+                maxmempool->setValue(maxmempool_min_MB);
+                maxmempool->setProperty("pv", maxmempool_min_MB);
+            } else {  // Cancel
+                limitdescendantsize->setValue(limitdescendantsize->property("pv").toInt());
+                return;
+            }
+        }
+        limitdescendantsize->setProperty("pv", limitdescendantsize->value());
+    });
 
     connect(mempoolExpandAll, &QPushButton::clicked, [mempoolToggles]() {
         for (auto *t : mempoolToggles) t->setChecked(true);
@@ -493,7 +542,36 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     grpTxTypes->addWidget(rejecttokens);
     FixTabOrder(rejecttokens);
 
-    QVBoxLayout * const grpFeesPriority = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Fees && Priority"), groupBox_Spamfiltering, &filterToggles);
+    rejectbarepubkey = new QCheckBox(groupBox_Spamfiltering);
+    rejectbarepubkey->setText(tr("Ignore bare/exposed public keys (pay-to-IP)"));
+    rejectbarepubkey->setToolTip(tr("Spam is sometimes disguised to appear as if it is a deprecated pay-to-IP (bare pubkey) transaction, where the \"key\" is actually arbitrary data (not a real key) instead. Support for pay-to-IP was only ever supported by Satoshi's early Bitcoin wallet, which has been abandoned since 2011."));
+    grpTxTypes->addWidget(rejectbarepubkey);
+    FixTabOrder(rejectbarepubkey);
+
+    rejectbaremultisig = new QCheckBox(groupBox_Spamfiltering);
+    rejectbaremultisig->setText(tr("Ignore bare/exposed \"multisig\" scripts"));
+    rejectbaremultisig->setToolTip(tr("Spam is sometimes disguised to appear as if it is an old-style N-of-M multi-party transaction, where most of the keys are really bogus. At the same time, legitimate multi-party transactions typically have always used P2SH format (which is not filtered by this option), which is more secure."));
+    grpTxTypes->addWidget(rejectbaremultisig);
+    FixTabOrder(rejectbaremultisig);
+
+    permitephemeral = new QValueComboBox(groupBox_Spamfiltering);
+    permitephemeral->addItem(QString("(no exception allowed)"), QVariant("reject"));
+    permitephemeral->addItem(QString("anchor (recommended)"), QVariant("anchor,-send,-dust"));
+    permitephemeral->addItem(QString("zero-value anchor/send"), QVariant("anchor,send,-dust"));
+    permitephemeral->addItem(QString("zero-value send-only"), QVariant("-anchor,send,-dust"));
+    permitephemeral->addItem(QString("dust send"), QVariant("-anchor,send,dust"));
+    permitephemeral->addItem(QString("dust"), QVariant("anchor,send,dust"));
+    permitephemeral->addItem(QString("dust anchor"), QVariant("anchor,-send,dust"));
+    permitephemeral->setToolTip(tr("For some smart contracts, it is impractical to increase the fee after the transaction is created. For this reason, they may use zero-value \"anchors\" to chain two transactions together, the subsequent transaction simply covering the fee for both. Ordinarily, these anchors might be rejected as dust, so it may make sense to make an exception when they are sent together. Variants of this can however be abused for anti-fungibility attacks and possibly spam."));
+    CreateOptionUI(grpTxTypes, permitephemeral, tr("Allow transactions to have at most one ephemeral %s output"));
+
+    rejectbareanchor = new QCheckBox(groupBox_Spamfiltering);
+    rejectbareanchor->setText(tr("Reject transactions that only have an anchor"));
+    rejectbareanchor->setToolTip(tr("Anchors are a way to allow fee-bumping smart contract transactions long after they have been created. With this option set, your node will refuse to relay or mine transactions that have only an anchor but no real sends."));
+    grpTxTypes->addWidget(rejectbareanchor);
+    FixTabOrder(rejectbareanchor);
+
+    QVBoxLayout * const grpFeesPriority = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Fees && Rate Limiting"), groupBox_Spamfiltering, &filterToggles);
 
     minrelaytxfee = new BitcoinAmountField(groupBox_Spamfiltering);
     CreateOptionUI(grpFeesPriority, minrelaytxfee, tr("Ignore transactions offering miners less than %s per kvB in transaction fees."));
@@ -509,95 +587,17 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     minrelaymaturity->setToolTip(tr("This effectively acts as a rate limit. When bitcoins are spent, they reset to zero blocks and slowly mature each block afterward, regardless of their value."));
     CreateOptionUI(grpFeesPriority, minrelaymaturity, tr("Delay accepting transactions spending coins that have been at rest fewer than %s blocks."));
 
+    QVBoxLayout * const grpScriptsData = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Resource Limits"), groupBox_Spamfiltering, &filterToggles);
+
     bytespersigop = new QSpinBox(groupBox_Spamfiltering);
     bytespersigop->setMinimum(1);
     bytespersigop->setMaximum(std::numeric_limits<int>::max());
-    CreateOptionUI(grpFeesPriority, bytespersigop, tr("Treat each consensus-counted sigop as at least %s bytes."));
+    CreateOptionUI(grpScriptsData, bytespersigop, tr("Treat each consensus-counted sigop as at least %s bytes."));
 
     bytespersigopstrict = new QSpinBox(groupBox_Spamfiltering);
     bytespersigopstrict->setMinimum(1);
     bytespersigopstrict->setMaximum(std::numeric_limits<int>::max());
-    CreateOptionUI(grpFeesPriority, bytespersigopstrict, tr("Ignore transactions with fewer than %s bytes per potentially-executed sigop."));
-
-    QVBoxLayout * const grpChainLimits = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Chain Limits"), groupBox_Spamfiltering, &filterToggles);
-
-    limitancestorcount = new QSpinBox(groupBox_Spamfiltering);
-    limitancestorcount->setMinimum(1);
-    limitancestorcount->setMaximum(std::numeric_limits<int>::max());
-    CreateOptionUI(grpChainLimits, limitancestorcount, tr("Ignore transactions with %s or more unconfirmed ancestors."));
-
-    limitancestorsize = new QSpinBox(groupBox_Spamfiltering);
-    limitancestorsize->setMinimum(1);
-    limitancestorsize->setMaximum(std::numeric_limits<int>::max());
-    CreateOptionUI(grpChainLimits, limitancestorsize, tr("Ignore transactions whose size with all unconfirmed ancestors exceeds %s kilobytes."));
-
-    limitdescendantcount = new QSpinBox(groupBox_Spamfiltering);
-    limitdescendantcount->setMinimum(1);
-    limitdescendantcount->setMaximum(std::numeric_limits<int>::max());
-    CreateOptionUI(grpChainLimits, limitdescendantcount, tr("Ignore transactions if any ancestor would have %s or more unconfirmed descendants."));
-
-    limitdescendantsize = new QSpinBox(groupBox_Spamfiltering);
-    limitdescendantsize->setMinimum(1);
-    limitdescendantsize->setMaximum(std::numeric_limits<int>::max());
-    CreateOptionUI(grpChainLimits, limitdescendantsize, tr("Ignore transactions if any ancestor would have more than %s kilobytes of unconfirmed descendants."));
-
-    connect(maxmempool, &QSpinBox::editingFinished, [&]() {
-        const int64_t limitdescendantsize_max_kvB = limitdescendantsizeMaximumVBytes(int64_t{maxmempool->value()} * 1'000'000) / 1'000;
-        if (limitdescendantsize_max_kvB < limitdescendantsize->value()) {
-            if (QMessageBox::question(this, tr("Confirm change"), tr("Decreasing your mempool size to %1 MB requires also decreasing your unconfirmed descendants size limit to %2 kB (currently %3 kB, on the Spam filtering tab).<br><br>Do you wish to make these changes?").arg(maxmempool->value()).arg(limitdescendantsize_max_kvB).arg(limitdescendantsize->value()), QMessageBox::Apply | QMessageBox::Cancel) == QMessageBox::Apply) {
-                limitdescendantsize->setValue(limitdescendantsize_max_kvB);
-                limitdescendantsize->setProperty("pv", (int)limitdescendantsize_max_kvB);
-            } else {  // Cancel
-                maxmempool->setValue(maxmempool->property("pv").toInt());
-                return;
-            }
-        }
-        maxmempool->setProperty("pv", maxmempool->value());
-    });
-    connect(limitdescendantsize, &QSpinBox::editingFinished, [&]() {
-        const int maxmempool_min_MB = std::ceil(maxmempoolMinimumBytes(int64_t{limitdescendantsize->value()} * 1'000) / 1'000'000.0);
-        if (maxmempool_min_MB > maxmempool->value()) {
-            if (QMessageBox::question(this, tr("Confirm change"), tr("Increasing your descendant size limit to %1 kB requires also increasing your mempool size to %2 MB (currently %3 MB, on the Mempool tab).<br><br>Do you wish to make these changes?").arg(limitdescendantsize->value()).arg(maxmempool_min_MB).arg(maxmempool->value()), QMessageBox::Apply | QMessageBox::Cancel) == QMessageBox::Apply) {
-                maxmempool->setValue(maxmempool_min_MB);
-                maxmempool->setProperty("pv", maxmempool_min_MB);
-            } else {  // Cancel
-                limitdescendantsize->setValue(limitdescendantsize->property("pv").toInt());
-                return;
-            }
-        }
-        limitdescendantsize->setProperty("pv", limitdescendantsize->value());
-    });
-
-    QVBoxLayout * const grpScriptsData = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Scripts && Data"), groupBox_Spamfiltering, &filterToggles);
-
-    rejectbarepubkey = new QCheckBox(groupBox_Spamfiltering);
-    rejectbarepubkey->setText(tr("Ignore bare/exposed public keys (pay-to-IP)"));
-    rejectbarepubkey->setToolTip(tr("Spam is sometimes disguised to appear as if it is a deprecated pay-to-IP (bare pubkey) transaction, where the \"key\" is actually arbitrary data (not a real key) instead. Support for pay-to-IP was only ever supported by Satoshi's early Bitcoin wallet, which has been abandoned since 2011."));
-    grpScriptsData->addWidget(rejectbarepubkey);
-    FixTabOrder(rejectbarepubkey);
-
-    rejectbaremultisig = new QCheckBox(groupBox_Spamfiltering);
-    rejectbaremultisig->setText(tr("Ignore bare/exposed \"multisig\" scripts"));
-    rejectbaremultisig->setToolTip(tr("Spam is sometimes disguised to appear as if it is an old-style N-of-M multi-party transaction, where most of the keys are really bogus. At the same time, legitimate multi-party transactions typically have always used P2SH format (which is not filtered by this option), which is more secure."));
-    grpScriptsData->addWidget(rejectbaremultisig);
-    FixTabOrder(rejectbaremultisig);
-
-    permitephemeral = new QValueComboBox(groupBox_Spamfiltering);
-    permitephemeral->addItem(QString("(no exception allowed)"), QVariant("reject"));
-    permitephemeral->addItem(QString("anchor (recommended)"), QVariant("anchor,-send,-dust"));
-    permitephemeral->addItem(QString("zero-value anchor/send"), QVariant("anchor,send,-dust"));
-    permitephemeral->addItem(QString("zero-value send-only"), QVariant("-anchor,send,-dust"));
-    permitephemeral->addItem(QString("dust send"), QVariant("-anchor,send,dust"));
-    permitephemeral->addItem(QString("dust"), QVariant("anchor,send,dust"));
-    permitephemeral->addItem(QString("dust anchor"), QVariant("anchor,-send,dust"));
-    permitephemeral->setToolTip(tr("For some smart contracts, it is impractical to increase the fee after the transaction is created. For this reason, they may use zero-value \"anchors\" to chain two transactions together, the subsequent transaction simply covering the fee for both. Ordinarily, these anchors might be rejected as dust, so it may make sense to make an exception when they are sent together. Variants of this can however be abused for anti-fungibility attacks and possibly spam."));
-    CreateOptionUI(grpScriptsData, permitephemeral, tr("Allow transactions to have at most one ephemeral %s output"));
-
-    rejectbareanchor = new QCheckBox(groupBox_Spamfiltering);
-    rejectbareanchor->setText(tr("Reject transactions that only have an anchor"));
-    rejectbareanchor->setToolTip(tr("Anchors are a way to allow fee-bumping smart contract transactions long after they have been created. With this option set, your node will refuse to relay or mine transactions that have only an anchor but no real sends."));
-    grpScriptsData->addWidget(rejectbareanchor);
-    FixTabOrder(rejectbareanchor);
+    CreateOptionUI(grpScriptsData, bytespersigopstrict, tr("Ignore transactions with fewer than %s bytes per potentially-executed sigop."));
 
     maxscriptsize = new QSpinBox(groupBox_Spamfiltering);
     maxscriptsize->setMinimum(0);
