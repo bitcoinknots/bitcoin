@@ -6,10 +6,11 @@
 
 from test_framework.blocktools import create_block
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal
+from test_framework.util import assert_equal, assert_greater_than
 
 from binascii import b2a_hex
 from decimal import Decimal
+import math
 
 def find_unspent(node, txid, amount):
     for utxo in node.listunspent(0):
@@ -186,6 +187,85 @@ class PriorityTest(BitcoinTestFramework):
 
         txid_e_reorg_prio = (amt_c2 * BTC * 6) / txmodsize_e
         self.assert_prio(txid_e, txid_e_starting_prio, txid_e_reorg_prio)
+
+        self.test_vsize_discount()
+        self.test_vsize_discount_disabled()
+
+    def test_vsize_discount(self):
+        self.testmsg('vsize discount is applied for aged UTXOs (coinblocksvsizediscount=1)')
+
+        self.restart_node(0, extra_args=['-coinblocksvsizediscount=1'])
+        self.restart_node(1, extra_args=['-blockprioritysize=1000000', '-blockmaxsize=1000000', '-coinblocksvsizediscount=1'])
+        self.restart_node(2, extra_args=['-coinblocksvsizediscount=1'])
+        self.connect_nodes(0, 1)
+        self.connect_nodes(1, 2)
+
+        node = self.nodes[0]
+
+        self.generate(node, 250)
+
+        amt = Decimal('1')
+        fee = Decimal('0.0001')
+        addr = node.getnewaddress()
+        txid_fund = node.sendtoaddress(addr, amt)
+        self.generate(node, 144)
+
+        utxo = find_unspent(node, txid_fund, amt)
+        txdata = node.createrawtransaction([utxo], {node.getnewaddress(): amt - fee})
+        txdata = node.signrawtransactionwithwallet(txdata)['hex']
+        decoded = node.decoderawtransaction(txdata)
+        raw_vsize = decoded['vsize']
+        txid = node.sendrawtransaction(txdata)
+
+        entry = node.getmempoolentry(txid)
+        mempool_vsize = entry['vsize']
+
+        self.log.info('  raw_vsize=%d mempool_vsize=%d' % (raw_vsize, mempool_vsize))
+        assert_greater_than(raw_vsize, mempool_vsize)
+
+        raw_weight = decoded['weight']
+        MIN_STANDARD_TX_NONWITNESS_SIZE = 65
+        WITNESS_SCALE_FACTOR = 4
+        min_weight = MIN_STANDARD_TX_NONWITNESS_SIZE * WITNESS_SCALE_FACTOR
+        inputs_coin_age = float(amt * BTC) * 144
+        coinblocks = inputs_coin_age / raw_vsize
+        MINIMUM_TX_PRIORITY = float(Decimal('100000000') * 144 / 250)
+        expected_ratio = min(0.5, math.log2(1.0 + coinblocks / MINIMUM_TX_PRIORITY) / 8.0)
+        weight_discount = int(-(expected_ratio * raw_weight))
+        effective_weight = max(raw_weight + weight_discount, min_weight)
+        expected_vsize = (effective_weight + WITNESS_SCALE_FACTOR - 1) // WITNESS_SCALE_FACTOR
+
+        self.log.info('  expected_vsize~=%d mempool_vsize=%d discount_ratio=%.3f' % (expected_vsize, mempool_vsize, expected_ratio))
+        assert abs(mempool_vsize - expected_vsize) <= 1
+
+    def test_vsize_discount_disabled(self):
+        self.testmsg('vsize discount is NOT applied when coinblocksvsizediscount=0')
+
+        self.stop_node(1)
+        self.stop_node(2)
+        self.restart_node(0, extra_args=['-coinblocksvsizediscount=0'])
+        node = self.nodes[0]
+
+        self.generatetoaddress(node, 250, node.getnewaddress(), sync_fun=self.no_op)
+
+        amt = Decimal('1')
+        fee = Decimal('0.0001')
+        addr = node.getnewaddress()
+        txid_fund = node.sendtoaddress(addr, amt)
+        self.generatetoaddress(node, 144, node.getnewaddress(), sync_fun=self.no_op)
+
+        utxo = find_unspent(node, txid_fund, amt)
+        txdata = node.createrawtransaction([utxo], {node.getnewaddress(): amt - fee})
+        txdata = node.signrawtransactionwithwallet(txdata)['hex']
+        decoded = node.decoderawtransaction(txdata)
+        raw_vsize = decoded['vsize']
+        txid = node.sendrawtransaction(txdata)
+
+        entry = node.getmempoolentry(txid)
+        mempool_vsize = entry['vsize']
+
+        self.log.info('  raw_vsize=%d mempool_vsize=%d' % (raw_vsize, mempool_vsize))
+        assert_equal(raw_vsize, mempool_vsize)
 
 if __name__ == '__main__':
     PriorityTest(__file__).main()

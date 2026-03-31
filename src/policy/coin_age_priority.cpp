@@ -4,11 +4,15 @@
 
 #include <policy/coin_age_priority.h>
 
+#include <algorithm>
+#include <cmath>
+
 #include <coins.h>
 #include <common/args.h>
 #include <consensus/validation.h>
 #include <node/miner.h>
 #include <policy/policy.h>
+#include <policy/settings.h>
 #include <primitives/transaction.h>
 #include <txmempool.h>
 #include <util/check.h>
@@ -23,7 +27,7 @@ unsigned int CalculateModifiedSize(const CTransaction& tx, unsigned int nTxSize)
     // is enough to cover a compressed pubkey p2sh redemption) for priority.
     // Providing any more cleanup incentive than making additional inputs free would
     // risk encouraging people to create junk outputs to redeem later.
-    Assert(nTxSize > 0);
+    if (nTxSize == 0) return 0;
     for (std::vector<CTxIn>::const_iterator it(tx.vin.begin()); it != tx.vin.end(); ++it)
     {
         unsigned int offset = 41U + std::min(110U, (unsigned int)it->scriptSig.size());
@@ -65,14 +69,29 @@ CoinAgeCache GetCoinAge(const CTransaction &tx, const CCoinsViewCache& view, int
     return r;
 }
 
-void CTxMemPoolEntry::UpdateCachedPriority(unsigned int currentHeight, CAmount valueInCurrentBlock)
+int32_t CTxMemPoolEntry::UpdateCachedPriority(unsigned int currentHeight, CAmount valueInCurrentBlock)
 {
     int heightDiff = int(currentHeight) - int(cachedHeight);
     double deltaPriority = ((double)heightDiff*inChainInputValue)/nModSize;
     cachedPriority += deltaPriority;
     cachedHeight = currentHeight;
+
+    m_cached_coin_age += (double)heightDiff * inChainInputValue;
     inChainInputValue += valueInCurrentBlock;
     assert(MoneyRange(inChainInputValue));
+
+    if (!::g_coinblocks_vsize_discount) return 0;
+
+    const int32_t old_size = GetTxSize();
+    static constexpr int32_t min_weight = MIN_STANDARD_TX_NONWITNESS_SIZE * WITNESS_SCALE_FACTOR;
+    m_coinblocks_weight_discount = CalculateCoinblocksWeightDiscount(m_cached_coin_age, nTxWeight, min_weight);
+    const int32_t new_size = GetTxSize();
+
+    if (new_size != old_size) {
+        nModSize = CalculateModifiedSize(GetTx(), new_size);
+    }
+
+    return new_size - old_size;
 }
 
 struct update_priority
@@ -82,11 +101,11 @@ struct update_priority
     {}
 
     void operator() (CTxMemPoolEntry &e)
-    { e.UpdateCachedPriority(height, value); }
+    { size_delta = e.UpdateCachedPriority(height, value); }
 
-    private:
-        unsigned int height;
-        CAmount value;
+    unsigned int height;
+    CAmount value;
+    int32_t size_delta{0};
 };
 
 void CTxMemPool::UpdateDependentPriorities(const CTransaction &tx, unsigned int nBlockHeight, bool addToChain)
@@ -98,7 +117,9 @@ void CTxMemPool::UpdateDependentPriorities(const CTransaction &tx, unsigned int 
             continue;
         uint256 hash = it->second->GetHash();
         txiter iter = mapTx.find(hash);
+        const int32_t old_size = iter->GetTxSize();
         mapTx.modify(iter, update_priority(nBlockHeight, addToChain ? tx.vout[i].nValue : -tx.vout[i].nValue));
+        totalTxSize += iter->GetTxSize() - old_size;
     }
 }
 
@@ -114,6 +135,22 @@ CTxMemPoolEntry::GetPriority(unsigned int currentHeight) const
     if (dResult < 0) // This should only happen if it was called with an invalid height
         dResult = 0;
     return dResult;
+}
+
+int32_t CalculateCoinblocksWeightDiscount(double inputs_coin_age, int32_t tx_weight, int32_t min_weight)
+{
+    if (tx_weight <= min_weight || inputs_coin_age <= 0.0) return 0;
+
+    const double vsize = static_cast<double>(tx_weight) / WITNESS_SCALE_FACTOR;
+    const double coinblocks = inputs_coin_age / vsize;
+    static constexpr double COINBLOCKS_DISCOUNT_LOG_DIVISOR{8.0};
+    const double discount_ratio = std::min(0.5, std::log2(1.0 + coinblocks / MINIMUM_TX_PRIORITY) / COINBLOCKS_DISCOUNT_LOG_DIVISOR);
+
+    int32_t weight_discount = static_cast<int32_t>(-discount_ratio * tx_weight);
+    weight_discount = std::max(weight_discount, min_weight - tx_weight);
+
+    Assume(weight_discount <= 0);
+    return weight_discount;
 }
 
 #ifndef BUILDING_FOR_LIBBITCOINKERNEL
