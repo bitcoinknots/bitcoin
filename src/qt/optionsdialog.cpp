@@ -37,6 +37,7 @@
 #include <QDataWidgetMapper>
 #include <QDir>
 #include <QDoubleSpinBox>
+#include <QEvent>
 #include <QFontDialog>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -47,6 +48,7 @@
 #include <QLocale>
 #include <QMessageBox>
 #include <QRadioButton>
+#include <QPushButton>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QSpacerItem>
@@ -173,15 +175,25 @@ void OptionsDialog::CreateOptionUI(QBoxLayout * const layout, QWidget * const o,
     CreateOptionUI(layout, text, {o}, { .horizontal_layout = horizontalLayout, });
 }
 
-static QVBoxLayout *createCollapsibleGroup(QVBoxLayout *parentLayout, const QString &title, QWidget *parentWidget)
+class ClickToggleFilter : public QObject {
+    QAbstractButton* m_button;
+public:
+    ClickToggleFilter(QAbstractButton* button, QObject* parent) : QObject(parent), m_button(button) {}
+    bool eventFilter(QObject*, QEvent* e) override {
+        if (e->type() == QEvent::MouseButtonRelease) { m_button->toggle(); return true; }
+        return false;
+    }
+};
+
+static QVBoxLayout *createCollapsibleGroup(QVBoxLayout *parentLayout, const QString &title, QWidget *parentWidget, QList<QToolButton*> *toggles = nullptr)
 {
     auto *toggle = new QToolButton(parentWidget);
     toggle->setStyleSheet("QToolButton { border: none; font-weight: bold; }");
     toggle->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-    toggle->setArrowType(Qt::DownArrow);
+    toggle->setArrowType(Qt::RightArrow);
     toggle->setText(title);
     toggle->setCheckable(true);
-    toggle->setChecked(true);
+    toggle->setChecked(false);
 
     auto *headerLayout = new QHBoxLayout();
     headerLayout->addWidget(toggle);
@@ -189,10 +201,13 @@ static QVBoxLayout *createCollapsibleGroup(QVBoxLayout *parentLayout, const QStr
     line->setFrameShape(QFrame::HLine);
     line->setFrameShadow(QFrame::Sunken);
     line->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
+    line->setCursor(Qt::PointingHandCursor);
+    line->installEventFilter(new ClickToggleFilter(toggle, line));
     headerLayout->addWidget(line);
     parentLayout->addLayout(headerLayout);
 
     auto *contentWidget = new QWidget(parentWidget);
+    contentWidget->setVisible(false);
     auto *innerLayout = new QVBoxLayout(contentWidget);
     innerLayout->setContentsMargins(18, 0, 0, 0);
     parentLayout->addWidget(contentWidget);
@@ -201,6 +216,8 @@ static QVBoxLayout *createCollapsibleGroup(QVBoxLayout *parentLayout, const QStr
         toggle->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
         contentWidget->setVisible(checked);
     });
+
+    if (toggles) toggles->append(toggle);
 
     return innerLayout;
 }
@@ -374,13 +391,22 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     QVBoxLayout * const verticalLayout_Mempool = new QVBoxLayout(tabMempool);
     ui->tabWidget->insertTab(ui->tabWidget->indexOf(ui->tabWindow), ModScrollArea::fromWidget(this, tabMempool), tr("Mem&pool"));
 
+    QList<QToolButton*> mempoolToggles;
+    auto *mempoolButtonLayout = new QHBoxLayout();
+    auto *mempoolExpandAll = new QPushButton(tr("Expand All"), tabMempool);
+    auto *mempoolCollapseAll = new QPushButton(tr("Collapse All"), tabMempool);
+    mempoolButtonLayout->addWidget(mempoolExpandAll);
+    mempoolButtonLayout->addWidget(mempoolCollapseAll);
+    mempoolButtonLayout->addStretch(1);
+    verticalLayout_Mempool->addLayout(mempoolButtonLayout);
+
     rejectspkreuse = new QCheckBox(tabMempool);
     rejectspkreuse->setText(tr("Disallow most address reuse"));
     rejectspkreuse->setToolTip(tr("With this option enabled, your memory pool will only allow each unique payment destination to be used once, effectively deprioritising address reuse. Address reuse is not technically supported, and harms the privacy of all Bitcoin users. It also has limited real-world utility, and has been known to be common with spam."));
     verticalLayout_Mempool->addWidget(rejectspkreuse);
     FixTabOrder(rejectspkreuse);
 
-    QVBoxLayout * const grpReplacementPolicy = createCollapsibleGroup(verticalLayout_Mempool, tr("Replacement Policy"), tabMempool);
+    QVBoxLayout * const grpReplacementPolicy = createCollapsibleGroup(verticalLayout_Mempool, tr("Replacement Policy"), tabMempool, &mempoolToggles);
 
     mempoolreplacement = new QValueComboBox(tabMempool);
     mempoolreplacement->addItem(QString("never"), QVariant("never"));
@@ -399,7 +425,7 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     mempooltruc->setToolTip(tr("Some transactions signal a request to limit both themselves and other related transactions to more restrictive expectations. Specifically, this would disallow more than 1 unconfirmed predecessor or spending transaction, as well as smaller size limits (see BIP 431 for details), regardless of what policy you have configured."));
     CreateOptionUI(grpReplacementPolicy, mempooltruc, tr("Transactions requesting more restrictive policy limits (TRUC): %s"));
 
-    QVBoxLayout * const grpResourceLimits = createCollapsibleGroup(verticalLayout_Mempool, tr("Resource Limits"), tabMempool);
+    QVBoxLayout * const grpResourceLimits = createCollapsibleGroup(verticalLayout_Mempool, tr("Resource Limits"), tabMempool, &mempoolToggles);
 
     maxorphantx = new QSpinBox(tabMempool);
     maxorphantx->setMinimum(0);
@@ -416,6 +442,13 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     mempoolexpiry->setMaximum(std::numeric_limits<int>::max());
     CreateOptionUI(grpResourceLimits, mempoolexpiry, tr("Do not keep transactions in memory more than %s hours"));
 
+    connect(mempoolExpandAll, &QPushButton::clicked, [mempoolToggles]() {
+        for (auto *t : mempoolToggles) t->setChecked(true);
+    });
+    connect(mempoolCollapseAll, &QPushButton::clicked, [mempoolToggles]() {
+        for (auto *t : mempoolToggles) t->setChecked(false);
+    });
+
     verticalLayout_Mempool->addItem(new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding));
 
     /* Filters tab */
@@ -425,7 +458,16 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     ui->tabWidget->insertTab(ui->tabWidget->indexOf(ui->tabWindow), ModScrollArea::fromWidget(this, groupBox_Spamfiltering), tr("Spam &filtering"));
     QVBoxLayout * const verticalLayout_Spamfiltering = new QVBoxLayout(groupBox_Spamfiltering);
 
-    QVBoxLayout * const grpTxTypes = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Transaction Types"), groupBox_Spamfiltering);
+    QList<QToolButton*> filterToggles;
+    auto *filterButtonLayout = new QHBoxLayout();
+    auto *filterExpandAll = new QPushButton(tr("Expand All"), groupBox_Spamfiltering);
+    auto *filterCollapseAll = new QPushButton(tr("Collapse All"), groupBox_Spamfiltering);
+    filterButtonLayout->addWidget(filterExpandAll);
+    filterButtonLayout->addWidget(filterCollapseAll);
+    filterButtonLayout->addStretch(1);
+    verticalLayout_Spamfiltering->addLayout(filterButtonLayout);
+
+    QVBoxLayout * const grpTxTypes = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Transaction Types"), groupBox_Spamfiltering, &filterToggles);
 
     rejectunknownscripts = new QCheckBox(groupBox_Spamfiltering);
     rejectunknownscripts->setText(tr("Ignore unrecognised receiver scripts"));
@@ -451,7 +493,7 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     grpTxTypes->addWidget(rejecttokens);
     FixTabOrder(rejecttokens);
 
-    QVBoxLayout * const grpFeesPriority = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Fees && Priority"), groupBox_Spamfiltering);
+    QVBoxLayout * const grpFeesPriority = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Fees && Priority"), groupBox_Spamfiltering, &filterToggles);
 
     minrelaytxfee = new BitcoinAmountField(groupBox_Spamfiltering);
     CreateOptionUI(grpFeesPriority, minrelaytxfee, tr("Ignore transactions offering miners less than %s per kvB in transaction fees."));
@@ -477,7 +519,7 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     bytespersigopstrict->setMaximum(std::numeric_limits<int>::max());
     CreateOptionUI(grpFeesPriority, bytespersigopstrict, tr("Ignore transactions with fewer than %s bytes per potentially-executed sigop."));
 
-    QVBoxLayout * const grpChainLimits = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Chain Limits"), groupBox_Spamfiltering);
+    QVBoxLayout * const grpChainLimits = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Chain Limits"), groupBox_Spamfiltering, &filterToggles);
 
     limitancestorcount = new QSpinBox(groupBox_Spamfiltering);
     limitancestorcount->setMinimum(1);
@@ -526,7 +568,7 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
         limitdescendantsize->setProperty("pv", limitdescendantsize->value());
     });
 
-    QVBoxLayout * const grpScriptsData = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Scripts && Data"), groupBox_Spamfiltering);
+    QVBoxLayout * const grpScriptsData = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Scripts && Data"), groupBox_Spamfiltering, &filterToggles);
 
     rejectbarepubkey = new QCheckBox(groupBox_Spamfiltering);
     rejectbarepubkey->setText(tr("Ignore bare/exposed public keys (pay-to-IP)"));
@@ -601,7 +643,7 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     grpScriptsData->addWidget(rejectbaredatacarrier);
     FixTabOrder(rejectbaredatacarrier);
 
-    QVBoxLayout * const grpDust = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Dust"), groupBox_Spamfiltering);
+    QVBoxLayout * const grpDust = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Dust"), groupBox_Spamfiltering, &filterToggles);
 
     dustrelayfee = new BitcoinAmountField(groupBox_Spamfiltering);
     CreateOptionUI(grpDust, dustrelayfee, tr("Ignore transactions with values that would cost more to spend at a fee rate of %s per kvB (\"dust\")."));
@@ -667,6 +709,13 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
         dustdynamic_enable_toggled(state && dustdynamic_enable->isChecked());
     });
 
+
+    connect(filterExpandAll, &QPushButton::clicked, [filterToggles]() {
+        for (auto *t : filterToggles) t->setChecked(true);
+    });
+    connect(filterCollapseAll, &QPushButton::clicked, [filterToggles]() {
+        for (auto *t : filterToggles) t->setChecked(false);
+    });
 
     verticalLayout_Spamfiltering->addStretch(1);
 
