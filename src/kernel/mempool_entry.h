@@ -15,6 +15,7 @@
 #include <util/epochguard.h>
 #include <util/overflow.h>
 
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <functional>
@@ -193,7 +194,7 @@ public:
     const CAmount& GetFee() const { return nFee; }
     int32_t GetTxSize() const
     {
-        return GetVirtualTransactionSize(nTxWeight + m_base_extra_weight + m_coinblocks_weight_discount, sigOpCost, ::nBytesPerSigOp);
+        return std::max<int32_t>(GetVirtualTransactionSize(nTxWeight + m_base_extra_weight + m_coinblocks_weight_discount, sigOpCost, ::nBytesPerSigOp), 1);
     }
     int32_t GetTxWeight() const { return nTxWeight; }
     std::chrono::seconds GetTime() const { return std::chrono::seconds{nTime}; }

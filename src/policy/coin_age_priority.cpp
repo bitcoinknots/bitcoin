@@ -27,7 +27,7 @@ unsigned int CalculateModifiedSize(const CTransaction& tx, unsigned int nTxSize)
     // is enough to cover a compressed pubkey p2sh redemption) for priority.
     // Providing any more cleanup incentive than making additional inputs free would
     // risk encouraging people to create junk outputs to redeem later.
-    Assert(nTxSize > 0);
+    if (nTxSize == 0) return 0;
     for (std::vector<CTxIn>::const_iterator it(tx.vin.begin()); it != tx.vin.end(); ++it)
     {
         unsigned int offset = 41U + std::min(110U, (unsigned int)it->scriptSig.size());
@@ -97,7 +97,7 @@ int32_t CTxMemPoolEntry::UpdateCachedPriority(unsigned int currentHeight, CAmoun
 struct update_priority
 {
     update_priority(unsigned int _height, CAmount _value) :
-        height(_height), value(_value), size_delta(0)
+        height(_height), value(_value)
     {}
 
     void operator() (CTxMemPoolEntry &e)
@@ -105,7 +105,7 @@ struct update_priority
 
     unsigned int height;
     CAmount value;
-    int32_t size_delta;
+    int32_t size_delta{0};
 };
 
 void CTxMemPool::UpdateDependentPriorities(const CTransaction &tx, unsigned int nBlockHeight, bool addToChain)
@@ -117,7 +117,9 @@ void CTxMemPool::UpdateDependentPriorities(const CTransaction &tx, unsigned int 
             continue;
         uint256 hash = it->second->GetHash();
         txiter iter = mapTx.find(hash);
+        const int32_t old_size = iter->GetTxSize();
         mapTx.modify(iter, update_priority(nBlockHeight, addToChain ? tx.vout[i].nValue : -tx.vout[i].nValue));
+        totalTxSize += iter->GetTxSize() - old_size;
     }
 }
 
