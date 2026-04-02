@@ -67,6 +67,9 @@ if(DEFINED ENV{CFLAGS})
 endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS OFF)
 add_subdirectory(secp256k1)
+if(TARGET hardening_interface)
+  target_link_libraries(secp256k1 INTERFACE hardening_interface)
+endif()
 set_target_properties(secp256k1 PROPERTIES
   EXCLUDE_FROM_ALL TRUE
 )
