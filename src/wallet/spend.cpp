@@ -419,8 +419,14 @@ CoinsResult AvailableCoins(const CWallet& wallet,
 
             std::unique_ptr<SigningProvider> provider = wallet.GetSolvingProvider(output.scriptPubKey);
 
-            if (segwit_inputs_only && !IsSegWitOutput(*provider, wtx.tx->vout[i].scriptPubKey)) {
-                continue;
+            if (segwit_inputs_only) {
+                if (provider) {
+                    if (!IsSegWitOutput(*provider, output.scriptPubKey)) continue;
+                } else {
+                    int witness_ver;
+                    std::vector<unsigned char> witness_prog;
+                    if (!output.scriptPubKey.IsWitnessProgram(witness_ver, witness_prog)) continue;
+                }
             }
 
             int input_bytes = CalculateMaximumSignedInputSize(output, COutPoint(), provider.get(), can_grind_r, coinControl);
