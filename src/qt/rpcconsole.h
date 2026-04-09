@@ -125,6 +125,7 @@ private Q_SLOTS:
     void updateDetailWidget();
     /** toggle visibility of ban list table */
     void toggleBanlistVisibility();
+
 public Q_SLOTS:
     void clear(bool keep_prompt = false);
     void fontBigger();

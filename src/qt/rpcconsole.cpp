@@ -1518,9 +1518,7 @@ void RPCConsole::showOrHideBanTableIfRequired()
         return;
 
     bool visible = clientModel->getBanTableModel()->shouldShow();
-    ui->banHeading->setVisible(visible);
-    ui->banToggleButton->setVisible(visible);
-            
+    ui->banSectionContainer->setVisible(visible);
     // Show table only if criteria says we should and user has selected to see it
     ui->banlistWidget->setVisible(visible && m_banlist_visible);
 
