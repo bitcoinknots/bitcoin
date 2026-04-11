@@ -221,6 +221,13 @@ void WalletFrame::gotoVerifyMessageTab(QString addr)
         walletView->gotoVerifyMessageTab(addr);
 }
 
+void WalletFrame::gotoSweepPrivKeyDialog()
+{
+    WalletView *walletView = currentWalletView();
+    if (walletView)
+        walletView->gotoSweepPrivKeyDialog();
+}
+
 void WalletFrame::gotoLoadPSBT(bool from_clipboard)
 {
     std::vector<unsigned char> data;
