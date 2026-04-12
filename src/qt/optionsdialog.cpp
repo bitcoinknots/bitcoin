@@ -187,34 +187,38 @@ public:
 
 static QVBoxLayout *createCollapsibleGroup(QVBoxLayout *parentLayout, const QString &title, QWidget *parentWidget, QList<QToolButton*> *toggles = nullptr)
 {
-    auto *toggle = new QToolButton(parentWidget);
+    auto *header = new QWidget(parentWidget);
+    auto *headerLayout = new QHBoxLayout(header);
+    headerLayout->setContentsMargins(0, 0, 0, 0);
+
+    auto *toggle = new QToolButton(header);
     toggle->setStyleSheet("QToolButton { border: none; font-weight: bold; }");
     toggle->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     toggle->setArrowType(Qt::RightArrow);
     toggle->setText(title);
     toggle->setCheckable(true);
     toggle->setChecked(false);
-
-    auto *headerLayout = new QHBoxLayout();
     headerLayout->addWidget(toggle);
-    auto *line = new QFrame(parentWidget);
+
+    auto *line = new QFrame(header);
     line->setFrameShape(QFrame::HLine);
     line->setFrameShadow(QFrame::Sunken);
     line->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
-    line->setCursor(Qt::PointingHandCursor);
-    line->installEventFilter(new ClickToggleFilter(toggle, line));
+    line->setAttribute(Qt::WA_TransparentForMouseEvents, true);
     headerLayout->addWidget(line);
-    parentLayout->addLayout(headerLayout);
+
+    header->installEventFilter(new ClickToggleFilter(toggle, header));
+    parentLayout->addWidget(header);
 
     auto *contentWidget = new QWidget(parentWidget);
-    contentWidget->setVisible(false);
+    contentWidget->setMaximumHeight(0);
     auto *innerLayout = new QVBoxLayout(contentWidget);
     innerLayout->setContentsMargins(18, 0, 0, 0);
     parentLayout->addWidget(contentWidget);
 
     QObject::connect(toggle, &QToolButton::toggled, [toggle, contentWidget](bool checked) {
         toggle->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
-        contentWidget->setVisible(checked);
+        contentWidget->setMaximumHeight(checked ? QWIDGETSIZE_MAX : 0);
     });
 
     if (toggles) toggles->append(toggle);
