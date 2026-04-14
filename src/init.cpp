@@ -2336,7 +2336,7 @@ bool StartIndexBackgroundSync(NodeContext& node)
     // starting from that point up to the current tip.
     // indexes_start_block='nullptr' means "start from height 0".
     std::optional<const CBlockIndex*> indexes_start_block;
-    std::string older_index_name;
+    BaseIndex* older_index{nullptr};
     ChainstateManager& chainman = *Assert(node.chainman);
     const Chainstate& chainstate = WITH_LOCK(::cs_main, return chainman.GetChainstateForIndexing());
     const CChain& index_chain = chainstate.m_chain;
@@ -2354,7 +2354,7 @@ bool StartIndexBackgroundSync(NodeContext& node)
 
         if (!indexes_start_block || !pindex || pindex->nHeight < indexes_start_block.value()->nHeight) {
             indexes_start_block = pindex;
-            older_index_name = summary.name;
+            older_index = index;
             if (!pindex) break; // Starting from genesis so no need to look for earlier block.
         }
     };
@@ -2365,7 +2365,9 @@ bool StartIndexBackgroundSync(NodeContext& node)
         const CBlockIndex* start_block = *indexes_start_block;
         if (!start_block) start_block = chainman.ActiveChain().Genesis();
         if (!chainman.m_blockman.CheckBlockDataAvailability(*index_chain.Tip(), *Assert(start_block))) {
-            return InitError(Untranslated(strprintf("%s best block of the index goes beyond pruned data. Please disable the index or reindex (which will download the whole blockchain again)", older_index_name)));
+            return InitError(strprintf(
+                _("Index \"%s\" needs block data that has been pruned.\nRestart with -reindex to rebuild (re-downloading the entire blockchain), or %s to disable."),
+                older_index->GetName(), older_index->GetDisableAction()));
         }
     }
 
