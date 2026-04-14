@@ -865,6 +865,10 @@ public:
     /** Whether this peer provides all services that we want. Used for eviction decisions */
     std::atomic_bool m_has_all_wanted_services{false};
 
+    /** Whether this is a non-BIP110 outbound peer (lacks NODE_REDUCED_DATA).
+     *  Used to exclude from outbound connection counts. Limited to 2 such peers. */
+    std::atomic_bool m_is_non_bip110_outbound{false};
+
     /** Whether we should relay transactions to this peer. This only changes
      * from false to true. It will never change back to false. */
     std::atomic_bool m_relays_txs{false};
@@ -1240,8 +1244,8 @@ public:
 
     void StartExtraBlockRelayPeers();
 
-    // Count the number of full-relay peer we have.
-    int GetFullOutboundConnCount() const;
+    // Count the number of BIP110 full-relay peers we have (excludes non-BIP110 peers).
+    int GetBIP110FullOutboundConnCount() const;
     // Return the number of outbound peers we have in excess of our target (eg,
     // if we previously called SetTryNewOutboundPeer(true), and have since set
     // to false, we may have extra peers that we wish to disconnect). This may

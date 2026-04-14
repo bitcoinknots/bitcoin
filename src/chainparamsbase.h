@@ -13,6 +13,9 @@
 
 class ArgsManager;
 
+static const std::string CONSENSUSRULES_CONFIG_NAME{"consensusrules"};
+static const std::string CONSENSUSRULES_REQUIRED{"rdts"};
+
 /**
  * CBaseChainParams defines the base parameters (shared between bitcoin-cli and bitcoind)
  * of a given instance of the Bitcoin system.
