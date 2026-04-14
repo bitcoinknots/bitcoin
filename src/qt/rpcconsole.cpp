@@ -459,7 +459,10 @@ void RPCExecutor::request(const QString &command, const WalletModel* wallet_mode
                 "   example:    getblock(getblockhash(0) 1)[tx]\n\n"
 
                 "Results without keys can be queried with an integer in brackets using the parenthesized syntax.\n"
-                "   example:    getblock(getblockhash(0),1)[tx][0]\n\n")));
+                "   example:    getblock(getblockhash(0),1)[tx][0]\n\n"
+
+                "Console Commands:\n"
+                "   /clearhistory    Clears the command history and console output.\n\n")));
             return;
         }
         if (!RPCConsole::RPCExecuteCommandLine(m_node, result, executableCommand, nullptr, wallet_model)) {
@@ -667,6 +670,49 @@ void RPCConsole::WriteCommandHistory()
     settings.endArray();
 }
 
+void RPCConsole::ClearCommandHistory()
+{
+    // First pass: read existing commands and overwrite with dummy data of same length
+    QSettings settings;
+    int size = settings.beginReadArray("nRPCConsoleWindowHistory");
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+    history.resize(size);
+#else
+    if (history.size() > size) {
+        history.erase(history.begin() + size, history.end());
+    } else {
+        history.reserve(size);
+        for (int i = history.size(); i < size; ++i) {
+            history.append(QString());
+        }
+    }
+#endif
+    for (int i = 0; i < size; ++i) {
+        settings.setArrayIndex(i);
+        QString cmd = settings.value("cmd").toString();
+        // Store dummy command with same length as original (don't leak length info)
+        history[i].fill('x', cmd.size());
+    }
+    settings.endArray();
+
+    // Write dummy data to overwrite the original commands
+    WriteCommandHistory();
+
+    // Clear the dummy data (leaves it intact on disk)
+    for (QStringList::size_type i = history.size(); i; ) {
+        --i;
+        history[i].clear();
+    }
+    WriteCommandHistory();
+
+    // Clear the history list
+    history.clear();
+    WriteCommandHistory();
+
+    historyPtr = 0;
+    cmdBeforeBrowsing.clear();
+}
+
 RPCConsole::~RPCConsole()
 {
     QSettings settings;
@@ -871,6 +917,7 @@ void RPCConsole::setClientModel(ClientModel *model, int bestblock_height, int64_
         }
 
         wordList << "help-console";
+        wordList << "/clearhistory";
         wordList.sort();
         autoCompleter = new QCompleter(wordList, this);
         autoCompleter->setModelSorting(QCompleter::CaseSensitivelySortedModel);
@@ -1150,6 +1197,26 @@ void RPCConsole::on_lineEdit_returnPressed()
     if (cmd == QLatin1String("stop")) {
         std::string dummy;
         RPCExecuteCommandLine(m_node, dummy, cmd.toStdString());
+        return;
+    }
+
+    // Special command to clear command history
+    if (cmd == QLatin1String("/clearhistory")) {
+        QMessageBox::StandardButton reply = QMessageBox::question(this,
+            tr("Clear Command History"),
+            tr("This will permanently clear your command history and console output.<br><br>"
+               "While this action is irreversible, complete removal from memory and disk "
+               "cannot be guaranteed.<br><br>"
+               "Are you sure you want to proceed?"),
+            QMessageBox::Yes | QMessageBox::No,
+            QMessageBox::No);
+
+        if (reply == QMessageBox::Yes) {
+            ClearCommandHistory();
+            clear(/*keep_prompt=*/false);  // Clear console output too
+            message(CMD_REPLY, tr("Command history and console output cleared."));
+        }
+        ui->lineEdit->clear();
         return;
     }
 
