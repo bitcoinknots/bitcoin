@@ -1118,6 +1118,7 @@ public:
         bool whitelist_forcerelay = DEFAULT_WHITELISTFORCERELAY;
         bool whitelist_relay = DEFAULT_WHITELISTRELAY;
         bool m_capture_messages = false;
+        bool disable_v1conn_clearnet = false;
     };
 
     void Init(const Options& connOptions) EXCLUSIVE_LOCKS_REQUIRED(!m_added_nodes_mutex, !m_total_bytes_sent_mutex)
@@ -1158,6 +1159,7 @@ public:
         whitelist_forcerelay = connOptions.whitelist_forcerelay;
         whitelist_relay = connOptions.whitelist_relay;
         m_capture_messages = connOptions.m_capture_messages;
+        disable_v1conn_clearnet = connOptions.disable_v1conn_clearnet;
     }
 
     // test only
@@ -1318,6 +1320,9 @@ public:
     bool ShouldRunInactivityChecks(const CNode& node, std::chrono::microseconds now) const;
 
     bool MultipleManualOrFullOutboundConns(Network net) const EXCLUSIVE_LOCKS_REQUIRED(m_nodes_mutex);
+
+    /* Returns true if outbound v1 connections need to be disabled on IPV4/IPV6 network. */
+    bool DisableV1OnClearnet(Network net) const;
 
 private:
     struct ListenSocket {
@@ -1652,6 +1657,13 @@ private:
      * flag for whether messages are captured
      */
     bool m_capture_messages{false};
+
+    /**
+     * option for disabling outbound v1 connections on IPV4 and IPV6.
+     * outbound connections on IPV4/IPV6 need to be v2 connections.
+     * outbound connections on Tor/I2P/CJDNS can be v1 or v2 connections.
+     */
+    bool disable_v1conn_clearnet;
 
     /**
      * Mutex protecting m_i2p_sam_sessions.
