@@ -14,6 +14,7 @@
 #include <qt/receivecoinsdialog.h>
 #include <qt/sendcoinsdialog.h>
 #include <qt/signverifymessagedialog.h>
+#include <qt/sweepprivkeydialog.h>
 #include <qt/transactiontablemodel.h>
 #include <qt/transactionview.h>
 #include <qt/walletmodel.h>
@@ -188,6 +189,14 @@ void WalletView::gotoVerifyMessageTab(QString addr)
 
     if (!addr.isEmpty())
         signVerifyMessageDialog->setAddress_VM(addr);
+}
+
+void WalletView::gotoSweepPrivKeyDialog()
+{
+    SweepPrivKeyDialog *dialog = new SweepPrivKeyDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setModel(walletModel);
+    dialog->show();
 }
 
 bool WalletView::handlePaymentRequest(const SendCoinsRecipient& recipient)

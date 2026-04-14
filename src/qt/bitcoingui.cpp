@@ -342,6 +342,8 @@ void BitcoinGUI::createActions()
     signMessageAction->setStatusTip(tr("Sign messages with your Bitcoin addresses to prove you own them"));
     verifyMessageAction = new QAction(tr("&Verify message…"), this);
     verifyMessageAction->setStatusTip(tr("Verify messages to ensure they were signed with specified Bitcoin addresses"));
+    sweepPrivKeyAction = new QAction(tr("&Sweep private key…"), this);
+    sweepPrivKeyAction->setStatusTip(tr("Sweep coins from a private key into this wallet"));
     m_load_psbt_action = new QAction(tr("&Load PSBT from file…"), this);
     m_load_psbt_action->setStatusTip(tr("Load Partially Signed Bitcoin Transaction"));
     m_load_psbt_clipboard_action = new QAction(tr("Load PSBT from &clipboard…"), this);
@@ -428,6 +430,8 @@ void BitcoinGUI::createActions()
         connect(m_load_psbt_clipboard_action, &QAction::triggered, [this]{ gotoLoadPSBT(true); });
         connect(verifyMessageAction, &QAction::triggered, [this]{ showNormalIfMinimized(); });
         connect(verifyMessageAction, &QAction::triggered, [this]{ gotoVerifyMessageTab(); });
+        connect(sweepPrivKeyAction, &QAction::triggered, [this]{ showNormalIfMinimized(); });
+        connect(sweepPrivKeyAction, &QAction::triggered, [this]{ gotoSweepPrivKeyDialog(); });
         connect(usedSendingAddressesAction, &QAction::triggered, walletFrame, &WalletFrame::usedSendingAddresses);
         connect(usedReceivingAddressesAction, &QAction::triggered, walletFrame, &WalletFrame::usedReceivingAddresses);
         connect(openAction, &QAction::triggered, this, &BitcoinGUI::openClicked);
@@ -551,6 +555,7 @@ void BitcoinGUI::createMenuBar()
         file->addAction(openAction);
         file->addAction(signMessageAction);
         file->addAction(verifyMessageAction);
+        file->addAction(sweepPrivKeyAction);
         file->addAction(m_load_psbt_action);
         file->addAction(m_load_psbt_clipboard_action);
         file->addSeparator();
@@ -882,6 +887,7 @@ void BitcoinGUI::setWalletActionsEnabled(bool enabled)
     changePassphraseAction->setEnabled(enabled);
     signMessageAction->setEnabled(enabled);
     verifyMessageAction->setEnabled(enabled);
+    sweepPrivKeyAction->setEnabled(enabled);
     usedSendingAddressesAction->setEnabled(enabled);
     usedReceivingAddressesAction->setEnabled(enabled);
     openAction->setEnabled(enabled);
@@ -1089,6 +1095,12 @@ void BitcoinGUI::gotoVerifyMessageTab(QString addr)
 {
     if (walletFrame) walletFrame->gotoVerifyMessageTab(addr);
 }
+
+void BitcoinGUI::gotoSweepPrivKeyDialog()
+{
+    if (walletFrame) walletFrame->gotoSweepPrivKeyDialog();
+}
+
 void BitcoinGUI::gotoLoadPSBT(bool from_clipboard)
 {
     if (walletFrame) walletFrame->gotoLoadPSBT(from_clipboard);
