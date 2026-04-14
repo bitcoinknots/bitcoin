@@ -13,6 +13,7 @@
 #include <streams.h>
 #include <util/fs.h>
 #include <util/fs_helpers.h>
+#include <util/obfuscation.h>
 #include <util/strencodings.h>
 #include <util/translation.h>
 
@@ -300,8 +301,7 @@ CDBWrapper::CDBWrapper(const DBParams& params)
         LogPrintf("Finished database compaction of %s\n", fs::PathToString(params.path));
     }
 
-    // The base-case obfuscation key, which is a noop.
-    obfuscate_key = std::vector<unsigned char>(OBFUSCATE_KEY_NUM_BYTES, '\000');
+    assert(!obfuscate_key); // Needed for unobfuscated Read()/Write() below
 
     bool key_exists = Read(OBFUSCATE_KEY_KEY, obfuscate_key);
 
@@ -312,12 +312,11 @@ CDBWrapper::CDBWrapper(const DBParams& params)
 
         // Write `new_key` so we don't obfuscate the key with itself
         Write(OBFUSCATE_KEY_KEY, new_key);
-        obfuscate_key = new_key;
+        Read(CDBWrapper::OBFUSCATE_KEY_KEY, obfuscate_key);
 
-        LogPrintf("Wrote new obfuscate key for %s: %s\n", fs::PathToString(params.path), HexStr(obfuscate_key));
+        LogInfo("Wrote new obfuscation key for %s: %s", fs::PathToString(params.path), obfuscate_key.HexKey());
     }
-
-    LogPrintf("Using obfuscation key for %s: %s\n", fs::PathToString(params.path), HexStr(obfuscate_key));
+    LogInfo("Using obfuscation key for %s: %s", fs::PathToString(params.path), obfuscate_key.HexKey());
 }
 
 CDBWrapper::~CDBWrapper()
@@ -368,16 +367,13 @@ size_t CDBWrapper::DynamicMemoryUsage() const
 // past the null-terminator.
 const std::string CDBWrapper::OBFUSCATE_KEY_KEY("\000obfuscate_key", 14);
 
-const unsigned int CDBWrapper::OBFUSCATE_KEY_NUM_BYTES = 8;
-
 /**
  * Returns a string (consisting of 8 random bytes) suitable for use as an
  * obfuscating XOR key.
  */
 std::vector<unsigned char> CDBWrapper::CreateObfuscateKey() const
 {
-    std::vector<uint8_t> ret(OBFUSCATE_KEY_NUM_BYTES);
-    GetRandBytes(ret);
+    auto ret = FastRandomContext{}.randbytes(Obfuscation::KEY_SIZE);
     return ret;
 }
 
@@ -464,7 +460,7 @@ void CDBIterator::Next() { m_impl_iter->iter->Next(); }
 
 namespace dbwrapper_private {
 
-const std::vector<unsigned char>& GetObfuscateKey(const CDBWrapper &w)
+const Obfuscation& GetObfuscateKey(const CDBWrapper& w)
 {
     return w.obfuscate_key;
 }
