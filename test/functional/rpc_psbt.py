@@ -20,17 +20,21 @@ from test_framework.messages import (
     CTxOut,
     MAX_BIP125_RBF_SEQUENCE,
     WITNESS_SCALE_FACTOR,
+    ser_compact_size,
 )
 from test_framework.psbt import (
     PSBT,
     PSBTMap,
+    PSBT_GLOBAL_PROPRIETARY,
     PSBT_GLOBAL_UNSIGNED_TX,
     PSBT_IN_RIPEMD160,
     PSBT_IN_SHA256,
     PSBT_IN_HASH160,
     PSBT_IN_HASH256,
     PSBT_IN_NON_WITNESS_UTXO,
+    PSBT_IN_PROPRIETARY,
     PSBT_IN_WITNESS_UTXO,
+    PSBT_OUT_PROPRIETARY,
     PSBT_OUT_TAP_TREE,
 )
 from test_framework.script import CScript, OP_TRUE
@@ -94,6 +98,65 @@ class PSBTTest(BitcoinTestFramework):
         # Check that the walletprocesspsbt call succeeds but also recognizes that the transaction is not complete
         signed_psbt_incomplete = wallet.walletprocesspsbt(signed_psbt_obj.to_base64(), finalize=False)
         assert signed_psbt_incomplete["complete"] is False
+
+    def test_combinepsbt_preserves_proprietary_fields(self):
+        self.log.info("Test that combining PSBTs preserves proprietary fields")
+
+        def proprietary_key(type_byte, identifier, subtype, key_data=b""):
+            return bytes([type_byte]) + ser_compact_size(len(identifier)) + identifier + ser_compact_size(subtype) + key_data
+
+        def proprietary_entry(key, value, identifier, subtype):
+            return {"identifier": identifier.hex(), "subtype": subtype, "key": key.hex(), "value": value.hex()}
+
+        tx = CTransaction()
+        tx.vin = [CTxIn(outpoint=COutPoint(hash=int('aa' * 32, 16), n=0), scriptSig=b"")]
+        tx.vout = [CTxOut(nValue=0, scriptPubKey=b"")]
+
+        global_key_a = proprietary_key(type_byte=PSBT_GLOBAL_PROPRIETARY, identifier=b"gc", subtype=1, key_data=b"\x01")
+        global_key_b = proprietary_key(type_byte=PSBT_GLOBAL_PROPRIETARY, identifier=b"gc", subtype=2, key_data=b"\x02")
+        input_key_a = proprietary_key(type_byte=PSBT_IN_PROPRIETARY, identifier=b"in", subtype=3, key_data=b"\x03")
+        input_key_b = proprietary_key(type_byte=PSBT_IN_PROPRIETARY, identifier=b"in", subtype=4, key_data=b"\x04")
+        output_key_a = proprietary_key(type_byte=PSBT_OUT_PROPRIETARY, identifier=b"out", subtype=5, key_data=b"\x05")
+        output_key_b = proprietary_key(type_byte=PSBT_OUT_PROPRIETARY, identifier=b"out", subtype=6, key_data=b"\x06")
+
+        psbt1 = PSBT(
+            g=PSBTMap({
+                PSBT_GLOBAL_UNSIGNED_TX: tx.serialize(),
+                global_key_a: b"\xaa",
+            }),
+            i=[PSBTMap({
+                input_key_a: b"\xbb",
+            })],
+            o=[PSBTMap({
+                output_key_a: b"\xcc",
+            })],
+        ).to_base64()
+        psbt2 = PSBT(
+            g=PSBTMap({
+                PSBT_GLOBAL_UNSIGNED_TX: tx.serialize(),
+                global_key_b: b"\xdd",
+            }),
+            i=[PSBTMap({
+                input_key_b: b"\xee",
+            })],
+            o=[PSBTMap({
+                output_key_b: b"\xff",
+            })],
+        ).to_base64()
+
+        decoded = self.nodes[0].decodepsbt(self.nodes[0].combinepsbt([psbt1, psbt2]))
+        assert_equal(decoded["proprietary"], [
+            proprietary_entry(key=global_key_a, value=b"\xaa", identifier=b"gc", subtype=1),
+            proprietary_entry(key=global_key_b, value=b"\xdd", identifier=b"gc", subtype=2),
+        ])
+        assert_equal(decoded["inputs"][0]["proprietary"], [
+            proprietary_entry(key=input_key_a, value=b"\xbb", identifier=b"in", subtype=3),
+            proprietary_entry(key=input_key_b, value=b"\xee", identifier=b"in", subtype=4),
+        ])
+        assert_equal(decoded["outputs"][0]["proprietary"], [
+            proprietary_entry(key=output_key_a, value=b"\xcc", identifier=b"out", subtype=5),
+            proprietary_entry(key=output_key_b, value=b"\xff", identifier=b"out", subtype=6),
+        ])
 
     def test_utxo_conversion(self):
         self.log.info("Check that non-witness UTXOs are removed for segwit v1+ inputs")
@@ -976,6 +1039,8 @@ class PSBTTest(BitcoinTestFramework):
             assert_equal(len(res_input[preimage_key]), 1)
             assert hash.hex() in res_input[preimage_key]
             assert_equal(res_input[preimage_key][hash.hex()], preimage.hex())
+
+        self.test_combinepsbt_preserves_proprietary_fields()
 
         self.log.info("Test that combining PSBTs with different transactions fails")
         tx = CTransaction()
