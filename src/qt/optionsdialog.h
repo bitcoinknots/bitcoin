@@ -38,8 +38,13 @@ public:
     ModScrollArea();
     static ModScrollArea *fromWidget(QWidget *parent, QWidget *o);
 
+    void setReservedWidth(int w) { m_reserved_width = w; }
+
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;
+
+private:
+    int m_reserved_width{0};
 };
 
 namespace Ui {
