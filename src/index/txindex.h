@@ -23,6 +23,7 @@ private:
     const std::unique_ptr<DB> m_db;
 
     bool AllowPrune() const override { return false; }
+    bilingual_str GetDisableAction() const override { return _("set -txindex=0"); }
 
 protected:
     bool CustomAppend(const interfaces::BlockInfo& block) override;
