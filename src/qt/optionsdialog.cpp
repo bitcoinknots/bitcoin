@@ -76,7 +76,7 @@ ModScrollArea *ModScrollArea::fromWidget(QWidget * const parent, QWidget * const
 
 QSize ModScrollArea::minimumSizeHint() const
 {
-    auto w = std::max(widget()->minimumSizeHint().width(), m_reserved_width);
+    auto w = std::max(widget()->minimumSizeHint().width(), m_reserved_min_width);
     w += verticalScrollBar()->sizeHint().width();
     const auto h = fontMetrics().height() * 2;
     return QSize(w, h);
@@ -85,7 +85,7 @@ QSize ModScrollArea::minimumSizeHint() const
 QSize ModScrollArea::sizeHint() const
 {
     QSize sz = widget()->sizeHint();
-    sz.rwidth() = std::max(sz.width(), m_reserved_width);
+    sz.rwidth() = std::max(sz.width(), m_reserved_hint_width);
     sz.rwidth() += verticalScrollBar()->sizeHint().width();
     return sz;
 }
@@ -195,10 +195,10 @@ static QVBoxLayout *createCollapsibleGroup(QVBoxLayout *parentLayout, const QStr
     auto *toggle = new QToolButton(header);
     toggle->setStyleSheet("QToolButton { border: none; font-weight: bold; }");
     toggle->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-    toggle->setArrowType(Qt::RightArrow);
+    toggle->setArrowType(Qt::DownArrow);
     toggle->setText(title);
     toggle->setCheckable(true);
-    toggle->setChecked(false);
+    toggle->setChecked(true);
     headerLayout->addWidget(toggle);
 
     auto *line = new QFrame(header);
@@ -212,7 +212,6 @@ static QVBoxLayout *createCollapsibleGroup(QVBoxLayout *parentLayout, const QStr
     parentLayout->addWidget(header);
 
     auto *contentWidget = new QWidget(parentWidget);
-    contentWidget->setVisible(false);
     auto *innerLayout = new QVBoxLayout(contentWidget);
     innerLayout->setContentsMargins(18, 0, 0, 0);
     parentLayout->addWidget(contentWidget);
@@ -504,10 +503,9 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
         for (auto *t : mempoolToggles) t->setChecked(false);
     });
 
-    for (auto *t : mempoolToggles) t->setChecked(true);
     tabMempool->adjustSize();
-    scrollMempool->setReservedWidth(tabMempool->sizeHint().width());
-    for (auto *t : mempoolToggles) t->setChecked(false);
+    scrollMempool->setReservedWidths(tabMempool->minimumSizeHint().width(), tabMempool->sizeHint().width());
+    mempoolCollapseAll->click();
 
     verticalLayout_Mempool->addItem(new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding));
 
@@ -729,10 +727,9 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
         for (auto *t : filterToggles) t->setChecked(false);
     });
 
-    for (auto *t : filterToggles) t->setChecked(true);
     tabFilters->adjustSize();
-    scrollFilters->setReservedWidth(tabFilters->sizeHint().width());
-    for (auto *t : filterToggles) t->setChecked(false);
+    scrollFilters->setReservedWidths(tabFilters->minimumSizeHint().width(), tabFilters->sizeHint().width());
+    filterCollapseAll->click();
 
     verticalLayout_Spamfiltering->addStretch(1);
 
