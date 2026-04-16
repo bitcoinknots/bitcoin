@@ -1975,6 +1975,17 @@ BOOST_AUTO_TEST_CASE(mib_string_literal_test)
     BOOST_CHECK_EXCEPTION(operator""_MiB(static_cast<unsigned long long>(max_mib) + 1), std::overflow_error, HasReason("MiB value too large for size_t byte conversion"));
 }
 
+BOOST_AUTO_TEST_CASE(is_space_byte_range_test)
+{
+    std::vector expected(256, false);
+    for (auto c : std::string_view(" \f\n\r\t\v")) expected[c] = true;
+
+    for (auto i{0U}; i < expected.size(); ++i) {
+        auto c = static_cast<char>(i);
+        BOOST_CHECK_MESSAGE(IsSpace(c) == expected[i], "IsSpace test failed for char value: " << i);
+    }
+}
+
 BOOST_AUTO_TEST_CASE(ceil_div_test)
 {
     // Return type is effectively the wider of the two types.
