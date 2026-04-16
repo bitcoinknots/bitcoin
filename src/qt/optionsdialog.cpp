@@ -37,15 +37,18 @@
 #include <QDataWidgetMapper>
 #include <QDir>
 #include <QDoubleSpinBox>
+#include <QEvent>
 #include <QFontDialog>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QToolButton>
 #include <QInputDialog>
 #include <QIntValidator>
 #include <QLabel>
 #include <QLocale>
 #include <QMessageBox>
 #include <QRadioButton>
+#include <QPushButton>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QSpacerItem>
@@ -73,7 +76,7 @@ ModScrollArea *ModScrollArea::fromWidget(QWidget * const parent, QWidget * const
 
 QSize ModScrollArea::minimumSizeHint() const
 {
-    auto w = widget()->minimumSizeHint().width();
+    auto w = std::max(widget()->minimumSizeHint().width(), m_reserved_min_width);
     w += verticalScrollBar()->sizeHint().width();
     const auto h = fontMetrics().height() * 2;
     return QSize(w, h);
@@ -82,6 +85,7 @@ QSize ModScrollArea::minimumSizeHint() const
 QSize ModScrollArea::sizeHint() const
 {
     QSize sz = widget()->sizeHint();
+    sz.rwidth() = std::max(sz.width(), m_reserved_hint_width);
     sz.rwidth() += verticalScrollBar()->sizeHint().width();
     return sz;
 }
@@ -170,6 +174,56 @@ void OptionsDialog::CreateOptionUI(QBoxLayout * const layout, const QString& tex
 void OptionsDialog::CreateOptionUI(QBoxLayout * const layout, QWidget * const o, const QString& text, QBoxLayout *horizontalLayout)
 {
     CreateOptionUI(layout, text, {o}, { .horizontal_layout = horizontalLayout, });
+}
+
+class ClickToggleFilter : public QObject {
+    QAbstractButton* m_button;
+public:
+    ClickToggleFilter(QAbstractButton* button, QObject* parent) : QObject(parent), m_button(button) {}
+    bool eventFilter(QObject*, QEvent* e) override {
+        if (e->type() == QEvent::MouseButtonRelease) { m_button->toggle(); return true; }
+        return false;
+    }
+};
+
+static QVBoxLayout *createCollapsibleGroup(QVBoxLayout *parentLayout, const QString &title, QWidget *parentWidget, QList<QToolButton*> *toggles = nullptr)
+{
+    auto *header = new QWidget(parentWidget);
+    auto *headerLayout = new QHBoxLayout(header);
+    headerLayout->setContentsMargins(0, 0, 0, 0);
+
+    auto *toggle = new QToolButton(header);
+    toggle->setStyleSheet("QToolButton { border: none; font-weight: bold; }");
+    toggle->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    toggle->setArrowType(Qt::DownArrow);
+    toggle->setText(title);
+    toggle->setCheckable(true);
+    toggle->setChecked(true);
+    headerLayout->addWidget(toggle);
+
+    auto *line = new QFrame(header);
+    line->setFrameShape(QFrame::HLine);
+    line->setFrameShadow(QFrame::Sunken);
+    line->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
+    line->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+    headerLayout->addWidget(line);
+
+    header->installEventFilter(new ClickToggleFilter(toggle, header));
+    parentLayout->addWidget(header);
+
+    auto *contentWidget = new QWidget(parentWidget);
+    auto *innerLayout = new QVBoxLayout(contentWidget);
+    innerLayout->setContentsMargins(18, 0, 0, 0);
+    parentLayout->addWidget(contentWidget);
+
+    QObject::connect(toggle, &QToolButton::toggled, [toggle, contentWidget](bool checked) {
+        toggle->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
+        contentWidget->setVisible(checked);
+    });
+
+    if (toggles) toggles->append(toggle);
+
+    return innerLayout;
 }
 
 static void setSiblingsEnabled(QWidget * const o, const bool state)
@@ -339,122 +393,81 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
 
     QWidget * const tabMempool = new QWidget();
     QVBoxLayout * const verticalLayout_Mempool = new QVBoxLayout(tabMempool);
-    ui->tabWidget->insertTab(ui->tabWidget->indexOf(ui->tabWindow), tabMempool, tr("Mem&pool"));
+    auto * const scrollMempool = ModScrollArea::fromWidget(this, tabMempool);
+    ui->tabWidget->insertTab(ui->tabWidget->indexOf(ui->tabWindow), scrollMempool, tr("Mem&pool"));
+
+    QList<QToolButton*> mempoolToggles;
+    auto *mempoolButtonLayout = new QHBoxLayout();
+    auto *mempoolExpandAll = new QPushButton(tr("Expand All"), tabMempool);
+    auto *mempoolCollapseAll = new QPushButton(tr("Collapse All"), tabMempool);
+    mempoolButtonLayout->addWidget(mempoolExpandAll);
+    mempoolButtonLayout->addWidget(mempoolCollapseAll);
+    mempoolButtonLayout->addStretch(1);
+    verticalLayout_Mempool->addLayout(mempoolButtonLayout);
+
+    QVBoxLayout * const grpReplacementPolicy = createCollapsibleGroup(verticalLayout_Mempool, tr("Replacement Policy"), tabMempool, &mempoolToggles);
+
+    rejectspkreuse = new QCheckBox(tabMempool);
+    rejectspkreuse->setText(tr("Disallow most address reuse"));
+    rejectspkreuse->setToolTip(tr("With this option enabled, your memory pool will only allow each unique payment destination to be used once, effectively deprioritising address reuse. Address reuse is not technically supported, and harms the privacy of all Bitcoin users. It also has limited real-world utility, and has been known to be common with spam."));
+    grpReplacementPolicy->addWidget(rejectspkreuse);
+    FixTabOrder(rejectspkreuse);
 
     mempoolreplacement = new QValueComboBox(tabMempool);
     mempoolreplacement->addItem(QString("never"), QVariant("never"));
     mempoolreplacement->addItem(QString("with a higher mining fee, and opt-in"), QVariant("fee,optin"));
     mempoolreplacement->addItem(QString("with a higher mining fee (no opt-out)"), QVariant("fee,-optin"));
-    CreateOptionUI(verticalLayout_Mempool, mempoolreplacement, tr("Transaction &replacement: %s"));
+    CreateOptionUI(grpReplacementPolicy, mempoolreplacement, tr("Transaction &replacement: %s"));
 
     incrementalrelayfee = new BitcoinAmountField(tabMempool);
     connect(incrementalrelayfee, SIGNAL(valueChanged()), this, SLOT(incrementalrelayfee_changed()));
-    CreateOptionUI(verticalLayout_Mempool, incrementalrelayfee, tr("Require transaction fees to be at least %s per kvB higher than transactions they are replacing."));
-
-    rejectspkreuse = new QCheckBox(tabMempool);
-    rejectspkreuse->setText(tr("Disallow most address reuse"));
-    rejectspkreuse->setToolTip(tr("With this option enabled, your memory pool will only allow each unique payment destination to be used once, effectively deprioritising address reuse. Address reuse is not technically supported, and harms the privacy of all Bitcoin users. It also has limited real-world utility, and has been known to be common with spam."));
-    verticalLayout_Mempool->addWidget(rejectspkreuse);
-    FixTabOrder(rejectspkreuse);
+    CreateOptionUI(grpReplacementPolicy, incrementalrelayfee, tr("Require transaction fees to be at least %s per kvB higher than transactions they are replacing."));
 
     mempooltruc = new QValueComboBox(tabMempool);
     mempooltruc->addItem(QString("do not relay or mine at all"), QVariant("reject"));
     mempooltruc->addItem(QString("handle the same as other transactions"), QVariant("accept"));
     mempooltruc->addItem(QString("impose stricter limits requested"), QVariant("enforce"));
     mempooltruc->setToolTip(tr("Some transactions signal a request to limit both themselves and other related transactions to more restrictive expectations. Specifically, this would disallow more than 1 unconfirmed predecessor or spending transaction, as well as smaller size limits (see BIP 431 for details), regardless of what policy you have configured."));
-    CreateOptionUI(verticalLayout_Mempool, mempooltruc, tr("Transactions requesting more restrictive policy limits (TRUC): %s"));
+    CreateOptionUI(grpReplacementPolicy, mempooltruc, tr("Transactions requesting more restrictive policy limits (TRUC): %s"));
+
+    QVBoxLayout * const grpResourceLimits = createCollapsibleGroup(verticalLayout_Mempool, tr("Resource Limits"), tabMempool, &mempoolToggles);
 
     maxorphantx = new QSpinBox(tabMempool);
     maxorphantx->setMinimum(0);
     maxorphantx->setMaximum(std::numeric_limits<int>::max());
-    CreateOptionUI(verticalLayout_Mempool, maxorphantx, tr("Keep at most %s unconnected transactions in memory"));
+    CreateOptionUI(grpResourceLimits, maxorphantx, tr("Keep at most %s unconnected transactions in memory"));
 
     maxmempool = new QSpinBox(tabMempool);
     maxmempool->setMinimum(1);
     maxmempool->setMaximum(std::numeric_limits<int>::max());
-    CreateOptionUI(verticalLayout_Mempool, maxmempool, tr("Keep the transaction memory pool below %s MB"));
+    CreateOptionUI(grpResourceLimits, maxmempool, tr("Keep the transaction memory pool below %s MB"));
 
     mempoolexpiry = new QSpinBox(tabMempool);
     mempoolexpiry->setMinimum(1);
     mempoolexpiry->setMaximum(std::numeric_limits<int>::max());
-    CreateOptionUI(verticalLayout_Mempool, mempoolexpiry, tr("Do not keep transactions in memory more than %s hours"));
+    CreateOptionUI(grpResourceLimits, mempoolexpiry, tr("Do not keep transactions in memory more than %s hours"));
 
-    verticalLayout_Mempool->addItem(new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding));
+    QVBoxLayout * const grpChainLimits = createCollapsibleGroup(verticalLayout_Mempool, tr("Chain Limits"), tabMempool, &mempoolToggles);
 
-    /* Filters tab */
-
-    QWidget * const tabFilters = new QWidget();
-    auto& groupBox_Spamfiltering = tabFilters;
-    ui->tabWidget->insertTab(ui->tabWidget->indexOf(ui->tabWindow), ModScrollArea::fromWidget(this, groupBox_Spamfiltering), tr("Spam &filtering"));
-    QVBoxLayout * const verticalLayout_Spamfiltering = new QVBoxLayout(groupBox_Spamfiltering);
-
-    rejectunknownscripts = new QCheckBox(groupBox_Spamfiltering);
-    rejectunknownscripts->setText(tr("Ignore unrecognised receiver scripts"));
-    rejectunknownscripts->setToolTip(tr("With this option enabled, unrecognised receiver (\"pubkey\") scripts will be ignored. Unrecognisable scripts could be used to bypass further spam filters. If your software is outdated, they may also be used to trick you into thinking you were sent bitcoins that will never confirm."));
-    verticalLayout_Spamfiltering->addWidget(rejectunknownscripts);
-    FixTabOrder(rejectunknownscripts);
-
-    rejectunknownwitness = new QCheckBox(groupBox_Spamfiltering);
-    rejectunknownwitness->setText(tr("Reject unknown witness script versions"));
-    rejectunknownwitness->setToolTip(tr("Some attempts to spam Bitcoin intentionally use undefined witness script formats reserved for future use. By enabling this option, your node will reject transactions using these undefined/future versions. Note that if you send to many addresses in a single transaction, the entire transaction may be rejected if any single one of them attempts to use an undefined format."));
-    verticalLayout_Spamfiltering->addWidget(rejectunknownwitness);
-    FixTabOrder(rejectunknownwitness);
-
-    rejectparasites = new QCheckBox(groupBox_Spamfiltering);
-    rejectparasites->setText(tr("Reject parasite transactions"));
-    rejectparasites->setToolTip(tr("With this option enabled, transactions related to parasitic overlay protocols will be ignored. Parasites are transactions using Bitcoin as a technical infrastructure to animate other protocols, unrelated to ordinary money transfers."));
-    verticalLayout_Spamfiltering->addWidget(rejectparasites);
-    FixTabOrder(rejectparasites);
-
-    rejecttokens = new QCheckBox(groupBox_Spamfiltering);
-    rejecttokens->setText(tr("Ignore transactions involving non-bitcoin token/asset overlay protocols"));
-    rejecttokens->setToolTip(tr("With this option enabled, transactions involving non-bitcoin tokens/assets will not be relayed or mined by your node. Due to not having value, and some technical design flaws, token mints and transfers are often spammy and can bog down the network."));
-    verticalLayout_Spamfiltering->addWidget(rejecttokens);
-    FixTabOrder(rejecttokens);
-
-    minrelaytxfee = new BitcoinAmountField(groupBox_Spamfiltering);
-    CreateOptionUI(verticalLayout_Spamfiltering, minrelaytxfee, tr("Ignore transactions offering miners less than %s per kvB in transaction fees."));
-
-    minrelaycoinblocks = new BitcoinAmountField(groupBox_Spamfiltering);
-    minrelaycoinblocks->SetMaxValue(std::numeric_limits<CAmount>::max());
-    minrelaycoinblocks->setToolTip(tr("This effectively acts as a rate limit. When bitcoins are spent, they reset to zero \"coinblocks\" (aka coin age) and slowly build up more coinblocks based on their value each block afterward. Small coins take longer than large amounts."));
-    CreateOptionUI(verticalLayout_Spamfiltering, minrelaycoinblocks, tr("Delay accepting transactions spending coins that have been at rest less than %s per block."));
-
-    minrelaymaturity = new QSpinBox(groupBox_Spamfiltering);
-    minrelaymaturity->setMinimum(0);
-    minrelaymaturity->setMaximum(std::numeric_limits<int>::max());
-    minrelaymaturity->setToolTip(tr("This effectively acts as a rate limit. When bitcoins are spent, they reset to zero blocks and slowly mature each block afterward, regardless of their value."));
-    CreateOptionUI(verticalLayout_Spamfiltering, minrelaymaturity, tr("Delay accepting transactions spending coins that have been at rest fewer than %s blocks."));
-
-    bytespersigop = new QSpinBox(groupBox_Spamfiltering);
-    bytespersigop->setMinimum(1);
-    bytespersigop->setMaximum(std::numeric_limits<int>::max());
-    CreateOptionUI(verticalLayout_Spamfiltering, bytespersigop, tr("Treat each consensus-counted sigop as at least %s bytes."));
-
-    bytespersigopstrict = new QSpinBox(groupBox_Spamfiltering);
-    bytespersigopstrict->setMinimum(1);
-    bytespersigopstrict->setMaximum(std::numeric_limits<int>::max());
-    CreateOptionUI(verticalLayout_Spamfiltering, bytespersigopstrict, tr("Ignore transactions with fewer than %s bytes per potentially-executed sigop."));
-
-    limitancestorcount = new QSpinBox(groupBox_Spamfiltering);
+    limitancestorcount = new QSpinBox(tabMempool);
     limitancestorcount->setMinimum(1);
     limitancestorcount->setMaximum(std::numeric_limits<int>::max());
-    CreateOptionUI(verticalLayout_Spamfiltering, limitancestorcount, tr("Ignore transactions with %s or more unconfirmed ancestors."));
+    CreateOptionUI(grpChainLimits, limitancestorcount, tr("Ignore transactions with %s or more unconfirmed ancestors."));
 
-    limitancestorsize = new QSpinBox(groupBox_Spamfiltering);
+    limitancestorsize = new QSpinBox(tabMempool);
     limitancestorsize->setMinimum(1);
     limitancestorsize->setMaximum(std::numeric_limits<int>::max());
-    CreateOptionUI(verticalLayout_Spamfiltering, limitancestorsize, tr("Ignore transactions whose size with all unconfirmed ancestors exceeds %s kilobytes."));
+    CreateOptionUI(grpChainLimits, limitancestorsize, tr("Ignore transactions whose size with all unconfirmed ancestors exceeds %s kilobytes."));
 
-    limitdescendantcount = new QSpinBox(groupBox_Spamfiltering);
+    limitdescendantcount = new QSpinBox(tabMempool);
     limitdescendantcount->setMinimum(1);
     limitdescendantcount->setMaximum(std::numeric_limits<int>::max());
-    CreateOptionUI(verticalLayout_Spamfiltering, limitdescendantcount, tr("Ignore transactions if any ancestor would have %s or more unconfirmed descendants."));
+    CreateOptionUI(grpChainLimits, limitdescendantcount, tr("Ignore transactions if any ancestor would have %s or more unconfirmed descendants."));
 
-    limitdescendantsize = new QSpinBox(groupBox_Spamfiltering);
+    limitdescendantsize = new QSpinBox(tabMempool);
     limitdescendantsize->setMinimum(1);
     limitdescendantsize->setMaximum(std::numeric_limits<int>::max());
-    CreateOptionUI(verticalLayout_Spamfiltering, limitdescendantsize, tr("Ignore transactions if any ancestor would have more than %s kilobytes of unconfirmed descendants."));
+    CreateOptionUI(grpChainLimits, limitdescendantsize, tr("Ignore transactions if any ancestor would have more than %s kilobytes of unconfirmed descendants."));
 
     connect(maxmempool, &QSpinBox::editingFinished, [&]() {
         const int64_t limitdescendantsize_max_kvB = limitdescendantsizeMaximumVBytes(int64_t{maxmempool->value()} * 1'000'000) / 1'000;
@@ -483,19 +496,75 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
         limitdescendantsize->setProperty("pv", limitdescendantsize->value());
     });
 
+    connect(mempoolExpandAll, &QPushButton::clicked, [mempoolToggles]() {
+        for (auto *t : mempoolToggles) t->setChecked(true);
+    });
+    connect(mempoolCollapseAll, &QPushButton::clicked, [mempoolToggles]() {
+        for (auto *t : mempoolToggles) t->setChecked(false);
+    });
+
+    tabMempool->adjustSize();
+    scrollMempool->setReservedWidths(tabMempool->minimumSizeHint().width(), tabMempool->sizeHint().width());
+    mempoolCollapseAll->click();
+
+    verticalLayout_Mempool->addItem(new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding));
+
+    /* Filters tab */
+
+    QWidget * const tabFilters = new QWidget();
+    auto& groupBox_Spamfiltering = tabFilters;
+    auto * const scrollFilters = ModScrollArea::fromWidget(this, groupBox_Spamfiltering);
+    ui->tabWidget->insertTab(ui->tabWidget->indexOf(ui->tabWindow), scrollFilters, tr("Spam &filtering"));
+    QVBoxLayout * const verticalLayout_Spamfiltering = new QVBoxLayout(groupBox_Spamfiltering);
+
+    QList<QToolButton*> filterToggles;
+    auto *filterButtonLayout = new QHBoxLayout();
+    auto *filterExpandAll = new QPushButton(tr("Expand All"), groupBox_Spamfiltering);
+    auto *filterCollapseAll = new QPushButton(tr("Collapse All"), groupBox_Spamfiltering);
+    filterButtonLayout->addWidget(filterExpandAll);
+    filterButtonLayout->addWidget(filterCollapseAll);
+    filterButtonLayout->addStretch(1);
+    verticalLayout_Spamfiltering->addLayout(filterButtonLayout);
+
+    QVBoxLayout * const grpTxTypes = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Transaction Types"), groupBox_Spamfiltering, &filterToggles);
+
+    rejectunknownscripts = new QCheckBox(groupBox_Spamfiltering);
+    rejectunknownscripts->setText(tr("Ignore unrecognised receiver scripts"));
+    rejectunknownscripts->setToolTip(tr("With this option enabled, unrecognised receiver (\"pubkey\") scripts will be ignored. Unrecognisable scripts could be used to bypass further spam filters. If your software is outdated, they may also be used to trick you into thinking you were sent bitcoins that will never confirm."));
+    grpTxTypes->addWidget(rejectunknownscripts);
+    FixTabOrder(rejectunknownscripts);
+
+    rejectunknownwitness = new QCheckBox(groupBox_Spamfiltering);
+    rejectunknownwitness->setText(tr("Reject unknown witness script versions"));
+    rejectunknownwitness->setToolTip(tr("Some attempts to spam Bitcoin intentionally use undefined witness script formats reserved for future use. By enabling this option, your node will reject transactions using these undefined/future versions. Note that if you send to many addresses in a single transaction, the entire transaction may be rejected if any single one of them attempts to use an undefined format."));
+    grpTxTypes->addWidget(rejectunknownwitness);
+    FixTabOrder(rejectunknownwitness);
+
+    rejectparasites = new QCheckBox(groupBox_Spamfiltering);
+    rejectparasites->setText(tr("Reject parasite transactions"));
+    rejectparasites->setToolTip(tr("With this option enabled, transactions related to parasitic overlay protocols will be ignored. Parasites are transactions using Bitcoin as a technical infrastructure to animate other protocols, unrelated to ordinary money transfers."));
+    grpTxTypes->addWidget(rejectparasites);
+    FixTabOrder(rejectparasites);
+
+    rejecttokens = new QCheckBox(groupBox_Spamfiltering);
+    rejecttokens->setText(tr("Ignore transactions involving non-bitcoin token/asset overlay protocols"));
+    rejecttokens->setToolTip(tr("With this option enabled, transactions involving non-bitcoin tokens/assets will not be relayed or mined by your node. Due to not having value, and some technical design flaws, token mints and transfers are often spammy and can bog down the network."));
+    grpTxTypes->addWidget(rejecttokens);
+    FixTabOrder(rejecttokens);
+
     rejectbarepubkey = new QCheckBox(groupBox_Spamfiltering);
     rejectbarepubkey->setText(tr("Ignore bare/exposed public keys (pay-to-IP)"));
     rejectbarepubkey->setToolTip(tr("Spam is sometimes disguised to appear as if it is a deprecated pay-to-IP (bare pubkey) transaction, where the \"key\" is actually arbitrary data (not a real key) instead. Support for pay-to-IP was only ever supported by Satoshi's early Bitcoin wallet, which has been abandoned since 2011."));
-    verticalLayout_Spamfiltering->addWidget(rejectbarepubkey);
+    grpTxTypes->addWidget(rejectbarepubkey);
     FixTabOrder(rejectbarepubkey);
 
     rejectbaremultisig = new QCheckBox(groupBox_Spamfiltering);
     rejectbaremultisig->setText(tr("Ignore bare/exposed \"multisig\" scripts"));
     rejectbaremultisig->setToolTip(tr("Spam is sometimes disguised to appear as if it is an old-style N-of-M multi-party transaction, where most of the keys are really bogus. At the same time, legitimate multi-party transactions typically have always used P2SH format (which is not filtered by this option), which is more secure."));
-    verticalLayout_Spamfiltering->addWidget(rejectbaremultisig);
+    grpTxTypes->addWidget(rejectbaremultisig);
     FixTabOrder(rejectbaremultisig);
 
-    permitephemeral = new QValueComboBox(tabMempool);
+    permitephemeral = new QValueComboBox(groupBox_Spamfiltering);
     permitephemeral->addItem(QString("(no exception allowed)"), QVariant("reject"));
     permitephemeral->addItem(QString("anchor (recommended)"), QVariant("anchor,-send,-dust"));
     permitephemeral->addItem(QString("zero-value anchor/send"), QVariant("anchor,send,-dust"));
@@ -504,31 +573,59 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     permitephemeral->addItem(QString("dust"), QVariant("anchor,send,dust"));
     permitephemeral->addItem(QString("dust anchor"), QVariant("anchor,-send,dust"));
     permitephemeral->setToolTip(tr("For some smart contracts, it is impractical to increase the fee after the transaction is created. For this reason, they may use zero-value \"anchors\" to chain two transactions together, the subsequent transaction simply covering the fee for both. Ordinarily, these anchors might be rejected as dust, so it may make sense to make an exception when they are sent together. Variants of this can however be abused for anti-fungibility attacks and possibly spam."));
-    CreateOptionUI(verticalLayout_Spamfiltering, permitephemeral, tr("Allow transactions to have at most one ephemeral %s output"));
+    CreateOptionUI(grpTxTypes, permitephemeral, tr("Allow transactions to have at most one ephemeral %s output"));
 
     rejectbareanchor = new QCheckBox(groupBox_Spamfiltering);
     rejectbareanchor->setText(tr("Reject transactions that only have an anchor"));
     rejectbareanchor->setToolTip(tr("Anchors are a way to allow fee-bumping smart contract transactions long after they have been created. With this option set, your node will refuse to relay or mine transactions that have only an anchor but no real sends."));
-    verticalLayout_Spamfiltering->addWidget(rejectbareanchor);
+    grpTxTypes->addWidget(rejectbareanchor);
     FixTabOrder(rejectbareanchor);
+
+    QVBoxLayout * const grpFeesPriority = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Fees && Rate Limiting"), groupBox_Spamfiltering, &filterToggles);
+
+    minrelaytxfee = new BitcoinAmountField(groupBox_Spamfiltering);
+    CreateOptionUI(grpFeesPriority, minrelaytxfee, tr("Ignore transactions offering miners less than %s per kvB in transaction fees."));
+
+    minrelaycoinblocks = new BitcoinAmountField(groupBox_Spamfiltering);
+    minrelaycoinblocks->SetMaxValue(std::numeric_limits<CAmount>::max());
+    minrelaycoinblocks->setToolTip(tr("This effectively acts as a rate limit. When bitcoins are spent, they reset to zero \"coinblocks\" (aka coin age) and slowly build up more coinblocks based on their value each block afterward. Small coins take longer than large amounts."));
+    CreateOptionUI(grpFeesPriority, minrelaycoinblocks, tr("Delay accepting transactions spending coins that have been at rest less than %s per block."));
+
+    minrelaymaturity = new QSpinBox(groupBox_Spamfiltering);
+    minrelaymaturity->setMinimum(0);
+    minrelaymaturity->setMaximum(std::numeric_limits<int>::max());
+    minrelaymaturity->setToolTip(tr("This effectively acts as a rate limit. When bitcoins are spent, they reset to zero blocks and slowly mature each block afterward, regardless of their value."));
+    CreateOptionUI(grpFeesPriority, minrelaymaturity, tr("Delay accepting transactions spending coins that have been at rest fewer than %s blocks."));
+
+    QVBoxLayout * const grpScriptsData = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Resource Limits"), groupBox_Spamfiltering, &filterToggles);
+
+    bytespersigop = new QSpinBox(groupBox_Spamfiltering);
+    bytespersigop->setMinimum(1);
+    bytespersigop->setMaximum(std::numeric_limits<int>::max());
+    CreateOptionUI(grpScriptsData, bytespersigop, tr("Treat each consensus-counted sigop as at least %s bytes."));
+
+    bytespersigopstrict = new QSpinBox(groupBox_Spamfiltering);
+    bytespersigopstrict->setMinimum(1);
+    bytespersigopstrict->setMaximum(std::numeric_limits<int>::max());
+    CreateOptionUI(grpScriptsData, bytespersigopstrict, tr("Ignore transactions with fewer than %s bytes per potentially-executed sigop."));
 
     maxscriptsize = new QSpinBox(groupBox_Spamfiltering);
     maxscriptsize->setMinimum(0);
     maxscriptsize->setMaximum(std::numeric_limits<int>::max());
     maxscriptsize->setToolTip(tr("There may be rare smart contracts that require a large amount of code, but more often a larger code segment is actually just spam finding new ways to try to evade filtering. 1650 bytes is sometimes considered the high end of what might be normal, usually for N-of-20 multisig."));
-    CreateOptionUI(verticalLayout_Spamfiltering, maxscriptsize, tr("Ignore transactions with smart contract code larger than %s bytes."));
+    CreateOptionUI(grpScriptsData, maxscriptsize, tr("Ignore transactions with smart contract code larger than %s bytes."));
 
     maxtxlegacysigops = new QSpinBox(groupBox_Spamfiltering);
     maxtxlegacysigops->setMinimum(1);
     maxtxlegacysigops->setMaximum(1000000);
     maxtxlegacysigops->setToolTip(tr("Each signature operation in scripts to spend pre-segwit coins require calculations to be performed on the entire transaction. These \"legacy sigops\" can add up quickly, and there is typically only one per coin spent."));
-    CreateOptionUI(verticalLayout_Spamfiltering, maxtxlegacysigops, tr("Ignore transactions with more than %s \"legacy\" signature operations."));
+    CreateOptionUI(grpScriptsData, maxtxlegacysigops, tr("Ignore transactions with more than %s \"legacy\" signature operations."));
 
     datacarriersize = new QSpinBox(groupBox_Spamfiltering);
     datacarriersize->setMinimum(0);
     datacarriersize->setMaximum(std::numeric_limits<int>::max());
     datacarriersize->setToolTip(tr("While Bitcoin itself does not support attaching arbitrary data to transactions, despite that various methods for disguising it have been devised over the years. Since it is sometimes impractical to detect small spam disguised as ordinary transactions, it is sometimes considered beneficial to tolerate certain kinds of less harmful data attachments."));
-    CreateOptionUI(verticalLayout_Spamfiltering, datacarriersize, tr("Ignore transactions with additional data larger than %s bytes."));
+    CreateOptionUI(grpScriptsData, datacarriersize, tr("Ignore transactions with additional data larger than %s bytes."));
 
     datacarriercost = new QDoubleSpinBox(groupBox_Spamfiltering);
     datacarriercost->setDecimals(2);
@@ -537,7 +634,7 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     datacarriercost->setMinimum(0.25);
     datacarriercost->setMaximum(MAX_BLOCK_SERIALIZED_SIZE);
     datacarriercost->setToolTip(tr("As an alternative to, or in addition to, limiting the size of disguised data, you can also configure how it is accounted for in comparison to legitimate transaction data. For example, 1 vbyte per actual byte would count it as equivalent to ordinary transaction data; 0.25 vB/B would allow it to benefit from the so-called \"segwit discount\"; or 2 vB/B would establish a bias toward legitimate transactions."));
-    CreateOptionUI(verticalLayout_Spamfiltering, datacarriercost, tr("Weigh embedded data as %s virtual bytes per actual byte."));
+    CreateOptionUI(grpScriptsData, datacarriercost, tr("Weigh embedded data as %s virtual bytes per actual byte."));
     connect(datacarriercost, QOverload<double>::of(&QDoubleSpinBox::valueChanged), [&](double d){
         const double w = d * 4;
         const double wf = floor(w);
@@ -547,18 +644,19 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     rejectnonstddatacarrier = new QCheckBox(groupBox_Spamfiltering);
     rejectnonstddatacarrier->setText(tr("Ignore data embedded with non-standard formats"));
     rejectnonstddatacarrier->setToolTip(tr("Some attempts to spam Bitcoin intentionally use non-standard formats in an attempt to bypass the datacarrier limits. Without this option, %1 will attempt to detect these and enforce the intended limits. By enabling this option, your node will ignore these transactions entirely (when detected) even if they fall within the configured limits otherwise."));
-    verticalLayout_Spamfiltering->addWidget(rejectnonstddatacarrier);
+    grpScriptsData->addWidget(rejectnonstddatacarrier);
     FixTabOrder(rejectnonstddatacarrier);
-
-    dustrelayfee = new BitcoinAmountField(groupBox_Spamfiltering);
-    CreateOptionUI(verticalLayout_Spamfiltering, dustrelayfee, tr("Ignore transactions with values that would cost more to spend at a fee rate of %s per kvB (\"dust\")."));
 
     rejectbaredatacarrier = new QCheckBox(groupBox_Spamfiltering);
     rejectbaredatacarrier->setText(tr("Reject \"transactions\" that are only arbitrary data"));
     rejectbaredatacarrier->setToolTip(tr("With this option set, arbitrary data will only be permitted as defined above in addition to an otherwise-valid transaction. If there are no real recipients, the transaction will be rejected no matter how little data it includes."));
-    verticalLayout_Spamfiltering->addWidget(rejectbaredatacarrier);
+    grpScriptsData->addWidget(rejectbaredatacarrier);
     FixTabOrder(rejectbaredatacarrier);
 
+    QVBoxLayout * const grpDust = createCollapsibleGroup(verticalLayout_Spamfiltering, tr("Dust"), groupBox_Spamfiltering, &filterToggles);
+
+    dustrelayfee = new BitcoinAmountField(groupBox_Spamfiltering);
+    CreateOptionUI(grpDust, dustrelayfee, tr("Ignore transactions with values that would cost more to spend at a fee rate of %s per kvB (\"dust\")."));
 
     dustdynamic_enable = new QCheckBox(groupBox_Spamfiltering);
     dustdynamic_multiplier = new QDoubleSpinBox(groupBox_Spamfiltering);
@@ -568,14 +666,14 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     dustdynamic_multiplier->setMinimum(0.001);
     dustdynamic_multiplier->setMaximum(65);
     dustdynamic_multiplier->setValue(DEFAULT_DUST_RELAY_MULTIPLIER / 1000.0);
-    CreateOptionUI(verticalLayout_Spamfiltering, tr("%1 Automatically adjust the dust limit upward to %2 times:"), {dustdynamic_enable, dustdynamic_multiplier});
+    CreateOptionUI(grpDust, tr("%1 Automatically adjust the dust limit upward to %2 times:"), {dustdynamic_enable, dustdynamic_multiplier});
 
     dustdynamic_target = new QRadioButton(groupBox_Spamfiltering);
     dustdynamic_target_blocks = new QSpinBox(groupBox_Spamfiltering);
     dustdynamic_target_blocks->setMinimum(2);
     dustdynamic_target_blocks->setMaximum(1008);  // FIXME: Get this from the fee estimator
     dustdynamic_target_blocks->setValue(1008);
-    CreateOptionUI(verticalLayout_Spamfiltering, tr("%1 fee estimate for %2 blocks."), {dustdynamic_target, dustdynamic_target_blocks}, { .indent = checkbox_indent, });
+    CreateOptionUI(grpDust, tr("%1 fee estimate for %2 blocks."), {dustdynamic_target, dustdynamic_target_blocks}, { .indent = checkbox_indent, });
     // FIXME: Make it possible to click labels to select + focus spinbox
 
     dustdynamic_mempool = new QRadioButton(groupBox_Spamfiltering);
@@ -583,7 +681,7 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     dustdynamic_mempool_kvB->setMinimum(1);
     dustdynamic_mempool_kvB->setMaximum(std::numeric_limits<int32_t>::max());
     dustdynamic_mempool_kvB->setValue(3024000);
-    CreateOptionUI(verticalLayout_Spamfiltering, tr("%1 the lowest fee of the best known %2 kvB of unconfirmed transactions."), {dustdynamic_mempool, dustdynamic_mempool_kvB}, { .indent = checkbox_indent, });
+    CreateOptionUI(grpDust, tr("%1 the lowest fee of the best known %2 kvB of unconfirmed transactions."), {dustdynamic_mempool, dustdynamic_mempool_kvB}, { .indent = checkbox_indent, });
 
     const auto dustdynamic_enable_toggled = [this](const bool state){
         dustdynamic_multiplier->setEnabled(state);
@@ -621,6 +719,17 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
         dustdynamic_enable_toggled(state && dustdynamic_enable->isChecked());
     });
 
+
+    connect(filterExpandAll, &QPushButton::clicked, [filterToggles]() {
+        for (auto *t : filterToggles) t->setChecked(true);
+    });
+    connect(filterCollapseAll, &QPushButton::clicked, [filterToggles]() {
+        for (auto *t : filterToggles) t->setChecked(false);
+    });
+
+    tabFilters->adjustSize();
+    scrollFilters->setReservedWidths(tabFilters->minimumSizeHint().width(), tabFilters->sizeHint().width());
+    filterCollapseAll->click();
 
     verticalLayout_Spamfiltering->addStretch(1);
 
