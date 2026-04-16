@@ -35,6 +35,7 @@ BOOST_AUTO_TEST_CASE(connections_desirable_service_flags)
     auto consensus = m_node.chainman->GetParams().GetConsensus();
 
     // Check we start connecting to full nodes
+    // Note: NODE_REDUCED_DATA requirement is enforced separately in VERSION processing
     ServiceFlags peer_flags{NODE_WITNESS | NODE_NETWORK_LIMITED};
     BOOST_CHECK(peerman->GetDesirableServiceFlags(peer_flags) == ServiceFlags(NODE_NETWORK | NODE_WITNESS));
 

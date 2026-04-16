@@ -68,8 +68,8 @@ BOOST_AUTO_TEST_CASE(outbound_slow_chain_eviction)
     connman.Handshake(
         /*node=*/dummyNode1,
         /*successfully_connected=*/true,
-        /*remote_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS),
-        /*local_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS),
+        /*remote_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA),
+        /*local_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA),
         /*version=*/PROTOCOL_VERSION,
         /*relay_txs=*/true);
 
