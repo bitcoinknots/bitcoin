@@ -19,6 +19,7 @@
 #include <util/translation.h>
 
 #include <chrono>
+#include <limits>
 #include <memory>
 
 using common::AmountErrMsg;
@@ -26,15 +27,24 @@ using kernel::MemPoolLimits;
 using kernel::MemPoolOptions;
 
 namespace {
-void ApplyArgsManOptions(const ArgsManager& argsman, MemPoolLimits& mempool_limits)
+util::Result<void> ApplyArgsManOptions(const ArgsManager& argsman, MemPoolLimits& mempool_limits)
 {
+    // Clang <18 doesn't allow the implicit arg type
+    using SizeLimitOptions = ArgsManager::AssignIntArgToVarOptions<int64_t>;
+
     mempool_limits.ancestor_count = argsman.GetIntArg("-limitancestorcount", mempool_limits.ancestor_count);
 
-    if (auto vkb = argsman.GetIntArg("-limitancestorsize")) mempool_limits.ancestor_size_vbytes = *vkb * 1'000;
+    if (auto err = argsman.AssignIntArgToVar<decltype(mempool_limits.ancestor_size_vbytes), SizeLimitOptions{.min = 0, .multiplier = 1'000}>("limitancestorsize", mempool_limits.ancestor_size_vbytes); !err) {
+        return err;
+    }
 
     mempool_limits.descendant_count = argsman.GetIntArg("-limitdescendantcount", mempool_limits.descendant_count);
 
-    if (auto vkb = argsman.GetIntArg("-limitdescendantsize")) mempool_limits.descendant_size_vbytes = *vkb * 1'000;
+    if (auto err = argsman.AssignIntArgToVar<decltype(mempool_limits.descendant_size_vbytes), SizeLimitOptions{.min = 0, .multiplier = 1'000}>("limitdescendantsize", mempool_limits.descendant_size_vbytes); !err) {
+        return err;
+    }
+
+    return {};
 }
 }
 
@@ -94,7 +104,5 @@ util::Result<void> ApplyArgsManOptions(const ArgsManager& argsman, const CChainP
 
     mempool_opts.persist_v1_dat = argsman.GetBoolArg("-persistmempoolv1", mempool_opts.persist_v1_dat);
 
-    ApplyArgsManOptions(argsman, mempool_opts.limits);
-
-    return {};
+    return ApplyArgsManOptions(argsman, mempool_opts.limits);
 }
