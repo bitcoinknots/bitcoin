@@ -46,8 +46,8 @@ static void HandleError(const leveldb::Status& status)
     if (status.ok())
         return;
     const std::string errmsg = "Fatal LevelDB error: " + status.ToString();
-    LogPrintf("%s\n", errmsg);
-    LogPrintf("You can use -debug=leveldb to get more complete diagnostic messages\n");
+    LogError("%s", errmsg);
+    LogInfo("You can use -debug=leveldb to get more complete diagnostic messages");
     throw dbwrapper_error(errmsg);
 }
 
@@ -344,7 +344,7 @@ std::optional<std::string> CDBWrapper::ReadImpl(Span<const std::byte> key) const
     if (!status.ok()) {
         if (status.IsNotFound())
             return std::nullopt;
-        LogPrintf("LevelDB read failure: %s\n", status.ToString());
+        LogError("LevelDB read failure: %s", status.ToString());
         HandleError(status);
     }
     return strValue;
@@ -359,7 +359,7 @@ bool CDBWrapper::ExistsImpl(Span<const std::byte> key) const
     if (!status.ok()) {
         if (status.IsNotFound())
             return false;
-        LogPrintf("LevelDB read failure: %s\n", status.ToString());
+        LogError("LevelDB read failure: %s", status.ToString());
         HandleError(status);
     }
     return true;

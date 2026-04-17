@@ -330,7 +330,7 @@ static void http_request_cb(struct evhttp_request* req, void* arg)
         if (g_work_queue->Enqueue(item.get())) {
             item.release(); /* if true, queue took ownership */
         } else {
-            LogPrintf("WARNING: request rejected because http work queue depth exceeded, it can be increased with the -rpcworkqueue= setting\n");
+            LogWarning("Request rejected because http work queue depth exceeded, it can be increased with the -rpcworkqueue= setting");
             item->req->WriteReply(HTTP_SERVICE_UNAVAILABLE, "Work queue depth exceeded");
         }
     } else {
@@ -355,11 +355,94 @@ static void ThreadHTTP(struct event_base* base)
     LogDebug(BCLog::HTTP, "Exited http event loop\n");
 }
 
+static struct evhttp_bound_socket *
+my_bind_socket_with_handle(struct evhttp *http, const char *address, ev_uint16_t port, bool& ignorable_error)
+{
+    evutil_socket_t fd;
+    struct evhttp_bound_socket *bound;
+    int serrno;
+
+    struct evutil_addrinfo *aitop = nullptr;
+
+    if (address == nullptr && port == 0) {
+        fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (fd == -1) {
+            LogPrintf("libevent: socket: %s\n", evutil_socket_error_to_string(evutil_socket_geterror(-1)));
+            return nullptr;
+        }
+    } else {
+        struct evutil_addrinfo hints = {};
+        int ai_result;
+
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_flags = EVUTIL_AI_PASSIVE|EVUTIL_AI_ADDRCONFIG;
+        const std::string strport = strprintf("%d", port);
+        ai_result = evutil_getaddrinfo(address, strport.c_str(), &hints, &aitop);
+        if (ai_result || !aitop) {
+            switch (ai_result) {
+            case 0:
+                break;
+            case EVUTIL_EAI_SYSTEM:
+                LogPrintf("libevent: getaddrinfo\n");
+                break;
+            case EVUTIL_EAI_NODATA:
+                LogPrintf("evutil_getaddrinfo doesn't support IPv6; cannot bind %s:%d\n", address, port);
+                [[fallthrough]];
+            case EVUTIL_EAI_ADDRFAMILY:
+            case EVUTIL_EAI_FAMILY:
+            case EVUTIL_EAI_SOCKTYPE:
+                ignorable_error = true;
+                break;
+            default:
+                LogPrintf("libevent: getaddrinfo: %s\n", evutil_gai_strerror(ai_result));
+            }
+            return nullptr;
+        }
+
+        fd = socket(aitop->ai_family, SOCK_STREAM, 0);
+        if (fd == -1) {
+            evutil_freeaddrinfo(aitop);
+            return nullptr;
+        }
+        evutil_make_listen_socket_reuseable(fd);
+    }
+
+    const int on = 1;
+    setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (sockopt_arg_type)&on, sizeof(on));
+
+    bool listen_failed = false;
+    if (evutil_make_socket_nonblocking(fd) < 0 ||
+        evutil_make_socket_closeonexec(fd) < 0 ||
+        (aitop && bind(fd, aitop->ai_addr, aitop->ai_addrlen) == -1) ||
+        (listen_failed = (listen(fd, 128) == -1))
+    ) {
+        serrno = EVUTIL_SOCKET_ERROR();
+        if (listen_failed) LogPrintf("libevent: %s: listen\n", __func__);
+        evutil_closesocket(fd);
+        if (aitop) evutil_freeaddrinfo(aitop);
+        EVUTIL_SET_SOCKET_ERROR(serrno);
+        return nullptr;
+    }
+
+    if (aitop) evutil_freeaddrinfo(aitop);
+
+    bound = evhttp_accept_socket_with_handle(http, fd);
+    if (bound == nullptr) {
+        evutil_closesocket(fd);
+        return nullptr;
+    }
+
+    LogDebug(BCLog::LIBEVENT, "libevent: Bound to port %d - Awaiting connections ... \n", port);
+    return bound;
+}
+
 /** Bind HTTP server to specified addresses */
 static bool HTTPBindAddresses(struct evhttp* http)
 {
     uint16_t http_port{static_cast<uint16_t>(gArgs.GetIntArg("-rpcport", BaseParams().RPCPort()))};
     std::vector<std::pair<std::string, uint16_t>> endpoints;
+    bool is_default = false;
 
     // Determine what addresses to bind to
     // To prevent misconfiguration and accidental exposure of the RPC
@@ -369,8 +452,9 @@ static bool HTTPBindAddresses(struct evhttp* http)
     if (gArgs.GetArgs("-rpcallowip").empty() || gArgs.GetArgs("-rpcbind").empty()) { // Default to loopback if not allowing external IPs
         endpoints.emplace_back("::1", http_port);
         endpoints.emplace_back("127.0.0.1", http_port);
+        is_default = true;
         if (!gArgs.GetArgs("-rpcallowip").empty()) {
-            LogPrintf("WARNING: option -rpcallowip was specified without -rpcbind; this doesn't usually make sense\n");
+            LogWarning("Option -rpcallowip was specified without -rpcbind; this doesn't usually make sense");
         }
         if (!gArgs.GetArgs("-rpcbind").empty()) {
             LogPrintf("WARNING: option -rpcbind was ignored because -rpcallowip was not specified, refusing to allow everyone to connect\n");
@@ -388,13 +472,15 @@ static bool HTTPBindAddresses(struct evhttp* http)
     }
 
     // Bind addresses
+    int num_fail = 0;
     for (std::vector<std::pair<std::string, uint16_t> >::iterator i = endpoints.begin(); i != endpoints.end(); ++i) {
         LogPrintf("Binding RPC on address %s port %i\n", i->first, i->second);
-        evhttp_bound_socket *bind_handle = evhttp_bind_socket_with_handle(http, i->first.empty() ? nullptr : i->first.c_str(), i->second);
+        bool ignorable_error = false;
+        evhttp_bound_socket *bind_handle = my_bind_socket_with_handle(http, i->first.empty() ? nullptr : i->first.c_str(), i->second, ignorable_error);
         if (bind_handle) {
             const std::optional<CNetAddr> addr{LookupHost(i->first, false)};
             if (i->first.empty() || (addr.has_value() && addr->IsBindAny())) {
-                LogPrintf("WARNING: the RPC server is not safe to expose to untrusted networks such as the public internet\n");
+                LogWarning("The RPC server is not safe to expose to untrusted networks such as the public internet");
             }
             // Set the no-delay option (disable Nagle's algorithm) on the TCP socket.
             evutil_socket_t fd = evhttp_bound_socket_get_fd(bind_handle);
@@ -404,10 +490,27 @@ static bool HTTPBindAddresses(struct evhttp* http)
             }
             boundSockets.push_back(bind_handle);
         } else {
-            LogPrintf("Binding RPC on address %s port %i failed.\n", i->first, i->second);
+            int err = EVUTIL_SOCKET_ERROR();
+            if (!is_default || (err != EADDRNOTAVAIL && err != ENOENT && err != EOPNOTSUPP && !ignorable_error)) {
+                LogWarning("Binding RPC on address %s port %i failed (Error: %s).", i->first, i->second, NetworkErrorString(err));
+                num_fail += 1;
+            } else {
+                // Don't count failure if binding was not explicitly configured
+                // (default settings) and the address is not available.
+                // (for example: Travis without IPv6 localhost will return ENOENT)
+                LogPrintf("Binding RPC on address %s port %i failed, error ignored because interface was unavailable.\n", i->first, i->second);
+            }
         }
     }
-    return !boundSockets.empty();
+    if (num_fail != 0) {
+        // In case of an error, clean up listening sockets that succeeded to
+        // avoid leak
+        for (evhttp_bound_socket *socket : boundSockets) {
+            evhttp_del_accept_socket(http, socket);
+        }
+        boundSockets.clear();
+    }
+    return num_fail == 0;
 }
 
 /** Simple wrapper to set thread name and run work queue */
@@ -460,7 +563,7 @@ bool InitHTTPServer(const util::SignalInterrupt& interrupt)
     raii_evhttp http_ctr = obtain_evhttp(base_ctr.get());
     struct evhttp* http = http_ctr.get();
     if (!http) {
-        LogPrintf("couldn't create evhttp. Exiting.\n");
+        LogError("Couldn't create evhttp. Exiting.");
         return false;
     }
 
@@ -470,7 +573,7 @@ bool InitHTTPServer(const util::SignalInterrupt& interrupt)
     evhttp_set_gencb(http, http_request_cb, (void*)&interrupt);
 
     if (!HTTPBindAddresses(http)) {
-        LogPrintf("Unable to bind any endpoint for RPC server\n");
+        LogError("Unable to bind all endpoints for RPC server");
         return false;
     }
 
@@ -600,7 +703,7 @@ HTTPRequest::~HTTPRequest()
 {
     if (!replySent) {
         // Keep track of whether reply was sent to avoid request leaks
-        LogPrintf("%s: Unhandled request\n", __func__);
+        LogWarning("Unhandled HTTP request");
         WriteReply(HTTP_INTERNAL_SERVER_ERROR, "Unhandled request");
     }
     // evhttpd cleans up the request, as long as a reply was sent.

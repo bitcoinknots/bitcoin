@@ -388,6 +388,7 @@ BASE_SCRIPTS = [
     'rpc_scanblocks.py',
     'p2p_sendtxrcncl.py',
     'rpc_scantxoutset.py',
+    'feature_torcontrol.py',
     'feature_unsupported_utxo_db.py',
     'feature_logging.py',
     'feature_anchors.py',

@@ -108,28 +108,28 @@ std::streampos GetFileSize(const char* path, std::streamsize max)
 bool FileCommit(FILE* file)
 {
     if (fflush(file) != 0) { // harmless if redundantly called
-        LogPrintf("fflush failed: %s\n", SysErrorString(errno));
+        LogError("fflush failed: %s", SysErrorString(errno));
         return false;
     }
 #ifdef WIN32
     HANDLE hFile = (HANDLE)_get_osfhandle(_fileno(file));
     if (FlushFileBuffers(hFile) == 0) {
-        LogPrintf("FlushFileBuffers failed: %s\n", Win32ErrorString(GetLastError()));
+        LogError("FlushFileBuffers failed: %s", Win32ErrorString(GetLastError()));
         return false;
     }
 #elif defined(__APPLE__) && defined(F_FULLFSYNC)
     if (fcntl(fileno(file), F_FULLFSYNC, 0) == -1) { // Manpage says "value other than -1" is returned on success
-        LogPrintf("fcntl F_FULLFSYNC failed: %s\n", SysErrorString(errno));
+        LogError("fcntl F_FULLFSYNC failed: %s", SysErrorString(errno));
         return false;
     }
 #elif HAVE_FDATASYNC
     if (fdatasync(fileno(file)) != 0 && errno != EINVAL) { // Ignore EINVAL for filesystems that don't support sync
-        LogPrintf("fdatasync failed: %s\n", SysErrorString(errno));
+        LogError("fdatasync failed: %s", SysErrorString(errno));
         return false;
     }
 #else
     if (fsync(fileno(file)) != 0 && errno != EINVAL) {
-        LogPrintf("fsync failed: %s\n", SysErrorString(errno));
+        LogError("fsync failed: %s", SysErrorString(errno));
         return false;
     }
 #endif
@@ -212,7 +212,8 @@ void AllocateFileRange(FILE* file, unsigned int offset, unsigned int length)
     ftruncate(fileno(file), static_cast<off_t>(offset) + length);
 #else
 #if defined(HAVE_POSIX_FALLOCATE)
-    // Version using posix_fallocate
+    // Use posix_fallocate to advise the kernel how much data we have to write,
+    // if this system supports it.
     off_t nEndPos = (off_t)offset + length;
     if (0 == posix_fallocate(fileno(file), 0, nEndPos)) return;
 #endif
@@ -232,6 +233,50 @@ void AllocateFileRange(FILE* file, unsigned int offset, unsigned int length)
 #endif
 }
 
+FILE* AdviseSequential(FILE *file) {
+#ifdef _POSIX_C_SOURCE
+# if _POSIX_C_SOURCE >= 200112L
+    // Since this whole thing is advisory anyway, we can ignore any errors
+    // encountered up to and including the posix_fadvise call. However, we must
+    // rewind the file to the appropriate position if we've changed the seek
+    // offset.
+    if (file == nullptr) {
+        return nullptr;
+    }
+    const int fd = fileno(file);
+    if (fd == -1) {
+        return file;
+    }
+    const off_t start = lseek(fd, 0, SEEK_CUR);
+    if (start == -1) {
+        return file;
+    }
+    posix_fadvise(fd, start, 0, POSIX_FADV_WILLNEED);
+    posix_fadvise(fd, start, 0, POSIX_FADV_SEQUENTIAL);
+# endif
+#endif
+    return file;
+}
+
+int CloseAndUncache(FILE *file) {
+#ifdef _POSIX_C_SOURCE
+# if _POSIX_C_SOURCE >= 200112L
+    // Ignore any errors up to and including the posix_fadvise call since it's
+    // advisory.
+    if (file != nullptr) {
+        const int fd = fileno(file);
+        if (fd != -1) {
+            const off_t end = lseek(fd, 0, SEEK_END);
+            if (end != (off_t)-1) {
+                posix_fadvise(fd, 0, end, POSIX_FADV_DONTNEED);
+            }
+        }
+    }
+# endif
+#endif
+    return std::fclose(file);
+}
+
 #ifdef WIN32
 fs::path GetSpecialFolderPath(int nFolder, bool fCreate)
 {
@@ -241,7 +286,7 @@ fs::path GetSpecialFolderPath(int nFolder, bool fCreate)
         return fs::path(pszPath);
     }
 
-    LogPrintf("SHGetSpecialFolderPathW() failed, could not obtain requested path.\n");
+    LogError("SHGetSpecialFolderPathW() failed, could not obtain requested path.");
     return fs::path("");
 }
 #endif
