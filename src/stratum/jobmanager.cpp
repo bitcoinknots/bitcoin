@@ -88,6 +88,7 @@ Job JobManager::RefreshJob()
 {
     LOCK(m_mutex);
     m_current_job = BuildSkeletonJob();
+    m_current_job.id = util::ToString(m_next_job_id++);
     m_current_job.id = ToString(m_next_job_id++);
     return m_current_job;
 }
