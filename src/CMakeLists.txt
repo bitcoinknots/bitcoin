@@ -307,6 +307,8 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   script/sigcache.cpp
   signet.cpp
   stats/init.cpp
+  stratum/jobmanager.cpp
+  stratum/server.cpp
   stats/rpc_stats.cpp
   stats/stats.cpp
   torcontrol.cpp
