@@ -72,6 +72,7 @@
 #include <scheduler.h>
 #include <script/sigcache.h>
 #include <stats/stats.h>
+#include <stratum/server.h>
 #include <sync.h>
 #include <torcontrol.h>
 #include <txdb.h>
@@ -284,6 +285,7 @@ void Interrupt(NodeContext& node)
     InterruptREST();
     InterruptTorControl();
     InterruptMapPort();
+    if (node.stratum_server) node.stratum_server->Interrupt();
     if (node.connman)
         node.connman->Interrupt();
     for (auto* index : node.indexes) {
@@ -314,6 +316,7 @@ void Shutdown(NodeContext& node)
         client->flush();
     }
     StopMapPort();
+    if (node.stratum_server) node.stratum_server->Stop();
 
     // Because these depend on each-other, we make sure that neither can be
     // using the other before destroying them.
@@ -404,6 +407,7 @@ void Shutdown(NodeContext& node)
     node.fee_estimator.reset();
     node.chainman.reset();
     node.validation_signals.reset();
+    node.stratum_server.reset();
     node.scheduler.reset();
     node.ecc_context.reset();
     node.kernel.reset();
@@ -543,6 +547,12 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-softwareexpiry", strprintf("Stop working after this POSIX timestamp (default: %s)", DEFAULT_SOFTWARE_EXPIRY), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::OPTIONS);
 #if HAVE_SYSTEM
     argsman.AddArg("-startupnotify=<cmd>", "Execute command on startup.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+#endif
+    argsman.AddArg("-stratum", "Enable the built-in Stratum V1 solo-mining skeleton server (default: 0)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-stratumaddress=<address>", "Payout address used by the Stratum job manager skeleton", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-stratumdifficulty=<n>", "Fixed share difficulty advertised by the Stratum skeleton server (default: 1)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-stratumport=<port>", "Listen port used by the Stratum skeleton server (default: 3333)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+#if HAVE_SYSTEM
     argsman.AddArg("-shutdownnotify=<cmd>", "Execute command immediately before beginning shutdown. The need for shutdown may be urgent, so be careful not to delay it long (if the command doesn't require interaction with the server, consider having it fork into the background).", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
 #endif
     argsman.AddArg("-txindex", strprintf("Maintain a full transaction index, used by the getrawtransaction rpc call (default: %u)", DEFAULT_TXINDEX), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
@@ -2401,6 +2411,23 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
 
     if (!node.connman->Start(scheduler, connOptions)) {
         return false;
+    }
+
+    const stratum::Config stratum_config = stratum::GetConfig(args);
+    if (stratum_config.enabled) {
+        if (stratum_config.address.empty()) {
+            return InitError(_("Stratum server requires -stratumaddress to be set."));
+        }
+        node.stratum_server = std::make_unique<stratum::Server>(stratum_config);
+        node.stratum_server->SetNotifyHook([](const UniValue& notify) {
+            LogPrintLevel(BCLog::NET, BCLog::Level::Debug, "Stratum notify: %s\n", notify.write());
+        });
+        node.stratum_server->SetShareSubmitHook([](const UniValue& submit) {
+            LogPrintf("Stratum share submitted: %s\n", submit.write());
+        });
+        if (!node.stratum_server->Start()) {
+            return InitError(_("Unable to start Stratum server."));
+        }
     }
 
     // ********************************************************* Step 13: finished
