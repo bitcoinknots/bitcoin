@@ -1137,6 +1137,8 @@ static RPCHelpMan getstratuminfo()
             }
             const auto info = node.stratum_server->GetInfo();
             obj.pushKV("enabled", info.enabled);
+            obj.pushKV("listening", info.listening);
+            obj.pushKV("accept_loop_running", info.accept_loop_running);
             obj.pushKV("bind", info.bind);
             obj.pushKV("port", info.port);
             obj.pushKV("clients", (uint64_t)info.clients);

@@ -7,8 +7,10 @@
 #include <common/args.h>
 #include <interfaces/mining.h>
 #include <logging.h>
+#include <netbase.h>
 #include <stratum/share_validation.h>
 #include <stratum/stratum_messages.h>
+#include <util/sock.h>
 #include <util/thread.h>
 
 #include <chrono>
@@ -42,18 +44,28 @@ bool Server::Start()
     if (!m_config.enabled) return true;
     if (m_running.exchange(true)) return true;
 
+    if (!InitListeningSocket()) {
+        m_running.store(false);
+        return false;
+    }
+
     m_job_manager.RefreshJobs(RefreshReason::NEW_PREVHASH);
     m_thread = std::thread(&util::TraceThread, "stratum", [this] { ThreadRun(); });
-    LogPrintf("Stratum enabled on %s:%u\n", m_config.bind, m_config.port);
+    LogPrintf("Stratum configured and listening on %s:%u\n", m_config.bind, m_config.port);
     return true;
 }
 
-void Server::Interrupt() { m_running.store(false); }
+void Server::Interrupt()
+{
+    m_running.store(false);
+}
 
 void Server::Stop()
 {
     Interrupt();
     if (m_thread.joinable()) m_thread.join();
+    m_listen_socket.reset();
+    m_listening.store(false);
 }
 
 Session& Server::GetOrCreateSession(uint64_t session_id)
@@ -150,16 +162,47 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
 
 void Server::ThreadRun()
 {
+    m_accept_loop_running.store(true);
+    LogPrintf("Stratum accept loop started on %s:%u\n", m_config.bind, m_config.port);
+    auto next_job_refresh = std::chrono::steady_clock::now();
+
     while (m_running.load()) {
-        m_job_manager.RefreshJobs(RefreshReason::TEMPLATE_UPDATE_ONLY);
-        UninterruptibleSleep(std::chrono::milliseconds{m_config.job_refresh_ms});
+        if (!m_listen_socket) break;
+
+        const auto now = std::chrono::steady_clock::now();
+        if (now >= next_job_refresh) {
+            m_job_manager.RefreshJobs(RefreshReason::TEMPLATE_UPDATE_ONLY);
+            next_job_refresh = now + std::chrono::milliseconds{m_config.job_refresh_ms};
+        }
+
+        Sock::Event occurred{0};
+        if (!m_listen_socket->Wait(std::chrono::milliseconds{100}, Sock::RECV, &occurred)) {
+            LogPrintf("Stratum accept loop wait failed: %s\n", NetworkErrorString(WSAGetLastError()));
+            continue;
+        }
+        if ((occurred & Sock::RECV) != 0) {
+            struct sockaddr_storage addr;
+            socklen_t len = sizeof(addr);
+            auto client = m_listen_socket->Accept(reinterpret_cast<sockaddr*>(&addr), &len);
+            if (!client) {
+                const int err{WSAGetLastError()};
+                if (err != WSAEWOULDBLOCK && err != WSAEINTR && err != WSAEAGAIN) {
+                    LogPrintf("Stratum accept failed: %s\n", NetworkErrorString(err));
+                }
+            }
+        }
     }
+
+    m_accept_loop_running.store(false);
+    LogPrintf("Stratum accept loop exited on %s:%u\n", m_config.bind, m_config.port);
 }
 
 Info Server::GetInfo() const
 {
     Info info;
     info.enabled = m_config.enabled;
+    info.listening = m_listening.load();
+    info.accept_loop_running = m_accept_loop_running.load();
     info.bind = m_config.bind;
     info.port = m_config.port;
     info.version_rolling_enabled = m_config.version_rolling;
@@ -171,6 +214,51 @@ Info Server::GetInfo() const
     info.rejected_shares = m_rejected_shares;
     info.blocks_found = m_blocks_found;
     return info;
+}
+
+bool Server::InitListeningSocket()
+{
+    const auto bind_addr = Lookup(m_config.bind, m_config.port, /*fAllowLookup=*/false);
+    if (!bind_addr.has_value() || !bind_addr->IsValid()) {
+        LogPrintf("Stratum bind failed: unable to resolve bind address '%s:%u'\n", m_config.bind, m_config.port);
+        return false;
+    }
+
+    struct sockaddr_storage sockaddr;
+    socklen_t len = sizeof(sockaddr);
+    if (!bind_addr->GetSockAddr(reinterpret_cast<sockaddr*>(&sockaddr), &len)) {
+        LogPrintf("Stratum bind failed: unsupported address family for %s\n", bind_addr->ToStringAddrPort());
+        return false;
+    }
+
+    LogPrintf("Stratum creating socket for %s\n", bind_addr->ToStringAddrPort());
+    auto socket = CreateSock(bind_addr->GetSAFamily(), SOCK_STREAM, IPPROTO_TCP);
+    if (!socket) {
+        LogPrintf("Stratum socket creation failed for %s: %s\n", bind_addr->ToStringAddrPort(), NetworkErrorString(WSAGetLastError()));
+        return false;
+    }
+    LogPrintf("Stratum socket created for %s\n", bind_addr->ToStringAddrPort());
+
+    int n_one = 1;
+    if (socket->SetSockOpt(SOL_SOCKET, SO_REUSEADDR, (sockopt_arg_type)&n_one, sizeof(int)) == SOCKET_ERROR) {
+        LogPrintf("Stratum warning: error setting SO_REUSEADDR on %s: %s\n", bind_addr->ToStringAddrPort(), NetworkErrorString(WSAGetLastError()));
+    }
+
+    if (socket->Bind(reinterpret_cast<sockaddr*>(&sockaddr), len) == SOCKET_ERROR) {
+        LogPrintf("Stratum bind failed for %s: %s\n", bind_addr->ToStringAddrPort(), NetworkErrorString(WSAGetLastError()));
+        return false;
+    }
+    LogPrintf("Stratum bind succeeded for %s\n", bind_addr->ToStringAddrPort());
+
+    if (socket->Listen(SOMAXCONN) == SOCKET_ERROR) {
+        LogPrintf("Stratum listen failed for %s: %s\n", bind_addr->ToStringAddrPort(), NetworkErrorString(WSAGetLastError()));
+        return false;
+    }
+    LogPrintf("Stratum listen succeeded for %s\n", bind_addr->ToStringAddrPort());
+
+    m_listen_socket = std::move(socket);
+    m_listening.store(true);
+    return true;
 }
 
 Config GetConfig(const ArgsManager& args, bool is_regtest)

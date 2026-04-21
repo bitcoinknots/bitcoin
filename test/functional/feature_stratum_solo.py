@@ -3,6 +3,8 @@
 # Distributed under the MIT software license.
 """Basic embedded Stratum solo startup smoke test."""
 
+import socket
+
 from test_framework.test_framework import BitcoinTestFramework
 
 
@@ -26,6 +28,17 @@ class StratumSoloTest(BitcoinTestFramework):
         ])
         info = self.nodes[0].getstratuminfo()
         assert info['enabled']
+        assert info['listening']
+        assert info['accept_loop_running']
+
+        def stratum_port_reachable():
+            try:
+                with socket.create_connection(('127.0.0.1', 3333), timeout=1):
+                    return True
+            except OSError:
+                return False
+
+        self.wait_until(stratum_port_reachable, timeout=10)
 
 
 if __name__ == '__main__':
