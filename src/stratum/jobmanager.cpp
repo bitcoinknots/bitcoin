@@ -6,113 +6,85 @@
 
 #include <tinyformat.h>
 #include <util/strencodings.h>
-#include <util/string.h>
-#include <util/time.h>
-
-#include <sstream>
 
 namespace stratum {
 
-namespace {
-constexpr int EXTRANONCE2_SIZE{4};
-} // namespace
-
-JobManager::JobManager(std::string payout_address, uint32_t share_difficulty)
-    : m_payout_address(std::move(payout_address)), m_share_difficulty(share_difficulty)
+JobManager::JobManager(TemplateProvider& template_provider, uint32_t extranonce2_size, const std::string& payout_address)
+    : m_template_provider(template_provider), m_extranonce2_size(extranonce2_size), m_payout_address(payout_address)
 {
 }
 
-UniValue JobManager::HandleSubscribe(const UniValue& id) const
+std::string JobManager::NewJobId()
 {
-    UniValue subscriptions(UniValue::VARR);
-    UniValue notify_sub(UniValue::VARR);
-    notify_sub.push_back("mining.notify");
-    notify_sub.push_back("knots-subscription");
-    subscriptions.push_back(std::move(notify_sub));
-
-    UniValue result(UniValue::VARR);
-    result.push_back(std::move(subscriptions));
-    result.push_back("00000000"); // extranonce1
-    result.push_back(EXTRANONCE2_SIZE);
-
-    UniValue response(UniValue::VOBJ);
-    response.pushKV("id", id);
-    response.pushKV("result", std::move(result));
-    response.pushKV("error", UniValue{UniValue::VNULL});
-    return response;
+    return strprintf("%08x", m_next_job_id++);
 }
 
-UniValue JobManager::HandleAuthorize() const
+std::optional<Job> JobManager::RefreshJobs(RefreshReason reason)
 {
-    UniValue response(UniValue::VOBJ);
-    response.pushKV("result", true);
-    response.pushKV("error", UniValue{UniValue::VNULL});
-    return response;
-}
+    auto tpl = m_template_provider.Refresh(reason);
+    if (!tpl) return std::nullopt;
 
-UniValue JobManager::HandleSubmit(const UniValue& params) const
-{
-    UniValue response(UniValue::VOBJ);
-    if (!params.isArray() || params.size() < 5) {
-        UniValue err(UniValue::VARR);
-        err.push_back(20);
-        err.push_back("Invalid submit parameters");
-        err.push_back(UniValue{UniValue::VNULL});
-        response.pushKV("result", false);
-        response.pushKV("error", std::move(err));
-        return response;
-    }
-
-    // Skeleton implementation: accepts submissions matching current job id.
-    const std::string submitted_job_id = params[1].get_str();
-    bool accepted{false};
-    {
-        LOCK(m_mutex);
-        accepted = submitted_job_id == m_current_job.id;
-    }
-
-    response.pushKV("result", accepted);
-    if (!accepted) {
-        UniValue err(UniValue::VARR);
-        err.push_back(21);
-        err.push_back("Job not found");
-        err.push_back(UniValue{UniValue::VNULL});
-        response.pushKV("error", std::move(err));
-    } else {
-        response.pushKV("error", UniValue{UniValue::VNULL});
-    }
-    return response;
-}
-
-Job JobManager::RefreshJob()
-{
+    Job job;
     LOCK(m_mutex);
-    m_current_job = BuildSkeletonJob();
-    m_current_job.id = util::ToString(m_next_job_id++);
-    m_current_job.id = ToString(m_next_job_id++);
+    job.id = NewJobId();
+    job.prevhash = uint256S(tpl->prevhash);
+    job.coinb1 = "";
+    job.coinb2 = "";
+    job.merkle_branches = tpl->merkle_branch;
+    job.version = tpl->version;
+    job.nbits = tpl->nbits;
+    job.ntime = tpl->ntime;
+    job.clean_jobs = tpl->clean_jobs;
+    job.height = tpl->height;
+    job.block = tpl->block;
+    job.block_template = tpl->block_template;
+
+    m_current_job = job;
+    m_jobs[job.id] = job;
     return m_current_job;
 }
 
-std::optional<Job> JobManager::CurrentJob() const
+std::optional<Job> JobManager::CreateJobForSession(uint64_t session_id)
 {
     LOCK(m_mutex);
-    if (m_current_job.id.empty()) {
-        return std::nullopt;
+    if (!m_current_job.has_value()) return std::nullopt;
+    if (!m_extranonce1.contains(session_id)) {
+        m_extranonce1.emplace(session_id, strprintf("%08x", session_id));
     }
     return m_current_job;
+}
+
+std::optional<Job> JobManager::GetJob(const std::string& job_id) const
+{
+    LOCK(m_mutex);
+    if (const auto it = m_jobs.find(job_id); it != m_jobs.end()) return it->second;
+    return std::nullopt;
+}
+
+std::string JobManager::GetSessionExtranonce1(uint64_t session_id)
+{
+    LOCK(m_mutex);
+    if (!m_extranonce1.contains(session_id)) {
+        m_extranonce1.emplace(session_id, strprintf("%08x", session_id));
+    }
+    return m_extranonce1.at(session_id);
 }
 
 UniValue JobManager::BuildNotify(const Job& job) const
 {
     UniValue params(UniValue::VARR);
     params.push_back(job.id);
-    params.push_back(job.prevhash);
-    params.push_back(job.coinbase1);
-    params.push_back(job.coinbase2);
-    params.push_back(job.merkle_branches);
-    params.push_back(job.version);
-    params.push_back(job.nbits);
-    params.push_back(job.ntime);
+    params.push_back(job.prevhash.GetHex());
+    params.push_back(job.coinb1);
+    params.push_back(job.coinb2);
+
+    UniValue branches(UniValue::VARR);
+    for (const auto& branch : job.merkle_branches) branches.push_back(branch.GetHex());
+    params.push_back(std::move(branches));
+
+    params.push_back(strprintf("%08x", job.version));
+    params.push_back(strprintf("%08x", job.nbits));
+    params.push_back(strprintf("%08x", job.ntime));
     params.push_back(job.clean_jobs);
 
     UniValue payload(UniValue::VOBJ);
@@ -120,27 +92,6 @@ UniValue JobManager::BuildNotify(const Job& job) const
     payload.pushKV("method", "mining.notify");
     payload.pushKV("params", std::move(params));
     return payload;
-}
-
-Job JobManager::BuildSkeletonJob() const
-{
-    Job job;
-    job.prevhash = "0000000000000000000000000000000000000000000000000000000000000000";
-    job.coinbase1 = "02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff";
-    job.coinbase2 = strprintf("%s00000000", HexStr(m_payout_address));
-    job.version = "20000000";
-    job.nbits = "1d00ffff";
-
-    std::stringstream ntime;
-    ntime << std::hex << GetTime();
-    job.ntime = ntime.str();
-
-    UniValue branches(UniValue::VARR);
-    job.merkle_branches = std::move(branches);
-    job.clean_jobs = true;
-    (void)m_share_difficulty;
-
-    return job;
 }
 
 } // namespace stratum

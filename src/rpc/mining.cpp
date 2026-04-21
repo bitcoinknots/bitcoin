@@ -30,6 +30,7 @@
 #include <rpc/mining.h>
 #include <rpc/server.h>
 #include <rpc/server_util.h>
+#include <stratum/server.h>
 #include <rpc/util.h>
 #include <script/descriptor.h>
 #include <script/script.h>
@@ -1119,6 +1120,39 @@ protected:
     }
 };
 
+
+static RPCHelpMan getstratuminfo()
+{
+    return RPCHelpMan{"getstratuminfo",
+        "Returns runtime information about the embedded Stratum server.",
+        {},
+        RPCResult{RPCResult::Type::OBJ, "", ""},
+        RPCExamples{HelpExampleCli("getstratuminfo", "") + HelpExampleRpc("getstratuminfo", "")},
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue {
+            NodeContext& node = EnsureAnyNodeContext(request.context);
+            UniValue obj(UniValue::VOBJ);
+            if (!node.stratum_server) {
+                obj.pushKV("enabled", false);
+                return obj;
+            }
+            const auto info = node.stratum_server->GetInfo();
+            obj.pushKV("enabled", info.enabled);
+            obj.pushKV("bind", info.bind);
+            obj.pushKV("port", info.port);
+            obj.pushKV("clients", (uint64_t)info.clients);
+            obj.pushKV("current_job_id", info.current_job_id);
+            obj.pushKV("current_height", info.current_height);
+            obj.pushKV("current_prevhash", info.current_prevhash);
+            obj.pushKV("accepted_shares", info.accepted_shares);
+            obj.pushKV("rejected_shares", info.rejected_shares);
+            obj.pushKV("blocks_found", info.blocks_found);
+            obj.pushKV("version_rolling_enabled", info.version_rolling_enabled);
+            obj.pushKV("version_rolling_mask", strprintf("%08x", info.version_rolling_mask));
+            return obj;
+        },
+    };
+}
+
 static RPCHelpMan submitblock()
 {
     // We allow 2 arguments for compliance with BIP22. Argument 2 is ignored.
@@ -1216,7 +1250,8 @@ void RegisterMiningRPCCommands(CRPCTable& t)
         {"mining", &getmininginfo},
         {"mining", &prioritisetransaction},
         {"mining", &getprioritisedtransactions},
-        {"mining", &getblocktemplate},
+{"mining", &getblocktemplate},
+        {"mining", &getstratuminfo},
         {"mining", &submitblock},
         {"mining", &submitheader},
 

@@ -309,6 +309,10 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   stats/init.cpp
   stratum/jobmanager.cpp
   stratum/server.cpp
+  stratum/session.cpp
+  stratum/share_validation.cpp
+  stratum/stratum_messages.cpp
+  stratum/template_provider.cpp
   stats/rpc_stats.cpp
   stats/stats.cpp
   torcontrol.cpp

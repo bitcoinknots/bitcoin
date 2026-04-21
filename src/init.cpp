@@ -36,6 +36,7 @@
 #include <interfaces/mining.h>
 #include <interfaces/node.h>
 #include <kernel/caches.h>
+#include <key_io.h>
 #include <kernel/context.h>
 #include <kernel/warning.h>
 #include <key.h>
@@ -548,10 +549,16 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
 #if HAVE_SYSTEM
     argsman.AddArg("-startupnotify=<cmd>", "Execute command on startup.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
 #endif
-    argsman.AddArg("-stratum", "Enable the built-in Stratum V1 solo-mining skeleton server (default: 0)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
-    argsman.AddArg("-stratumaddress=<address>", "Payout address used by the Stratum job manager skeleton", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
-    argsman.AddArg("-stratumdifficulty=<n>", "Fixed share difficulty advertised by the Stratum skeleton server (default: 1)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
-    argsman.AddArg("-stratumport=<port>", "Listen port used by the Stratum skeleton server (default: 3333)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-stratum", "Enable built-in Stratum V1 solo-mining server (default: 0)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-stratumbind=<host>", "Bind host used by Stratum server (default: 127.0.0.1)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-stratumport=<port>", "Listen port used by Stratum server (default: 3333)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-stratumextranonce2size=<n>", "Fixed extranonce2 byte-size for Stratum clients (default: 4)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-stratumdifficulty=<n>", "Fixed share difficulty advertised by Stratum server (default: 1 on regtest)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-stratumpayoutaddress=<address>", "Payout address used for Stratum solo mining", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-stratumversionrolling", "Enable BIP310 version-rolling negotiation (default: 0)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-stratumversionrollingmask=<hex>", "Version rolling mask hex (default: 1fffe000)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-stratumjobrefreshms=<ms>", "Job refresh interval in milliseconds (default: 1000)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-stratumallowselfselect", "Reserved for future self-select templates (default: 0)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
 #if HAVE_SYSTEM
     argsman.AddArg("-shutdownnotify=<cmd>", "Execute command immediately before beginning shutdown. The need for shutdown may be urgent, so be careful not to delay it long (if the command doesn't require interaction with the server, consider having it fork into the background).", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
 #endif
@@ -2413,18 +2420,16 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         return false;
     }
 
-    const stratum::Config stratum_config = stratum::GetConfig(args);
+    const stratum::Config stratum_config = stratum::GetConfig(args, chainparams.IsMockableChain());
     if (stratum_config.enabled) {
-        if (stratum_config.address.empty()) {
-            return InitError(_("Stratum server requires -stratumaddress to be set."));
+        if (stratum_config.payout_address.empty()) {
+            return InitError(_("Stratum server requires -stratumpayoutaddress to be set."));
         }
-        node.stratum_server = std::make_unique<stratum::Server>(stratum_config);
-        node.stratum_server->SetNotifyHook([](const UniValue& notify) {
-            LogPrintLevel(BCLog::NET, BCLog::Level::Debug, "Stratum notify: %s\n", notify.write());
-        });
-        node.stratum_server->SetShareSubmitHook([](const UniValue& submit) {
-            LogPrintf("Stratum share submitted: %s\n", submit.write());
-        });
+        const auto dest = DecodeDestination(stratum_config.payout_address);
+        if (!IsValidDestination(dest)) {
+            return InitError(_("Invalid -stratumpayoutaddress."));
+        }
+        node.stratum_server = std::make_unique<stratum::Server>(stratum_config, *Assert(node.mining));
         if (!node.stratum_server->Start()) {
             return InitError(_("Unable to start Stratum server."));
         }
