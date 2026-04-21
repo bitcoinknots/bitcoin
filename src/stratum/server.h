@@ -20,6 +20,7 @@
 #include <unordered_map>
 
 class ArgsManager;
+class Sock;
 
 namespace interfaces {
 class Mining;
@@ -49,6 +50,8 @@ struct Config {
 
 struct Info {
     bool enabled{false};
+    bool listening{false};
+    bool accept_loop_running{false};
     std::string bind;
     uint16_t port{0};
     size_t clients{0};
@@ -77,6 +80,7 @@ public:
     Info GetInfo() const;
 
 private:
+    bool InitListeningSocket();
     void ThreadRun();
 
     const Config m_config;
@@ -84,7 +88,10 @@ private:
     JobManager m_job_manager;
 
     std::atomic<bool> m_running{false};
+    std::atomic<bool> m_listening{false};
+    std::atomic<bool> m_accept_loop_running{false};
     std::thread m_thread;
+    std::unique_ptr<Sock> m_listen_socket;
 
     mutable Mutex m_mutex;
     std::unordered_map<uint64_t, std::unique_ptr<Session>> m_sessions GUARDED_BY(m_mutex);
