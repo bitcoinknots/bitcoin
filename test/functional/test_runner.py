@@ -374,6 +374,7 @@ BASE_SCRIPTS = [
     'p2p_fingerprint.py',
     'feature_uacomment.py',
     'feature_init.py',
+    'feature_stratum_solo.py',
     'wallet_coinbase_category.py --legacy-wallet',
     'wallet_coinbase_category.py --descriptors',
     'feature_filelock.py',

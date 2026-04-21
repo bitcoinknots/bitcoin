@@ -5,16 +5,30 @@
 #include <stratum/server.h>
 
 #include <common/args.h>
+#include <interfaces/mining.h>
 #include <logging.h>
+#include <stratum/share_validation.h>
+#include <stratum/stratum_messages.h>
 #include <util/thread.h>
 
 #include <chrono>
-#include <utility>
 
 namespace stratum {
+namespace {
+uint32_t ParseHexU32(const std::string& s, uint32_t def)
+{
+    try {
+        size_t idx{0};
+        const uint32_t out = static_cast<uint32_t>(std::stoul(s, &idx, 16));
+        return idx == s.size() ? out : def;
+    } catch (...) {
+        return def;
+    }
+}
+} // namespace
 
-Server::Server(Config config)
-    : m_config(std::move(config)), m_job_manager(m_config.address, m_config.difficulty)
+Server::Server(const Config& config, interfaces::Mining& mining)
+    : m_config(config), m_template_provider(mining), m_job_manager(m_template_provider, m_config.extranonce2_size, m_config.payout_address)
 {
 }
 
@@ -28,102 +42,150 @@ bool Server::Start()
     if (!m_config.enabled) return true;
     if (m_running.exchange(true)) return true;
 
+    m_job_manager.RefreshJobs(RefreshReason::NEW_PREVHASH);
     m_thread = std::thread(&util::TraceThread, "stratum", [this] { ThreadRun(); });
-    LogPrintf("Stratum skeleton enabled on 0.0.0.0:%u (solo mode)\n", m_config.port);
+    LogPrintf("Stratum enabled on %s:%u\n", m_config.bind, m_config.port);
     return true;
 }
 
-void Server::Interrupt()
-{
-    m_running.store(false);
-}
+void Server::Interrupt() { m_running.store(false); }
 
 void Server::Stop()
 {
     Interrupt();
-    if (m_thread.joinable()) {
-        m_thread.join();
-    }
+    if (m_thread.joinable()) m_thread.join();
 }
 
-UniValue Server::HandleMessage(const UniValue& request)
+Session& Server::GetOrCreateSession(uint64_t session_id)
 {
-    UniValue response(UniValue::VOBJ);
-    if (!request.isObject()) {
-        response.pushKV("result", false);
-        response.pushKV("error", "Malformed JSON request");
-        return response;
+    LOCK(m_mutex);
+    if (!m_sessions.contains(session_id)) {
+        auto s = std::make_unique<Session>();
+        s->session_id = session_id;
+        s->extranonce2_size = m_config.extranonce2_size;
+        s->difficulty = m_config.difficulty;
+        s->version_rolling_mask = m_config.version_rolling ? m_config.version_rolling_mask : 0;
+        s->extranonce1 = m_job_manager.GetSessionExtranonce1(session_id);
+        m_sessions.emplace(session_id, std::move(s));
+    }
+    return *m_sessions.at(session_id);
+}
+
+UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
+{
+    const UniValue id = request.exists("id") ? request["id"] : UniValue{UniValue::VNULL};
+    if (!request.isObject() || !request.exists("method")) {
+        return BuildError(id, 20, "malformed-request");
     }
 
-    const std::string method = request.exists("method") ? request["method"].get_str() : "";
-    const UniValue id = request.exists("id") ? request["id"] : UniValue{UniValue::VNULL};
+    Session& session = GetOrCreateSession(session_id);
+    const std::string method = request["method"].get_str();
     const UniValue params = request.exists("params") ? request["params"] : UniValue{UniValue::VARR};
 
     if (method == "mining.subscribe") {
-        return m_job_manager.HandleSubscribe(id);
+        session.subscribed = true;
+        UniValue subscriptions(UniValue::VARR);
+        UniValue s1(UniValue::VARR);
+        s1.push_back("mining.set_difficulty");
+        s1.push_back("subid-diff");
+        subscriptions.push_back(std::move(s1));
+        UniValue s2(UniValue::VARR);
+        s2.push_back("mining.notify");
+        s2.push_back("subid-notify");
+        subscriptions.push_back(std::move(s2));
+
+        UniValue result(UniValue::VARR);
+        result.push_back(std::move(subscriptions));
+        result.push_back(session.extranonce1);
+        result.push_back(session.extranonce2_size);
+
+        UniValue resp(UniValue::VOBJ);
+        resp.pushKV("id", id);
+        resp.pushKV("result", std::move(result));
+        resp.pushKV("error", UniValue{UniValue::VNULL});
+        return resp;
     }
 
     if (method == "mining.authorize") {
-        auto ret = m_job_manager.HandleAuthorize();
-        ret.pushKV("id", id);
-        return ret;
+        if (!params.isArray() || params.size() < 1 || params[0].get_str().empty()) {
+            return BuildError(id, 24, "invalid-worker-name");
+        }
+        session.worker_name = params[0].get_str();
+        session.authorized = true;
+        return BuildSuccess(id);
+    }
+
+    if (method == "mining.suggest_difficulty" || method == "mining.extranonce.subscribe") {
+        return BuildSuccess(id);
     }
 
     if (method == "mining.submit") {
-        auto ret = m_job_manager.HandleSubmit(params);
-        ret.pushKV("id", id);
+        auto submit = ParseSubmitParams(params);
+        if (!submit) return BuildError(id, 20, "invalid-submit-format");
 
-        LOCK(m_callback_mutex);
-        if (m_submit_hook) m_submit_hook(request);
-        return ret;
+        auto job = m_job_manager.GetJob(submit->job_id);
+        if (!job) {
+            LOCK(m_mutex);
+            m_rejected_shares++;
+            session.rejected++;
+            return BuildError(id, 21, "job-not-found");
+        }
+
+        arith_uint256 pow_limit;
+        pow_limit.SetCompact(job->nbits);
+        const auto val = ValidateShare(*submit, session, *job, pow_limit);
+        LOCK(m_mutex);
+        if (!val.accepted_share) {
+            m_rejected_shares++;
+            session.rejected++;
+            return BuildError(id, 23, val.reject_reason);
+        }
+        m_accepted_shares++;
+        session.accepted++;
+        return BuildSuccess(id);
     }
 
-    response.pushKV("id", id);
-    response.pushKV("result", false);
-    UniValue err(UniValue::VARR);
-    err.push_back(404);
-    err.push_back("Method not found");
-    err.push_back(UniValue{UniValue::VNULL});
-    response.pushKV("error", std::move(err));
-    return response;
-}
-
-void Server::SetNotifyHook(std::function<void(const UniValue&)> notify_hook)
-{
-    LOCK(m_callback_mutex);
-    m_notify_hook = std::move(notify_hook);
-}
-
-void Server::SetShareSubmitHook(std::function<void(const UniValue&)> submit_hook)
-{
-    LOCK(m_callback_mutex);
-    m_submit_hook = std::move(submit_hook);
+    return BuildError(id, 404, "method-not-found");
 }
 
 void Server::ThreadRun()
 {
     while (m_running.load()) {
-        const Job job = m_job_manager.RefreshJob();
-        const UniValue notify = m_job_manager.BuildNotify(job);
-
-        LOCK(m_callback_mutex);
-        if (m_notify_hook) {
-            m_notify_hook(notify);
-        } else {
-            LogPrintLevel(BCLog::NET, BCLog::Level::Debug, "Stratum notify: %s\n", notify.write());
-        }
-
-        UninterruptibleSleep(std::chrono::seconds{10});
+        m_job_manager.RefreshJobs(RefreshReason::TEMPLATE_UPDATE_ONLY);
+        UninterruptibleSleep(std::chrono::milliseconds{m_config.job_refresh_ms});
     }
 }
 
-Config GetConfig(const ArgsManager& args)
+Info Server::GetInfo() const
+{
+    Info info;
+    info.enabled = m_config.enabled;
+    info.bind = m_config.bind;
+    info.port = m_config.port;
+    info.version_rolling_enabled = m_config.version_rolling;
+    info.version_rolling_mask = m_config.version_rolling_mask;
+
+    LOCK(m_mutex);
+    info.clients = m_sessions.size();
+    info.accepted_shares = m_accepted_shares;
+    info.rejected_shares = m_rejected_shares;
+    info.blocks_found = m_blocks_found;
+    return info;
+}
+
+Config GetConfig(const ArgsManager& args, bool is_regtest)
 {
     Config cfg;
     cfg.enabled = args.GetBoolArg("-stratum", false);
+    cfg.bind = args.GetArg("-stratumbind", "127.0.0.1");
     cfg.port = static_cast<uint16_t>(args.GetIntArg("-stratumport", 3333));
-    cfg.address = args.GetArg("-stratumaddress", "");
-    cfg.difficulty = static_cast<uint32_t>(args.GetIntArg("-stratumdifficulty", 1));
+    cfg.extranonce2_size = static_cast<uint32_t>(args.GetIntArg("-stratumextranonce2size", 4));
+    cfg.difficulty = args.GetIntArg("-stratumdifficulty", is_regtest ? 1 : 1024);
+    cfg.payout_address = args.GetArg("-stratumpayoutaddress", "");
+    cfg.version_rolling = args.GetBoolArg("-stratumversionrolling", false);
+    cfg.version_rolling_mask = ParseHexU32(args.GetArg("-stratumversionrollingmask", "1fffe000"), 0x1fffe000);
+    cfg.job_refresh_ms = args.GetIntArg("-stratumjobrefreshms", 1000);
+    cfg.allow_self_select = args.GetBoolArg("-stratumallowselfselect", false);
     return cfg;
 }
 
