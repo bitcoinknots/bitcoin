@@ -3,7 +3,7 @@
 // file COPYING or https://opensource.org/license/mit/.
 
 #include <stratum/server.h>
-
+#include <sys/socket.h>
 #include <common/args.h>
 #include <interfaces/mining.h>
 #include <logging.h>
