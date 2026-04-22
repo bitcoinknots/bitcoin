@@ -28,6 +28,19 @@ uint32_t ParseHexU32(const std::string& s, uint32_t def)
         return def;
     }
 }
+
+std::optional<CService> ResolveBindAddress(const std::string& bind, uint16_t port)
+{
+    if (bind == "0.0.0.0") {
+        struct in_addr any4{};
+        return CService(any4, port);
+    }
+    if (bind == "::") {
+        struct in6_addr any6{};
+        return CService(any6, port);
+    }
+    return Lookup(bind, port, /*fAllowLookup=*/false);
+}
 } // namespace
 
 Server::Server(const Config& config, interfaces::Mining& mining)
@@ -44,7 +57,7 @@ Server::~Server()
 
 bool Server::InitListeningSocket()
 {
-    const auto bind_addr = Lookup(m_config.bind, m_config.port, /*fAllowLookup=*/false);
+    const auto bind_addr = ResolveBindAddress(m_config.bind, m_config.port);
     if (!bind_addr.has_value() || !bind_addr->IsValid()) {
         LogPrintf("Stratum bind failed: unable to resolve bind address '%s:%u'\n", m_config.bind, m_config.port);
         return false;
@@ -56,6 +69,13 @@ bool Server::InitListeningSocket()
         LogPrintf("Stratum bind failed: unsupported address family for %s\n", bind_addr->ToStringAddrPort());
         return false;
     }
+
+    CService final_bind_addr;
+    if (!final_bind_addr.SetSockAddr(reinterpret_cast<struct sockaddr*>(&servaddr), len)) {
+        LogPrintf("Stratum bind failed: unable to normalize sockaddr for %s\n", bind_addr->ToStringAddrPort());
+        return false;
+    }
+    LogPrintf("Stratum bind sockaddr resolved to %s (family=%d)\n", final_bind_addr.ToStringAddrPort(), final_bind_addr.GetSAFamily());
 
     LogPrintf("Stratum creating socket for %s\n", bind_addr->ToStringAddrPort());
     auto socket = CreateSock(bind_addr->GetSAFamily(), SOCK_STREAM, IPPROTO_TCP);
