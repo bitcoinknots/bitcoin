@@ -4,7 +4,7 @@
 
 #include <stratum/share_validation.h>
 
-#include <common/hex.h>
+#include <util/strencodings.h>
 #include <crypto/sha256.h>
 #include <stratum/jobmanager.h>
 #include <util/strencodings.h>
