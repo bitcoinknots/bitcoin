@@ -4,6 +4,7 @@
 
 #include <stratum/server.h>
 #include <sys/socket.h>
+
 #include <common/args.h>
 #include <interfaces/mining.h>
 #include <logging.h>
@@ -30,7 +31,9 @@ uint32_t ParseHexU32(const std::string& s, uint32_t def)
 } // namespace
 
 Server::Server(const Config& config, interfaces::Mining& mining)
-    : m_config(config), m_template_provider(mining), m_job_manager(m_template_provider, m_config.extranonce2_size, m_config.payout_address)
+    : m_config(config),
+      m_template_provider(mining),
+      m_job_manager(m_template_provider, m_config.extranonce2_size, m_config.payout_address)
 {
 }
 
@@ -84,6 +87,23 @@ bool Server::InitListeningSocket()
     return true;
 }
 
+bool Server::Start()
+{
+    if (!m_config.enabled) return true;
+    if (m_running.exchange(true)) return true;
+
+    if (!InitListeningSocket()) {
+        m_running.store(false);
+        m_listening.store(false);
+        return false;
+    }
+
+    m_job_manager.RefreshJobs(RefreshReason::NEW_PREVHASH);
+    m_thread = std::thread(&util::TraceThread, "stratum", [this] { ThreadRun(); });
+    LogPrintf("Stratum configured and listening on %s:%u\n", m_config.bind, m_config.port);
+    return true;
+}
+
 void Server::Interrupt()
 {
     m_running.store(false);
@@ -125,11 +145,13 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
 
     if (method == "mining.subscribe") {
         session.subscribed = true;
+
         UniValue subscriptions(UniValue::VARR);
         UniValue s1(UniValue::VARR);
         s1.push_back("mining.set_difficulty");
         s1.push_back("subid-diff");
         subscriptions.push_back(std::move(s1));
+
         UniValue s2(UniValue::VARR);
         s2.push_back("mining.notify");
         s2.push_back("subid-notify");
@@ -175,12 +197,14 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
         arith_uint256 pow_limit;
         pow_limit.SetCompact(job->nbits);
         const auto val = ValidateShare(*submit, session, *job, pow_limit);
+
         LOCK(m_mutex);
         if (!val.accepted_share) {
             m_rejected_shares++;
             session.rejected++;
             return BuildError(id, 23, val.reject_reason);
         }
+
         m_accepted_shares++;
         session.accepted++;
         return BuildSuccess(id);
@@ -209,6 +233,7 @@ void Server::ThreadRun()
             LogPrintf("Stratum accept loop wait failed: %s\n", NetworkErrorString(WSAGetLastError()));
             continue;
         }
+
         if ((occurred & Sock::RECV) != 0) {
             struct sockaddr_storage addr;
             socklen_t len = sizeof(addr);
