@@ -3,7 +3,7 @@
 // file COPYING or https://opensource.org/license/mit/.
 
 #include <stratum/share_validation.h>
-
+#include <hash.h>
 #include <util/strencodings.h>
 #include <crypto/sha256.h>
 #include <stratum/jobmanager.h>
