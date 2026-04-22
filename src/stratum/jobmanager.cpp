@@ -1,7 +1,7 @@
 // Copyright (c) 2026 The Bitcoin Knots developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://opensource.org/license/mit/.
-
+#include <uint256.h>
 #include <stratum/jobmanager.h>
 
 #include <tinyformat.h>
@@ -27,7 +27,9 @@ std::optional<Job> JobManager::RefreshJobs(RefreshReason reason)
     Job job;
     LOCK(m_mutex);
     job.id = NewJobId();
-    job.prevhash = uint256S(tpl->prevhash);
+    auto prevhash = uint256::FromHex(tpl->prevhash);
+    if (!prevhash) return std::nullopt;
+    job.prevhash = *prevhash;
     job.coinb1 = "";
     job.coinb2 = "";
     job.merkle_branches = tpl->merkle_branch;
