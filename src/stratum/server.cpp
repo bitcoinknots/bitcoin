@@ -245,51 +245,6 @@ Info Server::GetInfo() const
     return info;
 }
 
-bool Server::InitListeningSocket()
-{
-    const auto bind_addr = Lookup(m_config.bind, m_config.port, /*fAllowLookup=*/false);
-    if (!bind_addr.has_value() || !bind_addr->IsValid()) {
-        LogPrintf("Stratum bind failed: unable to resolve bind address '%s:%u'\n", m_config.bind, m_config.port);
-        return false;
-    }
-
-    struct sockaddr_storage sockaddr;
-    socklen_t len = sizeof(sockaddr);
-    if (!bind_addr->GetSockAddr(reinterpret_cast<sockaddr*>(&sockaddr), &len)) {
-        LogPrintf("Stratum bind failed: unsupported address family for %s\n", bind_addr->ToStringAddrPort());
-        return false;
-    }
-
-    LogPrintf("Stratum creating socket for %s\n", bind_addr->ToStringAddrPort());
-    auto socket = CreateSock(bind_addr->GetSAFamily(), SOCK_STREAM, IPPROTO_TCP);
-    if (!socket) {
-        LogPrintf("Stratum socket creation failed for %s: %s\n", bind_addr->ToStringAddrPort(), NetworkErrorString(WSAGetLastError()));
-        return false;
-    }
-    LogPrintf("Stratum socket created for %s\n", bind_addr->ToStringAddrPort());
-
-    int n_one = 1;
-    if (socket->SetSockOpt(SOL_SOCKET, SO_REUSEADDR, (sockopt_arg_type)&n_one, sizeof(int)) == SOCKET_ERROR) {
-        LogPrintf("Stratum warning: error setting SO_REUSEADDR on %s: %s\n", bind_addr->ToStringAddrPort(), NetworkErrorString(WSAGetLastError()));
-    }
-
-    if (socket->Bind(reinterpret_cast<sockaddr*>(&sockaddr), len) == SOCKET_ERROR) {
-        LogPrintf("Stratum bind failed for %s: %s\n", bind_addr->ToStringAddrPort(), NetworkErrorString(WSAGetLastError()));
-        return false;
-    }
-    LogPrintf("Stratum bind succeeded for %s\n", bind_addr->ToStringAddrPort());
-
-    if (socket->Listen(SOMAXCONN) == SOCKET_ERROR) {
-        LogPrintf("Stratum listen failed for %s: %s\n", bind_addr->ToStringAddrPort(), NetworkErrorString(WSAGetLastError()));
-        return false;
-    }
-    LogPrintf("Stratum listen succeeded for %s\n", bind_addr->ToStringAddrPort());
-
-    m_listen_socket = std::move(socket);
-    m_listening.store(true);
-    return true;
-}
-
 Config GetConfig(const ArgsManager& args, bool is_regtest)
 {
     Config cfg;
