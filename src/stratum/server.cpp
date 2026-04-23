@@ -146,9 +146,6 @@ void Server::Stop()
     if (m_thread.joinable()) m_thread.join();
     {
         LOCK(m_mutex);
-        for (auto& [session_id, conn] : m_connections) {
-            if (conn->socket) conn->socket->Close();
-        }
         m_connections.clear();
         m_sessions.clear();
     }
@@ -320,7 +317,7 @@ void Server::HandleClient(uint64_t session_id)
             continue;
         }
         if ((occurred & Sock::RECV) == 0) {
-            if ((occurred & Sock::ERR) != 0 || (occurred & Sock::HUP) != 0) break;
+            if ((occurred & Sock::ERR) != 0) break;
             continue;
         }
 
