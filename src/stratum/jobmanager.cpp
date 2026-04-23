@@ -4,6 +4,7 @@
 #include <uint256.h>
 #include <stratum/jobmanager.h>
 
+#include <logging.h>
 #include <tinyformat.h>
 #include <util/strencodings.h>
 
@@ -24,11 +25,27 @@ std::optional<Job> JobManager::RefreshJobs(RefreshReason reason)
     auto tpl = m_template_provider.Refresh(reason);
     if (!tpl) return std::nullopt;
 
-    Job job;
-    LOCK(m_mutex);
-    job.id = NewJobId();
     auto prevhash = uint256::FromHex(tpl->prevhash);
     if (!prevhash) return std::nullopt;
+
+    LOCK(m_mutex);
+    if (m_current_job.has_value()) {
+        const Job& current = *m_current_job;
+        const bool unchanged =
+            current.prevhash == *prevhash &&
+            current.version == tpl->version &&
+            current.nbits == tpl->nbits &&
+            current.ntime == tpl->ntime &&
+            current.height == tpl->height &&
+            current.merkle_branches == tpl->merkle_branch;
+        if (unchanged) {
+            LogPrintf("Stratum job refresh decision: built=0 reason=template-unchanged job_id=%s\n", current.id);
+            return m_current_job;
+        }
+    }
+
+    Job job;
+    job.id = NewJobId();
     job.prevhash = *prevhash;
     job.coinb1 = "";
     job.coinb2 = "";
@@ -43,6 +60,12 @@ std::optional<Job> JobManager::RefreshJobs(RefreshReason reason)
 
     m_current_job = job;
     m_jobs[job.id] = job;
+    LogPrintf("Stratum job refresh decision: built=1 reason=%s job_id=%s prevhash=%s height=%d clean_jobs=%d\n",
+              reason == RefreshReason::NEW_PREVHASH ? "new-prevhash" : "template-update",
+              job.id,
+              job.prevhash.GetHex(),
+              job.height,
+              job.clean_jobs);
     return m_current_job;
 }
 

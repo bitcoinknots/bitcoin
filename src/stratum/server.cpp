@@ -11,10 +11,12 @@
 #include <netbase.h>
 #include <stratum/share_validation.h>
 #include <stratum/stratum_messages.h>
+#include <tinyformat.h>
 #include <util/sock.h>
 #include <util/thread.h>
 
 #include <chrono>
+#include <array>
 
 namespace stratum {
 namespace {
@@ -40,6 +42,15 @@ std::optional<CService> ResolveBindAddress(const std::string& bind, uint16_t por
         return CService(any6, port);
     }
     return Lookup(bind, port, /*fAllowLookup=*/false);
+}
+
+std::string SockAddrToString(const struct sockaddr_storage& addr, socklen_t len)
+{
+    CService peer;
+    if (peer.SetSockAddr(reinterpret_cast<const struct sockaddr*>(&addr), len)) {
+        return peer.ToStringAddrPort();
+    }
+    return "<unknown-peer>";
 }
 } // namespace
 
@@ -133,6 +144,12 @@ void Server::Stop()
 {
     Interrupt();
     if (m_thread.joinable()) m_thread.join();
+    {
+        LOCK(m_mutex);
+        m_connections.clear();
+        m_sessions.clear();
+    }
+
     m_listen_socket.reset();
     m_listening.store(false);
 }
@@ -233,6 +250,126 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
     return BuildError(id, 404, "method-not-found");
 }
 
+bool Server::SendMessageToClient(const Sock& socket, uint64_t session_id, const UniValue& payload, const char* context) const
+{
+    const std::string out = payload.write() + "\n";
+    size_t sent{0};
+    while (sent < out.size()) {
+        const ssize_t ret = socket.Send(out.data() + sent, out.size() - sent, MSG_NOSIGNAL);
+        if (ret <= 0) {
+            LogPrintf("Stratum session=%u send failed (%s): %s\n", session_id, context, NetworkErrorString(WSAGetLastError()));
+            return false;
+        }
+        sent += static_cast<size_t>(ret);
+    }
+    LogPrintf("Stratum response sent session=%u (%s): %s\n", session_id, context, out);
+    return true;
+}
+
+std::vector<UniValue> Server::BuildPostAuthorizeMessages(uint64_t session_id)
+{
+    std::vector<UniValue> out;
+    double session_difficulty{0.0};
+    {
+        LOCK(m_mutex);
+        const auto it = m_sessions.find(session_id);
+        if (it == m_sessions.end()) return out;
+        Session& session = *it->second;
+        if (!session.subscribed || !session.authorized || session.initial_messages_sent) {
+            return out;
+        }
+        session.initial_messages_sent = true;
+        session_difficulty = session.difficulty;
+    }
+
+    UniValue diff_params(UniValue::VARR);
+    diff_params.push_back(session_difficulty);
+    UniValue diff(UniValue::VOBJ);
+    diff.pushKV("id", UniValue{UniValue::VNULL});
+    diff.pushKV("method", "mining.set_difficulty");
+    diff.pushKV("params", std::move(diff_params));
+    out.push_back(std::move(diff));
+
+    if (const auto job = m_job_manager.CreateJobForSession(session_id)) {
+        out.push_back(m_job_manager.BuildNotify(*job));
+    }
+    return out;
+}
+
+void Server::HandleClient(uint64_t session_id)
+{
+    std::unique_ptr<Sock> socket;
+    {
+        LOCK(m_mutex);
+        const auto it = m_connections.find(session_id);
+        if (it == m_connections.end()) return;
+        socket = std::move(it->second->socket);
+    }
+    if (!socket) return;
+
+    std::string recv_buffer;
+    recv_buffer.reserve(4096);
+    std::array<char, 4096> buf;
+
+    while (m_running.load()) {
+        Sock::Event occurred{0};
+        if (!socket->Wait(std::chrono::milliseconds{100}, Sock::RECV, &occurred)) {
+            continue;
+        }
+        if ((occurred & Sock::RECV) == 0) {
+            if ((occurred & Sock::ERR) != 0) break;
+            continue;
+        }
+
+        const ssize_t ret = socket->Recv(buf.data(), buf.size(), 0);
+        if (ret <= 0) break;
+        recv_buffer.append(buf.data(), static_cast<size_t>(ret));
+
+        size_t pos{0};
+        while (true) {
+            const size_t end = recv_buffer.find('\n', pos);
+            if (end == std::string::npos) {
+                recv_buffer.erase(0, pos);
+                break;
+            }
+            std::string line = recv_buffer.substr(pos, end - pos);
+            pos = end + 1;
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            if (line.empty()) continue;
+
+            LogPrintf("Stratum request received session=%u: %s\n", session_id, line);
+
+            UniValue request;
+            if (!request.read(line)) {
+                const UniValue err = BuildError(UniValue{UniValue::VNULL}, 20, "malformed-request");
+                if (!SendMessageToClient(*socket, session_id, err, "parse-error")) {
+                    goto disconnect;
+                }
+                continue;
+            }
+
+            const UniValue response = HandleMessage(session_id, request);
+            if (!SendMessageToClient(*socket, session_id, response, "rpc-response")) {
+                goto disconnect;
+            }
+
+            for (const UniValue& msg : BuildPostAuthorizeMessages(session_id)) {
+                if (!SendMessageToClient(*socket, session_id, msg, "post-authorize")) {
+                    goto disconnect;
+                }
+            }
+        }
+    }
+
+disconnect:
+    {
+        LOCK(m_mutex);
+        m_connections.erase(session_id);
+        m_sessions.erase(session_id);
+    }
+    LogPrintf("Stratum client disconnected session=%u\n", session_id);
+}
+
 void Server::ThreadRun()
 {
     m_accept_loop_running.store(true);
@@ -263,7 +400,27 @@ void Server::ThreadRun()
                 if (err != WSAEWOULDBLOCK && err != WSAEINTR && err != WSAEAGAIN) {
                     LogPrintf("Stratum accept failed: %s\n", NetworkErrorString(err));
                 }
+                continue;
             }
+
+            const uint64_t session_id = m_next_session_id.fetch_add(1);
+            auto connection = std::make_unique<ClientConnection>();
+            connection->session_id = session_id;
+            connection->peer = SockAddrToString(addr, len);
+            const std::string peer = connection->peer;
+            connection->socket = std::move(client);
+
+            {
+                LOCK(m_mutex);
+                m_connections.emplace(session_id, std::move(connection));
+            }
+
+            std::thread(&util::TraceThread, strprintf("stratumcli-%u", session_id), [this, session_id] {
+                HandleClient(session_id);
+            }).detach();
+
+            GetOrCreateSession(session_id);
+            LogPrintf("Stratum client accepted session=%u peer=%s\n", session_id, peer);
         }
     }
 
@@ -283,7 +440,7 @@ Info Server::GetInfo() const
     info.version_rolling_mask = m_config.version_rolling_mask;
 
     LOCK(m_mutex);
-    info.clients = m_sessions.size();
+    info.clients = m_connections.size();
     info.accepted_shares = m_accepted_shares;
     info.rejected_shares = m_rejected_shares;
     info.blocks_found = m_blocks_found;
