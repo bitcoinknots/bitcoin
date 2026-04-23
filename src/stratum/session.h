@@ -19,6 +19,7 @@ struct Session {
     double difficulty{1.0};
     uint32_t version_rolling_mask{0};
     std::string worker_name;
+    bool initial_messages_sent{false};
 
     uint64_t accepted{0};
     uint64_t rejected{0};

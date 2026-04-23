@@ -18,6 +18,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 class ArgsManager;
 class Sock;
@@ -82,6 +83,17 @@ public:
 private:
     bool InitListeningSocket();
     void ThreadRun();
+    void HandleClient(uint64_t session_id);
+    bool SendMessageToClient(const Sock& socket, uint64_t session_id, const UniValue& payload, const char* context) const;
+    std::vector<UniValue> BuildPostAuthorizeMessages(uint64_t session_id);
+
+
+    struct ClientConnection {
+        uint64_t session_id{0};
+        std::string peer;
+        std::unique_ptr<Sock> socket;
+    };
+
 
     const Config m_config;
     TemplateProvider m_template_provider;
@@ -95,9 +107,11 @@ private:
 
     mutable Mutex m_mutex;
     std::unordered_map<uint64_t, std::unique_ptr<Session>> m_sessions GUARDED_BY(m_mutex);
+    std::unordered_map<uint64_t, std::unique_ptr<ClientConnection>> m_connections GUARDED_BY(m_mutex);
     uint64_t m_accepted_shares GUARDED_BY(m_mutex){0};
     uint64_t m_rejected_shares GUARDED_BY(m_mutex){0};
     uint64_t m_blocks_found GUARDED_BY(m_mutex){0};
+    std::atomic<uint64_t> m_next_session_id{1};
 };
 
 Config GetConfig(const ArgsManager& args, bool is_regtest);
