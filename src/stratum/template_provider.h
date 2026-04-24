@@ -14,6 +14,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <chrono>
 
 namespace interfaces {
 class Mining;
@@ -53,6 +54,8 @@ private:
 
     mutable Mutex m_mutex;
     std::optional<WorkTemplate> m_current GUARDED_BY(m_mutex);
+    std::optional<uint256> m_last_tip_hash GUARDED_BY(m_mutex);
+    std::chrono::steady_clock::time_point m_last_template_build GUARDED_BY(m_mutex){};
 };
 
 } // namespace stratum
