@@ -3,6 +3,7 @@
 // file COPYING or https://opensource.org/license/mit/.
 
 #include <stratum/server.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 
 #include <common/args.h>
@@ -34,14 +35,33 @@ uint32_t ParseHexU32(const std::string& s, uint32_t def)
 std::optional<CService> ResolveBindAddress(const std::string& bind, uint16_t port)
 {
     if (bind == "0.0.0.0") {
-        struct in_addr any4{};
-        return CService(any4, port);
+        struct sockaddr_in addr4{};
+        addr4.sin_family = AF_INET;
+        addr4.sin_port = htons(port);
+        addr4.sin_addr.s_addr = htonl(INADDR_ANY);
+        CService service(addr4);
+        LogPrintf("Stratum ResolveBindAddress path=explicit-ipv4-any bind=%s port=%u service=%s valid=%d bind_any=%d family=%d\n",
+                  bind, port, service.ToStringAddrPort(), service.IsValid(), service.IsBindAny(), service.GetSAFamily());
+        return service;
     }
     if (bind == "::") {
-        struct in6_addr any6{};
-        return CService(any6, port);
+        struct sockaddr_in6 addr6{};
+        addr6.sin6_family = AF_INET6;
+        addr6.sin6_port = htons(port);
+        addr6.sin6_addr = in6addr_any;
+        CService service(addr6);
+        LogPrintf("Stratum ResolveBindAddress path=explicit-ipv6-any bind=%s port=%u service=%s valid=%d bind_any=%d family=%d\n",
+                  bind, port, service.ToStringAddrPort(), service.IsValid(), service.IsBindAny(), service.GetSAFamily());
+        return service;
     }
-    return Lookup(bind, port, /*fAllowLookup=*/false);
+    const auto resolved = Lookup(bind, port, /*fAllowLookup=*/false);
+    if (resolved.has_value()) {
+        LogPrintf("Stratum ResolveBindAddress path=lookup bind=%s port=%u service=%s valid=%d bind_any=%d family=%d\n",
+                  bind, port, resolved->ToStringAddrPort(), resolved->IsValid(), resolved->IsBindAny(), resolved->GetSAFamily());
+    } else {
+        LogPrintf("Stratum ResolveBindAddress path=lookup bind=%s port=%u failed\n", bind, port);
+    }
+    return resolved;
 }
 
 std::string SockAddrToString(const struct sockaddr_storage& addr, socklen_t len)
@@ -69,8 +89,14 @@ Server::~Server()
 bool Server::InitListeningSocket()
 {
     const auto bind_addr = ResolveBindAddress(m_config.bind, m_config.port);
-    if (!bind_addr.has_value() || !bind_addr->IsValid()) {
+    if (!bind_addr.has_value()) {
         LogPrintf("Stratum bind failed: unable to resolve bind address '%s:%u'\n", m_config.bind, m_config.port);
+        return false;
+    }
+    LogPrintf("Stratum bind resolve result addr=%s valid=%d bind_any=%d family=%d\n",
+              bind_addr->ToStringAddrPort(), bind_addr->IsValid(), bind_addr->IsBindAny(), bind_addr->GetSAFamily());
+    if (!bind_addr->IsValid() && !bind_addr->IsBindAny()) {
+        LogPrintf("Stratum bind failed: resolved address is neither valid nor bind-any '%s:%u'\n", m_config.bind, m_config.port);
         return false;
     }
 
@@ -86,7 +112,8 @@ bool Server::InitListeningSocket()
         LogPrintf("Stratum bind failed: unable to normalize sockaddr for %s\n", bind_addr->ToStringAddrPort());
         return false;
     }
-    LogPrintf("Stratum bind sockaddr resolved to %s (family=%d)\n", final_bind_addr.ToStringAddrPort(), final_bind_addr.GetSAFamily());
+    LogPrintf("Stratum bind sockaddr resolved to %s (family=%d, valid=%d, bind_any=%d)\n",
+              final_bind_addr.ToStringAddrPort(), final_bind_addr.GetSAFamily(), final_bind_addr.IsValid(), final_bind_addr.IsBindAny());
 
     LogPrintf("Stratum creating socket for %s\n", bind_addr->ToStringAddrPort());
     auto socket = CreateSock(bind_addr->GetSAFamily(), SOCK_STREAM, IPPROTO_TCP);
@@ -99,6 +126,12 @@ bool Server::InitListeningSocket()
     int n_one = 1;
     if (socket->SetSockOpt(SOL_SOCKET, SO_REUSEADDR, (sockopt_arg_type)&n_one, sizeof(int)) == SOCKET_ERROR) {
         LogPrintf("Stratum warning: error setting SO_REUSEADDR on %s: %s\n", bind_addr->ToStringAddrPort(), NetworkErrorString(WSAGetLastError()));
+    }
+    if (bind_addr->GetSAFamily() == AF_INET6) {
+        int n_zero = 0;
+        if (socket->SetSockOpt(IPPROTO_IPV6, IPV6_V6ONLY, (sockopt_arg_type)&n_zero, sizeof(int)) == SOCKET_ERROR) {
+            LogPrintf("Stratum warning: error setting IPV6_V6ONLY=0 on %s: %s\n", bind_addr->ToStringAddrPort(), NetworkErrorString(WSAGetLastError()));
+        }
     }
 
     if (socket->Bind(reinterpret_cast<struct sockaddr*>(&servaddr), len) == SOCKET_ERROR) {
