@@ -1126,7 +1126,22 @@ static RPCHelpMan getstratuminfo()
     return RPCHelpMan{"getstratuminfo",
         "Returns runtime information about the embedded Stratum server.",
         {},
-        RPCResult{RPCResult::Type::OBJ, "", ""},
+        RPCResult{RPCResult::Type::OBJ, "", "", {
+            {RPCResult::Type::BOOL, "enabled", "Whether the embedded Stratum server is enabled."},
+            {RPCResult::Type::BOOL, "listening", /*optional=*/true, "Whether the Stratum listener socket is active."},
+            {RPCResult::Type::BOOL, "accept_loop_running", /*optional=*/true, "Whether the Stratum accept loop thread is currently running."},
+            {RPCResult::Type::STR, "bind", /*optional=*/true, "Configured bind host for the Stratum server."},
+            {RPCResult::Type::NUM, "port", /*optional=*/true, "Configured Stratum listen port."},
+            {RPCResult::Type::NUM, "clients", /*optional=*/true, "Number of currently connected Stratum clients."},
+            {RPCResult::Type::STR, "current_job_id", /*optional=*/true, "Identifier of the current Stratum mining job, if any."},
+            {RPCResult::Type::NUM, "current_height", /*optional=*/true, "Block height targeted by the current Stratum job."},
+            {RPCResult::Type::STR_HEX, "current_prevhash", /*optional=*/true, "Previous-block hash for the current Stratum job."},
+            {RPCResult::Type::NUM, "accepted_shares", /*optional=*/true, "Total number of accepted shares."},
+            {RPCResult::Type::NUM, "rejected_shares", /*optional=*/true, "Total number of rejected shares."},
+            {RPCResult::Type::NUM, "blocks_found", /*optional=*/true, "Total number of blocks found through submitted shares."},
+            {RPCResult::Type::BOOL, "version_rolling_enabled", /*optional=*/true, "Whether version-rolling negotiation is enabled."},
+            {RPCResult::Type::STR_HEX, "version_rolling_mask", /*optional=*/true, "Version-rolling mask as 8-digit hex."},
+        }},
         RPCExamples{HelpExampleCli("getstratuminfo", "") + HelpExampleRpc("getstratuminfo", "")},
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue {
             NodeContext& node = EnsureAnyNodeContext(request.context);
