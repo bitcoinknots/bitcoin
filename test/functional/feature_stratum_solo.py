@@ -12,6 +12,10 @@ from test_framework.test_framework import BitcoinTestFramework
 
 
 class StratumSoloTest(BitcoinTestFramework):
+    def add_options(self, parser):
+        # This test only needs a standard wallet/address and works with descriptor wallets.
+        self.add_wallet_options(parser, descriptors=True, legacy=False)
+
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
