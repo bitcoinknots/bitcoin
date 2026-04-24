@@ -151,11 +151,25 @@ endif
 endif
 endef
 
-ifeq ($(patsubst -%,,$(firstword $(strip $(host_CXX)))),)
-$(error host_CXX does not resolve to a compiler path (got: "$(host_CXX)"). Ensure the compiler is in PATH.)
+host_CXX_prog := $(firstword $(strip $(host_CXX)))
+build_CXX_prog := $(firstword $(strip $(build_CXX)))
+ifeq ($(host_CXX_prog),)
+$(error host_CXX is empty. Ensure the compiler is in PATH.)
 endif
-ifeq ($(patsubst -%,,$(firstword $(strip $(build_CXX)))),)
-$(error build_CXX does not resolve to a compiler path (got: "$(build_CXX)"). Ensure the compiler is in PATH.)
+ifeq ($(build_CXX_prog),)
+$(error build_CXX is empty. Ensure the compiler is in PATH.)
+endif
+ifneq ($(patsubst -%,,$(host_CXX_prog)),$(host_CXX_prog))
+$(error host_CXX first word is a flag, not a compiler path (got: "$(host_CXX_prog)" from host_CXX="$(host_CXX)"). Ensure the compiler is in PATH.)
+endif
+ifneq ($(patsubst -%,,$(build_CXX_prog)),$(build_CXX_prog))
+$(error build_CXX first word is a flag, not a compiler path (got: "$(build_CXX_prog)" from build_CXX="$(build_CXX)"). Ensure the compiler is in PATH.)
+endif
+ifeq ($(shell command -v $(host_CXX_prog) 2>/dev/null),)
+$(error host_CXX "$(host_CXX_prog)" is not executable / not found. host_CXX="$(host_CXX)")
+endif
+ifeq ($(shell command -v $(build_CXX_prog) 2>/dev/null),)
+$(error build_CXX "$(build_CXX_prog)" is not executable / not found. build_CXX="$(build_CXX)")
 endif
 
 $(eval $(call run_hardening_probe,host,$(host),$(strip $(host_CXX)),$($(host_os)_cmake_system_name),$(host_arch),$(host_os),$(host_toolchain_LDFLAGS)))
