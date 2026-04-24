@@ -47,6 +47,7 @@ public:
     std::optional<Job> RefreshJobs(RefreshReason reason);
     std::optional<Job> CreateJobForSession(uint64_t session_id);
     std::optional<Job> GetJob(const std::string& job_id) const;
+    std::optional<Job> CurrentJob() const;
 
     std::string GetSessionExtranonce1(uint64_t session_id);
     UniValue BuildNotify(const Job& job) const;

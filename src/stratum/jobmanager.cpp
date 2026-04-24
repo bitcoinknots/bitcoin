@@ -86,6 +86,12 @@ std::optional<Job> JobManager::GetJob(const std::string& job_id) const
     return std::nullopt;
 }
 
+std::optional<Job> JobManager::CurrentJob() const
+{
+    LOCK(m_mutex);
+    return m_current_job;
+}
+
 std::string JobManager::GetSessionExtranonce1(uint64_t session_id)
 {
     LOCK(m_mutex);

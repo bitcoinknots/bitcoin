@@ -244,6 +244,23 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
 
         m_accepted_shares++;
         session.accepted++;
+
+        if (val.accepted_block && job->block_template) {
+            try {
+                const uint32_t ntime = static_cast<uint32_t>(std::stoul(submit->ntime, nullptr, 16));
+                const uint32_t nonce = static_cast<uint32_t>(std::stoul(submit->nonce, nullptr, 16));
+                const bool submitted = job->block_template->submitSolution(job->version, ntime, nonce, job->block_template->getCoinbaseTx());
+                if (submitted) {
+                    m_blocks_found++;
+                    LogPrintf("Stratum block candidate accepted session=%u job_id=%s hash=%s\n", session_id, submit->job_id, val.block_hash.GetHex());
+                } else {
+                    LogPrintf("Stratum block candidate rejected session=%u job_id=%s hash=%s\n", session_id, submit->job_id, val.block_hash.GetHex());
+                }
+            } catch (...) {
+                LogPrintf("Stratum block candidate parse failure session=%u job_id=%s\n", session_id, submit->job_id);
+            }
+        }
+
         return BuildSuccess(id);
     }
 
@@ -444,6 +461,11 @@ Info Server::GetInfo() const
     info.accepted_shares = m_accepted_shares;
     info.rejected_shares = m_rejected_shares;
     info.blocks_found = m_blocks_found;
+    if (const auto current_job = m_job_manager.CurrentJob()) {
+        info.current_job_id = current_job->id;
+        info.current_height = current_job->height;
+        info.current_prevhash = current_job->prevhash.GetHex();
+    }
     return info;
 }
 
