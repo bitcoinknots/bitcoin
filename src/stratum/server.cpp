@@ -100,6 +100,12 @@ bool Server::InitListeningSocket()
     if (socket->SetSockOpt(SOL_SOCKET, SO_REUSEADDR, (sockopt_arg_type)&n_one, sizeof(int)) == SOCKET_ERROR) {
         LogPrintf("Stratum warning: error setting SO_REUSEADDR on %s: %s\n", bind_addr->ToStringAddrPort(), NetworkErrorString(WSAGetLastError()));
     }
+    if (bind_addr->GetSAFamily() == AF_INET6) {
+        int n_zero = 0;
+        if (socket->SetSockOpt(IPPROTO_IPV6, IPV6_V6ONLY, (sockopt_arg_type)&n_zero, sizeof(int)) == SOCKET_ERROR) {
+            LogPrintf("Stratum warning: error setting IPV6_V6ONLY=0 on %s: %s\n", bind_addr->ToStringAddrPort(), NetworkErrorString(WSAGetLastError()));
+        }
+    }
 
     if (socket->Bind(reinterpret_cast<struct sockaddr*>(&servaddr), len) == SOCKET_ERROR) {
         LogPrintf("Stratum bind failed for %s: %s\n", bind_addr->ToStringAddrPort(), NetworkErrorString(WSAGetLastError()));

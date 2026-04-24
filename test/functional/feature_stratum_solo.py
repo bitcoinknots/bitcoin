@@ -45,26 +45,43 @@ class StratumSoloTest(BitcoinTestFramework):
                 return msg
         raise AssertionError("timed out waiting for expected Stratum message")
 
-    def run_test(self):
-        addr = self.nodes[0].getnewaddress()
+    def restart_with_bind(self, addr, bind):
         self.restart_node(0, extra_args=[
             '-regtest=1',
             '-server=1',
             '-stratum=1',
-            '-stratumbind=127.0.0.1',
+            f'-stratumbind={bind}',
             '-stratumport=3333',
             '-stratumdifficulty=1',
             f'-stratumpayoutaddress={addr}',
         ])
 
+    def wait_for_stratum_connection(self, host):
         def stratum_port_reachable():
             try:
-                with socket.create_connection(('127.0.0.1', 3333), timeout=1):
+                with socket.create_connection((host, 3333), timeout=1):
                     return True
             except OSError:
                 return False
-
         self.wait_until(stratum_port_reachable, timeout=10)
+
+    def run_test(self):
+        addr = self.nodes[0].getnewaddress()
+        self.restart_with_bind(addr, '0.0.0.0')
+        self.wait_for_stratum_connection('127.0.0.1')
+        info_ipv4_any = self.nodes[0].getstratuminfo()
+        assert_equal(info_ipv4_any["bind"], "0.0.0.0")
+        assert_equal(info_ipv4_any["listening"], True)
+
+        if socket.has_ipv6:
+            self.restart_with_bind(addr, '::')
+            self.wait_for_stratum_connection('::1')
+            info_ipv6_any = self.nodes[0].getstratuminfo()
+            assert_equal(info_ipv6_any["bind"], "::")
+            assert_equal(info_ipv6_any["listening"], True)
+
+        self.restart_with_bind(addr, '127.0.0.1')
+        self.wait_for_stratum_connection('127.0.0.1')
 
         with socket.create_connection(("127.0.0.1", 3333), timeout=5) as sock:
             self._stratum_buf = b""
