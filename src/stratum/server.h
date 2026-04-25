@@ -56,12 +56,21 @@ struct Info {
     std::string bind;
     uint16_t port{0};
     size_t clients{0};
+    size_t connected_clients{0};
+    size_t authorized_clients{0};
     std::string current_job_id;
     int32_t current_height{0};
     std::string current_prevhash;
     uint64_t accepted_shares{0};
     uint64_t rejected_shares{0};
     uint64_t blocks_found{0};
+    std::string last_client_ip;
+    std::string last_authorized_worker;
+    std::string last_accepted_share_hash;
+    std::string last_rejected_share_reason;
+    std::string last_block_submission_result;
+    int64_t uptime{0};
+    int64_t last_notify_time{0};
     bool version_rolling_enabled{false};
     uint32_t version_rolling_mask{0};
 };
@@ -111,6 +120,13 @@ private:
     uint64_t m_accepted_shares GUARDED_BY(m_mutex){0};
     uint64_t m_rejected_shares GUARDED_BY(m_mutex){0};
     uint64_t m_blocks_found GUARDED_BY(m_mutex){0};
+    std::string m_last_client_ip GUARDED_BY(m_mutex);
+    std::string m_last_authorized_worker GUARDED_BY(m_mutex);
+    std::string m_last_accepted_share_hash GUARDED_BY(m_mutex);
+    std::string m_last_rejected_share_reason GUARDED_BY(m_mutex);
+    std::string m_last_block_submission_result GUARDED_BY(m_mutex);
+    int64_t m_start_time GUARDED_BY(m_mutex){0};
+    int64_t m_last_notify_time GUARDED_BY(m_mutex){0};
     std::atomic<uint64_t> m_next_session_id{1};
 };
 

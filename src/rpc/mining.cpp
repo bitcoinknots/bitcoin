@@ -1133,12 +1133,21 @@ static RPCHelpMan getstratuminfo()
             {RPCResult::Type::STR, "bind", /*optional=*/true, "Configured bind host for the Stratum server."},
             {RPCResult::Type::NUM, "port", /*optional=*/true, "Configured Stratum listen port."},
             {RPCResult::Type::NUM, "clients", /*optional=*/true, "Number of currently connected Stratum clients."},
+            {RPCResult::Type::NUM, "connected_clients", /*optional=*/true, "Number of currently connected Stratum clients."},
+            {RPCResult::Type::NUM, "authorized_clients", /*optional=*/true, "Number of currently authorized Stratum clients."},
             {RPCResult::Type::STR, "current_job_id", /*optional=*/true, "Identifier of the current Stratum mining job, if any."},
             {RPCResult::Type::NUM, "current_height", /*optional=*/true, "Block height targeted by the current Stratum job."},
             {RPCResult::Type::STR_HEX, "current_prevhash", /*optional=*/true, "Previous-block hash for the current Stratum job."},
             {RPCResult::Type::NUM, "accepted_shares", /*optional=*/true, "Total number of accepted shares."},
             {RPCResult::Type::NUM, "rejected_shares", /*optional=*/true, "Total number of rejected shares."},
             {RPCResult::Type::NUM, "blocks_found", /*optional=*/true, "Total number of blocks found through submitted shares."},
+            {RPCResult::Type::STR, "last_client_ip", /*optional=*/true, "Most recent client IP address observed by the Stratum server."},
+            {RPCResult::Type::STR, "last_authorized_worker", /*optional=*/true, "Most recent worker name accepted by mining.authorize."},
+            {RPCResult::Type::STR_HEX, "last_accepted_share_hash", /*optional=*/true, "Share hash for the most recent accepted share."},
+            {RPCResult::Type::STR, "last_rejected_share_reason", /*optional=*/true, "Reason string for the most recent rejected share."},
+            {RPCResult::Type::STR, "last_block_submission_result", /*optional=*/true, "Result of the most recent block-candidate submission attempt."},
+            {RPCResult::Type::NUM, "uptime", /*optional=*/true, "Seconds since the embedded Stratum server started."},
+            {RPCResult::Type::NUM_TIME, "last_notify_time", /*optional=*/true, "Unix epoch time for the last mining.notify dispatched by the Stratum server."},
             {RPCResult::Type::BOOL, "version_rolling_enabled", /*optional=*/true, "Whether version-rolling negotiation is enabled."},
             {RPCResult::Type::STR_HEX, "version_rolling_mask", /*optional=*/true, "Version-rolling mask as 8-digit hex."},
         }},
@@ -1157,12 +1166,21 @@ static RPCHelpMan getstratuminfo()
             obj.pushKV("bind", info.bind);
             obj.pushKV("port", info.port);
             obj.pushKV("clients", (uint64_t)info.clients);
+            obj.pushKV("connected_clients", (uint64_t)info.connected_clients);
+            obj.pushKV("authorized_clients", (uint64_t)info.authorized_clients);
             obj.pushKV("current_job_id", info.current_job_id);
             obj.pushKV("current_height", info.current_height);
             obj.pushKV("current_prevhash", info.current_prevhash);
             obj.pushKV("accepted_shares", info.accepted_shares);
             obj.pushKV("rejected_shares", info.rejected_shares);
             obj.pushKV("blocks_found", info.blocks_found);
+            obj.pushKV("last_client_ip", info.last_client_ip);
+            obj.pushKV("last_authorized_worker", info.last_authorized_worker);
+            obj.pushKV("last_accepted_share_hash", info.last_accepted_share_hash);
+            obj.pushKV("last_rejected_share_reason", info.last_rejected_share_reason);
+            obj.pushKV("last_block_submission_result", info.last_block_submission_result);
+            obj.pushKV("uptime", info.uptime);
+            obj.pushKV("last_notify_time", info.last_notify_time);
             obj.pushKV("version_rolling_enabled", info.version_rolling_enabled);
             obj.pushKV("version_rolling_mask", strprintf("%08x", info.version_rolling_mask));
             return obj;
