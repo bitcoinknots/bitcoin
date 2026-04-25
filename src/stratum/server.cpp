@@ -301,7 +301,7 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
 
         m_accepted_shares++;
         session.accepted++;
-        m_last_accepted_share_hash = val.share_hash.GetHex();
+        m_last_accepted_share_hash = val.block_hash.GetHex();
         m_last_block_submission_result = "not-a-block-candidate";
 
         if (val.accepted_block && job->block_template) {
