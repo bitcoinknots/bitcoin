@@ -3,6 +3,7 @@
 // file COPYING or https://opensource.org/license/mit/.
 
 #include <stratum/server.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 
 #include <common/args.h>
@@ -14,9 +15,11 @@
 #include <tinyformat.h>
 #include <util/sock.h>
 #include <util/thread.h>
+#include <util/time.h>
 
 #include <chrono>
 #include <array>
+#include <algorithm>
 
 namespace stratum {
 namespace {
@@ -34,14 +37,33 @@ uint32_t ParseHexU32(const std::string& s, uint32_t def)
 std::optional<CService> ResolveBindAddress(const std::string& bind, uint16_t port)
 {
     if (bind == "0.0.0.0") {
-        struct in_addr any4{};
-        return CService(any4, port);
+        struct sockaddr_in addr4{};
+        addr4.sin_family = AF_INET;
+        addr4.sin_port = htons(port);
+        addr4.sin_addr.s_addr = htonl(INADDR_ANY);
+        CService service(addr4);
+        LogPrintf("Stratum ResolveBindAddress path=explicit-ipv4-any bind=%s port=%u service=%s valid=%d bind_any=%d family=%d\n",
+                  bind, port, service.ToStringAddrPort(), service.IsValid(), service.IsBindAny(), service.GetSAFamily());
+        return service;
     }
     if (bind == "::") {
-        struct in6_addr any6{};
-        return CService(any6, port);
+        struct sockaddr_in6 addr6{};
+        addr6.sin6_family = AF_INET6;
+        addr6.sin6_port = htons(port);
+        addr6.sin6_addr = in6addr_any;
+        CService service(addr6);
+        LogPrintf("Stratum ResolveBindAddress path=explicit-ipv6-any bind=%s port=%u service=%s valid=%d bind_any=%d family=%d\n",
+                  bind, port, service.ToStringAddrPort(), service.IsValid(), service.IsBindAny(), service.GetSAFamily());
+        return service;
     }
-    return Lookup(bind, port, /*fAllowLookup=*/false);
+    const auto resolved = Lookup(bind, port, /*fAllowLookup=*/false);
+    if (resolved.has_value()) {
+        LogPrintf("Stratum ResolveBindAddress path=lookup bind=%s port=%u service=%s valid=%d bind_any=%d family=%d\n",
+                  bind, port, resolved->ToStringAddrPort(), resolved->IsValid(), resolved->IsBindAny(), resolved->GetSAFamily());
+    } else {
+        LogPrintf("Stratum ResolveBindAddress path=lookup bind=%s port=%u failed\n", bind, port);
+    }
+    return resolved;
 }
 
 std::string SockAddrToString(const struct sockaddr_storage& addr, socklen_t len)
@@ -49,6 +71,15 @@ std::string SockAddrToString(const struct sockaddr_storage& addr, socklen_t len)
     CService peer;
     if (peer.SetSockAddr(reinterpret_cast<const struct sockaddr*>(&addr), len)) {
         return peer.ToStringAddrPort();
+    }
+    return "<unknown-peer>";
+}
+
+std::string SockAddrToIP(const struct sockaddr_storage& addr, socklen_t len)
+{
+    CService peer;
+    if (peer.SetSockAddr(reinterpret_cast<const struct sockaddr*>(&addr), len)) {
+        return peer.ToStringAddr();
     }
     return "<unknown-peer>";
 }
@@ -69,8 +100,14 @@ Server::~Server()
 bool Server::InitListeningSocket()
 {
     const auto bind_addr = ResolveBindAddress(m_config.bind, m_config.port);
-    if (!bind_addr.has_value() || !bind_addr->IsValid()) {
+    if (!bind_addr.has_value()) {
         LogPrintf("Stratum bind failed: unable to resolve bind address '%s:%u'\n", m_config.bind, m_config.port);
+        return false;
+    }
+    LogPrintf("Stratum bind resolve result addr=%s valid=%d bind_any=%d family=%d\n",
+              bind_addr->ToStringAddrPort(), bind_addr->IsValid(), bind_addr->IsBindAny(), bind_addr->GetSAFamily());
+    if (!bind_addr->IsValid() && !bind_addr->IsBindAny()) {
+        LogPrintf("Stratum bind failed: resolved address is neither valid nor bind-any '%s:%u'\n", m_config.bind, m_config.port);
         return false;
     }
 
@@ -86,7 +123,8 @@ bool Server::InitListeningSocket()
         LogPrintf("Stratum bind failed: unable to normalize sockaddr for %s\n", bind_addr->ToStringAddrPort());
         return false;
     }
-    LogPrintf("Stratum bind sockaddr resolved to %s (family=%d)\n", final_bind_addr.ToStringAddrPort(), final_bind_addr.GetSAFamily());
+    LogPrintf("Stratum bind sockaddr resolved to %s (family=%d, valid=%d, bind_any=%d)\n",
+              final_bind_addr.ToStringAddrPort(), final_bind_addr.GetSAFamily(), final_bind_addr.IsValid(), final_bind_addr.IsBindAny());
 
     LogPrintf("Stratum creating socket for %s\n", bind_addr->ToStringAddrPort());
     auto socket = CreateSock(bind_addr->GetSAFamily(), SOCK_STREAM, IPPROTO_TCP);
@@ -99,6 +137,12 @@ bool Server::InitListeningSocket()
     int n_one = 1;
     if (socket->SetSockOpt(SOL_SOCKET, SO_REUSEADDR, (sockopt_arg_type)&n_one, sizeof(int)) == SOCKET_ERROR) {
         LogPrintf("Stratum warning: error setting SO_REUSEADDR on %s: %s\n", bind_addr->ToStringAddrPort(), NetworkErrorString(WSAGetLastError()));
+    }
+    if (bind_addr->GetSAFamily() == AF_INET6) {
+        int n_zero = 0;
+        if (socket->SetSockOpt(IPPROTO_IPV6, IPV6_V6ONLY, (sockopt_arg_type)&n_zero, sizeof(int)) == SOCKET_ERROR) {
+            LogPrintf("Stratum warning: error setting IPV6_V6ONLY=0 on %s: %s\n", bind_addr->ToStringAddrPort(), NetworkErrorString(WSAGetLastError()));
+        }
     }
 
     if (socket->Bind(reinterpret_cast<struct sockaddr*>(&servaddr), len) == SOCKET_ERROR) {
@@ -129,6 +173,10 @@ bool Server::Start()
         return false;
     }
 
+    {
+        LOCK(m_mutex);
+        m_start_time = GetTime();
+    }
     m_job_manager.RefreshJobs(RefreshReason::NEW_PREVHASH);
     m_thread = std::thread(&util::TraceThread, "stratum", [this] { ThreadRun(); });
     LogPrintf("Stratum configured and listening on %s:%u\n", m_config.bind, m_config.port);
@@ -148,6 +196,7 @@ void Server::Stop()
         LOCK(m_mutex);
         m_connections.clear();
         m_sessions.clear();
+        m_start_time = 0;
     }
 
     m_listen_socket.reset();
@@ -210,8 +259,10 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
         if (!params.isArray() || params.size() < 1 || params[0].get_str().empty()) {
             return BuildError(id, 24, "invalid-worker-name");
         }
+        LOCK(m_mutex);
         session.worker_name = params[0].get_str();
         session.authorized = true;
+        m_last_authorized_worker = session.worker_name;
         return BuildSuccess(id);
     }
 
@@ -221,13 +272,18 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
 
     if (method == "mining.submit") {
         auto submit = ParseSubmitParams(params);
-        if (!submit) return BuildError(id, 20, "invalid-submit-format");
+        if (!submit) {
+            LOCK(m_mutex);
+            m_last_rejected_share_reason = "invalid-submit-format";
+            return BuildError(id, 20, "invalid-submit-format");
+        }
 
         auto job = m_job_manager.GetJob(submit->job_id);
         if (!job) {
             LOCK(m_mutex);
             m_rejected_shares++;
             session.rejected++;
+            m_last_rejected_share_reason = "job-not-found";
             return BuildError(id, 21, "job-not-found");
         }
 
@@ -239,11 +295,14 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
         if (!val.accepted_share) {
             m_rejected_shares++;
             session.rejected++;
+            m_last_rejected_share_reason = val.reject_reason;
             return BuildError(id, 23, val.reject_reason);
         }
 
         m_accepted_shares++;
         session.accepted++;
+        m_last_accepted_share_hash = val.share_hash.GetHex();
+        m_last_block_submission_result = "not-a-block-candidate";
 
         if (val.accepted_block && job->block_template) {
             try {
@@ -252,11 +311,14 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
                 const bool submitted = job->block_template->submitSolution(job->version, ntime, nonce, job->block_template->getCoinbaseTx());
                 if (submitted) {
                     m_blocks_found++;
+                    m_last_block_submission_result = "accepted";
                     LogPrintf("Stratum block candidate accepted session=%u job_id=%s hash=%s\n", session_id, submit->job_id, val.block_hash.GetHex());
                 } else {
+                    m_last_block_submission_result = "rejected";
                     LogPrintf("Stratum block candidate rejected session=%u job_id=%s hash=%s\n", session_id, submit->job_id, val.block_hash.GetHex());
                 }
             } catch (...) {
+                m_last_block_submission_result = "parse-failure";
                 LogPrintf("Stratum block candidate parse failure session=%u job_id=%s\n", session_id, submit->job_id);
             }
         }
@@ -308,6 +370,8 @@ std::vector<UniValue> Server::BuildPostAuthorizeMessages(uint64_t session_id)
     out.push_back(std::move(diff));
 
     if (const auto job = m_job_manager.CreateJobForSession(session_id)) {
+        LOCK(m_mutex);
+        m_last_notify_time = GetTime();
         out.push_back(m_job_manager.BuildNotify(*job));
     }
     return out;
@@ -425,11 +489,13 @@ void Server::ThreadRun()
             connection->session_id = session_id;
             connection->peer = SockAddrToString(addr, len);
             const std::string peer = connection->peer;
+            const std::string peer_ip = SockAddrToIP(addr, len);
             connection->socket = std::move(client);
 
             {
                 LOCK(m_mutex);
                 m_connections.emplace(session_id, std::move(connection));
+                m_last_client_ip = peer_ip;
             }
 
             std::thread(&util::TraceThread, strprintf("stratumcli-%u", session_id), [this, session_id] {
@@ -458,9 +524,20 @@ Info Server::GetInfo() const
 
     LOCK(m_mutex);
     info.clients = m_connections.size();
+    info.connected_clients = info.clients;
+    info.authorized_clients = std::count_if(m_sessions.begin(), m_sessions.end(), [](const auto& entry) {
+        return entry.second && entry.second->authorized;
+    });
     info.accepted_shares = m_accepted_shares;
     info.rejected_shares = m_rejected_shares;
     info.blocks_found = m_blocks_found;
+    info.last_client_ip = m_last_client_ip;
+    info.last_authorized_worker = m_last_authorized_worker;
+    info.last_accepted_share_hash = m_last_accepted_share_hash;
+    info.last_rejected_share_reason = m_last_rejected_share_reason;
+    info.last_block_submission_result = m_last_block_submission_result;
+    info.last_notify_time = m_last_notify_time;
+    if (m_start_time > 0) info.uptime = std::max<int64_t>(0, GetTime() - m_start_time);
     if (const auto current_job = m_job_manager.CurrentJob()) {
         info.current_job_id = current_job->id;
         info.current_height = current_job->height;
