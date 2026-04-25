@@ -151,6 +151,12 @@ endif
 endif
 endef
 
+# Skip the hardening probe (which writes to WORK_PATH) when the user only
+# invokes inspection or housekeeping targets. This keeps `make print-VAR`,
+# `make clean`, `make download`, etc. usable from a read-only srcdir.
+hardening_skip_probe := $(if $(MAKECMDGOALS),$(if $(filter-out print-% clean clean-all download download-% check-packages check-sources,$(MAKECMDGOALS)),,1))
+
+ifndef hardening_skip_probe
 host_CXX_prog := $(firstword $(strip $(host_CXX)))
 build_CXX_prog := $(firstword $(strip $(build_CXX)))
 ifeq ($(host_CXX_prog),)
@@ -181,6 +187,7 @@ endif
 ifeq ($(wildcard $(build_hardening_mk)),)
 $(error Hardening probe failed for build $(build). See $(build_hardening_probe_dir)/configure.log)
 endif
+endif # hardening_skip_probe
 
 -include $(host_hardening_mk)
 host_probe_workaround_cflags := $(workaround_cflags)
