@@ -20,6 +20,7 @@
 #include <chrono>
 #include <array>
 #include <algorithm>
+#include <cmath>
 
 namespace stratum {
 namespace {
@@ -82,6 +83,21 @@ std::string SockAddrToIP(const struct sockaddr_storage& addr, socklen_t len)
         return peer.ToStringAddr();
     }
     return "<unknown-peer>";
+}
+
+double ParseStratumDifficulty(const ArgsManager& args, bool is_regtest)
+{
+    const std::string diff_str = args.GetArg("-stratumdifficulty", is_regtest ? "1" : "1024");
+    try {
+        size_t idx{0};
+        const double diff = std::stod(diff_str, &idx);
+        if (idx != diff_str.size() || !std::isfinite(diff) || diff <= 0.0) {
+            return is_regtest ? 1.0 : 1024.0;
+        }
+        return diff;
+    } catch (...) {
+        return is_regtest ? 1.0 : 1024.0;
+    }
 }
 } // namespace
 
@@ -287,15 +303,15 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
             return BuildError(id, 21, "job-not-found");
         }
 
-        arith_uint256 pow_limit;
-        pow_limit.SetCompact(job->nbits);
-        const auto val = ValidateShare(*submit, session, *job, pow_limit);
+        const auto val = ValidateShare(*submit, session, *job);
 
         LOCK(m_mutex);
         if (!val.accepted_share) {
             m_rejected_shares++;
             session.rejected++;
             m_last_rejected_share_reason = val.reject_reason;
+            LogPrintf("Stratum share rejected session=%u job_id=%s hash=%s share_target=%s network_target=%s session_difficulty=%.8f reason=%s\n",
+                      session_id, submit->job_id, val.block_hash.GetHex(), val.share_target.GetHex(), val.network_target.GetHex(), session.difficulty, val.reject_reason);
             return BuildError(id, 23, val.reject_reason);
         }
 
@@ -521,6 +537,7 @@ Info Server::GetInfo() const
     info.port = m_config.port;
     info.version_rolling_enabled = m_config.version_rolling;
     info.version_rolling_mask = m_config.version_rolling_mask;
+    info.stratum_difficulty = m_config.difficulty;
 
     LOCK(m_mutex);
     info.clients = m_connections.size();
@@ -553,7 +570,7 @@ Config GetConfig(const ArgsManager& args, bool is_regtest)
     cfg.bind = args.GetArg("-stratumbind", "127.0.0.1");
     cfg.port = static_cast<uint16_t>(args.GetIntArg("-stratumport", 3333));
     cfg.extranonce2_size = static_cast<uint32_t>(args.GetIntArg("-stratumextranonce2size", 4));
-    cfg.difficulty = args.GetIntArg("-stratumdifficulty", is_regtest ? 1 : 1024);
+    cfg.difficulty = ParseStratumDifficulty(args, is_regtest);
     cfg.payout_address = args.GetArg("-stratumpayoutaddress", "");
     cfg.version_rolling = args.GetBoolArg("-stratumversionrolling", false);
     cfg.version_rolling_mask = ParseHexU32(args.GetArg("-stratumversionrollingmask", "1fffe000"), 0x1fffe000);

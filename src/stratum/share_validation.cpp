@@ -9,8 +9,14 @@
 #include <stratum/jobmanager.h>
 #include <util/strencodings.h>
 
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+
 namespace stratum {
 namespace {
+constexpr uint32_t DIFF1_BITS{0x1d00ffff};
+
 uint256 HashConcat(const uint256& a, const uint256& b)
 {
     HashWriter ss{};
@@ -23,9 +29,34 @@ uint32_t ParseHexU32(const std::string& s)
     size_t idx{0};
     return static_cast<uint32_t>(std::stoul(s, &idx, 16));
 }
+
+arith_uint256 GetDiff1Target()
+{
+    arith_uint256 diff1_target;
+    bool fneg, fov;
+    diff1_target.SetCompact(DIFF1_BITS, &fneg, &fov);
+    assert(!fneg && !fov && diff1_target != 0);
+    return diff1_target;
+}
+
+arith_uint256 GetShareTarget(double difficulty)
+{
+    constexpr uint64_t SCALE{100000000};
+    arith_uint256 share_target = GetDiff1Target();
+
+    // Difficulty is validated at config load, but clamp here defensively.
+    if (!(std::isfinite(difficulty)) || difficulty <= 0.0) {
+        return 0;
+    }
+
+    const uint64_t scaled = std::max<uint64_t>(1, static_cast<uint64_t>(difficulty * SCALE));
+    share_target *= SCALE;
+    share_target /= arith_uint256{scaled};
+    return share_target;
+}
 } // namespace
 
-ShareValidationResult ValidateShare(const SubmitRequest& req, const Session& session, const Job& job, const arith_uint256& pow_limit)
+ShareValidationResult ValidateShare(const SubmitRequest& req, const Session& session, const Job& job)
 {
     ShareValidationResult ret;
     if (req.extranonce2.size() != session.extranonce2_size * 2) {
@@ -71,13 +102,13 @@ ShareValidationResult ValidateShare(const SubmitRequest& req, const Session& ses
         ret.reject_reason = "invalid-network-target";
         return ret;
     }
-
-    arith_uint256 share_target = pow_limit;
-    if (session.difficulty > 1) share_target /= static_cast<uint32_t>(session.difficulty);
+    const arith_uint256 share_target{GetShareTarget(session.difficulty)};
 
     ret.accepted_share = hash_val <= share_target;
     ret.accepted_block = hash_val <= network_target;
     ret.block_hash = header.GetHash();
+    ret.share_target = share_target;
+    ret.network_target = network_target;
     if (!ret.accepted_share) ret.reject_reason = "low-difficulty-share";
     return ret;
 }

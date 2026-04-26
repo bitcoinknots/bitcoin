@@ -97,6 +97,7 @@ class StratumSoloTest(BitcoinTestFramework):
 
             set_diff = self.recv_until(sock, lambda m: m.get("method") == "mining.set_difficulty")
             assert_equal(len(set_diff["params"]), 1)
+            assert_equal(set_diff["params"][0], 1)
 
             notify = self.recv_until(sock, lambda m: m.get("method") == "mining.notify")
             params = notify["params"]
@@ -116,6 +117,7 @@ class StratumSoloTest(BitcoinTestFramework):
             assert_equal(info_connected["current_job_id"], job["job_id"])
             assert_equal(info_connected["current_height"] > 0, True)
             assert_equal(info_connected["current_prevhash"], job["prevhash"])
+            assert_equal(info_connected["stratum_difficulty"], 1)
             shares_before = info_connected["accepted_shares"]
             blocks_before = info_connected["blocks_found"]
             blockcount_before = self.nodes[0].getblockcount()
