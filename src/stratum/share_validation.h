@@ -22,9 +22,11 @@ struct ShareValidationResult {
     bool accepted_block{false};
     std::string reject_reason;
     uint256 block_hash;
+    arith_uint256 share_target;
+    arith_uint256 network_target;
 };
 
-ShareValidationResult ValidateShare(const SubmitRequest& req, const Session& session, const Job& job, const arith_uint256& pow_limit);
+ShareValidationResult ValidateShare(const SubmitRequest& req, const Session& session, const Job& job);
 
 } // namespace stratum
 
