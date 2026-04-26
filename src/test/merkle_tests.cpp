@@ -306,9 +306,15 @@ BOOST_AUTO_TEST_CASE(merkle_test_mutated_return_value)
     mutated_leaves.insert(mutated_leaves.end(), leaves.end() - 2, leaves.end()); // repeat last two elements
 
     bool mutated{true};
-    const auto unmutated_root{ComputeMerkleRoot(leaves, &mutated)};
+    const uint256 unmutated_root{ComputeMerkleRoot(leaves, &mutated)};
     BOOST_CHECK(!mutated);
     BOOST_CHECK_EQUAL(unmutated_root, ComputeMerkleRoot(mutated_leaves, &mutated));
+    BOOST_CHECK( mutated);
+
+    const std::vector nontrailing_duplicate_leaves{uint256{1}, uint256{1}, uint256{3}, uint256{4}};
+    mutated = false;
+    const uint256 nontrailing_duplicate_root{ComputeMerkleRoot(nontrailing_duplicate_leaves, &mutated)};
+    BOOST_CHECK(nontrailing_duplicate_root == ComputeMerkleRoot(nontrailing_duplicate_leaves));
     BOOST_CHECK(mutated);
 }
 
