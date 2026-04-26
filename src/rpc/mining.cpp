@@ -1150,6 +1150,7 @@ static RPCHelpMan getstratuminfo()
             {RPCResult::Type::NUM_TIME, "last_notify_time", /*optional=*/true, "Unix epoch time for the last mining.notify dispatched by the Stratum server."},
             {RPCResult::Type::BOOL, "version_rolling_enabled", /*optional=*/true, "Whether version-rolling negotiation is enabled."},
             {RPCResult::Type::STR_HEX, "version_rolling_mask", /*optional=*/true, "Version-rolling mask as 8-digit hex."},
+            {RPCResult::Type::NUM, "stratum_difficulty", /*optional=*/true, "Configured fixed Stratum share difficulty."},
         }},
         RPCExamples{HelpExampleCli("getstratuminfo", "") + HelpExampleRpc("getstratuminfo", "")},
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue {
@@ -1183,6 +1184,7 @@ static RPCHelpMan getstratuminfo()
             obj.pushKV("last_notify_time", info.last_notify_time);
             obj.pushKV("version_rolling_enabled", info.version_rolling_enabled);
             obj.pushKV("version_rolling_mask", strprintf("%08x", info.version_rolling_mask));
+            obj.pushKV("stratum_difficulty", info.stratum_difficulty);
             return obj;
         },
     };
