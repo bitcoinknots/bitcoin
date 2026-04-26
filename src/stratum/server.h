@@ -73,6 +73,7 @@ struct Info {
     int64_t last_notify_time{0};
     bool version_rolling_enabled{false};
     uint32_t version_rolling_mask{0};
+    double stratum_difficulty{0.0};
 };
 
 class Server
