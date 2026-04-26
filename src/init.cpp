@@ -553,7 +553,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-stratumbind=<host>", "Bind host used by Stratum server (default: 127.0.0.1)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-stratumport=<port>", "Listen port used by Stratum server (default: 3333)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-stratumextranonce2size=<n>", "Fixed extranonce2 byte-size for Stratum clients (default: 4)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
-    argsman.AddArg("-stratumdifficulty=<n>", "Fixed share difficulty advertised by Stratum server (default: 1 on regtest)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-stratumdifficulty=<d>", "Fixed share difficulty advertised by Stratum server as a positive number, including fractional values (default: 1 on regtest)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-stratumpayoutaddress=<address>", "Payout address used for Stratum solo mining", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-stratumversionrolling", "Enable BIP310 version-rolling negotiation (default: 0)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-stratumversionrollingmask=<hex>", "Version rolling mask hex (default: 1fffe000)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
