@@ -42,8 +42,12 @@ void BanMan::EnsureSweepScheduled()
     if (!m_scheduler) return;
     if (m_sweep_started) return;
     m_sweep_started = true;
+    SweepBannedAndSchedule();
+}
+
+void BanMan::SweepBannedAndSchedule()
+{
     SweepBanned();
-    m_next_sweep_time = std::numeric_limits<int64_t>::max();
     ScheduleNextSweep();
 }
 
@@ -51,15 +55,14 @@ void BanMan::SweepBannedAndSchedule(uint64_t expected_seq)
 {
     LOCK(m_banned_mutex);
     if (expected_seq != m_sweep_seq) return;
-    SweepBanned();
-    m_next_sweep_time = std::numeric_limits<int64_t>::max();
-    ScheduleNextSweep();
+    SweepBannedAndSchedule();
 }
 
 void BanMan::ScheduleNextSweep()
 {
     AssertLockHeld(m_banned_mutex);
 
+    m_next_sweep_time = std::numeric_limits<int64_t>::max();
     if (!m_scheduler) return;
     if (m_banned.empty()) return;
 

@@ -87,6 +87,7 @@ private:
     void LoadBanlist() EXCLUSIVE_LOCKS_REQUIRED(!m_banned_mutex);
     //!clean unused entries (if bantime has expired)
     void SweepBanned() EXCLUSIVE_LOCKS_REQUIRED(m_banned_mutex);
+    void SweepBannedAndSchedule() EXCLUSIVE_LOCKS_REQUIRED(m_banned_mutex);
     void SweepBannedAndSchedule(uint64_t expected_seq) EXCLUSIVE_LOCKS_REQUIRED(!m_banned_mutex);
     void ScheduleNextSweep() EXCLUSIVE_LOCKS_REQUIRED(m_banned_mutex);
 
