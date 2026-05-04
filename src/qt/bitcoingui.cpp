@@ -33,6 +33,9 @@
 #ifdef Q_OS_MACOS
 #include <qt/macdockiconhandler.h>
 #endif
+#ifdef BITCOIN_QT_WIN_TASKBAR
+#include <qt/wintaskbarprogress.h>
+#endif
 
 #include <chain.h>
 #include <chainparams.h>
@@ -226,6 +229,10 @@ BitcoinGUI::BitcoinGUI(interfaces::Node& node, const PlatformStyle *_platformSty
 #ifdef Q_OS_MACOS
     m_app_nap_inhibitor = new CAppNapInhibitor;
 #endif
+#ifdef BITCOIN_QT_WIN_TASKBAR
+    m_taskbar_progress = new WinTaskbarProgress(this);
+    QApplication::instance()->installNativeEventFilter(m_taskbar_progress);
+#endif
 
     GUIUtil::handleCloseWindowShortcut(this);
 }
@@ -242,6 +249,9 @@ BitcoinGUI::~BitcoinGUI()
 #ifdef Q_OS_MACOS
     delete m_app_nap_inhibitor;
     MacDockIconHandler::cleanup();
+#endif
+#ifdef BITCOIN_QT_WIN_TASKBAR
+    QApplication::instance()->removeNativeEventFilter(m_taskbar_progress);
 #endif
 
     delete NetWatch;
@@ -1238,6 +1248,9 @@ void BitcoinGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVer
 
         progressBarLabel->setVisible(false);
         progressBar->setVisible(false);
+#ifdef BITCOIN_QT_WIN_TASKBAR
+        m_taskbar_progress->setVisible(false);
+#endif
     }
     else
     {
@@ -1252,6 +1265,11 @@ void BitcoinGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVer
         progressBar->setMaximum(1000000000);
         progressBar->setValue(nVerificationProgress * 1000000000.0 + 0.5);
         progressBar->setVisible(true);
+#ifdef BITCOIN_QT_WIN_TASKBAR
+        m_taskbar_progress->setWindow(this);
+        m_taskbar_progress->setValue(qRound(nVerificationProgress * 100.0));
+        m_taskbar_progress->setVisible(true);
+#endif
 
         tooltip = tr("Catching up…") + QString("<br>") + tooltip;
         if(count != prevBlocks)
