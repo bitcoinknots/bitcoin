@@ -37,7 +37,7 @@ class WalletStartupTest(BitcoinTestFramework):
         self.log.info("Test wallet load failure due to non-writable directory")
         wallet_name = "bad_permissions"
 
-        node.createwallet(wallet_name, descriptors=True)
+        node.createwallet(wallet_name)
         node.unloadwallet(wallet_name)
 
         dir_path = node.wallets_path / wallet_name
@@ -49,7 +49,7 @@ class WalletStartupTest(BitcoinTestFramework):
         else:
             # Ensure we don't load a wallet located in a non-writable directory.
             # The node will crash later on if we cannot write to disk.
-            assert_raises_rpc_error(-4, f"SQLiteDatabase: Failed to open database in directory '{str(dir_path)}': directory is not writable", node.loadwallet, wallet_name)
+            assert_raises_rpc_error(-4, f"Failed to open database in directory '{str(dir_path)}': directory is not writable", node.loadwallet, wallet_name)
 
         # Reset directory permissions for cleanup
         dir_path.chmod(original_dir_perms)

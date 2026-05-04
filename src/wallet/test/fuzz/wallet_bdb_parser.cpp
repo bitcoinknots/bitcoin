@@ -40,6 +40,7 @@ void initialize_wallet_bdb_parser()
 
 FUZZ_TARGET(wallet_bdb_parser, .init = initialize_wallet_bdb_parser)
 {
+    SeedRandomStateForTest(SeedRand::ZEROS);  // for IsDirWritable
     const auto wallet_path = g_setup->m_args.GetDataDirNet() / "fuzzed_wallet.dat";
 
     {
