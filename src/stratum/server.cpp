@@ -271,6 +271,35 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
         return resp;
     }
 
+    if (method == "mining.configure") {
+        UniValue result(UniValue::VOBJ);
+        UniValue extensions(UniValue::VARR);
+        uint32_t requested_mask{0};
+        bool requested_version_rolling{false};
+        if (params.isArray() && params.size() >= 1 && params[0].isArray()) {
+            for (size_t i = 0; i < params[0].size(); ++i) {
+                if (params[0][i].isStr() && params[0][i].get_str() == "version-rolling") {
+                    requested_version_rolling = true;
+                    break;
+                }
+            }
+        }
+        if (params.isArray() && params.size() >= 2 && params[1].isObject() && params[1].exists("version-rolling.mask")) {
+            requested_mask = ParseHexU32(params[1]["version-rolling.mask"].get_str(), 0);
+        }
+        const bool accepted = requested_version_rolling && m_config.version_rolling;
+        result.pushKV("version-rolling", accepted);
+        if (accepted) {
+            const uint32_t effective_mask = requested_mask == 0 ? m_config.version_rolling_mask : (requested_mask & m_config.version_rolling_mask);
+            result.pushKV("version-rolling.mask", strprintf("%08x", effective_mask));
+        }
+        UniValue resp(UniValue::VOBJ);
+        resp.pushKV("id", id);
+        resp.pushKV("result", std::move(result));
+        resp.pushKV("error", UniValue{UniValue::VNULL});
+        return resp;
+    }
+
     if (method == "mining.authorize") {
         if (!params.isArray() || params.size() < 1 || params[0].get_str().empty()) {
             return BuildError(id, 24, "invalid-worker-name");
@@ -313,8 +342,8 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
             m_rejected_shares++;
             session.rejected++;
             m_last_rejected_share_reason = val.reject_reason;
-            LogPrintf("Stratum share rejected session=%u job_id=%s extranonce1=%s extranonce2=%s ntime=%s nonce=%s version_bits=%s final_version=%08x coinbase_hash=%s merkle_root=%s block_hash=%s share_target=%s network_target=%s session_difficulty=%.8f reason=%s\n",
-                      session_id, submit->job_id, session.extranonce1, submit->extranonce2, submit->ntime, submit->nonce, submit->version_bits.value_or(""), val.final_version, val.coinbase_hash.GetHex(), val.merkle_root.GetHex(), val.block_hash.GetHex(), val.share_target.GetHex(), val.network_target.GetHex(), session.difficulty, val.reject_reason);
+            LogPrintf("Stratum share rejected session=%u job_id=%s extranonce1=%s extranonce2=%s ntime=%s nonce=%s version_bits=%s job_version=%08x submitted_version_bits=%08x mask=%08x final_version=%08x coinbase_hash=%s merkle_root=%s block_hash=%s share_target=%s network_target=%s session_difficulty=%.8f reason=%s\n",
+                      session_id, submit->job_id, session.extranonce1, submit->extranonce2, submit->ntime, submit->nonce, submit->version_bits.value_or(""), val.job_version, val.submitted_version_bits, val.version_rolling_mask, val.final_version, val.coinbase_hash.GetHex(), val.merkle_root.GetHex(), val.block_hash.GetHex(), val.share_target.GetHex(), val.network_target.GetHex(), session.difficulty, val.reject_reason);
             return BuildError(id, 23, val.reject_reason);
         }
 
@@ -322,8 +351,8 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
         session.accepted++;
         m_last_accepted_share_hash = val.block_hash.GetHex();
         m_last_block_submission_result = "not-a-block-candidate";
-        LogPrintf("Stratum share accepted session=%u job_id=%s extranonce1=%s extranonce2=%s ntime=%s nonce=%s version_bits=%s final_version=%08x coinbase_hash=%s merkle_root=%s block_hash=%s share_target=%s network_target=%s session_difficulty=%.8f accepted_block=%d\n",
-                  session_id, submit->job_id, session.extranonce1, submit->extranonce2, submit->ntime, submit->nonce, submit->version_bits.value_or(""), val.final_version, val.coinbase_hash.GetHex(), val.merkle_root.GetHex(), val.block_hash.GetHex(), val.share_target.GetHex(), val.network_target.GetHex(), session.difficulty, val.accepted_block);
+        LogPrintf("Stratum share accepted session=%u job_id=%s extranonce1=%s extranonce2=%s ntime=%s nonce=%s version_bits=%s job_version=%08x submitted_version_bits=%08x mask=%08x final_version=%08x coinbase_hash=%s merkle_root=%s block_hash=%s share_target=%s network_target=%s session_difficulty=%.8f accepted_block=%d\n",
+                  session_id, submit->job_id, session.extranonce1, submit->extranonce2, submit->ntime, submit->nonce, submit->version_bits.value_or(""), val.job_version, val.submitted_version_bits, val.version_rolling_mask, val.final_version, val.coinbase_hash.GetHex(), val.merkle_root.GetHex(), val.block_hash.GetHex(), val.share_target.GetHex(), val.network_target.GetHex(), session.difficulty, val.accepted_block);
 
         if (val.accepted_block && job->block_template) {
             try {

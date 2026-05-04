@@ -61,6 +61,8 @@ arith_uint256 GetShareTarget(double difficulty)
 ShareValidationResult ValidateShare(const SubmitRequest& req, const Session& session, const Job& job, const Config& config)
 {
     ShareValidationResult ret;
+    ret.job_version = job.version;
+    ret.version_rolling_mask = config.version_rolling_mask;
     if (req.extranonce2.size() != session.extranonce2_size * 2) {
         ret.reject_reason = "invalid-extranonce2-size";
         return ret;
@@ -82,7 +84,8 @@ ShareValidationResult ValidateShare(const SubmitRequest& req, const Session& ses
             return ret;
         }
         const uint32_t submitted_version = ParseHexU32(req.version_bits.value());
-        if ((submitted_version & ~config.version_rolling_mask) != (job.version & ~config.version_rolling_mask)) {
+        ret.submitted_version_bits = submitted_version;
+        if ((submitted_version & ~config.version_rolling_mask) != 0) {
             ret.reject_reason = "invalid-version-bits-mask";
             return ret;
         }
