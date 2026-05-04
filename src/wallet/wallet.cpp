@@ -556,8 +556,11 @@ std::shared_ptr<CWallet> RestoreWallet(WalletContext& context, const fs::path& b
         // Clean up the parent directory if we created it during restoration.
         // As we have created it, it must be empty after deleting the wallet file.
         if (created_parent_dir) {
-            Assume(fs::is_empty(wallet_path));
-            fs::remove(wallet_path);
+            if (Assume(fs::is_empty(wallet_path))) {
+                fs::remove(wallet_path);
+            } else {
+                LogInfo("Failed wallet restore: Directory %s is not empty; leaving it alone\n", fs::PathToString(wallet_path));
+            }
         }
     }
 
@@ -4750,8 +4753,11 @@ util::Result<MigrationResult> MigrateLegacyToDescriptor(std::shared_ptr<CWallet>
 
         // Second, delete the created wallet directories and nothing else. They must be empty at this point.
         for (const fs::path& dir : wallet_empty_dirs_to_remove) {
-            Assume(fs::is_empty(dir));
-            fs::remove(dir);
+            if (Assume(fs::is_empty(dir))) {
+                fs::remove(dir);
+            } else {
+                LogInfo("Failed migration cleanup: Directory %s is not empty; leaving it alone\n", fs::PathToString(dir));
+            }
         }
 
         // Restore the backup
