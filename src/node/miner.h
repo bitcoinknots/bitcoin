@@ -102,7 +102,7 @@ struct CompareTxIterByAncestorCount {
 };
 
 
-struct CTxMemPoolModifiedEntry_Indices final : boost::multi_index::indexed_by<
+using CTxMemPoolModifiedEntry_Indices_ = boost::multi_index::indexed_by<
     boost::multi_index::ordered_unique<
         modifiedentry_iter,
         CompareCTxMemPoolIter
@@ -114,8 +114,12 @@ struct CTxMemPoolModifiedEntry_Indices final : boost::multi_index::indexed_by<
         boost::multi_index::identity<CTxMemPoolModifiedEntry>,
         CompareTxMemPoolEntryByAncestorFee
     >
->
-{};
+>;
+#if BOOST_VERSION >= 109100
+using CTxMemPoolModifiedEntry_Indices = CTxMemPoolModifiedEntry_Indices_;
+#else
+struct CTxMemPoolModifiedEntry_Indices final : CTxMemPoolModifiedEntry_Indices_{};
+#endif
 
 typedef boost::multi_index_container<
     CTxMemPoolModifiedEntry,
