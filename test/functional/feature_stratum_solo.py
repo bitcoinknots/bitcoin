@@ -6,7 +6,9 @@
 import json
 import socket
 import time
+from io import BytesIO
 
+from test_framework.messages import CBlockHeader, hash256, ser_uint256, uint256_from_compact, uint256_from_str
 from test_framework.util import assert_equal
 from test_framework.test_framework import BitcoinTestFramework
 
@@ -111,6 +113,8 @@ class StratumSoloTest(BitcoinTestFramework):
                 "nbits": params[6],
                 "ntime": params[7],
             }
+            assert job["coinb1"] != ""
+            assert job["coinb2"] != ""
 
             info_connected = self.nodes[0].getstratuminfo()
             assert info_connected["clients"] >= 1
@@ -122,8 +126,25 @@ class StratumSoloTest(BitcoinTestFramework):
             blocks_before = info_connected["blocks_found"]
             blockcount_before = self.nodes[0].getblockcount()
 
+            extranonce1 = subscribe["result"][1]
+            coinbase = bytes.fromhex(job["coinb1"] + extranonce1 + "00000000" + job["coinb2"])
+            coinbase_hash = hash256(coinbase)
+            merkle = coinbase_hash
+            for branch in job["merkle_branches"]:
+                merkle = hash256(merkle + bytes.fromhex(branch)[::-1])
+            share_target = uint256_from_compact(0x1d00ffff)
             accepted = False
-            for nonce in range(0, 2000):
+            for nonce in range(0, 200000):
+                header = CBlockHeader()
+                header.nVersion = int(job["version"], 16)
+                header.hashPrevBlock = int(job["prevhash"], 16)
+                header.hashMerkleRoot = uint256_from_str(merkle)
+                header.nTime = int(job["ntime"], 16)
+                header.nBits = int(job["nbits"], 16)
+                header.nNonce = nonce
+                header.rehash()
+                if header.sha256 > share_target:
+                    continue
                 submit_id = 100000 + nonce
                 self.send_json(sock, {
                     "id": submit_id,
