@@ -9,6 +9,7 @@
 #include <common/args.h>
 #include <consensus/params.h>
 #include <deploymentinfo.h>
+#include <kernel/chainparams.h>
 #include <logging.h>
 #include <tinyformat.h>
 #include <util/chaintype.h>
@@ -77,8 +78,8 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
 
     for (const std::string& strDeployment : args.GetArgs("-vbparams")) {
         std::vector<std::string> vDeploymentParams = SplitString(strDeployment, ':');
-        if (vDeploymentParams.size() < 3 || 4 < vDeploymentParams.size()) {
-            throw std::runtime_error("Version bits parameters malformed, expecting deployment:start:end[:min_activation_height]");
+        if (vDeploymentParams.size() < 3 || 7 < vDeploymentParams.size()) {
+            throw std::runtime_error("Version bits parameters malformed, expecting deployment:start:end[:min_activation_height[:max_activation_height[:active_duration[:threshold]]]]");
         }
         CChainParams::VersionBitsParameters vbparams{};
         if (!ParseInt64(vDeploymentParams[1], &vbparams.start_time)) {
@@ -94,12 +95,31 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         } else {
             vbparams.min_activation_height = 0;
         }
+        if (vDeploymentParams.size() >= 5) {
+            if (!ParseInt32(vDeploymentParams[4], &vbparams.max_activation_height)) {
+                throw std::runtime_error(strprintf("Invalid max_activation_height (%s)", vDeploymentParams[4]));
+            }
+        }
+        if (vDeploymentParams.size() >= 6) {
+            if (!ParseInt32(vDeploymentParams[5], &vbparams.active_duration)) {
+                throw std::runtime_error(strprintf("Invalid active_duration (%s)", vDeploymentParams[5]));
+            }
+        }
+        if (vDeploymentParams.size() >= 7) {
+            if (!ParseInt32(vDeploymentParams[6], &vbparams.threshold)) {
+                throw std::runtime_error(strprintf("Invalid threshold (%s)", vDeploymentParams[6]));
+            }
+        }
+        // Validate that timeout and max_activation_height are mutually exclusive
+        if (vbparams.timeout != Consensus::BIP9Deployment::NO_TIMEOUT && vbparams.max_activation_height < std::numeric_limits<int>::max()) {
+            throw std::runtime_error(strprintf("Cannot specify both timeout (%ld) and max_activation_height (%d) for deployment %s. Use timeout for BIP9 or max_activation_height for mandatory activation deadline, not both.", vbparams.timeout, vbparams.max_activation_height, vDeploymentParams[0]));
+        }
         bool found = false;
         for (int j=0; j < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; ++j) {
             if (vDeploymentParams[0] == VersionBitsDeploymentInfo[j].name) {
                 options.version_bits_parameters[Consensus::DeploymentPos(j)] = vbparams;
                 found = true;
-                LogPrintf("Setting version bits activation parameters for %s to start=%ld, timeout=%ld, min_activation_height=%d\n", vDeploymentParams[0], vbparams.start_time, vbparams.timeout, vbparams.min_activation_height);
+                LogPrintf("Setting version bits activation parameters for %s to start=%ld, timeout=%ld, min_activation_height=%d, max_activation_height=%d, active_duration=%d, threshold=%d\n", vDeploymentParams[0], vbparams.start_time, vbparams.timeout, vbparams.min_activation_height, vbparams.max_activation_height, vbparams.active_duration, vbparams.threshold);
                 break;
             }
         }
@@ -118,6 +138,17 @@ const CChainParams &Params() {
 
 std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, const ChainType chain)
 {
+    g_rdts_consent = static_cast<RDTSConsentFlag>(args.GetIntArg("rdts_consent_flag", static_cast<int64_t>(g_rdts_consent)));
+    g_enable_rdts = g_rdts_consent != RDTSConsentFlag::UNSUPPORTED_UNSAFE_NO_ENFORCEMENT;
+    if (g_rdts_consent == RDTSConsentFlag::UNSUPPORTED_UNSAFE_NO_ENFORCEMENT && !g_enable_rdts) {
+        for (const auto& rulesok : args.GetArgs(CONSENSUSRULES_CONFIG_NAME)) {
+            if (rulesok == CONSENSUSRULES_REQUIRED) {
+                g_enable_rdts = true;
+                break;
+            }
+        }
+    }
+
     switch (chain) {
     case ChainType::MAIN:
         return CChainParams::Main();
