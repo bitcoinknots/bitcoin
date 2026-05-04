@@ -16,19 +16,17 @@ std::pair<std::string, std::string> BuildCoinbaseParts(const CBlock& block, size
 {
     CMutableTransaction coinbase{*block.vtx.at(0)};
     assert(!coinbase.vin.empty());
-    static constexpr std::byte MARKER1{std::byte{0x33}};
-    static constexpr std::byte MARKER2{std::byte{0x77}};
     std::vector<unsigned char> marker(extranonce_size, 0x33);
     marker.insert(marker.end(), extranonce_size, 0x77);
     coinbase.vin[0].scriptSig = CScript() << marker;
     const CTransaction tx{coinbase};
-    DataStream ds{};
-    ds << TX_WITH_WITNESS(tx);
-    const auto tx_bytes = Span{ds}.ToUCharVec();
-    const auto it = std::search(tx_bytes.begin(), tx_bytes.end(), marker.begin(), marker.end());
-    assert(it != tx_bytes.end());
-    const size_t split = static_cast<size_t>(it - tx_bytes.begin());
-    return {HexStr(Span<const unsigned char>{tx_bytes}.first(split)), HexStr(Span<const unsigned char>{tx_bytes}.subspan(split + marker.size()))};
+    DataStream serialized_coinbase;
+    serialized_coinbase << TX_WITH_WITNESS(tx);
+    const std::string coinbase_hex = HexStr(serialized_coinbase);
+    const std::string marker_hex = HexStr(marker);
+    const size_t marker_offset = coinbase_hex.find(marker_hex);
+    assert(marker_offset != std::string::npos);
+    return {coinbase_hex.substr(0, marker_offset), coinbase_hex.substr(marker_offset + marker_hex.size())};
 }
 } // namespace
 

@@ -6,9 +6,9 @@
 #include <consensus/merkle.h>
 #include <hash.h>
 #include <primitives/transaction.h>
-#include <serialize.h>
 #include <stratum/jobmanager.h>
 #include <stratum/server.h>
+#include <streams.h>
 #include <util/strencodings.h>
 
 #include <algorithm>
