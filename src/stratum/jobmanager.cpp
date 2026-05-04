@@ -5,10 +5,32 @@
 #include <stratum/jobmanager.h>
 
 #include <logging.h>
+#include <primitives/transaction.h>
+#include <streams.h>
 #include <tinyformat.h>
 #include <util/strencodings.h>
 
 namespace stratum {
+namespace {
+std::pair<std::string, std::string> BuildCoinbaseParts(const CBlock& block, size_t extranonce_size)
+{
+    CMutableTransaction coinbase{*block.vtx.at(0)};
+    assert(!coinbase.vin.empty());
+    static constexpr std::byte MARKER1{std::byte{0x33}};
+    static constexpr std::byte MARKER2{std::byte{0x77}};
+    std::vector<unsigned char> marker(extranonce_size, 0x33);
+    marker.insert(marker.end(), extranonce_size, 0x77);
+    coinbase.vin[0].scriptSig = CScript() << marker;
+    const CTransaction tx{coinbase};
+    DataStream ds{};
+    ds << TX_WITH_WITNESS(tx);
+    const auto tx_bytes = Span{ds}.ToUCharVec();
+    const auto it = std::search(tx_bytes.begin(), tx_bytes.end(), marker.begin(), marker.end());
+    assert(it != tx_bytes.end());
+    const size_t split = static_cast<size_t>(it - tx_bytes.begin());
+    return {HexStr(Span<const unsigned char>{tx_bytes}.first(split)), HexStr(Span<const unsigned char>{tx_bytes}.subspan(split + marker.size()))};
+}
+} // namespace
 
 JobManager::JobManager(TemplateProvider& template_provider, uint32_t extranonce2_size, const std::string& payout_address)
     : m_template_provider(template_provider), m_extranonce2_size(extranonce2_size), m_payout_address(payout_address)
@@ -47,8 +69,10 @@ std::optional<Job> JobManager::RefreshJobs(RefreshReason reason)
     Job job;
     job.id = NewJobId();
     job.prevhash = *prevhash;
-    job.coinb1 = "";
-    job.coinb2 = "";
+    const size_t extranonce_size = 4 + m_extranonce2_size;
+    const auto [coinb1, coinb2] = BuildCoinbaseParts(tpl->block, extranonce_size);
+    job.coinb1 = coinb1;
+    job.coinb2 = coinb2;
     job.merkle_branches = tpl->merkle_branch;
     job.version = tpl->version;
     job.nbits = tpl->nbits;
