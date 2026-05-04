@@ -3,10 +3,12 @@
 // file COPYING or https://opensource.org/license/mit/.
 
 #include <stratum/share_validation.h>
+#include <consensus/merkle.h>
 #include <hash.h>
-#include <util/strencodings.h>
-#include <crypto/sha256.h>
+#include <primitives/transaction.h>
 #include <stratum/jobmanager.h>
+#include <stratum/server.h>
+#include <streams.h>
 #include <util/strencodings.h>
 
 #include <algorithm>
@@ -56,7 +58,7 @@ arith_uint256 GetShareTarget(double difficulty)
 }
 } // namespace
 
-ShareValidationResult ValidateShare(const SubmitRequest& req, const Session& session, const Job& job)
+ShareValidationResult ValidateShare(const SubmitRequest& req, const Session& session, const Job& job, const Config& config)
 {
     ShareValidationResult ret;
     if (req.extranonce2.size() != session.extranonce2_size * 2) {
@@ -69,14 +71,26 @@ ShareValidationResult ValidateShare(const SubmitRequest& req, const Session& ses
         return ret;
     }
 
-    CBlockHeader header;
-    header.nVersion = static_cast<int32_t>(job.version);
+    uint32_t final_version = job.version;
     if (req.version_bits.has_value()) {
         if (!IsHex(req.version_bits.value())) {
             ret.reject_reason = "invalid-version-bits";
             return ret;
         }
+        if (!config.version_rolling) {
+            ret.reject_reason = "version-rolling-not-enabled";
+            return ret;
+        }
+        const uint32_t submitted_version = ParseHexU32(req.version_bits.value());
+        if ((submitted_version & ~config.version_rolling_mask) != (job.version & ~config.version_rolling_mask)) {
+            ret.reject_reason = "invalid-version-bits-mask";
+            return ret;
+        }
+        final_version = (job.version & ~config.version_rolling_mask) | (submitted_version & config.version_rolling_mask);
     }
+
+    CBlockHeader header;
+    header.nVersion = static_cast<int32_t>(final_version);
 
     header.hashPrevBlock = job.prevhash;
     header.nBits = job.nbits;
@@ -88,7 +102,17 @@ ShareValidationResult ValidateShare(const SubmitRequest& req, const Session& ses
         return ret;
     }
 
-    uint256 merkle = job.block.vtx.at(0)->GetHash();
+    CMutableTransaction coinbase;
+    try {
+        const std::vector<unsigned char> coinbase_raw = ParseHex(job.coinb1 + session.extranonce1 + req.extranonce2 + job.coinb2);
+        DataStream ds{coinbase_raw};
+        ds >> TX_WITH_WITNESS(coinbase);
+    } catch (...) {
+        ret.reject_reason = "invalid-coinbase";
+        return ret;
+    }
+
+    uint256 merkle = CTransaction{coinbase}.GetHash();
     for (const auto& h : job.merkle_branches) {
         merkle = HashConcat(merkle, h);
     }
@@ -107,6 +131,9 @@ ShareValidationResult ValidateShare(const SubmitRequest& req, const Session& ses
     ret.accepted_share = hash_val <= share_target;
     ret.accepted_block = hash_val <= network_target;
     ret.block_hash = header.GetHash();
+    ret.final_version = final_version;
+    ret.coinbase_hash = CTransaction{coinbase}.GetHash();
+    ret.merkle_root = merkle;
     ret.share_target = share_target;
     ret.network_target = network_target;
     if (!ret.accepted_share) ret.reject_reason = "low-difficulty-share";

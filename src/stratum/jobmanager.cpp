@@ -5,10 +5,30 @@
 #include <stratum/jobmanager.h>
 
 #include <logging.h>
+#include <primitives/transaction.h>
+#include <streams.h>
 #include <tinyformat.h>
 #include <util/strencodings.h>
 
 namespace stratum {
+namespace {
+std::pair<std::string, std::string> BuildCoinbaseParts(const CBlock& block, size_t extranonce_size)
+{
+    CMutableTransaction coinbase{*block.vtx.at(0)};
+    assert(!coinbase.vin.empty());
+    std::vector<unsigned char> marker(extranonce_size, 0x33);
+    marker.insert(marker.end(), extranonce_size, 0x77);
+    coinbase.vin[0].scriptSig = CScript() << marker;
+    const CTransaction tx{coinbase};
+    DataStream serialized_coinbase;
+    serialized_coinbase << TX_WITH_WITNESS(tx);
+    const std::string coinbase_hex = HexStr(serialized_coinbase);
+    const std::string marker_hex = HexStr(marker);
+    const size_t marker_offset = coinbase_hex.find(marker_hex);
+    assert(marker_offset != std::string::npos);
+    return {coinbase_hex.substr(0, marker_offset), coinbase_hex.substr(marker_offset + marker_hex.size())};
+}
+} // namespace
 
 JobManager::JobManager(TemplateProvider& template_provider, uint32_t extranonce2_size, const std::string& payout_address)
     : m_template_provider(template_provider), m_extranonce2_size(extranonce2_size), m_payout_address(payout_address)
@@ -47,8 +67,10 @@ std::optional<Job> JobManager::RefreshJobs(RefreshReason reason)
     Job job;
     job.id = NewJobId();
     job.prevhash = *prevhash;
-    job.coinb1 = "";
-    job.coinb2 = "";
+    const size_t extranonce_size = 4 + m_extranonce2_size;
+    const auto [coinb1, coinb2] = BuildCoinbaseParts(tpl->block, extranonce_size);
+    job.coinb1 = coinb1;
+    job.coinb2 = coinb2;
     job.merkle_branches = tpl->merkle_branch;
     job.version = tpl->version;
     job.nbits = tpl->nbits;

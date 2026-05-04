@@ -282,7 +282,10 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
         return BuildSuccess(id);
     }
 
-    if (method == "mining.suggest_difficulty" || method == "mining.extranonce.subscribe") {
+    if (method == "mining.suggest_difficulty") {
+        return BuildError(id, 20, "unsupported-method");
+    }
+    if (method == "mining.extranonce.subscribe") {
         return BuildSuccess(id);
     }
 
@@ -303,15 +306,15 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
             return BuildError(id, 21, "job-not-found");
         }
 
-        const auto val = ValidateShare(*submit, session, *job);
+        const auto val = ValidateShare(*submit, session, *job, m_config);
 
         LOCK(m_mutex);
         if (!val.accepted_share) {
             m_rejected_shares++;
             session.rejected++;
             m_last_rejected_share_reason = val.reject_reason;
-            LogPrintf("Stratum share rejected session=%u job_id=%s hash=%s share_target=%s network_target=%s session_difficulty=%.8f reason=%s\n",
-                      session_id, submit->job_id, val.block_hash.GetHex(), val.share_target.GetHex(), val.network_target.GetHex(), session.difficulty, val.reject_reason);
+            LogPrintf("Stratum share rejected session=%u job_id=%s extranonce1=%s extranonce2=%s ntime=%s nonce=%s version_bits=%s final_version=%08x coinbase_hash=%s merkle_root=%s block_hash=%s share_target=%s network_target=%s session_difficulty=%.8f reason=%s\n",
+                      session_id, submit->job_id, session.extranonce1, submit->extranonce2, submit->ntime, submit->nonce, submit->version_bits.value_or(""), val.final_version, val.coinbase_hash.GetHex(), val.merkle_root.GetHex(), val.block_hash.GetHex(), val.share_target.GetHex(), val.network_target.GetHex(), session.difficulty, val.reject_reason);
             return BuildError(id, 23, val.reject_reason);
         }
 
@@ -319,12 +322,14 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
         session.accepted++;
         m_last_accepted_share_hash = val.block_hash.GetHex();
         m_last_block_submission_result = "not-a-block-candidate";
+        LogPrintf("Stratum share accepted session=%u job_id=%s extranonce1=%s extranonce2=%s ntime=%s nonce=%s version_bits=%s final_version=%08x coinbase_hash=%s merkle_root=%s block_hash=%s share_target=%s network_target=%s session_difficulty=%.8f accepted_block=%d\n",
+                  session_id, submit->job_id, session.extranonce1, submit->extranonce2, submit->ntime, submit->nonce, submit->version_bits.value_or(""), val.final_version, val.coinbase_hash.GetHex(), val.merkle_root.GetHex(), val.block_hash.GetHex(), val.share_target.GetHex(), val.network_target.GetHex(), session.difficulty, val.accepted_block);
 
         if (val.accepted_block && job->block_template) {
             try {
                 const uint32_t ntime = static_cast<uint32_t>(std::stoul(submit->ntime, nullptr, 16));
                 const uint32_t nonce = static_cast<uint32_t>(std::stoul(submit->nonce, nullptr, 16));
-                const bool submitted = job->block_template->submitSolution(job->version, ntime, nonce, job->block_template->getCoinbaseTx());
+                const bool submitted = job->block_template->submitSolution(val.final_version, ntime, nonce, job->block_template->getCoinbaseTx());
                 if (submitted) {
                     m_blocks_found++;
                     m_last_block_submission_result = "accepted";
