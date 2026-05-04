@@ -614,3 +614,5 @@ Config GetConfig(const ArgsManager& args, bool is_regtest)
 }
 
 } // namespace stratum
+        LogPrintf("Stratum share accepted session=%u job_id=%s extranonce1=%s extranonce2=%s ntime=%s nonce=%s version_bits=%s final_version=%08x coinbase_hash=%s merkle_root=%s block_hash=%s share_target=%s network_target=%s session_difficulty=%.8f accepted_block=%d\n",
+                  session_id, submit->job_id, session.extranonce1, submit->extranonce2, submit->ntime, submit->nonce, submit->version_bits.value_or(""), val.final_version, val.coinbase_hash.GetHex(), val.merkle_root.GetHex(), val.block_hash.GetHex(), val.share_target.GetHex(), val.network_target.GetHex(), session.difficulty, val.accepted_block);
