@@ -44,6 +44,8 @@ struct MappingResult {
     std::string ToString() const;
 };
 
+extern bool g_pcp_warn_for_unauthorized;
+
 //! Try to open a port using RFC 6886 NAT-PMP. IPv4 only.
 //!
 //! * gateway: Destination address for PCP requests (usually the default gateway).
