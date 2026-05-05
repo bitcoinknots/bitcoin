@@ -354,11 +354,11 @@ UniValue Server::HandleMessage(uint64_t session_id, const UniValue& request)
         LogPrintf("Stratum share accepted session=%u job_id=%s extranonce1=%s extranonce2=%s ntime=%s nonce=%s version_bits=%s job_version=%08x submitted_version_bits=%08x mask=%08x final_version=%08x coinbase_hash=%s merkle_root=%s block_hash=%s share_target=%s network_target=%s session_difficulty=%.8f accepted_block=%d\n",
                   session_id, submit->job_id, session.extranonce1, submit->extranonce2, submit->ntime, submit->nonce, submit->version_bits.value_or(""), val.job_version, val.submitted_version_bits, val.version_rolling_mask, val.final_version, val.coinbase_hash.GetHex(), val.merkle_root.GetHex(), val.block_hash.GetHex(), val.share_target.GetHex(), val.network_target.GetHex(), session.difficulty, val.accepted_block);
 
-        if (val.accepted_block && job->block_template) {
+        if (val.accepted_block && job->block_template && val.coinbase_tx) {
             try {
                 const uint32_t ntime = static_cast<uint32_t>(std::stoul(submit->ntime, nullptr, 16));
                 const uint32_t nonce = static_cast<uint32_t>(std::stoul(submit->nonce, nullptr, 16));
-                const bool submitted = job->block_template->submitSolution(val.final_version, ntime, nonce, job->block_template->getCoinbaseTx());
+                const bool submitted = job->block_template->submitSolution(val.final_version, ntime, nonce, val.coinbase_tx);
                 if (submitted) {
                     m_blocks_found++;
                     m_last_block_submission_result = "accepted";
@@ -614,5 +614,3 @@ Config GetConfig(const ArgsManager& args, bool is_regtest)
 }
 
 } // namespace stratum
-        LogPrintf("Stratum share accepted session=%u job_id=%s extranonce1=%s extranonce2=%s ntime=%s nonce=%s version_bits=%s final_version=%08x coinbase_hash=%s merkle_root=%s block_hash=%s share_target=%s network_target=%s session_difficulty=%.8f accepted_block=%d\n",
-                  session_id, submit->job_id, session.extranonce1, submit->extranonce2, submit->ntime, submit->nonce, submit->version_bits.value_or(""), val.final_version, val.coinbase_hash.GetHex(), val.merkle_root.GetHex(), val.block_hash.GetHex(), val.share_target.GetHex(), val.network_target.GetHex(), session.difficulty, val.accepted_block);

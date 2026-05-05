@@ -10,6 +10,7 @@
 
 #include <arith_uint256.h>
 #include <uint256.h>
+#include <primitives/transaction.h>
 
 #include <string>
 
@@ -31,6 +32,7 @@ struct ShareValidationResult {
     uint32_t final_version{0};
     uint256 coinbase_hash;
     uint256 merkle_root;
+    CTransactionRef coinbase_tx;
 };
 
 ShareValidationResult ValidateShare(const SubmitRequest& req, const Session& session, const Job& job, const Config& config);

@@ -16,18 +16,60 @@ std::pair<std::string, std::string> BuildCoinbaseParts(const CBlock& block, size
 {
     CMutableTransaction coinbase{*block.vtx.at(0)};
     assert(!coinbase.vin.empty());
+    // Placeholder must be exactly extranonce1 + extranonce2 size.
+    // The miner inserts extranonce1 (4 bytes) + extranonce2, so do not
+    // double this length or the scriptSig length/push opcode becomes wrong.
     std::vector<unsigned char> marker(extranonce_size, 0x33);
-    marker.insert(marker.end(), extranonce_size, 0x77);
     coinbase.vin[0].scriptSig = CScript() << marker;
     const CTransaction tx{coinbase};
     DataStream serialized_coinbase;
-    serialized_coinbase << TX_WITH_WITNESS(tx);
+    serialized_coinbase << TX_NO_WITNESS(tx);
     const std::string coinbase_hex = HexStr(serialized_coinbase);
     const std::string marker_hex = HexStr(marker);
     const size_t marker_offset = coinbase_hex.find(marker_hex);
     assert(marker_offset != std::string::npos);
     return {coinbase_hex.substr(0, marker_offset), coinbase_hex.substr(marker_offset + marker_hex.size())};
 }
+
+std::string ReverseHexBytes(const std::string& hex)
+{
+    if (hex.size() % 2 != 0) return hex;
+    std::string out;
+    out.reserve(hex.size());
+    for (size_t i = hex.size(); i > 0; i -= 2) {
+        out.append(hex, i - 2, 2);
+    }
+    return out;
+}
+
+std::string StratumHashHex(const uint256& hash)
+{
+    return ReverseHexBytes(hash.GetHex());
+}
+
+
+std::string SwapHexWordBytes(const std::string& hex)
+{
+    if (hex.size() % 8 != 0) return hex;
+    std::string out;
+    out.reserve(hex.size());
+    for (size_t i = 0; i < hex.size(); i += 8) {
+        out.append(hex, i + 6, 2);
+        out.append(hex, i + 4, 2);
+        out.append(hex, i + 2, 2);
+        out.append(hex, i + 0, 2);
+    }
+    return out;
+}
+
+std::string StratumPrevHashHex(const uint256& hash)
+{
+    // ESP-Miner / Bitaxe applies reverse_endianness_per_word() to prevhash.
+    // Send prevhash pre-swapped per 32-bit word so the miner hashes the
+    // real Bitcoin header prevhash bytes.
+    return SwapHexWordBytes(StratumHashHex(hash));
+}
+
 } // namespace
 
 JobManager::JobManager(TemplateProvider& template_provider, uint32_t extranonce2_size, const std::string& payout_address)
@@ -127,12 +169,12 @@ UniValue JobManager::BuildNotify(const Job& job) const
 {
     UniValue params(UniValue::VARR);
     params.push_back(job.id);
-    params.push_back(job.prevhash.GetHex());
+    params.push_back(StratumPrevHashHex(job.prevhash));
     params.push_back(job.coinb1);
     params.push_back(job.coinb2);
 
     UniValue branches(UniValue::VARR);
-    for (const auto& branch : job.merkle_branches) branches.push_back(branch.GetHex());
+    for (const auto& branch : job.merkle_branches) branches.push_back(StratumHashHex(branch));
     params.push_back(std::move(branches));
 
     params.push_back(strprintf("%08x", job.version));

@@ -109,7 +109,7 @@ ShareValidationResult ValidateShare(const SubmitRequest& req, const Session& ses
     try {
         const std::vector<unsigned char> coinbase_raw = ParseHex(job.coinb1 + session.extranonce1 + req.extranonce2 + job.coinb2);
         DataStream ds{coinbase_raw};
-        ds >> TX_WITH_WITNESS(coinbase);
+        ds >> TX_NO_WITNESS(coinbase);
     } catch (...) {
         ret.reject_reason = "invalid-coinbase";
         return ret;
@@ -139,6 +139,7 @@ ShareValidationResult ValidateShare(const SubmitRequest& req, const Session& ses
     ret.merkle_root = merkle;
     ret.share_target = share_target;
     ret.network_target = network_target;
+    if (ret.accepted_block) ret.coinbase_tx = MakeTransactionRef(coinbase);
     if (!ret.accepted_share) ret.reject_reason = "low-difficulty-share";
     return ret;
 }
