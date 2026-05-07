@@ -128,6 +128,17 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         options.coinbase_maturity_long_release_height = release_height;
     }
 
+    if (const auto arg{args.GetArg("-testcoinbasematuritylongexpiry")}; arg) {
+        int64_t expiry;
+        if (!options.coinbase_maturity_long_start_height || !ParseInt64(*arg, &expiry) || expiry <= 1296688602) {
+            throw std::runtime_error("Invalid long coinbase maturity expiry: requires -testcoinbasematuritylong and a time after regtest genesis.");
+        }
+        if (options.rdts_expiry_time && *options.rdts_expiry_time != expiry) {
+            throw std::runtime_error("Long coinbase maturity expiry must match RDTS expiry.");
+        }
+        options.coinbase_maturity_long_expiry = expiry;
+    }
+
     for (const std::string& strDeployment : args.GetArgs("-vbparams")) {
         std::vector<std::string> vDeploymentParams = SplitString(strDeployment, ':');
         if (vDeploymentParams.size() < 3 || 7 < vDeploymentParams.size()) {
