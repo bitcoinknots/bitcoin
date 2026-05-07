@@ -132,6 +132,20 @@ double GetDifficulty(const CBlockIndex& blockindex)
     return dDiff;
 }
 
+double GetDifficultyBlake2b(const CBlockIndex& blockindex)
+{
+    return GetBlockProof(blockindex).getdouble();
+}
+
+void PushDifficulty(UniValue& result, const CBlockIndex& blockindex)
+{
+    if (blockindex.m_header_v2) {
+        result.pushKV("difficulty_blake2b", GetDifficultyBlake2b(blockindex));
+    } else {
+        result.pushKV("difficulty", GetDifficulty(blockindex));
+    }
+}
+
 static int ComputeNextBlockAndDepth(const CBlockIndex& tip, const CBlockIndex& blockindex, const CBlockIndex*& next)
 {
     next = tip.GetAncestor(blockindex.nHeight + 1);
@@ -198,7 +212,7 @@ UniValue blockheaderToJSON(const CBlockIndex& tip, const CBlockIndex& blockindex
     result.pushKV("nonce", blockindex.nNonce);
     result.pushKV("bits", strprintf("%08x", blockindex.nBits));
     result.pushKV("target", GetTarget(blockindex, pow_limit).GetHex());
-    result.pushKV("difficulty", GetDifficulty(blockindex));
+    PushDifficulty(result, blockindex);
     result.pushKV("chainwork", blockindex.nChainWork.GetHex());
     result.pushKV("nTx", blockindex.nTx);
     if (blockindex.nTx > 0) {
@@ -504,26 +518,6 @@ static RPCHelpMan syncwithvalidationinterfacequeue()
     };
 }
 
-static RPCHelpMan getdifficulty()
-{
-    return RPCHelpMan{"getdifficulty",
-                "\nReturns the proof-of-work difficulty as a multiple of the minimum difficulty.\n",
-                {},
-                RPCResult{
-                    RPCResult::Type::NUM, "", "the proof-of-work difficulty as a multiple of the minimum difficulty."},
-                RPCExamples{
-                    HelpExampleCli("getdifficulty", "")
-            + HelpExampleRpc("getdifficulty", "")
-                },
-        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
-{
-    ChainstateManager& chainman = EnsureAnyChainman(request.context);
-    LOCK(cs_main);
-    return GetDifficulty(*CHECK_NONFATAL(chainman.ActiveChain().Tip()));
-},
-    };
-}
-
 static RPCHelpMan getblockfrompeer()
 {
     return RPCHelpMan{
@@ -822,7 +816,8 @@ static RPCHelpMan getblockheader()
                             {RPCResult::Type::NUM, "nonce", "The nonce"},
                             {RPCResult::Type::STR_HEX, "bits", "nBits: compact representation of the block difficulty target"},
                             {RPCResult::Type::STR_HEX, "target", "The difficulty target"},
-                            {RPCResult::Type::NUM, "difficulty", "The difficulty"},
+                            {RPCResult::Type::NUM, "difficulty", /*optional=*/true, "The proof-of-work difficulty as a multiple of the minimum difficulty (only for SHA256d blocks)"},
+                            {RPCResult::Type::NUM, "difficulty_blake2b", /*optional=*/true, "The expected average number of BLAKE2b hashes needed to find this block (only for header-v2 blocks)"},
                             {RPCResult::Type::STR_HEX, "chainwork", "Expected number of hashes required to produce the current chain"},
                             {RPCResult::Type::NUM, "nTx", "The number of transactions in the block, or 0 if only the block header is available (DEPRECATED)"},
                             {RPCResult::Type::NUM, "txcount", /*optional=*/true, "The number of transactions in the block; for entries where only the header has been seen this is the count committed in the v2 header, and it is omitted when unknown"},
@@ -1011,7 +1006,8 @@ static RPCHelpMan getblock()
                     {RPCResult::Type::NUM, "nonce", "The nonce"},
                     {RPCResult::Type::STR_HEX, "bits", "nBits: compact representation of the block difficulty target"},
                     {RPCResult::Type::STR_HEX, "target", "The difficulty target"},
-                    {RPCResult::Type::NUM, "difficulty", "The difficulty"},
+                    {RPCResult::Type::NUM, "difficulty", /*optional=*/true, "The proof-of-work difficulty as a multiple of the minimum difficulty (only for SHA256d blocks)"},
+                    {RPCResult::Type::NUM, "difficulty_blake2b", /*optional=*/true, "The expected average number of BLAKE2b hashes needed to find this block (only for header-v2 blocks)"},
                     {RPCResult::Type::STR_HEX, "chainwork", "Expected number of hashes required to produce the chain up to this block (in hex)"},
                     {RPCResult::Type::NUM, "nTx", "The number of transactions in the block, or 0 if only the block header is available (DEPRECATED)"},
                     {RPCResult::Type::NUM, "txcount", /*optional=*/true, "The number of transactions in the block; for entries where only the header has been seen this is the count committed in the v2 header, and it is omitted when unknown"},
@@ -1839,7 +1835,8 @@ RPCHelpMan getblockchaininfo()
                 {RPCResult::Type::STR, "bestblockhash", "the hash of the currently best block"},
                 {RPCResult::Type::STR_HEX, "bits", "nBits: compact representation of the block difficulty target"},
                 {RPCResult::Type::STR_HEX, "target", "The difficulty target"},
-                {RPCResult::Type::NUM, "difficulty", "the current difficulty"},
+                {RPCResult::Type::NUM, "difficulty", /*optional=*/true, "The proof-of-work difficulty as a multiple of the minimum difficulty (only for SHA256d blocks)"},
+                {RPCResult::Type::NUM, "difficulty_blake2b", /*optional=*/true, "The expected average number of BLAKE2b hashes needed to find the tip block (only for header-v2 blocks)"},
                 {RPCResult::Type::NUM_TIME, "time", "The block time expressed in " + UNIX_EPOCH_TIME},
                 {RPCResult::Type::NUM_TIME, "mediantime", "The median block time expressed in " + UNIX_EPOCH_TIME},
                 {RPCResult::Type::NUM, "verificationprogress", "estimate of verification progress [0..1]"},
@@ -1879,7 +1876,7 @@ RPCHelpMan getblockchaininfo()
     obj.pushKV("bestblockhash", tip.GetBlockHash().GetHex());
     obj.pushKV("bits", strprintf("%08x", tip.nBits));
     obj.pushKV("target", GetTarget(tip, chainman.GetConsensus().powLimit).GetHex());
-    obj.pushKV("difficulty", GetDifficulty(tip));
+    PushDifficulty(obj, tip);
     obj.pushKV("time", tip.GetBlockTime());
     obj.pushKV("mediantime", tip.GetMedianTimePast());
     obj.pushKV("verificationprogress", chainman.GuessVerificationProgress(&tip));
@@ -4063,7 +4060,8 @@ const std::vector<RPCResult> RPCHelpForChainstate{
     {RPCResult::Type::STR_HEX, "bestblockhash", "blockhash of the tip"},
     {RPCResult::Type::STR_HEX, "bits", "nBits: compact representation of the block difficulty target"},
     {RPCResult::Type::STR_HEX, "target", "The difficulty target"},
-    {RPCResult::Type::NUM, "difficulty", "difficulty of the tip"},
+    {RPCResult::Type::NUM, "difficulty", /*optional=*/true, "The proof-of-work difficulty as a multiple of the minimum difficulty (only for SHA256d blocks)"},
+    {RPCResult::Type::NUM, "difficulty_blake2b", /*optional=*/true, "The expected average number of BLAKE2b hashes needed to find the chainstate's tip block (only for header-v2 blocks)"},
     {RPCResult::Type::NUM, "verificationprogress", "progress towards the network tip"},
     {RPCResult::Type::STR_HEX, "snapshot_blockhash", /*optional=*/true, "the base block of the snapshot this chainstate is based on, if any"},
     {RPCResult::Type::NUM, "coins_db_cache_bytes", "size of the coinsdb cache"},
@@ -4107,7 +4105,7 @@ return RPCHelpMan{
         data.pushKV("bestblockhash",         tip->GetBlockHash().GetHex());
         data.pushKV("bits", strprintf("%08x", tip->nBits));
         data.pushKV("target", GetTarget(*tip, chainman.GetConsensus().powLimit).GetHex());
-        data.pushKV("difficulty", GetDifficulty(*tip));
+        PushDifficulty(data, *tip);
         data.pushKV("verificationprogress", chainman.GuessVerificationProgress(tip));
         data.pushKV("coins_db_cache_bytes",  cs.m_coinsdb_cache_size_bytes);
         data.pushKV("coins_tip_cache_bytes", cs.m_coinstip_cache_size_bytes);
@@ -4256,7 +4254,6 @@ void RegisterBlockchainRPCCommands(CRPCTable& t)
         {"blockchain", &getblockhash},
         {"blockchain", &getblockheader},
         {"blockchain", &getchaintips},
-        {"blockchain", &getdifficulty},
         {"blockchain", &getdeploymentinfo},
         {"blockchain", &gettxout},
         {"blockchain", &gettxoutsetinfo},

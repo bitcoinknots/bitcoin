@@ -225,7 +225,12 @@ class TestBitcoinCli(BitcoinTestFramework):
         expected_network_info = f"in {network_info['connections_in']}, out {network_info['connections_out']}, total {network_info['connections']}"
         assert_equal(cli_get_info["Network"], expected_network_info)
         assert_equal(cli_get_info['Proxies'], network_info['networks'][0]['proxy'])
-        assert_equal(Decimal(cli_get_info['Difficulty']), blockchain_info['difficulty'])
+        if 'difficulty' in blockchain_info:
+            assert_equal(Decimal(cli_get_info['Difficulty']), blockchain_info['difficulty'])
+            assert 'Difficulty (BLAKE2b hashes)' not in cli_get_info
+        else:
+            assert_equal(Decimal(cli_get_info['Difficulty (BLAKE2b hashes)']), blockchain_info['difficulty_blake2b'])
+            assert 'Difficulty' not in cli_get_info
         assert_equal(cli_get_info['Chain'], blockchain_info['chain'])
         for field in ['Blocks', 'Headers', 'Time offset (s)', 'Version']:
             assert_scale(int(cli_get_info[field]), expected_scale=0)
