@@ -75,7 +75,10 @@ static int verify_script(const unsigned char *scriptPubKey, unsigned int scriptP
         return set_error(err, bitcoinconsensus_ERR_INVALID_FLAGS);
     }
 
-    if (flags & bitcoinconsensus_SCRIPT_FLAGS_VERIFY_TAPROOT && spentOutputs == nullptr) {
+    // The unified message commits to every spent amount and scriptPubKey, on
+    // inputs carrying no witness as well, so it needs them for the same reason
+    // taproot does.
+    if (flags & (bitcoinconsensus_SCRIPT_FLAGS_VERIFY_TAPROOT | bitcoinconsensus_SCRIPT_FLAGS_VERIFY_UNIFIED_SIGHASH) && spentOutputs == nullptr) {
         return set_error(err, bitcoinconsensus_ERR_SPENT_OUTPUTS_REQUIRED);
     }
 
@@ -106,8 +109,11 @@ static int verify_script(const unsigned char *scriptPubKey, unsigned int scriptP
 
         PrecomputedTransactionData txdata(tx);
 
-        if (spentOutputs != nullptr && flags & bitcoinconsensus_SCRIPT_FLAGS_VERIFY_TAPROOT) {
-            txdata.Init(tx, std::move(spent_outputs));
+        if (spentOutputs != nullptr && flags & (bitcoinconsensus_SCRIPT_FLAGS_VERIFY_TAPROOT | bitcoinconsensus_SCRIPT_FLAGS_VERIFY_UNIFIED_SIGHASH)) {
+            // Forced for the unified message, which needs the commitments even
+            // when nothing in the transaction carries a witness.
+            txdata.Init(tx, std::move(spent_outputs),
+                        /*force=*/!!(flags & bitcoinconsensus_SCRIPT_FLAGS_VERIFY_UNIFIED_SIGHASH));
         }
 
         return VerifyScript(tx.vin[nIn].scriptSig, CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), &tx.vin[nIn].scriptWitness, flags, TransactionSignatureChecker(&tx, nIn, amount, txdata, MissingDataBehavior::FAIL), nullptr);
