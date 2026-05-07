@@ -4,7 +4,7 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test ReducedData Temporary Softfork (RDTS) consensus rules.
 
-This test verifies all 7 consensus rules enforced by DEPLOYMENT_REDUCED_DATA:
+This test verifies all 7 consensus rules enforced by RDTS:
 
 1. Output scriptPubKeys exceeding 34 bytes are invalid (except OP_RETURN up to 83 bytes)
 2. OP_PUSHDATA* with payloads larger than 256 bytes are invalid (except BIP16 redeemScript)
@@ -114,10 +114,11 @@ class ReducedDataTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        # Make DEPLOYMENT_REDUCED_DATA always active (from block 0)
-        # Using start_time=-1 (ALWAYS_ACTIVE) bypasses BIP9 state machine
+        # Activate RDTS at the BLAKE2b fork inside the 120-block warmup, with
+        # a far-future expiry, so every block this test crafts is post-fork
         self.extra_args = [[
-            '-vbparams=reduced_data:-1:999999999999:0',
+            '-testactivationheight=blake2b@100',
+            '-rdtsexpiry=2000000000',
             '-acceptnonstdtxn=1',
         ]]
 
@@ -302,7 +303,7 @@ class ReducedDataTest(BitcoinTestFramework):
 
         Bitcoin currently defines witness v0 (P2WPKH/P2WSH) and v1 (Taproot).
         Versions v2-v16 are reserved for future upgrades and are currently undefined.
-        After DEPLOYMENT_REDUCED_DATA, spending these undefined versions is invalid.
+        Under RDTS, spending these undefined versions is invalid.
         """
         self.log.info("Testing undefined witness version rejection...")
 
@@ -366,7 +367,7 @@ class ReducedDataTest(BitcoinTestFramework):
 
         # Mine the funding transaction in a block
         block_height = node.getblockcount() + 1
-        block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1)
+        block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1, height=block_height, header_v2=True)
         block.vtx.append(funding_tx)
         add_witness_commitment(block)
         block.solve()
@@ -395,7 +396,7 @@ class ReducedDataTest(BitcoinTestFramework):
         assert_equal(result['allowed'], True)
         self.log.info("  ✓ Taproot key-path spend without annex: ACCEPTED")
 
-        # Test 4.2: Taproot key-path spend WITH annex (invalid after DEPLOYMENT_REDUCED_DATA)
+        # Test 4.2: Taproot key-path spend WITH annex (invalid under RDTS)
         self.log.info("  Test 4.2: Taproot key-path spend with annex (should be rejected)")
 
         # Create another funding transaction
@@ -404,7 +405,7 @@ class ReducedDataTest(BitcoinTestFramework):
 
         # Mine the funding transaction in a block
         block_height2 = node.getblockcount() + 1
-        block2 = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height2), int(node.getblockheader(node.getbestblockhash())['time']) + 1)
+        block2 = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height2), int(node.getblockheader(node.getbestblockhash())['time']) + 1, height=block_height2, header_v2=True)
         block2.vtx.append(funding_tx2)
         add_witness_commitment(block2)
         block2.solve()
@@ -474,7 +475,7 @@ class ReducedDataTest(BitcoinTestFramework):
         funding_txid_valid = funding_tx_valid.rehash()
 
         block_height = node.getblockcount() + 1
-        block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1)
+        block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1, height=block_height, header_v2=True)
         block.vtx.append(funding_tx_valid)
         add_witness_commitment(block)
         block.solve()
@@ -518,7 +519,7 @@ class ReducedDataTest(BitcoinTestFramework):
         funding_txid_invalid = funding_tx_invalid.rehash()
 
         block_height = node.getblockcount() + 1
-        block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1)
+        block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1, height=block_height, header_v2=True)
         block.vtx.append(funding_tx_invalid)
         add_witness_commitment(block)
         block.solve()
@@ -570,7 +571,7 @@ class ReducedDataTest(BitcoinTestFramework):
         funding_txid_valid = funding_tx_valid.rehash()
 
         block_height = node.getblockcount() + 1
-        block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1)
+        block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1, height=block_height, header_v2=True)
         block.vtx.append(funding_tx_valid)
         add_witness_commitment(block)
         block.solve()
@@ -610,7 +611,7 @@ class ReducedDataTest(BitcoinTestFramework):
             funding_txid_invalid = funding_tx_invalid.rehash()
 
             block_height = node.getblockcount() + 1
-            block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1)
+            block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1, height=block_height, header_v2=True)
             block.vtx.append(funding_tx_invalid)
             add_witness_commitment(block)
             block.solve()
@@ -643,7 +644,7 @@ class ReducedDataTest(BitcoinTestFramework):
         privkey = generate_privkey()
         internal_pubkey, _ = compute_xonly_pubkey(privkey)
 
-        # Test 7.1: Tapscript with OP_IF (invalid in Tapscript under DEPLOYMENT_REDUCED_DATA)
+        # Test 7.1: Tapscript with OP_IF (invalid in Tapscript under RDTS)
         self.log.info("  Test 7.1: Tapscript with OP_IF (should be rejected)")
 
         # Create a Tapscript with OP_IF: OP_1 OP_IF OP_1 OP_ENDIF
@@ -656,7 +657,7 @@ class ReducedDataTest(BitcoinTestFramework):
         funding_txid_if = funding_tx_if.rehash()
 
         block_height = node.getblockcount() + 1
-        block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1)
+        block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1, height=block_height, header_v2=True)
         block.vtx.append(funding_tx_if)
         add_witness_commitment(block)
         block.solve()
@@ -680,7 +681,7 @@ class ReducedDataTest(BitcoinTestFramework):
         assert_equal(result_if['allowed'], False)
         self.log.info(f"  ✓ Tapscript with OP_IF: REJECTED ({result_if['reject-reason']})")
 
-        # Test 7.2: Tapscript with OP_NOTIF (invalid in Tapscript under DEPLOYMENT_REDUCED_DATA)
+        # Test 7.2: Tapscript with OP_NOTIF (invalid in Tapscript under RDTS)
         self.log.info("  Test 7.2: Tapscript with OP_NOTIF (should be rejected)")
 
         # Create a Tapscript with OP_NOTIF: OP_0 OP_NOTIF OP_1 OP_ENDIF
@@ -693,7 +694,7 @@ class ReducedDataTest(BitcoinTestFramework):
         funding_txid_notif = funding_tx_notif.rehash()
 
         block_height = node.getblockcount() + 1
-        block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1)
+        block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1, height=block_height, header_v2=True)
         block.vtx.append(funding_tx_notif)
         add_witness_commitment(block)
         block.solve()
@@ -864,7 +865,7 @@ class ReducedDataTest(BitcoinTestFramework):
         funding_txid = funding_tx.rehash()
 
         block_height = node.getblockcount() + 1
-        block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1)
+        block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1, height=block_height, header_v2=True)
         block.vtx.append(funding_tx)
         add_witness_commitment(block)
         block.solve()
@@ -904,7 +905,7 @@ class ReducedDataTest(BitcoinTestFramework):
             tip_header = node.getblockheader(tip)
             block_time = tip_header['time'] + 1
             coinbase = create_coinbase(height, script_pubkey=script_pubkey)
-            block = create_block(int(tip, 16), coinbase, ntime=block_time)
+            block = create_block(int(tip, 16), coinbase, ntime=block_time, height=height, header_v2=True)
             add_witness_commitment(block)
             block.solve()
             return block
@@ -947,7 +948,7 @@ class ReducedDataTest(BitcoinTestFramework):
         tip_header = node.getblockheader(tip)
         block_time = tip_header['time'] + 1
         coinbase = create_coinbase(height, extra_output_script=script_opreturn_83)
-        block_opreturn_valid = create_block(int(tip, 16), coinbase, ntime=block_time)
+        block_opreturn_valid = create_block(int(tip, 16), coinbase, ntime=block_time, height=height, header_v2=True)
         add_witness_commitment(block_opreturn_valid)
         block_opreturn_valid.solve()
 
@@ -969,7 +970,7 @@ class ReducedDataTest(BitcoinTestFramework):
         tip_header = node.getblockheader(tip)
         block_time = tip_header['time'] + 1
         coinbase = create_coinbase(height, extra_output_script=script_opreturn_84)
-        block_opreturn_invalid = create_block(int(tip, 16), coinbase, ntime=block_time)
+        block_opreturn_invalid = create_block(int(tip, 16), coinbase, ntime=block_time, height=height, header_v2=True)
         add_witness_commitment(block_opreturn_invalid)
         block_opreturn_invalid.solve()
 
@@ -988,7 +989,7 @@ class ReducedDataTest(BitcoinTestFramework):
         p2a_value = p2a_funding.vout[0].nValue
 
         block_height = node.getblockcount() + 1
-        block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1)
+        block = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1, height=block_height, header_v2=True)
         block.vtx.append(p2a_funding)
         add_witness_commitment(block)
         block.solve()
@@ -1007,7 +1008,7 @@ class ReducedDataTest(BitcoinTestFramework):
         p2a_spend.rehash()
 
         block_height = node.getblockcount() + 1
-        block_bad = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1)
+        block_bad = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1, height=block_height, header_v2=True)
         block_bad.vtx.append(p2a_spend)
         add_witness_commitment(block_bad)
         block_bad.solve()
@@ -1027,7 +1028,7 @@ class ReducedDataTest(BitcoinTestFramework):
         p2a_spend_empty.rehash()
 
         block_height = node.getblockcount() + 1
-        block_good = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1)
+        block_good = create_block(int(node.getbestblockhash(), 16), create_coinbase(block_height), int(node.getblockheader(node.getbestblockhash())['time']) + 1, height=block_height, header_v2=True)
         block_good.vtx.append(p2a_spend_empty)
         add_witness_commitment(block_good)
         block_good.solve()
