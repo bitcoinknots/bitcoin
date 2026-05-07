@@ -49,6 +49,7 @@ PATTERN_AGENT = re.compile(
     r"|26\.(0|1|2|99)\.0"
     r"|27\.(0|1|2|99)\.0"
     r"|28\.(0|1|99)\.0"
+    r"|29\."
     r")")
 
 def parseline(line: str) -> Union[dict, None]:
@@ -227,9 +228,10 @@ def main():
     # Enforce minimal number of blocks.
     ips = [ip for ip in ips if ip['blocks'] >= args.minblocks]
     print(f'{ip_stats(ips):s} Enforce minimal number of blocks', file=sys.stderr)
-    # Require service bit 1.
-    ips = [ip for ip in ips if (ip['service'] & 1) == 1]
-    print(f'{ip_stats(ips):s} Require service bit 1', file=sys.stderr)
+    # Require service bits: NODE_NETWORK (1 << 0), NODE_WITNESS (1 << 3), NODE_REDUCED_DATA (1 << 27)
+    required_services = (1 << 0) | (1 << 3) | (1 << 27)  # 0x8000009
+    ips = [ip for ip in ips if (ip['service'] & required_services) == required_services]
+    print(f'{ip_stats(ips):s} Require service bits: NODE_NETWORK, NODE_WITNESS, NODE_REDUCED_DATA', file=sys.stderr)
     # Require at least 50% 30-day uptime for clearnet, onion and i2p; 10% for cjdns
     req_uptime = {
         'ipv4': 50,
