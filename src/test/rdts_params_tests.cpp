@@ -9,6 +9,7 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <algorithm>
 #include <limits>
 
 BOOST_FIXTURE_TEST_SUITE(rdts_params_tests, BasicTestingSetup)
@@ -58,6 +59,35 @@ BOOST_AUTO_TEST_CASE(rdts_mainnet_schedule)
     // activated at, 52416 its active duration: the expiry above was chosen to
     // match that window, so a fork height past it needs a new expiry.
     BOOST_CHECK(c.Blake2bHeight == std::numeric_limits<int>::max() || c.Blake2bHeight < 965664 + 52416);
+}
+
+// Testnet4: the expiry was extended after the original one (October 13th,
+// 2026 15:00:00 UTC) had passed. Pin the new date, that the rule applies
+// again at the old boundary, and the revalidation deployment that makes a
+// node which connected blocks without the rule check them again.
+BOOST_AUTO_TEST_CASE(rdts_testnet4_extension)
+{
+    const auto testnet4{CreateChainParams(ArgsManager{}, ChainType::TESTNET4)};
+    const Consensus::Params& c{testnet4->GetConsensus()};
+    constexpr int64_t ORIGINAL_EXPIRY{1791903600};
+    constexpr int FIRST_UNCHECKED_HEIGHT{152963};
+    BOOST_CHECK_EQUAL(c.RdtsExpiryTime, 1806537600); // April 1st, 2027 00:00 UTC
+    BOOST_CHECK(c.RdtsActiveAt(FIRST_UNCHECKED_HEIGHT, ORIGINAL_EXPIRY));
+    BOOST_CHECK(c.RdtsActiveAt(FIRST_UNCHECKED_HEIGHT, c.RdtsExpiryTime - 1));
+    BOOST_CHECK(!c.RdtsActiveAt(FIRST_UNCHECKED_HEIGHT, c.RdtsExpiryTime));
+
+    const auto& deployments{c.chainstate_revalidation_deployments};
+    const auto it{std::find_if(deployments.begin(), deployments.end(),
+                               [](const auto& d) { return d.name == "rdts_testnet4_extension_20270401"; })};
+    BOOST_REQUIRE(it != deployments.end());
+    BOOST_CHECK_EQUAL(it->start_height, FIRST_UNCHECKED_HEIGHT);
+    BOOST_CHECK_EQUAL(it->stop_height, std::numeric_limits<int>::max());
+
+    // Mainnet keeps its own schedule and needs no revalidation.
+    const auto mainnet{CreateChainParams(ArgsManager{}, ChainType::MAIN)};
+    for (const auto& d : mainnet->GetConsensus().chainstate_revalidation_deployments) {
+        BOOST_CHECK(d.name != "rdts_testnet4_extension_20270401");
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

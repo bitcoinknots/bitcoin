@@ -428,13 +428,25 @@ public:
 
         consensus.Blake2bHeight = 150308;
         m_stale_peer_common_height = consensus.Blake2bHeight - 1;
-        consensus.RdtsExpiryTime = 1791903600; // October 13th, 2026 15:00:00 UTC
+        // Extended from 1791903600 (October 13th, 2026 15:00:00 UTC) after
+        // that time had passed; see the revalidation deployment below.
+        consensus.RdtsExpiryTime = 1806537600; // April 1st, 2027 00:00:00 UTC
 
         consensus.CoinbaseMaturityLongStartHeight = 151406;
         consensus.CoinbaseMaturityLongEnforceHeight = 151550;
         consensus.CoinbaseMaturityLongReleaseHeight = 158111;
         consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
         AddLongCoinbaseMaturityRevalidationDeployment(consensus);
+
+        // Block 152963 is the first whose parent's median-time-past had
+        // reached the previous RDTS expiry. Nodes that connected it, or any
+        // later block, with the previous parameters applied no RDTS rule to
+        // them and must check them again.
+        consensus.chainstate_revalidation_deployments.push_back({
+            .name = "rdts_testnet4_extension_20270401",
+            .start_height = 152963,
+            .stop_height = std::numeric_limits<int>::max(),
+        });
 
         consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000001d6dce8651b6094e4c1"};
         consensus.defaultAssumeValid = uint256{"0000000000003ed4f08dbdf6f7d6b271a6bcffce25675cb40aa9fa43179a89f3"}; // 72600
