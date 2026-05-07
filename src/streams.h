@@ -383,7 +383,17 @@ class AutoFile
 protected:
     std::FILE* m_file;
     Obfuscation m_obfuscation;
-    std::optional<int64_t> m_position;
+    /** The file's position, or nullopt until position() can ask the file for it */
+    mutable std::optional<int64_t> m_position_cache;
+
+    std::optional<int64_t> position() const
+    {
+        if (!m_position_cache.has_value() && !IsNull()) [[unlikely]] {
+            auto pos{FileTell64(m_file)};
+            if (pos >= 0) m_position_cache = pos;
+        }
+        return m_position_cache;
+    }
     bool m_was_written{false};
 
 public:
