@@ -141,6 +141,33 @@ class ImportPrunedFundsTest(BitcoinTestFramework):
         mb.header.nTime += 1  # modify arbitrary block header field to change block hash
         assert_raises_rpc_error(-5, "Block not found in chain", w1.importprunedfunds, rawtxn1, mb.serialize().hex())
 
+        self.log.info("Test removeprunedfunds with conflicting transactions")
+        node = self.nodes[0]
+
+        # Create a transaction
+        utxo = node.listunspent()[0]
+        addr = node.getnewaddress()
+        tx1_id = node.send(outputs=[{addr: 1}], inputs=[utxo])["txid"]
+        tx1_fee = node.gettransaction(tx1_id)["fee"]
+
+        # Create a conflicting tx with a larger fee (tx1_fee is negative)
+        output_value = utxo["amount"] + tx1_fee - Decimal("0.00001")
+        raw_tx2 = node.createrawtransaction(inputs=[utxo], outputs=[{addr: output_value}])
+        signed_tx2 = node.signrawtransactionwithwallet(raw_tx2)
+        tx2_id = node.sendrawtransaction(signed_tx2["hex"])
+        assert tx2_id != tx1_id
+
+        # Both txs should be in the wallet, tx2 replaced tx1 in mempool
+        assert tx1_id in [tx["txid"] for tx in node.listtransactions()]
+        assert tx2_id in [tx["txid"] for tx in node.listtransactions()]
+
+        # Remove the replaced tx from wallet
+        node.removeprunedfunds(tx1_id)
+
+        # The UTXO should still be considered spent (by tx2)
+        available_utxos = [u["txid"] for u in node.listunspent(minconf=0)]
+        assert utxo["txid"] not in available_utxos, "UTXO should still be spent by conflicting tx"
+
 
 if __name__ == '__main__':
     ImportPrunedFundsTest(__file__).main()
