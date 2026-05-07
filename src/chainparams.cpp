@@ -7,6 +7,7 @@
 
 #include <chainparamsbase.h>
 #include <common/args.h>
+#include <consensus/consensus.h>
 #include <consensus/params.h>
 #include <deploymentinfo.h>
 #include <logging.h>
@@ -98,6 +99,33 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
             throw std::runtime_error("-blake2b_headline requires -testactivationheight=blake2b@<height>");
         }
         options.blake2b_headline.emplace(arg->begin(), arg->end());
+    }
+
+    if (const auto arg{args.GetArg("-testcoinbasematuritylong")}; arg) {
+        const auto values{SplitString(*arg, ':')};
+        if (values.size() != 3) {
+            throw std::runtime_error(strprintf("Invalid format (%s) for -testcoinbasematuritylong=<start_height>:<enforce_height>:<release_height>.", *arg));
+        }
+
+        int32_t start_height;
+        int32_t enforce_height;
+        int32_t release_height;
+        if (!ParseInt32(values[0], &start_height) || start_height < 0 || start_height >= std::numeric_limits<int>::max()) {
+            throw std::runtime_error(strprintf("Invalid start height (%s) for -testcoinbasematuritylong=<start_height>:<enforce_height>:<release_height>.", values[0]));
+        }
+        if (!ParseInt32(values[1], &enforce_height) || enforce_height < 2 || enforce_height >= std::numeric_limits<int>::max()) {
+            throw std::runtime_error(strprintf("Invalid enforce height (%s) for -testcoinbasematuritylong=<start_height>:<enforce_height>:<release_height>.", values[1]));
+        }
+        if (!ParseInt32(values[2], &release_height) || release_height <= start_height || release_height <= enforce_height || release_height >= std::numeric_limits<int>::max()) {
+            throw std::runtime_error(strprintf("Invalid release height (%s) for -testcoinbasematuritylong=<start_height>:<enforce_height>:<release_height>.", values[2]));
+        }
+        if (release_height - start_height <= COINBASE_MATURITY) {
+            throw std::runtime_error(strprintf("Invalid height range (%s) for -testcoinbasematuritylong=<start_height>:<enforce_height>:<release_height>: release_height - start_height must exceed COINBASE_MATURITY.", *arg));
+        }
+
+        options.coinbase_maturity_long_start_height = start_height;
+        options.coinbase_maturity_long_enforce_height = enforce_height;
+        options.coinbase_maturity_long_release_height = release_height;
     }
 
     for (const std::string& strDeployment : args.GetArgs("-vbparams")) {
