@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <common/sighash_rules.h>
 #include <chainparams.h>
 #include <common/args.h>
 #include <common/system.h>
@@ -85,7 +86,7 @@ util::Result<void> ExternalSignerScriptPubKeyMan::DisplayAddress(const CTxDestin
 }
 
 // If sign is true, transaction must previously have been filled
-std::optional<PSBTError> ExternalSignerScriptPubKeyMan::FillPSBT(PartiallySignedTransaction& psbt, const PrecomputedTransactionData& txdata, int sighash_type, bool sign, bool bip32derivs, int* n_signed, bool finalize) const
+std::optional<PSBTError> ExternalSignerScriptPubKeyMan::FillPSBT(PartiallySignedTransaction& psbt, const PrecomputedTransactionData& txdata, int sighash_type, bool sign, bool bip32derivs, int* n_signed, bool finalize, std::vector<bilingual_str>* warnings) const
 {
     if (!sign) {
         return DescriptorScriptPubKeyMan::FillPSBT(psbt, txdata, sighash_type, false, bip32derivs, n_signed, finalize);
@@ -98,6 +99,18 @@ std::optional<PSBTError> ExternalSignerScriptPubKeyMan::FillPSBT(PartiallySigned
         complete &= PSBTInputSigned(input);
     }
     if (complete) return {};
+
+    // The device signs whatever it understands, and no external signer knows
+    // about the opt-in bit yet, so what comes back is a legacy signature. It is
+    // still valid, it simply carries no replay protection, and the caller asked
+    // for the opposite. Say so rather than let the difference pass unnoticed.
+    if (SighashRulesForSigning() == SighashRules::UNIFIED) {
+        const bilingual_str warning = _("External signer cannot produce an opt-in signature. "
+                                        "Signing under the legacy rules, so this transaction "
+                                        "carries no replay protection.");
+        LogWarning("%s\n", warning.original);
+        if (warnings) warnings->push_back(warning);
+    }
 
     auto signer{GetExternalSigner2()};
     if (!signer) {
