@@ -4,6 +4,7 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 export LC_ALL=C
+set -eo pipefail
 TOPDIR=${TOPDIR:-$(git rev-parse --show-toplevel)}
 BUILDDIR=${BUILDDIR:-$TOPDIR/build}
 BINDIR=${BINDIR:-$BUILDDIR/bin}
@@ -13,8 +14,13 @@ EXAMPLE_CONF_FILE=${EXAMPLE_CONF_FILE:-$SHARE_EXAMPLES_DIR/bitcoin.conf}
 
 [ ! -x "$BITCOIND" ] && echo "$BITCOIND not found or not executable." && exit 1
 
+# bitcoind reads and creates files in its datadir before handling -version and
+# -help, so point it at a throwaway directory rather than the default one.
+DATADIR=$(mktemp -d)
+trap 'rm -rf "$DATADIR"' EXIT
+
 DIRTY=""
-VERSION_OUTPUT=$($BITCOIND --version)
+VERSION_OUTPUT=$($BITCOIND -datadir="$DATADIR" --version)
 if [[ $VERSION_OUTPUT == *"dirty"* ]]; then
   DIRTY="${DIRTY}${BITCOIND}\n"
 fi
@@ -49,7 +55,7 @@ EOF
 # parse the output from bitcoind --help
 # adding newlines is a bit funky to ensure portability for BSD
 # see here for more details: https://stackoverflow.com/a/24575385
-${BITCOIND} --help \
+${BITCOIND} -datadir="$DATADIR" --help \
     | sed '1,/Options:/d' \
     | sed -E '/^[[:space:]]{2}-help/,/^[[:space:]]*$/d' \
     | sed -E 's/^[[:space:]]{2}\-/#/' \
