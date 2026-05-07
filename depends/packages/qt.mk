@@ -1,9 +1,9 @@
 package=qt
-$(package)_version=5.15.16
+$(package)_version=5.15.19
 $(package)_download_path=https://download.qt.io/archive/qt/5.15/$($(package)_version)/submodules
 $(package)_suffix=everywhere-opensource-src-$($(package)_version).tar.xz
 $(package)_file_name=qtbase-$($(package)_suffix)
-$(package)_sha256_hash=b04815058c18058b6ba837206756a2c87d1391f07a0dcb0dd314f970fd041592
+$(package)_sha256_hash=51e91c73abacab81e64efd01bf95794e79c0e605ad80947a024769f0dd620a32
 $(package)_linux_dependencies=freetype fontconfig libxcb libxkbcommon libxcb_util libxcb_util_render libxcb_util_keysyms libxcb_util_image libxcb_util_wm
 $(package)_qt_libs=corelib network widgets gui plugins testlib
 $(package)_linguist_tools = lrelease lupdate lconvert
@@ -24,10 +24,10 @@ $(package)_patches += windows_lto.patch
 $(package)_patches += darwin_no_libm.patch
 
 $(package)_qttranslations_file_name=qttranslations-$($(package)_suffix)
-$(package)_qttranslations_sha256_hash=415dbbb82a75dfc9a7be969e743bee54c0e6867be37bce4cf8f03da39f20112a
+$(package)_qttranslations_sha256_hash=967e0d259af13f47e853f183cffc9671cc054380188fee28402f6425132a2c7b
 
 $(package)_qttools_file_name=qttools-$($(package)_suffix)
-$(package)_qttools_sha256_hash=1cab11887faca54af59f4995ee435c9ad98d194e9e6889c846692c8b6815fc1c
+$(package)_qttools_sha256_hash=2694af886130d63b8a42bcd138f4035fd8108273ebd16781f87300da352f1aa6
 
 $(package)_extra_sources  = $($(package)_qttranslations_file_name)
 $(package)_extra_sources += $($(package)_qttools_file_name)
@@ -226,7 +226,6 @@ define $(package)_preprocess_cmds
   patch -p1 -i $($(package)_patch_dir)/qtbase-moc-ignore-gcc-macro.patch && \
   patch -p1 -i $($(package)_patch_dir)/memory_resource.patch && \
   patch -p1 -i $($(package)_patch_dir)/no_warnings_for_symbols.patch && \
-  patch -p1 -i $($(package)_patch_dir)/clang_18_libpng.patch && \
   patch -p1 -i $($(package)_patch_dir)/rcc_hardcode_timestamp.patch && \
   patch -p1 -i $($(package)_patch_dir)/duplicate_lcqpafonts.patch && \
   patch -p1 -i $($(package)_patch_dir)/utc_from_string_no_optimize.patch && \
