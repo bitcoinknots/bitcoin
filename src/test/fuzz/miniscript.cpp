@@ -283,7 +283,7 @@ struct SatisfierContext : ParserContext {
 const struct CheckerContext: BaseSignatureChecker {
     // Signature checker methods. Checks the right dummy signature is used.
     bool CheckECDSASignature(const std::vector<unsigned char>& sig, const std::vector<unsigned char>& vchPubKey,
-                             const CScript& scriptCode, SigVersion sigversion) const override
+                             const CScript& scriptCode, SigVersion sigversion, SighashRules sighash_rules = SighashRules::LEGACY) const override
     {
         const CPubKey key{vchPubKey};
         const auto it = TEST_DATA.dummy_sigs.find(key);
@@ -291,7 +291,7 @@ const struct CheckerContext: BaseSignatureChecker {
         return it->second.first == sig;
     }
     bool CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey, SigVersion,
-                               ScriptExecutionData&, ScriptError*) const override {
+                               ScriptExecutionData&, ScriptError*, SighashRules) const override {
         XOnlyPubKey pk{pubkey};
         auto it = TEST_DATA.schnorr_sigs.find(pk);
         if (it == TEST_DATA.schnorr_sigs.end()) return false;

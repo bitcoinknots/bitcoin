@@ -7,6 +7,7 @@
 
 #include <addresstype.h>
 #include <consensus/amount.h>
+#include <script/interpreter.h>
 #include <map>
 #include <optional>
 #include <string>

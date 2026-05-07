@@ -57,7 +57,7 @@ static CMutableTransaction TestSimpleSpend(const CTransaction& from, uint32_t in
     std::map<COutPoint, Coin> coins;
     coins[mtx.vin[0].prevout].out = from.vout[index];
     std::map<int, bilingual_str> input_errors;
-    BOOST_CHECK(SignTransaction(mtx, &keystore, coins, SIGHASH_ALL, input_errors));
+    BOOST_CHECK(SignTransaction(mtx, &keystore, coins, SIGHASH_ALL, input_errors, /*inputs_amount_sum=*/nullptr, /*sighash_rules=*/SighashRules::LEGACY));
     return mtx;
 }
 
