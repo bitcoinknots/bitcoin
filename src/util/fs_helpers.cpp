@@ -42,6 +42,7 @@
 #else
 #include <io.h> /* For _get_osfhandle, _chsize */
 #include <shlobj.h> /* For SHGetSpecialFolderPathW */
+#include <windows.h>
 #endif // WIN32
 
 /** Mutex to protect dir_locks. */
@@ -393,4 +394,17 @@ bool IsDirWritable(const fs::path& dir_path)
         return true;
     }
     return false;
+}
+
+bool IsSymlink(const fs::path& path)
+{
+#ifdef WIN32
+    DWORD file_attrs = GetFileAttributesW(path.wstring().c_str());
+    if (file_attrs == INVALID_FILE_ATTRIBUTES) {
+        throw fs::filesystem_error("Unable to get file attributes", fs::PathToString(path), std::make_error_code(std::errc::invalid_argument));
+    }
+    return (file_attrs & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+#else
+    return fs::is_symlink(path);
+#endif
 }
