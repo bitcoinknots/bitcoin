@@ -850,6 +850,21 @@ std::vector<CAddress> AddrManImpl::GetAddr_(size_t max_addresses, size_t max_pct
     return addresses;
 }
 
+size_t AddrManImpl::CountAddr_(ServiceFlags require, size_t max) const
+{
+    AssertLockHeld(cs);
+
+    if (max == 0) return 0;
+    const auto now{Now<NodeSeconds>()};
+    size_t count{0};
+    for (const auto& [id, ai] : mapInfo) {
+        if ((ai.nServices & require) != require) continue;
+        if (ai.IsTerrible(now)) continue;
+        if (++count >= max) break;
+    }
+    return count;
+}
+
 std::vector<std::pair<AddrInfo, AddressPosition>> AddrManImpl::GetEntries_(bool from_tried) const
 {
     AssertLockHeld(cs);
@@ -1235,6 +1250,15 @@ std::vector<CAddress> AddrManImpl::GetAddr(size_t max_addresses, size_t max_pct,
     return addresses;
 }
 
+size_t AddrManImpl::CountAddr(ServiceFlags require, size_t max) const
+{
+    LOCK(cs);
+    Check();
+    auto count = CountAddr_(require, max);
+    Check();
+    return count;
+}
+
 std::vector<std::pair<AddrInfo, AddressPosition>> AddrManImpl::GetEntries(bool from_tried) const
 {
     LOCK(cs);
@@ -1332,6 +1356,11 @@ std::pair<CAddress, NodeSeconds> AddrMan::Select(bool new_only, const std::unord
 std::vector<CAddress> AddrMan::GetAddr(size_t max_addresses, size_t max_pct, std::optional<Network> network, const bool filtered) const
 {
     return m_impl->GetAddr(max_addresses, max_pct, network, filtered);
+}
+
+size_t AddrMan::CountAddr(ServiceFlags require, size_t max) const
+{
+    return m_impl->CountAddr(require, max);
 }
 
 std::vector<std::pair<AddrInfo, AddressPosition>> AddrMan::GetEntries(bool use_tried) const
