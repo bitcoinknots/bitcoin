@@ -453,11 +453,20 @@ void CTxMemPool::Apply(ChangeSet* changeset)
             ancestors = *Assume(changeset->CalculateMemPoolAncestors(tx_entry, Limits::NoLimits()));
         }
         // First splice this entry into mapTx.
+#if BOOST_VERSION >= 107400
         auto node_handle = changeset->m_to_add.extract(tx_entry);
         auto result = mapTx.insert(std::move(node_handle));
 
         Assume(result.inserted);
         txiter it = result.position;
+#else
+        // Boost 1.73 didn't support node extraction, so we have to copy
+        auto result = mapTx.emplace(CTxMemPoolEntry::ExplicitCopy, *tx_entry);
+        changeset->m_to_add.erase(tx_entry);
+
+        Assume(result.second);
+        txiter it = result.first;
+#endif
 
         // Now update the entry for ancestors/descendants.
         if (ancestors.has_value()) {
