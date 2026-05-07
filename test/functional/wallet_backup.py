@@ -227,7 +227,7 @@ class WalletBackupTest(BitcoinTestFramework):
             os.rename(node.wallets_path / "wallet.dat", node.wallets_path / "default.wallet.dat")
         backup_file = self.nodes[0].datadir_path / 'wallet.bak'
         wallet_name = ""
-        error_message = "Wallet loading failed. Prune: last wallet synchronisation goes beyond pruned data. You need to -reindex (download the whole blockchain again in case of pruned node)"
+        error_message = "Wallet loading failed. Prune: last wallet synchronisation goes beyond pruned data. You need to -reindex (download the whole blockchain again in case of a pruned node)"
         assert_raises_rpc_error(-4, error_message, node.restorewallet, wallet_name, backup_file)
         assert node.wallets_path.exists() # ensure the wallets dir exists
         if not self.options.descriptors:
