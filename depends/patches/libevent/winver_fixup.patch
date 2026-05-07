@@ -58,7 +58,7 @@ index 2ec80560..8647f72b 100644
  #endif
  
 diff --git a/evutil.c b/evutil.c
-index 9817f086..8537ffe8 100644
+index bb06087a..a613fa2b 100644
 --- a/evutil.c
 +++ b/evutil.c
 @@ -24,6 +24,14 @@
@@ -67,8 +67,8 @@ index 9817f086..8537ffe8 100644
  
 +#ifdef _WIN32
 +#ifndef _WIN32_WINNT
-+/* For structs needed by GetAdaptersAddresses */
-+#define _WIN32_WINNT 0x0501
++/* For structs needed by GetAdaptersAddresses and AI_NUMERICSERV */
++#define _WIN32_WINNT 0x0600
 +#endif
 +#define WIN32_LEAN_AND_MEAN
 +#endif
@@ -76,22 +76,20 @@ index 9817f086..8537ffe8 100644
  #include "event2/event-config.h"
  #include "evconfig-private.h"
  
-@@ -31,15 +39,10 @@
+@@ -31,13 +39,7 @@
  #include <winsock2.h>
  #include <winerror.h>
  #include <ws2tcpip.h>
+-#ifndef _WIN32_WINNT
+-/* For structs needed by GetAdaptersAddresses and AI_NUMERICSERV */
+-#define _WIN32_WINNT 0x0600
+-#endif
 -#define WIN32_LEAN_AND_MEAN
  #include <windows.h>
 -#undef WIN32_LEAN_AND_MEAN
  #include <io.h>
  #include <tchar.h>
  #include <process.h>
--#undef _WIN32_WINNT
--/* For structs needed by GetAdaptersAddresses */
--#define _WIN32_WINNT 0x0501
- #include <iphlpapi.h>
- #include <netioapi.h>
- #endif
 diff --git a/listener.c b/listener.c
 index f5c00c9c..d1080e76 100644
 --- a/listener.c

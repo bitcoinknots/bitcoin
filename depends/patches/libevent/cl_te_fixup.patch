@@ -1,0 +1,54 @@
+Tolerate requests sending both Content-Length and Transfer-Encoding.
+
+libevent 2.1.13 rejects these outright. RFC 9112 section 6.3 also permits
+processing the request according to the Transfer-Encoding alone, provided
+the connection is closed afterwards, which avoids breaking existing RPC
+clients that send both headers.
+
+Only requests whose Transfer-Encoding actually frames the body are accepted
+this way; duplicate Content-Length and non-chunked encodings stay ambiguous
+and are still rejected.
+
+diff --git a/http.c b/http.c
+index 18775872..cc115061 100644
+--- a/http.c
++++ b/http.c
+@@ -2267,11 +2267,13 @@ evhttp_validate_len_and_encoding_(struct evhttp_request *req)
+ 	struct evkeyval *h = NULL;
+ 	int is_chunked = 0;
+ 	int dup_cl = 0;
++	int te_and_cl = 0;
+ 
+-	if (evhttp_find_header(headers, "Transfer-Encoding") != NULL &&
+-	    evhttp_find_unique_header(headers, "Content-Length", &dup_cl) != NULL) {
+-		/* Both TE and CL were present: Not allowed. */
+-		return -1;
++	if (evhttp_find_unique_header(headers, "Content-Length", &dup_cl) != NULL &&
++	    evhttp_find_header(headers, "Transfer-Encoding") != NULL) {
++		/* Both TE and CL were present. Defer the decision until we know
++		 * whether the Transfer-Encoding actually frames the body. */
++		te_and_cl = 1;
+ 	}
+ 	if (dup_cl) {
+ 		/* CL was present twice: Not allowed.
+@@ -2307,6 +2309,20 @@ evhttp_validate_len_and_encoding_(struct evhttp_request *req)
+ 
+ 	req->chunked = is_chunked;
+ 
++	if (te_and_cl) {
++		/* RFC 9112 section 6.3 permits processing such a message
++		 * according to the Transfer-Encoding alone, as long as the
++		 * connection is closed afterwards. Only do so for requests
++		 * whose encoding actually frames the body; anything else stays
++		 * ambiguous and is still rejected. */
++		if (!is_chunked || req->kind != EVHTTP_REQUEST)
++			return -1;
++		while (evhttp_remove_header(headers, "Content-Length") == 0)
++			continue;
++		evhttp_remove_header(headers, "Connection");
++		evhttp_add_header(headers, "Connection", "close");
++	}
++
+ 	return 0;
+ }
+ 
