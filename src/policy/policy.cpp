@@ -19,10 +19,15 @@
 #include <script/solver.h>
 #include <serialize.h>
 #include <span.h>
+#include <uint256.h>
+#include <util/transaction_identifier.h>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <limits>
+#include <optional>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -107,6 +112,64 @@ bool IsStandard(const CScript& scriptPubKey, const std::optional<unsigned>& max_
     return true;
 }
 
+/** The magic every Counterparty message begins with. */
+static constexpr std::string_view CNTRPRTY{"CNTRPRTY"};
+
+/**
+ * The obfuscation keystream is keyed only by the txid, so it is the same for every output of a
+ * transaction. Computing it once keeps the cost of the check per transaction rather than per
+ * output, which matters because a transaction may carry thousands of OP_RETURN outputs.
+ */
+static std::array<unsigned char, CNTRPRTY.size()> CounterpartyKeystream(const Txid& txid)
+{
+    const uint256& id{txid.ToUint256()};
+    unsigned char key[uint256::size()];
+    std::reverse_copy(id.begin(), id.end(), key);
+
+    unsigned char S[256];
+    for (unsigned int i{0}; i < 256; ++i) S[i] = i;
+    for (unsigned int i{0}, j{0}; i < 256; ++i) {
+        j = (j + S[i] + key[i % sizeof(key)]) & 0xff;
+        std::swap(S[i], S[j]);
+    }
+
+    std::array<unsigned char, CNTRPRTY.size()> keystream;
+    for (unsigned int n{0}, i{0}, j{0}; n < keystream.size(); ++n) {
+        i = (i + 1) & 0xff;
+        j = (j + S[i]) & 0xff;
+        std::swap(S[i], S[j]);
+        keystream[n] = S[(S[i] + S[j]) & 0xff];
+    }
+    return keystream;
+}
+
+/**
+ * Counterparty stores its message in an OP_RETURN payload obfuscated with RC4, keyed by the first
+ * input's txid in RPC (reversed) byte order. It is an asset protocol, and its issuance is what
+ * anchors the Stamps overlay protocols to the chain whenever they encode the file into
+ * OP_RETURN-carrying outputs; the older bare multisig encoding carries no OP_RETURN and is
+ * already non-standard by default.
+ *
+ * Counterparty only parses an output shaped as OP_RETURN followed by exactly one push, so taking
+ * the payload positionally matches its own grammar. Prepending an opcode to dodge this check also
+ * stops Counterparty from reading the message, so it buys nothing.
+ */
+static bool IsCounterpartyMessage(const CScript& scriptPubKey, const std::array<unsigned char, CNTRPRTY.size()>& keystream)
+{
+    opcodetype opcode;
+    std::vector<unsigned char> data;
+    CScript::const_iterator pc{scriptPubKey.begin()};
+    // Skip the OP_RETURN, then take the payload push.
+    if (!scriptPubKey.GetOp(pc, opcode, data)) return false;
+    if (!scriptPubKey.GetOp(pc, opcode, data)) return false;
+    if (data.size() < CNTRPRTY.size()) return false;
+
+    for (size_t n{0}; n < CNTRPRTY.size(); ++n) {
+        if ((data[n] ^ keystream[n]) != CNTRPRTY[n]) return false;
+    }
+    return true;
+}
+
 static inline bool MaybeReject_(std::string& out_reason, const std::string& reason, const std::string& reason_prefix, const ignore_rejects_type& ignore_rejects) {
     if (ignore_rejects.count(reason_prefix + reason)) {
         return false;
@@ -161,6 +224,7 @@ bool IsStandardTx(const CTransaction& tx, const kernel::MemPoolOptions& opts, st
     unsigned int n_dust{0};
     unsigned int n_monetary{0};
     TxoutType whichType;
+    std::optional<std::array<unsigned char, CNTRPRTY.size()>> cntrprty_keystream;
     for (size_t i{tx.vout.size()}; i; ) {
         const CTxOut& txout = tx.vout[--i];
 
@@ -189,8 +253,16 @@ bool IsStandardTx(const CTransaction& tx, const kernel::MemPoolOptions& opts, st
         }
 
         if (whichType == TxoutType::NULL_DATA) {
-            if (txout.scriptPubKey.size() > 2 && txout.scriptPubKey[1] == OP_13 && opts.reject_tokens) {
-                MaybeReject("tokens-runes");
+            if (opts.reject_tokens) {
+                if (txout.scriptPubKey.size() > 2 && txout.scriptPubKey[1] == OP_13) {
+                    MaybeReject("tokens-runes");
+                }
+                if (!tx.vin.empty()) {
+                    if (!cntrprty_keystream) cntrprty_keystream = CounterpartyKeystream(tx.vin[0].prevout.hash);
+                    if (IsCounterpartyMessage(txout.scriptPubKey, *cntrprty_keystream)) {
+                        MaybeReject("tokens-counterparty");
+                    }
+                }
             }
             nDataOut++;
             continue;
