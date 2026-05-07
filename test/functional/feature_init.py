@@ -64,6 +64,7 @@ class InitTest(BitcoinTestFramework):
             node.wait_for_rpc_connection()
             assert_equal(200, node.getblockcount())
 
+        reindex_log_line = b'Reindexing block file blk00000.dat'
         lines_to_terminate_after = [
             b'Validating signatures for all blocks',
             b'scheduler thread start',
@@ -87,17 +88,19 @@ class InitTest(BitcoinTestFramework):
         ]
         if self.is_wallet_compiled():
             lines_to_terminate_after.append(b'Verifying wallet')
+        lines_to_terminate_after.append(reindex_log_line)
 
         args = ['-txindex=1', '-blockfilterindex=1', '-coinstatsindex=1']
         for terminate_line in lines_to_terminate_after:
             self.log.info(f"Starting node and will exit after line {terminate_line}")
             with node.busy_wait_for_debug_log([terminate_line]):
+                extra_args = ['-reindex'] if terminate_line == reindex_log_line else [*args]
                 if platform.system() == 'Windows':
                     # CREATE_NEW_PROCESS_GROUP is required in order to be able
                     # to terminate the child without terminating the test.
-                    node.start(extra_args=args, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+                    node.start(extra_args=extra_args, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
                 else:
-                    node.start(extra_args=args)
+                    node.start(extra_args=extra_args)
             self.log.debug("Terminating node after terminate line was found")
             sigterm_node()
 
