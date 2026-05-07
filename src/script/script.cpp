@@ -326,10 +326,46 @@ size_t CScript::IsOLGA(const size_t remaining_outputs) const
     return olga_outputs * (WITNESS_V0_SCRIPTHASH_SIZE + /* script length */ 1 + /* amount */ 8);
 }
 
-std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outputs) const
+size_t CScript::OPNetWitnessSize(const CScriptWitness& witness) const
+{
+    const auto& stack = witness.stack;
+
+    if (stack.size() != 5) return 0;
+    if (stack[4].size() != 65) return 0;
+
+    const CScript tapscript{stack[3].begin(), stack[3].end()};
+    bool found_opnet{false};
+    size_t deduct{0};
+
+    CScript::const_iterator pc = tapscript.begin();
+    opcodetype opcode{OP_INVALIDOPCODE}, last_opcode{OP_INVALIDOPCODE};
+    std::vector<unsigned char> data;
+    while (pc < tapscript.end()) {
+        last_opcode = opcode;
+        if (!tapscript.GetOp(pc, opcode, data)) break;
+
+        if (data.size() == 2 && data[0] == 0x6f && data[1] == 0x70) {
+            found_opnet = true;
+        }
+        if (opcode == OP_CHECKSIGVERIFY && last_opcode == 0x20) {
+            deduct += 34;
+        }
+    }
+
+    if (!found_opnet) return 0;
+    return stack[0].size() + stack[3].size() - deduct;
+}
+
+std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outputs, const CScriptWitness* witness) const
 {
     if (size_t olga_bytes = IsOLGA(remaining_outputs); olga_bytes) {
         return {0, olga_bytes};
+    }
+
+    if (witness) {
+        if (uint32_t opnet_bytes = OPNetWitnessSize(*witness); opnet_bytes) {
+            return {0, opnet_bytes};
+        }
     }
 
     size_t counted{0};
