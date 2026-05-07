@@ -59,6 +59,12 @@ struct ConnmanTestMsg : public CConnman {
         if (node.IsManualOrFullOutboundConn()) ++m_network_conn_counts[node.addr.GetNetwork()];
     }
 
+    bool MultipleManualOrFullOutboundConnsLocked(Network net)
+    {
+        LOCK(m_nodes_mutex);
+        return MultipleManualOrFullOutboundConns(net);
+    }
+
     void ClearTestNodes()
     {
         LOCK(m_nodes_mutex);

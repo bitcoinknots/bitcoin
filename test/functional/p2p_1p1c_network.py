@@ -53,6 +53,10 @@ class PackageRelayTest(BitcoinTestFramework):
             assert_equal(node.getmempoolinfo()['minrelaytxfee'], Decimal(DEFAULT_MIN_RELAY_TX_FEE) / COIN)
             assert_greater_than(node.getmempoolinfo()['mempoolminfee'], Decimal(DEFAULT_MIN_RELAY_TX_FEE) / COIN)
 
+        # Store mempoolminfee for dynamic feerate calculation
+        self.mempoolminfee = self.nodes[0].getmempoolinfo()['mempoolminfee']
+        self.log.info(f"mempoolminfee after fill_mempool: {self.mempoolminfee} BTC/kvB ({self.mempoolminfee * 100000:.4f} sat/vB)")
+
     def create_basic_1p1c(self, wallet):
         low_fee_parent = wallet.create_self_transfer(fee_rate=Decimal(DEFAULT_MIN_RELAY_TX_FEE) / COIN, confirmed_only=True)
         high_fee_child = wallet.create_self_transfer(utxo_to_spend=low_fee_parent["new_utxo"], fee_rate=999*Decimal(DEFAULT_MIN_RELAY_TX_FEE)/ COIN)
@@ -86,8 +90,15 @@ class PackageRelayTest(BitcoinTestFramework):
         return [low_fee_parent_2outs["hex"], high_fee_child_2outs["hex"]], low_fee_parent_2outs["tx"], high_fee_child_2outs["tx"]
 
     def create_package_2p1c(self, wallet):
-        parent1 = wallet.create_self_transfer(fee_rate=Decimal(DEFAULT_MIN_RELAY_TX_FEE) / COIN * 10, confirmed_only=True)
-        parent2 = wallet.create_self_transfer(fee_rate=Decimal(DEFAULT_MIN_RELAY_TX_FEE) / COIN * 20, confirmed_only=True)
+        # Use dynamic feerates based on actual mempoolminfee to ensure parents are above eviction threshold
+        # Set parent1 at 2x threshold, parent2 at 4x threshold (same relative ratio as before)
+        parent1_feerate = self.mempoolminfee * 2
+        parent2_feerate = self.mempoolminfee * 4
+
+        self.log.info(f"Creating 2p1c package with parent1={parent1_feerate} BTC/kvB, parent2={parent2_feerate} BTC/kvB")
+
+        parent1 = wallet.create_self_transfer(fee_rate=parent1_feerate, confirmed_only=True)
+        parent2 = wallet.create_self_transfer(fee_rate=parent2_feerate, confirmed_only=True)
         child = wallet.create_self_transfer_multi(
             utxos_to_spend=[parent1["new_utxo"], parent2["new_utxo"]],
             fee_per_output=999*parent1["tx"].get_vsize(),

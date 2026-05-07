@@ -393,13 +393,25 @@ void TestSatisfy(const KeyConverter& converter, const std::string& testcase, con
                 // Test non-malleable satisfaction.
                 ScriptError serror;
                 bool res = VerifyScript(CScript(), script_pubkey, &witness_nonmal, STANDARD_SCRIPT_VERIFY_FLAGS, checker, &serror);
-                // Non-malleable satisfactions are guaranteed to be valid if ValidSatisfactions().
-                if (node->ValidSatisfactions()) BOOST_CHECK(res);
+                // Non-malleable satisfactions are guaranteed to be valid if ValidSatisfactions(), unless REDUCED_DATA rules are violated.
+                if (node->ValidSatisfactions()) {
+                    BOOST_CHECK(res ||
+                                serror == ScriptError::SCRIPT_ERR_PUSH_SIZE ||
+                                serror == ScriptError::SCRIPT_ERR_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM ||
+                                serror == ScriptError::SCRIPT_ERR_DISCOURAGE_UPGRADABLE_TAPROOT_VERSION ||
+                                serror == ScriptError::SCRIPT_ERR_DISCOURAGE_OP_SUCCESS ||
+                                serror == ScriptError::SCRIPT_ERR_TAPSCRIPT_MINIMALIF);
+                }
                 // More detailed: non-malleable satisfactions must be valid, or could fail with ops count error (if CheckOpsLimit failed),
-                // or with a stack size error (if CheckStackSize check fails).
+                // or with a stack size error (if CheckStackSize check fails), or with REDUCED_DATA-related errors.
                 BOOST_CHECK(res ||
                             (!node->CheckOpsLimit() && serror == ScriptError::SCRIPT_ERR_OP_COUNT) ||
-                            (!node->CheckStackSize() && serror == ScriptError::SCRIPT_ERR_STACK_SIZE));
+                            (!node->CheckStackSize() && serror == ScriptError::SCRIPT_ERR_STACK_SIZE) ||
+                            (serror == ScriptError::SCRIPT_ERR_PUSH_SIZE) ||
+                            (serror == ScriptError::SCRIPT_ERR_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM) ||
+                            (serror == ScriptError::SCRIPT_ERR_DISCOURAGE_UPGRADABLE_TAPROOT_VERSION) ||
+                            (serror == ScriptError::SCRIPT_ERR_DISCOURAGE_OP_SUCCESS) ||
+                            (serror == ScriptError::SCRIPT_ERR_TAPSCRIPT_MINIMALIF));
             }
 
             if (mal_success && (!nonmal_success || witness_mal.stack != witness_nonmal.stack)) {
@@ -407,8 +419,15 @@ void TestSatisfy(const KeyConverter& converter, const std::string& testcase, con
                 ScriptError serror;
                 bool res = VerifyScript(CScript(), script_pubkey, &witness_mal, STANDARD_SCRIPT_VERIFY_FLAGS, checker, &serror);
                 // Malleable satisfactions are not guaranteed to be valid under any conditions, but they can only
-                // fail due to stack or ops limits.
-                BOOST_CHECK(res || serror == ScriptError::SCRIPT_ERR_OP_COUNT || serror == ScriptError::SCRIPT_ERR_STACK_SIZE);
+                // fail due to stack or ops limits, or REDUCED_DATA-related errors.
+                BOOST_CHECK(res ||
+                            serror == ScriptError::SCRIPT_ERR_OP_COUNT ||
+                            serror == ScriptError::SCRIPT_ERR_STACK_SIZE ||
+                            serror == ScriptError::SCRIPT_ERR_PUSH_SIZE ||
+                            serror == ScriptError::SCRIPT_ERR_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM ||
+                            serror == ScriptError::SCRIPT_ERR_DISCOURAGE_UPGRADABLE_TAPROOT_VERSION ||
+                            serror == ScriptError::SCRIPT_ERR_DISCOURAGE_OP_SUCCESS ||
+                            serror == ScriptError::SCRIPT_ERR_TAPSCRIPT_MINIMALIF);
             }
 
             if (node->IsSane()) {
