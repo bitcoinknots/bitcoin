@@ -90,7 +90,7 @@ FUZZ_TARGET(script_sign, .init = initialize_script_sign)
         const std::optional<CTxOut> tx_out = ConsumeDeserializable<CTxOut>(fuzzed_data_provider);
         const unsigned int n_in = fuzzed_data_provider.ConsumeIntegral<unsigned int>();
         if (mutable_transaction && tx_out && mutable_transaction->vin.size() > n_in) {
-            SignatureData signature_data_1 = DataFromTransaction(*mutable_transaction, n_in, *tx_out);
+            SignatureData signature_data_1 = DataFromTransaction(*mutable_transaction, n_in, *tx_out, /*sighash_rules=*/SighashRules::LEGACY);
             CTxIn input;
             UpdateInput(input, signature_data_1);
             const CScript script = ConsumeScript(fuzzed_data_provider);
@@ -132,7 +132,7 @@ FUZZ_TARGET(script_sign, .init = initialize_script_sign)
             }
             std::map<COutPoint, Coin> coins{ConsumeCoins(fuzzed_data_provider)};
             std::map<int, bilingual_str> input_errors;
-            (void)SignTransaction(sign_transaction_tx_to, &provider, coins, fuzzed_data_provider.ConsumeIntegral<int>(), input_errors);
+            (void)SignTransaction(sign_transaction_tx_to, &provider, coins, fuzzed_data_provider.ConsumeIntegral<int>(), input_errors, /*inputs_amount_sum=*/nullptr, /*sighash_rules=*/SighashRules::LEGACY);
         }
     }
 
