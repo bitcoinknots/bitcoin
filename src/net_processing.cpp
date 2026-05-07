@@ -1852,14 +1852,18 @@ std::optional<std::string> PeerManagerImpl::FetchBlock(NodeId peer_id, const uin
 {
     if (m_chainman.m_blockman.LoadingBlocks()) return "Loading blocks ...";
 
+    // The lock must be taken here before fetching Peer so another thread does
+    // not delete the CNodeState from under the current thread, causing an
+    // assertion failure in BlockRequested. This lock can be replaced with a
+    // net-specific lock when more of CNodeState is moved into Peer.
+    LOCK(cs_main);
+
     // Ensure this peer exists and hasn't been disconnected
     PeerRef peer = GetPeerRef(peer_id);
     if (peer == nullptr) return "Peer does not exist";
 
     // Ignore pre-segwit peers
     if (!CanServeWitnesses(*peer)) return "Pre-SegWit peer";
-
-    LOCK(cs_main);
 
     if (IsBlockRequestedFromPeer(hash, peer_id)) return "Already requested from this peer";
 
