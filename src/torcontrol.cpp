@@ -93,6 +93,13 @@ void TorControlConnection::readcb(struct bufferevent *bev, void *ctx)
     //  If there is not a whole line to read, evbuffer_readln returns nullptr
     while((line = evbuffer_readln(input, &n_read_out, EVBUFFER_EOL_CRLF)) != nullptr)
     {
+        if (n_read_out >= MAX_LINE_LENGTH) {
+            free(line);
+            LogWarning("tor: Disconnecting because MAX_LINE_LENGTH exceeded");
+            self->Disconnect();
+            self->disconnected(*self);
+            return;
+        }
         std::string s(line, n_read_out);
         free(line);
         if (s.size() < 4) // Short line
@@ -122,9 +129,10 @@ void TorControlConnection::readcb(struct bufferevent *bev, void *ctx)
     //  Check for size of buffer - protect against memory exhaustion with very long lines
     //  Do this after evbuffer_readln to make sure all full lines have been
     //  removed from the buffer. Everything left is an incomplete line.
-    if (evbuffer_get_length(input) > MAX_LINE_LENGTH) {
+    if (evbuffer_get_length(input) + 1 >= MAX_LINE_LENGTH) {
         LogWarning("tor: Disconnecting because MAX_LINE_LENGTH exceeded");
         self->Disconnect();
+        self->disconnected(*self);
     }
 }
 
@@ -510,6 +518,10 @@ void TorController::authchallenge_cb(TorControlConnection& _conn, const TorContr
 {
     if (reply.code == 250) {
         LogDebug(BCLog::TOR, "SAFECOOKIE authentication challenge successful\n");
+        if (reply.lines.empty()) {
+            LogWarning("tor: AUTHCHALLENGE reply was empty");
+            return;
+        }
         std::pair<std::string,std::string> l = SplitTorReplyLine(reply.lines[0]);
         if (l.first == "AUTHCHALLENGE") {
             std::map<std::string,std::string> m = ParseTorReplyMapping(l.second);
