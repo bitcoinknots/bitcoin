@@ -5,6 +5,7 @@
 """Exercise the height-activated proof-of-work change on regtest."""
 
 import json
+from decimal import Decimal
 from pathlib import Path
 
 from test_framework.blocktools import create_block, create_coinbase
@@ -31,6 +32,16 @@ V2_HEADER_KEYS = (
     "xor_key",
     "mm_rhs",
 )
+
+
+def assert_sha256d_difficulty(result, expected):
+    assert_equal(result["difficulty"], expected)
+    assert "difficulty_blake2b" not in result
+
+
+def assert_blake2b_difficulty(result, expected):
+    assert_equal(result["difficulty_blake2b"], expected)
+    assert "difficulty" not in result
 
 
 class PowChangeTest(BitcoinTestFramework):
@@ -119,6 +130,15 @@ class PowChangeTest(BitcoinTestFramework):
         assert_equal(len(pre_header.serialize()), 80)
         assert_equal(pre_hash, hash256(pre_header.serialize())[::-1].hex())
         assert_equal(pre_hash, powhash(pre_header)[::-1].hex())
+        pre_difficulty = Decimal('4.656542373906925E-10')
+        assert_sha256d_difficulty(node.getblockheader(pre_hash), pre_difficulty)
+        assert_sha256d_difficulty(node.getblock(pre_hash), pre_difficulty)
+        assert_sha256d_difficulty(node.getblockchaininfo(), pre_difficulty)
+        assert_sha256d_difficulty(node.getchainstates()["chainstates"][-1], pre_difficulty)
+        mining_info = node.getmininginfo()
+        assert_sha256d_difficulty(mining_info, pre_difficulty)
+        assert_equal(mining_info["next"]["height"], CHANGE_HEIGHT)
+        assert_blake2b_difficulty(mining_info["next"], 2)
 
         self.log.info("The activation block and its successors use BLAKE2b")
         assert_raises_rpc_error(
@@ -151,6 +171,14 @@ class PowChangeTest(BitcoinTestFramework):
         verbose_post_header = node.getblockheader(post_hash)
         assert_equal(verbose_post_header["version"], post_header.nVersion)
         assert_equal(verbose_post_header["versionHex"], f"{post_header.nVersion:08x}")
+        assert_blake2b_difficulty(verbose_post_header, 2)
+        assert_blake2b_difficulty(node.getblock(post_hash), 2)
+        assert_blake2b_difficulty(node.getblockchaininfo(), 2)
+        assert_blake2b_difficulty(node.getchainstates()["chainstates"][-1], 2)
+        mining_info = node.getmininginfo()
+        assert_blake2b_difficulty(mining_info, 2)
+        assert_equal(mining_info["next"]["height"], CHANGE_HEIGHT + 1)
+        assert_blake2b_difficulty(mining_info["next"], 2)
 
         self.log.info("The high two flag bits are reserved")
         for high_flag in (0x40, 0x80):
