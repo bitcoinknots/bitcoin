@@ -2115,6 +2115,34 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         do_reindex_chainstate,
         kernel_cache_sizes,
         args);
+
+    // A data directory advanced by a client that was not enforcing BIP110/RDTS
+    // can contain blocks that violate RDTS mandatory signaling. Normal startup
+    // does not re-validate inherited history, so correct such state now: mark
+    // the offending blocks invalid and reorganize to the best valid chain. If
+    // the data needed to rewind has been pruned, report it as a load failure so
+    // the reindex prompt below offers recovery, rather than running on (or
+    // partially rewinding) an invalid chain.
+    //
+    // Skip this on any reindex: -reindex and -reindex-chainstate re-connect blocks
+    // through ConnectBlock, which re-enforces the rule and rejects violators during
+    // the rebuild, so the correction is redundant. It is also unsafe there: a
+    // chainstate reindex returns here with the active chain not yet built, and
+    // correcting against an empty chain would fail an internal consistency check.
+    //
+    // The block index is shared, so the invalid marks apply to any background
+    // (assumeutxo) chainstate too; only the active chainstate is reorganized here.
+    // Safe while every snapshot base stays below the RDTS window (as today); a
+    // future snapshot base above the window would need re-review.
+    if (status == ChainstateLoadStatus::SUCCESS && !ShutdownRequested(node) &&
+            !do_reindex && !do_reindex_chainstate) {
+        bilingual_str rdts_error;
+        if (!node.chainman->ActiveChainstate().CorrectRdtsInvalidBlocks(rdts_error)) {
+            status = ChainstateLoadStatus::FAILURE;
+            error = rdts_error;
+        }
+    }
+
     if (status == ChainstateLoadStatus::FAILURE && !do_reindex && !ShutdownRequested(node)) {
         // If reindex=auto, directly start the reindex
         bool fAutoReindex = (args.GetArg("-reindex", "0") == "auto");
@@ -2124,7 +2152,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
             do_retry = HasTestOption(args, "reindex_after_failure_noninteractive_yes") ||
             uiInterface.ThreadSafeQuestion(
             error + Untranslated(".\n\n") + _("Do you want to rebuild the databases now?"),
-            error.original + ".\nPlease restart with -reindex or -reindex-chainstate to recover.",
+            error.original + (args.GetIntArg("-prune", 0) ? ".\nPlease restart with -reindex to recover." : ".\nPlease restart with -reindex or -reindex-chainstate to recover."),
             "", CClientUIInterface::MSG_ERROR | CClientUIInterface::BTN_ABORT);
         } else {
             LogPrintf("Automatically running a reindex.\n");
