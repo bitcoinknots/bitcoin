@@ -991,9 +991,6 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
     }
 
     UniValue aux(UniValue::VOBJ);
-    if (block.m_height == consensusParams.DeploymentHeight(Consensus::DEPLOYMENT_BLAKE2B)) {
-        aux.pushKV("blake2b_headline", HexStr(blake2b_headline));
-    }
 
     CBlockHeader block_header{block};
     // Update nTime (and potentially nBits)
