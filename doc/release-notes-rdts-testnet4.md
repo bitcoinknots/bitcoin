@@ -1,3 +1,0 @@
-RDTS on testnet4: expiry extended to 2027 April 1st
-
-The testnet4 deployment of RDTS expired on 2026 October 13th 15:00 UTC under the previous parameters. It is extended to 2027 April 1st 00:00 UTC, so that testnet4 keeps exercising the RDTS rules ahead of the mainnet expiry in 2027 September. The extension applies to the blocks already mined since the original expiry: a node that connected block 152963 or any later block with the previous parameters checks those blocks again at its first start, rewinding to block 152962 and reconnecting from there. Blocks that break an RDTS rule are rejected by that check. Mainnet is unchanged.
