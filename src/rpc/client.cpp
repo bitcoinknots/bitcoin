@@ -222,6 +222,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "gettxoutsetinfo", 2, "use_index"},
     { "dumptxoutset", 2, "options" },
     { "dumptxoutset", 2, "rollback", /*also_string=*/true },
+    { "dumptxoutset", 2, "in_memory" },
     { "lockunspent", 0, "unlock" },
     { "lockunspent", 1, "transactions" },
     { "lockunspent", 2, "persistent" },
