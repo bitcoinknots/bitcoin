@@ -56,6 +56,7 @@ add_library(bitcoinkernel
   ../script/sigcache.cpp
   ../script/solver.cpp
   ../signet.cpp
+  ../stats/stats.cpp
   ../streams.cpp
   ../support/lockedpool.cpp
   ../sync.cpp
