@@ -483,6 +483,8 @@ private:
                 str += 'T';
             } else if (s == "UTREEXO_TMP?") {
                 str += 'y';
+            } else if (s == "REDUCED_DATA?") {
+                str += '4';
             } else {
                 str += ToLower(s[0]);
             }
@@ -764,6 +766,7 @@ public:
         "           \"t\" - UTREEXO peer can handle Utreexo proof requests for blocks it serves\n"
         "           \"T\" - UTREEXO_ARCHIVE peer can handle Utreexo proof requests for all  historical blocks\n"
         "           \"y\" - UTREEXO_TMP? peer can handle Utreexo proof requests\n"
+        "           \"4\" - REDUCED_DATA? peer enforces the ReducedData SoftFork\n"
         "           \"m\" - MALICIOUS? peer openly seeks to aid in bypassing network policy/spam filters (OR to sabotage nodes that seek to)\n"
         "           \"u\" - UNKNOWN: unrecognized bit flag\n"
         "  v        Version of transport protocol used for the connection\n"
