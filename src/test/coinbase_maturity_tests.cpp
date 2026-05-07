@@ -13,6 +13,8 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <algorithm>
+
 #include <limits>
 
 BOOST_AUTO_TEST_SUITE(coinbase_maturity_tests)
@@ -38,11 +40,14 @@ BOOST_AUTO_TEST_CASE(long_maturity_derived_from_schedule)
         const auto& consensus{testnet4->GetConsensus()};
         BOOST_CHECK_EQUAL(consensus.CoinbaseMaturityLong, consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight);
         BOOST_CHECK_GT(consensus.CoinbaseMaturityLong, COINBASE_MATURITY);
-        BOOST_REQUIRE_EQUAL(consensus.chainstate_revalidation_deployments.size(), 1);
-        const auto& deployment{consensus.chainstate_revalidation_deployments.front()};
-        BOOST_CHECK_EQUAL(deployment.name, "long_coinbase_maturity");
-        BOOST_CHECK_EQUAL(deployment.start_height, consensus.CoinbaseMaturityLongEnforceHeight);
-        BOOST_CHECK_EQUAL(deployment.stop_height, consensus.CoinbaseMaturityLongReleaseHeight - 1);
+        // Other rules may add their own revalidation deployments (testnet4 has
+        // one for the RDTS extension), so look this one up by name.
+        const auto& deployments{consensus.chainstate_revalidation_deployments};
+        const auto deployment_it{std::find_if(deployments.begin(), deployments.end(),
+                                              [](const auto& d) { return d.name == "long_coinbase_maturity"; })};
+        BOOST_REQUIRE(deployment_it != deployments.end());
+        BOOST_CHECK_EQUAL(deployment_it->start_height, consensus.CoinbaseMaturityLongEnforceHeight);
+        BOOST_CHECK_EQUAL(deployment_it->stop_height, consensus.CoinbaseMaturityLongReleaseHeight - 1);
     }
 
     const auto& main_consensus{main->GetConsensus()};
