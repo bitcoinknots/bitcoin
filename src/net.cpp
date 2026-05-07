@@ -2033,16 +2033,15 @@ void CConnman::NotifyNumConnectionsChanged()
     }
 }
 
-bool CConnman::ShouldRunInactivityChecks(const CNode& node, std::chrono::seconds now) const
+bool CConnman::ShouldRunInactivityChecks(const CNode& node, std::chrono::microseconds now) const
 {
     return node.m_connected + m_peer_connect_timeout < now;
 }
 
-bool CConnman::InactivityCheck(const CNode& node) const
+bool CConnman::InactivityCheck(const CNode& node, std::chrono::microseconds now) const
 {
     // Tests that see disconnects after using mocktime can start nodes with a
     // large timeout. For example, -peertimeout=999999999.
-    const auto now{GetTime<std::chrono::seconds>()};
     const auto last_send{node.m_last_send.load()};
     const auto last_recv{node.m_last_recv.load()};
 
@@ -2066,7 +2065,7 @@ bool CConnman::InactivityCheck(const CNode& node) const
 
     if (now > last_send + TIMEOUT_INTERVAL) {
         LogDebug(BCLog::NET,
-            "socket sending timeout: %is, %s\n", count_seconds(now - last_send),
+            "socket sending timeout: %is, %s\n", Ticks<std::chrono::seconds>(now - last_send),
             node.DisconnectMsg(fLogIPs)
         );
         return true;
@@ -2074,7 +2073,7 @@ bool CConnman::InactivityCheck(const CNode& node) const
 
     if (now > last_recv + TIMEOUT_INTERVAL) {
         LogDebug(BCLog::NET,
-            "socket receive timeout: %is, %s\n", count_seconds(now - last_recv),
+            "socket receive timeout: %is, %s\n", Ticks<std::chrono::seconds>(now - last_recv),
             node.DisconnectMsg(fLogIPs)
         );
         return true;
@@ -2167,6 +2166,8 @@ void CConnman::SocketHandlerConnected(const std::vector<CNode*>& nodes,
 {
     AssertLockNotHeld(m_total_bytes_sent_mutex);
 
+    auto now = GetTime<std::chrono::microseconds>();
+
     for (CNode* pnode : nodes) {
         if (interruptNet)
             return;
@@ -2257,7 +2258,7 @@ void CConnman::SocketHandlerConnected(const std::vector<CNode*>& nodes,
             }
         }
 
-        if (InactivityCheck(*pnode)) pnode->fDisconnect = true;
+        if (InactivityCheck(*pnode, now)) pnode->fDisconnect = true;
     }
 }
 
@@ -3929,7 +3930,7 @@ void CConnman::PushMessage(CNode* pnode, CSerializedNetMsg&& msg)
     AssertLockNotHeld(m_total_bytes_sent_mutex);
     size_t nMessageSize = msg.data.size();
     LogDebug(BCLog::NET, "sending %s (%d bytes) peer=%d\n", msg.m_type, nMessageSize, pnode->GetId());
-    if (gArgs.GetBoolArg("-capturemessages", false)) {
+    if (m_capture_messages) {
         CaptureMessage(pnode->addr, msg.m_type, msg.data, /*is_incoming=*/false);
     }
 
