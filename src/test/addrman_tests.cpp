@@ -465,6 +465,47 @@ BOOST_AUTO_TEST_CASE(getaddr_unfiltered)
     BOOST_CHECK_EQUAL(addrman->GetAddr(/*max_addresses=*/0, /*max_pct=*/0, /*network=*/std::nullopt, /*filtered=*/false).size(), 3U);
 }
 
+BOOST_AUTO_TEST_CASE(count_addr)
+{
+    auto addrman = std::make_unique<AddrMan>(EMPTY_NETGROUPMAN, DETERMINISTIC, GetCheckRatio(m_node));
+    const auto now{Now<NodeSeconds>()};
+
+    BOOST_CHECK_EQUAL(addrman->CountAddr(NODE_BLAKE2B, 100), 0U);
+    BOOST_CHECK_EQUAL(addrman->CountAddr(NODE_BLAKE2B, 0), 0U);
+
+    const ServiceFlags hf{ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_BLAKE2B)};
+    const ServiceFlags non_hf{ServiceFlags(NODE_NETWORK | NODE_WITNESS)};
+    const CNetAddr source = ResolveIP("252.2.2.2");
+
+    // Distinct netgroups so nothing evicts from the new table.
+    std::vector<CAddress> addrs;
+    for (int i = 1; i <= 5; ++i) {
+        CAddress a{CAddress(ResolveService("250." + ToString(i) + ".1.1", 8333), hf)};
+        a.nTime = now;
+        addrs.push_back(a);
+    }
+    for (int i = 1; i <= 3; ++i) {
+        CAddress a{CAddress(ResolveService("251." + ToString(i) + ".1.1", 8333), non_hf)};
+        a.nTime = now;
+        addrs.push_back(a);
+    }
+    // Left terrible (no nTime), so it is not counted.
+    addrs.emplace_back(ResolveService("249.1.1.1", 8333), hf);
+    // Advertises NODE_BLAKE2B but not the network/witness flags: matches a
+    // single-flag require, but not the full SeedsServiceFlags() set.
+    CAddress bare{CAddress(ResolveService("248.1.1.1", 8333), NODE_BLAKE2B)};
+    bare.nTime = now;
+    addrs.push_back(bare);
+    BOOST_CHECK(addrman->Add(addrs, source));
+    BOOST_CHECK_EQUAL(addrman->Size(), 10U);
+
+    BOOST_CHECK_EQUAL(addrman->CountAddr(NODE_BLAKE2B, 100), 6U);
+    BOOST_CHECK_EQUAL(addrman->CountAddr(SeedsServiceFlags(), 100), 5U);
+    // Early-out caps the count at max.
+    BOOST_CHECK_EQUAL(addrman->CountAddr(NODE_BLAKE2B, 3), 3U);
+    BOOST_CHECK_EQUAL(addrman->CountAddr(NODE_COMPACT_FILTERS, 100), 0U);
+}
+
 BOOST_AUTO_TEST_CASE(caddrinfo_get_tried_bucket_legacy)
 {
     CAddress addr1 = CAddress(ResolveService("250.1.1.1", 8333), NODE_NONE);
