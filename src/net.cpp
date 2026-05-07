@@ -2342,13 +2342,20 @@ void CConnman::ThreadDNSAddressSeed()
     std::shuffle(seeds.begin(), seeds.end(), rng);
     int seeds_right_now = 0; // Number of seeds left before testing if we have enough connections
 
-    if (gArgs.GetBoolArg("-forcednsseed", DEFAULT_FORCEDNSSEED)) {
+    // Only a full node advertising NODE_BLAKE2B can serve the header chain past
+    // the BLAKE2b hard fork, so drive the DNS-seed cadence off the count of such
+    // peers in addrman rather than its total size. SeedsServiceFlags() is the
+    // desirable network/witness flags plus NODE_BLAKE2B, matching what the
+    // outbound selection loop requires. Counted up to the delay threshold (all
+    // the decision below needs) and skipped when -forcednsseed queries all.
+    const bool force_dnsseed{gArgs.GetBoolArg("-forcednsseed", DEFAULT_FORCEDNSSEED)};
+    const size_t blake2b_count{force_dnsseed ? 0 : addrman.CountAddr(SeedsServiceFlags(), DNSSEEDS_DELAY_PEER_THRESHOLD)};
+
+    if (force_dnsseed) {
         // When -forcednsseed is provided, query all.
         seeds_right_now = seeds.size();
-    } else if (addrman.Size() == 0) {
-        // If we have no known peers, query all.
-        // This will occur on the first run, or if peers.dat has been
-        // deleted.
+    } else if (blake2b_count == 0) {
+        // No peers that can serve headers past the hard fork (incl. an empty addrman): query all.
         seeds_right_now = seeds.size();
     }
 
@@ -2367,7 +2374,7 @@ void CConnman::ThreadDNSAddressSeed()
         //   DNS seeds, and if that fails too, also try the fixed seeds.
         //   (done in ThreadOpenConnections)
         int found = 0;
-        const std::chrono::seconds seeds_wait_time = (addrman.Size() >= DNSSEEDS_DELAY_PEER_THRESHOLD ? DNSSEEDS_DELAY_MANY_PEERS : DNSSEEDS_DELAY_FEW_PEERS);
+        const std::chrono::seconds seeds_wait_time = (blake2b_count >= DNSSEEDS_DELAY_PEER_THRESHOLD ? DNSSEEDS_DELAY_MANY_PEERS : DNSSEEDS_DELAY_FEW_PEERS);
 
         for (const std::string& seed : seeds) {
             if (seeds_right_now == 0) {
@@ -2976,6 +2983,18 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect, Spa
             if (!fFeeler && !m_msgproc->HasAllDesirableServiceFlags(addr.nServices)) {
                 continue;
             } else if (fFeeler && !MayHaveUsefulAddressDB(addr.nServices)) {
+                continue;
+            }
+
+            // Prefer NODE_BLAKE2B peers for the first outbound-full-relay slots
+            // so the node quickly has peers that can serve the header chain past
+            // the hard fork. #368 demotes any non-BLAKE2B full-outbound peer to
+            // stale, so nOutboundFullRelay already counts only fork-capable ones.
+            // Fall back to any desirable peer after enough tries so a node that
+            // cannot yet find one still bootstraps.
+            if (conn_type == ConnectionType::OUTBOUND_FULL_RELAY &&
+                nOutboundFullRelay < SEED_OUTBOUND_CONNECTION_THRESHOLD &&
+                !(addr.nServices & NODE_BLAKE2B) && nTries < 30) {
                 continue;
             }
 
