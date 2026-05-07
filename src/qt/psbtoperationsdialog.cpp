@@ -2,6 +2,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <chainparams.h>
+#include <common/args.h>
+#include <common/sighash_rules.h>
 #include <qt/psbtoperationsdialog.h>
 
 #include <common/messages.h>
@@ -56,7 +59,8 @@ void PSBTOperationsDialog::openWithPSBT(PartiallySignedTransaction psbtx)
 {
     m_transaction_data = psbtx;
 
-    bool complete = FinalizePSBT(psbtx); // Make sure all existing signatures are fully combined before checking for completeness.
+    // Make sure all existing signatures are fully combined before checking for completeness.
+    bool complete = FinalizePSBT(psbtx);
     if (m_wallet_model) {
         size_t n_could_sign;
         const auto err{m_wallet_model->wallet().fillPSBT(SIGHASH_ALL, /*sign=*/false, /*bip32derivs=*/true, &n_could_sign, m_transaction_data, complete)};

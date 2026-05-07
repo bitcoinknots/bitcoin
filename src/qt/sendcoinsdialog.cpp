@@ -4,6 +4,8 @@
 
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
+#include <common/args.h>
+#include <common/sighash_rules.h>
 #include <qt/sendcoinsdialog.h>
 #include <qt/forms/ui_sendcoinsdialog.h>
 

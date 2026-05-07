@@ -122,6 +122,11 @@ bool CheckTxScripts(const CTransaction& tx, const std::map<COutPoint, CScript>& 
     const std::map<COutPoint, int64_t>& map_prevout_values, unsigned int flags,
     const PrecomputedTransactionData& txdata, const std::string& strTest, bool expect_valid)
 {
+    // SCRIPT_VERIFY_UNIFIED_SIGHASH stays in the sweep. Nothing in this corpus
+    // opted in, so the flag must make no difference to any of it, and sweeping
+    // it here is what holds that: a change that let the new rules reach a
+    // signature that did not ask for them would fail these vectors.
+
     bool tx_valid = true;
     ScriptError err = expect_valid ? SCRIPT_ERR_UNKNOWN_ERROR : SCRIPT_ERR_OK;
     for (unsigned int i = 0; i < tx.vin.size() && tx_valid; ++i) {
