@@ -872,6 +872,32 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     // At least one data push is needed after OP_13 to match
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << OP_13;
     CheckIsStandard(t);
+
+    // Test rejecttokens catching a Counterparty issuance, an asset protocol whose issuance is
+    // what anchors the Stamps overlay protocols. Payload and input txid are from mainnet
+    // transaction 92df895bbf715316fee36cb536453fcd509dc80569afee6dce9e8203ad51de15.
+    const Txid dummy_txid{t.vin[0].prevout.hash};
+    const Txid cntrprty_txid{*Txid::FromHex("e915fa8be0a5d25c4327d056a54bbed7051f6ecf850993994741645012bb0e6b")};
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << "dfa3af7889188ce8034d69efcf5a63a82d6290bbbc54572b93657db6f7d83d"_hex;
+    t.vin[0].prevout.hash = cntrprty_txid;
+    CheckIsNotStandard(t, "tokens-counterparty");
+    // The payload is obfuscated with the first input's txid, so it only decodes against that input
+    t.vin[0].prevout.hash = dummy_txid;
+    CheckIsStandard(t);
+    // A payload too short to hold the magic is not a Counterparty message
+    t.vin[0].prevout.hash = cntrprty_txid;
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << "dfa3af7889188c"_hex;
+    CheckIsStandard(t);
+    // Every datacarrier output is checked, not just the one the keystream is derived on
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << "dfa3af7889188ce8034d69efcf5a63a82d6290bbbc54572b93657db6f7d83d"_hex;
+    t.vout.emplace_back(0, CScript() << OP_RETURN << "dfa3af7889188c"_hex);
+    CheckIsNotStandard(t, "tokens-counterparty");
+    t.vout.pop_back();
+    g_mempool_opts.reject_tokens = false;
+    CheckIsStandard(t);
+    g_mempool_opts.reject_tokens = true;
+    t.vin[0].prevout.hash = dummy_txid;
+
     // Test rejecttokens applying to OLGA
     const auto olga_header = CScript() << OP_0 << "003e7374616d703a000000000000000000000000000000000000000000000000"_hex;
     t.vout[0].scriptPubKey = olga_header;
