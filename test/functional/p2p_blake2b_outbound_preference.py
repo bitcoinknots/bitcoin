@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""ThreadOpenConnections prefers NODE_BLAKE2B peers for the first outbound
-full-relay slots (SEED_OUTBOUND_CONNECTION_THRESHOLD), so a node quickly gains
-peers that can serve the header chain past the BLAKE2b hard fork. It falls back
-to any desirable peer after enough tries so a node with none yet still bootstraps.
+"""ThreadOpenConnections prefers NODE_BLAKE2B peers when filling an outbound
+target, so a node quickly gains peers that can serve the header chain past the
+BLAKE2b hard fork. It falls back to any desirable peer after enough tries, while
+one that lacks the bit would still be tolerated as a stale peer, so a node that
+can find none still bootstraps.
 
 The addresses are unreachable (connections go through an unreachable proxy and
-never complete), so we observe the addresses the node attempts in debug.log. A
-fresh node with no anchors always opens OUTBOUND_FULL_RELAY first, so every
-attempt exercises the preference.
+never complete), so we observe the addresses the node attempts in debug.log and
+no peer is ever demoted, which is what keeps the fallback in play here. A fresh
+node with no anchors always opens OUTBOUND_FULL_RELAY first, so every attempt
+exercises the preference. p2p_blake2b_outbound_slots.py covers what happens once
+connections complete and the stale budget runs out.
 
 Case A: mix of NODE_BLAKE2B (250.x) and non-HF (251.x) -> the first slots are HF.
 Case B: only non-HF (251.x)                            -> attempted anyway (fallback).

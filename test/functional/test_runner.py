@@ -145,6 +145,7 @@ BASE_SCRIPTS = [
     'p2p_blake2b_dns_immediate.py',
     'p2p_blake2b_legacy_block_sync.py',
     'p2p_blake2b_outbound_preference.py',
+    'p2p_blake2b_outbound_slots.py',
     'wallet_groups.py --legacy-wallet',
     'wallet_groups.py --descriptors',
     'p2p_blockfilters.py',
