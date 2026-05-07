@@ -558,6 +558,7 @@ inspecting signatures in Mach-O binaries.")
         gcc-toolchain-13
         cmake-minimal
         gnu-make
+        pkg-config
         ;; Scripting
         python-minimal ;; (3.10)
         ;; Git
@@ -573,7 +574,6 @@ inspecting signatures in Mach-O binaries.")
                  osslsigncode))
           ((string-contains target "-linux-")
            (list bison
-                 pkg-config
                  (list gcc-toolchain-13 "static")
                  (make-bitcoin-cross-toolchain target)))
           ((string-contains target "darwin")
