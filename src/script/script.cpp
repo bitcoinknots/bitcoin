@@ -306,6 +306,378 @@ bool CScript::HasValidOps() const
     return true;
 }
 
+// Static truthiness of a byte vector, matching CastToBool in the interpreter:
+// any nonzero byte is true, except a lone trailing sign bit (negative zero).
+static bool DataCarrierCastToBool(const std::vector<unsigned char>& vch)
+{
+    for (size_t i = 0; i < vch.size(); ++i) {
+        if (vch[i] != 0) {
+            if (i == vch.size() - 1 && vch[i] == 0x80) return false;
+            return true;
+        }
+    }
+    return false;
+}
+
+namespace {
+/** A value on the stack that follows from constants alone, as an index into KnownValues; 0 if it depends on the witness or a signature */
+using KnownValue = size_t;
+constexpr KnownValue UNKNOWN{0};
+
+/** The values FindDeadParts has seen; the stacks hold indexes, so copying a value costs nothing */
+class KnownValues
+{
+    std::vector<std::vector<unsigned char>> m_values{{}};
+
+public:
+    KnownValue Add(std::vector<unsigned char> v)
+    {
+        m_values.push_back(std::move(v));
+        return m_values.size() - 1;
+    }
+    KnownValue AddNum(int64_t n) { return Add(CScriptNum{n}.getvch()); }
+    const std::vector<unsigned char>& Get(KnownValue v) const { return m_values[v]; }
+    /** The value as a script number, if it is known and a valid one */
+    bool Num(KnownValue v, int64_t& out) const
+    {
+        if (v == UNKNOWN) return false;
+        try {
+            out = CScriptNum{m_values[v], /*fRequireMinimal=*/true}.GetInt64();
+            return true;
+        } catch (const scriptnum_error&) {
+            return false;
+        }
+    }
+};
+
+/** The top of the stack as far as constants determine it; below it nothing is known */
+class KnownStack
+{
+    std::vector<KnownValue> m_items;
+
+public:
+    size_t size() const { return m_items.size(); }
+    void Push(KnownValue v)
+    {
+        m_items.push_back(std::move(v));
+        if (m_items.size() > MAX_STACK_SIZE) Forget(); // the script fails here anyway
+    }
+    KnownValue Pop()
+    {
+        if (m_items.empty()) return UNKNOWN;
+        KnownValue v{std::move(m_items.back())};
+        m_items.pop_back();
+        return v;
+    }
+    KnownValue Peek(size_t depth) const { return depth < m_items.size() ? m_items[m_items.size() - 1 - depth] : UNKNOWN; }
+    KnownValue& At(size_t depth) { return m_items[m_items.size() - 1 - depth]; }
+    void Forget() { m_items.clear(); }
+};
+
+} // namespace
+
+DeadParts FindDeadParts(const CScript& script)
+{
+    DeadParts dead{std::vector<bool>(script.size()), std::vector<bool>(script.size())};
+    // Per open conditional: whether constants decide it, and whether its current part runs
+    struct Frame { bool known; bool running; };
+    std::vector<Frame> frames;
+    size_t not_running{0}; // open frames whose current part does not run
+    KnownValues values;
+    KnownStack stack, alt;
+    opcodetype opcode;
+    std::vector<unsigned char> push;
+    // Each opcode costs one step, and OP_ROLL also costs its depth, the one move
+    // that is not constant time. Stop, marking nothing more, after a few steps per
+    // byte: no spendable script rolls deep over and over, and one built to do so
+    // gets the plain scan instead of costing the node more than its size.
+    size_t steps_left{4 * size_t{script.size()}};
+
+    for (CScript::const_iterator it{script.begin()}; it < script.end();) {
+        const size_t offset{size_t(it - script.begin())};
+        if (!script.GetOp(it, opcode, push)) break;
+        if (steps_left == 0) break;
+        --steps_left;
+
+        if (opcode == OP_IF || opcode == OP_NOTIF) {
+            if (not_running) {
+                frames.push_back({true, false});
+                ++not_running;
+                continue;
+            }
+            const KnownValue cond{stack.Pop()};
+            if (cond != UNKNOWN) {
+                const bool runs{DataCarrierCastToBool(values.Get(cond)) == (opcode == OP_IF)};
+                if (!runs) {
+                    dead.at_if[offset] = true;
+                    ++not_running;
+                }
+                frames.push_back({true, runs});
+            } else {
+                frames.push_back({false, true});
+            }
+            continue;
+        }
+        if (opcode == OP_ELSE || opcode == OP_ENDIF) {
+            if (frames.empty()) break; // unbalanced: the script cannot run
+            Frame& frame{frames.back()};
+            const bool outer_running{not_running == (frame.running ? 0 : 1)};
+            if (opcode == OP_ELSE) {
+                if (frame.known && outer_running) {
+                    frame.running = !frame.running;
+                    if (frame.running) {
+                        --not_running;
+                    } else {
+                        ++not_running;
+                        dead.at_else[offset] = true;
+                    }
+                } else if (!frame.known) {
+                    // The else part starts from the state before the OP_IF, which is not kept
+                    stack.Forget();
+                    alt.Forget();
+                }
+            } else {
+                if (!frame.running) --not_running;
+                if (!frame.known && not_running == 0) {
+                    stack.Forget();
+                    alt.Forget();
+                }
+                frames.pop_back();
+            }
+            continue;
+        }
+        if (not_running) continue;
+
+        if (opcode <= OP_PUSHDATA4) {
+            stack.Push(values.Add(push));
+            continue;
+        }
+        if (opcode == OP_1NEGATE || (opcode >= OP_1 && opcode <= OP_16)) {
+            stack.Push(values.AddNum(opcode == OP_1NEGATE ? -1 : CScript::DecodeOP_N(opcode)));
+            continue;
+        }
+        switch (opcode) {
+        case OP_NOP: case OP_NOP1: case OP_CHECKLOCKTIMEVERIFY: case OP_CHECKSEQUENCEVERIFY:
+        case OP_NOP4: case OP_NOP5: case OP_NOP6: case OP_NOP7: case OP_NOP8: case OP_NOP9: case OP_NOP10:
+        case OP_CODESEPARATOR:
+            break;
+        case OP_VERIFY: case OP_DROP:
+            stack.Pop();
+            break;
+        case OP_2DROP:
+            stack.Pop();
+            stack.Pop();
+            break;
+        case OP_TOALTSTACK:
+            alt.Push(stack.Pop());
+            break;
+        case OP_FROMALTSTACK:
+            stack.Push(alt.Pop());
+            break;
+        case OP_DUP:
+            stack.Push(stack.Peek(0));
+            break;
+        case OP_OVER:
+            stack.Push(stack.Peek(1));
+            break;
+        case OP_2DUP: {
+            const KnownValue a{stack.Peek(1)}, b{stack.Peek(0)};
+            stack.Push(a);
+            stack.Push(b);
+            break;
+        }
+        case OP_3DUP: {
+            const KnownValue a{stack.Peek(2)}, b{stack.Peek(1)}, c{stack.Peek(0)};
+            stack.Push(a);
+            stack.Push(b);
+            stack.Push(c);
+            break;
+        }
+        case OP_2OVER: {
+            const KnownValue a{stack.Peek(3)}, b{stack.Peek(2)};
+            stack.Push(a);
+            stack.Push(b);
+            break;
+        }
+        case OP_IFDUP: {
+            const KnownValue top{stack.Peek(0)};
+            if (top == UNKNOWN) {
+                stack.Forget(); // whether it duplicates is not known, so neither is the depth
+            } else if (DataCarrierCastToBool(values.Get(top))) {
+                stack.Push(top);
+            }
+            break;
+        }
+        case OP_SIZE: {
+            const KnownValue top{stack.Peek(0)};
+            stack.Push(top == UNKNOWN ? UNKNOWN : values.AddNum(values.Get(top).size()));
+            break;
+        }
+        case OP_DEPTH:
+            stack.Push(UNKNOWN);
+            break;
+        case OP_NIP: case OP_SWAP: case OP_TUCK: case OP_ROT: case OP_2SWAP: case OP_2ROT: {
+            const size_t need{opcode == OP_2ROT ? 6u : opcode == OP_2SWAP ? 4u : opcode == OP_ROT ? 3u : 2u};
+            if (stack.size() < need) {
+                stack.Forget();
+                break;
+            }
+            if (opcode == OP_NIP) {
+                const KnownValue top{stack.Pop()};
+                stack.Pop();
+                stack.Push(top);
+            } else if (opcode == OP_SWAP) {
+                std::swap(stack.At(0), stack.At(1));
+            } else if (opcode == OP_TUCK) {
+                const KnownValue top{stack.Pop()}, second{stack.Pop()};
+                stack.Push(top);
+                stack.Push(second);
+                stack.Push(top);
+            } else if (opcode == OP_ROT) {
+                std::swap(stack.At(2), stack.At(1));
+                std::swap(stack.At(1), stack.At(0));
+            } else if (opcode == OP_2SWAP) {
+                std::swap(stack.At(3), stack.At(1));
+                std::swap(stack.At(2), stack.At(0));
+            } else {
+                std::vector<KnownValue> six;
+                for (int i{0}; i < 6; ++i) six.push_back(stack.Pop());
+                // six[5] and six[4] were deepest; they move to the top
+                for (int i{3}; i >= 0; --i) stack.Push(six[i]);
+                stack.Push(six[5]);
+                stack.Push(six[4]);
+            }
+            break;
+        }
+        case OP_PICK: case OP_ROLL: {
+            int64_t n{0};
+            const bool known{values.Num(stack.Pop(), n)};
+            if (!known || n < 0 || size_t(n) >= stack.size()) {
+                // Reaches below what is known, or the depth itself is unknown
+                if (opcode == OP_ROLL || !known) stack.Forget();
+                stack.Push(UNKNOWN);
+                break;
+            }
+            const KnownValue v{stack.At(n)};
+            if (opcode == OP_ROLL) {
+                if (size_t(n) > steps_left) return dead;
+                steps_left -= n;
+                std::vector<KnownValue> above;
+                for (int64_t i{0}; i < n; ++i) above.push_back(stack.Pop());
+                stack.Pop();
+                for (auto i{above.rbegin()}; i != above.rend(); ++i) stack.Push(*i);
+            }
+            stack.Push(v);
+            break;
+        }
+        case OP_EQUAL: case OP_EQUALVERIFY: {
+            const KnownValue b{stack.Pop()}, a{stack.Pop()};
+            if (opcode == OP_EQUAL) {
+                stack.Push(a == UNKNOWN || b == UNKNOWN ? UNKNOWN : values.Add(values.Get(a) == values.Get(b) ? std::vector<unsigned char>{1} : std::vector<unsigned char>{}));
+            }
+            break;
+        }
+        case OP_1ADD: case OP_1SUB: case OP_NEGATE: case OP_ABS: case OP_NOT: case OP_0NOTEQUAL: {
+            int64_t a{0};
+            if (!values.Num(stack.Pop(), a)) {
+                stack.Push(UNKNOWN);
+                break;
+            }
+            int64_t r{};
+            switch (opcode) {
+            case OP_1ADD: r = a + 1; break;
+            case OP_1SUB: r = a - 1; break;
+            case OP_NEGATE: r = -a; break;
+            case OP_ABS: r = a < 0 ? -a : a; break;
+            case OP_NOT: r = a == 0; break;
+            default: r = a != 0; break;
+            }
+            stack.Push(values.AddNum(r));
+            break;
+        }
+        case OP_ADD: case OP_SUB: case OP_BOOLAND: case OP_BOOLOR: case OP_NUMEQUAL: case OP_NUMEQUALVERIFY:
+        case OP_NUMNOTEQUAL: case OP_LESSTHAN: case OP_GREATERTHAN: case OP_LESSTHANOREQUAL:
+        case OP_GREATERTHANOREQUAL: case OP_MIN: case OP_MAX: {
+            int64_t a{0}, b{0};
+            const bool known_b{values.Num(stack.Pop(), b)};
+            const bool known_a{values.Num(stack.Pop(), a)};
+            if (opcode == OP_NUMEQUALVERIFY) break;
+            if (!known_a || !known_b) {
+                stack.Push(UNKNOWN);
+                break;
+            }
+            int64_t r{};
+            switch (opcode) {
+            case OP_ADD: r = a + b; break;
+            case OP_SUB: r = a - b; break;
+            case OP_BOOLAND: r = a != 0 && b != 0; break;
+            case OP_BOOLOR: r = a != 0 || b != 0; break;
+            case OP_NUMEQUAL: r = a == b; break;
+            case OP_NUMNOTEQUAL: r = a != b; break;
+            case OP_LESSTHAN: r = a < b; break;
+            case OP_GREATERTHAN: r = a > b; break;
+            case OP_LESSTHANOREQUAL: r = a <= b; break;
+            case OP_GREATERTHANOREQUAL: r = a >= b; break;
+            case OP_MIN: r = a < b ? a : b; break;
+            default: r = a > b ? a : b; break;
+            }
+            stack.Push(values.AddNum(r));
+            break;
+        }
+        case OP_WITHIN: {
+            int64_t hi{0}, lo{0}, x{0};
+            const bool known_hi{values.Num(stack.Pop(), hi)};
+            const bool known_lo{values.Num(stack.Pop(), lo)};
+            const bool known_x{values.Num(stack.Pop(), x)};
+            stack.Push(known_hi && known_lo && known_x ? values.AddNum(lo <= x && x < hi) : UNKNOWN);
+            break;
+        }
+        case OP_RIPEMD160: case OP_SHA1: case OP_SHA256: case OP_HASH160: case OP_HASH256:
+            stack.Pop();
+            stack.Push(UNKNOWN);
+            break;
+        case OP_CHECKSIG:
+            stack.Pop();
+            stack.Pop();
+            stack.Push(UNKNOWN);
+            break;
+        case OP_CHECKSIGVERIFY:
+            stack.Pop();
+            stack.Pop();
+            break;
+        case OP_CHECKSIGADD:
+            stack.Pop();
+            stack.Pop();
+            stack.Pop();
+            stack.Push(UNKNOWN);
+            break;
+        case OP_CHECKMULTISIG: case OP_CHECKMULTISIGVERIFY: {
+            int64_t keys{0}, sigs{0};
+            if (!values.Num(stack.Pop(), keys) || keys < 0 || keys > MAX_PUBKEYS_PER_MULTISIG) {
+                stack.Forget();
+            } else {
+                for (int64_t i{0}; i < keys; ++i) stack.Pop();
+                if (!values.Num(stack.Pop(), sigs) || sigs < 0 || sigs > keys) {
+                    stack.Forget();
+                } else {
+                    for (int64_t i{0}; i < sigs + 1; ++i) stack.Pop(); // the signatures and the dummy
+                }
+            }
+            if (opcode == OP_CHECKMULTISIG) stack.Push(UNKNOWN);
+            break;
+        }
+        case OP_RETURN:
+            return dead; // the script fails here
+        default:
+            // Not modeled: forget what is known rather than guess
+            stack.Forget();
+            alt.Forget();
+            break;
+        }
+    }
+    return dead;
+}
+
 size_t CScript::IsOLGA(const size_t remaining_outputs) const
 {
     if (!IsPayToWitnessScriptHash()) {
@@ -685,7 +1057,7 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
     return (pubkeys - provable - MAX_UNPROVEN_PUBKEYS) * CPubKey::COMPRESSED_SIZE + odd_bytes;
 }
 
-std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outputs, const CScriptWitness* witness) const
+std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outputs, const CScriptWitness* witness, const bool dead_branches) const
 {
     if (size_t olga_bytes = IsOLGA(remaining_outputs); olga_bytes) {
         return {0, olga_bytes};
@@ -697,6 +1069,10 @@ std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outpu
         }
     }
 
+    // Where a constant guard makes part of a conditional unreachable
+    const DeadParts dead{dead_branches ? FindDeadParts(*this) : DeadParts{}};
+    // A span that began at a conditional counts its guard push too; one that began at OP_ELSE does not
+    size_t span_guard{1};
     size_t counted{0};
     opcodetype opcode, last_opcode{OP_INVALIDOPCODE};
     std::vector<unsigned char> push_data;
@@ -720,20 +1096,42 @@ std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outpu
             return {size(), 0};
         }
 
-        // Match OP_FALSE OP_IF
+        // Count a conditional part that constants make unreachable: the
+        // OP_FALSE OP_IF inscription envelope, and with dead_branches any part
+        // FindDeadParts marks, including an OP_ELSE part. Pushes there cannot
+        // affect the spend, so they are data. With dead_branches an OP_ELSE
+        // switches between the counted and the live part; without it only the
+        // envelope counts, through its OP_ENDIF.
+        const size_t offset{size_t(opcode_it - begin())};
+        const bool dead_guard{(opcode == OP_IF && last_opcode == OP_FALSE) ||
+                              (dead_branches && (opcode == OP_IF || opcode == OP_NOTIF) && dead.at_if[offset])};
+        if (dead_branches && !inside_noop && opcode == OP_ELSE && dead.at_else[offset]) {
+            inside_noop = 1;
+            data_began = opcode_it;
+            span_guard = 0;
+            continue;
+        }
+        if (dead_guard && !inside_noop) span_guard = 1;
+
         if (inside_noop) {
             switch (opcode) {
             case OP_IF: case OP_NOTIF:
                 ++inside_noop;
                 break;
+            case OP_ELSE:
+                if (dead_branches && inside_noop == 1) {
+                    counted += opcode_it - data_began + span_guard;
+                    inside_noop = 0;
+                }
+                break;
             case OP_ENDIF:
                 if (0 == --inside_noop) {
-                    counted += it - data_began + 1;
+                    counted += it - data_began + span_guard;
                 }
                 break;
             default: /* do nothing */;
             }
-        } else if (opcode == OP_IF && last_opcode == OP_FALSE) {
+        } else if (dead_guard) {
             inside_noop = 1;
             data_began = opcode_it;
         // Match <data> OP_DROP, or a run of <data>/pushnums ... OP_DROP/OP_2DROP (bare/BIP-110 envelope)
