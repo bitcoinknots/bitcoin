@@ -161,6 +161,44 @@ BOOST_FIXTURE_TEST_CASE(chainstatemanager_rebalance_caches, TestChain100Setup)
     BOOST_CHECK_CLOSE(double(c2.m_coinsdb_cache_size_bytes), max_cache * 0.95, 1);
 }
 
+BOOST_FIXTURE_TEST_CASE(chainstatemanager_ibd_exit_after_loading_blocks, ChainTestingSetup)
+{
+    CBlockIndex tip;
+    ChainstateManager& chainman{*Assert(m_node.chainman)};
+    auto apply{[&](bool cached_finished_ibd, bool loading_blocks, bool tip_exists, bool enough_work, bool tip_recent) {
+        LOCK(::cs_main);
+        chainman.ResetChainstates();
+        chainman.InitializeChainstate(m_node.mempool.get());
+
+        const auto recent_time{Now<NodeSeconds>() - chainman.m_options.max_tip_age};
+
+        chainman.m_cached_finished_ibd.store(cached_finished_ibd, std::memory_order_relaxed);
+        chainman.m_blockman.m_importing = loading_blocks;
+        if (tip_exists) {
+            tip.nChainWork = chainman.MinimumChainWork() - (enough_work ? 0 : 1);
+            tip.nTime = (recent_time - (tip_recent ? 0h : 100h)).time_since_epoch().count();
+            chainman.ActiveChain().SetTip(tip);
+        } else {
+            assert(!chainman.ActiveChain().Tip());
+        }
+        chainman.UpdateIBDStatus();
+    }};
+
+    for (const bool cached_finished_ibd : {false, true}) {
+        for (const bool loading_blocks : {false, true}) {
+            for (const bool tip_exists : {false, true}) {
+                for (const bool enough_work : {false, true}) {
+                    for (const bool tip_recent : {false, true}) {
+                        apply(cached_finished_ibd, loading_blocks, tip_exists, enough_work, tip_recent);
+                        const bool expected_ibd = !cached_finished_ibd && (loading_blocks || !tip_exists || !enough_work || !tip_recent);
+                        BOOST_CHECK_EQUAL(chainman.IsInitialBlockDownload(), expected_ibd);
+                    }
+                }
+            }
+        }
+    }
+}
+
 struct SnapshotTestSetup : TestChain100Setup {
     // Run with coinsdb on the filesystem to support, e.g., moving invalidated
     // chainstate dirs to "*_invalid".
