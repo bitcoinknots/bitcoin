@@ -107,6 +107,7 @@ struct Params {
     int SegwitHeight;
     /** Block height at which BLAKE2b hardfork becomes active */
     int Blake2bHeight{std::numeric_limits<int>::max()};
+    std::vector<unsigned char> Blake2bHeadline;
     uint8_t Blake2bTargetShift{20};
     /**
      * RDTS (BIP110 ReducedData Temporary Softfork) deployment expiry.
