@@ -13,6 +13,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <limits>
 #include <memory>
 
 // NOTE: When adjusting this, update rpcnet:setban's help ("24h")
@@ -23,6 +24,7 @@ static constexpr std::chrono::minutes DUMP_BANS_INTERVAL{15};
 
 class CClientUIInterface;
 class CNetAddr;
+class CScheduler;
 class CSubNet;
 
 // Banman manages two related but distinct concepts:
@@ -62,6 +64,8 @@ public:
     BanMan(fs::path ban_file, CClientUIInterface* client_interface, int64_t default_ban_time);
     void Ban(const CNetAddr& net_addr, int64_t ban_time_offset = 0, bool since_unix_epoch = false) EXCLUSIVE_LOCKS_REQUIRED(!m_banned_mutex);
     void Ban(const CSubNet& sub_net, int64_t ban_time_offset = 0, bool since_unix_epoch = false) EXCLUSIVE_LOCKS_REQUIRED(!m_banned_mutex);
+    void SetScheduler(CScheduler& scheduler) EXCLUSIVE_LOCKS_REQUIRED(!m_banned_mutex);
+    void EnsureSweepScheduled() EXCLUSIVE_LOCKS_REQUIRED(!m_banned_mutex);
     void Discourage(const CNetAddr& net_addr) EXCLUSIVE_LOCKS_REQUIRED(!m_banned_mutex);
     void ClearBanned() EXCLUSIVE_LOCKS_REQUIRED(!m_banned_mutex);
 
@@ -83,8 +87,15 @@ private:
     void LoadBanlist() EXCLUSIVE_LOCKS_REQUIRED(!m_banned_mutex);
     //!clean unused entries (if bantime has expired)
     void SweepBanned() EXCLUSIVE_LOCKS_REQUIRED(m_banned_mutex);
+    void SweepBannedAndSchedule() EXCLUSIVE_LOCKS_REQUIRED(m_banned_mutex);
+    void SweepBannedAndSchedule(uint64_t expected_seq) EXCLUSIVE_LOCKS_REQUIRED(!m_banned_mutex);
+    void ScheduleNextSweep() EXCLUSIVE_LOCKS_REQUIRED(m_banned_mutex);
 
     Mutex m_banned_mutex;
+    CScheduler* m_scheduler GUARDED_BY(m_banned_mutex){nullptr};
+    bool m_sweep_started GUARDED_BY(m_banned_mutex){false};
+    int64_t m_next_sweep_time GUARDED_BY(m_banned_mutex){std::numeric_limits<int64_t>::max()};
+    uint64_t m_sweep_seq GUARDED_BY(m_banned_mutex){0};
     banmap_t m_banned GUARDED_BY(m_banned_mutex);
     bool m_is_dirty GUARDED_BY(m_banned_mutex){false};
     CClientUIInterface* m_client_interface = nullptr;
