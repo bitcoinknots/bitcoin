@@ -423,7 +423,6 @@ void TxConfirmStats::Read(AutoFile& filein, size_t numBuckets)
     // Read data file and do some very basic sanity checking
     // buckets and bucketMap are not updated yet, so don't access them
     // If there is a read failure, we'll just discard this entire object anyway
-    size_t maxConfirms, maxPeriods;
 
     // The current version will store the decay with each individual TxConfirmStats and also keep a scale factor
     filein >> Using<EncodedDoubleFormatter>(decay);
@@ -444,10 +443,9 @@ void TxConfirmStats::Read(AutoFile& filein, size_t numBuckets)
         throw std::runtime_error("Corrupt estimates file. Mismatch in tx count bucket count");
     }
     filein >> Using<VectorFormatter<VectorFormatter<EncodedDoubleFormatter>>>(confAvg);
-    maxPeriods = confAvg.size();
-    maxConfirms = scale * maxPeriods;
+    const size_t maxPeriods = confAvg.size();
 
-    if (maxConfirms <= 0 || maxConfirms > 6 * 24 * 7) { // one week
+    if (maxPeriods == 0 || scale > (6 * 24 * 7) / maxPeriods) { // one week
         throw std::runtime_error("Corrupt estimates file.  Must maintain estimates for between 1 and 1008 (one week) confirms");
     }
     for (unsigned int i = 0; i < maxPeriods; i++) {
@@ -470,6 +468,7 @@ void TxConfirmStats::Read(AutoFile& filein, size_t numBuckets)
     // to match the number of confirms and buckets
     resizeInMemoryCounters(numBuckets);
 
+    const size_t maxConfirms = scale * maxPeriods;
     LogDebug(BCLog::ESTIMATEFEE, "Reading estimates: %u buckets counting confirms up to %u blocks\n",
              numBuckets, maxConfirms);
 }
