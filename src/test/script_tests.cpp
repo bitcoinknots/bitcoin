@@ -1623,8 +1623,8 @@ BOOST_AUTO_TEST_CASE(script_HasValidOps)
     BOOST_CHECK(!script.HasValidOps());
 }
 
-static std::string DatacarrierBytesStr(const CScript &script, const size_t remaining_outputs = 0) {
-    auto dcb = script.DatacarrierBytes(remaining_outputs);
+static std::string DatacarrierBytesStr(const CScript &script, const size_t remaining_outputs = 0, const bool dead_branches = true) {
+    auto dcb = script.DatacarrierBytes(remaining_outputs, nullptr, dead_branches);
     return strprintf("%s+%s", dcb.first, dcb.second);
 }
 
@@ -1717,6 +1717,86 @@ BOOST_AUTO_TEST_CASE(script_DataCarrierBytes)
     BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(olga_header, 1));
     // OGLA with extra outputs still is OLGA
     BOOST_CHECK_EQUAL("0+82", DatacarrierBytesStr(olga_header, 3));
+
+    // A dead branch guarded by a true constant before OP_NOTIF is data, the
+    // mirror of the OP_FALSE OP_IF envelope above (JXL-n-hide witness shape).
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_1 << OP_NOTIF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_16 << OP_NOTIF << OP_7 << OP_ENDIF));
+    // Empty dead branch counts its span, same as OP_FALSE OP_IF OP_ENDIF.
+    BOOST_CHECK_EQUAL("0+3", DatacarrierBytesStr(CScript() << OP_TRUE << OP_NOTIF << OP_ENDIF));
+    // A live branch is not data: false before OP_NOTIF, or true before OP_IF.
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << OP_0 << OP_NOTIF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << OP_1 << OP_IF << OP_7 << OP_ENDIF));
+    // A guard that depends on the witness or a signature is not counted: this
+    // is how spendable scripts branch (Lightning, miniscript)
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << OP_DUP << OP_IF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << OP_SIZE << 32 << OP_EQUAL << OP_NOTIF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << OP_1 << OP_CHECKSIG << OP_NOTIF << OP_7 << OP_ENDIF));
+    // A guard that constants decide is counted however it is computed
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_1 << OP_NOP << OP_NOTIF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_1 << OP_DUP << OP_DROP << OP_NOTIF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_1 << OP_TOALTSTACK << OP_FROMALTSTACK << OP_NOTIF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_1 << OP_2 << OP_EQUAL << OP_IF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << OP_1 << OP_1 << OP_EQUAL << OP_IF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_2 << OP_3 << OP_ADD << OP_5 << OP_NUMNOTEQUAL << OP_IF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_1 << OP_16 << OP_CHECKSEQUENCEVERIFY << OP_DROP << OP_NOTIF << OP_7 << OP_ENDIF));
+    // A constant pushed before a witness-dependent conditional is still known inside it
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_DUP << OP_IF << OP_1 << OP_NOTIF << OP_7 << OP_ENDIF << OP_ENDIF));
+    // Lightning scripts (BOLT 3) count nothing
+    const std::vector<unsigned char> key(33, 0x02), hash(20, 0x11);
+    const CScript to_local{CScript() << OP_IF << key << OP_ELSE << 144 << OP_CHECKSEQUENCEVERIFY << OP_DROP << key << OP_ENDIF << OP_CHECKSIG};
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(to_local));
+    const CScript offered_htlc{CScript() << OP_DUP << OP_HASH160 << hash << OP_EQUAL << OP_IF << OP_CHECKSIG << OP_ELSE << key << OP_SWAP
+        << OP_SIZE << 32 << OP_EQUAL << OP_NOTIF << OP_DROP << 2 << OP_SWAP << key << 2 << OP_CHECKMULTISIG << OP_ELSE << OP_HASH160
+        << hash << OP_EQUALVERIFY << OP_CHECKSIG << OP_ENDIF << OP_ENDIF};
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(offered_htlc));
+    const CScript anchor{CScript() << key << OP_CHECKSIG << OP_IFDUP << OP_NOTIF << OP_16 << OP_CHECKSEQUENCEVERIFY << OP_ENDIF};
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(anchor));
+    // The guard can be a data push, judged by its value: a zero push is false
+    // (dead OP_IF), a one push is true (dead OP_NOTIF); the reverse is live.
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << "00"_hex << OP_IF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << "01"_hex << OP_NOTIF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << "01"_hex << OP_IF << OP_7 << OP_ENDIF));
+    // The witness script shape from JXL-n-hide tx 23e8f946...: OP_1 OP_NOTIF,
+    // six 255-byte pushes, OP_ENDIF OP_1. The whole dead branch is counted.
+    CScript jxl_witness = CScript() << OP_1 << OP_NOTIF;
+    for (int i = 0; i < 6; ++i) jxl_witness << std::vector<unsigned char>(255, 0xab);
+    jxl_witness << OP_ENDIF << OP_1;
+    BOOST_CHECK_EQUAL("0+1545", DatacarrierBytesStr(jxl_witness));
+
+    // OP_ELSE switches between the counted and the live part: the live else of
+    // a dead branch is not data, and the dead else of a live one is
+    BOOST_CHECK_EQUAL("0+3", DatacarrierBytesStr(CScript() << OP_0 << OP_IF << OP_7 << OP_ELSE << OP_8 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+3", DatacarrierBytesStr(CScript() << OP_1 << OP_IF << OP_7 << OP_ELSE << OP_8 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+13", DatacarrierBytesStr(CScript() << OP_1 << OP_IF << OP_ELSE << zeros(10) << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+13", DatacarrierBytesStr(CScript() << OP_0 << OP_NOTIF << OP_ELSE << zeros(10) << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << OP_DUP << OP_IF << OP_7 << OP_ELSE << OP_8 << OP_ENDIF));
+    // Repeated OP_ELSE keeps toggling, as the interpreter does
+    BOOST_CHECK_EQUAL("0+6", DatacarrierBytesStr(CScript() << OP_0 << OP_IF << OP_7 << OP_ELSE << OP_8 << OP_ELSE << OP_9 << OP_ENDIF));
+    // A dead branch nested in a live else is found
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_DUP << OP_IF << OP_ELSE << OP_0 << OP_IF << OP_7 << OP_ENDIF << OP_ENDIF));
+
+    // With -rejectdeadbranches=0 only the OP_FALSE OP_IF envelope counts, as before, through its OP_ENDIF
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(jxl_witness, 0, false));
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << OP_1 << OP_NOTIF << OP_7 << OP_ENDIF, 0, false));
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << "00"_hex << OP_IF << OP_7 << OP_ENDIF, 0, false));
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_FALSE << OP_IF << OP_7 << OP_ENDIF, 0, false));
+    BOOST_CHECK_EQUAL("0+13", DatacarrierBytesStr(CScript() << zeros(11) << OP_DROP, 0, false));
+    BOOST_CHECK_EQUAL("0+6", DatacarrierBytesStr(CScript() << OP_0 << OP_IF << OP_7 << OP_ELSE << OP_8 << OP_ENDIF, 0, false));
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << OP_1 << OP_IF << OP_ELSE << zeros(10) << OP_ENDIF, 0, false));
+
+    // Following constants costs one step per opcode plus each OP_ROLL's depth, at most
+    // four per byte: one deep roll before the guard is followed, a string of them is not
+    const CScript dead_tail = CScript() << OP_1 << OP_NOTIF << OP_7 << OP_ENDIF;
+    const auto deep_rolls = [&](int rolls) {
+        CScript s;
+        for (int i{0}; i < 999; ++i) s << OP_1;
+        for (int i{0}; i < rolls; ++i) s << CScriptNum{998} << OP_ROLL;
+        s.insert(s.end(), dead_tail.begin(), dead_tail.end());
+        return s;
+    };
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(deep_rolls(1)));
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(deep_rolls(10)));
 }
 
 BOOST_AUTO_TEST_CASE(script_DataCarrierBytes_unproven_pubkeys)
