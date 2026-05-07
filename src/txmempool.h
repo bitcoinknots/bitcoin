@@ -329,7 +329,7 @@ public:
 
     static const int ROLLING_FEE_HALFLIFE = 60 * 60 * 12; // public only for testing
 
-    struct CTxMemPoolEntry_Indices final : boost::multi_index::indexed_by<
+    using CTxMemPoolEntry_Indices_ = boost::multi_index::indexed_by<
             // sorted by txid
             boost::multi_index::hashed_unique<mempoolentry_txid, SaltedTxidHasher>,
             // sorted by wtxid
@@ -356,8 +356,12 @@ public:
                 boost::multi_index::identity<CTxMemPoolEntry>,
                 CompareTxMemPoolEntryByAncestorFee
             >
-        >
-        {};
+        >;
+#if BOOST_VERSION >= 109100
+    using CTxMemPoolEntry_Indices = CTxMemPoolEntry_Indices_;
+#else
+    struct CTxMemPoolEntry_Indices final : CTxMemPoolEntry_Indices_{};
+#endif
     typedef boost::multi_index_container<
         CTxMemPoolEntry,
         CTxMemPoolEntry_Indices
