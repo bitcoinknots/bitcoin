@@ -417,7 +417,7 @@ static inline JSONRPCRequest transformNamedArguments(const JSONRPCRequest& in, c
         if (named_only) {
             if (options.empty()) {
                 if (options.isNull()) continue;
-                if (positional_args && positional_args.mapped()->size() > (size_t)hole) {
+                if (positional_args && positional_args.mapped()->size() > out.params.size() + (size_t)hole) {
                     // some alternative to options is specified positionally; we can't use options at all
                     options = UniValue::VNULL;
                     continue;
