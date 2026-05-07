@@ -208,6 +208,7 @@ BASE_SCRIPTS = [
     'wallet_txn_clone.py',
     'wallet_txn_clone.py --segwit',
     'mining_coin_age_priority.py',
+    'mining_priority_fee.py',
     'rpc_getchaintips.py',
     'rpc_misc.py',
     'p2p_1p1c_network.py',
