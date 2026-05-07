@@ -86,6 +86,7 @@ struct MemPoolOptions {
     bool permit_bare_multisig{DEFAULT_PERMIT_BAREMULTISIG};
     bool reject_parasites{DEFAULT_REJECT_PARASITES};
     bool reject_tokens{DEFAULT_REJECT_TOKENS};
+    bool subdustfeepenalty{DEFAULT_SUBDUSTFEEPENALTY};
     bool accept_non_std_datacarrier{DEFAULT_ACCEPT_NON_STD_DATACARRIER};
     bool require_standard{true};
     bool acceptunknownwitness{DEFAULT_ACCEPTUNKNOWNWITNESS};
