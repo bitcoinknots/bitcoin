@@ -191,7 +191,11 @@ bool DumpMempool(const CTxMemPool& pool, const fs::path& dump_path, FopenFn mock
         for (const auto& i : vinfo) {
             file << TX_WITH_WITNESS(*(i.tx));
             file << int64_t{count_seconds(i.m_time)};
-            file << int64_t{i.nFeeDelta};
+            // Persist only explicit fee deltas. Admission recalculates automatic
+            // policy penalties; saving them here would turn them into manual
+            // prioritisation and apply them again on every reload.
+            const auto delta = mapDeltas.find(i.tx->GetHash());
+            file << int64_t{delta == mapDeltas.end() ? 0 : delta->second};
             mapDeltas.erase(i.tx->GetHash());
         }
 
