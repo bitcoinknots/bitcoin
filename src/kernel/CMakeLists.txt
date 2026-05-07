@@ -88,6 +88,7 @@ add_library(bitcoinkernel
 target_link_libraries(bitcoinkernel
   PRIVATE
     core_interface
+    external_lib_interface
     bitcoin_clientversion
     bitcoin_crypto
     leveldb
