@@ -3646,7 +3646,11 @@ int CWallet::GetTxBlocksToMaturity(const CWalletTx& wtx) const
     }
     int chain_depth = GetTxDepthInMainChain(wtx);
     assert(chain_depth >= 0); // coinbase tx should not be conflicted
-    const int maturity{HaveChain() ? chain().coinbaseMaturity() : COINBASE_MATURITY};
+    const int max_maturity{HaveChain() ? chain().maxCoinbaseMaturity() : COINBASE_MATURITY};
+    // Retain the extra-confirmation margin, but avoid taking cs_main for old rewards.
+    if (chain_depth > max_maturity) return 0;
+    const auto* confirmed{wtx.state<TxStateConfirmed>()};
+    const int maturity{HaveChain() ? chain().coinbaseMaturity(confirmed ? confirmed->confirmed_block_hash : uint256{}) : COINBASE_MATURITY};
     return std::max(0, (maturity + 1) - chain_depth);
 }
 
