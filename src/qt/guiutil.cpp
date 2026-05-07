@@ -1277,6 +1277,12 @@ QString MakeHtmlLink(const QString& source, const QString& link)
         QLatin1String("<a href=\"") + link + QLatin1String("\">") + link + QLatin1String("</a>"));
 }
 
+QString MakeHtmlLink(const QString& source)
+{
+    static const QRegularExpression uri(QStringLiteral(R"#(([\s>]|^)((https)://([\w./-]+))(?=\.?[\s<]|\.?$))#"), QRegularExpression::InvertedGreedinessOption);
+    return QString(source).replace(uri, QStringLiteral(R"#(\1<a href="\2">\3&#x2060;:&#x2060;/&#x2060;/&#x2060;\4</a>)#"));
+}
+
 void PrintSlotException(
     const std::exception* exception,
     const QObject* sender,
