@@ -101,6 +101,7 @@ add_executable(fuzz
   script_descriptor_cache.cpp
   script_flags.cpp
   script_format.cpp
+  unified_sighash.cpp
   script_interpreter.cpp
   script_ops.cpp
   script_parsing.cpp
