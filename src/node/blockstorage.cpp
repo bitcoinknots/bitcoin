@@ -53,6 +53,7 @@ static constexpr uint8_t DB_FLAG{'F'};
 static constexpr uint8_t DB_REINDEX_FLAG{'R'};
 static constexpr uint8_t DB_LAST_BLOCK{'l'};
 static constexpr uint8_t DB_PRUNE_LOCK{'L'};
+static constexpr uint8_t DB_CHAINSTATE_REVALIDATION_MARKER{'V'};
 // Keys used in previous version that might still be found in the DB:
 // BlockTreeDB::DB_TXINDEX_BLOCK{'T'};
 // BlockTreeDB::DB_TXINDEX{'t'}
@@ -140,6 +141,16 @@ bool BlockTreeDB::ReadFlag(const std::string& name, bool& fValue)
     }
     fValue = ch == uint8_t{'1'};
     return true;
+}
+
+bool BlockTreeDB::WriteChainstateRevalidationMarker(const std::string& name, const node::ChainstateRevalidationMarker& marker)
+{
+    return Write(std::make_pair(DB_CHAINSTATE_REVALIDATION_MARKER, name), marker, true);
+}
+
+bool BlockTreeDB::ReadChainstateRevalidationMarker(const std::string& name, node::ChainstateRevalidationMarker& marker)
+{
+    return Read(std::make_pair(DB_CHAINSTATE_REVALIDATION_MARKER, name), marker);
 }
 
 bool BlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, std::function<CBlockIndex*(const uint256&)> insertBlockIndex, const util::SignalInterrupt& interrupt)

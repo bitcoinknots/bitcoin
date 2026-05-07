@@ -1566,6 +1566,14 @@ static ChainstateLoadResult InitAndLoadChainstate(
     };
     auto [status, error] = catch_exceptions([&] { return LoadChainstate(chainman, cache_sizes, options); });
     if (status == node::ChainstateLoadStatus::SUCCESS) {
+        if (!ShutdownRequested(node) && !chainman.GetConsensus().chainstate_revalidation_deployments.empty()) {
+            uiInterface.InitMessage(_("Revalidating blocks…"));
+            bilingual_str revalidation_error;
+            if (!chainman.ActiveChainstate().RewindForChainstateRevalidation(revalidation_error)) {
+                return {node::ChainstateLoadStatus::FAILURE, revalidation_error};
+            }
+        }
+
         uiInterface.InitMessage(_("Verifying blocks…"));
         if (chainman.m_blockman.m_have_pruned && options.check_blocks > MIN_BLOCKS_TO_KEEP) {
             LogWarning("pruned datadir may not have more than %d blocks; only checking available blocks\n",

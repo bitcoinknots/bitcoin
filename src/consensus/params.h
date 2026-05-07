@@ -6,11 +6,13 @@
 #ifndef BITCOIN_CONSENSUS_PARAMS_H
 #define BITCOIN_CONSENSUS_PARAMS_H
 
+#include <consensus/consensus.h>
 #include <uint256.h>
 
 #include <chrono>
 #include <limits>
 #include <map>
+#include <string>
 #include <vector>
 
 namespace Consensus {
@@ -80,6 +82,34 @@ struct BIP9Deployment {
 };
 
 /**
+ * Chainstate record of deployment enforcement.
+ *
+ * NOTE: Currently this only turns "valid" into "indeterminate" (and only
+ * for ConnectBlock checks). It cannot turn "invalid" into "indeterminate"
+ * and therefore is not safe to use for hardforks, only softforks.
+ */
+struct ChainstateRevalidationDeployment {
+    /** Deployment name used for persisted state.
+     *
+     * Note that if enforcement isn't exactly the same (eg, an earlier
+     * CoinbaseMaturityLongStartHeight), this must be changed.
+     */
+    std::string name;
+    /**
+     * First block height whose cached validation may be invalidated.
+     *
+     * The current revalidation framework only demotes cached validation back
+     * to BLOCK_VALID_TRANSACTIONS. It is only appropriate for deployments
+     * whose new checks are re-run by ConnectBlock() after that point. Rules
+     * checked by CheckBlock() or ContextualCheckBlock() need additional block
+     * index support before they can use this safely.
+     */
+    int start_height{std::numeric_limits<int>::max()};
+    /** Last block height whose cached validation may be invalidated. */
+    int stop_height{std::numeric_limits<int>::max()};
+};
+
+/**
  * Parameters that influence chain consensus.
  */
 struct Params {
@@ -123,6 +153,15 @@ struct Params {
      * behaviour is unchanged on chains that do not set it.
      */
     int64_t RdtsExpiryTime{std::numeric_limits<int64_t>::min()};
+    int CoinbaseMaturityLong{COINBASE_MATURITY};
+    int CoinbaseMaturityLongStartHeight{std::numeric_limits<int>::max()};
+    int CoinbaseMaturityLongEnforceHeight{std::numeric_limits<int>::max()};
+    int CoinbaseMaturityLongReleaseHeight{std::numeric_limits<int>::max()};
+    bool CoinbaseMaturityLongActiveAt(int height) const
+    {
+        return height >= CoinbaseMaturityLongEnforceHeight && height < CoinbaseMaturityLongReleaseHeight;
+    }
+    std::vector<ChainstateRevalidationDeployment> chainstate_revalidation_deployments;
     /** Don't warn about unknown BIP 9 activations below this height.
      * This prevents us from warning about the CSV and segwit activations. */
     int MinBIP9WarningHeight;

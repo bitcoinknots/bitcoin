@@ -415,6 +415,41 @@ BOOST_FIXTURE_TEST_CASE(coin_mark_dirty_immature_credit, TestChain100Setup)
     BOOST_CHECK_EQUAL(CachedTxGetImmatureCredit(wallet, wtx, ISMINE_SPENDABLE), 50*COIN);
 }
 
+BOOST_FIXTURE_TEST_CASE(immature_coinbase_credit_ignores_wallet_spends, TestChain100Setup)
+{
+    auto wallet{CreateSyncedWallet(*m_node.chain, WITH_LOCK(Assert(m_node.chainman)->GetMutex(), return m_node.chainman->ActiveChain()), coinbaseKey)};
+    const int tip_height{WITH_LOCK(Assert(m_node.chainman)->GetMutex(), return m_node.chainman->ActiveChain().Height())};
+    const uint256 tip_hash{WITH_LOCK(Assert(m_node.chainman)->GetMutex(), return m_node.chainman->ActiveChain().Tip()->GetBlockHash())};
+
+    CMutableTransaction coinbase{*m_coinbase_txns.back()};
+    coinbase.vout[0].nValue = 2 * COIN;
+    coinbase.vout.emplace_back(COIN, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
+    const auto coinbase_tx{MakeTransactionRef(coinbase)};
+    const auto coinbase_hash{coinbase_tx->GetHash()};
+    const uint32_t unspent_vout{static_cast<uint32_t>(coinbase_tx->vout.size() - 1)};
+
+    CMutableTransaction spend;
+    spend.vin.emplace_back(COutPoint{coinbase_hash, 0});
+    spend.vout.emplace_back(coinbase_tx->vout[0].nValue, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
+
+    {
+        LOCK(wallet->cs_wallet);
+        wallet->SetLastBlockProcessed(tip_height, tip_hash);
+        BOOST_REQUIRE(wallet->AddToWallet(coinbase_tx, TxStateConfirmed{tip_hash, tip_height, /*index=*/0}));
+
+        const CWalletTx& coinbase_wtx{wallet->mapWallet.at(coinbase_hash)};
+        BOOST_CHECK_EQUAL(CachedTxGetImmatureCredit(*wallet, coinbase_wtx, ISMINE_SPENDABLE), coinbase_tx->vout[0].nValue + coinbase_tx->vout[unspent_vout].nValue);
+    }
+
+    wallet->transactionAddedToMempool(MakeTransactionRef(spend));
+
+    LOCK(wallet->cs_wallet);
+    const CWalletTx& coinbase_wtx{wallet->mapWallet.at(coinbase_hash)};
+    BOOST_CHECK(wallet->IsSpent(COutPoint{coinbase_hash, 0}));
+    BOOST_CHECK_GT(wallet->GetTxBlocksToMaturity(coinbase_wtx), 0);
+    BOOST_CHECK_EQUAL(CachedTxGetImmatureCredit(*wallet, coinbase_wtx, ISMINE_SPENDABLE), coinbase_tx->vout[unspent_vout].nValue);
+}
+
 static int64_t AddTx(ChainstateManager& chainman, CWallet& wallet, uint32_t lockTime, int64_t mockTime, int64_t blockTime)
 {
     CMutableTransaction tx;

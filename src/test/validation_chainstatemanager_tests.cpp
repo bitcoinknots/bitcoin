@@ -206,13 +206,15 @@ struct SnapshotTestSetup : TestChain100Setup {
     // Note that this means the tests run considerably slower than in-memory DB
     // tests, but we can't otherwise test this functionality since it relies on
     // destructive filesystem operations.
-    SnapshotTestSetup() : TestChain100Setup{
-                              {},
-                              {
-                                  .coins_db_in_memory = false,
-                                  .block_tree_db_in_memory = false,
-                              },
-                          }
+    explicit SnapshotTestSetup(std::vector<const char*> extra_args = {})
+        : TestChain100Setup{
+              ChainType::REGTEST,
+              {
+                  .extra_args = std::move(extra_args),
+                  .coins_db_in_memory = false,
+                  .block_tree_db_in_memory = false,
+              },
+          }
     {
     }
 
@@ -663,6 +665,44 @@ BOOST_FIXTURE_TEST_CASE(chainstatemanager_snapshot_init, SnapshotTestSetup)
             }
         }
     }
+}
+
+struct SnapshotRevalidationTestSetup : SnapshotTestSetup {
+    SnapshotRevalidationTestSetup()
+        : SnapshotTestSetup{{"-testcoinbasematuritylong=1:2:103"}}
+    {
+    }
+};
+
+BOOST_FIXTURE_TEST_CASE(chainstatemanager_snapshot_revalidation_waits_for_background, SnapshotRevalidationTestSetup)
+{
+    this->SetupSnapshot();
+
+    ChainstateManager& chainman = *Assert(m_node.chainman);
+    node::ChainstateRevalidationMarker marker;
+    auto has_marker = [&]() EXCLUSIVE_LOCKS_REQUIRED(::cs_main) {
+        return chainman.m_blockman.m_block_tree_db->ReadChainstateRevalidationMarker("long_coinbase_maturity", marker);
+    };
+
+    // The deployment ends before the snapshot base, so the active snapshot
+    // chainstate must not claim to have revalidated it. The background
+    // chainstate is responsible for validating pre-snapshot history.
+    BOOST_CHECK(!WITH_LOCK(::cs_main, return has_marker()));
+
+    bilingual_str error;
+    BOOST_CHECK(chainman.ActiveChainstate().RewindForChainstateRevalidation(error));
+    BOOST_CHECK(error.empty());
+    BOOST_CHECK_EQUAL(WITH_LOCK(::cs_main, return chainman.ActiveHeight()), 210);
+    BOOST_CHECK(!WITH_LOCK(::cs_main, return has_marker()));
+
+    SnapshotCompletionResult res;
+    res = WITH_LOCK(::cs_main, return chainman.MaybeCompleteSnapshotValidation());
+    BOOST_CHECK_EQUAL(res, SnapshotCompletionResult::SUCCESS);
+    BOOST_REQUIRE(WITH_LOCK(::cs_main, return has_marker()));
+    BOOST_CHECK_EQUAL(marker.start_height, 2);
+    BOOST_CHECK_EQUAL(marker.stop_height, 102);
+    const uint256 marker_block_hash = WITH_LOCK(::cs_main, return chainman.ActiveChain()[marker.stop_height]->GetBlockHash());
+    BOOST_CHECK_EQUAL(marker.block_hash, marker_block_hash);
 }
 
 BOOST_FIXTURE_TEST_CASE(chainstatemanager_snapshot_completion, SnapshotTestSetup)
