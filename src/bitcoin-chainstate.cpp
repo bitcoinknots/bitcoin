@@ -23,6 +23,7 @@
 #include <logging.h>
 #include <node/blockstorage.h>
 #include <node/chainstate.h>
+#include <node/dbcache.h>
 #include <random.h>
 #include <script/sigcache.h>
 #include <util/chaintype.h>
@@ -106,7 +107,7 @@ int main(int argc, char* argv[])
     };
     auto notifications = std::make_unique<KernelNotifications>();
 
-    kernel::CacheSizes cache_sizes{DEFAULT_KERNEL_CACHE};
+    kernel::CacheSizes cache_sizes{node::GetDefaultDBCache()};
 
     // SETUP: Chainstate
     auto chainparams = CChainParams::Main();
