@@ -116,7 +116,7 @@ void BerkeleyEnvironment::Close()
 
     int ret = dbenv->close(0);
     if (ret != 0)
-        LogPrintf("BerkeleyEnvironment::Close: Error %d closing database environment: %s\n", ret, DbEnv::strerror(ret));
+        LogWarning("BerkeleyEnvironment::Close: Error %d closing database environment: %s", ret, DbEnv::strerror(ret));
     if (!fMockDb)
         DbEnv(uint32_t{0}).remove(strPath.c_str(), 0);
 
@@ -153,7 +153,7 @@ bool BerkeleyEnvironment::Open(bilingual_str& err)
     fs::path pathIn = fs::PathFromString(strPath);
     TryCreateDirectories(pathIn);
     if (util::LockDirectory(pathIn, ".walletlock") != util::LockResult::Success) {
-        LogPrintf("Cannot obtain a lock on wallet directory %s. Another instance may be using it.\n", strPath);
+        LogWarning("Cannot obtain a lock on wallet directory %s. Another instance may be using it.", strPath);
         err = strprintf(_("Error initializing wallet database environment %s!"), fs::quoted(fs::PathToString(Directory())));
         return false;
     }
@@ -189,10 +189,10 @@ bool BerkeleyEnvironment::Open(bilingual_str& err)
                              nEnvFlags,
                          S_IRUSR | S_IWUSR);
     if (ret != 0) {
-        LogPrintf("BerkeleyEnvironment::Open: Error %d opening database environment: %s\n", ret, DbEnv::strerror(ret));
+        LogWarning("BerkeleyEnvironment::Open: Error %d opening database environment: %s", ret, DbEnv::strerror(ret));
         int ret2 = dbenv->close(0);
         if (ret2 != 0) {
-            LogPrintf("BerkeleyEnvironment::Open: Error %d closing failed database environment: %s\n", ret2, DbEnv::strerror(ret2));
+            LogWarning("BerkeleyEnvironment::Open: Error %d closing failed database environment: %s", ret2, DbEnv::strerror(ret2));
         }
         Reset();
         err = strprintf(_("Error initializing wallet database environment %s!"), fs::quoted(fs::PathToString(Directory())));
@@ -590,7 +590,7 @@ bool BerkeleyDatabase::Rewrite(const char* pszSkip)
                                             DB_CREATE,          // Flags
                                             0);
                     if (ret > 0) {
-                        LogPrintf("BerkeleyBatch::Rewrite: Can't create database file %s\n", strFileRes);
+                        LogWarning("BerkeleyBatch::Rewrite: Can't create database file %s", strFileRes);
                         fSuccess = false;
                     }
 
@@ -640,7 +640,7 @@ bool BerkeleyDatabase::Rewrite(const char* pszSkip)
                         fSuccess = false;
                 }
                 if (!fSuccess)
-                    LogPrintf("BerkeleyBatch::Rewrite: Failed to rewrite database file %s\n", strFileRes);
+                    LogWarning("BerkeleyBatch::Rewrite: Failed to rewrite database file %s", strFileRes);
                 return fSuccess;
             }
         }
@@ -742,7 +742,7 @@ bool BerkeleyDatabase::Backup(const std::string& strDest) const
 
                 try {
                     if (fs::exists(pathDest) && fs::equivalent(pathSrc, pathDest)) {
-                        LogPrintf("cannot backup to wallet source file %s\n", fs::PathToString(pathDest));
+                        LogWarning("cannot backup to wallet source file %s", fs::PathToString(pathDest));
                         return false;
                     }
 
@@ -750,7 +750,7 @@ bool BerkeleyDatabase::Backup(const std::string& strDest) const
                     LogPrintf("copied %s to %s\n", strFile, fs::PathToString(pathDest));
                     return true;
                 } catch (const fs::filesystem_error& e) {
-                    LogPrintf("error copying %s to %s - %s\n", strFile, fs::PathToString(pathDest), fsbridge::get_filesystem_error_message(e));
+                    LogWarning("error copying %s to %s - %s", strFile, fs::PathToString(pathDest), fsbridge::get_filesystem_error_message(e));
                     return false;
                 }
             }
@@ -878,7 +878,7 @@ bool BerkeleyDatabaseSanityCheck()
      * than the header that was compiled against, flag an error.
      */
     if (major != DB_VERSION_MAJOR || minor < DB_VERSION_MINOR) {
-        LogPrintf("BerkeleyDB database version conflict: header version is %d.%d, library version is %d.%d\n",
+        LogError("BerkeleyDB database version conflict: header version is %d.%d, library version is %d.%d",
             DB_VERSION_MAJOR, DB_VERSION_MINOR, major, minor);
         return false;
     }
