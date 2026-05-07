@@ -485,6 +485,8 @@ private:
                 str += 'y';
             } else if (s == "REDUCED_DATA?") {
                 str += '4';
+            } else if (s == "BLAKE2B?") {
+                str += 'B';
             } else {
                 str += ToLower(s[0]);
             }
@@ -768,6 +770,7 @@ public:
         "           \"y\" - UTREEXO_TMP? peer can handle Utreexo proof requests\n"
         "           \"r\" - REPLACE_BY_FEE? peer supports replacement of transactions without BIP 125 signalling\n"
         "           \"4\" - REDUCED_DATA? peer enforces the ReducedData SoftFork\n"
+        "           \"B\" - BLAKE2B? peer enforces the BLAKE2b hardfork rules\n"
         "           \"m\" - MALICIOUS? peer openly seeks to aid in bypassing network policy/spam filters (OR to sabotage nodes that seek to)\n"
         "           \"u\" - UNKNOWN: unrecognized bit flag\n"
         "  v        Version of transport protocol used for the connection\n"

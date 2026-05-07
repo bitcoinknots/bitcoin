@@ -991,7 +991,7 @@ namespace { // Variables internal to initialization process only
 
 int nMaxConnections;
 int available_fds;
-ServiceFlags g_local_services = ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_REDUCED_DATA);
+ServiceFlags g_local_services = ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_BLAKE2B);
 int64_t peer_connect_timeout;
 std::set<BlockFilterType> g_enabled_filter_types;
 
