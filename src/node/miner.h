@@ -190,6 +190,10 @@ public:
 
 private:
     const Options m_options;
+    //! Effective weight cap for the block being assembled: nBlockMaxWeight,
+    //! further clamped in CreateNewBlock when RDTS is active for the next
+    //! block (the consensus limit drops to REDUCED_DATA_MAX_BLOCK_WEIGHT).
+    size_t m_effective_max_weight;
 
     // utility functions
     /** Clear the block's state and prepare for assembling a new block */
