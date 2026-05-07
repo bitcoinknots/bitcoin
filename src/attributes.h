@@ -24,4 +24,13 @@
 #  error No known always_inline attribute for this platform.
 #endif
 
+#ifdef __has_attribute
+# if __has_attribute(nonnull)
+#  define ARG_NONNULL(_x)  __attribute__ ((__nonnull__(_x)))
+# endif
+#endif
+#ifndef ARG_NONNULL
+#  define ARG_NONNULL(_x)
+#endif
+
 #endif // BITCOIN_ATTRIBUTES_H
