@@ -186,11 +186,17 @@ bool static IsLowDERSignature(const valtype &vchSig, ScriptError* serror) {
     return true;
 }
 
-bool static IsDefinedHashtypeSignature(const valtype &vchSig) {
+bool static IsDefinedHashtypeSignature(const valtype &vchSig, unsigned int flags) {
     if (vchSig.size() == 0) {
         return false;
     }
     unsigned char nHashType = vchSig[vchSig.size() - 1] & (~(SIGHASH_ANYONECANPAY));
+    // The opt-in bit is a defined hash type wherever the fork applies. The
+    // mempool sets that flag on any chain which schedules it, so this rejects
+    // only on one that does not, where the byte has never meant anything.
+    if (SighashRulesFromFlags(flags) == SighashRules::UNIFIED) {
+        nHashType &= ~SIGHASH_UNIFIED;
+    }
     if (nHashType < SIGHASH_ALL || nHashType > SIGHASH_SINGLE)
         return false;
 
@@ -208,8 +214,17 @@ bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned i
     } else if ((flags & SCRIPT_VERIFY_LOW_S) != 0 && !IsLowDERSignature(vchSig, serror)) {
         // serror is set
         return false;
-    } else if ((flags & SCRIPT_VERIFY_STRICTENC) != 0 && !IsDefinedHashtypeSignature(vchSig)) {
-        return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
+    } else if ((flags & SCRIPT_VERIFY_STRICTENC) != 0 && !IsDefinedHashtypeSignature(vchSig, flags)) {
+        // A byte that would be defined where the fork applies says the spender
+        // opted in, not that the hash type is malformed. Kept apart so a caller
+        // can tell the two apart. Deliberately says "not active here" rather than
+        // "not yet": this is reached on a chain that has not scheduled the fork
+        // at all, where it never becomes active, since one that has schedules the
+        // flag on and accepts the byte.
+        const bool early{!vchSig.empty() && (vchSig.back() & SIGHASH_UNIFIED) &&
+                         SighashRulesFromFlags(flags) != SighashRules::UNIFIED &&
+                         IsDefinedHashtypeSignature(vchSig, flags | SCRIPT_VERIFY_UNIFIED_SIGHASH)};
+        return set_error(serror, early ? SCRIPT_ERR_SIG_HASHTYPE_TOO_EARLY : SCRIPT_ERR_SIG_HASHTYPE);
     }
     return true;
 }
@@ -324,7 +339,9 @@ static bool EvalChecksigPreTapscript(const valtype& vchSig, const valtype& vchPu
     // Subset of script starting at the most recent codeseparator
     CScript scriptCode(pbegincodehash, pend);
 
-    // Drop the signature in pre-segwit scripts but not segwit scripts
+    // Drop the signature in pre-segwit scripts but not segwit scripts.
+    // This is left as it is: the new signature hash is opt-in, so it must not
+    // change how any existing script is evaluated.
     if (sigversion == SigVersion::BASE) {
         int found = FindAndDelete(scriptCode, CScript() << vchSig);
         if (found > 0 && (flags & SCRIPT_VERIFY_CONST_SCRIPTCODE))
@@ -335,7 +352,7 @@ static bool EvalChecksigPreTapscript(const valtype& vchSig, const valtype& vchPu
         //serror is set
         return false;
     }
-    fSuccess = checker.CheckECDSASignature(vchSig, vchPubKey, scriptCode, sigversion);
+    fSuccess = checker.CheckECDSASignature(vchSig, vchPubKey, scriptCode, sigversion, SighashRulesFromFlags(flags));
 
     if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) && vchSig.size())
         return set_error(serror, SCRIPT_ERR_SIG_NULLFAIL);
@@ -366,7 +383,7 @@ static bool EvalChecksigTapscript(const valtype& sig, const valtype& pubkey, Scr
     if (pubkey.size() == 0) {
         return set_error(serror, SCRIPT_ERR_PUBKEYTYPE);
     } else if (pubkey.size() == 32) {
-        if (success && !checker.CheckSchnorrSignature(sig, pubkey, sigversion, execdata, serror)) {
+        if (success && !checker.CheckSchnorrSignature(sig, pubkey, sigversion, execdata, serror, SighashRulesFromFlags(flags))) {
             return false; // serror is set
         }
     } else {
@@ -1170,7 +1187,7 @@ bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& 
                         }
 
                         // Check signature
-                        bool fOk = checker.CheckECDSASignature(vchSig, vchPubKey, scriptCode, sigversion);
+                        bool fOk = checker.CheckECDSASignature(vchSig, vchPubKey, scriptCode, sigversion, SighashRulesFromFlags(flags));
 
                         if (fOk) {
                             isig++;
@@ -1468,6 +1485,10 @@ template PrecomputedTransactionData::PrecomputedTransactionData(const CMutableTr
 const HashWriter HASHER_TAPSIGHASH{TaggedHash("TapSighash")};
 const HashWriter HASHER_TAPLEAF{TaggedHash("TapLeaf")};
 const HashWriter HASHER_TAPBRANCH{TaggedHash("TapBranch")};
+// Names the algorithm, following TapSighash. Keeps this message disjoint from
+// every other BIP340 tagged hash; it cannot change after deployment without
+// invalidating every signature made under it.
+const HashWriter HASHER_UNIFIED_SIGHASH{TaggedHash("UnifiedSighash")};
 
 static bool HandleMissingData(MissingDataBehavior mdb)
 {
@@ -1598,6 +1619,140 @@ void SigHashCache::Store(int32_t hash_type, const CScript& script_code, const Ha
     entry.emplace(script_code, writer);
 }
 
+/** Hardfork signature hash for BASE and WITNESS_V0 inputs.
+ *
+ * Commits to every spent amount and scriptPubKey, so a signer cannot be lied to
+ * about any input's value (CVE-2020-14199), and costs O(scriptCode) per input
+ * rather than O(transaction), so validation is linear (CVE-2013-2292). The
+ * tagged hash makes the message disjoint from every existing sighash, which is
+ * what provides replay protection across the fork.
+ *
+ * Returns false when the transaction data needed is unavailable, or for a
+ * SIGHASH_SINGLE input with no corresponding output. The latter is the legacy
+ * uint256::ONE bug, which is not carried across the fork.
+ */
+template <class T>
+bool SignatureHashUnified(uint256& hash_out, const CScript& scriptCode, const T& txTo, unsigned int nIn, int32_t nHashType, SigVersion sigversion, const PrecomputedTransactionData& cache, const ScriptExecutionData* execdata, MissingDataBehavior mdb)
+{
+    assert(nIn < txTo.vin.size());
+    const bool taproot{sigversion == SigVersion::TAPROOT || sigversion == SigVersion::TAPSCRIPT};
+    assert(sigversion == SigVersion::BASE || sigversion == SigVersion::WITNESS_V0 || taproot);
+    // Taproot commits to context that is not in the transaction, so refuse to
+    // sign without it rather than sign over less.
+    if (taproot && (execdata == nullptr || !execdata->m_annex_init)) return HandleMissingData(mdb);
+
+    // Needed for every script type, not just taproot, despite the name. The flag
+    // means the spent-amount and spent-script aggregates have been computed, and
+    // this message commits to both on every input: committing to every spent
+    // amount is what closes CVE-2020-14199, which is the reason a bare or segwit
+    // v0 input opts in at all. They live behind a taproot-named flag only
+    // because BIP341 is what introduced them.
+    if (!(cache.m_bip341_taproot_ready && cache.m_spent_outputs_ready)) return HandleMissingData(mdb);
+
+    // This message is only defined for signatures that opted in.
+    if (!(nHashType & SIGHASH_UNIFIED)) return false;
+    // Each script type keeps the reading it has today, so opting in changes the
+    // message and nothing else. The legacy algorithm takes SINGLE and NONE by
+    // their low bits and everything else as ALL, and bare, P2SH and segwit v0
+    // keep that. BIP341 instead refuses a hash type it does not define, at
+    // consensus rather than by policy, and taproot and tapscript keep that: the
+    // bytes it reserved stay reserved.
+    const int32_t output_type{nHashType & 0x1f};
+    if (taproot) {
+        if (nHashType & ~(0x1f | SIGHASH_ANYONECANPAY | SIGHASH_UNIFIED)) return false;
+        if (output_type != SIGHASH_ALL && output_type != SIGHASH_NONE && output_type != SIGHASH_SINGLE) return false;
+    }
+    const bool anyonecanpay{!!(nHashType & SIGHASH_ANYONECANPAY)};
+
+    HashWriter ss{HASHER_UNIFIED_SIGHASH};
+
+    // Domain-separate the script types, so a signature made for one is never
+    // valid for another. Deliberately not defaulted: a script version added
+    // later must be given its own value here rather than silently sharing the
+    // one for bare inputs, which would be a cross-type collision of exactly the
+    // kind this byte exists to prevent.
+    uint8_t script_type;
+    switch (sigversion) {
+    case SigVersion::BASE: script_type = 0; break;
+    case SigVersion::WITNESS_V0: script_type = 1; break;
+    case SigVersion::TAPROOT: script_type = 2; break;
+    case SigVersion::TAPSCRIPT: script_type = 3; break;
+    default: assert(false);
+    }
+    // Laid out as BIP341 lays out its message, so the two can be read side by
+    // side. The epoch is BIP341's, kept so a later revision has the same room
+    // to move that BIP341 left itself.
+    static constexpr uint8_t EPOCH = 0;
+    ss << EPOCH;
+    // One byte, as BIP341 writes it and as the signature carries it: consensus
+    // reads the hash type from the last byte of the signature, so a wider field
+    // could hold a value no verifier would ever reconstruct.
+    ss << static_cast<uint8_t>(nHashType);
+
+    // Transaction level data. The locktime is committed to as five bytes rather
+    // than the four it occupies today: four run out on 2106-02-07, and a
+    // hardfork that widened the field later would otherwise have to change this
+    // message and invalidate every signature made under it. The fifth byte is
+    // zero until something sets it.
+    ss << txTo.version;
+    ss << txTo.nLockTime;
+    ss << uint8_t{0};
+    if (!anyonecanpay) {
+        ss << cache.m_prevouts_single_hash;
+        ss << cache.m_spent_amounts_single_hash;
+        ss << cache.m_spent_scripts_single_hash;
+        ss << cache.m_sequences_single_hash;
+    }
+    if (output_type != SIGHASH_NONE && output_type != SIGHASH_SINGLE) {
+        ss << cache.m_outputs_single_hash;   // ALL, and every value that is not NONE or SINGLE
+    }
+
+    // Where BIP341 writes its spend type. It has an annex bit to pack in there
+    // and we do not, so the byte is the script type alone.
+    ss << script_type;
+
+    // Data about the input being signed. Under ANYONECANPAY the aggregate
+    // hashes are absent, so this input's own prevout, spent output and sequence
+    // are committed to directly. Its position is deliberately not committed to
+    // in that case, so the input can still be moved into another transaction,
+    // which is the reason the flag exists.
+    if (anyonecanpay) {
+        ss << txTo.vin[nIn].prevout;
+        ss << cache.m_spent_outputs[nIn];
+        ss << txTo.vin[nIn].nSequence;
+    } else {
+        ss << static_cast<uint32_t>(nIn);
+    }
+
+    if (!taproot) {
+        ss << scriptCode;
+    } else {
+        // The annex is committed to, or it would be malleable.
+        ss << static_cast<uint8_t>(execdata->m_annex_present ? 1 : 0);
+        if (execdata->m_annex_present) ss << execdata->m_annex_hash;
+    }
+
+    // The single output, where BIP341 puts it.
+    if (output_type == SIGHASH_SINGLE) {
+        if (nIn >= txTo.vout.size()) return false;
+        HashWriter single_output{};
+        single_output << txTo.vout[nIn];
+        ss << single_output.GetSHA256();
+    }
+
+    if (sigversion == SigVersion::TAPSCRIPT) {
+        // Without the leaf hash a signature for one script leaf would be
+        // valid for any other leaf under the same key.
+        if (!execdata->m_tapleaf_hash_init || !execdata->m_codeseparator_pos_init) return HandleMissingData(mdb);
+        ss << execdata->m_tapleaf_hash;
+        ss << static_cast<uint8_t>(0); // key version
+        ss << execdata->m_codeseparator_pos;
+    }
+
+    hash_out = ss.GetSHA256();
+    return true;
+}
+
 template <class T>
 uint256 SignatureHash(const CScript& scriptCode, const T& txTo, unsigned int nIn, int32_t nHashType, const CAmount& amount, SigVersion sigversion, const PrecomputedTransactionData* cache, SigHashCache* sighash_cache)
 {
@@ -1691,7 +1846,7 @@ bool GenericTransactionSignatureChecker<T>::VerifySchnorrSignature(Span<const un
 }
 
 template <class T>
-bool GenericTransactionSignatureChecker<T>::CheckECDSASignature(const std::vector<unsigned char>& vchSigIn, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion) const
+bool GenericTransactionSignatureChecker<T>::CheckECDSASignature(const std::vector<unsigned char>& vchSigIn, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion, SighashRules sighash_rules) const
 {
     CPubKey pubkey(vchPubKey);
     if (!pubkey.IsValid())
@@ -1711,7 +1866,23 @@ bool GenericTransactionSignatureChecker<T>::CheckECDSASignature(const std::vecto
     // Witness sighashes need the amount.
     if (sigversion == SigVersion::WITNESS_V0 && amount < 0) return HandleMissingData(m_mdb);
 
-    uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, sigversion, this->txdata, &m_sighash_cache);
+    uint256 sighash;
+    // The spender opts in per signature, via the hash type byte. Before
+    // activation the bit carries no meaning and the legacy message applies, so
+    // such a signature simply does not verify yet.
+    if (sighash_rules == SighashRules::UNIFIED && (nHashType & SIGHASH_UNIFIED)) {
+        // No midstate cache here. The per-transaction aggregates are
+        // precomputed, so cost is the fixed preimage plus the scriptCode
+        // rather than the whole transaction: linear in the number of inputs
+        // overall, which is what closes CVE-2013-2292. Repeated signatures
+        // over one large scriptCode still rehash it, giving up the Knots
+        // midstate cache for that case; the bound is no worse than BIP143
+        // without it.
+        if (!this->txdata) return HandleMissingData(m_mdb);
+        if (!SignatureHashUnified(sighash, scriptCode, *txTo, nIn, nHashType, sigversion, *this->txdata, nullptr, m_mdb)) return false;
+    } else {
+        sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, sigversion, this->txdata, &m_sighash_cache);
+    }
 
     if (!VerifyECDSASignature(vchSig, pubkey, sighash))
         return false;
@@ -1720,7 +1891,7 @@ bool GenericTransactionSignatureChecker<T>::CheckECDSASignature(const std::vecto
 }
 
 template <class T>
-bool GenericTransactionSignatureChecker<T>::CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey_in, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror) const
+bool GenericTransactionSignatureChecker<T>::CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey_in, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror, SighashRules sighash_rules) const
 {
     assert(sigversion == SigVersion::TAPROOT || sigversion == SigVersion::TAPSCRIPT);
     // Schnorr signatures have 32-byte public keys. The caller is responsible for enforcing this.
@@ -1743,7 +1914,16 @@ bool GenericTransactionSignatureChecker<T>::CheckSchnorrSignature(Span<const uns
     }
     uint256 sighash;
     if (!this->txdata) return HandleMissingData(m_mdb);
-    if (!SignatureHashSchnorr(sighash, execdata, *txTo, nIn, hashtype, sigversion, *this->txdata, m_mdb)) {
+    if (sighash_rules == SighashRules::UNIFIED && (hashtype & SIGHASH_UNIFIED)) {
+        // Opted in: one algorithm for every script type, so taproot uses the
+        // same signature hash as the rest rather than BIP341's.
+        if (!SignatureHashUnified(sighash, CScript{}, *txTo, nIn, hashtype, sigversion, *this->txdata, &execdata, m_mdb)) {
+            return set_error(serror, SCRIPT_ERR_SCHNORR_SIG_HASHTYPE);
+        }
+    } else if (!SignatureHashSchnorr(sighash, execdata, *txTo, nIn, hashtype, sigversion, *this->txdata, m_mdb)) {
+        // Not reported as early, unlike the legacy path above. BIP341 refuses a
+        // hash type it does not define whatever this fork does, so the byte was
+        // already invalid here before the fork existed and stays so after it.
         return set_error(serror, SCRIPT_ERR_SCHNORR_SIG_HASHTYPE);
     }
     if (!VerifySchnorrSignature(sig, pubkey, sighash)) return set_error(serror, SCRIPT_ERR_SCHNORR_SIG);
@@ -1835,6 +2015,11 @@ bool GenericTransactionSignatureChecker<T>::CheckSequence(const CScriptNum& nSeq
 }
 
 // explicit instantiation
+// Explicit instantiation: sign.cpp calls this, and relying on it being
+// instantiated as a side effect of a call elsewhere in this file is fragile.
+template bool SignatureHashUnified(uint256&, const CScript&, const CTransaction&, unsigned int, int32_t, SigVersion, const PrecomputedTransactionData&, const ScriptExecutionData*, MissingDataBehavior);
+template bool SignatureHashUnified(uint256&, const CScript&, const CMutableTransaction&, unsigned int, int32_t, SigVersion, const PrecomputedTransactionData&, const ScriptExecutionData*, MissingDataBehavior);
+
 template class GenericTransactionSignatureChecker<CTransaction>;
 template class GenericTransactionSignatureChecker<CMutableTransaction>;
 
@@ -1972,7 +2157,7 @@ static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, 
         execdata.m_annex_init = true;
         if (stack.size() == 1) {
             // Key path spending (stack size is 1 after removing optional annex)
-            if (!checker.CheckSchnorrSignature(stack.front(), program, SigVersion::TAPROOT, execdata, serror)) {
+            if (!checker.CheckSchnorrSignature(stack.front(), program, SigVersion::TAPROOT, execdata, serror, SighashRulesFromFlags(flags))) {
                 return false; // serror is set
             }
             return set_success(serror);

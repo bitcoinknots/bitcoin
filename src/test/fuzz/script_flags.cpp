@@ -30,6 +30,15 @@ FUZZ_TARGET(script_flags)
         unsigned int fuzzed_flags;
         ds >> fuzzed_flags;
 
+        // This target asserts that flags only ever restrict: dropping one from
+        // a passing case keeps it passing, adding one to a failing case keeps
+        // it failing. SCRIPT_VERIFY_UNIFIED_SIGHASH is the one flag that does not
+        // work that way, because it makes signatures valid that were not, which
+        // is what a hardfork is. Leave it out of the sweep rather than weaken
+        // the invariant for every other flag.
+        verify_flags &= ~(unsigned int)SCRIPT_VERIFY_UNIFIED_SIGHASH;
+        fuzzed_flags &= ~(unsigned int)SCRIPT_VERIFY_UNIFIED_SIGHASH;
+
         std::vector<CTxOut> spent_outputs;
         for (unsigned i = 0; i < tx.vin.size(); ++i) {
             CTxOut prevout;

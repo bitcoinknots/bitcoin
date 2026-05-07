@@ -94,6 +94,8 @@ BASE_SCRIPTS = [
     # Longest test should go first, to favor running tests in parallel
     # vv Tests less than 5m vv
     'feature_fee_estimation.py',
+    'feature_unified_sighash.py --descriptors',
+    'rpc_combinerawtransaction_unified.py --descriptors',
     'feature_taproot.py',
     'feature_reduced_data_temporary_deployment.py',
     'feature_bip9_max_activation_height.py',

@@ -43,6 +43,7 @@ typedef enum ScriptError_t
 
     /* Malleability */
     SCRIPT_ERR_SIG_HASHTYPE,
+    SCRIPT_ERR_SIG_HASHTYPE_TOO_EARLY,
     SCRIPT_ERR_SIG_DER,
     SCRIPT_ERR_MINIMALDATA,
     SCRIPT_ERR_SIG_PUSHONLY,
