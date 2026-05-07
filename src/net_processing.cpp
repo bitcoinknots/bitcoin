@@ -3475,7 +3475,11 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         }
 
         const bool is_v1transport = pfrom.m_transport->GetInfo().transport_type == TransportProtocolType::V1;
-        if (pfrom.IsInboundConn() && is_v1transport && m_connman.RequiresV2Peer(pfrom.ConnectedThroughNetwork())) {
+        // An onion inbound that is only assumed (no -bind=...=onion) is also checked by its source address:
+        // Tor reaches us from this host or a private address, so a clearnet source means a clearnet peer.
+        const bool clearnet_v1{m_connman.RequiresV2Peer(pfrom.ConnectedThroughNetwork()) ||
+                               (pfrom.m_inbound_onion_assumed && m_connman.RequiresV2Peer(pfrom.addr.GetNetClass()))};
+        if (pfrom.IsInboundConn() && is_v1transport && clearnet_v1) {
             LogDebug(BCLog::NET, "v1 connection from a clearnet peer not allowed (-v2onlyclearnet), %s", pfrom.DisconnectMsg(fLogIPs));
             pfrom.fDisconnect = true;
             return;
