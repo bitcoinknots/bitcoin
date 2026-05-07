@@ -20,6 +20,17 @@ from test_framework.util import assert_equal, assert_raises_rpc_error
 from test_framework.wallet import MiniWallet
 
 CHANGE_HEIGHT = 20
+V2_HEADER_KEYS = (
+    "header_version",
+    "nonce2",
+    "nonce3",
+    "extranonce",
+    "time_offset",
+    "header_flags",
+    "xor_key_mask_clear_bits",
+    "xor_key",
+    "mm_rhs",
+)
 
 
 class PowChangeTest(BitcoinTestFramework):
@@ -167,6 +178,14 @@ class PowChangeTest(BitcoinTestFramework):
                 lambda: node.submitheader(hexdata=CBlockHeader(invalid_flags).serialize().hex()),
             )
 
+        self.log.info("Verbose getblockheader exposes the v2 header fields")
+        post_json = node.getblockheader(post_hash, True)
+        for key in V2_HEADER_KEYS:
+            assert key in post_json, f"missing {key} in verbose v2 header"
+        assert_equal(post_json["header_version"], 2)
+        pre_json = node.getblockheader(pre_hash, True)
+        assert_equal(pre_json["header_version"], 0)
+
         # A null XOR key disables anti-withholding regardless of how many mask
         # bits the pool requests to clear.
         assert_equal(post_header.m_xor_key, 0)
@@ -185,8 +204,26 @@ class PowChangeTest(BitcoinTestFramework):
         merge_mined_block.m_xor_key = 0x0123456789abcdef0123456789abcdef
         merge_mined_block.m_xor_key_mask_clear_bits = 255
         merge_mined_block.m_mm_rhs = 0xfedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+        merge_mined_block.m_extranonce = 0x00112233445566778899aabbccddeeff
+        merge_mined_block.m_nonce2 = 0xdeadbeef
+        merge_mined_block.m_nonce3 = 0xfeedface
         merge_mined_block.solve()
         assert_equal(node.submitblock(merge_mined_block.serialize().hex()), None)
+
+        # The blob fields are emitted in wire (forward) byte order, so the
+        # expected hex is the block's own value serialised little-endian.
+        mm_json = node.getblockheader(node.getbestblockhash(), True)
+        assert_equal(mm_json["header_version"], 2)
+        assert_equal(mm_json["extranonce"], merge_mined_block.m_extranonce.to_bytes(16, "little").hex())
+        assert_equal(mm_json["xor_key"], merge_mined_block.m_xor_key.to_bytes(16, "little").hex())
+        assert_equal(mm_json["mm_rhs"], merge_mined_block.m_mm_rhs.to_bytes(32, "little").hex())
+        assert_equal(mm_json["xor_key_mask_clear_bits"], merge_mined_block.m_xor_key_mask_clear_bits)
+        assert_equal(mm_json["header_flags"], merge_mined_block.m_flags)
+        assert_equal(mm_json["time_offset"], merge_mined_block.m_time_offset)
+        assert_equal(len(mm_json["nonce2"]), 8)
+        assert_equal(len(mm_json["nonce3"]), 8)
+        assert_equal(mm_json["nonce2"], merge_mined_block.m_nonce2.to_bytes(4, "little").hex())
+        assert_equal(mm_json["nonce3"], merge_mined_block.m_nonce3.to_bytes(4, "little").hex())
 
         invalid_txcount = create_block(
             merge_mined_block.sha256,
@@ -235,6 +272,46 @@ class PowChangeTest(BitcoinTestFramework):
         generated_header = self.get_header(generated["hash"])
         assert_equal(len(generated_block["tx"]), 2)
         assert_equal(generated_header.m_txcount, 2)
+
+        self.log.info("Header-only entries take nTx from the v2 header, or omit it")
+        # Submitting only the header leaves an index entry with no block body,
+        # so any transaction count can come only from the header itself. The
+        # count below deliberately differs from the block's own transaction
+        # list, which the node never sees.
+        v2_header_only = create_block(
+            merge_mined_block.sha256,
+            create_coinbase(CHANGE_HEIGHT + 2),
+            merge_mined_block.nTime + 2,
+            height=CHANGE_HEIGHT + 2,
+            header_v2=True,
+        )
+        v2_header_only.m_txcount = 3
+        v2_header_only.solve()
+        assert_equal(node.submitheader(hexdata=CBlockHeader(v2_header_only).serialize().hex()), None)
+        v2_header_only_json = node.getblockheader(v2_header_only.hash, True)
+        assert_equal(v2_header_only_json["header_version"], 2)
+        assert_equal(v2_header_only_json["nTx"], 0)
+        assert_equal(v2_header_only_json["txcount"], 3)
+
+        # A v1 header commits to no count, so nTx is omitted entirely until the
+        # block itself arrives.
+        v1_header_only = create_block(
+            int(pre_parent_hash, 16),
+            create_coinbase(CHANGE_HEIGHT - 1),
+            pre_parent["time"] + 2,
+            height=CHANGE_HEIGHT - 1,
+            header_v2=False,
+        )
+        v1_header_only.solve()
+        assert_equal(node.submitheader(hexdata=CBlockHeader(v1_header_only).serialize().hex()), None)
+        v1_header_only_json = node.getblockheader(v1_header_only.hash, True)
+        assert_equal(v1_header_only_json["header_version"], 0)
+        assert_equal(v1_header_only_json["nTx"], 0)
+        assert "txcount" not in v1_header_only_json
+
+        # Fully downloaded blocks keep reporting their actual count.
+        assert_equal(node.getblockheader(pre_hash, True)["nTx"], 1)
+        assert_equal(node.getblockheader(post_hash, True)["nTx"], 1)
 
 
 if __name__ == "__main__":
