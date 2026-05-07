@@ -6,13 +6,20 @@
 #ifndef BITCOIN_UTIL_FS_HELPERS_H
 #define BITCOIN_UTIL_FS_HELPERS_H
 
+#include <bitcoin-build-config.h> // IWYU pragma: keep
+
 #include <util/fs.h>
 
+#include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <iosfwd>
 #include <limits>
 #include <optional>
+
+#if defined(USE_FSEEKO)
+#include <sys/types.h>
+#endif
 
 /**
  * Ensure file contents are fully committed to disk, using a platform-specific
@@ -39,7 +46,28 @@ inline int FileSeek64(FILE* file, int64_t offset, int origin)
 #if defined(WIN32)
     return _fseeki64(file, offset, origin);
 #else
-    return std::fseek(file, offset, origin);
+#if defined(USE_FSEEKO)
+    using offset_type = off_t;
+    const auto native_seek{[file](offset_type distance, int whence) { return fseeko(file, distance, whence); }};
+#else
+    using offset_type = long;
+    const auto native_seek{[file](offset_type distance, int whence) { return std::fseek(file, distance, whence); }};
+#endif
+    if constexpr (std::numeric_limits<offset_type>::max() < std::numeric_limits<int64_t>::max()) {
+        // off_t can be an extended integer type unsupported by std::in_range.
+        const auto in_range{[min = std::numeric_limits<offset_type>::min(), max = std::numeric_limits<offset_type>::max()](int64_t value) {
+            return min <= value && value <= max;
+        }};
+        if (!in_range(offset)) [[unlikely]] {
+            const offset_type step{offset > 0 ? std::numeric_limits<offset_type>::max() : std::numeric_limits<offset_type>::min()};
+            do {
+                if (const int ret{native_seek(step, origin)}; ret != 0) return ret;
+                offset -= step;
+                origin = SEEK_CUR;
+            } while (!in_range(offset));
+        }
+    }
+    return native_seek(static_cast<offset_type>(offset), origin);
 #endif
 }
 
@@ -52,10 +80,23 @@ inline int FileSeek64(FILE* file, int64_t offset, int origin)
 inline int64_t FileTell64(FILE* file)
 {
 #if defined(WIN32)
-    return _ftelli64(file);
+    const auto offset{_ftelli64(file)};
+#elif defined(USE_FTELLO)
+    const auto offset{ftello(file)};
 #else
-    return std::ftell(file);
+    const auto offset{std::ftell(file)};
 #endif
+    if constexpr (std::numeric_limits<decltype(offset)>::max() > std::numeric_limits<int64_t>::max()) {
+        // off_t can be an extended integer type unsupported by std::in_range.
+        const auto in_range{[min = std::numeric_limits<int64_t>::min(), max = std::numeric_limits<int64_t>::max()](auto value) {
+            return min <= value && value <= max;
+        }};
+        if (!in_range(offset)) {
+            errno = EOVERFLOW;
+            return -1;
+        }
+    }
+    return static_cast<int64_t>(offset);
 }
 
 int RaiseFileDescriptorLimit(int nMinFD);
