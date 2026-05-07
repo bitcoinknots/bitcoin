@@ -440,7 +440,7 @@ void Chainstate::MaybeUpdateMempoolForReorg(
                 const Coin& coin{CoinsTip().AccessCoin(txin.prevout)};
                 assert(!coin.IsSpent());
                 const auto mempool_spend_height{m_chain.Tip()->nHeight + 1};
-                if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < consensusParams.CoinbaseMaturityLong) {
+                if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < Consensus::CoinbaseMaturityPolicy(consensusParams, m_chain[coin.nHeight])) {
                     return true;
                 }
             }
@@ -1020,7 +1020,9 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     const auto& consensusParams{args.m_chainparams.GetConsensus()};
     if (!Consensus::CheckTxInputs(tx, state, m_view, block_height_next, ws.m_base_fees, CheckTxInputsRules::OutputSizeLimit,
                                   consensusParams.CoinbaseMaturityLong,
-                                  /*long_maturity_start_height=*/ 0)) {
+                                  consensusParams.CoinbaseMaturityLongStartHeight,
+                                  Consensus::CoinbaseMaturityLongEndHeight(consensusParams, m_active_chainstate.m_chain.Tip()),
+                                  consensusParams.CoinbaseMaturityBeforeRolling())) {
         return false; // state filled in by CheckTxInputs
     }
 
@@ -3007,8 +3009,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         }
     }
 
-    const bool long_maturity_consensus_active{consensusParams.CoinbaseMaturityLongActiveAt(pindex->nHeight)};
-    const int long_maturity_start_height{long_maturity_consensus_active ? consensusParams.CoinbaseMaturityLongStartHeight : std::numeric_limits<int>::max()};
+    const int long_maturity_end_height{Consensus::CoinbaseMaturityLongEndHeight(consensusParams, pindex->pprev)};
 
     std::vector<int> prevheights;
     CAmount nFees = 0;
@@ -3028,8 +3029,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
             CAmount txfee = 0;
             TxValidationState tx_state;
             if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, chk_input_rules,
-                                          consensusParams.CoinbaseMaturityLong,
-                                          long_maturity_start_height)) {
+                                          consensusParams, long_maturity_end_height)) {
                 // Any transaction validation failure in ConnectBlock is a block consensus failure
                 state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
                               tx_state.GetRejectReason(),
@@ -3257,7 +3257,7 @@ bool Chainstate::FlushStateToDisk(
         // It's been a while since we wrote the block index and chain state to disk. Do this frequently, so we don't need to redownload or reindex after a crash.
         bool fPeriodicWrite = mode == FlushStateMode::PERIODIC && nNow >= m_next_write;
         // Combine all conditions that result in a write to disk.
-        bool should_write = (mode == FlushStateMode::ALWAYS) || fCacheLarge || fCacheCritical || fPeriodicWrite || fFlushForPrune;
+        bool should_write = (mode == FlushStateMode::ALWAYS) || (mode == FlushStateMode::FORCE_SYNC) || fCacheLarge || fCacheCritical || fPeriodicWrite || fFlushForPrune;
         // Write blocks, block index and best chain related state to disk.
         if (should_write) {
             // Ensure we can write block index
