@@ -344,7 +344,7 @@ class ConfArgsTest(BitcoinTestFramework):
                 "Loaded 0 addresses from peers.dat",
                 "DNS seeding disabled",
                 "Fixed seeds are disabled",
-        ]):
+        ], timeout=2):
             self.start_node(0, extra_args=['-dnsseed=0', '-fixedseeds=0'])
         self.stop_node(0)
 
@@ -388,7 +388,7 @@ class ConfArgsTest(BitcoinTestFramework):
         # If the user did not disable -dnsseed, but it was soft-disabled because they provided -connect,
         # they shouldn't see a warning about -dnsseed being ignored.
         with self.nodes[0].assert_debug_log(expected_msgs=addcon_thread_started,
-                unexpected_msgs=dnsseed_ignored):
+                unexpected_msgs=dnsseed_ignored, timeout=2):
             self.restart_node(0, extra_args=['-connect=fakeaddress1', UNREACHABLE_PROXY_ARG])
 
         # We have to supply expected_msgs as it's a required argument
@@ -396,7 +396,7 @@ class ConfArgsTest(BitcoinTestFramework):
         # These cases test for -connect being supplied but only to disable it
         for connect_arg in ['-connect=0', '-noconnect']:
             with self.nodes[0].assert_debug_log(expected_msgs=addcon_thread_started,
-                    unexpected_msgs=seednode_ignored):
+                    unexpected_msgs=seednode_ignored, timeout=2):
                 self.restart_node(0, extra_args=[connect_arg, '-seednode=fakeaddress2'])
 
             # Make sure -noconnect soft-disables -listen and -dnsseed.
