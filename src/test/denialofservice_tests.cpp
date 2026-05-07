@@ -69,8 +69,8 @@ BOOST_AUTO_TEST_CASE(outbound_slow_chain_eviction)
     connman.Handshake(
         /*node=*/dummyNode1,
         /*successfully_connected=*/true,
-        /*remote_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA),
-        /*local_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA),
+        /*remote_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA | NODE_BLAKE2B),
+        /*local_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA | NODE_BLAKE2B),
         /*version=*/PROTOCOL_VERSION,
         /*relay_txs=*/true);
 
@@ -299,7 +299,7 @@ BOOST_FIXTURE_TEST_CASE(block_relay_only_eviction, OutboundTest)
     connman->ClearTestNodes();
 }
 
-//! BIP-110: peers that don't advertise NODE_REDUCED_DATA are tolerated as
+//! Peers that don't advertise NODE_BLAKE2B are tolerated as
 //! *additional* connections, so they must never count towards the automatic
 //! outbound targets. Otherwise ThreadOpenConnections opens replacements for them
 //! (it skips them) while the eviction logic disconnects good peers to compensate
@@ -323,7 +323,7 @@ BOOST_FIXTURE_TEST_CASE(stale_outbound_peers_are_additional, OutboundTest)
     auto demote = [&](CNode& n) { return connman->DemoteToStaleOutbound(n, 1000); };
 
     // A stale peer is only tolerated while its outbound target still has room, so
-    // they arrive first here, as during a rollout where BIP110 peers are scarce.
+    // they arrive first here, as during a rollout where preferred peers are scarce.
     const size_t first_stale{vNodes.size()};
     const int kStaleFullRelay{3};
     for (int i = 0; i < kStaleFullRelay; ++i) {
@@ -333,11 +333,11 @@ BOOST_FIXTURE_TEST_CASE(stale_outbound_peers_are_additional, OutboundTest)
     AddRandomOutboundPeer(id, vNodes, *peerLogic, *connman, ConnectionType::BLOCK_RELAY);
     BOOST_CHECK(demote(*vNodes.back()));
     // None of them count towards the targets they are filling in for.
-    BOOST_CHECK_EQUAL(connman->GetBIP110FullOutboundConnCount(), 0);
+    BOOST_CHECK_EQUAL(connman->GetFullOutboundConnCount(), 0);
     BOOST_CHECK_EQUAL(connman->GetExtraFullOutboundCount(), 0);
     BOOST_CHECK_EQUAL(connman->GetExtraBlockRelayCount(), 0);
 
-    // BIP110 peers then arrive and fill both targets. They are not gated, so the
+    // Preferred peers then arrive and fill both targets. They are not gated, so the
     // stale peers we already tolerate end up on top of a full target.
     const size_t first_good{vNodes.size()};
     for (int i = 0; i < MAX_OUTBOUND_FULL_RELAY_CONNECTIONS; ++i) {
@@ -346,7 +346,7 @@ BOOST_FIXTURE_TEST_CASE(stale_outbound_peers_are_additional, OutboundTest)
     for (int i = 0; i < MAX_BLOCK_RELAY_ONLY_CONNECTIONS; ++i) {
         AddRandomOutboundPeer(id, vNodes, *peerLogic, *connman, ConnectionType::BLOCK_RELAY);
     }
-    BOOST_CHECK_EQUAL(connman->GetBIP110FullOutboundConnCount(), MAX_OUTBOUND_FULL_RELAY_CONNECTIONS);
+    BOOST_CHECK_EQUAL(connman->GetFullOutboundConnCount(), MAX_OUTBOUND_FULL_RELAY_CONNECTIONS);
     BOOST_CHECK_EQUAL(connman->GetExtraFullOutboundCount(), 0);
     BOOST_CHECK_EQUAL(connman->GetExtraBlockRelayCount(), 0);
 
@@ -367,7 +367,7 @@ BOOST_FIXTURE_TEST_CASE(stale_outbound_peers_are_additional, OutboundTest)
     }
 
     // A tolerated stale peer must not mask a genuinely extra good peer. Give the
-    // BIP110 peers filling the target a recent block announcement so they are not
+    // preferred peers filling the target a recent block announcement so they are not
     // the natural eviction candidates, and leave the extra peer worse than them
     // but still better than a stale peer, which has never announced at all. If
     // the full-relay candidate scan failed to skip stale peers it would pick one
@@ -391,7 +391,7 @@ BOOST_FIXTURE_TEST_CASE(stale_outbound_peers_are_additional, OutboundTest)
     BOOST_CHECK(extra_full_relay.fDisconnect == true);
     BOOST_CHECK(extra_block_relay.fDisconnect == true);
     for (size_t i = first_stale; i < first_good; ++i) {
-        BOOST_CHECK(vNodes[i]->m_is_non_bip110_outbound);
+        BOOST_CHECK(vNodes[i]->m_is_stale_outbound);
         BOOST_CHECK(vNodes[i]->fDisconnect == false);
     }
     for (size_t i = first_good; i < vNodes.size() - 2; ++i) {
@@ -413,9 +413,9 @@ BOOST_FIXTURE_TEST_CASE(stale_outbound_peers_are_additional, OutboundTest)
     connman->ClearTestNodes();
 }
 
-//! BIP-110: a stale peer is not our outbound coverage of its network either, so
+//! A stale peer is not our outbound coverage of its network either, so
 //! it cannot strip the "only peer on this network" eviction protection from a
-//! BIP110 peer sharing that network.
+//! preferred peer sharing that network.
 BOOST_FIXTURE_TEST_CASE(stale_outbound_is_not_network_coverage, OutboundTest)
 {
     NodeId id{0};
@@ -439,7 +439,7 @@ BOOST_FIXTURE_TEST_CASE(stale_outbound_is_not_network_coverage, OutboundTest)
     connman->ClearTestNodes();
 }
 
-//! BIP-110: a demoted stale outbound peer draws on the inbound budget. It is
+//! A demoted stale outbound peer draws on the inbound budget. It is
 //! refused (so the caller disconnects it) when either -maxstaleoutbound are
 //! already tolerated or the inbound budget is full; the latter keeps a later
 //! outbound connection from pushing us past -maxconnections.
