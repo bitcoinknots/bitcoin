@@ -134,6 +134,7 @@ class TestNode():
 
         if self.version is None:
             self.args += [
+                "-corepolicy",
                 "-softwareexpiry=0",
                 "-walletimplicitsegwit",
             ]
