@@ -389,7 +389,7 @@ void BitcoinApplication::initializeResult(bool success, interfaces::BlockAndHead
 {
     qDebug() << __func__ << ": Initialization result: " << success;
 
-    if (success) {
+    if (success && !m_node->shutdownRequested()) {
         delete m_splash;
         m_splash = nullptr;
 
