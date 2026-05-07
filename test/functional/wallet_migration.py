@@ -1703,7 +1703,7 @@ class WalletMigrationTest(BitcoinTestFramework):
         # Check migration failure
         mocked_time = int(time.time())
         self.master_node.setmocktime(mocked_time)
-        assert_raises_rpc_error(-4, "last wallet synchronisation goes beyond pruned data. You need to -reindex (download the whole blockchain again in case of pruned node)", self.master_node.migratewallet, wallet_name="")
+        assert_raises_rpc_error(-4, "last wallet synchronisation goes beyond pruned data. You need to -reindex (download the whole blockchain again in case of a pruned node)", self.master_node.migratewallet, wallet_name="")
         self.master_node.setmocktime(0)
 
         # Verify the /wallets/ path exists, the wallet is still BDB and the backup file is there.
