@@ -78,6 +78,16 @@ BOOST_AUTO_TEST_CASE(get_difficulty_for_very_high_target)
     TestDifficulty(0x12345678, 5913134931067755359633408.0);
 }
 
+BOOST_AUTO_TEST_CASE(get_difficulty_for_blake2b_block)
+{
+    CBlockIndex* block_index = CreateBlockIndexWithNbits(0x1f111111);
+    block_index->m_header_v2 = true;
+    double difficulty = GetDifficultyBlake2b(*block_index);
+    delete block_index;
+
+    RejectDifficultyMismatch(difficulty, 3840);
+}
+
 //! Prune chain from height down to genesis block and check that
 //! GetPruneHeight returns the correct value
 static void CheckGetPruneHeight(node::BlockManager& blockman, CChain& chain, int height) EXCLUSIVE_LOCKS_REQUIRED(::cs_main)

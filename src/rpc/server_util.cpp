@@ -147,4 +147,5 @@ void NextEmptyBlockIndex(CBlockIndex& tip, const Consensus::Params& consensusPar
     next_index.nBits = next_header.nBits;
     next_index.nNonce = next_header.nNonce;
     next_index.nHeight = tip.nHeight + 1;
+    next_index.m_header_v2 = consensusParams.IsBlake2bHeight(next_index.nHeight);
 }

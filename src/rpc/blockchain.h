@@ -37,6 +37,10 @@ using coinascii_cb_t = std::function<std::string(const COutPoint&, const Coin&)>
  * difficulty (4295032833 hashes).
  */
 double GetDifficulty(const CBlockIndex& blockindex);
+/** Get the expected average number of BLAKE2b hashes needed to find this block. */
+double GetDifficultyBlake2b(const CBlockIndex& blockindex);
+/** Push the appropriate user-facing difficulty field for this block. */
+void PushDifficulty(UniValue& result, const CBlockIndex& blockindex);
 
 /** Block description to JSON */
 UniValue blockToJSON(node::BlockManager& blockman, const CBlock& block, const CBlockIndex& tip, const CBlockIndex& blockindex, TxVerbosity verbosity, const uint256 pow_limit) LOCKS_EXCLUDED(cs_main);
