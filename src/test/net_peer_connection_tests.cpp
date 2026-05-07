@@ -237,6 +237,55 @@ BOOST_AUTO_TEST_CASE(v2onlyclearnet_inbound_v1)
         BOOST_CHECK(!node.fDisconnect);
         peerman->FinalizeNode(node);
     }
+
+    // Without a -bind=...=onion listener every inbound on the first -bind is assumed to be onion
+    // (knots#427). A v1 peer from a clearnet source address is still a clearnet peer: disconnected.
+    {
+        CNode node{++id,
+                   /*sock=*/std::make_shared<StaticContentsSock>(""),
+                   addr,
+                   /*nKeyedNetGroupIn=*/0,
+                   /*nLocalHostNonceIn=*/0,
+                   CAddress{},
+                   /*addrNameIn=*/"",
+                   ConnectionType::INBOUND,
+                   /*inbound_onion=*/true,
+                   /*network_key=*/0,
+                   CNodeOptions{.inbound_onion_assumed = true}};
+        BOOST_REQUIRE_EQUAL(node.ConnectedThroughNetwork(), Network::NET_ONION);
+        connman->Handshake(node,
+                           /*successfully_connected=*/false,
+                           /*remote_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS),
+                           /*local_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS),
+                           /*version=*/PROTOCOL_VERSION,
+                           /*relay_txs=*/true);
+        BOOST_CHECK(node.fDisconnect);
+        peerman->FinalizeNode(node);
+    }
+
+    // The same assumed onion inbound from a local address, as from a Tor daemon on this host, is kept.
+    {
+        CNode node{++id,
+                   /*sock=*/std::make_shared<StaticContentsSock>(""),
+                   CAddress{ip(0x0100007f), NODE_NONE},
+                   /*nKeyedNetGroupIn=*/0,
+                   /*nLocalHostNonceIn=*/0,
+                   CAddress{},
+                   /*addrNameIn=*/"",
+                   ConnectionType::INBOUND,
+                   /*inbound_onion=*/true,
+                   /*network_key=*/0,
+                   CNodeOptions{.inbound_onion_assumed = true}};
+        BOOST_REQUIRE_EQUAL(node.ConnectedThroughNetwork(), Network::NET_ONION);
+        connman->Handshake(node,
+                           /*successfully_connected=*/true,
+                           /*remote_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS),
+                           /*local_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS),
+                           /*version=*/PROTOCOL_VERSION,
+                           /*relay_txs=*/true);
+        BOOST_CHECK(!node.fDisconnect);
+        peerman->FinalizeNode(node);
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
