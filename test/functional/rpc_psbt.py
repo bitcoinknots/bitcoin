@@ -264,6 +264,20 @@ class PSBTTest(BitcoinTestFramework):
 
         wallet.unloadwallet()
 
+    def test_addresstype_legacy_with_no_legacy_change(self):
+        self.generate(self.nodes[2], 1)
+        self.log.info("Test walletcreatefundedpsbt with addresstype=legacy but no legacy change descriptors")
+        self.restart_node(2, extra_args=["-addresstype=legacy"])
+        self.connect_nodes(0, 2)
+        self.connect_nodes(1, 2)
+        self.nodes[2].createwallet(wallet_name='no_legacy_change', blank=True)
+        w = self.nodes[2].get_wallet_rpc('no_legacy_change')
+        xprv = 'tprv8ZgxMBicQKsPevADjDCWsa6DfhkVXicu8NQUzfibwX2MexVwW4tCec5mXdCW8kJwkzBRRmAay1KZya4WsehVvjTGVW6JLqiqd8DdZ4xSg52'
+        assert w.importdescriptors([{"desc": descsum_create(f'tr({xprv}/*)'), "internal": True, "timestamp":"now", 'active': True, 'range': (0,100)}])[0]['success']
+        self.nodes[0].sendtoaddress(w.getrawchangeaddress(address_type='bech32m'), 20)
+        self.generate(self.nodes[0], 6)
+        w.walletcreatefundedpsbt([], {self.nodes[0].getnewaddress():10})['psbt']
+
     def assert_change_type(self, psbtx, expected_type):
         """Assert that the given PSBT has a change output with the given type."""
 
@@ -1116,6 +1130,9 @@ class PSBTTest(BitcoinTestFramework):
 
         self.log.info("Test descriptorprocesspsbt raises if an invalid sighashtype is passed")
         assert_raises_rpc_error(-8, "'all' is not a valid sighash parameter.", self.nodes[2].descriptorprocesspsbt, psbt, [descriptor], sighashtype="all")
+
+        if self.options.descriptors:
+            self.test_addresstype_legacy_with_no_legacy_change()
 
 
 if __name__ == '__main__':
