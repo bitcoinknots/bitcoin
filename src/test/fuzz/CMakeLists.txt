@@ -38,6 +38,7 @@ add_executable(fuzz
   crypto_hkdf_hmac_sha256_l32.cpp
   crypto_poly1305.cpp
   cuckoocache.cpp
+  datacarrier_dead_branch.cpp
   decode_tx.cpp
   descriptor_parse.cpp
   deserialize.cpp
