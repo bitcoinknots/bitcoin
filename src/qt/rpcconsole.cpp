@@ -1017,7 +1017,7 @@ void RPCConsole::setNumBlocks(int count, const QDateTime& blockDate, double nVer
 {
     if (synctype == SyncType::BLOCK_SYNC) {
         ui->numberOfBlocks->setText(QString::number(count));
-        ui->lastBlockTime->setText(blockDate.toString());
+        ui->lastBlockTime->setText(GUIUtil::dateTimeStr(blockDate));
     }
 }
 
