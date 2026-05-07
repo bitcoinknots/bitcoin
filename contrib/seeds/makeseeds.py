@@ -107,7 +107,8 @@ def parseline(line: str) -> Union[dict, None]:
         sortkey = ip
         ipstr = m.group(1)
         port = int(m.group(6))
-    # Extract uptime %.
+    # Extract uptime % over the 7-day and 30-day windows.
+    uptime7 = float(sline[6][:-1])
     uptime30 = float(sline[7][:-1])
     # Extract Unix timestamp of last success.
     lastsuccess = int(sline[2])
@@ -126,6 +127,7 @@ def parseline(line: str) -> Union[dict, None]:
         'port': port,
         'ipnum': ip,
         'uptime': uptime30,
+        'uptime7': uptime7,
         'lastsuccess': lastsuccess,
         'version': version,
         'agent': agent,
@@ -135,10 +137,13 @@ def parseline(line: str) -> Union[dict, None]:
     }
 
 def dedup(ips: list[dict]) -> list[dict]:
-    """ Remove duplicates from `ips` where multiple ips share address and port. """
-    d = {}
+    """ Remove duplicates from `ips` where multiple ips share address and port,
+    keeping the entry with the best uptime (and latest success as tie breaker). """
+    d: dict[tuple[str, int], dict] = {}
     for ip in ips:
-        d[ip['ip'],ip['port']] = ip
+        key = (ip['ip'], ip['port'])
+        if key not in d or (ip['uptime'], ip['lastsuccess']) > (d[key]['uptime'], d[key]['lastsuccess']):
+            d[key] = ip
     return list(d.values())
 
 def filtermultiport(ips: list[dict]) -> list[dict]:
@@ -198,8 +203,9 @@ def ip_stats(ips: list[dict]) -> str:
 def parse_args():
     argparser = argparse.ArgumentParser(description='Generate a list of bitcoin node seed ip addresses.')
     argparser.add_argument("-a","--asmap", help='the location of the asmap asn database file (required)', required=True)
-    argparser.add_argument("-s","--seeds", help='the location of the DNS seeds file (required)', required=True)
+    argparser.add_argument("-s","--seeds", nargs='+', help='the location of one or more DNS seeds files (required). Given more than one, each is parsed as its own file, so a source missing a trailing newline cannot silently merge into the next.', required=True)
     argparser.add_argument("-m", "--minblocks", help="The minimum number of blocks each node must have", default=MIN_BLOCKS, type=int)
+    argparser.add_argument("-u", "--uptime-window", help="Judge uptime over the last 7 or 30 days (default: 30). Use 7 while the network is younger than 30 days, when no node can meet a 30-day threshold", default=30, type=int, choices=[7, 30])
     return argparser.parse_args()
 
 def main():
@@ -211,8 +217,14 @@ def main():
     print('Done.', file=sys.stderr)
 
     print('Loading and parsing DNS seeds…', end='', file=sys.stderr, flush=True)
-    with open(args.seeds, 'r', encoding='utf8') as f:
-        lines = f.readlines()
+    # Read each file separately and concatenate the parsed line lists, not the raw
+    # bytes. A shell-level `cat a b > combined` silently merges a's last line into
+    # b's first line if a has no trailing newline, corrupting both; readlines() per
+    # file has no such failure mode regardless of a file's trailing newline.
+    lines = []
+    for seeds_path in args.seeds:
+        with open(seeds_path, 'r', encoding='utf8') as f:
+            lines += f.readlines()
     ips = [parseline(line) for line in lines]
     random.shuffle(ips)
     print('Done.', file=sys.stderr)
@@ -222,9 +234,6 @@ def main():
     # Skip entries with invalid address.
     ips = [ip for ip in ips if ip is not None]
     print(f'{ip_stats(ips):s} Skip entries with invalid address', file=sys.stderr)
-    # Skip duplicates (in case multiple seeds files were concatenated)
-    ips = dedup(ips)
-    print(f'{ip_stats(ips):s} After removing duplicates', file=sys.stderr)
     # Enforce minimal number of blocks.
     ips = [ip for ip in ips if ip['blocks'] >= args.minblocks]
     print(f'{ip_stats(ips):s} Enforce minimal number of blocks', file=sys.stderr)
@@ -232,7 +241,11 @@ def main():
     required_services = (1 << 0) | (1 << 3) | (1 << 28)  # 0x10000009
     ips = [ip for ip in ips if (ip['service'] & required_services) == required_services]
     print(f'{ip_stats(ips):s} Require service bits: NODE_NETWORK, NODE_WITNESS, NODE_BLAKE2B', file=sys.stderr)
-    # Require at least 50% 30-day uptime for clearnet, onion and i2p; 10% for cjdns
+    # Judge uptime over the selected window (see --uptime-window).
+    if args.uptime_window == 7:
+        for ip in ips:
+            ip['uptime'] = ip['uptime7']
+    # Require at least 50% uptime for clearnet, onion and i2p; 10% for cjdns
     req_uptime = {
         'ipv4': 50,
         'ipv6': 50,
@@ -245,6 +258,11 @@ def main():
     # Require a known and recent user agent.
     ips = [ip for ip in ips if PATTERN_AGENT.match(ip['agent'])]
     print(f'{ip_stats(ips):s} Require a known and recent user agent', file=sys.stderr)
+    # Skip duplicates (several seeders may list the same node). This runs after
+    # the filters above so a node is kept if any seeder's entry for it passes
+    # them, rather than depending on which seeder's entry survives the shuffle.
+    ips = dedup(ips)
+    print(f'{ip_stats(ips):s} After removing duplicates', file=sys.stderr)
     # Sort by availability (and use last success as tie breaker)
     ips.sort(key=lambda x: (x['uptime'], x['lastsuccess'], x['ip']), reverse=True)
     # Filter out hosts with multiple bitcoin ports, these are likely abusive
