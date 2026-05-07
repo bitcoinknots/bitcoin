@@ -184,7 +184,6 @@ ReadStatus PartiallyDownloadedBlock::FillBlock(CBlock& block, const std::vector<
 {
     if (header.IsNull()) return READ_STATUS_INVALID;
 
-    uint256 hash = header.GetHash();
     block = header;
     block.vtx.resize(txn_available.size());
 
@@ -212,11 +211,14 @@ ReadStatus PartiallyDownloadedBlock::FillBlock(CBlock& block, const std::vector<
         return READ_STATUS_FAILED; // Possible Short ID collision
     }
 
+    if (LogAcceptCategory(BCLog::CMPCTBLOCK, BCLog::Level::Debug)) {
+        const uint256 hash{block.GetHash()}; // avoid cleared header
     LogDebug(BCLog::CMPCTBLOCK, "Successfully reconstructed block %s with %lu txn prefilled, %lu txn from mempool (incl at least %lu from extra pool) and %lu txn requested\n", hash.ToString(), prefilled_count, mempool_count, extra_count, vtx_missing.size());
     if (vtx_missing.size() < 5) {
         for (const auto& tx : vtx_missing) {
             LogDebug(BCLog::CMPCTBLOCK, "Reconstructed block %s required tx %s\n", hash.ToString(), tx->GetHash().ToString());
         }
+    }
     }
 
     return READ_STATUS_OK;
