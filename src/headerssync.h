@@ -17,41 +17,6 @@
 #include <deque>
 #include <vector>
 
-// A compressed CBlockHeader, which leaves out the prevhash
-struct CompressedHeader {
-    // header
-    int32_t nVersion{0};
-    uint256 hashMerkleRoot;
-    uint32_t nTime{0};
-    uint32_t nBits{0};
-    uint32_t nNonce{0};
-
-    CompressedHeader()
-    {
-        hashMerkleRoot.SetNull();
-    }
-
-    CompressedHeader(const CBlockHeader& header)
-    {
-        nVersion = header.nVersion;
-        hashMerkleRoot = header.hashMerkleRoot;
-        nTime = header.nTime;
-        nBits = header.nBits;
-        nNonce = header.nNonce;
-    }
-
-    CBlockHeader GetFullHeader(const uint256& hash_prev_block) {
-        CBlockHeader ret;
-        ret.nVersion = nVersion;
-        ret.hashPrevBlock = hash_prev_block;
-        ret.hashMerkleRoot = hashMerkleRoot;
-        ret.nTime = nTime;
-        ret.nBits = nBits;
-        ret.nNonce = nNonce;
-        return ret;
-    };
-};
-
 /** HeadersSyncState:
  *
  * We wish to download a peer's headers chain in a DoS-resistant way.

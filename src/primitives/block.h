@@ -9,49 +9,46 @@
 #include <primitives/transaction.h>
 #include <serialize.h>
 #include <uint256.h>
+#include <util/overflow.h>
 #include <util/time.h>
 
-/** Nodes collect new transactions into a block, hash them into a hash tree,
- * and scan through nonce values to make the block's hash satisfy proof-of-work
- * requirements.  When they solve the proof-of-work, they broadcast the block
- * to everyone and the block is added to the block chain.  The first transaction
- * in the block is a special one that creates a new coin owned by the creator
- * of the block.
- */
-class CBlockHeader
-{
-public:
+#include <concepts>
+#include <type_traits>
+#include <utility>
+
+namespace BlockHeaderFlag {
+    constexpr uint8_t UseTimeOffset = 4;
+};
+
+// A compressed CBlockHeader, which leaves out the prevhash
+struct CompressedHeader {
+    static constexpr uint32_t VERSION_HEADER_V2_FLAG{0x80000000};
+
     // header
-    int32_t nVersion;
-    uint256 hashPrevBlock;
+    bool m_header_v2{false};
+    int32_t nVersion{0};
     uint256 hashMerkleRoot;
-    uint32_t nTime;
-    uint32_t nBits;
-    uint32_t nNonce;
+    uint32_t nTime{0};
+    uint32_t nBits{0};
+    // Direct PoW/ASIC grinding:
+    uint32_t nNonce{0};
+    uint32_t m_nonce2{0};
+    uint32_t m_nonce3{0};
+    // Sv1 extranonce:
+    uint128 m_extranonce{};
+    // Header 1 effectively-nonce, reserved:
+    uint8_t m_flags{0};
 
-    CBlockHeader()
+    uint32_t m_time_offset{0};
+    uint8_t m_xor_key_mask_clear_bits{0};
+    uint128 m_xor_key{};
+    uint256 m_mm_rhs;
+    uint16_t m_txcount{0};
+
+    CompressedHeader()
     {
-        SetNull();
-    }
-
-    SERIALIZE_METHODS(CBlockHeader, obj) { READWRITE(obj.nVersion, obj.hashPrevBlock, obj.hashMerkleRoot, obj.nTime, obj.nBits, obj.nNonce); }
-
-    void SetNull()
-    {
-        nVersion = 0;
-        hashPrevBlock.SetNull();
         hashMerkleRoot.SetNull();
-        nTime = 0;
-        nBits = 0;
-        nNonce = 0;
     }
-
-    bool IsNull() const
-    {
-        return (nBits == 0);
-    }
-
-    uint256 GetHash() const;
 
     NodeSeconds Time() const
     {
@@ -62,6 +59,113 @@ public:
     {
         return (int64_t)nTime;
     }
+
+    uint32_t GetCompleteVersion() const
+    {
+        return (m_header_v2 ? VERSION_HEADER_V2_FLAG : uint32_t{0}) | ((uint32_t)nVersion & ~VERSION_HEADER_V2_FLAG);
+    }
+
+    uint32_t GetTimeOnWire() const {
+        if (0 == (m_flags & BlockHeaderFlag::UseTimeOffset)) {
+            return nTime;
+        }
+        return WrappingSubtract(nTime, m_time_offset);
+    }
+};
+
+/** Nodes collect new transactions into a block, hash them into a hash tree,
+ * and scan through nonce values to make the block's hash satisfy proof-of-work
+ * requirements.  When they solve the proof-of-work, they broadcast the block
+ * to everyone and the block is added to the block chain.  The first transaction
+ * in the block is a special one that creates a new coin owned by the creator
+ * of the block.
+ */
+class CBlockHeader : public CompressedHeader
+{
+public:
+    // header
+    uint256 hashPrevBlock;
+    int32_t m_height;
+
+    CBlockHeader()
+    {
+        SetNull();
+    }
+
+    template <typename T> requires std::same_as<std::remove_cvref_t<T>, CompressedHeader>
+    CBlockHeader(T&& compressed_header, const uint256& hash_prev_block, const int32_t height)
+    : CompressedHeader(std::forward<T>(compressed_header)),
+      hashPrevBlock(hash_prev_block),
+      m_height(m_header_v2 ? height : 0)
+    {
+    }
+
+    SERIALIZE_METHODS(CBlockHeader, obj) {
+        uint32_t v, time_on_wire;
+        SER_WRITE(obj, v = obj.GetCompleteVersion());
+        SER_WRITE(obj, time_on_wire = obj.GetTimeOnWire());
+        READWRITE(v, obj.hashPrevBlock, obj.hashMerkleRoot, time_on_wire, obj.nBits, obj.nNonce);
+        SER_READ(obj, obj.m_header_v2 = v & VERSION_HEADER_V2_FLAG);
+        SER_READ(obj, obj.nVersion = v & ~VERSION_HEADER_V2_FLAG);
+        if (obj.m_header_v2) {
+            READWRITE(obj.m_nonce2, obj.m_nonce3, obj.m_extranonce, obj.m_time_offset, obj.m_txcount, obj.m_flags, obj.m_xor_key_mask_clear_bits, obj.m_xor_key, obj.m_height, obj.m_mm_rhs);
+        } else {
+            SER_READ(obj, obj.m_nonce2 = 0);
+            SER_READ(obj, obj.m_nonce3 = 0);
+            SER_READ(obj, obj.m_extranonce.SetNull());
+            SER_READ(obj, obj.m_time_offset = 0);
+            SER_READ(obj, obj.m_txcount = 0);
+            SER_READ(obj, obj.m_flags = 0);
+            SER_READ(obj, obj.m_xor_key_mask_clear_bits = 0);
+            SER_READ(obj, obj.m_xor_key.SetNull());
+            SER_READ(obj, obj.m_height = 0);
+            SER_READ(obj, obj.m_mm_rhs.SetNull());
+        }
+        SER_READ(obj, obj.nTime = WrappingAdd(time_on_wire, (obj.m_flags & BlockHeaderFlag::UseTimeOffset) ? obj.m_time_offset : 0));
+    }
+
+    void SetNull()
+    {
+        m_header_v2 = false;
+        nVersion = 0;
+        hashPrevBlock.SetNull();
+        hashMerkleRoot.SetNull();
+        nTime = 0;
+        nBits = 0;
+        nNonce = 0;
+        m_nonce2 = 0;
+        m_nonce3 = 0;
+        m_extranonce.SetNull();
+        m_time_offset = 0;
+        m_txcount = 0;
+        m_flags = 0;
+        m_xor_key_mask_clear_bits = 0;
+        m_xor_key.SetNull();
+        m_height = 0;
+        m_mm_rhs.SetNull();
+    }
+
+    bool IsNull() const
+    {
+        return (nBits == 0);
+    }
+
+    bool AreHeaderV2FieldsNull() const {
+        if (m_header_v2) return false;
+        if (m_nonce2) return false;
+        if (m_nonce3) return false;
+        if (!m_extranonce.IsNull()) return false;
+        if (m_time_offset) return false;
+        if (m_txcount) return false;
+        if (m_flags) return false;
+        if (m_xor_key_mask_clear_bits) return false;
+        if (!m_xor_key.IsNull()) return false;
+        if (!m_mm_rhs.IsNull()) return false;
+        if (m_height) return false;
+        return true;
+    }
+
+    uint256 GetHash() const;
 };
 
 
@@ -103,14 +207,7 @@ public:
 
     CBlockHeader GetBlockHeader() const
     {
-        CBlockHeader block;
-        block.nVersion       = nVersion;
-        block.hashPrevBlock  = hashPrevBlock;
-        block.hashMerkleRoot = hashMerkleRoot;
-        block.nTime          = nTime;
-        block.nBits          = nBits;
-        block.nNonce         = nNonce;
-        return block;
+        return static_cast<const CBlockHeader&>(*this);
     }
 
     std::string ToString() const;

@@ -108,6 +108,11 @@ public:
         ctx.Write(UCharCast(src.data()), src.size());
     }
 
+    uint64_t BytesWritten() const
+    {
+        return ctx.BytesWritten();
+    }
+
     /** Compute the double-SHA256 hash of all data written to this object.
      *
      * Invalidates this object.

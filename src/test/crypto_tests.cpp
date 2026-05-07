@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <crypto/aes.h>
+#include <crypto/blake2b.h>
 #include <crypto/chacha20.h>
 #include <crypto/chacha20poly1305.h>
 #include <crypto/hkdf_sha256_32.h>
@@ -427,6 +428,18 @@ BOOST_AUTO_TEST_CASE(sha256_testvectors) {
     TestSHA256(std::string(1000000, 'a'),
                "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0");
     TestSHA256(test1, "a316d55510b49662420f49d145d42fb83f31ef8dc016aa4e32df049991a91e26");
+}
+
+BOOST_AUTO_TEST_CASE(blake2b_256_testvectors)
+{
+    const auto test = [](const std::string& input, const std::string& expected) {
+        std::array<unsigned char, 32> output;
+        BOOST_REQUIRE_EQUAL(blake2b_nokey(output.data(), output.size(), input.data(), input.size()), 0);
+        BOOST_CHECK_EQUAL(HexStr(output), expected);
+    };
+
+    test("", "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8");
+    test("abc", "bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319");
 }
 
 BOOST_AUTO_TEST_CASE(sha512_testvectors) {

@@ -33,7 +33,9 @@ bool operator==(const CBlockFileInfo& a, const CBlockFileInfo& b)
 CBlockHeader ConsumeBlockHeader(FuzzedDataProvider& provider)
 {
     CBlockHeader header;
-    header.nVersion = provider.ConsumeIntegral<decltype(header.nVersion)>();
+    // Clear nVersion's high bit: it's the m_header_v2 wire flag, and setting it
+    // without m_header_v2 makes the v2 header round-trip underflow.
+    header.nVersion = provider.ConsumeIntegral<decltype(header.nVersion)>() & 0x7fffffff;
     header.hashPrevBlock = g_block_hash;
     header.hashMerkleRoot = g_block_hash;
     header.nTime = provider.ConsumeIntegral<decltype(header.nTime)>();
