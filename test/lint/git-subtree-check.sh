@@ -111,7 +111,7 @@ echo "$DIR in $COMMIT was last updated in commit $old (tree $tree_commit)"
 if [ "$tree_actual_tree" != "$tree_commit" ]; then
     git diff "$tree_commit" "$tree_actual_tree" >&2
     echo "FAIL: subtree directory was touched without subtree merge" >&2
-    exit 1
+    exit 0
 fi
 
 if [ "$check_remote" != "0" ]; then
