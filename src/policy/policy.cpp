@@ -646,14 +646,55 @@ static bool FollowDeadBranches(const CTxIn& txin)
     return ::g_reject_dead_branches && GetSerializeSize(txin.scriptWitness.stack) <= g_script_size_policy_limit;
 }
 
-std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsViewCache& view)
+std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsViewCache& view, const std::vector<VerifiedKeys>* verified_keys, std::vector<DatacarrierInputCache>* input_cache)
 {
     std::pair<size_t, size_t> ret{0, 0};
+    // A set per input or none at all. A partial one is not an observation.
+    if (verified_keys && verified_keys->size() != tx.vin.size()) verified_keys = nullptr;
 
-    for (const CTxIn& txin : tx.vin) {
+    // With no verified keys this is the static count: fill the cache, one entry per input. With verified
+    // keys and a cache that matches the inputs, this is the recount: reuse each input's dead-branch count
+    // and recompute only its unproven-pubkey part, so the dead-branch scan is not run a second time.
+    const bool populate{input_cache && !verified_keys};
+    const bool consume{input_cache && verified_keys && input_cache->size() == tx.vin.size()};
+    if (populate) {
+        input_cache->clear();
+        input_cache->reserve(tx.vin.size());
+    }
+
+    for (size_t i{0}; i < tx.vin.size(); ++i) {
+        const CTxIn& txin = tx.vin[i];
         const CTxOut &utxo = view.AccessCoin(txin.prevout).out;
         auto[script, consensus_weight_per_byte] = GetScriptForTransactionInput(utxo.scriptPubKey, txin);
-        const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness, FollowDeadBranches(txin));
+        // Recount from the verified keys only for an input whose counted script came from the witness:
+        // native P2WSH, a tapscript leaf, and P2SH-wrapped P2WSH, which GetScriptForTransactionInput
+        // returns with a per-byte weight of 1. The witness-based bypass lives there. A script taken from
+        // the scriptSig (legacy P2SH, bare multisig, P2PKH) comes back at WITNESS_SCALE_FACTOR, and keeps
+        // the static count unchanged, byte for byte.
+        const VerifiedKeys* input_keys{(verified_keys && consensus_weight_per_byte == 1) ? &(*verified_keys)[i] : nullptr};
+        std::pair<size_t, size_t> dcb;
+        if (populate) {
+            bool normal{false};
+            dcb = script.DatacarrierBytes(0, &txin.scriptWitness, FollowDeadBranches(txin), /*verified_keys=*/nullptr, &normal);
+            input_cache->push_back({dcb.first, dcb.second, normal});
+        } else if (consume) {
+            const DatacarrierInputCache& c{(*input_cache)[i]};
+            if (input_keys && c.normal) {
+                // Only the unproven-pubkey part can change with the keys; the dead-branch count cannot,
+                // so reuse it and recompute only the unproven part, skipping the dead-branch scan. A
+                // per-input empty set is not the same as no observation here (an empty set charges every
+                // counted key, nullptr charges none), so an eligible input is always recomputed, never
+                // read back from c.first.
+                dcb = script.DatacarrierBytesReusing(0, &txin.scriptWitness, input_keys, c.second);
+            } else {
+                // input_keys is set only for a witness-derived script, so this is either an input with no
+                // such script (counted the same with keys or without, i.e. nullptr both times) or one that
+                // took an early return the keys cannot change: the static result stands.
+                dcb = {c.first, c.second};
+            }
+        } else {
+            dcb = script.DatacarrierBytes(0, &txin.scriptWitness, FollowDeadBranches(txin), input_keys);
+        }
         ret.first += dcb.first;
         ret.second += dcb.second;
     }
