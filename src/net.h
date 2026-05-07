@@ -675,6 +675,9 @@ struct CNodeOptions
     bool forced_inbound{false};
     size_t recv_flood_size{DEFAULT_MAXRECEIVEBUFFER * 1000};
     bool use_v2transport = false;
+    // True if inbound_onion is only assumed: the connection arrived on a listener that also takes clearnet
+    // connections (no -bind=...=onion is configured), so it may not have come through Tor at all.
+    bool inbound_onion_assumed{false};
 };
 
 /** Information about a peer */
@@ -722,6 +725,8 @@ public:
     const std::string m_dest;
     //! Whether this peer is an inbound onion, i.e. connected via our Tor onion service.
     const bool m_inbound_onion;
+    //! Whether m_inbound_onion is only assumed from a listener shared with clearnet (see CNodeOptions).
+    const bool m_inbound_onion_assumed;
     std::atomic<int> nVersion{0};
     Mutex m_subver_mutex;
     /**
