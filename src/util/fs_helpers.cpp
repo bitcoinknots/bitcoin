@@ -180,11 +180,7 @@ int RaiseFileDescriptorLimit(int nMinFD)
 #endif
 }
 
-/**
- * this function tries to make a particular range of a file allocated (corresponding to disk space)
- * it is advisory, and the range specified in the arguments will never contain live data
- */
-void AllocateFileRange(FILE* file, uint64_t offset, unsigned int length)
+static void AllocateFileRangeUnsynced(FILE* file, uint64_t offset, unsigned int length)
 {
 #if defined(WIN32)
     // Windows-specific version
@@ -237,14 +233,33 @@ void AllocateFileRange(FILE* file, uint64_t offset, unsigned int length)
                 return;
             }
             memset(&buf[rlen], 0, now - rlen);
-            if (0 != fseek(file, -rlen, SEEK_CUR)) {
-                return;
-            }
+        }
+        if (0 != FileSeek64(file, -static_cast<int64_t>(rlen), SEEK_CUR)) {
+            return;
         }
         fwrite(buf, 1, now, file); // allowed to fail; this function is advisory anyway
+        if (0 != FileSeek64(file, 0, SEEK_CUR)) {
+            return;
+        }
         length -= now;
     }
 #endif
+}
+
+/**
+ * this function tries to make a particular range of a file allocated (corresponding to disk space)
+ * it is advisory, and the range specified in the arguments will never contain live data
+ */
+void AllocateFileRange(FILE* file, uint64_t offset, unsigned int length)
+{
+    // The platform code bypasses the stream, and the Windows code and the
+    // fallback move the file position, so write out anything buffered first
+    // (seeking does that, and unlike fflush is also valid after a read) and
+    // put the stream back afterwards
+    const int64_t pos{FileTell64(file)};
+    if (pos < 0 || FileSeek64(file, pos, SEEK_SET) != 0) return;
+    AllocateFileRangeUnsynced(file, offset, length);
+    FileSeek64(file, pos, SEEK_SET);
 }
 
 FILE* AdviseSequential(FILE *file) {
