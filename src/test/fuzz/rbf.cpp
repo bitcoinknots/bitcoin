@@ -195,7 +195,8 @@ FUZZ_TARGET(package_rbf, .init = initialize_package_rbf)
             replacement_entry_coin_age_cache,
             replacement_entry.GetSpendsCoinbase(),
             /*extra_weight=*/ replacement_entry.GetExtraWeight(),
-            replacement_entry.GetSigOpCost(), replacement_entry.GetLockPoints());
+            replacement_entry.GetSigOpCost(), replacement_entry.GetLockPoints(),
+            /*hardfork_active=*/ replacement_entry.GetHardforkActive());
     // Calculate the chunks for a replacement.
     auto calc_results{changeset->CalculateChunksForRBF()};
 
