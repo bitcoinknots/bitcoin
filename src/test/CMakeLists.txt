@@ -20,6 +20,7 @@ add_executable(test_bitcoin
   bip324_tests.cpp
   blockchain_tests.cpp
   blockencodings_tests.cpp
+  block_header_tests.cpp
   blockfilter_index_tests.cpp
   blockfilter_tests.cpp
   blockmanager_tests.cpp
@@ -133,6 +134,7 @@ include(TargetDataSources)
 target_json_data_sources(test_bitcoin
   data/base58_encode_decode.json
   data/bip341_wallet_vectors.json
+  data/block_header_v2.json
   data/blockfilters.json
   data/key_io_invalid.json
   data/key_io_valid.json
