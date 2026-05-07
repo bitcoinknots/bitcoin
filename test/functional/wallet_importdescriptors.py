@@ -67,6 +67,25 @@ class ImportDescriptorsTest(BitcoinTestFramework):
             assert_equal(result[0]['error']['code'], error_code)
             assert_equal(result[0]['error']['message'], error_message)
 
+    def test_keypool_range_bound(self):
+        self.log.info("Test that a -keypool larger than the descriptor range is rejected on import")
+        # Without an explicit range the import falls back to -keypool, which is only
+        # bounded below. A value past the int32_t range_end used to be truncated to a
+        # negative range, aborting the node during keypool top up.
+        self.restart_node(1, extra_args=self.extra_args[1] + ["-keypool=3000000000"])
+        node = self.nodes[1]
+        node.createwallet(wallet_name="keypool_bound", blank=True)
+        wrpc = node.get_wallet_rpc("keypool_bound")
+        desc = descsum_create("wpkh(tprv8ZgxMBicQKsPd7Uf69XL1XwhmjHopUGep8GuEiJDZmbQz6o58LninorQAfcKZWARbtRtfnLcJ5MQ2AtHcQJCCRUcMRvmDUjyEmNUWwx8UbK/0h/0h/*)")
+        self.test_importdesc({"desc": desc, "timestamp": "now"},
+                             success=False, error_code=-8, error_message='End of range is too high',
+                             warnings=['Range not given, using default keypool range'], wallet=wrpc)
+        # The node survived and no descriptor was added to the wallet.
+        assert_equal(wrpc.listdescriptors()['descriptors'], [])
+        wrpc.unloadwallet()
+        self.restart_node(1, extra_args=self.extra_args[1])
+        self.connect_nodes(0, 1)
+
     def run_test(self):
         self.log.info('Setting up wallets')
         self.nodes[0].createwallet(wallet_name='w0', disable_private_keys=False, descriptors=True)
@@ -273,6 +292,14 @@ class ImportDescriptorsTest(BitcoinTestFramework):
 
         self.test_importdesc({"desc": descsum_create(desc), "timestamp": "now", "range": [0, 1000001]},
                               success=False, error_code=-8, error_message='Range is too large')
+
+        # The wallet stores the descriptor range as int32_t and range_end is exclusive,
+        # so an inclusive endpoint of 2^31-1 has no representable end. It used to be
+        # truncated to a negative range_end, which aborted the node during keypool top up.
+        # Use an xpub: w1 rejects the xpriv above before the descriptor is added.
+        self.test_importdesc({"desc": descsum_create("wpkh(" + xpub + "/0/*)"), "timestamp": "now",
+                              "range": [2**31 - 1, 2**31 - 1]},
+                              success=False, error_code=-8, error_message='End of range is too high')
 
         self.log.info("Verify we can only extend descriptor's range")
         range_request = {"desc": descsum_create(desc), "timestamp": "now", "range": [5, 10], 'active': True}
@@ -772,6 +799,7 @@ class ImportDescriptorsTest(BitcoinTestFramework):
             assert_equal(w_multipath.getnewaddress(address_type="bech32"), w_multisplit.getnewaddress(address_type="bech32"))
             assert_equal(w_multipath.getrawchangeaddress(address_type="bech32"), w_multisplit.getrawchangeaddress(address_type="bech32"))
         assert_equal(sorted(w_multipath.listdescriptors()["descriptors"], key=lambda x: x["desc"]), sorted(w_multisplit.listdescriptors()["descriptors"], key=lambda x: x["desc"]))
+        self.test_keypool_range_bound()
 
 if __name__ == '__main__':
     ImportDescriptorsTest(__file__).main()
