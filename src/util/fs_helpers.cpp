@@ -11,11 +11,13 @@
 #include <random.h>
 #include <sync.h>
 #include <tinyformat.h>
+#include <util/check.h>
 #include <util/fs.h>
 #include <util/syserror.h>
 
 #include <cerrno>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <memory>
 #include <optional>
@@ -166,19 +168,38 @@ bool TruncateFile(FILE* file, unsigned int length)
  */
 int RaiseFileDescriptorLimit(int nMinFD)
 {
+    Assert(nMinFD >= 0);
 #if defined(WIN32)
     return 2048;
 #else
     struct rlimit limitFD;
     if (getrlimit(RLIMIT_NOFILE, &limitFD) != -1) {
-        if (limitFD.rlim_cur < (rlim_t)nMinFD) {
-            limitFD.rlim_cur = nMinFD;
-            if (limitFD.rlim_cur > limitFD.rlim_max)
+        // If the current soft limit is already higher, don't raise it
+        if (limitFD.rlim_cur != RLIM_INFINITY && std::cmp_less(limitFD.rlim_cur, nMinFD)) {
+            const auto current_limit{limitFD.rlim_cur};
+            limitFD.rlim_cur = std::in_range<rlim_t>(nMinFD) ? static_cast<rlim_t>(nMinFD) : limitFD.rlim_max;
+            // Don't raise soft limit beyond hard limit
+            if (limitFD.rlim_max != RLIM_INFINITY && (
+                limitFD.rlim_cur > limitFD.rlim_max
+                )
+            ) {
                 limitFD.rlim_cur = limitFD.rlim_max;
+            }
+            if (current_limit != limitFD.rlim_cur) {
             setrlimit(RLIMIT_NOFILE, &limitFD);
             getrlimit(RLIMIT_NOFILE, &limitFD);
+            }
         }
-        return limitFD.rlim_cur;
+        // Check the (possibly raised) current soft limit against the special
+        // value of RLIM_INFINITY. Some platforms implement this as the maximum
+        // uint64, others as int64 (-1). Avoid casting even if the return type
+        // is changed to uint64_t. We also cap unlikely but possible values
+        // that would overflow int.
+        if (limitFD.rlim_cur == RLIM_INFINITY ||
+            std::cmp_greater_equal(limitFD.rlim_cur, std::numeric_limits<int>::max())) {
+            return std::numeric_limits<int>::max();
+        }
+        return static_cast<int>(limitFD.rlim_cur);
     }
     return nMinFD; // getrlimit failed, assume it's fine
 #endif
