@@ -4,9 +4,11 @@
 
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
+#include <common/sighash_rules.h>
 #include <chainparamsbase.h>
 #include <clientversion.h>
 #include <coins.h>
+#include <chainparams.h>
 #include <common/args.h>
 #include <common/system.h>
 #include <compat/compat.h>
@@ -52,6 +54,7 @@ static void SetupBitcoinTxArgs(ArgsManager &argsman)
     argsman.AddArg("-json", "Select JSON output", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-txid", "Output only the hex-encoded transaction id of the resultant transaction.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     SetupChainParamsBaseOptions(argsman);
+    SetupSighashRulesArgs(argsman);
 
     argsman.AddArg("delin=N", "Delete input N from TX", ArgsManager::ALLOW_ANY, OptionsCategory::COMMANDS);
     argsman.AddArg("delout=N", "Delete output N from TX", ArgsManager::ALLOW_ANY, OptionsCategory::COMMANDS);
@@ -530,7 +533,7 @@ static void MutateTxDelOutput(CMutableTransaction& tx, const std::string& strOut
     tx.vout.erase(tx.vout.begin() + outIdx);
 }
 
-static const unsigned int N_SIGHASH_OPTS = 7;
+static const unsigned int N_SIGHASH_OPTS = 13;
 static const struct {
     const char *flagStr;
     int flags;
@@ -542,6 +545,15 @@ static const struct {
     {"ALL|ANYONECANPAY", SIGHASH_ALL|SIGHASH_ANYONECANPAY},
     {"NONE|ANYONECANPAY", SIGHASH_NONE|SIGHASH_ANYONECANPAY},
     {"SINGLE|ANYONECANPAY", SIGHASH_SINGLE|SIGHASH_ANYONECANPAY},
+    // The opt-in spellings, matching what SighashToStr prints and what the
+    // signing RPCs take. The name asks for the byte; which message is signed is
+    // decided by the rules in force, not by the name.
+    {"ALL|UNIFIED", SIGHASH_ALL|SIGHASH_UNIFIED},
+    {"ALL|ANYONECANPAY|UNIFIED", SIGHASH_ALL|SIGHASH_ANYONECANPAY|SIGHASH_UNIFIED},
+    {"NONE|UNIFIED", SIGHASH_NONE|SIGHASH_UNIFIED},
+    {"NONE|ANYONECANPAY|UNIFIED", SIGHASH_NONE|SIGHASH_ANYONECANPAY|SIGHASH_UNIFIED},
+    {"SINGLE|UNIFIED", SIGHASH_SINGLE|SIGHASH_UNIFIED},
+    {"SINGLE|ANYONECANPAY|UNIFIED", SIGHASH_SINGLE|SIGHASH_ANYONECANPAY|SIGHASH_UNIFIED},
 };
 
 static bool findSighashFlags(int& flags, const std::string& flagStr)
@@ -675,9 +687,46 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
 
     bool fHashSingle = ((nHashType & ~SIGHASH_ANYONECANPAY) == SIGHASH_SINGLE);
 
+    // The same rule the node signs by, minus the chain it has no way to read:
+    // with no height to compare against, the fork being scheduled is the whole
+    // answer. -walletoldsigs says otherwise, and this tool reads only the command
+    // line, so that flag has to be given here even when the node's config file
+    // already sets it.
+    const SighashRules sighash_rules{SighashRulesForSigning(gArgs, Params().GetConsensus())};
+    if ((nHashType & SIGHASH_UNIFIED) && sighash_rules != SighashRules::UNIFIED) {
+        // Asked for by name, so say why it cannot be given rather than fail as
+        // an unsolvable input further down.
+        throw std::runtime_error("UNIFIED was asked for, but this signs the legacy message: "
+                                 "either the fork is not scheduled on this network, or "
+                                 "-walletoldsigs is set");
+    }
+    // Built whenever every previous output is known, not only when signing for
+    // the fork: reading an input that already carries an opt-in signature needs
+    // the same commitments, and that happens under either rule set.
+    PrecomputedTransactionData txdata;
+    bool have_spent_outputs{false};
+    {
+        std::vector<CTxOut> spent_outputs;
+        spent_outputs.reserve(mergedTx.vin.size());
+        for (const CTxIn& txin : mergedTx.vin) {
+            const Coin& coin = view.AccessCoin(txin.prevout);
+            if (coin.IsSpent()) break;
+            spent_outputs.emplace_back(coin.out);
+        }
+        have_spent_outputs = spent_outputs.size() == mergedTx.vin.size();
+        if (sighash_rules == SighashRules::UNIFIED && !have_spent_outputs) {
+            throw std::runtime_error("the hardfork signature hash needs the previous output of every input; supply them all, or pass -walletoldsigs");
+        }
+        if (have_spent_outputs) {
+            txdata.Init(CTransaction(mergedTx), std::move(spent_outputs), /*force=*/true);
+        }
+    }
+
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn& txin = mergedTx.vin[i];
+        // Recorded before signing: UpdateInput below replaces whatever is here.
+        const bool input_had_data{!txin.scriptSig.empty() || !txin.scriptWitness.IsNull()};
         const Coin& coin = view.AccessCoin(txin.prevout);
         if (coin.IsSpent()) {
             continue;
@@ -685,16 +734,44 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
         const CScript& prevPubKey = coin.out.scriptPubKey;
         const CAmount& amount = coin.out.nValue;
 
-        SignatureData sigdata = DataFromTransaction(mergedTx, i, coin.out);
+        // Recognizing an existing opt-in signature needs the spent outputs it
+        // commits to. What is not recognized here is overwritten below, so a
+        // co-signer who did not pass -walletoldsigs would otherwise have their
+        // work destroyed.
+        SignatureData sigdata = DataFromTransaction(mergedTx, i, coin.out,
+                                                    have_spent_outputs ? &txdata : nullptr);
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
-        if (!fHashSingle || (i < mergedTx.vout.size()))
-            ProduceSignature(keystore, MutableTransactionSignatureCreator(mergedTx, i, amount, nHashType), prevPubKey, sigdata);
+        if (!fHashSingle || (i < mergedTx.vout.size())) {
+            MutableTransactionSignatureCreator creator(mergedTx, i, amount, sighash_rules == SighashRules::UNIFIED ? &txdata : nullptr, nHashType);
+            creator.SetSighashRules(sighash_rules);
+            ProduceSignature(keystore, creator, prevPubKey, sigdata);
+        }
 
-        if (amount == MAX_MONEY && !sigdata.scriptWitness.IsNull()) {
+        // The unified message commits to the amount of every input, not just
+        // witness ones, so a missing amount would be signed over as MAX_MONEY
+        // and the result emitted as though it were good.
+        if (amount == MAX_MONEY && (!sigdata.scriptWitness.IsNull() ||
+                                    sighash_rules == SighashRules::UNIFIED)) {
             throw std::runtime_error(strprintf("Missing amount for CTxOut with scriptPubKey=%s", HexStr(prevPubKey)));
         }
 
-        UpdateInput(txin, sigdata);
+        // Without every previous output an opt-in signature cannot be read back,
+        // so an input carrying one would be replaced by whatever was recognized.
+        // Write only when that cannot lose anything: the result solves the input,
+        // or every previous output was available to read it with, or there was
+        // nothing there to begin with. Completeness is the test rather than a
+        // non-empty scriptSig, which ProduceSignature fills with a placeholder
+        // even when it solved nothing.
+        if (sigdata.complete || have_spent_outputs || !input_had_data) {
+            UpdateInput(txin, sigdata);
+        } else {
+            // Refusing to write is the safe half of the choice; doing it
+            // quietly is not, since the signature just made is discarded too.
+            throw std::runtime_error(strprintf(
+                "Input %u already carries signature data that cannot be read back "
+                "without every previous output, so the new signature was not "
+                "written. Supply the previous output of every input.", i));
+        }
     }
 
     tx = mergedTx;

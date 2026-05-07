@@ -85,6 +85,15 @@ const std::map<unsigned char, std::string> mapSigHashTypes = {
     {static_cast<unsigned char>(SIGHASH_NONE|SIGHASH_ANYONECANPAY), std::string("NONE|ANYONECANPAY")},
     {static_cast<unsigned char>(SIGHASH_SINGLE), std::string("SINGLE")},
     {static_cast<unsigned char>(SIGHASH_SINGLE|SIGHASH_ANYONECANPAY), std::string("SINGLE|ANYONECANPAY")},
+    // The hardfork opt-in. Without these an opted-in signature renders as an
+    // empty string wherever a hash type is shown, which is every PSBT the wallet
+    // produces.
+    {static_cast<unsigned char>(SIGHASH_ALL|SIGHASH_UNIFIED), std::string("ALL|UNIFIED")},
+    {static_cast<unsigned char>(SIGHASH_ALL|SIGHASH_ANYONECANPAY|SIGHASH_UNIFIED), std::string("ALL|ANYONECANPAY|UNIFIED")},
+    {static_cast<unsigned char>(SIGHASH_NONE|SIGHASH_UNIFIED), std::string("NONE|UNIFIED")},
+    {static_cast<unsigned char>(SIGHASH_NONE|SIGHASH_ANYONECANPAY|SIGHASH_UNIFIED), std::string("NONE|ANYONECANPAY|UNIFIED")},
+    {static_cast<unsigned char>(SIGHASH_SINGLE|SIGHASH_UNIFIED), std::string("SINGLE|UNIFIED")},
+    {static_cast<unsigned char>(SIGHASH_SINGLE|SIGHASH_ANYONECANPAY|SIGHASH_UNIFIED), std::string("SINGLE|ANYONECANPAY|UNIFIED")},
 };
 
 std::string SighashToStr(unsigned char sighash_type)
@@ -126,7 +135,11 @@ std::string ScriptToAsmStr(const CScript& script, const bool fAttemptSighashDeco
                     // this won't decode correctly formatted public keys in Pubkey or Multisig scripts due to
                     // the restrictions on the pubkey formats (see IsCompressedOrUncompressedPubKey) being incongruous with the
                     // checks in CheckSignatureEncoding.
-                    if (CheckSignatureEncoding(vch, SCRIPT_VERIFY_STRICTENC, nullptr)) {
+                    // The opt-in bit is only a defined hash type where the fork's
+                    // flag is set, and this renders rather than validates, so it is
+                    // set unconditionally: without it an opted-in signature never
+                    // decodes and the names for those bytes are unreachable.
+                    if (CheckSignatureEncoding(vch, SCRIPT_VERIFY_STRICTENC | SCRIPT_VERIFY_UNIFIED_SIGHASH, nullptr)) {
                         const unsigned char chSigHashType = vch.back();
                         const auto it = mapSigHashTypes.find(chSigHashType);
                         if (it != mapSigHashTypes.end()) {
