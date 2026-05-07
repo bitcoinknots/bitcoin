@@ -865,13 +865,13 @@ public:
     std::atomic_bool m_has_all_wanted_services{false};
 
     /** Whether this connection counts towards an automatic outbound target. */
-    bool CountsTowardOutboundTarget() const { return !m_is_non_bip110_outbound; }
+    bool CountsTowardOutboundTarget() const { return !m_is_stale_outbound; }
 
-    /** Whether this outbound peer did not advertise NODE_REDUCED_DATA (BIP-110).
+    /** Whether this outbound peer did not advertise NODE_BLAKE2B.
      *  Such a peer is tolerated as an additional connection, like an addnode
      *  peer: it holds no automatic outbound semaphore slot and counts towards no
-     *  outbound target, so we keep looking for a BIP110 peer to fill it. */
-    std::atomic_bool m_is_non_bip110_outbound{false};
+     *  outbound target, so we keep looking for a preferred peer to fill it. */
+    std::atomic_bool m_is_stale_outbound{false};
 
     /** Whether we should relay transactions to this peer. This only changes
      * from false to true. It will never change back to false. */
@@ -1248,8 +1248,8 @@ public:
 
     void StartExtraBlockRelayPeers();
 
-    // Count the number of BIP110 full-relay peers we have (excludes non-BIP110 peers).
-    int GetBIP110FullOutboundConnCount() const;
+    // Count the number of preferred full-relay peers we have (excludes demoted stale peers).
+    int GetFullOutboundConnCount() const;
     // Return the number of outbound peers we have in excess of our target (eg,
     // if we previously called SetTryNewOutboundPeer(true), and have since set
     // to false, we may have extra peers that we wish to disconnect). This may
@@ -1260,12 +1260,12 @@ public:
     // Count the number of block-relay-only peers we have over our limit.
     int GetExtraBlockRelayCount() const;
 
-    /** Demote an outbound peer that did not advertise NODE_REDUCED_DATA to an
+    /** Demote an outbound peer that did not advertise NODE_BLAKE2B to an
      *  additional connection: give up its automatic outbound semaphore slot (so
-     *  we keep looking for a BIP110 peer) and stop counting it as our outbound
+     *  we keep looking for a preferred peer) and stop counting it as our outbound
      *  coverage of its network. A demoted peer draws on the inbound budget, so it
      *  is kept only while fewer than max_stale are already tolerated, its outbound
-     *  target is not already filled (by BIP110 or stale peers alike), and the
+     *  target is not already filled (by preferred or stale peers alike), and the
      *  inbound budget has room; otherwise this sets fDisconnect and returns false
      *  without demoting. Does its own logging. Must not be called on an already-
      *  demoted peer (Assert): the version handler guarantees this by rejecting
