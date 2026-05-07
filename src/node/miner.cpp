@@ -71,6 +71,7 @@ void RegenerateCommitments(CBlock& block, ChainstateManager& chainman)
     const CBlockIndex* prev_block = WITH_LOCK(::cs_main, return chainman.m_blockman.LookupBlockIndex(block.hashPrevBlock));
     chainman.GenerateCoinbaseCommitment(block, prev_block);
 
+    block.m_txcount = block.m_header_v2 ? block.vtx.size() : 0;
     block.hashMerkleRoot = BlockMerkleRoot(block);
 }
 
@@ -164,6 +165,7 @@ std::shared_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     assert(pindexPrev != nullptr);
     nHeight = pindexPrev->nHeight + 1;
 
+    pblock->m_header_v2 = chainparams.GetConsensus().IsBlake2bHeight(nHeight);
     pblock->nVersion = m_chainstate.m_chainman.m_versionbitscache.ComputeBlockVersion(pindexPrev, chainparams.GetConsensus());
     // -regtest only: allow overriding block.nVersion with
     // -blockversion=N to test forking scenarios
@@ -200,6 +202,9 @@ std::shared_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     coinbaseTx.vout[0].scriptPubKey = m_options.coinbase_output_script;
     coinbaseTx.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
     coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
+    if (nHeight == chainparams.GetConsensus().DeploymentHeight(Consensus::DEPLOYMENT_BLAKE2B)) {
+        coinbaseTx.vin[0].scriptSig << blake2b_headline;
+    }
     pblock->vtx[0] = MakeTransactionRef(std::move(coinbaseTx));
     pblocktemplate->vchCoinbaseCommitment = m_chainstate.m_chainman.GenerateCoinbaseCommitment(*pblock, pindexPrev);
     pblocktemplate->vTxFees[0] = -nFees;
@@ -209,7 +214,9 @@ std::shared_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
 
     // Fill in header
     pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
+    pblock->m_height = pblock->m_header_v2 ? nHeight : 0;
     UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
+    pblock->m_txcount      = pblock->m_header_v2 ? pblock->vtx.size() : 0;
     pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
     pblock->nNonce         = 0;
     pblocktemplate->vTxSigOpsCost[0] = WITNESS_SCALE_FACTOR * GetLegacySigOpCount(*pblock->vtx[0]);
