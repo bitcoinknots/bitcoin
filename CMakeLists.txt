@@ -266,7 +266,7 @@ string(APPEND CMAKE_CXX_LINK_EXECUTABLE " ${APPEND_LDFLAGS}")
 set(configure_warnings)
 
 include(CheckLinkerSupportsPIE)
-check_linker_supports_pie(configure_warnings)
+check_linker_supports_pie(configure_warnings CXX)
 
 # The core_interface library aims to encapsulate common build flags.
 # It is a usage requirement for all targets except for secp256k1, which
