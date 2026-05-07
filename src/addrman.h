@@ -175,6 +175,12 @@ public:
     std::vector<CAddress> GetAddr(size_t max_addresses, size_t max_pct, std::optional<Network> network, const bool filtered = true) const;
 
     /**
+     * Count addresses advertising all of `require` service flags (excluding
+     * terrible ones), stopping once `max` matches are found.
+     */
+    size_t CountAddr(ServiceFlags require, size_t max) const;
+
+    /**
      * Returns an information-location pair for all addresses in the selected addrman table.
      * If an address appears multiple times in the new table, an information-location pair
      * is returned for each occurrence. Addresses only ever appear once in the tried table.
