@@ -208,4 +208,61 @@ BOOST_AUTO_TEST_CASE(ChainParams_SIGNET_sanity)
     sanity_check_chainparams(*m_node.args, ChainType::SIGNET);
 }
 
+/* The one-off PoW-change target shift must be accepted by the headers-sync
+ * anti-DoS gate, without loosening it in any other case. */
+BOOST_AUTO_TEST_CASE(powchange_permitted_difficulty_transition)
+{
+    const auto chainParams = CreateChainParams(*m_node.args, ChainType::MAIN);
+    Consensus::Params params = chainParams->GetConsensus();
+
+    // The gate is only live on networks without min-difficulty blocks.
+    BOOST_CHECK(!params.fPowAllowMinDifficultyBlocks);
+
+    const uint32_t tip_nbits = 0x1702905c;
+    CBlockIndex pindexLast;
+    pindexLast.nHeight = 800000;
+    pindexLast.nBits = tip_nbits;
+    // 800001 is not a retarget boundary.
+    BOOST_CHECK((pindexLast.nHeight + 1) % params.DifficultyAdjustmentInterval() != 0);
+
+    CBlockHeader block;
+
+    // With the fork unset, behaviour is unchanged in both directions.
+    const unsigned int inert_nbits = GetNextWorkRequired(&pindexLast, &block, params);
+    BOOST_CHECK_EQUAL(inert_nbits, tip_nbits);
+    BOOST_CHECK(PermittedDifficultyTransition(params, pindexLast.nHeight + 1, tip_nbits, inert_nbits));
+
+    // Schedule the fork; the next block is at the Blake2bHeight.
+    params.Blake2bHeight = pindexLast.nHeight + 1;
+
+    const unsigned int fork_nbits = GetNextWorkRequired(&pindexLast, &block, params);
+    BOOST_CHECK_NE(fork_nbits, tip_nbits);
+
+    // This is the call headerssync.cpp makes for every header in IBD. The
+    // shifted target is now accepted across the algorithm change.
+    BOOST_CHECK(PermittedDifficultyTransition(params, pindexLast.nHeight + 1, tip_nbits, fork_nbits));
+
+    // ...but only that exact value: an extra 2^4 of slack is still rejected.
+    arith_uint256 too_easy;
+    too_easy.SetCompact(fork_nbits);
+    too_easy <<= 4;
+    BOOST_CHECK(!PermittedDifficultyTransition(params, pindexLast.nHeight + 1, tip_nbits, too_easy.GetCompact()));
+
+    // ...and only when the algorithm actually changes. Claiming the shift
+    // between two pre-fork blocks is still rejected.
+    params.Blake2bHeight = pindexLast.nHeight + 2;
+    BOOST_CHECK(!PermittedDifficultyTransition(params, pindexLast.nHeight + 1, tip_nbits, fork_nbits));
+
+    // At a retarget boundary the shift is permitted on top of the 4x window,
+    // and values beyond that window are still rejected.
+    const int64_t boundary_height = 798336;
+    BOOST_CHECK_EQUAL(boundary_height % params.DifficultyAdjustmentInterval(), 0);
+    params.Blake2bHeight = boundary_height;
+    BOOST_CHECK(PermittedDifficultyTransition(params, boundary_height, tip_nbits, fork_nbits));
+    arith_uint256 beyond_window;
+    beyond_window.SetCompact(fork_nbits);
+    beyond_window <<= 3;
+    BOOST_CHECK(!PermittedDifficultyTransition(params, boundary_height, tip_nbits, beyond_window.GetCompact()));
+}
+
 BOOST_AUTO_TEST_SUITE_END()
