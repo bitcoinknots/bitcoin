@@ -4,6 +4,7 @@
 
 #include <wallet/wallet.h>
 
+#include <chrono>
 #include <future>
 #include <memory>
 #include <stdint.h>
@@ -384,6 +385,48 @@ BOOST_FIXTURE_TEST_CASE(write_wallet_settings_concurrently, TestingSetup)
         Assert(RemoveWalletSetting(*chain, strprintf("wallet_%d", i)));
     },
                             /*num_expected_wallets=*/0);
+}
+
+BOOST_AUTO_TEST_CASE(old_coinbase_maturity_without_chain_lock)
+{
+    BOOST_CHECK_EQUAL(m_node.chain->maxCoinbaseMaturity(), 25920);
+    CMutableTransaction tx;
+    tx.vin.resize(1);
+    tx.vout.emplace_back(COIN, CScript{});
+    // Unknown blocks conservatively use the longest policy depth.
+    CWalletTx wtx{MakeTransactionRef(tx), TxStateConfirmed{GetRandHash(), 1, 0}};
+    {
+        LOCK(m_wallet.cs_wallet);
+        m_wallet.SetLastBlockProcessed(25920, GetRandHash());
+        BOOST_CHECK_EQUAL(m_wallet.GetTxBlocksToMaturity(wtx), 1);
+        m_wallet.SetLastBlockProcessed(25921, GetRandHash());
+        BOOST_CHECK_EQUAL(m_wallet.GetTxBlocksToMaturity(wtx), 0);
+    }
+
+    // A separate thread must finish while this thread holds cs_main. Release
+    // the lock before joining even on failure, so a regression cannot deadlock.
+    std::future<int> result;
+    {
+        LOCK(cs_main);
+        result = std::async(std::launch::async, [&] {
+            LOCK(m_wallet.cs_wallet);
+            return m_wallet.GetTxBlocksToMaturity(wtx);
+        });
+        BOOST_CHECK(result.wait_for(std::chrono::seconds{5}) == std::future_status::ready);
+    }
+    BOOST_CHECK_EQUAL(result.get(), 0);
+}
+
+BOOST_FIXTURE_TEST_CASE(coinbase_maturity_standard_margin, TestChain100Setup)
+{
+    BOOST_CHECK_EQUAL(m_node.chain->maxCoinbaseMaturity(), COINBASE_MATURITY);
+    CWallet wallet(m_node.chain.get(), "", CreateMockableWalletDatabase());
+    CWalletTx wtx{m_coinbase_txns.front(), TxStateConfirmed{GetRandHash(), 1, 0}};
+    LOCK(wallet.cs_wallet);
+    wallet.SetLastBlockProcessed(COINBASE_MATURITY, GetRandHash());
+    BOOST_CHECK_EQUAL(wallet.GetTxBlocksToMaturity(wtx), 1);
+    wallet.SetLastBlockProcessed(COINBASE_MATURITY + 1, GetRandHash());
+    BOOST_CHECK_EQUAL(wallet.GetTxBlocksToMaturity(wtx), 0);
 }
 
 // Check that GetImmatureCredit() returns a newly calculated value instead of

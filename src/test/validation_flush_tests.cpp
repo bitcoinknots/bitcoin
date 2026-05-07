@@ -6,6 +6,7 @@
 #include <test/util/coins.h>
 #include <test/util/random.h>
 #include <test/util/setup_common.h>
+#include <txdb.h>
 #include <validation.h>
 
 #include <boost/test/unit_test.hpp>
@@ -152,6 +153,24 @@ BOOST_AUTO_TEST_CASE(getcoinscachesizestate)
     BOOST_CHECK_EQUAL(
         chainstate.GetCoinsCacheSizeState(MAX_COINS_CACHE_BYTES, 0),
         CoinsCacheSizeState::OK);
+}
+
+BOOST_AUTO_TEST_CASE(force_sync_retains_cache)
+{
+    LOCK(::cs_main);
+    auto& chainstate = m_node.chainman->ActiveChainstate();
+    auto& view = chainstate.CoinsTip();
+    const auto outpoint = AddTestCoin(m_rng, view);
+    view.SetBestBlock(chainstate.m_chain.Tip()->GetBlockHash());
+    const auto cache_size = view.GetCacheSize();
+    BOOST_REQUIRE(cache_size > 0);
+    BOOST_CHECK(!chainstate.CoinsDB().HaveCoin(outpoint));
+
+    BlockValidationState state;
+    BOOST_REQUIRE(chainstate.FlushStateToDisk(state, FlushStateMode::FORCE_SYNC));
+    BOOST_CHECK_EQUAL(view.GetCacheSize(), cache_size);
+    BOOST_CHECK(chainstate.CoinsDB().HaveCoin(outpoint));
+    BOOST_CHECK(chainstate.CoinsDB().GetBestBlock() == view.GetBestBlock());
 }
 
 BOOST_AUTO_TEST_SUITE_END()
