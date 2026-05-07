@@ -24,6 +24,7 @@
 #include <util/strencodings.h>
 #include <util/string.h>
 #include <util/thread.h>
+#include <util/threadinterrupt.h>
 #include <util/time.h>
 
 #ifdef ENABLE_TOR_SUBPROCESS
@@ -83,6 +84,8 @@ static const int MAX_LINE_LENGTH = 100000;
  */
 constexpr int MAX_LINE_COUNT = 1000;
 static const uint16_t DEFAULT_TOR_SOCKS_PORT = 9050;
+
+static CThreadInterrupt g_tor_interrupt;
 
 /****** Low-level TorControlConnection ********/
 
@@ -743,7 +746,13 @@ std::string TorController::LaunchTor()
             LogDebug(BCLog::TOR, "tor: Tor process died before making control port file\n");
             throw std::runtime_error("tor process died");
         }
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        if (!g_tor_interrupt.sleep_for(std::chrono::seconds(1))) {
+            LogDebug(BCLog::TOR, "tor: Interrupted while waiting for Tor process to make control port file\n");
+            m_process->kill();
+            delete m_process;
+            m_process = nullptr;
+            throw std::runtime_error("interrupted");
+        }
     }
 
     std::ifstream controlport_file(controlport_env_filepath);
@@ -855,6 +864,7 @@ void StartTorControl(CService onion_service_target)
         LogWarning("tor: Unable to create event_base");
         return;
     }
+    g_tor_interrupt.reset();
 
     torControlThread = std::thread(&util::TraceThread, "torcontrol", [onion_service_target] {
         TorControlThread(onion_service_target);
@@ -865,6 +875,7 @@ void InterruptTorControl()
 {
     if (gBase) {
         LogPrintf("tor: Thread interrupt\n");
+        g_tor_interrupt();
         event_base_once(gBase, -1, EV_TIMEOUT, [](evutil_socket_t, short, void*) {
             event_base_loopbreak(gBase);
         }, nullptr, nullptr);
