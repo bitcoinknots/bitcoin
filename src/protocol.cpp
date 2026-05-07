@@ -104,6 +104,7 @@ static std::string serviceFlagToStr(size_t bit)
     case NODE_UTREEXO_TMP:     return "UTREEXO_TMP?";
     case NODE_REPLACE_BY_FEE:  return "REPLACE_BY_FEE?";
     case NODE_REDUCED_DATA:    return "REDUCED_DATA?";
+    case NODE_BLAKE2B:         return "BLAKE2B?";
     case NODE_MALICIOUS:       return "MALICIOUS?";
     // Not using default, so we get warned when a case is missing
     }

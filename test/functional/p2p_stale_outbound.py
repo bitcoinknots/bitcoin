@@ -2,11 +2,11 @@
 # Copyright (c) 2026 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Test BIP-110 tolerance of stale (non-NODE_REDUCED_DATA) outbound peers.
+"""Test tolerance of stale (non-NODE_BLAKE2B) outbound peers.
 
 A tolerated stale outbound peer is additional to the automatic outbound target
 but still counts within -maxconnections: it gives up its outbound slot (so we
-keep looking for a BIP110 peer) and is kept only while we are below our automatic
+keep looking for a preferred peer) and is kept only while we are below our automatic
 connection budget. Once we are already full it is disconnected instead, so the
 total connection count never exceeds -maxconnections.
 """
@@ -15,6 +15,7 @@ import os
 
 from test_framework.messages import (
     CBlockHeader,
+    NODE_BLAKE2B,
     NODE_NETWORK,
     NODE_P2P_V2,
     NODE_REDUCED_DATA,
@@ -49,25 +50,27 @@ MAX_STALE_OUTBOUND_CONNECTIONS = (MAX_OUTBOUND_FULL_RELAY_CONNECTIONS
 CHURN_ROUNDS = 25
 
 
-class BIP110StaleOutboundTest(BitcoinTestFramework):
+class StaleOutboundTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.extra_args = [[f"-maxconnections={ROOMY}", "-maxstaleoutbound=2"]]
         # anchors.dat is only dumped when outgoing addrman connections are enabled
         self.disable_autoconnect = False
 
-    def services(self, *, reduced_data):
-        services = NODE_NETWORK | NODE_WITNESS
-        if reduced_data:
-            services |= NODE_REDUCED_DATA
+    def services(self, *, preferred):
+        # A stale peer may well advertise NODE_REDUCED_DATA (eg an unupgraded
+        # Knots node); what makes it stale is the missing NODE_BLAKE2B.
+        services = NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA
+        if preferred:
+            services |= NODE_BLAKE2B
         if self.options.v2transport:
             services |= NODE_P2P_V2
         return services
 
-    def connect(self, node, p2p_idx, conn_type, *, reduced_data, **kwargs):
+    def connect(self, node, p2p_idx, conn_type, *, preferred, **kwargs):
         return node.add_outbound_p2p_connection(
             P2PInterface(), p2p_idx=p2p_idx, connection_type=conn_type,
-            services=self.services(reduced_data=reduced_data),
+            services=self.services(preferred=preferred),
             supports_v2_p2p=self.options.v2transport,
             advertise_v2_p2p=self.options.v2transport, **kwargs)
 
@@ -86,8 +89,8 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
         self.log.info("A stale outbound peer is kept when we are below the connection budget")
         self.restart_node(0, extra_args=[f"-maxconnections={ROOMY}", "-maxstaleoutbound=2"])
 
-        with node.assert_debug_log(["connected to non-BIP110 outbound peer (1/2)"]):
-            peer = self.connect(node, 0, "outbound-full-relay", reduced_data=False)
+        with node.assert_debug_log(["connected to stale outbound peer (1/2)"]):
+            peer = self.connect(node, 0, "outbound-full-relay", preferred=False)
             peer.sync_with_ping()
         assert_equal(self.outbound_count(node), 1)
         self.disconnect_all(node, [peer])
@@ -99,16 +102,16 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
         # outbound target itself is what refuses the peer.
         self.restart_node(0, extra_args=[f"-maxconnections={ROOMY}", "-maxstaleoutbound=8"])
 
-        # Fill the full-relay target with a mix of BIP110 and stale peers, the
-        # scenario where we have fewer BIP110 peers than the target but the total
+        # Fill the full-relay target with a mix of preferred and stale peers, the
+        # scenario where we have fewer preferred peers than the target but the total
         # already meets it.
         peers = []
         n_good = MAX_OUTBOUND_FULL_RELAY_CONNECTIONS - 3
         for i in range(n_good):
-            peers.append(self.connect(node, i, "outbound-full-relay", reduced_data=True))
+            peers.append(self.connect(node, i, "outbound-full-relay", preferred=True))
             peers[-1].sync_with_ping()
         for i in range(n_good, MAX_OUTBOUND_FULL_RELAY_CONNECTIONS):
-            peers.append(self.connect(node, i, "outbound-full-relay", reduced_data=False))
+            peers.append(self.connect(node, i, "outbound-full-relay", preferred=False))
             peers[-1].sync_with_ping()
         assert_equal(self.outbound_count(node), MAX_OUTBOUND_FULL_RELAY_CONNECTIONS)
 
@@ -117,7 +120,7 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
         target = MAX_OUTBOUND_FULL_RELAY_CONNECTIONS
         with node.assert_debug_log([f"the outbound target is already full ({target}/{target})"]):
             self.connect(node, MAX_OUTBOUND_FULL_RELAY_CONNECTIONS, "outbound-full-relay",
-                         reduced_data=False, wait_for_disconnect=True)
+                         preferred=False, wait_for_disconnect=True)
         self.wait_until(lambda: len(node.getpeerinfo()) == MAX_OUTBOUND_FULL_RELAY_CONNECTIONS)
         self.disconnect_all(node, peers)
 
@@ -129,12 +132,12 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
         self.restart_node(0, extra_args=[f"-maxconnections={FULL}", "-maxstaleoutbound=2"])
 
         with node.assert_debug_log(["no room within -maxconnections"]):
-            self.connect(node, 0, "outbound-full-relay", reduced_data=False,
+            self.connect(node, 0, "outbound-full-relay", preferred=False,
                          wait_for_disconnect=True)
         self.wait_until(lambda: len(node.getpeerinfo()) == 0)
 
-        # A BIP110 peer is unaffected: it takes the ordinary outbound slot.
-        peer = self.connect(node, 0, "outbound-full-relay", reduced_data=True)
+        # A preferred peer is unaffected: it takes the ordinary outbound slot.
+        peer = self.connect(node, 0, "outbound-full-relay", preferred=True)
         peer.sync_with_ping()
         assert_equal(self.outbound_count(node), 1)
         self.disconnect_all(node, [peer])
@@ -147,7 +150,7 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
         # and the total never exceeds -maxconnections.
         self.restart_node(0, extra_args=["-maxconnections=12", "-maxstaleoutbound=2"])
 
-        stale = self.connect(node, 0, "outbound-full-relay", reduced_data=False)
+        stale = self.connect(node, 0, "outbound-full-relay", preferred=False)
         stale.sync_with_ping()
         assert_equal(self.outbound_count(node), 1)
 
@@ -164,14 +167,14 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
         self.restart_node(0, extra_args=[f"-maxconnections={ROOMY}", "-maxstaleoutbound=0"])
 
         # With no stale budget, a stale full-relay peer is dropped before marking.
-        with node.assert_debug_log(["peer lacks NODE_REDUCED_DATA and already have 0 non-BIP110 outbound peers"]):
-            self.connect(node, 0, "outbound-full-relay", reduced_data=False,
+        with node.assert_debug_log(["peer lacks NODE_BLAKE2B and already have 0 stale outbound peers"]):
+            self.connect(node, 0, "outbound-full-relay", preferred=False,
                          wait_for_disconnect=True)
         self.wait_until(lambda: len(node.getpeerinfo()) == 0)
 
         # A stale addr-fetch peer is not gated: it is short-lived, holds no slot,
         # and -seednode bootstrap depends on it.
-        peer = self.connect(node, 0, "addr-fetch", reduced_data=False)
+        peer = self.connect(node, 0, "addr-fetch", preferred=False)
         peer.sync_with_ping()
         assert_equal(len(node.getpeerinfo()), 1)
         self.disconnect_all(node, [peer])
@@ -188,7 +191,7 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
         # would make the node start refusing stale peers.
         for i in range(CHURN_ROUNDS):
             peer = self.connect(node, i % 2, "outbound-full-relay",
-                                reduced_data=False, wait_for_verack=False)
+                                preferred=False, wait_for_verack=False)
             peer.peer_disconnect()
             peer.wait_for_disconnect()
             self.wait_until(lambda: len(node.getpeerinfo()) == 0)
@@ -196,7 +199,7 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
         # The whole budget must still be available.
         peers = []
         for i in range(2):
-            peers.append(self.connect(node, i, "outbound-full-relay", reduced_data=False))
+            peers.append(self.connect(node, i, "outbound-full-relay", preferred=False))
             peers[-1].sync_with_ping()
         assert_equal(self.outbound_count(node), 2)
         self.disconnect_all(node, peers)
@@ -206,20 +209,20 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
         self.log.info("A redundant version message does not spend the budget twice")
         self.restart_node(0, extra_args=[f"-maxconnections={ROOMY}", "-maxstaleoutbound=2"])
 
-        peer = self.connect(node, 0, "outbound-full-relay", reduced_data=False)
+        peer = self.connect(node, 0, "outbound-full-relay", preferred=False)
         peer.sync_with_ping()
 
         version = msg_version()
         version.nVersion = P2P_VERSION
         version.strSubVer = P2P_SUBVERSION
-        version.nServices = self.services(reduced_data=False)
+        version.nServices = self.services(preferred=False)
         version.nStartingHeight = 0
         with node.assert_debug_log(["redundant version message"]):
             peer.send_message(version)
             peer.sync_with_ping()
 
         # Only one budget slot was spent, so a second stale peer still gets in.
-        second = self.connect(node, 1, "outbound-full-relay", reduced_data=False)
+        second = self.connect(node, 1, "outbound-full-relay", preferred=False)
         second.sync_with_ping()
         assert_equal(self.outbound_count(node), 2)
         self.disconnect_all(node, [peer, second])
@@ -237,14 +240,14 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
         peers = []
         idx = 0
         for _ in range(MAX_OUTBOUND_FULL_RELAY_CONNECTIONS):
-            peers.append(self.connect(node, idx, "outbound-full-relay", reduced_data=False))
+            peers.append(self.connect(node, idx, "outbound-full-relay", preferred=False))
             peers[-1].sync_with_ping()
             idx += 1
         # One more full-relay peer has no gap left to fill, so it is disconnected
         # by the target check while the budget still has room.
         target = MAX_OUTBOUND_FULL_RELAY_CONNECTIONS
         with node.assert_debug_log([f"the outbound target is already full ({target}/{target})"]):
-            self.connect(node, idx, "outbound-full-relay", reduced_data=False,
+            self.connect(node, idx, "outbound-full-relay", preferred=False,
                          wait_for_disconnect=True)
         idx += 1
 
@@ -252,15 +255,15 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
         # peers is exactly the clamped budget: the per-target caps and
         # MAX_STALE_OUTBOUND_CONNECTIONS agree.
         for _ in range(MAX_BLOCK_RELAY_ONLY_CONNECTIONS - 1):
-            peers.append(self.connect(node, idx, "block-relay-only", reduced_data=False))
+            peers.append(self.connect(node, idx, "block-relay-only", preferred=False))
             peers[-1].sync_with_ping()
             idx += 1
         # The last one brings us to the clamped budget, so the per-target caps and
         # MAX_STALE_OUTBOUND_CONNECTIONS agree on the ceiling.
         with node.assert_debug_log(
-                [f"connected to non-BIP110 outbound peer ({MAX_STALE_OUTBOUND_CONNECTIONS}/"
+                [f"connected to stale outbound peer ({MAX_STALE_OUTBOUND_CONNECTIONS}/"
                  f"{MAX_STALE_OUTBOUND_CONNECTIONS})"]):
-            peers.append(self.connect(node, idx, "block-relay-only", reduced_data=False))
+            peers.append(self.connect(node, idx, "block-relay-only", preferred=False))
             peers[-1].sync_with_ping()
         assert_equal(self.outbound_count(node), MAX_STALE_OUTBOUND_CONNECTIONS)
         self.disconnect_all(node, peers)
@@ -280,12 +283,12 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
 
         # Only 4 peers can be protected from the lagging-chain eviction. Stale
         # peers connect first-come, so letting them take those slots would leave
-        # the BIP110 peers unprotected.
-        good = self.connect(node, 0, "outbound-full-relay", reduced_data=True)
+        # the preferred peers unprotected.
+        good = self.connect(node, 0, "outbound-full-relay", preferred=True)
         with node.assert_debug_log(["Protecting outbound peer"]):
             good.send_and_ping(msg_headers([tip_header]))
 
-        stale = self.connect(node, 1, "outbound-full-relay", reduced_data=False)
+        stale = self.connect(node, 1, "outbound-full-relay", preferred=False)
         with node.assert_debug_log(["received: headers"],
                                    unexpected_msgs=["Protecting outbound peer"]):
             stale.send_and_ping(msg_headers([tip_header]))
@@ -297,9 +300,9 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
         self.log.info("Stale block-relay peers must not be written to anchors.dat")
         self.restart_node(0, extra_args=[f"-maxconnections={ROOMY}", "-maxstaleoutbound=2"])
 
-        good = self.connect(node, 0, "block-relay-only", reduced_data=True)
+        good = self.connect(node, 0, "block-relay-only", preferred=True)
         good.sync_with_ping()
-        stale = self.connect(node, 1, "block-relay-only", reduced_data=False)
+        stale = self.connect(node, 1, "block-relay-only", preferred=False)
         stale.sync_with_ping()
         assert_equal(self.outbound_count(node), 2)
 
@@ -307,8 +310,8 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
         for info in node.getpeerinfo():
             assert_equal(info["connection_type"], "block-relay-only")
             ports[info["addr"]] = info["services"]
-        good_addr = [a for a, s in ports.items() if int(s, 16) & NODE_REDUCED_DATA]
-        stale_addr = [a for a, s in ports.items() if not int(s, 16) & NODE_REDUCED_DATA]
+        good_addr = [a for a, s in ports.items() if int(s, 16) & NODE_BLAKE2B]
+        stale_addr = [a for a, s in ports.items() if not int(s, 16) & NODE_BLAKE2B]
         assert_equal(len(good_addr), 1)
         assert_equal(len(stale_addr), 1)
 
@@ -340,4 +343,4 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
 
 
 if __name__ == '__main__':
-    BIP110StaleOutboundTest(__file__).main()
+    StaleOutboundTest(__file__).main()
