@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <common/sighash_rules.h>
 #include <coins.h>
 #include <consensus/amount.h>
 #include <consensus/tx_verify.h>
@@ -65,7 +66,7 @@ PSBTAnalysis AnalyzePSBT(PartiallySignedTransaction psbtx)
 
             // Figure out what is missing
             SignatureData outdata;
-            bool complete = SignPSBTInput(DUMMY_SIGNING_PROVIDER, psbtx, i, &txdata, 1, &outdata);
+            bool complete = SignPSBTInput(DUMMY_SIGNING_PROVIDER, psbtx, i, &txdata, 1, &outdata, /*finalize=*/true);
 
             // Things are missing
             if (!complete) {
@@ -125,7 +126,14 @@ PSBTAnalysis AnalyzePSBT(PartiallySignedTransaction psbtx)
             PSBTInput& input = psbtx.inputs[i];
             Coin newcoin;
 
-            if (!SignPSBTInput(DUMMY_SIGNING_PROVIDER, psbtx, i, nullptr, 1) || !psbtx.GetInputUTXO(newcoin.out, i)) {
+            // Recognize an input that is already signed before falling back to
+            // dummy finalization, and do it with the real transaction data. The
+            // dummy path has none, so it cannot verify a signature whose message
+            // commits to every spent output, and it refuses the opt-in hash type
+            // outright. Left to it, a finalized opted-in input fails here and the
+            // size estimate is dropped from the result without any error.
+            const bool already_signed{PSBTInputSignedAndVerified(psbtx, i, &txdata)};
+            if ((!already_signed && !SignPSBTInput(DUMMY_SIGNING_PROVIDER, psbtx, i, nullptr, 1, nullptr, /*finalize=*/true)) || !psbtx.GetInputUTXO(newcoin.out, i)) {
                 success = false;
                 break;
             } else {
