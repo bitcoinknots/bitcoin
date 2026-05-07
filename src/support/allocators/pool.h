@@ -153,7 +153,7 @@ class PoolResource final
     void AllocateChunk()
     {
         // if there is still any available memory left, put it into the freelist.
-        size_t remaining_available_bytes = std::distance(m_available_memory_it, m_available_memory_end);
+        size_t remaining_available_bytes = m_available_memory_end - m_available_memory_it;
         if (0 != remaining_available_bytes) {
             PlacementAddToList(m_available_memory_it, m_free_lists[remaining_available_bytes / ELEM_ALIGN_BYTES]);
         }
