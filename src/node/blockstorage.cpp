@@ -1272,7 +1272,7 @@ void ImportBlocks(ChainstateManager& chainman, std::span<const fs::path> import_
                 return;
             }
         } else {
-            LogPrintf("Warning: Could not open blocks file %s\n", fs::PathToString(path));
+            LogWarning("Could not open blocks file %s", fs::PathToString(path));
         }
     }
 
