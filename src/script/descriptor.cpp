@@ -2089,6 +2089,29 @@ std::vector<std::unique_ptr<DescriptorImpl>> ParseScript(uint32_t& key_exp_index
                 error = "Miniscript expressions can only be used in wsh or tr.";
                 return {};
             }
+            // Reduced-data (RDTS): OP_IF/OP_NOTIF-emitting fragments in a Tapscript leaf
+            // would be unspendable under reduced-data rules; reject them at parse time,
+            // consistent with the tr() nesting-depth cap above.
+            if (miniscript::IsTapscript(script_ctx)) {
+                std::vector<decltype(node.get())> stack{node.get()};
+                while (!stack.empty()) {
+                    const auto* subnode = stack.back();
+                    stack.pop_back();
+                    switch (subnode->fragment) {
+                    case miniscript::Fragment::OR_C:
+                    case miniscript::Fragment::OR_D:
+                    case miniscript::Fragment::OR_I:
+                    case miniscript::Fragment::ANDOR:
+                    case miniscript::Fragment::WRAP_D:
+                    case miniscript::Fragment::WRAP_J:
+                        error = "OP_IF/OP_NOTIF is not allowed in Taproot miniscript under reduced-data (outputs would be unspendable)";
+                        return {};
+                    default:
+                        break;
+                    }
+                    for (const auto& sub : subnode->subs) stack.push_back(sub.get());
+                }
+            }
             if (!node->IsSane() || node->IsNotSatisfiable()) {
                 // Try to find the first insane sub for better error reporting.
                 auto insane_node = node.get();
