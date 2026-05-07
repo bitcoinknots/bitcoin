@@ -17,6 +17,8 @@
 #include <util/strencodings.h>
 #include <util/threadinterrupt.h>
 
+bool g_pcp_warn_for_unauthorized{false};
+
 namespace {
 
 // RFC6886 NAT-PMP and RFC6887 Port Control Protocol (PCP) implementation.
@@ -81,6 +83,8 @@ constexpr size_t NATPMP_MAP_RESPONSE_LIFETIME_OFS = 12;
 constexpr uint8_t NATPMP_RESULT_SUCCESS = 0;
 //! Result code representing unsupported version.
 constexpr uint8_t NATPMP_RESULT_UNSUPP_VERSION = 1;
+//! Result code representing not authorized (router doesn't support port mapping).
+constexpr uint8_t NATPMP_RESULT_NOT_AUTHORIZED = 2;
 //! Result code representing lack of resources.
 constexpr uint8_t NATPMP_RESULT_NO_RESOURCES = 4;
 
@@ -144,6 +148,8 @@ constexpr size_t PCP_MAP_EXTERNAL_IP_OFS = 20;
 
 //! Result code representing success (RFC6887 7.4), shared with NAT-PMP.
 constexpr uint8_t PCP_RESULT_SUCCESS = NATPMP_RESULT_SUCCESS;
+//! Result code representing not authorized (RFC6887 7.4), shared with NAT-PMP.
+constexpr uint8_t PCP_RESULT_NOT_AUTHORIZED = NATPMP_RESULT_NOT_AUTHORIZED;
 //! Result code representing lack of resources (RFC6887 7.4).
 constexpr uint8_t PCP_RESULT_NO_RESOURCES = 8;
 
@@ -373,6 +379,18 @@ std::variant<MappingResult, MappingError> NATPMPRequestPortMap(const CNetAddr &g
 
         Assume(response.size() >= NATPMP_MAP_RESPONSE_SIZE);
         uint16_t result_code = ReadBE16(response.data() + NATPMP_RESPONSE_HDR_RESULT_OFS);
+        static bool already_warned_for_unauthorized{false};
+        if (result_code == NATPMP_RESULT_NOT_AUTHORIZED) {
+            if (already_warned_for_unauthorized && !g_pcp_warn_for_unauthorized) {
+                // NOT_AUTHORIZED is expected on many routers that don't support port mapping.
+                LogDebug(BCLog::NET, "natpmp: Port mapping failed with result %s\n", NATPMPResultString(result_code));
+                return MappingError::PROTOCOL_ERROR;
+            } else {
+                already_warned_for_unauthorized = true;
+            }
+        } else {
+            already_warned_for_unauthorized = false;
+        }
         if (result_code != NATPMP_RESULT_SUCCESS) {
             LogPrintLevel(BCLog::NET, BCLog::Level::Warning, "natpmp: Port mapping failed with result %s\n", NATPMPResultString(result_code));
             if (result_code == NATPMP_RESULT_NO_RESOURCES) {
@@ -507,6 +525,18 @@ std::variant<MappingResult, MappingError> PCPRequestPortMap(const PCPMappingNonc
     uint32_t lifetime_ret = ReadBE32(response.data() + PCP_HDR_LIFETIME_OFS);
     uint16_t external_port = ReadBE16(response.data() + PCP_HDR_SIZE + PCP_MAP_EXTERNAL_PORT_OFS);
     CNetAddr external_addr{PCPUnwrapAddress(response.subspan(PCP_HDR_SIZE + PCP_MAP_EXTERNAL_IP_OFS, ADDR_IPV6_SIZE))};
+    static bool already_warned_for_unauthorized{false};
+    if (result_code == PCP_RESULT_NOT_AUTHORIZED) {
+        if (already_warned_for_unauthorized && !g_pcp_warn_for_unauthorized) {
+            // NOT_AUTHORIZED is expected on many routers that don't support port mapping.
+            LogDebug(BCLog::NET, "pcp: Mapping failed with result %s\n", PCPResultString(result_code));
+            return MappingError::PROTOCOL_ERROR;
+        } else {
+            already_warned_for_unauthorized = true;
+        }
+    } else {
+        already_warned_for_unauthorized = false;
+    }
     if (result_code != PCP_RESULT_SUCCESS) {
         LogPrintLevel(BCLog::NET, BCLog::Level::Warning, "pcp: Mapping failed with result %s\n", PCPResultString(result_code));
         if (result_code == PCP_RESULT_NO_RESOURCES) {
