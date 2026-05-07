@@ -138,7 +138,7 @@ void ModalOverlay::tipUpdate(int count, const QDateTime& blockDate, double nVeri
     }
 
     // show the last block date
-    ui->newestBlockDate->setText(blockDate.toString());
+    ui->newestBlockDate->setText(GUIUtil::dateTimeStr(blockDate));
 
     // show the percentage done according to nVerificationProgress
     ui->percentageProgress->setText(QString::number(nVerificationProgress*100, 'f', 2)+"%");
