@@ -54,7 +54,13 @@ class Blake2bDnsImmediate(BitcoinTestFramework):
         self.log.info("PASS A: queries DNS right away")
 
         self.log.info("Add one NODE_BLAKE2B address")
-        node.addpeeraddress("8.8.8.8", 8333, False, HF)
+        # A single address can lose its new-table bucket to an entry already
+        # there, so keep trying until one lands.
+        for octet in range(8, 64):
+            if node.addpeeraddress(f"{octet}.8.8.8", 8333, False, HF)["success"]:
+                break
+        else:
+            assert False, "could not add a NODE_BLAKE2B address to addrman"
         total, hf = self._counts()
         self.log.info(f"addrman: {total} entries, {hf} NODE_BLAKE2B")
         assert total > 1000 and hf >= 1
