@@ -272,6 +272,12 @@ public:
                 .hash_serialized = AssumeutxoHash{uint256{"4daf8a17b4902498c5787966a2b51c613acdab5df5db73f196fa59a4da2f1568"}},
                 .m_chain_tx_count = 1226586151,
                 .blockhash = consteval_ctor(uint256{"0000000000000000000108970acb9522ffd516eae17acddcb1bd16469194a821"}),
+            },
+            {
+                .height = 976'000,
+                .hash_serialized = AssumeutxoHash{uint256{"dbd67717d3f108e4fbd8b4f9efc4057cac11a0ba7c23584b43cca42c9edb7118"}},
+                .m_chain_tx_count = 1417215373,
+                .blockhash = consteval_ctor(uint256{"000000000000000098441aee029573795681eb1602c75271e809b136e9217373"}),
             }
         };
 
