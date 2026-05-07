@@ -185,6 +185,9 @@ public:
     //! Get last block time.
     virtual int64_t getLastBlockTime() = 0;
 
+    //! Get coinbase maturity.
+    virtual int coinbaseMaturity() = 0;
+
     //! Get verification progress.
     virtual double getVerificationProgress() = 0;
 
