@@ -765,6 +765,33 @@ public:
 
     /** Whether the chain state needs to be redownloaded due to lack of witness data */
     [[nodiscard]] bool NeedsRedownload() const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+
+    /**
+     * Correct chain state inherited from a client that was not enforcing
+     * BIP110/RDTS. Such a data directory can contain blocks that violate RDTS
+     * mandatory signaling; normal startup does not re-validate inherited history,
+     * so an enforcing node would otherwise keep them. This marks every offending
+     * block in the index invalid (whether or not on the active chain) and
+     * reorganizes to the best valid chain, mirroring the approach BIP148 used.
+     * The verdict is re-derived from the stored block header (nVersion), so it
+     * needs no persisted per-block marker and cannot misfire on a chain that was
+     * validated correctly. Only the header-derivable mandatory-signaling rule is
+     * handled; output-size and script-push violations require block data and
+     * remain a -reindex-chainstate matter.
+     *
+     * Returns false if an offending block could not be corrected, setting @p error
+     * to a user-facing reason (the data needed to rewind has been pruned, or the
+     * invalidate/reorg failed); the caller should refuse to start and direct the
+     * operator to -reindex rather than run on an invalid chain.
+     */
+    [[nodiscard]] bool CorrectRdtsInvalidBlocks(bilingual_str& error)
+        EXCLUSIVE_LOCKS_REQUIRED(!m_chainstate_mutex)
+        LOCKS_EXCLUDED(::cs_main);
+
+    /** All not-yet-invalid blocks in the index that fail BIP110/RDTS mandatory
+     *  signaling. The verdict is header-derived and independent of other blocks'
+     *  validity, so a single scan is sufficient. @sa CorrectRdtsInvalidBlocks */
+    [[nodiscard]] std::vector<CBlockIndex*> FindRdtsSignalingViolations() const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     /** Ensures we have a genesis block in the block tree, possibly writing one to disk. */
     bool LoadGenesisBlock();
 
