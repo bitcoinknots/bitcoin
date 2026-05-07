@@ -583,7 +583,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-onlynet=<net>", "Make automatic outbound connections only to network <net> (" + Join(GetNetworkNames(), ", ") + "). Inbound and manual connections are not affected by this option. It can be specified multiple times to allow multiple networks.", ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
     argsman.AddArg("-v2transport", strprintf("Support v2 transport (default: %u)", DEFAULT_V2_TRANSPORT), ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
     argsman.AddArg("-v2onlyclearnet", strprintf("Ensure all outbound IPv4/IPv6 peers use encrypted network traffic (default: %u). Using this option requires -listen=0 and takes valuable listening capacity away from the network. Enable this option only if passive network observers like ISPs, firewalls, etc. pose a threat and unencrypted network traffic must be avoided. Note: Encryption protects message contents but does not obscure that you are running a Bitcoin node. Observers can still identify Bitcoin activity from your outbound connection attempts to the default port (8333) or by analysing traffic patterns.", DEFAULT_V2_ONLY_CLEARNET), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::CONNECTION);
-    argsman.AddArg("-peerbloomfilters", strprintf("Support filtering of blocks and transaction with bloom filters (default: %u)", DEFAULT_PEERBLOOMFILTERS), ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
+    argsman.AddArg("-peerbloomfilters", strprintf("Support filtering of blocks and transactions with bloom filters (default: %s)", DEFAULT_PEERBLOOMFILTERS ? "1" : "localhost only"), ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
     argsman.AddArg("-peerblockfilters", strprintf("Serve compact block filters to peers per BIP 157 (default: %u)", DEFAULT_PEERBLOCKFILTERS), ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
     argsman.AddArg("-txreconciliation", strprintf("Enable transaction reconciliations per BIP 330 (default: %d)", DEFAULT_TXRECONCILIATION_ENABLE), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::CONNECTION);
     argsman.AddArg("-port=<port>", strprintf("Listen for connections on <port> (default: %u, testnet3: %u, testnet4: %u, signet: %u, regtest: %u). Not relevant for I2P (see doc/i2p.md). If set to a value x, the default onion listening port will be set to x+1.", defaultChainParams->GetDefaultPort(), testnetChainParams->GetDefaultPort(), testnet4ChainParams->GetDefaultPort(), signetChainParams->GetDefaultPort(), regtestChainParams->GetDefaultPort()), ArgsManager::ALLOW_ANY | ArgsManager::NETWORK_ONLY, OptionsCategory::CONNECTION);
@@ -2318,7 +2318,14 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         Discover();
     }
 
-    for (const auto& net : args.GetArgs("-whitelist")) {
+    std::vector<std::string> whitelist_opts = args.GetArgs("-whitelist");
+    if ((g_local_services & NODE_BLOOM) != NODE_BLOOM && args.GetBoolArg("-peerbloomfilters", true)) {
+        // If peerbloomfilters isn't specified, enable it only for localhost by default
+        whitelist_opts.emplace_back("in,out,bloomfilter@127.0.0.0/8");
+        whitelist_opts.emplace_back("in,out,bloomfilter@[::1]/128");
+    }
+
+    for (const auto& net : whitelist_opts) {
         NetWhitelistPermissions subnet;
         ConnectionDirection connection_direction;
         bilingual_str error;
