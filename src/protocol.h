@@ -345,6 +345,8 @@ enum ServiceFlags : uint64_t {
 
     NODE_UTREEXO_TMP = (1 << 24),
 
+    NODE_REPLACE_BY_FEE = (1 << 26),
+
     // NODE_REDUCED_DATA means the node enforces ReducedData rules as applicable
     NODE_REDUCED_DATA = (1 << 27),
 
