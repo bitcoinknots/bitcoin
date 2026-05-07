@@ -268,10 +268,11 @@ bool BitcoinAmountField::validate()
 
 void BitcoinAmountField::setValid(bool valid)
 {
-    if (valid)
-        amount->setStyleSheet("");
-    else
-        amount->setStyleSheet(STYLE_INVALID);
+    const QString style = valid ? QString() : QStringLiteral(STYLE_INVALID);
+    if (amount->styleSheet() != style) {
+        // CAUTION: Some Qt styles (Breeze in particular) add event handlers in setStyleSheet, which causes the eventFilter to run infinitely; use a QueuedConnection to change it outside of the eventFilter instead
+        QMetaObject::invokeMethod(amount, "setStyleSheet", Qt::QueuedConnection, Q_ARG(QString, style));
+    }
 }
 
 bool BitcoinAmountField::eventFilter(QObject *object, QEvent *event)
