@@ -5,7 +5,7 @@
 """Test that ignore_rejects cannot relax reduced-data (RDTS) consensus rules.
 
 PolicyScriptChecks must stay at least as strict as ConsensusScriptChecks: once
-DEPLOYMENT_REDUCED_DATA is active its flags are consensus, so a script-verify-flag
+RDTS is active its flags are consensus, so a script-verify-flag
 ignore_rejects that clears them lets a transaction pass the former and fail the
 latter. ConsensusScriptChecks treats that as a bug, logging "BUG! PLEASE REPORT
 THIS!" and tripping an Assume() that aborts on ABORT_ON_FAILED_ASSUME builds.
@@ -42,11 +42,11 @@ from test_framework.wallet import MiniWallet
 # ConsensusScriptChecks' "policy passed but consensus failed" alarm.
 BUG_MSG = "BUG! PLEASE REPORT THIS!"
 
-# Start immediately and expire active_duration (144) blocks after activating, so
-# the deployment runs the real DEFINED -> ... -> ACTIVE -> EXPIRED path.
-VBPARAMS = "-vbparams=reduced_data:0:999999999999:0:2147483647:144"
-ACTIVATION_HEIGHT = 432
-EXPIRY_HEIGHT = ACTIVATION_HEIGHT + 144
+# Activate at the BLAKE2b fork inside the warmup and expire at a fixed
+# median-time-past the test crosses with setmocktime, so the deployment runs
+# the real inactive -> active -> expired path.
+ACTIVATION_HEIGHT = 100
+EXPIRY_TIME = 2000000000
 
 # Violates SCRIPT_VERIFY_REDUCED_DATA itself, which only the broad token clears.
 TAPSCRIPT_OP_IF = CScript([OP_1, OP_IF, OP_1, OP_ENDIF])
@@ -71,7 +71,10 @@ class RdtsIgnoreRejectsTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        self.extra_args = [[VBPARAMS]]
+        self.extra_args = [[
+            f'-testactivationheight=blake2b@{ACTIVATION_HEIGHT}',
+            f'-rdtsexpiry={EXPIRY_TIME}',
+        ]]
 
     def fund_taproot_leaf(self, leaf_script):
         """Mine a Taproot output committing to leaf_script, and return a tx that
@@ -86,8 +89,10 @@ class RdtsIgnoreRejectsTest(BitcoinTestFramework):
 
         # Mine the funding tx directly: its own relay is not what is under test.
         tip = node.getbestblockhash()
-        block = create_block(int(tip, 16), create_coinbase(node.getblockcount() + 1),
-                             node.getblockheader(tip)['time'] + 1)
+        height = node.getblockcount() + 1
+        block = create_block(int(tip, 16), create_coinbase(height),
+                             node.getblockheader(tip)['time'] + 1,
+                             height=height, header_v2=True)
         block.vtx.append(funding_tx)
         add_witness_commitment(block)
         block.solve()
@@ -115,21 +120,22 @@ class RdtsIgnoreRejectsTest(BitcoinTestFramework):
             self.log.info(f"  {name} with ignore_rejects={ignore_rejects}: "
                           f"rejected ({result['reject-reason']})")
 
-    def deployment_status(self):
-        return self.nodes[0].getdeploymentinfo()['deployments']['reduced_data']['bip9']['status']
+    def rdts_active_for_next_block(self):
+        info = self.nodes[0].getblockchaininfo()
+        return info['blocks'] + 1 >= ACTIVATION_HEIGHT and info['mediantime'] < EXPIRY_TIME
 
     def run_test(self):
         node = self.nodes[0]
         self.wallet = MiniWallet(node)
-        self.generate(self.wallet, 110)  # coinbase maturity
+        self.generate(self.wallet, 110)  # coinbase maturity; crosses the fork
 
-        self.generate(self.wallet, ACTIVATION_HEIGHT + 8 - node.getblockcount())
-        assert_equal(self.deployment_status(), 'active')
+        assert_equal(self.rdts_active_for_next_block(), True)
         self.log.info(f"Deployment active at height {node.getblockcount()}")
         self.check_all_rejected()
 
-        self.generate(self.wallet, EXPIRY_HEIGHT + 6 - node.getblockcount())
-        assert_equal(self.deployment_status(), 'expired')
+        node.setmocktime(EXPIRY_TIME)
+        self.generate(self.wallet, 12)  # push the median-time-past to EXPIRY_TIME
+        assert_equal(self.rdts_active_for_next_block(), False)
         self.log.info(f"Deployment expired at height {node.getblockcount()}")
         self.check_all_rejected()
 
