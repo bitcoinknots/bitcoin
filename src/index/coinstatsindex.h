@@ -41,6 +41,7 @@ private:
     [[nodiscard]] bool ReverseBlock(const CBlock& block, const CBlockIndex* pindex);
 
     bool AllowPrune() const override { return true; }
+    bilingual_str GetDisableAction() const override { return _("set -coinstatsindex=0"); }
 
 protected:
     bool CustomInit(const std::optional<interfaces::BlockRef>& block) override;
