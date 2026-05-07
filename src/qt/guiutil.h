@@ -424,6 +424,7 @@ namespace GUIUtil
      * Replaces a plain text link with an HTML tagged one.
      */
     QString MakeHtmlLink(const QString& source, const QString& link);
+    QString MakeHtmlLink(const QString& source);
 
     void PrintSlotException(
         const std::exception* exception,

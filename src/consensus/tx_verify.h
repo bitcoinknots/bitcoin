@@ -17,14 +17,45 @@ class TxValidationState;
 
 /** Transaction validation functions */
 
+class CheckTxInputsRules {
+    using underlying_type = unsigned int;
+    underlying_type m_flags;
+    constexpr explicit CheckTxInputsRules(underlying_type flags) noexcept : m_flags(flags) {}
+
+    enum class Rule {
+        None = 0,
+        OutputSizeLimit = 1 << 0,
+    };
+
+public:
+    using enum Rule;
+
+    constexpr CheckTxInputsRules(Rule rule) noexcept : m_flags(static_cast<underlying_type>(rule)) {}
+
+    [[nodiscard]] constexpr bool test(CheckTxInputsRules rules) const noexcept {
+        return (m_flags & rules.m_flags) == rules.m_flags;
+    }
+
+    [[nodiscard]] constexpr CheckTxInputsRules operator|(const CheckTxInputsRules other) const noexcept {
+        return CheckTxInputsRules{m_flags | other.m_flags};
+    }
+};
+
 namespace Consensus {
+/**
+ * Check whether all outputs of this transaction satisfy size limits.
+ * Regular outputs must be <= MAX_OUTPUT_SCRIPT_SIZE (34 bytes).
+ * OP_RETURN outputs must be <= MAX_OUTPUT_DATA_SIZE (83 bytes).
+ */
+bool CheckOutputSizes(const CTransaction& tx, TxValidationState& state);
+
 /**
  * Check whether all inputs of this transaction are valid (no double spends and amounts)
  * This does not modify the UTXO set. This does not check scripts and sigs.
  * @param[out] txfee Set to the transaction fee if successful.
  * Preconditions: tx.IsCoinBase() is false.
  */
-[[nodiscard]] bool CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee);
+[[nodiscard]] bool CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, CheckTxInputsRules rules);
 } // namespace Consensus
 
 /** Auxiliary functions for transaction validation (ideally should not be exposed) */

@@ -402,14 +402,12 @@ class SegWitTest(BitcoinTestFramework):
                     [bare, p2sh, p2wsh, p2sh_p2wsh] = self.p2sh_address_to_script(v)
                     # p2sh multisig with compressed keys should always be spendable
                     spendable_anytime.extend([p2sh])
-                    # bare multisig can be watched and signed, but is not treated as ours
-                    solvable_after_importaddress.extend([bare])
                     # P2WSH and P2SH(P2WSH) multisig with compressed keys are spendable after direct importaddress
                     spendable_after_importaddress.extend([p2wsh, p2sh_p2wsh])
                 else:
                     [p2wpkh, p2sh_p2wpkh, p2pk, p2pkh, p2sh_p2pk, p2sh_p2pkh, p2wsh_p2pk, p2wsh_p2pkh, p2sh_p2wsh_p2pk, p2sh_p2wsh_p2pkh] = self.p2pkh_address_to_script(v)
                     # normal P2PKH and P2PK with compressed keys should always be spendable
-                    spendable_anytime.extend([p2pkh, p2pk])
+                    spendable_anytime.extend([p2pkh])
                     # P2SH_P2PK, P2SH_P2PKH with compressed keys are spendable after direct importaddress
                     spendable_after_importaddress.extend([p2sh_p2pk, p2sh_p2pkh, p2wsh_p2pk, p2wsh_p2pkh, p2sh_p2wsh_p2pk, p2sh_p2wsh_p2pkh])
                     # P2WPKH and P2SH_P2WPKH with compressed keys should always be spendable
@@ -421,14 +419,12 @@ class SegWitTest(BitcoinTestFramework):
                     [bare, p2sh, p2wsh, p2sh_p2wsh] = self.p2sh_address_to_script(v)
                     # p2sh multisig with uncompressed keys should always be spendable
                     spendable_anytime.extend([p2sh])
-                    # bare multisig can be watched and signed, but is not treated as ours
-                    solvable_after_importaddress.extend([bare])
                     # P2WSH and P2SH(P2WSH) multisig with uncompressed keys are never seen
                     unseen_anytime.extend([p2wsh, p2sh_p2wsh])
                 else:
                     [p2wpkh, p2sh_p2wpkh, p2pk, p2pkh, p2sh_p2pk, p2sh_p2pkh, p2wsh_p2pk, p2wsh_p2pkh, p2sh_p2wsh_p2pk, p2sh_p2wsh_p2pkh] = self.p2pkh_address_to_script(v)
                     # normal P2PKH and P2PK with uncompressed keys should always be spendable
-                    spendable_anytime.extend([p2pkh, p2pk])
+                    spendable_anytime.extend([p2pkh])
                     # P2SH_P2PK and P2SH_P2PKH are spendable after direct importaddress
                     spendable_after_importaddress.extend([p2sh_p2pk, p2sh_p2pkh])
                     # Witness output types with uncompressed keys are never seen
@@ -439,11 +435,11 @@ class SegWitTest(BitcoinTestFramework):
                 if v['isscript']:
                     # Multisig without private is not seen after addmultisigaddress, but seen after importaddress
                     [bare, p2sh, p2wsh, p2sh_p2wsh] = self.p2sh_address_to_script(v)
-                    solvable_after_importaddress.extend([bare, p2sh, p2wsh, p2sh_p2wsh])
+                    solvable_after_importaddress.extend([p2sh, p2wsh, p2sh_p2wsh])
                 else:
                     [p2wpkh, p2sh_p2wpkh, p2pk, p2pkh, p2sh_p2pk, p2sh_p2pkh, p2wsh_p2pk, p2wsh_p2pkh, p2sh_p2wsh_p2pk, p2sh_p2wsh_p2pkh] = self.p2pkh_address_to_script(v)
                     # normal P2PKH, P2PK, P2WPKH and P2SH_P2WPKH with compressed keys should always be seen
-                    solvable_anytime.extend([p2pkh, p2pk, p2wpkh, p2sh_p2wpkh])
+                    solvable_anytime.extend([p2pkh, p2wpkh, p2sh_p2wpkh])
                     # P2SH_P2PK, P2SH_P2PKH with compressed keys are seen after direct importaddress
                     solvable_after_importaddress.extend([p2sh_p2pk, p2sh_p2pkh, p2wsh_p2pk, p2wsh_p2pkh, p2sh_p2wsh_p2pk, p2sh_p2wsh_p2pkh])
 
@@ -452,13 +448,13 @@ class SegWitTest(BitcoinTestFramework):
                 if v['isscript']:
                     [bare, p2sh, p2wsh, p2sh_p2wsh] = self.p2sh_address_to_script(v)
                     # Base uncompressed multisig without private is not seen after addmultisigaddress, but seen after importaddress
-                    solvable_after_importaddress.extend([bare, p2sh])
+                    solvable_after_importaddress.extend([p2sh])
                     # P2WSH and P2SH(P2WSH) multisig with uncompressed keys are never seen
                     unseen_anytime.extend([p2wsh, p2sh_p2wsh])
                 else:
                     [p2wpkh, p2sh_p2wpkh, p2pk, p2pkh, p2sh_p2pk, p2sh_p2pkh, p2wsh_p2pk, p2wsh_p2pkh, p2sh_p2wsh_p2pk, p2sh_p2wsh_p2pkh] = self.p2pkh_address_to_script(v)
                     # normal P2PKH and P2PK with uncompressed keys should always be seen
-                    solvable_anytime.extend([p2pkh, p2pk])
+                    solvable_anytime.extend([p2pkh])
                     # P2SH_P2PK, P2SH_P2PKH with uncompressed keys are seen after direct importaddress
                     solvable_after_importaddress.extend([p2sh_p2pk, p2sh_p2pkh])
                     # Witness output types with uncompressed keys are never seen

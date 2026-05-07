@@ -5,7 +5,9 @@
 """Test mempool limiting together/eviction with the wallet."""
 
 from decimal import Decimal
+import time
 
+from test_framework.authproxy import JSONRPCException
 from test_framework.mempool_util import (
     fill_mempool,
 )
@@ -121,7 +123,7 @@ class MempoolLimitTest(BitcoinTestFramework):
         num_big_parents = 3
         # Need to be large enough to trigger eviction
         # (note that the mempool usage of a tx is about three times its vsize)
-        assert_greater_than(parent_vsize * num_big_parents * 3, current_info["maxmempool"] - current_info["bytes"])
+        assert_greater_than(parent_vsize * num_big_parents * 3, current_info["maxmempool"] - current_info["usage"])
 
         big_parent_txids = []
         big_parent_wtxids = []
@@ -159,7 +161,7 @@ class MempoolLimitTest(BitcoinTestFramework):
             assert_equal(len(package_res["tx-results"][wtxid]["fees"]["effective-includes"]), 1)
 
         # Maximum size must never be exceeded.
-        assert_greater_than(node.getmempoolinfo()["maxmempool"], node.getmempoolinfo()["bytes"])
+        assert_greater_than(node.getmempoolinfo()["maxmempool"], node.getmempoolinfo()["usage"])
 
         # Package found in mempool still
         resulting_mempool_txids = node.getrawmempool()
@@ -200,12 +202,42 @@ class MempoolLimitTest(BitcoinTestFramework):
         # Mempool transaction which is evicted due to being at the "bottom" of the mempool when the
         # mempool overflows and evicts by descendant score. It's important that the eviction doesn't
         # happen in the middle of package evaluation, as it can invalidate the coins cache.
-        mempool_evicted_tx = self.wallet.send_self_transfer(
-            from_node=node,
-            fee_rate=mempoolmin_feerate,
-            target_vsize=evicted_vsize,
-            confirmed_only=True
-        )
+        #
+        # NOTE: On 32-bit systems (i686), there's a race condition where concurrent transaction additions
+        # can cause the mempool to repeatedly exceed the limit, causing immediate eviction of low-fee
+        # transactions. We retry with exponential backoff to handle this scenario.
+        mempool_evicted_tx = None
+        max_retries = 20
+        for attempt in range(max_retries):
+            try:
+                # Brief backoff on retries to let concurrent operations settle
+                if attempt > 0:
+                    backoff = min(0.05 * (2 ** (attempt - 1)), 2.0)  # Exponential backoff, max 2 seconds
+                    self.log.info(f"Retry attempt {attempt + 1}/{max_retries} after {backoff:.2f}s backoff...")
+                    time.sleep(backoff)
+                    # Rescan UTXOs to recover any that failed to be added
+                    self.wallet.rescan_utxos()
+                    # Update minimum feerate as it may have increased during retries
+                    mempoolmin_feerate = node.getmempoolinfo()["mempoolminfee"]
+
+                mempool_evicted_tx = self.wallet.send_self_transfer(
+                    from_node=node,
+                    fee_rate=mempoolmin_feerate,
+                    target_vsize=evicted_vsize,
+                    confirmed_only=True
+                )
+                if attempt > 0:
+                    self.log.info(f"Successfully added transaction on attempt {attempt + 1}")
+                break
+            except JSONRPCException as e:
+                if e.error['code'] == -26:  # mempool full or min fee not met
+                    if attempt < max_retries - 1:
+                        continue
+                    else:
+                        self.log.error(f"Failed to add transaction after {max_retries} attempts due to race condition")
+                raise
+
+        assert mempool_evicted_tx is not None, "Failed to add transaction after retries"
         # Already in mempool when package is submitted.
         assert mempool_evicted_tx["txid"] in node.getrawmempool()
 
@@ -229,7 +261,7 @@ class MempoolLimitTest(BitcoinTestFramework):
         num_big_parents = 3
         # Need to be large enough to trigger eviction
         # (note that the mempool usage of a tx is about three times its vsize)
-        assert_greater_than(parent_vsize * num_big_parents * 3, current_info["maxmempool"] - current_info["bytes"])
+        assert_greater_than(parent_vsize * num_big_parents * 3, current_info["maxmempool"] - current_info["usage"])
         parent_feerate = 10 * mempoolmin_feerate
 
         big_parent_txids = []
@@ -260,7 +292,7 @@ class MempoolLimitTest(BitcoinTestFramework):
             assert_equal(node.submitpackage(package_hex)["package_msg"], "transaction failed")
 
         # Maximum size must never be exceeded.
-        assert_greater_than(node.getmempoolinfo()["maxmempool"], node.getmempoolinfo()["bytes"])
+        assert_greater_than(node.getmempoolinfo()["maxmempool"], node.getmempoolinfo()["usage"])
 
         # Evicted transaction and its descendants must not be in mempool.
         resulting_mempool_txids = node.getrawmempool()
@@ -329,7 +361,7 @@ class MempoolLimitTest(BitcoinTestFramework):
         assert len([tx_res for _, tx_res in res["tx-results"].items() if "error" in tx_res and tx_res["error"] == "bad-txns-inputs-missingorspent"])
 
         # Maximum size must never be exceeded.
-        assert_greater_than(node.getmempoolinfo()["maxmempool"], node.getmempoolinfo()["bytes"])
+        assert_greater_than(node.getmempoolinfo()["maxmempool"], node.getmempoolinfo()["usage"])
 
         resulting_mempool_txids = node.getrawmempool()
         # The replacement should be successful.
@@ -406,7 +438,7 @@ class MempoolLimitTest(BitcoinTestFramework):
         # Needs to be large enough to trigger eviction
         # (note that the mempool usage of a tx is about three times its vsize)
         target_vsize_each = 50000
-        assert_greater_than(target_vsize_each * 2 * 3, node.getmempoolinfo()["maxmempool"] - node.getmempoolinfo()["bytes"])
+        assert_greater_than(target_vsize_each * 2 * 3, node.getmempoolinfo()["maxmempool"] - node.getmempoolinfo()["usage"])
         # Should be a true CPFP: parent's feerate is just below mempool min feerate
         parent_feerate = mempoolmin_feerate - Decimal("0.0000001")  # 0.01 sats/vbyte below min feerate
         # Parent + child is above mempool minimum feerate
