@@ -131,6 +131,10 @@ BOOST_AUTO_TEST_CASE(rpc_namedonlyparams)
     // Make sure options object specified through args array conflicts.
     BOOST_CHECK_EXCEPTION(TransformParams(JSON(R"({"args": [1, 2, {"opt1": 10}], "opt2": 20})"), arg_names), UniValue,
                           HasJSON(R"({"code":-8,"message":"Cannot specify both 'options' and named parameter opt2"})"));
+
+    // Make sure named-only parameters are still passed as options when the
+    // positional args array stops before the options position.
+    BOOST_CHECK_EQUAL(TransformParams(JSON(R"({"args": [1], "arg2": 2, "opt1": 10})"), arg_names).write(), R"([1,2,{"opt1":10}])");
 }
 
 BOOST_AUTO_TEST_CASE(rpc_rawparams)
