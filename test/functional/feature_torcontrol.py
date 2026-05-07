@@ -155,6 +155,7 @@ class TorControlTest(BitcoinTestFramework):
         assert_equal(mock_tor.received_commands[1], "AUTHENTICATE")
         assert_equal(mock_tor.received_commands[2], "GETINFO net/listeners/socks")
         assert mock_tor.received_commands[3].startswith("ADD_ONION ")
+        assert "PoWDefensesEnabled=1" in mock_tor.received_commands[3]
 
         # Clean up
         mock_tor.stop()
@@ -181,6 +182,38 @@ class TorControlTest(BitcoinTestFramework):
         # Should now process the complete response and send AUTHENTICATE
         self.wait_until(lambda: len(mock_tor.received_commands) >= 2, timeout=5)
         assert_equal(mock_tor.received_commands[1], "AUTHENTICATE")
+
+        # Clean up
+        mock_tor.stop()
+
+    def test_pow_fallback(self):
+        self.log.info("Test that ADD_ONION retries without PoW on 512 error")
+
+        class NoPowServer(MockTorControlServer):
+            def _get_response(self, command):
+                if command.startswith("ADD_ONION"):
+                    if "PoWDefensesEnabled=1" in command:
+                        return "512 Unrecognized option\r\n"
+                    else:
+                        return (
+                            "250-ServiceID=testserviceid1234567890123456789012345678901234567890123456\r\n"
+                            "250 OK\r\n"
+                        )
+                return super()._get_response(command)
+
+        mock_tor = NoPowServer(self.next_port())
+        self.restart_with_mock(mock_tor)
+
+        # Expect: PROTOCOLINFO, AUTHENTICATE, GETINFO, ADD_ONION (with PoW), ADD_ONION (without PoW)
+        self.wait_until(lambda: len(mock_tor.received_commands) >= 5, timeout=10)
+
+        # First ADD_ONION should have PoW enabled
+        assert mock_tor.received_commands[3].startswith("ADD_ONION ")
+        assert "PoWDefensesEnabled=1" in mock_tor.received_commands[3]
+
+        # Retry should be ADD_ONION without PoW
+        assert mock_tor.received_commands[4].startswith("ADD_ONION ")
+        assert "PoWDefensesEnabled=1" not in mock_tor.received_commands[4]
 
         # Clean up
         mock_tor.stop()
@@ -228,6 +261,7 @@ class TorControlTest(BitcoinTestFramework):
     def run_test(self):
         self.test_basic()
         self.test_partial_data()
+        self.test_pow_fallback()
         self.test_oversized_line()
         self.test_overmany_lines()
 
