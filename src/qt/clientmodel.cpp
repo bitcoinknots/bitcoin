@@ -210,7 +210,7 @@ bool ClientModel::isReleaseVersion() const
 
 QString ClientModel::formatClientStartupTime() const
 {
-    return QDateTime::currentDateTime().addSecs(-TicksSeconds(GetUptime())).toString();
+    return GUIUtil::dateTimeStr(QDateTime::currentDateTime().addSecs(-TicksSeconds(GetUptime())));
 }
 
 QString ClientModel::dataDir() const
