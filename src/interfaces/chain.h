@@ -144,6 +144,10 @@ public:
     //! pruned), and contains transactions.
     virtual bool haveBlockOnDisk(int height) = 0;
 
+    //! Number of blocks policy requires a coinbase output to be buried under
+    //! before the wallet should treat it as spendable.
+    virtual int coinbaseMaturity() = 0;
+
     virtual bool pruneLockExists(const std::string& name) const = 0;
     virtual bool updatePruneLock(const std::string& name, const node::PruneLockInfo& lock_info, bool sync=false) = 0;
     virtual bool deletePruneLock(const std::string& name) = 0;
