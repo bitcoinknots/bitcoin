@@ -127,7 +127,6 @@ BasicTestingSetup::BasicTestingSetup(const ChainType chainType, TestOpts opts)
             "-debug",
             "-debugexclude=libevent",
             "-debugexclude=leveldb",
-            "-blake2b_headline=",
         },
         opts.extra_args);
     if (G_TEST_COMMAND_LINE_ARGUMENTS) {
