@@ -35,6 +35,7 @@
 #include <vector>
 
 unsigned int g_script_size_policy_limit{DEFAULT_SCRIPT_SIZE_POLICY_LIMIT};
+bool g_reject_dead_branches{DEFAULT_REJECT_DEAD_BRANCHES};
 
 CAmount GetDustThreshold(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
 {
@@ -635,6 +636,16 @@ std::pair<CScript, unsigned int> GetScriptForTransactionInput(CScript prevScript
     return std::make_pair(CScript(), 0);
 }
 
+/**
+ * Whether to look for dead branches in this input. A witness over the script size
+ * limit fails IsWitnessStandard right after, so following its constants would be
+ * work spent on a transaction that is rejected anyway.
+ */
+static bool FollowDeadBranches(const CTxIn& txin)
+{
+    return ::g_reject_dead_branches && GetSerializeSize(txin.scriptWitness.stack) <= g_script_size_policy_limit;
+}
+
 std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsViewCache& view)
 {
     std::pair<size_t, size_t> ret{0, 0};
@@ -642,7 +653,7 @@ std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsV
     for (const CTxIn& txin : tx.vin) {
         const CTxOut &utxo = view.AccessCoin(txin.prevout).out;
         auto[script, consensus_weight_per_byte] = GetScriptForTransactionInput(utxo.scriptPubKey, txin);
-        const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness);
+        const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness, FollowDeadBranches(txin));
         ret.first += dcb.first;
         ret.second += dcb.second;
     }
@@ -667,7 +678,7 @@ int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& vi
             const CTxOut &utxo = view.AccessCoin(txin.prevout).out;
             auto[script, consensus_weight_per_byte] = GetScriptForTransactionInput(utxo.scriptPubKey, txin);
             if (weight_per_data_byte > consensus_weight_per_byte) {
-                const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness);
+                const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness, FollowDeadBranches(txin));
                 mod_weight += int64_t(dcb.first + dcb.second) * (weight_per_data_byte - consensus_weight_per_byte);
             }
         }

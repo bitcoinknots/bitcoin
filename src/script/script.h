@@ -578,7 +578,7 @@ public:
 
     size_t OPNetWitnessSize(const CScriptWitness& witness) const;
     size_t IsOLGA(size_t remaining_outputs) const;
-    std::pair<size_t, size_t> DatacarrierBytes(size_t remaining_outputs, const CScriptWitness* witness = nullptr) const;
+    std::pair<size_t, size_t> DatacarrierBytes(size_t remaining_outputs, const CScriptWitness* witness = nullptr, bool dead_branches = false) const;
 
     void clear()
     {
@@ -587,6 +587,19 @@ public:
         shrink_to_fit();
     }
 };
+
+/** Byte offsets of the OP_IF/OP_NOTIF whose first part, and the OP_ELSE whose part, a constant guard makes unreachable */
+struct DeadParts {
+    std::vector<bool> at_if, at_else;
+};
+
+/**
+ * Follow the script as far as constants determine it and mark the conditional
+ * parts that can never run. Anything read from the witness, a signature check,
+ * a hash or an opcode not modeled here is unknown, and an unknown condition
+ * marks nothing, so a spendable script is never read as dead.
+ */
+DeadParts FindDeadParts(const CScript& script);
 
 struct CScriptWitness
 {
