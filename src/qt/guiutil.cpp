@@ -405,17 +405,22 @@ bool isObscured(QWidget *w)
 
 void bringToFront(QWidget* w)
 {
+#ifdef Q_OS_MACOS
+    ForceActivation();
+#endif
+
     if (w) {
+#if (QT_VERSION < QT_VERSION_CHECK(6, 3, 2))
         if (QGuiApplication::platformName() == "wayland") {
+            // Workaround for bug fixed in https://codereview.qt-project.org/c/qt/qtwayland/+/421125
             auto flags = w->windowFlags();
             w->setWindowFlags(flags|Qt::WindowStaysOnTopHint);
             w->show();
             w->setWindowFlags(flags);
             w->show();
-        } else {
-#ifdef Q_OS_MACOS
-            ForceActivation();
+        } else
 #endif
+        {
             // activateWindow() (sometimes) helps with keyboard focus on Windows
             if (w->isMinimized()) {
                 w->showNormal();
