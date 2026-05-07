@@ -474,6 +474,10 @@ CNode* CConnman::ConnectNode(CAddress addrConnect, const char *pszDest, bool fCo
     std::unique_ptr<i2p::sam::Session> i2p_transient_session;
 
     for (auto& target_addr: connect_to) {
+        if (RequiresV2ForOutbound(target_addr, pszDest ? pszDest : "") && !use_v2transport) {
+            LogDebug(BCLog::NET, "skipping v1 connection to %s (-v2onlyclearnet)\n", target_addr.ToStringAddrPort());
+            continue;
+        }
         if (target_addr.IsValid()) {
             const bool use_proxy{GetProxy(target_addr.GetNetwork(), proxy)};
             bool proxyConnectionFailed = false;
@@ -1990,7 +1994,7 @@ void CConnman::DisconnectNodes()
                 // Add to reconnection list if appropriate. We don't reconnect right here, because
                 // the creation of a connection is a blocking operation (up to several seconds),
                 // and we don't want to hold up the socket handler thread for that long.
-                if (network_active && pnode->m_transport->ShouldReconnectV1()) {
+                if (network_active && !RequiresV2ForOutbound(pnode->addr, pnode->m_dest) && pnode->m_transport->ShouldReconnectV1()) {
                     reconnections_to_add.push_back({
                         .addr_connect = pnode->addr,
                         .grant = std::move(pnode->grantOutbound),
@@ -2552,6 +2556,13 @@ bool CConnman::MultipleManualOrFullOutboundConns(Network net) const
 {
     AssertLockHeld(m_nodes_mutex);
     return m_network_conn_counts[net] > 1;
+}
+
+bool CConnman::RequiresV2ForOutbound(const CNetAddr& addr, std::string_view dest_name) const
+{
+    if (!m_v2only_clearnet) return false;
+    if (IsClearnet(addr.GetNetClass())) return true;
+    return !addr.IsValid() && !dest_name.empty();
 }
 
 bool CConnman::MaybePickPreferredNetwork(std::optional<Network>& network)
