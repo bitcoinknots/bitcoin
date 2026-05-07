@@ -7,6 +7,7 @@
 
 namespace kernel {
 enum class Warning {
+    RULES_NOT_CONSENTED,
     UNKNOWN_NEW_RULES_ACTIVATED,
     LARGE_WORK_INVALID_CHAIN,
     UNKNOWN_NEW_RULES_SIGNAL_VBITS,

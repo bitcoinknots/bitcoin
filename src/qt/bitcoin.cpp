@@ -15,6 +15,7 @@
 #include <interfaces/handler.h>
 #include <interfaces/init.h>
 #include <interfaces/node.h>
+#include <kernel/chainparams.h>
 #include <logging.h>
 #include <node/context.h>
 #include <node/interface_ui.h>
@@ -632,6 +633,13 @@ int GuiMain(int argc, char* argv[])
     // Parse URIs on command line
     PaymentServer::ipcParseCommandLine(argc, argv);
 #endif
+
+    if (g_rdts_consent == RDTSConsentFlag::RUNTIME_WARN) {
+        // The GUI user is presented with a choice to consent or exit.
+        // It doesn't make sense to continue running if they choose exit.
+        // We set this here since it should be after SelectParams loads the test option yet still before AppInitMain acts on it
+        g_rdts_consent = RDTSConsentFlag::RUNTIME_CHECK;
+    }
 
     QScopedPointer<const NetworkStyle> networkStyle(NetworkStyle::instantiate(Params().GetChainType()));
     assert(!networkStyle.isNull());

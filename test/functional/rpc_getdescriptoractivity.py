@@ -206,7 +206,7 @@ class GetBlocksActivityTest(BitcoinTestFramework):
 
     def test_no_address(self, node, wallet):
         self.log.info("Test that activity is still reported for scripts without an associated address")
-        raw_wallet = MiniWallet(self.nodes[0], mode=MiniWalletMode.RAW_P2PK)
+        raw_wallet = MiniWallet(self.nodes[0], mode=MiniWalletMode.RAW_OP_TRUE)
         self.generate(raw_wallet, 100)
 
         no_addr_tx = raw_wallet.send_self_transfer(from_node=node)
