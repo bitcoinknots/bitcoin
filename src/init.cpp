@@ -1749,7 +1749,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     // requested to kill the GUI during the last operation. If so, exit.
     if (ShutdownRequested(node)) {
         LogPrintf("Shutdown requested. Exiting.\n");
-        return false;
+        return true;
     }
 
     ChainstateManager& chainman = *Assert(node.chainman);
@@ -1905,7 +1905,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     }
 
     if (ShutdownRequested(node)) {
-        return false;
+        return true;
     }
 
     // ********************************************************* Step 12: start node
