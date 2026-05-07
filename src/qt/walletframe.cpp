@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <qt/pairingpage.h>
 #include <qt/walletframe.h>
 
 #include <node/interface_ui.h>
@@ -34,6 +35,8 @@ WalletFrame::WalletFrame(const PlatformStyle* _platformStyle, QWidget* parent)
     QVBoxLayout *walletFrameLayout = new QVBoxLayout(this);
     setContentsMargins(0,0,0,0);
     walletStack = new QStackedWidget(this);
+    m_global_stack = new QStackedWidget(this);
+    m_global_stack->addWidget(walletStack);
     walletFrameLayout->setContentsMargins(0,0,0,0);
     walletFrameLayout->setSpacing(0);
 
@@ -44,7 +47,7 @@ WalletFrame::WalletFrame(const PlatformStyle* _platformStyle, QWidget* parent)
     m_label_alerts->setMargin(3);
     m_label_alerts->setTextInteractionFlags(Qt::TextSelectableByMouse);
     walletFrameLayout->addWidget(m_label_alerts);
-    walletFrameLayout->addWidget(walletStack);
+    walletFrameLayout->addWidget(m_global_stack);
 
     // hbox for no wallet
     QWidget* no_wallet_group = new QWidget(walletStack);
@@ -61,6 +64,9 @@ WalletFrame::WalletFrame(const PlatformStyle* _platformStyle, QWidget* parent)
     no_wallet_group->setLayout(no_wallet_layout);
 
     walletStack->addWidget(no_wallet_group);
+
+    m_page_pairing = new PairingPage(this);
+    m_global_stack->addWidget(m_page_pairing);
 }
 
 WalletFrame::~WalletFrame() = default;
@@ -68,6 +74,8 @@ WalletFrame::~WalletFrame() = default;
 void WalletFrame::setClientModel(ClientModel *_clientModel)
 {
     this->clientModel = _clientModel;
+
+    m_page_pairing->setClientModel(_clientModel);
 
     for (auto i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i) {
         i.value()->setClientModel(_clientModel);
@@ -166,6 +174,12 @@ void WalletFrame::gotoOverviewPage()
     QMap<WalletModel*, WalletView*>::const_iterator i;
     for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
         i.value()->gotoOverviewPage();
+    m_global_stack->setCurrentWidget(walletStack);
+}
+
+void WalletFrame::gotoPairingPage()
+{
+    m_global_stack->setCurrentWidget(m_page_pairing);
 }
 
 void WalletFrame::gotoHistoryPage()
@@ -173,6 +187,7 @@ void WalletFrame::gotoHistoryPage()
     QMap<WalletModel*, WalletView*>::const_iterator i;
     for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
         i.value()->gotoHistoryPage();
+    m_global_stack->setCurrentWidget(walletStack);
 }
 
 void WalletFrame::gotoReceiveCoinsPage()
@@ -180,6 +195,7 @@ void WalletFrame::gotoReceiveCoinsPage()
     QMap<WalletModel*, WalletView*>::const_iterator i;
     for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
         i.value()->gotoReceiveCoinsPage();
+    m_global_stack->setCurrentWidget(walletStack);
 }
 
 void WalletFrame::gotoSendCoinsPage(QString addr)
@@ -187,6 +203,7 @@ void WalletFrame::gotoSendCoinsPage(QString addr)
     QMap<WalletModel*, WalletView*>::const_iterator i;
     for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
         i.value()->gotoSendCoinsPage(addr);
+    m_global_stack->setCurrentWidget(walletStack);
 }
 
 void WalletFrame::gotoSignMessageTab(QString addr)
