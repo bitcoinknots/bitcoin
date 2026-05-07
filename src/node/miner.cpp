@@ -212,7 +212,7 @@ std::shared_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     coinbaseTx.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
     coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
     if (nHeight == chainparams.GetConsensus().DeploymentHeight(Consensus::DEPLOYMENT_BLAKE2B)) {
-        coinbaseTx.vin[0].scriptSig << blake2b_headline;
+        coinbaseTx.vin[0].scriptSig << chainparams.GetConsensus().Blake2bHeadline;
     }
     pblock->vtx[0] = MakeTransactionRef(std::move(coinbaseTx));
     pblocktemplate->vchCoinbaseCommitment = m_chainstate.m_chainman.GenerateCoinbaseCommitment(*pblock, pindexPrev);
