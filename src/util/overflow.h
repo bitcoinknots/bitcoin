@@ -13,6 +13,22 @@
 #include <optional>
 #include <type_traits>
 
+template <std::unsigned_integral T>
+[[nodiscard]] constexpr T WrappingAdd(const T i, const T j) noexcept
+{
+    constexpr T max{std::numeric_limits<T>::max()};
+    if (j > max - i) return j - (max - i) - 1;
+    return i + j;
+}
+
+template <std::unsigned_integral T>
+[[nodiscard]] constexpr T WrappingSubtract(const T i, const T j) noexcept
+{
+    constexpr T max{std::numeric_limits<T>::max()};
+    if (j > i) return max - (j - i) + 1;
+    return i - j;
+}
+
 template <class T>
 [[nodiscard]] bool AdditionOverflow(const T i, const T j) noexcept
 {

@@ -89,13 +89,20 @@ def nbits_str(nbits):
 def target_str(target):
     return f"{target:064x}"
 
-def create_block(hashprev=None, coinbase=None, ntime=None, *, version=None, tmpl=None, txlist=None):
+def create_block(hashprev=None, coinbase=None, ntime=None, *, version=None, tmpl=None, txlist=None, height=None, header_v2=None):
     """Create a block (with regtest difficulty)."""
     block = CBlock()
     if tmpl is None:
         tmpl = {}
     block.nVersion = version or tmpl.get('version') or VERSIONBITS_LAST_OLD_BLOCK_VERSION
     block.nTime = ntime or tmpl.get('curtime') or int(time.time() + 600)
+    block_height = height if height is not None else tmpl.get('height')
+    if header_v2 is None:
+        header_v2 = '!blake2b' in tmpl.get('rules', ())
+    if header_v2 and block_height is None:
+        raise ValueError("A v2 block requires a height")
+    block.m_header_v2 = header_v2
+    block.m_height = block_height if block.m_header_v2 else 0
     block.hashPrevBlock = hashprev or int(tmpl['previousblockhash'], 0x10)
     if tmpl and tmpl.get('bits') is not None:
         block.nBits = struct.unpack('>I', bytes.fromhex(tmpl['bits']))[0]
@@ -109,6 +116,7 @@ def create_block(hashprev=None, coinbase=None, ntime=None, *, version=None, tmpl
             if not hasattr(tx, 'calc_sha256'):
                 tx = tx_from_hex(tx)
             block.vtx.append(tx)
+    block.m_txcount = len(block.vtx) if block.m_header_v2 else 0
     block.hashMerkleRoot = block.calc_merkle_root()
     block.calc_sha256()
     return block
@@ -124,7 +132,7 @@ def create_empty_fork(node, fork_length=FORK_LENGTH):
 
     blocks = []
     for _ in range(fork_length):
-        block = create_block(tip, create_coinbase(height + 1), block_time)
+        block = create_block(tip, create_coinbase(height + 1), block_time, height=height + 1)
         block.solve()
         blocks.append(block)
         tip = block.sha256
@@ -155,6 +163,10 @@ def add_witness_commitment(block, nonce=0):
     block.vtx[0].vout.append(CTxOut(0, get_witness_script(witness_root, witness_nonce)))
     block.vtx[0].rehash()
     block.hashMerkleRoot = block.calc_merkle_root()
+    if block.m_header_v2:
+        # v2 headers commit to the transaction count; refresh it in case
+        # transactions were appended after create_block
+        block.m_txcount = len(block.vtx)
     block.rehash()
 
 

@@ -106,7 +106,7 @@ ASSUME_CONVEX = True
 # System properties:
 
 # Headers in the redownload buffer are stored without prevhash. [bits]
-COMPACT_HEADER_SIZE = 48 * 8
+COMPACT_HEADER_SIZE = 136 * 8
 
 # How many bits a header uses in P2P protocol. [bits]
 NET_HEADER_SIZE = 81 * 8

@@ -63,7 +63,9 @@ class ZMQHandler():
             print(body.hex())
         elif topic == b"rawblock":
             print('- RAW BLOCK HEADER ('+sequence+') -')
-            print(body[:80].hex())
+            version = int.from_bytes(body[:4], "little")
+            header_size = 164 if version & 0x80000000 else 80
+            print(body[:header_size].hex())
         elif topic == b"rawtx":
             print('- RAW TX ('+sequence+') -')
             print(body.hex())

@@ -406,6 +406,8 @@ public:
 
 /** Functions for validating blocks and updating the block tree */
 
+extern std::vector<unsigned char> blake2b_headline;
+
 /** Context-independent validity checks */
 bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
 

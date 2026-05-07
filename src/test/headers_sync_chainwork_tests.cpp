@@ -143,4 +143,111 @@ BOOST_AUTO_TEST_CASE(headers_sync_state)
     BOOST_CHECK(result.success);
 }
 
+// End-to-end: a peer serving the PoW-change fork block presyncs successfully,
+// while a peer claiming the same target drop before activation is rejected.
+// HeadersSyncState does not itself verify proof of work, so the headers here
+// are unmined; only nBits and connectivity matter to this path.
+BOOST_AUTO_TEST_CASE(headers_sync_powchange_fork)
+{
+    const auto mainnet = CreateChainParams(*m_node.args, ChainType::MAIN);
+    Consensus::Params params = mainnet->GetConsensus();
+    BOOST_CHECK(!params.fPowAllowMinDifficultyBlocks);
+
+    // Must be in the past: m_max_commitments is derived from wall clock minus
+    // the chain_start time, so a future timestamp starves the commitment budget.
+    const int64_t block_time = 1700000000;
+    const uint32_t tip_nbits = 0x1702905c;
+
+    uint256 start_hash{uint256::ONE};
+    CBlockIndex chain_start;
+    chain_start.nHeight = 800000;
+    chain_start.nBits = tip_nbits;
+    chain_start.nTime = block_time - 6000;
+    chain_start.phashBlock = &start_hash;
+    BOOST_CHECK((chain_start.nHeight + 1) % params.DifficultyAdjustmentInterval() != 0);
+    params.Blake2bHeight = chain_start.nHeight + 2;
+
+    arith_uint256 shifted;
+    shifted.SetCompact(tip_nbits);
+    shifted <<= params.Blake2bTargetShift;
+    const uint32_t fork_nbits = shifted.GetCompact();
+
+    const uint256 connect_hash{chain_start.GetBlockHeader().GetHash()};
+
+    auto build_chain = [&](uint32_t first_nbits, uint32_t second_nbits) {
+        std::vector<CBlockHeader> headers(2);
+        headers[0].nVersion = 4;
+        headers[0].hashPrevBlock = connect_hash;
+        headers[0].nTime = block_time - 1200;
+        headers[0].nBits = first_nbits;
+        headers[1].nVersion = 4;
+        headers[1].hashPrevBlock = headers[0].GetHash();
+        headers[1].nTime = block_time - 600;
+        headers[1].nBits = second_nbits;
+        headers[1].m_header_v2 = true;
+        headers[1].m_height = params.Blake2bHeight;
+        return headers;
+    };
+
+    const arith_uint256 minimum_required_work{UintToArith256(params.nMinimumChainWork)};
+
+    auto presyncs = [&](const std::vector<CBlockHeader>& headers) {
+        HeadersSyncState hss(/*id=*/0, params, &chain_start, minimum_required_work);
+        const auto result = hss.ProcessNextHeaders(headers, /*full_headers_message=*/true);
+        return result.success && hss.GetState() == HeadersSyncState::State::PRESYNC;
+    };
+
+    BOOST_CHECK_NE(fork_nbits, tip_nbits);
+    BOOST_CHECK(presyncs(build_chain(tip_nbits, fork_nbits)));
+    BOOST_CHECK(!presyncs(build_chain(fork_nbits, fork_nbits)));
+
+    arith_uint256 too_easy;
+    too_easy.SetCompact(fork_nbits);
+    too_easy <<= 4;
+    BOOST_CHECK(!presyncs(build_chain(tip_nbits, too_easy.GetCompact())));
+}
+
+// The one-time target shift must not be granted again after activation.
+BOOST_AUTO_TEST_CASE(headers_sync_powchange_repeated_shift)
+{
+    const auto mainnet = CreateChainParams(*m_node.args, ChainType::MAIN);
+    Consensus::Params params = mainnet->GetConsensus();
+    const int64_t block_time = 1700000000;
+    const uint32_t tip_nbits = 0x1702905c;
+
+    uint256 start_hash{uint256::ONE};
+    CBlockIndex chain_start;
+    chain_start.nHeight = 800000;
+    chain_start.nBits = tip_nbits;
+    chain_start.nTime = block_time - 6000;
+    chain_start.phashBlock = &start_hash;
+    params.Blake2bHeight = chain_start.nHeight + 1;
+
+    std::vector<CBlockHeader> headers;
+    uint256 prev{chain_start.GetBlockHeader().GetHash()};
+    uint32_t nbits = tip_nbits;
+    for (int i = 0; i < 2; ++i) {
+        arith_uint256 target;
+        target.SetCompact(nbits);
+        target <<= params.Blake2bTargetShift;
+        const arith_uint256 limit = UintToArith256(params.powLimit);
+        if (target > limit) target = limit;
+        nbits = target.GetCompact();
+
+        CBlockHeader header;
+        header.nVersion = 4;
+        header.hashPrevBlock = prev;
+        header.nTime = block_time + i * 600;
+        header.nBits = nbits;
+        header.m_header_v2 = true;
+        header.m_height = chain_start.nHeight + i + 1;
+        headers.push_back(header);
+        prev = header.GetHash();
+    }
+
+    HeadersSyncState hss(0, params, &chain_start, UintToArith256(params.nMinimumChainWork));
+    const auto result = hss.ProcessNextHeaders(headers, true);
+    BOOST_CHECK(!result.success);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -21,12 +21,84 @@ from collections import namedtuple
 settings = {}
 
 def calc_hash_str(blk_hdr):
-    blk_hdr_hash = hashlib.sha256(hashlib.sha256(blk_hdr).digest()).digest()
-    return blk_hdr_hash[::-1].hex()
+    if not blk_hdr[3] & 0x80:
+        blk_hdr_hash = hashlib.sha256(hashlib.sha256(blk_hdr).digest()).digest()
+        return blk_hdr_hash[::-1].hex()
+
+    def tagged_hash(tag, data):
+        tag_hash = hashlib.sha256(tag.encode()).digest()
+        return hashlib.sha256(tag_hash + tag_hash + data).digest()
+
+    def blake2b(data):
+        return hashlib.blake2b(data, digest_size=32).digest()
+
+    flags = blk_hdr[110:111]
+    xor_key = blk_hdr[112:128]
+    xor_key_hash = tagged_hash("Bitcoin block hash PoW XOR key", xor_key)
+    xor_key_mask_clear_bits = blk_hdr[111:112]
+    prevblock_ordered = blk_hdr[4:36][::-1]
+    prevblock_hidden = bytearray(tagged_hash("Bitcoin prevblock header, hashed", prevblock_ordered))
+    prevblock_hidden[:6] = b"\x00" * 6
+    h1 = tagged_hash(
+        "Bitcoin block header 1",
+        blk_hdr[:4]         # version
+        + prevblock_ordered
+        + blk_hdr[128:132]  # height
+        + blk_hdr[36:68]    # hashMerkleRoot
+        + blk_hdr[68:72]    # time
+        + b"\x00"
+        + blk_hdr[72:76]    # nBits
+        + blk_hdr[108:110]  # tx count
+        + b"\x00" * 2
+        + flags
+        + xor_key_mask_clear_bits
+        + xor_key_hash,
+    )
+    h2 = tagged_hash("Merge-mining hook", h1 + b"\x00" * 32 + blk_hdr[132:164])
+    hash1 = blake2b(
+        b"\x00" * 4
+        + h2
+        + blk_hdr[88:104]   # extranonce
+    )
+    asic_tail = (
+        blk_hdr[76:80]      # nonce
+        + blk_hdr[80:84]    # nonce2
+        + blk_hdr[104:108]  # time_offset
+        + blk_hdr[84:88]    # nonce3
+        + hash1
+    )
+    asic_profile = flags[0] & 3
+    if asic_profile == 0:
+        asic_input = prevblock_hidden + asic_tail
+    elif asic_profile == 1:
+        asic_input = (
+            blk_hdr[76:80]      # nonce
+            + blk_hdr[80:84]    # nonce2
+            + blk_hdr[84:88]    # nonce3
+            + blk_hdr[104:108]  # time_offset
+            + hash1
+            + h2
+        )
+    elif asic_profile == 2:
+        asic_input = (b"\x00" * 48) + h2 + asic_tail
+    elif asic_profile == 3:
+        asic_input = (b"\x00" * 80) + h2 + asic_tail
+    hash2 = blake2b(asic_input)
+    mask = bytes(32)
+    if any(xor_key):
+        mask = bytearray(tagged_hash("Bitcoin block hash PoW XOR mask", xor_key))
+        clear_bytes, remaining_bits = divmod(xor_key_mask_clear_bits[0], 8)
+        mask[:clear_bytes] = b"\x00" * clear_bytes
+        mask[clear_bytes] &= 0xff >> remaining_bits
+        mask = bytes(mask)
+    result = bytes(a ^ b for a, b in zip(hash2, mask))
+    return result.hex()
 
 def get_blk_dt(blk_hdr):
     members = struct.unpack("<I", blk_hdr[68:68+4])
     nTime = members[0]
+    if blk_hdr[3] & 0x80 and blk_hdr[110] & 4:
+        nTime = (nTime + int.from_bytes(blk_hdr[104:108], "little")) & 0xffffffff
     dt = datetime.datetime.fromtimestamp(nTime)
     dt_ym = datetime.datetime(dt.year, dt.month, 1)
     return (dt_ym, nTime)
@@ -224,8 +296,10 @@ class BlockDataCopier:
                 continue
             inLenLE = inhdr[4:]
             su = struct.unpack("<I", inLenLE)
-            inLen = su[0] - 80 # length without header
             blk_hdr = self.read_xored(self.inF, 80)
+            if blk_hdr[3] & 0x80:
+                blk_hdr += self.read_xored(self.inF, 84)
+            inLen = su[0] - len(blk_hdr)
             inExtent = BlockExtent(self.inFn, self.inF.tell(), inhdr, blk_hdr, inLen)
 
             self.hash_str = calc_hash_str(blk_hdr)
