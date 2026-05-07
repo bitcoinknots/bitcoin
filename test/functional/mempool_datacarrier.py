@@ -15,6 +15,7 @@ from test_framework.script import (
     CScript,
     OP_1,
     OP_2DROP,
+    OP_7,
     OP_DROP,
     OP_RETURN,
     taproot_construct,
@@ -92,6 +93,50 @@ class DataCarrierTest(BitcoinTestFramework):
                                     self.wallet.sendrawtransaction, from_node=node, tx_hex=tx_hex)
 
 
+    def test_bare_envelope(self, node: TestNode, data_len: int, success: bool, interleave_pushnum: bool = False) -> None:
+        # A bare inscription envelope: <marker> <data>... balanced by OP_2DROP,
+        # with no OP_IF wrapper (the shape ordinals/ord#4545 uses under BIP-110).
+        # A pushnum interleaved in the run (which ord's parser accepts as payload)
+        # must not strand the large push from datacarrier counting.
+        if interleave_pushnum:
+            envelope_script = CScript([randbytes(data_len), OP_7, randbytes(1), OP_2DROP, OP_DROP, OP_1])
+        else:
+            envelope_script = CScript([b'ord', randbytes(data_len), OP_2DROP, OP_1])
+        internal_key = b'\x01' * 32
+        tap = taproot_construct(internal_key, [("leaf", envelope_script), ("dummy", CScript([OP_1]))])
+        leaf = tap.leaves["leaf"]
+        control_block = bytes([leaf.version | tap.negflag]) + tap.internal_pubkey + leaf.merklebranch
+        assert len(control_block) == 65
+
+        utxo = self.wallet.get_utxo()
+        funding_tx = CTransaction()
+        funding_tx.vin = [CTxIn(COutPoint(int(utxo['txid'], 16), utxo['vout']))]
+        funding_value = int(utxo['value'] * 100_000_000) - 1000
+        funding_tx.vout = [CTxOut(funding_value, tap.scriptPubKey)]
+        funding_tx.version = 2
+        self.wallet.sign_tx(funding_tx)
+        funding_tx.rehash()
+        self.nodes[0].sendrawtransaction(funding_tx.serialize().hex())
+        self.generate(self.nodes[0], 1, sync_fun=self.sync_blocks)
+
+        spend_tx = CTransaction()
+        spend_tx.version = 2
+        spend_tx.vin = [CTxIn(COutPoint(int(funding_tx.hash, 16), 0))]
+        spend_tx.vout = [CTxOut(funding_value - 1000, tap.scriptPubKey)]
+        spend_tx.wit.vtxinwit = [CTxInWitness()]
+        spend_tx.wit.vtxinwit[0].scriptWitness.stack = [
+            bytes(envelope_script),  # tapscript
+            control_block,           # control block (65 bytes)
+        ]
+        tx_hex = spend_tx.serialize().hex()
+
+        if success:
+            self.wallet.sendrawtransaction(from_node=node, tx_hex=tx_hex)
+            assert spend_tx.rehash() in node.getrawmempool(True)
+        else:
+            assert_raises_rpc_error(-26, "txn-datacarrier-exceeded",
+                                    self.wallet.sendrawtransaction, from_node=node, tx_hex=tx_hex)
+
     def run_test(self):
         self.wallet = MiniWallet(self.nodes[0])
 
@@ -140,6 +185,17 @@ class DataCarrierTest(BitcoinTestFramework):
 
         self.log.info("Testing an OPNet transaction (just pushing 'op') with -datacarriersize=2.")
         self.test_opnet_transaction(node=self.nodes[3], success=False)
+
+        self.log.info("Testing a bare OP_2DROP envelope larger than the default -datacarriersize.")
+        self.test_bare_envelope(node=self.nodes[0], data_len=MAX_OP_RETURN_RELAY, success=False)
+
+        self.log.info("Testing a bare OP_2DROP envelope smaller than the default -datacarriersize.")
+        # data_len >= 2 keeps the payload a minimal push; a 1-byte push of 1..16 or 0x81 would be
+        # rejected by MINIMALDATA in script verification rather than accepted by the datacarrier check.
+        self.test_bare_envelope(node=self.nodes[0], data_len=2, success=True)
+
+        self.log.info("Testing a bare envelope with a pushnum interleaved in the push run.")
+        self.test_bare_envelope(node=self.nodes[0], data_len=MAX_OP_RETURN_RELAY, success=False, interleave_pushnum=True)
 
 
 if __name__ == '__main__':
