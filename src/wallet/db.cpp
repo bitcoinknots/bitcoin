@@ -7,6 +7,7 @@
 #include <common/args.h>
 #include <logging.h>
 #include <util/fs.h>
+#include <util/fs_helpers.h>
 #include <wallet/db.h>
 
 #include <algorithm>
@@ -55,6 +56,11 @@ std::vector<std::pair<fs::path, std::string>> ListDatabases(const fs::path& wall
 
         try {
             const fs::path path{it->path().lexically_relative(wallet_dir)};
+
+            if (IsSymlink(it->path())) {
+                LogWarning("Not recursively searching symlink/reparse point at '%s'", fs::PathToString(it->path()));
+                it.disable_recursion_pending();
+            }
 
             if (it->status().type() == fs::file_type::directory) {
                 if (IsBDBFile(BDBDataFile(it->path()))) {
