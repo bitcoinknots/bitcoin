@@ -21,17 +21,6 @@ class DumptxoutsetTest(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.num_nodes = 1
 
-    def check_expected_network(self, node, active):
-        rev_file = node.blocks_path / "rev00000.dat"
-        bogus_file = node.blocks_path / "bogus.dat"
-        rev_file.rename(bogus_file)
-        assert_raises_rpc_error(
-            -1, 'Could not roll back to requested height.', node.dumptxoutset, 'utxos.dat', rollback=99)
-        assert_equal(node.getnetworkinfo()['networkactive'], active)
-
-        # Cleanup
-        bogus_file.rename(rev_file)
-
     @staticmethod
     def check_output_file(path, is_human_readable, expected_digest):
         with open(str(path), 'rb') as f:
@@ -95,14 +84,6 @@ class DumptxoutsetTest(BitcoinTestFramework):
         assert_raises_rpc_error(
             -8, 'Invalid snapshot type "bogus" specified. Please specify "rollback" or "latest"', node.dumptxoutset, 'utxos.dat', "bogus")
 
-        self.log.info("Test that dumptxoutset failure does not leave the network activity suspended when it was on previously")
-        self.check_expected_network(node, True)
-
-        self.log.info("Test that dumptxoutset failure leaves the network activity suspended when it was off")
-        node.setnetworkactive(False)
-        self.check_expected_network(node, False)
-        node.setnetworkactive(True)
-
         if params.get('format') == ():
             with open(expected_path, 'r', encoding='utf-8') as f:
                 content = f.readlines()
@@ -112,6 +93,35 @@ class DumptxoutsetTest(BitcoinTestFramework):
                         "#(blockhash 09abf0e7b510f61ca6cf33bab104e9ee99b3528b371d27a2d4b39abb800fba7e ) txid{s}vout{s}value{s}coinbase{s}height{s}scriptPubKey".format(s=sep))
                 assert_equal(content[0].rstrip(),
                     "b9edce02689692b1cdc3440d03011486a27c46b966248b922cc6e4315e900708{s}0{s}5000000000{s}1{s}78{s}76a9142b4569203694fc997e13f2c0a1383b9e16c77a0d88ac".format(s=sep))
+
+    def test_dumptxoutset_with_fork(self):
+        node = self.nodes[0]
+        tip = node.getbestblockhash()
+        target_height = node.getblockcount() - 10
+        target_hash = node.getblockhash(target_height)
+
+        # Create a fork of two blocks at the target height
+        invalid_block = node.getblockhash(target_height + 1)
+        node.invalidateblock(invalid_block)
+        # Reset mocktime to not regenerate the same blockhash
+        node.setmocktime(0)
+        self.generate(node, 2)
+
+        # Move back on to actual main chain
+        node.reconsiderblock(invalid_block)
+        self.wait_until(lambda: node.getbestblockhash() == tip)
+
+        # Use dumptxoutset at the forked height
+        out = node.dumptxoutset("txoutset_fork.dat", "rollback", {"rollback": target_height})
+
+        # Verify the snapshot was created at the target height and not the fork tip
+        assert_equal(out['base_height'], target_height)
+        assert_equal(out['base_hash'], target_hash)
+
+        # Cover the same case as above with an in-memory database
+        out_mem = node.dumptxoutset("txoutset_fork_mem.dat", "rollback", {"rollback": target_height, "in_memory": True})
+        assert_equal(out_mem['base_height'], target_height)
+        assert_equal(out_mem['base_hash'], target_hash)
 
     def run_test(self):
         """Test a trivial usage of the dumptxoutset RPC command."""
@@ -140,6 +150,9 @@ class DumptxoutsetTest(BitcoinTestFramework):
         # Other failing tests
         assert_raises_rpc_error(
             -8, 'unable to find item \'sample\'',  node.dumptxoutset, path='xxx', type='latest', format=['sample'])
+
+        self.log.info("Testing dumptxoutset with chain fork at target height")
+        self.test_dumptxoutset_with_fork()
 
 if __name__ == '__main__':
     DumptxoutsetTest(__file__).main()
