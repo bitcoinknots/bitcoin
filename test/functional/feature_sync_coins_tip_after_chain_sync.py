@@ -7,6 +7,8 @@ Test SyncCoinsTipAfterChainSync logic
 """
 
 
+import http.client
+
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.messages import (
     MSG_BLOCK,
@@ -47,11 +49,16 @@ SYNC_CHECK_INTERVAL = 30
 
 
 class SyncCoinsTipAfterChainSyncTest(BitcoinTestFramework):
+    def add_options(self, parser):
+        parser.add_argument("--crash-recovery", action="store_true", help="Crash during the scheduled flush and verify recovery")
+
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 1
         # Set maxtipage to 1 to get us out of IBD after 1 block past our mocktime
         self.extra_args = [["-maxtipage=1"]]
+        if self.options.crash_recovery:
+            self.extra_args[0] += ["-dbbatchsize=1", "-dbcrashratio=1"]
 
     def run_test(self):
         NUM_BLOCKS = 3
@@ -135,10 +142,28 @@ class SyncCoinsTipAfterChainSyncTest(BitcoinTestFramework):
             node.mockscheduler(SYNC_CHECK_INTERVAL)
 
         self.log.info("Verify node syncs chainstate to disk on next scheduler update")
-        with node.assert_debug_log(
-            ["Finished syncing to tip, syncing chainstate to disk"]
-        ):
-            node.mockscheduler(SYNC_CHECK_INTERVAL)
+        if self.options.crash_recovery:
+            expected_coins = [node.gettxout(block.vtx[0].rehash(), 0) for block in blocks]
+            with node.assert_debug_log(["Finished syncing to tip, syncing chainstate to disk", "Simulating a crash. Goodbye."]):
+                try:
+                    node.mockscheduler(SYNC_CHECK_INTERVAL)
+                except (OSError, http.client.HTTPException):
+                    pass  # The scheduled crash may interrupt the RPC response.
+                node.wait_until_stopped()
+            node.p2ps.clear()
+            self.start_node(0, extra_args=["-maxtipage=1"])
+            assert_equal(node.getbestblockhash(), blocks[-1].hash)
+            assert_equal(node.gettxoutsetinfo()["txouts"], NUM_BLOCKS)
+            assert_equal([node.gettxout(block.vtx[0].rehash(), 0) for block in blocks], expected_coins)
+        else:
+            with node.assert_debug_log(["Finished syncing to tip, syncing chainstate to disk"]):
+                node.mockscheduler(SYNC_CHECK_INTERVAL)
+            # Connecting another block reports the cache size. All three
+            # existing coins must remain cached after the scheduled sync.
+            block = create_block(blocks[-1].sha256, create_coinbase(NUM_BLOCKS + 1), block_time)
+            block.solve()
+            with node.assert_debug_log([f"MiB({NUM_BLOCKS + 1}txo)"]):
+                assert_equal(node.submitblock(block.serialize().hex()), None)
 
 
 if __name__ == "__main__":

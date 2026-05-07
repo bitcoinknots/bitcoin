@@ -30,6 +30,7 @@ import http.client
 import random
 import time
 
+from test_framework.authproxy import JSONRPCException
 from test_framework.blocktools import COINBASE_MATURITY
 from test_framework.messages import (
     COIN,
@@ -73,17 +74,30 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
         self.start_nodes()
         # Leave them unconnected, we'll use submitblock directly in this test
 
-    def restart_node(self, node_index, expected_tip):
+    def restart_node(self, node_index, expected_tip, pending_block=None):
         """Start up a given node id, wait for the tip to reach the given block hash, and calculate the utxo hash.
 
         Exceptions on startup should indicate node crash (due to -dbcrashratio), in which case we try again. Give up
-        after 60 seconds. Returns the utxo hash of the given node."""
+        after 120 * timeout_factor seconds. If pending_block was never received,
+        submit it after recovery. Returns the utxo hash of the given node."""
 
         time_start = time.time()
         while time.time() - time_start < 120 * self.options.timeout_factor:
             try:
                 # Any of these RPC calls could throw due to node crash
                 self.start_node(node_index)
+                if pending_block is not None:
+                    try:
+                        self.nodes[node_index].getblockheader(expected_tip)
+                    except JSONRPCException as e:
+                        if e.error["code"] != -5:
+                            raise
+                        # A background flush can crash the node before submitblock
+                        # reaches it. These nodes have no peers to supply the block.
+                        # Only resend unknown blocks: known blocks must recover
+                        # without resubmission, preserving the recovery check.
+                        self.log.debug(f"Resubmitting undelivered block {expected_tip} to node {node_index}")
+                        assert_equal(self.nodes[node_index].submitblock(pending_block), None)
                 self.nodes[node_index].waitforblock(expected_tip)
                 utxo_hash = self.nodes[node_index].gettxoutsetinfo()['hash_serialized_3']
                 return utxo_hash
@@ -149,7 +163,7 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
                     # (change the exit code perhaps, and check that here?)
                     self.wait_for_node_exit(i, timeout=30)
                     self.log.debug(f"Restarting node {i} after block hash {block_hash}")
-                    nodei_utxo_hash = self.restart_node(i, block_hash)
+                    nodei_utxo_hash = self.restart_node(i, block_hash, pending_block=block)
                     assert nodei_utxo_hash is not None
                     self.restart_counts[i] += 1
                 else:
@@ -223,6 +237,13 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
         block_hashes_to_sync = []
         for height in range(initial_height + 1, self.nodes[3].getblockcount() + 1):
             block_hashes_to_sync.append(self.nodes[3].getblockhash(height))
+
+        # Deterministically exercise a crash before block delivery. The first
+        # submitblock must fail, and recovery must deliver that unknown block
+        # instead of waiting forever for an unconnected node to find it.
+        self.log.info("Crash node 0 before delivering its first new block")
+        self.nodes[0].process.kill()
+        self.wait_for_node_exit(0, timeout=30)
 
         self.log.debug(f"Syncing {len(block_hashes_to_sync)} blocks with other nodes")
         # Syncing the blocks could cause nodes to crash, so the test begins here.

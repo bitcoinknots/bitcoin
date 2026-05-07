@@ -110,6 +110,7 @@ FLUSHMODE_NAME = {
     1: "IF_NEEDED",
     2: "PERIODIC",
     3: "ALWAYS",
+    4: "FORCE_SYNC",
 }
 
 
