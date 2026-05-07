@@ -365,6 +365,7 @@ BASE_SCRIPTS = [
     'rpc_estimatefee.py',
     'rpc_getblockstats.py',
     'feature_port.py',
+    'feature_powchange.py',
     'feature_bind_port_externalip.py',
     'wallet_create_tx.py --legacy-wallet',
     'wallet_send.py --legacy-wallet',

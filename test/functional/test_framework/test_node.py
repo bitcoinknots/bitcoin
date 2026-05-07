@@ -135,6 +135,7 @@ class TestNode():
 
         if self.version is None:
             self.args += [
+                "-blake2b_headline=BLAKE2b functional test headline",
                 "-corepolicy",
                 "-softwareexpiry=0",
                 "-walletimplicitsegwit",
