@@ -433,6 +433,8 @@ bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& 
     execdata.m_codeseparator_pos = 0xFFFFFFFFUL;
     execdata.m_codeseparator_pos_init = true;
 
+    const unsigned int max_element_size = (flags & SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE) ? MAX_SCRIPT_ELEMENT_SIZE_REDUCED : MAX_SCRIPT_ELEMENT_SIZE;
+
     try
     {
         for (; pc < pend; ++opcode_pos) {
@@ -443,7 +445,7 @@ bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& 
             //
             if (!script.GetOp(pc, opcode, vchPushValue))
                 return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
-            if (vchPushValue.size() > MAX_SCRIPT_ELEMENT_SIZE)
+            if (vchPushValue.size() > max_element_size)
                 return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
 
             if (sigversion == SigVersion::BASE || sigversion == SigVersion::WITNESS_V0) {
@@ -614,6 +616,10 @@ bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& 
                             // The input argument to the OP_IF and OP_NOTIF opcodes must be either
                             // exactly 0 (the empty vector) or exactly 1 (the one-byte vector with value 1).
                             if (vch.size() > 1 || (vch.size() == 1 && vch[0] != 1)) {
+                                return set_error(serror, SCRIPT_ERR_TAPSCRIPT_MINIMALIF);
+                            }
+                            // BAN_OPIF reuses MINIMALIF error code as this is a stricter form of the same restriction
+                            if (flags & SCRIPT_VERIFY_BAN_OPIF) {
                                 return set_error(serror, SCRIPT_ERR_TAPSCRIPT_MINIMALIF);
                             }
                         }
@@ -1858,8 +1864,9 @@ static bool ExecuteWitnessScript(const Span<const valtype>& stack_span, const CS
     }
 
     // Disallow stack item size > MAX_SCRIPT_ELEMENT_SIZE in witness stack
+    const unsigned int max_element_size = (flags & SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE) ? MAX_SCRIPT_ELEMENT_SIZE_REDUCED : MAX_SCRIPT_ELEMENT_SIZE;
     for (const valtype& elem : stack) {
-        if (elem.size() > MAX_SCRIPT_ELEMENT_SIZE) return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+        if (elem.size() > max_element_size) return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
     }
 
     // Run the script interpreter.
@@ -1953,6 +1960,11 @@ static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, 
         if (stack.size() >= 2 && !stack.back().empty() && stack.back()[0] == ANNEX_TAG) {
             // Drop annex (this is non-standard; see IsWitnessStandard)
             const valtype& annex = SpanPopBack(stack);
+            if (flags & SCRIPT_VERIFY_BAN_ANNEX) {
+                return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+            } else if ((flags & SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE) && annex.size() > MAX_SCRIPT_ELEMENT_SIZE_REDUCED) {
+                return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+            }
             execdata.m_annex_hash = (HashWriter{} << annex).GetSHA256();
             execdata.m_annex_present = true;
         } else {
@@ -1969,7 +1981,8 @@ static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, 
             // Script path spending (stack size is >1 after removing optional annex)
             const valtype& control = SpanPopBack(stack);
             const valtype& script = SpanPopBack(stack);
-            if (control.size() < TAPROOT_CONTROL_BASE_SIZE || control.size() > TAPROOT_CONTROL_MAX_SIZE || ((control.size() - TAPROOT_CONTROL_BASE_SIZE) % TAPROOT_CONTROL_NODE_SIZE) != 0) {
+            const unsigned int max_control_size = (flags & SCRIPT_VERIFY_REDUCED_CONTROL_BLOCK) ? TAPROOT_CONTROL_MAX_SIZE_REDUCED : TAPROOT_CONTROL_MAX_SIZE;
+            if (control.size() < TAPROOT_CONTROL_BASE_SIZE || control.size() > max_control_size || ((control.size() - TAPROOT_CONTROL_BASE_SIZE) % TAPROOT_CONTROL_NODE_SIZE) != 0) {
                 return set_error(serror, SCRIPT_ERR_TAPROOT_WRONG_CONTROL_SIZE);
             }
             execdata.m_tapleaf_hash = ComputeTapleafHash(control[0] & TAPROOT_LEAF_MASK, script);
@@ -1989,7 +2002,7 @@ static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, 
             }
             return set_success(serror);
         }
-    } else if (!is_p2sh && CScript::IsPayToAnchor(witversion, program)) {
+    } else if (stack.empty() && !is_p2sh && CScript::IsPayToAnchor(witversion, program)) {
         return true;
     } else {
         if (flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM) {
@@ -2018,6 +2031,12 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const C
     // scriptSig and scriptPubKey must be evaluated sequentially on the same stack
     // rather than being simply concatenated (see CVE-2010-5141)
     std::vector<std::vector<unsigned char> > stack, stackCopy;
+    if (scriptPubKey.IsPayToScriptHash()) {
+        // Disable SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE for pushing the P2SH redeemScript
+        if (!EvalScript(stack, scriptSig, flags & ~SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE, checker, SigVersion::BASE, serror))
+            // serror is set
+            return false;
+    } else
     if (!EvalScript(stack, scriptSig, flags, checker, SigVersion::BASE, serror))
         // serror is set
         return false;
@@ -2068,6 +2087,15 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const C
         const valtype& pubKeySerialized = stack.back();
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
         popstack(stack);
+
+        if (flags & SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE) {
+            // We bypassed the reduced data check above to exempt redeemScript
+            // Now enforce it on the rest of the stack items here
+            // This is sufficient because P2SH requires scriptSig to be push-only
+            for (const valtype& elem : stack) {
+                if (elem.size() > MAX_SCRIPT_ELEMENT_SIZE_REDUCED) return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+            }
+        }
 
         if (!EvalScript(stack, pubKey2, flags, checker, SigVersion::BASE, serror))
             // serror is set

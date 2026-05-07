@@ -69,6 +69,7 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
         for r in result_test:
             # Skip these checks for now
             r.pop('wtxid')
+            r.pop('usage')
             if "fees" in r:
                 r["fees"].pop("effective-feerate")
                 r["fees"].pop("effective-includes")

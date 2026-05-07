@@ -143,9 +143,50 @@ enum : uint32_t {
     // Making unknown public key versions (in BIP 342 scripts) non-standard
     SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_PUBKEYTYPE = (1U << 20),
 
+    // Enforce MAX_SCRIPT_ELEMENT_SIZE_REDUCED instead of MAX_SCRIPT_ELEMENT_SIZE
+    // The P2SH redeemScript push is exempted
+    // It is enforced on the annex as well
+    // NOTE: more RDTS flags after SIGHASH_UNIFIED
+    SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE = (1U << 21),
+
+    // Taproot control blocks are limited to TAPROOT_CONTROL_MAX_SIZE_REDUCED
+    SCRIPT_VERIFY_REDUCED_CONTROL_BLOCK = (1U << 23),
+
+    // Taproot annex is also invalid
+    SCRIPT_VERIFY_BAN_ANNEX = (1U << 24),
+
+    // OP_IF is forbidden inside Tapscript
+    SCRIPT_VERIFY_BAN_OPIF = (1U << 25),
+
     // Constants to point to the highest flag in use. Add new flags above this line.
     //
     SCRIPT_VERIFY_END_MARKER
+};
+
+static constexpr unsigned int REDUCED_DATA_VERIFY_FLAGS{0
+    | SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE
+    | SCRIPT_VERIFY_REDUCED_CONTROL_BLOCK
+    | SCRIPT_VERIFY_BAN_ANNEX
+    | SCRIPT_VERIFY_BAN_OPIF
+};
+
+static constexpr unsigned int REDUCED_DATA_STANDARD_VERIFY_FLAGS{0
+    | SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE
+    | SCRIPT_VERIFY_REDUCED_CONTROL_BLOCK
+    | SCRIPT_VERIFY_BAN_ANNEX
+    | SCRIPT_VERIFY_BAN_OPIF
+    | SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM
+    | SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_TAPROOT_VERSION
+    | SCRIPT_VERIFY_DISCOURAGE_OP_SUCCESS
+};
+
+static constexpr unsigned int REDUCED_DATA_MANDATORY_VERIFY_FLAGS{0
+    | SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE
+    | SCRIPT_VERIFY_REDUCED_CONTROL_BLOCK
+    | SCRIPT_VERIFY_BAN_OPIF
+    | SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM
+    | SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_TAPROOT_VERSION
+    | SCRIPT_VERIFY_DISCOURAGE_OP_SUCCESS
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError* serror);
@@ -234,6 +275,8 @@ static constexpr size_t TAPROOT_CONTROL_BASE_SIZE = 33;
 static constexpr size_t TAPROOT_CONTROL_NODE_SIZE = 32;
 static constexpr size_t TAPROOT_CONTROL_MAX_NODE_COUNT = 128;
 static constexpr size_t TAPROOT_CONTROL_MAX_SIZE = TAPROOT_CONTROL_BASE_SIZE + TAPROOT_CONTROL_NODE_SIZE * TAPROOT_CONTROL_MAX_NODE_COUNT;
+static constexpr size_t TAPROOT_CONTROL_MAX_NODE_COUNT_REDUCED = 7;
+static constexpr size_t TAPROOT_CONTROL_MAX_SIZE_REDUCED = TAPROOT_CONTROL_BASE_SIZE + TAPROOT_CONTROL_NODE_SIZE * TAPROOT_CONTROL_MAX_NODE_COUNT_REDUCED;
 
 extern const HashWriter HASHER_TAPSIGHASH; //!< Hasher with tag "TapSighash" pre-fed to it.
 extern const HashWriter HASHER_TAPLEAF;    //!< Hasher with tag "TapLeaf" pre-fed to it.

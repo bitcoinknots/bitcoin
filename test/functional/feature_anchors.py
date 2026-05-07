@@ -8,7 +8,7 @@ import os
 
 from test_framework.p2p import P2PInterface, P2P_SERVICES
 from test_framework.socks5 import Socks5Configuration, Socks5Server
-from test_framework.messages import CAddress, hash256
+from test_framework.messages import CAddress, hash256, ser_compact_size
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import check_node_connections, assert_equal, p2p_port
 
@@ -113,7 +113,7 @@ class AnchorsTest(BitcoinTestFramework):
         caddr.ip, port_str = ONION_ADDR.split(":")
         caddr.port = int(port_str)
         # TorV3 addrv2 serialization:
-        # time(4) | services(1) | networkID(1) | address length(1) | address(32)
+        # time(4) | services(CompactSize) | networkID(1) | address length(CompactSize) | address(32)
         expected_pubkey = caddr.serialize_v2()[7:39].hex()
 
         # position of services byte of first addr in anchors.dat
@@ -122,7 +122,7 @@ class AnchorsTest(BitcoinTestFramework):
         data = bytes()
         with open(node_anchors_path, "rb") as file_handler:
             data = file_handler.read()
-            assert_equal(data[services_index], 0x00)  # services == NONE
+            assert_equal(data[services_index], 0x00)  # services == NONE (CompactSize encoded as 1 byte)
             anchors2 = data.hex()
             assert expected_pubkey in anchors2
 
@@ -131,7 +131,9 @@ class AnchorsTest(BitcoinTestFramework):
             # This is necessary because on restart we will not attempt an anchor connection
             # to a host without our required services, even if its address is in the anchors.dat file
             new_data = bytearray(data)[:-32]
-            new_data[services_index] = P2P_SERVICES
+            # Replace the 1-byte services field (0x00) with the CompactSize-encoded P2P_SERVICES (5 bytes for 0x08000009)
+            services_bytes = ser_compact_size(P2P_SERVICES)
+            new_data = new_data[:services_index] + services_bytes + new_data[services_index+1:]
             new_data_hash = hash256(new_data)
             file_handler.write(new_data + new_data_hash)
 

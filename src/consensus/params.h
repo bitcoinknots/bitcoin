@@ -32,6 +32,7 @@ constexpr bool ValidDeployment(BuriedDeployment dep) { return dep <= DEPLOYMENT_
 enum DeploymentPos : uint16_t {
     DEPLOYMENT_TESTDUMMY,
     DEPLOYMENT_TAPROOT, // Deployment of Schnorr/Taproot (BIPs 340-342)
+    DEPLOYMENT_REDUCED_DATA, // ReducedData Temporary Softfork (RDTS)
     // NOTE: Also add new deployments to VersionBitsDeploymentInfo in deploymentinfo.cpp
     MAX_VERSION_BITS_DEPLOYMENTS
 };
@@ -52,6 +53,16 @@ struct BIP9Deployment {
      *  boundary.
      */
     int min_activation_height{0};
+    /** Maximum height for activation. If less than INT_MAX, the deployment will activate
+     *  at this height regardless of signaling (similar to BIP8 flag day).
+     *  std::numeric_limits<int>::max() means no maximum (activation only via signaling). */
+    int max_activation_height{std::numeric_limits<int>::max()};
+    /** For temporary softforks: number of blocks the deployment remains active after activation.
+     *  std::numeric_limits<int>::max() means permanent (never expires). */
+    int active_duration{std::numeric_limits<int>::max()};
+    /** Per-deployment activation threshold. If 0, uses the global nRuleChangeActivationThreshold.
+     *  Otherwise, specifies the number of blocks required for this specific deployment. */
+    int threshold{0};
 
     /** Constant for nTimeout very far in the future. */
     static constexpr int64_t NO_TIMEOUT = std::numeric_limits<int64_t>::max();

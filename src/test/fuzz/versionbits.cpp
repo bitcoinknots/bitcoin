@@ -32,15 +32,17 @@ public:
     const int m_period;
     const int m_threshold;
     const int m_min_activation_height;
+    const int m_active_duration;
     const int m_bit;
 
-    TestConditionChecker(int64_t begin, int64_t end, int period, int threshold, int min_activation_height, int bit)
-        : m_begin{begin}, m_end{end}, m_period{period}, m_threshold{threshold}, m_min_activation_height{min_activation_height}, m_bit{bit}
+    TestConditionChecker(int64_t begin, int64_t end, int period, int threshold, int min_activation_height, int active_duration, int bit)
+        : m_begin{begin}, m_end{end}, m_period{period}, m_threshold{threshold}, m_min_activation_height{min_activation_height}, m_active_duration{active_duration}, m_bit{bit}
     {
         assert(m_period > 0);
         assert(0 <= m_threshold && m_threshold <= m_period);
         assert(0 <= m_bit && m_bit < 32 && m_bit < VERSIONBITS_NUM_BITS);
         assert(0 <= m_min_activation_height);
+        assert(m_active_duration > 0);
     }
 
     bool Condition(const CBlockIndex* pindex, const Consensus::Params& params) const override { return Condition(pindex->nVersion); }
@@ -49,6 +51,7 @@ public:
     int Period(const Consensus::Params& params) const override { return m_period; }
     int Threshold(const Consensus::Params& params) const override { return m_threshold; }
     int MinActivationHeight(const Consensus::Params& params) const override { return m_min_activation_height; }
+    int ActiveDuration(const Consensus::Params& params) const override { return m_active_duration; }
 
     ThresholdState GetStateFor(const CBlockIndex* pindexPrev) const { return AbstractThresholdConditionChecker::GetStateFor(pindexPrev, dummy_params, m_cache); }
     int GetStateSinceHeightFor(const CBlockIndex* pindexPrev) const { return AbstractThresholdConditionChecker::GetStateSinceHeightFor(pindexPrev, dummy_params, m_cache); }
@@ -168,8 +171,9 @@ FUZZ_TARGET(versionbits, .init = initialize)
         timeout = fuzzed_data_provider.ConsumeBool() ? Consensus::BIP9Deployment::NO_TIMEOUT : fuzzed_data_provider.ConsumeIntegral<int64_t>();
     }
     int min_activation = fuzzed_data_provider.ConsumeIntegralInRange<int>(0, period * max_periods);
+    int active_duration = fuzzed_data_provider.ConsumeBool() ? std::numeric_limits<int>::max() : (fuzzed_data_provider.ConsumeIntegralInRange<int>(1, max_periods) * period);
 
-    TestConditionChecker checker(start_time, timeout, period, threshold, min_activation, bit);
+    TestConditionChecker checker(start_time, timeout, period, threshold, min_activation, active_duration, bit);
 
     // Early exit if the versions don't signal sensibly for the deployment
     if (!checker.Condition(ver_signal)) return;
@@ -337,13 +341,22 @@ FUZZ_TARGET(versionbits, .init = initialize)
             assert(exp_state == ThresholdState::FAILED);
         }
         break;
+    case ThresholdState::EXPIRED:
+        assert(!always_active_test);
+        assert(active_duration < std::numeric_limits<int>::max());
+        assert(min_activation <= current_block->nHeight + 1);
+        assert(exp_state == ThresholdState::EXPIRED || exp_state == ThresholdState::ACTIVE);
+        if (exp_state == ThresholdState::ACTIVE) {
+            assert(since == exp_since + active_duration);  // EXPIRED starts exactly active_duration blocks after ACTIVE started
+        }
+        break;
     default:
         assert(false);
     }
 
     if (blocks.size() >= period * max_periods) {
         // we chose the timeout (and block times) so that by the time we have this many blocks it's all over
-        assert(state == ThresholdState::ACTIVE || state == ThresholdState::FAILED);
+        assert(state == ThresholdState::ACTIVE || state == ThresholdState::FAILED || state == ThresholdState::EXPIRED);
     }
 
     if (always_active_test) {
