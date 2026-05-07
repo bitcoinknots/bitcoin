@@ -766,6 +766,7 @@ public:
         "           \"t\" - UTREEXO peer can handle Utreexo proof requests for blocks it serves\n"
         "           \"T\" - UTREEXO_ARCHIVE peer can handle Utreexo proof requests for all  historical blocks\n"
         "           \"y\" - UTREEXO_TMP? peer can handle Utreexo proof requests\n"
+        "           \"r\" - REPLACE_BY_FEE? peer supports replacement of transactions without BIP 125 signalling\n"
         "           \"4\" - REDUCED_DATA? peer enforces the ReducedData SoftFork\n"
         "           \"m\" - MALICIOUS? peer openly seeks to aid in bypassing network policy/spam filters (OR to sabotage nodes that seek to)\n"
         "           \"u\" - UNKNOWN: unrecognized bit flag\n"
