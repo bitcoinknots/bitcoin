@@ -246,10 +246,6 @@ void OverviewPage::setClientModel(ClientModel *model)
 {
     this->clientModel = model;
     if (model) {
-        // Show warning, for example if this is a prerelease version
-        connect(model, &ClientModel::alertsChanged, this, &OverviewPage::updateAlerts);
-        updateAlerts(model->getStatusBarWarnings());
-
         connect(model->getOptionsModel(), &OptionsModel::fontForMoneyChanged, this, &OverviewPage::setMonospacedFont);
         setMonospacedFont(clientModel->getOptionsModel()->getFontForMoney());
     }
@@ -326,12 +322,6 @@ void OverviewPage::updateDisplayUnit()
 
         ui->listTransactions->update();
     }
-}
-
-void OverviewPage::updateAlerts(const QString &warnings)
-{
-    this->ui->labelAlerts->setVisible(!warnings.isEmpty());
-    this->ui->labelAlerts->setText(warnings);
 }
 
 void OverviewPage::showOutOfSyncWarning(bool fShow)
