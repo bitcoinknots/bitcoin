@@ -10,6 +10,7 @@
 #include <interfaces/types.h>
 #include <util/string.h>
 #include <util/threadinterrupt.h>
+#include <util/translation.h>
 #include <validationinterface.h>
 
 #include <string>
@@ -133,6 +134,10 @@ public:
 
     /// Get the name of the index for display in logs.
     const std::string& GetName() const LIFETIMEBOUND { return m_name; }
+
+    /// Get the action the user should take to disable this index, including the verb
+    /// (e.g., "set -txindex=0" or "remove 'basic' from -blockfilterindex").
+    virtual bilingual_str GetDisableAction() const = 0;
 
     /// Blocks the current thread until the index is caught up to the current
     /// state of the block chain. This only blocks if the index has gotten in
