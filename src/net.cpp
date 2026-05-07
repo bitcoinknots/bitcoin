@@ -1818,6 +1818,10 @@ void CConnman::CreateNodeFromAcceptedSocket(std::unique_ptr<Sock>&& sock,
             return std::find(m_onion_binds.begin(), m_onion_binds.end(), addr_bind) != m_onion_binds.end();
         }
     }();
+    // Without a -bind=...=onion listener, an onion inbound is an assumption about a listener that
+    // clearnet peers can reach too. A connection from the bind address itself comes from this host
+    // (such as a Tor daemon whose onion service points at that address), so it is not in doubt.
+    const bool inbound_onion_assumed{inbound_onion && m_onion_binds.empty() && CNetAddr{addr} != CNetAddr{addr_bind}};
 
     // Tor inbound connections do not reveal the peer's actual network address.
     // Therefore do not apply address-based whitelist permissions to them.
@@ -1908,6 +1912,7 @@ void CConnman::CreateNodeFromAcceptedSocket(std::unique_ptr<Sock>&& sock,
                                  .forced_inbound = forced,
                                  .recv_flood_size = nReceiveFloodSize,
                                  .use_v2transport = use_v2transport,
+                                 .inbound_onion_assumed = inbound_onion_assumed,
                              });
     pnode->AddRef();
     m_msgproc->InitializeNode(*pnode, local_services);
@@ -3911,6 +3916,7 @@ CNode::CNode(NodeId idIn,
       m_addr_name{addrNameIn.empty() ? addr.ToStringAddrPort() : addrNameIn},
       m_dest(addrNameIn),
       m_inbound_onion{inbound_onion},
+      m_inbound_onion_assumed{inbound_onion && node_opts.inbound_onion_assumed},
       m_prefer_evict{node_opts.prefer_evict},
       m_forced_inbound{node_opts.forced_inbound},
       nKeyedNetGroup{nKeyedNetGroupIn},
