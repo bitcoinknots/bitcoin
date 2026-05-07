@@ -471,9 +471,23 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
 
         Should only be called once after the nodes have been specified in
         set_test_params()."""
+        def get_version_number(version):
+            if not isinstance(version, str):
+                return version
+            match = re.match(r"^v?(\d+)\.(\d+)(?:\.(\d+))?(?:\.(\d+))?", version)
+            if not match:
+                raise ValueError(f"Invalid version {version}")
+            major, minor, patch, build = (int(component or 0) for component in match.groups())
+            if major == 0:
+                return minor * 10000 + patch * 100 + build
+            return major * 10000 + minor * 100 + patch
+
         def get_bin_from_version(version, bin_name, bin_default):
             if not version:
                 return bin_default
+            if isinstance(version, str):
+                tag = version if version.startswith("v") else f"v{version}"
+                return os.path.join(self.options.previous_releases_path, tag, 'bin', bin_name)
             if version > 219999:
                 # Starting at client version 220000 the first two digits represent
                 # the major version, e.g. v22.0 instead of v0.22.0.
@@ -506,6 +520,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
                 extra_args[i] = extra_args[i] + ["-whitelist=noban,in,out@127.0.0.1"]
         if versions is None:
             versions = [None] * num_nodes
+        node_versions = [get_version_number(version) for version in versions]
         if binary is None:
             binary = [get_bin_from_version(v, 'bitcoind', self.options.bitcoind) for v in versions]
         if binary_cli is None:
@@ -535,7 +550,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
                 timeout_factor=self.options.timeout_factor,
                 bitcoind=binary[i],
                 bitcoin_cli=binary_cli[i],
-                version=versions[i],
+                version=node_versions[i],
                 coverage_dir=self.options.coveragedir,
                 cwd=self.options.tmpdir,
                 extra_conf=extra_confs[i],
