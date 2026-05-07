@@ -74,6 +74,12 @@
 /* Define to 1 if fdatasync is available. */
 #cmakedefine HAVE_FDATASYNC 1
 
+/* Define to 1 if fseeko has a wider offset type than long. */
+#cmakedefine USE_FSEEKO 1
+
+/* Define to 1 if ftello has a wider return type than long. */
+#cmakedefine USE_FTELLO 1
+
 /* Define this symbol if the BSD getentropy system call is available with
    sys/random.h */
 #cmakedefine HAVE_GETENTROPY_RAND 1
