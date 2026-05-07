@@ -343,6 +343,27 @@ output directory.
 EOF
 }
 
+guix-prefetch '1h00qp4z5k6lfz310xjwsmqs8fwxi6ngas51169cafz4h9fmc68y' 'https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.bz2'
+
+guix-prefetch-gcrypt() {
+    local GCRYPT_URI_ROOT='https://gnupg.org/ftp/gcrypt'
+    guix-prefetch "$1" "$GCRYPT_URI_ROOT/$2"
+}
+
+guix-prefetch-gcrypt '09haz1kk48b8q0hd58g98whylah0fp121yfgjms7pzsbzgj8w3sp' 'libgpg-error/libgpg-error-1.45.tar.bz2'
+guix-prefetch-gcrypt '1pp9zyx02bzgzjzldxf0mx9kp3530xgaaqcz4n2cv100ddaaw57g' "libgcrypt/libgcrypt-1.10.1.tar.bz2"
+guix-prefetch-gcrypt '0ghpyhhfa3nsraph6dws50jb3dc8g2cfl7dizdnyrm179fawakzp' "gnutls/v3.8/gnutls-3.8.3.tar.xz"
+
+guix-prefetch-boostp() {
+    local BOOST_PATCH_URI_ROOT='https://raw.githubusercontent.com/boostorg/website/05cef10d5fe9ec883fce7d974a9049cc78e1e1fa/patches/1_80_0'
+    guix-prefetch "$1" "$BOOST_PATCH_URI_ROOT/$2.patch" "boost-$2.patch"
+}
+
+guix-prefetch-boostp '067hhylqkzzdbqzc1hkbpaqmvz248lxqrdhb2yi6iq9qabsik3lk' '0001-filesystem-win-fix-dir-it-net-share'
+guix-prefetch-boostp '00w3albf8527glclx85p5b2ml3vr06xpwwmfyzg005v1cp8avcpi' '0002-filesystem-fix-weakly-canonical-long-paths'
+guix-prefetch-boostp '0dw839w22cawqawfpsx7j7v9y0x2vn66m732iidpxvdxbjn2kzva' '0003-unordered-valid-after-move'
+guix-prefetch-boostp '09k8k3b1306jkjls12wfghj820n828j6aaxzmcr0wpnjhp8fzi1v' '0004-filesystem-posix-fix-no-at-apis-missing-include'
+
 # Deterministically build Bitcoin Core
 # shellcheck disable=SC2153
 for host in $HOSTS; do
