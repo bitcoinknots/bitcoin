@@ -69,7 +69,7 @@ public:
     bool Open(bilingual_str& error);
     void Close();
     void Flush(bool fShutdown);
-    void CheckpointLSN(const std::string& strFile);
+    [[nodiscard]] bool CheckpointLSN(const std::string& strFile);
 
     void CloseDb(const fs::path& filename);
     void ReloadDbEnv();
