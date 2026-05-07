@@ -1910,9 +1910,11 @@ RPCHelpMan getblockchaininfo()
 namespace {
 const std::vector<RPCResult> RPCHelpForDeployment{
     {RPCResult::Type::STR, "type", "one of \"buried\", \"bip9\", \"flagday\""},
-    {RPCResult::Type::NUM, "height", /*optional=*/true, "height of the first block which enforces the rules (only for \"buried\" and \"flagday\" types, or \"bip9\" type with \"active\" status; for \"flagday\" this is the BLAKE2b hardfork height)"},
-    {RPCResult::Type::NUM, "height_end", /*optional=*/true, "height of the last block which enforces the rules (only for \"bip9\" type with \"active\" status and temporary deployments)"},
-    {RPCResult::Type::BOOL, "active", "true if the rules are enforced for the mempool and the next block (the mempool applies the RDTS rules regardless of this flag)"},
+    {RPCResult::Type::NUM, "height", /*optional=*/true, "height of the first block which enforces the rules (only for \"buried\" and \"flagday\" types, or \"bip9\" type with \"active\" status)"},
+    {RPCResult::Type::NUM, "height_end", /*optional=*/true, "height of the last block which enforces the rules (only for temporary deployments)"},
+    {RPCResult::Type::NUM, "coinbase_start_height", /*optional=*/true, "height of the first generated coin covered by the long coinbase maturity rule (only for \"long_coinbase_maturity\")"},
+    {RPCResult::Type::NUM, "maturity", /*optional=*/true, "required coinbase maturity depth for covered generated coins (only for \"long_coinbase_maturity\")"},
+    {RPCResult::Type::BOOL, "active", "true if the consensus rules are enforced for the next block (policy may enforce related rules independently of this flag)"},
     {RPCResult::Type::NUM_TIME, "expiry_time", /*optional=*/true, "median time past at and after which the rules are no longer enforced (only for \"flagday\" type; a block is past expiry when its parent's median time past has reached this value)"},
     {RPCResult::Type::OBJ, "bip9", /*optional=*/true, "status of bip9 softforks (only for \"bip9\" type)",
     {
@@ -1959,6 +1961,21 @@ void RdtsFlagDayDescPushBack(const CBlockIndex* blockindex, UniValue& softforks,
     softforks.pushKV("reduced_data", std::move(rv));
 }
 
+void LongCoinbaseMaturityDescPushBack(const CBlockIndex* blockindex, UniValue& softforks, const ChainstateManager& chainman)
+{
+    const Consensus::Params& params{chainman.GetConsensus()};
+    if (params.CoinbaseMaturityLongReleaseHeight == std::numeric_limits<int>::max()) return;
+
+    UniValue rv(UniValue::VOBJ);
+    rv.pushKV("type", "flagday");
+    rv.pushKV("height", params.CoinbaseMaturityLongEnforceHeight);
+    rv.pushKV("height_end", params.CoinbaseMaturityLongReleaseHeight - 1);
+    rv.pushKV("coinbase_start_height", params.CoinbaseMaturityLongStartHeight);
+    rv.pushKV("maturity", params.CoinbaseMaturityLong);
+    rv.pushKV("active", params.CoinbaseMaturityLongActiveAt(blockindex->nHeight + 1));
+    softforks.pushKV("long_coinbase_maturity", std::move(rv));
+}
+
 UniValue DeploymentInfo(const CBlockIndex* blockindex, const ChainstateManager& chainman)
 {
     UniValue softforks(UniValue::VOBJ);
@@ -1970,6 +1987,7 @@ UniValue DeploymentInfo(const CBlockIndex* blockindex, const ChainstateManager& 
     SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_TESTDUMMY);
     SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_TAPROOT);
     RdtsFlagDayDescPushBack(blockindex, softforks, chainman);
+    LongCoinbaseMaturityDescPushBack(blockindex, softforks, chainman);
     return softforks;
 }
 } // anon namespace

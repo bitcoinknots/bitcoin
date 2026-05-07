@@ -77,6 +77,15 @@ static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits
     return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nNonce, nBits, nVersion, genesisReward);
 }
 
+static void AddLongCoinbaseMaturityRevalidationDeployment(Consensus::Params& consensus)
+{
+    consensus.chainstate_revalidation_deployments.push_back({
+        .name = "long_coinbase_maturity",
+        .start_height = consensus.CoinbaseMaturityLongEnforceHeight,
+        .stop_height = consensus.CoinbaseMaturityLongReleaseHeight - 1,
+    });
+}
+
 /**
  * Main network on which people trade goods and services.
  */
@@ -130,6 +139,12 @@ public:
         // via versionbits; the stall at 961633 prevented it from ever
         // reaching ACTIVE, and that deployment has been removed.)
         consensus.RdtsExpiryTime = 1819756800; // September 1st, 2027 00:00 UTC
+
+        consensus.CoinbaseMaturityLongStartHeight = 973440;
+        consensus.CoinbaseMaturityLongEnforceHeight = 973440;
+        consensus.CoinbaseMaturityLongReleaseHeight = 979920;
+        consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
+        AddLongCoinbaseMaturityRevalidationDeployment(consensus);
 
         consensus.nMinimumChainWork = uint256{"00000000000000000000000000000000000000013e00277374c9f9eeadc70200"};
         consensus.defaultAssumeValid = uint256{"0000000000000078ed1e20cac1acf78df6d1060c78059fb6331e17141c881fc8"}; // 964264
@@ -404,6 +419,12 @@ public:
         consensus.Blake2bHeight = 150308;
         consensus.RdtsExpiryTime = 1791903600; // October 13th, 2026 15:00:00 UTC
 
+        consensus.CoinbaseMaturityLongStartHeight = 151406;
+        consensus.CoinbaseMaturityLongEnforceHeight = 151550;
+        consensus.CoinbaseMaturityLongReleaseHeight = 158111;
+        consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
+        AddLongCoinbaseMaturityRevalidationDeployment(consensus);
+
         consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000001d6dce8651b6094e4c1"};
         consensus.defaultAssumeValid = uint256{"0000000000003ed4f08dbdf6f7d6b271a6bcffce25675cb40aa9fa43179a89f3"}; // 72600
 
@@ -663,6 +684,14 @@ public:
         // default, so regtest behaviour is unchanged.
         if (opts.rdts_expiry_time) {
             consensus.RdtsExpiryTime = *opts.rdts_expiry_time;
+        }
+
+        if (opts.coinbase_maturity_long_start_height) {
+            consensus.CoinbaseMaturityLongStartHeight = *opts.coinbase_maturity_long_start_height;
+            consensus.CoinbaseMaturityLongEnforceHeight = *opts.coinbase_maturity_long_enforce_height;
+            consensus.CoinbaseMaturityLongReleaseHeight = *opts.coinbase_maturity_long_release_height;
+            consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
+            AddLongCoinbaseMaturityRevalidationDeployment(consensus);
         }
 
         for (const auto& [deployment_pos, version_bits_params] : opts.version_bits_parameters) {
