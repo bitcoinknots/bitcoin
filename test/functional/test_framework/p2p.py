@@ -71,6 +71,7 @@ from test_framework.messages import (
     msg_version,
     MSG_WTX,
     msg_wtxidrelay,
+    NODE_BLAKE2B,
     NODE_NETWORK,
     NODE_WITNESS,
     NODE_REDUCED_DATA,
@@ -96,7 +97,7 @@ MIN_P2P_VERSION_SUPPORTED = 60001
 # Version 70016 supports wtxid relay
 P2P_VERSION = 70016
 # The services that this test framework offers in its `version` message
-P2P_SERVICES = NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA
+P2P_SERVICES = NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA | NODE_BLAKE2B
 # The P2P user agent string that this test framework sends in its `version` message
 P2P_SUBVERSION = "/python-p2p-tester:0.0.3/"
 # Value for relay that this test framework sends in its `version` message
