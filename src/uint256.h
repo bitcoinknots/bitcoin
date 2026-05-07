@@ -122,6 +122,14 @@ public:
 
     constexpr uint64_t GetUint64(int pos) const { return ReadLE64(m_data.data() + pos * 8); }
 
+    base_blob ReversedBytes() const {
+        base_blob n;
+        for (size_t i = 0; i < WIDTH; ++i) {
+            n.m_data.data()[i] = m_data.data()[WIDTH - 1 - i];
+        }
+        return n;
+    }
+
     template<typename Stream>
     void Serialize(Stream& s) const
     {
@@ -181,6 +189,9 @@ std::optional<uintN_t> FromUserHex(std::string_view input)
     return FromHex<uintN_t>(input);
 }
 } // namespace detail
+
+class uint128 : public base_blob<128> {
+};
 
 /** 160-bit opaque blob.
  * @note This type is called uint160 for historical reasons only. It is an opaque
