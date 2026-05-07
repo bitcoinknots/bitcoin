@@ -1124,6 +1124,19 @@ public:
         return BackgroundSyncInProgress() ? m_ibd_chainstate->m_chain.Tip() : nullptr;
     }
 
+    /**
+     * Update and possibly latch the IBD status.
+     *
+     * If block loading has finished and the current chain tip has enough work
+     * and is recent, set `m_cached_is_ibd` to false. This function never sets
+     * the flag back to true.
+     *
+     * This should be called after operations that may affect IBD exit
+     * conditions (e.g. after updating the active chain tip, or after
+     * `ImportBlocks()` finishes).
+     */
+    bool UpdateIBDStatus() EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+
     node::BlockMap& BlockIndex() EXCLUSIVE_LOCKS_REQUIRED(::cs_main)
     {
         AssertLockHeld(::cs_main);
