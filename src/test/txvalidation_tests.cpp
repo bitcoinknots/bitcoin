@@ -66,6 +66,27 @@ BOOST_FIXTURE_TEST_CASE(tx_mempool_reject_coinbase, TestChain100Setup)
     BOOST_CHECK(result.m_state.GetResult() == TxValidationResult::TX_CONSENSUS);
 }
 
+struct DatacarrierTestingSetup : public TestChain100Setup {
+    DatacarrierTestingSetup()
+        : TestChain100Setup{ChainType::REGTEST, {.extra_args = {"-acceptnonstdtxn=1", "-acceptnonstddatacarrier=0", "-datacarrierfullcount=1", "-datacarriersize=10"}}} {}
+};
+
+BOOST_FIXTURE_TEST_CASE(tx_mempool_reject_datacarrier, DatacarrierTestingSetup)
+{
+    const std::vector<std::pair<CScript, std::string>> cases{
+        {CScript() << std::vector<unsigned char>(20) << OP_DROP << OP_TRUE, "txn-datacarrier-nonstandard"},
+        {CScript() << OP_RETURN << std::vector<unsigned char>(20), "txn-datacarrier-exceeded"},
+    };
+    for (const auto& [script, reason] : cases) {
+        const auto mtx{CreateValidMempoolTransaction(m_coinbase_txns[0], 0, 0, coinbaseKey, script, CAmount(1 * COIN), /*submit=*/false)};
+        LOCK(cs_main);
+        const MempoolAcceptResult result = m_node.chainman->ProcessTransaction(MakeTransactionRef(mtx));
+        BOOST_CHECK(result.m_result_type == MempoolAcceptResult::ResultType::INVALID);
+        BOOST_CHECK_EQUAL(result.m_state.GetRejectReason(), reason);
+        BOOST_CHECK(result.m_state.GetResult() == TxValidationResult::TX_NOT_STANDARD);
+    }
+}
+
 // Generate a number of random, nonexistent outpoints.
 static inline std::vector<COutPoint> random_outpoints(size_t num_outpoints) {
     std::vector<COutPoint> outpoints;
