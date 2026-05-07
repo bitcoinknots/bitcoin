@@ -13,6 +13,8 @@
 static const unsigned int MAX_BLOCK_SERIALIZED_SIZE = 4000000;
 /** The maximum allowed weight for a block, see BIP 141 (network rule) */
 static const unsigned int MAX_BLOCK_WEIGHT = 4000000;
+/** The maximum allowed weight for a block while the RDTS deployment is active (see Consensus::Params::RdtsActiveAt) */
+static const unsigned int REDUCED_DATA_MAX_BLOCK_WEIGHT = 800000;
 /** The maximum allowed number of signature check operations in a block (network rule) */
 static const int64_t MAX_BLOCK_SIGOPS_COST = 80000;
 /** Coinbase transaction outputs can only be spent after this number of new blocks (network rule) */

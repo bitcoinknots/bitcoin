@@ -75,6 +75,24 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         }
     }
 
+    if (const auto arg{args.GetArg("-rdtsexpiry", "")}; !arg.empty()) {
+        // RDTS activates at the BLAKE2b fork height: one fork instant, as on
+        // mainnet. Only the deployment's expiry is schedulable here; a
+        // separate activation would let tests schedule the two apart, which
+        // no real network can do.
+        if (!options.activation_heights.contains(Consensus::BuriedDeployment::DEPLOYMENT_BLAKE2B)) {
+            throw std::runtime_error("-rdtsexpiry requires -testactivationheight=blake2b@<height> (RDTS activates at the hardfork).");
+        }
+        int64_t expiry;
+        // Must postdate the regtest genesis block (1296688602): an earlier
+        // expiry precedes every possible median-time-past, making it
+        // indistinguishable from not scheduling the deployment at all.
+        if (!ParseInt64(arg, &expiry) || expiry <= 1296688602) {
+            throw std::runtime_error(strprintf("Invalid expiry (%s) for -rdtsexpiry=<time>: must exceed the regtest genesis timestamp (1296688602).", arg));
+        }
+        options.rdts_expiry_time = expiry;
+    }
+
     for (const std::string& strDeployment : args.GetArgs("-vbparams")) {
         std::vector<std::string> vDeploymentParams = SplitString(strDeployment, ':');
         if (vDeploymentParams.size() < 3 || 7 < vDeploymentParams.size()) {
