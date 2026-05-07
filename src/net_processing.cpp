@@ -2851,7 +2851,9 @@ void PeerManagerImpl::UpdatePeerStateForReceivedHeaders(CNode& pfrom, Peer& peer
     // Note that outbound block-relay peers are excluded from this protection, and
     // thus always subject to eviction under the bad/lagging chain logic.
     // See ChainSyncTimeoutState.
-    if (!pfrom.fDisconnect && pfrom.IsFullOutboundConn() && nodestate->pindexBestKnownBlock != nullptr) {
+    // Stale peers are excluded, so they cannot take all the protect slots and
+    // leave the BIP110 peers we want to keep unprotected.
+    if (!pfrom.fDisconnect && pfrom.IsFullOutboundConn() && pfrom.CountsTowardOutboundTarget() && nodestate->pindexBestKnownBlock != nullptr) {
         if (m_outbound_peers_with_protect_from_disconnect < MAX_OUTBOUND_PEERS_TO_PROTECT_FROM_DISCONNECT && nodestate->pindexBestKnownBlock->nChainWork >= m_chainman.ActiveChain().Tip()->nChainWork && !nodestate->m_chain_sync.m_protect) {
             LogDebug(BCLog::NET, "Protecting outbound peer=%d from eviction\n", pfrom.GetId());
             nodestate->m_chain_sync.m_protect = true;
@@ -3535,6 +3537,17 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         }
 
         pfrom.m_has_all_wanted_services = HasAllDesirableServiceFlags(nServices);
+        // BIP-110: tolerate up to -maxstaleoutbound outbound peers not enforcing
+        // the ReducedData rules, demoting each to an additional connection. Only
+        // the persistent outbound target types are gated; ADDR_FETCH (eg
+        // -seednode) and FEELER are transient and count towards no target, so
+        // spending the budget on them would only break bootstrapping.
+        if ((pfrom.IsFullOutboundConn() || pfrom.IsBlockOnlyConn()) && !(nServices & NODE_REDUCED_DATA)) {
+            // Keep it as an additional connection, see CNode::m_is_non_bip110_outbound.
+            if (!m_connman.DemoteToStaleOutbound(pfrom, m_opts.maxstaleoutbound)) {
+                return;
+            }
+        }
         peer->m_their_services = nServices;
         pfrom.SetAddrLocal(addrMe);
         peer->m_starting_height = starting_height;
@@ -5133,7 +5146,9 @@ void PeerManagerImpl::EvictExtraOutboundPeers(std::chrono::seconds now)
         std::pair<NodeId, std::chrono::seconds> youngest_peer{-1, 0}, next_youngest_peer{-1, 0};
 
         m_connman.ForEachNode([&](CNode* pnode) {
-            if (!pnode->IsBlockOnlyConn() || pnode->fDisconnect) return;
+            // A stale peer is not what put us over the target, so evicting one
+            // would leave us over it.
+            if (!pnode->IsBlockOnlyConn() || pnode->fDisconnect || !pnode->CountsTowardOutboundTarget()) return;
             if (pnode->GetId() > youngest_peer.first) {
                 next_youngest_peer = youngest_peer;
                 youngest_peer.first = pnode->GetId();
@@ -5183,8 +5198,9 @@ void PeerManagerImpl::EvictExtraOutboundPeers(std::chrono::seconds now)
             AssertLockHeld(::cs_main);
 
             // Only consider outbound-full-relay peers that are not already
-            // marked for disconnection
-            if (!pnode->IsFullOutboundConn() || pnode->fDisconnect) return;
+            // marked for disconnection, and that count towards the target we are
+            // over: evicting a stale peer would leave us over it.
+            if (!pnode->IsFullOutboundConn() || pnode->fDisconnect || !pnode->CountsTowardOutboundTarget()) return;
             CNodeState *state = State(pnode->GetId());
             if (state == nullptr) return; // shouldn't be possible, but just in case
             // Don't evict our protected peers

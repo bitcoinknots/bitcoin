@@ -174,4 +174,6 @@
 /* Define if building embedded LevelDB */
 #cmakedefine EMBEDDED_LEVELDB 1
 
+#define RDTS_CONSENT RDTSConsentFlag::@RDTS_CONSENT@
+
 #endif //BITCOIN_CONFIG_H
