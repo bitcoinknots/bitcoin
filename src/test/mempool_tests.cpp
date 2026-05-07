@@ -804,4 +804,16 @@ BOOST_AUTO_TEST_CASE(MempoolAncestryTestsDiamond)
     BOOST_CHECK_EQUAL(descendants, 4ULL);
 }
 
+BOOST_AUTO_TEST_CASE(MempoolEntryMaxExtraWeight)
+{
+    CMutableTransaction mtx;
+    mtx.vin.resize(1);
+    mtx.vout.emplace_back(0, CScript() << OP_RETURN);
+    const CTransactionRef tx{MakeTransactionRef(mtx)};
+    const int32_t extra_weight{std::numeric_limits<int32_t>::max()};
+    const CTxMemPoolEntry entry{tx, /*fee=*/0, /*time=*/0, /*entry_height=*/1, /*entry_sequence=*/0, COIN_AGE_CACHE_ZERO,
+                                /*spends_coinbase=*/false, extra_weight, /*sigops_cost=*/0, LockPoints{}};
+    BOOST_CHECK_EQUAL(entry.GetTxSize(), (int64_t{extra_weight} + WITNESS_SCALE_FACTOR - 1) / WITNESS_SCALE_FACTOR);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
