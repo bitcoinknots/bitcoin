@@ -244,6 +244,15 @@ util::Result<int> SighashFromStr(const std::string& sighash)
         {std::string("NONE|ANYONECANPAY"), int(SIGHASH_NONE|SIGHASH_ANYONECANPAY)},
         {std::string("SINGLE"), int(SIGHASH_SINGLE)},
         {std::string("SINGLE|ANYONECANPAY"), int(SIGHASH_SINGLE|SIGHASH_ANYONECANPAY)},
+        // The hardfork opt-in, spelled as SighashToStr renders it. Without these
+        // a hash type shown by decodepsbt or decoderawtransaction cannot be given
+        // back to the RPC that signs, and no caller can ask to opt in by name.
+        {std::string("ALL|UNIFIED"), int(SIGHASH_ALL|SIGHASH_UNIFIED)},
+        {std::string("ALL|ANYONECANPAY|UNIFIED"), int(SIGHASH_ALL|SIGHASH_ANYONECANPAY|SIGHASH_UNIFIED)},
+        {std::string("NONE|UNIFIED"), int(SIGHASH_NONE|SIGHASH_UNIFIED)},
+        {std::string("NONE|ANYONECANPAY|UNIFIED"), int(SIGHASH_NONE|SIGHASH_ANYONECANPAY|SIGHASH_UNIFIED)},
+        {std::string("SINGLE|UNIFIED"), int(SIGHASH_SINGLE|SIGHASH_UNIFIED)},
+        {std::string("SINGLE|ANYONECANPAY|UNIFIED"), int(SIGHASH_SINGLE|SIGHASH_ANYONECANPAY|SIGHASH_UNIFIED)},
     };
     const auto& it = map_sighash_values.find(sighash);
     if (it != map_sighash_values.end()) {
