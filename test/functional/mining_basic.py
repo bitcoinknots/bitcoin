@@ -461,6 +461,7 @@ class MiningTest(BitcoinTestFramework):
         assert_equal(mining_info['bits'], nbits_str(REGTEST_N_BITS))
         assert_equal(mining_info['target'], target_str(REGTEST_TARGET))
         assert_equal(mining_info['difficulty'], Decimal('4.656542373906925E-10'))
+        assert 'difficulty_blake2b' not in mining_info
         assert_equal(mining_info['next'], {
             'height': 201,
             'target': target_str(REGTEST_TARGET),
