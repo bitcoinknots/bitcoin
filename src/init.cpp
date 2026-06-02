@@ -502,7 +502,9 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
                    ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-fastprune", "Use smaller block files and lower minimum prune height for testing purposes", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::DEBUG_TEST);
 #if HAVE_SYSTEM
-    argsman.AddArg("-blocknotify=<cmd>", "Execute command when the best block changes (%s in cmd is replaced by block hash)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-blocknotify=<cmd>", "Execute command when the best block changes (%s in cmd is replaced by block hash). Supports http:// URLs for native HTTP GET notifications.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+#else
+    argsman.AddArg("-blocknotify=<cmd>", "If it starts with http:// then will perform an HTTP GET request. (%s in URL is replaced by block hash)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
 #endif
     argsman.AddArg("-blockreconstructionextratxn=<n>", strprintf("Extra transactions to keep in memory for compact block reconstructions (default: %u)", DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-blockreconstructionextratxnsize=<n>",
@@ -2240,7 +2242,6 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         }
     }
 
-#if HAVE_SYSTEM
     if (args.IsArgSet("-blocknotify")) {
         auto blocknotify_commands = args.GetArgs("-blocknotify");
         uiInterface.NotifyBlockTip_connect([blocknotify_commands](SynchronizationState sync_state, const CBlockIndex* pBlockIndex) {
@@ -2250,11 +2251,10 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
                 ReplaceAll(command, "%s", blockhash_hex);
 
                 std::thread t(runCommand, command);
-                t.detach(); // thread runs free
+                t.detach();
             }
         });
     }
-#endif
 
     std::vector<fs::path> vImportFiles;
     for (const std::string& strFile : args.GetArgs("-loadblock")) {
