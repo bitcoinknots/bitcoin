@@ -12,6 +12,7 @@
 #include <validationinterface.h>
 
 #include <chrono>
+#include <utility>
 
 class AddrMan;
 class CChainParams;
@@ -165,6 +166,12 @@ public:
 
     /** Get number of peers from which we're downloading blocks */
     virtual int GetNumberOfPeersWithValidatedDownloads() const EXCLUSIVE_LOCKS_REQUIRED(::cs_main) = 0;
+
+    /** Get a copy of the extra pool (vExtraTxnForCompact) and current ring buffer position for persistence. */
+    virtual std::pair<std::vector<CTransactionRef>, size_t> GetExtraPoolForDump() const = 0;
+
+    /** Set the extra pool contents, position, and memory usage (used on startup to restore from disk). */
+    virtual void SetExtraPool(std::vector<CTransactionRef> pool, size_t pos, size_t memusage) = 0;
 };
 
 #endif // BITCOIN_NET_PROCESSING_H

@@ -521,6 +521,8 @@ public:
     void UpdateLastBlockAnnounceTime(NodeId node, int64_t time_in_seconds) override;
     ServiceFlags GetDesirableServiceFlags(ServiceFlags services) const override;
     int GetNumberOfPeersWithValidatedDownloads() const override EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
+    std::pair<std::vector<CTransactionRef>, size_t> GetExtraPoolForDump() const override EXCLUSIVE_LOCKS_REQUIRED(!g_msgproc_mutex);
+    void SetExtraPool(std::vector<CTransactionRef> pool, size_t pos, size_t memusage) override EXCLUSIVE_LOCKS_REQUIRED(!g_msgproc_mutex);
 
 private:
     /** Consider evicting an outbound peer based on the amount of time they've been behind our tip */
@@ -1697,6 +1699,24 @@ int PeerManagerImpl::GetNumberOfPeersWithValidatedDownloads() const
 {
     AssertLockHeld(m_chainman.GetMutex());
     return m_peers_downloading_from;
+}
+
+std::pair<std::vector<CTransactionRef>, size_t> PeerManagerImpl::GetExtraPoolForDump() const
+{
+    LOCK(g_msgproc_mutex);
+    return {vExtraTxnForCompact, vExtraTxnForCompactIt};
+}
+
+void PeerManagerImpl::SetExtraPool(std::vector<CTransactionRef> pool, size_t pos, size_t memusage)
+{
+    LOCK(g_msgproc_mutex);
+    vExtraTxnForCompact.assign(m_opts.max_extra_txs, nullptr);
+    for (size_t i = 0; i < pool.size() && i < m_opts.max_extra_txs; ++i) {
+        vExtraTxnForCompact[i] = std::move(pool[i]);
+    }
+    vExtraTxnForCompactIt = std::min(pos, static_cast<size_t>(m_opts.max_extra_txs));
+    if (vExtraTxnForCompactIt >= m_opts.max_extra_txs) vExtraTxnForCompactIt = 0;
+    blockreconstructionextratxn_memusage = memusage;
 }
 
 bool PeerManagerImpl::GetNodeStateStats(NodeId nodeid, CNodeStateStats& stats) const
