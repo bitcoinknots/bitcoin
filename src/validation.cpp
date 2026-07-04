@@ -433,10 +433,34 @@ void Chainstate::MaybeUpdateMempoolForReorg(
 * signature and script validity results will be reused if we validate this
 * transaction again during block validation.
 * */
+/** Per-input script-verification flags with the reduced-data (RDTS) flags stripped for
+ *  inputs spending UTXOs created before reduced-data activation ("grandfathered"),
+ *  mirroring ConnectBlock. Returns an empty vector (meaning: use `flags` uniformly) when
+ *  no input needs the exemption. Pre-activation nothing is exempted, so the reduced-data
+ *  relay filter is preserved. */
+static std::vector<unsigned int> ReducedDataFlagsPerInput(const CTransaction& tx, const CCoinsViewCache& view,
+                unsigned int flags, Chainstate& chainstate)
+                EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+{
+    const CBlockIndex* tip = chainstate.m_chain.Tip();
+    const int reduced_data_start_height = DeploymentActiveAfter(tip, chainstate.m_chainman, Consensus::DEPLOYMENT_REDUCED_DATA)
+        ? chainstate.m_chainman.m_versionbitscache.StateSinceHeight(tip, chainstate.m_chainman.GetConsensus(), Consensus::DEPLOYMENT_REDUCED_DATA)
+        : 0; // not active: exempt nothing, preserving the pre-activation relay filter
+    std::vector<unsigned int> flags_per_input;
+    for (size_t j = 0; j < tx.vin.size(); j++) {
+        if (view.AccessCoin(tx.vin[j].prevout).nHeight < reduced_data_start_height) {
+            flags_per_input.resize(tx.vin.size(), flags);
+            flags_per_input[j] = flags & ~REDUCED_DATA_MANDATORY_VERIFY_FLAGS;
+        }
+    }
+    return flags_per_input;
+}
+
 static bool CheckInputsFromMempoolAndCache(const CTransaction& tx, TxValidationState& state,
                 const CCoinsViewCache& view, const CTxMemPool& pool,
                 unsigned int flags, PrecomputedTransactionData& txdata, CCoinsViewCache& coins_tip,
-                ValidationCache& validation_cache)
+                ValidationCache& validation_cache,
+                const std::vector<unsigned int>& flags_per_input = {})
                 EXCLUSIVE_LOCKS_REQUIRED(cs_main, pool.cs)
 {
     AssertLockHeld(cs_main);
@@ -468,7 +492,7 @@ static bool CheckInputsFromMempoolAndCache(const CTransaction& tx, TxValidationS
     }
 
     // Call CheckInputScripts() to cache signature and script validity against current tip consensus rules.
-    return CheckInputScripts(tx, state, view, flags, /* cacheSigStore= */ true, /* cacheFullScriptStore= */ true, txdata, validation_cache);
+    return CheckInputScripts(tx, state, view, flags, /* cacheSigStore= */ true, /* cacheFullScriptStore= */ true, txdata, validation_cache, /*pvChecks=*/nullptr, flags_per_input);
 }
 
 namespace {
@@ -1516,9 +1540,13 @@ bool MemPoolAccept::PolicyScriptChecks(const ATMPArgs& args, Workspace& ws)
 
     const unsigned int scriptVerifyFlags = PolicyScriptVerifyFlags(args.m_ignore_rejects);
 
+    // Reduced-data (RDTS): exempt inputs spending pre-activation (grandfathered) UTXOs,
+    // matching consensus, so those spends are not filtered as non-standard at relay.
+    const std::vector<unsigned int> flags_per_input = ReducedDataFlagsPerInput(tx, m_view, scriptVerifyFlags, m_active_chainstate);
+
     // Check input scripts and signatures.
     // This is done last to help prevent CPU exhaustion denial-of-service attacks.
-    if (!CheckInputScripts(tx, state, m_view, scriptVerifyFlags, true, false, ws.m_precomputed_txdata, GetValidationCache())) {
+    if (!CheckInputScripts(tx, state, m_view, scriptVerifyFlags, true, false, ws.m_precomputed_txdata, GetValidationCache(), /*pvChecks=*/nullptr, flags_per_input)) {
         // Detect a failure due to a missing witness so that p2p code can handle rejection caching appropriately.
         if (!tx.HasWitness() && SpendsNonAnchorWitnessProg(tx, m_view)) {
             state.Invalid(TxValidationResult::TX_WITNESS_STRIPPED,
@@ -1554,8 +1582,9 @@ bool MemPoolAccept::ConsensusScriptChecks(const ATMPArgs& args, Workspace& ws)
     // invalid blocks (using TestBlockValidity), however allowing such
     // transactions into the mempool can be exploited as a DoS attack.
     unsigned int currentBlockScriptVerifyFlags{GetBlockScriptFlags(*m_active_chainstate.m_chain.Tip(), m_active_chainstate.m_chainman)};
+    const std::vector<unsigned int> flags_per_input = ReducedDataFlagsPerInput(tx, m_view, currentBlockScriptVerifyFlags, m_active_chainstate);
     if (!CheckInputsFromMempoolAndCache(tx, state, m_view, m_pool, currentBlockScriptVerifyFlags,
-                                        ws.m_precomputed_txdata, m_active_chainstate.CoinsTip(), GetValidationCache())) {
+                                        ws.m_precomputed_txdata, m_active_chainstate.CoinsTip(), GetValidationCache(), flags_per_input)) {
         LogError("BUG! PLEASE REPORT THIS! CheckInputScripts failed against latest-block but not STANDARD flags %s, %s", hash.ToString(), state.ToString());
         return Assume(false);
     }
