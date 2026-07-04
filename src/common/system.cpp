@@ -64,6 +64,8 @@ void runCommand(const std::string& strCommand)
     if (nErr) {
         LogWarning("runCommand error: system(%s) returned %d", strCommand, nErr);
     }
+#else
+    LogWarning("runCommand: configured command was not run because shell execution is unavailable: %s", strCommand);
 #endif
 }
 

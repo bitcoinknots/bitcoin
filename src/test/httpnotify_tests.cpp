@@ -8,9 +8,21 @@
 
 #include <boost/test/unit_test.hpp>
 
+#ifdef WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
+
+#include <chrono>
+
 BOOST_FIXTURE_TEST_SUITE(httpnotify_tests, BasicTestingSetup)
 
-// === Task 5.2: URL parsing unit tests ===
+// URL parsing basic cases
 
 BOOST_AUTO_TEST_CASE(parse_url_basic)
 {
@@ -96,7 +108,7 @@ BOOST_AUTO_TEST_CASE(parse_url_malformed)
     BOOST_CHECK(!ParseHttpUrl("ftp://host").has_value());
 }
 
-// === Task 5.3: HTTP request construction unit tests ===
+// HTTP request construction tests
 
 BOOST_AUTO_TEST_CASE(build_request_format)
 {
@@ -111,9 +123,13 @@ BOOST_AUTO_TEST_CASE(build_request_format)
     // Root path
     req = BuildHttpGetRequest("localhost", 80, "/");
     BOOST_CHECK_EQUAL(req, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+
+    // IPv6 literals must be bracketed in the Host header when a port is present
+    req = BuildHttpGetRequest("::1", 7152, "/NOTIFY");
+    BOOST_CHECK_EQUAL(req, "GET /NOTIFY HTTP/1.1\r\nHost: [::1]:7152\r\nConnection: close\r\n\r\n");
 }
 
-// === Task 5.4: Block hash substitution integration tests ===
+// Block hash substitution tests
 
 BOOST_AUTO_TEST_CASE(block_hash_substitution)
 {
@@ -149,8 +165,7 @@ BOOST_AUTO_TEST_CASE(block_hash_substitution)
     }
 }
 
-// === Task 5.5: Property test for URL routing correctness ===
-// **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 8.1**
+// Property test: URL routing correctness
 
 BOOST_AUTO_TEST_CASE(property_1_url_routing_correctness)
 {
@@ -253,8 +268,7 @@ BOOST_AUTO_TEST_CASE(property_1_url_routing_correctness)
     }
 }
 
-// === Task 5.6: Property test for block hash substitution completeness ===
-// **Validates: Requirements 2.1, 2.2**
+// Property test: block hash substitution completeness
 
 BOOST_AUTO_TEST_CASE(property_2_block_hash_substitution_completeness)
 {
@@ -350,8 +364,7 @@ BOOST_AUTO_TEST_CASE(property_2_block_hash_substitution_completeness)
     }
 }
 
-// === Task 5.7: Property test for URL parsing round-trip ===
-// **Validates: Requirements 7.1, 7.2, 7.3, 7.5, 3.5, 3.6**
+// Property test: URL parsing round-trip
 
 BOOST_AUTO_TEST_CASE(property_3_url_parsing_round_trip)
 {
@@ -424,8 +437,7 @@ BOOST_AUTO_TEST_CASE(property_3_url_parsing_round_trip)
     }
 }
 
-// === Task 5.8: Property test for HTTP request format invariants ===
-// **Validates: Requirements 3.1, 3.2, 3.3, 3.4**
+// Property test: HTTP request format invariants
 
 BOOST_AUTO_TEST_CASE(property_4_http_request_format_invariants)
 {
@@ -497,8 +509,7 @@ BOOST_AUTO_TEST_CASE(property_4_http_request_format_invariants)
     }
 }
 
-// === Task 5.9: Property test for malformed URL rejection ===
-// **Validates: Requirements 7.4**
+// Property test: malformed URL rejection
 
 BOOST_AUTO_TEST_CASE(property_5_malformed_url_rejection)
 {
@@ -599,6 +610,151 @@ BOOST_AUTO_TEST_CASE(property_5_malformed_url_rejection)
             "Expected ParseHttpUrl to return nullopt for malformed URL: \"" + malformed_urls[i] +
             "\" (vector " + std::to_string(i) + ")");
     }
+}
+
+// Socket-level test: loopback listener validates connect/send/addrinfo path
+
+BOOST_AUTO_TEST_CASE(httpnotify_loopback)
+{
+#ifdef WIN32
+    WSADATA wsa_data;
+    (void)WSAStartup(MAKEWORD(2, 2), &wsa_data);
+#endif
+
+    // 1. Create a TCP listener on 127.0.0.1:0 (OS picks port)
+    int listener = (int)socket(AF_INET, SOCK_STREAM, 0);
+    BOOST_REQUIRE(listener != -1);
+
+    // SO_REUSEADDR prevents TIME_WAIT failures on rapid re-runs
+    int reuse = 1;
+    (void)setsockopt(listener, SOL_SOCKET, SO_REUSEADDR,
+                     reinterpret_cast<const char*>(&reuse), sizeof(reuse));
+
+    struct sockaddr_in addr{};
+    addr.sin_family      = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // 127.0.0.1
+    addr.sin_port        = 0;                       // OS picks port
+
+    BOOST_REQUIRE(bind(listener,
+                       reinterpret_cast<struct sockaddr*>(&addr),
+                       sizeof(addr)) == 0);
+    BOOST_REQUIRE(listen(listener, 1) == 0);
+
+    // 2. Retrieve the OS-assigned port
+    struct sockaddr_in bound_addr{};
+    socklen_t bound_len = sizeof(bound_addr);
+    BOOST_REQUIRE(getsockname(listener,
+                              reinterpret_cast<struct sockaddr*>(&bound_addr),
+                              &bound_len) == 0);
+    const uint16_t bound_port = ntohs(bound_addr.sin_port);
+
+    // 3. Build the expected request bytes (source of truth)
+    const std::string expected = BuildHttpGetRequest("127.0.0.1", bound_port, "/NOTIFY");
+
+    // 4. Call HttpNotify() — connects to the listener, sends request, returns
+    //    (HttpNotify() does not wait for a response, so it returns before accept())
+    const std::string url = "http://127.0.0.1:" + std::to_string(bound_port) + "/NOTIFY";
+    HttpNotify(url);
+
+    // 5. Accept the incoming connection with a bounded timeout
+    struct sockaddr_in client_addr{};
+    socklen_t client_len = sizeof(client_addr);
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(listener, &readfds);
+    timeval timeout{};
+    timeout.tv_sec = 5;
+    timeout.tv_usec = 0;
+    const int ready = select((int)listener + 1, &readfds, nullptr, nullptr, &timeout);
+    BOOST_REQUIRE_MESSAGE(ready > 0, "Timed out waiting for incoming connection");
+    int client = (int)accept(listener,
+                             reinterpret_cast<struct sockaddr*>(&client_addr),
+                             &client_len);
+    BOOST_REQUIRE(client != -1);
+
+    // 6. Read exactly len(expected) bytes with a bounded timeout
+    std::string received;
+    received.resize(expected.size());
+    size_t total = 0;
+    while (total < expected.size()) {
+        FD_ZERO(&readfds);
+        FD_SET(client, &readfds);
+        timeout.tv_sec = 5;
+        timeout.tv_usec = 0;
+        const int recv_ready = select((int)client + 1, &readfds, nullptr, nullptr, &timeout);
+        BOOST_REQUIRE_MESSAGE(recv_ready > 0, "Timed out waiting for HTTP notify data");
+        int n = (int)recv(client,
+                          &received[total],
+                          (int)(expected.size() - total),
+                          0);
+        if (n <= 0) break;
+        total += (size_t)n;
+    }
+    received.resize(total);
+
+    // 7. Cleanup
+#ifdef WIN32
+    closesocket(client);
+    closesocket(listener);
+#else
+    close(client);
+    close(listener);
+#endif
+
+    // 8. Assert: received bytes are byte-for-byte equal to BuildHttpGetRequest() output
+    BOOST_CHECK_EQUAL(received, expected);
+}
+
+// Socket-level test: connection refused validates timeout behavior
+
+BOOST_AUTO_TEST_CASE(httpnotify_connection_refused)
+{
+#ifdef WIN32
+    WSADATA wsa_data;
+    (void)WSAStartup(MAKEWORD(2, 2), &wsa_data);
+#endif
+
+    // 1. Bind on 127.0.0.1:0 to get a free port assigned by the OS, then close
+    //    immediately so the port is closed when HttpNotify() tries to connect.
+    int probe = (int)socket(AF_INET, SOCK_STREAM, 0);
+    BOOST_REQUIRE(probe != -1);
+
+    struct sockaddr_in addr{};
+    addr.sin_family      = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port        = 0;
+
+    BOOST_REQUIRE(bind(probe,
+                       reinterpret_cast<struct sockaddr*>(&addr),
+                       sizeof(addr)) == 0);
+
+    struct sockaddr_in bound_addr{};
+    socklen_t bound_len = sizeof(bound_addr);
+    BOOST_REQUIRE(getsockname(probe,
+                              reinterpret_cast<struct sockaddr*>(&bound_addr),
+                              &bound_len) == 0);
+    const uint16_t free_port = ntohs(bound_addr.sin_port);
+
+#ifdef WIN32
+    closesocket(probe);
+#else
+    close(probe);
+#endif
+    // Port is now closed; any connect attempt will get ECONNREFUSED immediately
+
+    // 2. Record wall-clock time before calling HttpNotify()
+    const auto t_start = std::chrono::steady_clock::now();
+
+    // 3. Call HttpNotify() — should encounter ECONNREFUSED and return quickly
+    const std::string url = "http://127.0.0.1:" + std::to_string(free_port) + "/NOTIFY";
+    HttpNotify(url);
+
+    // 4. Compute elapsed wall-clock time
+    const auto elapsed = std::chrono::steady_clock::now() - t_start;
+
+    // 5. Assert: must have returned within 5 seconds
+    //    ECONNREFUSED on loopback is typically < 1 ms; 5 s is a very conservative bound.
+    BOOST_CHECK(elapsed < std::chrono::seconds(5));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

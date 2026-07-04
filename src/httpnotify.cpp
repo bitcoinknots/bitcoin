@@ -5,6 +5,7 @@
 
 #include <compat/compat.h>
 #include <logging.h>
+#include <netbase.h>
 #include <util/sock.h>
 
 #include <charconv>
@@ -12,8 +13,6 @@
 #include <cstring>
 #include <optional>
 #include <string>
-
-static constexpr int HTTP_NOTIFY_TIMEOUT_SECS = 5;
 
 std::optional<ParsedUrl> ParseHttpUrl(const std::string& url)
 {
@@ -121,7 +120,12 @@ std::optional<ParsedUrl> ParseHttpUrl(const std::string& url)
 std::string BuildHttpGetRequest(const std::string& host, uint16_t port, const std::string& path)
 {
     std::string request = "GET " + path + " HTTP/1.1\r\n";
-    request += "Host: " + host;
+    request += "Host: ";
+    if (host.find(':') != std::string::npos && host.find(']') == std::string::npos) {
+        request += "[" + host + "]";
+    } else {
+        request += host;
+    }
     if (port != 80) {
         request += ":" + std::to_string(port);
     }
@@ -156,50 +160,81 @@ void HttpNotify(const std::string& url)
         return;
     }
 
-    // Create TCP socket
-    SOCKET sock = socket(ai_result->ai_family, ai_result->ai_socktype, ai_result->ai_protocol);
-    if (sock == INVALID_SOCKET) {
-        LogWarning("httpnotify: failed to create socket for '%s:%d': %s", host, port, NetworkErrorString(WSAGetLastError()));
-        freeaddrinfo(ai_result);
-        return;
+    struct AddrInfoDeleter {
+        void operator()(addrinfo* p) const { freeaddrinfo(p); }
+    };
+    std::unique_ptr<addrinfo, AddrInfoDeleter> ai_guard{ai_result};
+
+    // Build HTTP GET request (outside loop — same for all candidates)
+    const std::string request = BuildHttpGetRequest(host, port, path);
+
+    // Try each address candidate in order until one connects
+    for (addrinfo* ai = ai_result; ai != nullptr; ai = ai->ai_next) {
+        // Create a socket for this address family; will be closed on scope exit
+        std::unique_ptr<Sock> sock = CreateSock(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        if (!sock) {
+            LogWarning("httpnotify: failed to create socket for '%s:%d'", host, port);
+            continue;
+        }
+
+        // Use non-blocking connect to enforce timeout via Wait()
+        if (!sock->SetNonBlocking()) {
+            LogWarning("httpnotify: SetNonBlocking failed for '%s:%d'", host, port);
+            continue;
+        }
+
+        // Attempt connect
+        if (sock->Connect(ai->ai_addr, static_cast<socklen_t>(ai->ai_addrlen)) == SOCKET_ERROR) {
+            const int err = WSAGetLastError();
+            if (err == WSAEINPROGRESS || err == WSAEWOULDBLOCK || err == WSAEINVAL) {
+                // Async connect in progress; wait up to nConnectTimeout ms
+                Sock::Event occurred{0};
+                if (!sock->Wait(std::chrono::milliseconds{nConnectTimeout}, Sock::RECV | Sock::SEND, &occurred)) {
+                    LogWarning("httpnotify: wait for connect failed for '%s:%d'", host, port);
+                    continue;
+                }
+                if (occurred == 0) {
+                    LogWarning("httpnotify: connect timed out for '%s:%d'", host, port);
+                    continue;
+                }
+                // Check SO_ERROR to confirm actual connection success
+                int sockerr{0};
+                socklen_t sockerr_len{sizeof(sockerr)};
+                if (sock->GetSockOpt(SOL_SOCKET, SO_ERROR, &sockerr, &sockerr_len) == SOCKET_ERROR) {
+                    LogWarning("httpnotify: getsockopt SO_ERROR failed for '%s:%d'", host, port);
+                    continue;
+                }
+                if (sockerr != 0) {
+                    LogWarning("httpnotify: connect failed after wait for '%s:%d': %s", host, port, NetworkErrorString(sockerr));
+                    continue;
+                }
+            } else {
+#ifdef WIN32
+                if (err != WSAEISCONN) {
+#endif
+                    LogWarning("httpnotify: connect() failed for '%s:%d': %s", host, port, NetworkErrorString(err));
+                    continue;
+#ifdef WIN32
+                }
+#endif
+            }
+        }
+
+        // Connected; send the HTTP GET request
+        const ssize_t sent = sock->Send(
+            request.data(), request.size(),
+#ifndef WIN32
+            MSG_NOSIGNAL
+#else
+            0
+#endif
+        );
+        if (sent < 0 || static_cast<size_t>(sent) != request.size()) {
+            LogWarning("httpnotify: send failed for '%s:%d'", host, port);
+        }
+        return; // Socket closed via RAII, addrinfo freed via ai_guard
     }
 
-    // Set SO_SNDTIMEO for connect and send timeout
-#ifdef WIN32
-    DWORD timeout_ms = HTTP_NOTIFY_TIMEOUT_SECS * 1000;
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (sockopt_arg_type)&timeout_ms, sizeof(timeout_ms));
-#else
-    struct timeval timeout;
-    timeout.tv_sec = HTTP_NOTIFY_TIMEOUT_SECS;
-    timeout.tv_usec = 0;
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (sockopt_arg_type)&timeout, sizeof(timeout));
-#endif
-
-    // Connect
-    if (connect(sock, ai_result->ai_addr, ai_result->ai_addrlen) == SOCKET_ERROR) {
-        LogWarning("httpnotify: connection failed to '%s:%d': %s", host, port, NetworkErrorString(WSAGetLastError()));
-#ifdef WIN32
-        closesocket(sock);
-#else
-        close(sock);
-#endif
-        freeaddrinfo(ai_result);
-        return;
-    }
-
-    freeaddrinfo(ai_result);
-
-    // Build and send HTTP GET request
-    std::string request = BuildHttpGetRequest(host, port, path);
-    ssize_t sent = send(sock, request.c_str(), request.size(), MSG_NOSIGNAL);
-    if (sent == SOCKET_ERROR || static_cast<size_t>(sent) != request.size()) {
-        LogWarning("httpnotify: send failed to '%s:%d': %s", host, port, NetworkErrorString(WSAGetLastError()));
-    }
-
-    // Close socket
-#ifdef WIN32
-    closesocket(sock);
-#else
-    close(sock);
-#endif
+    // All address candidates failed
+    LogWarning("httpnotify: all candidates failed for '%s:%d'", host, port);
 }
