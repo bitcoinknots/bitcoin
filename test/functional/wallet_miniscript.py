@@ -49,12 +49,12 @@ DESCS = [
     *[f"wsh({ms})" for ms in P2WSH_MINISCRIPTS],
     # A Taproot with one of the above scripts as the single script path.
     f"tr(4d54bb9928a0683b7e383de72943b214b0716f58aa54c7ba6bcea2328bc9c768,{P2WSH_MINISCRIPTS[0]})",
-    # A Taproot with two script paths among the above scripts.
-    f"tr(4d54bb9928a0683b7e383de72943b214b0716f58aa54c7ba6bcea2328bc9c768,{{{P2WSH_MINISCRIPTS[0]},{P2WSH_MINISCRIPTS[1]}}})",
-    # A Taproot with three script paths among the above scripts.
-    f"tr(4d54bb9928a0683b7e383de72943b214b0716f58aa54c7ba6bcea2328bc9c768,{{{{{P2WSH_MINISCRIPTS[0]},{P2WSH_MINISCRIPTS[1]}}},{P2WSH_MINISCRIPTS[2].replace('multi', 'multi_a')}}})",
-    # A Taproot with all above scripts in its tree.
-    f"tr(4d54bb9928a0683b7e383de72943b214b0716f58aa54c7ba6bcea2328bc9c768,{{{{{P2WSH_MINISCRIPTS[0]},{P2WSH_MINISCRIPTS[1]}}},{{{P2WSH_MINISCRIPTS[2].replace('multi', 'multi_a')},{P2WSH_MINISCRIPTS[3]}}}}})",
+    # A Taproot with two (branch-free) script paths. Reduced-data (RDTS) forbids
+    # OP_IF/OP_NOTIF in Tapscript, so multi-leaf trees use non-branching leaves here;
+    # rejection of branching leaves is covered by reduced_data_op_if_guard_test().
+    f"tr(4d54bb9928a0683b7e383de72943b214b0716f58aa54c7ba6bcea2328bc9c768,{{and_v(v:pk({TPUBS[0]}/*),pk({TPUBS[1]}/*)),and_v(v:pk({TPUBS[2]}/*),pk({TPUBS[3]}/*))}})",
+    # A branch-free depth-2 Taproot tree, exercising nested TapTree building.
+    f"tr(4d54bb9928a0683b7e383de72943b214b0716f58aa54c7ba6bcea2328bc9c768,{{{{pk({TPUBS[0]}/*),pk({TPUBS[1]}/*)}},{{pk({TPUBS[2]}/*),and_v(v:pk({TPUBS[3]}/*),pk({TPUBS[4]}/*))}}}})",
 ]
 
 DESCS_PRIV = [
@@ -322,6 +322,46 @@ class WalletMiniscriptTest(BitcoinTestFramework):
                 )
             self.ms_sig_wallet.sendrawtransaction(res["hex"])
 
+    def reduced_data_op_if_guard_test(self):
+        """Reduced-data (RDTS): Taproot miniscript leaves that emit OP_IF/OP_NOTIF are
+        rejected at parse time (the guard lives in the shared descriptor parser, so
+        import active/watch-only alike), consistent with the tr() nesting-depth cap.
+        P2WSH branching and non-branching Tapscript are unaffected."""
+        self.log.info("Testing the reduced-data OP_IF-in-tapscript guard")
+        self.nodes[0].createwallet(
+            wallet_name="ms_rdts", descriptors=True, disable_private_keys=True
+        )
+        wallet = self.nodes[0].get_wallet_rpc("ms_rdts")
+        key = "4d54bb9928a0683b7e383de72943b214b0716f58aa54c7ba6bcea2328bc9c768"
+        # P2WSH_MINISCRIPTS[1] uses or_d/or_c (OP_IF/OP_NOTIF); [0] uses or_b (OP_BOOLOR).
+        branch = P2WSH_MINISCRIPTS[1]
+        nobranch = P2WSH_MINISCRIPTS[0]
+
+        def imp(desc, active):
+            return wallet.importdescriptors(
+                [{"desc": descsum_create(desc), "active": active, "timestamp": "now"}]
+            )[0]
+
+        err = "OP_IF/OP_NOTIF is not allowed in Taproot"
+        # A branching Tapscript leaf is rejected whether imported active or watch-only.
+        for active in (True, False):
+            res = imp(f"tr({key},{branch})", active)
+            assert not res["success"], res
+            assert err in res["error"]["message"], res
+        # A multi-leaf tree is rejected if ANY leaf branches (here the second leaf).
+        res = imp(f"tr({key},{{{nobranch},{branch}}})", False)
+        assert not res["success"], res
+        assert err in res["error"]["message"], res
+        # The l: wrapper desugars to or_i (OP_IF) and is likewise rejected.
+        res = imp(f"tr({key},l:pk({TPUBS[0]}/*))", False)
+        assert not res["success"], res
+        assert err in res["error"]["message"], res
+        # A non-branching Tapscript miniscript is accepted (single and multi-leaf).
+        assert (res := imp(f"tr({key},{nobranch})", False))["success"], res
+        assert (res := imp(f"tr({key},{{pk({TPUBS[0]}/*),pk({TPUBS[1]}/*)}})", False))["success"], res
+        # Branching fragments in P2WSH (not Taproot) are unaffected.
+        assert (res := imp(f"wsh({branch})", False))["success"], res
+
     def run_test(self):
         self.log.info("Making a descriptor wallet")
         self.funder = self.nodes[0].get_wallet_rpc(self.default_wallet_name)
@@ -331,6 +371,8 @@ class WalletMiniscriptTest(BitcoinTestFramework):
         self.ms_wo_wallet = self.nodes[0].get_wallet_rpc("ms_wo")
         self.nodes[0].createwallet(wallet_name="ms_sig", descriptors=True)
         self.ms_sig_wallet = self.nodes[0].get_wallet_rpc("ms_sig")
+
+        self.reduced_data_op_if_guard_test()
 
         # Sanity check we wouldn't let an insane Miniscript descriptor in
         res = self.ms_wo_wallet.importdescriptors(
