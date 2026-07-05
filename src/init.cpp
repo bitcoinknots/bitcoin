@@ -136,6 +136,7 @@ using node::BlockManager;
 using node::CalculateCacheSizes;
 using node::ChainstateLoadResult;
 using node::ChainstateLoadStatus;
+using node::DEFAULT_PERSIST_EXTRA_POOL;
 using node::DEFAULT_PERSIST_MEMPOOL;
 using node::DEFAULT_PRINT_MODIFIED_FEE;
 using node::DEFAULT_STOPATHEIGHT;
@@ -346,8 +347,8 @@ void Shutdown(NodeContext& node)
 
     // Dump extra pool to disk for compact block reconstruction on next startup.
     if (node.peerman && ShouldPersistExtraPool(*node.args)) {
-        auto [pool, pos] = node.peerman->GetExtraPoolForDump();
-        DumpExtraPool(pool, pos, ExtraPoolPath(*node.args));
+        auto pool = node.peerman->GetExtraPoolForDump();
+        DumpExtraPool(pool, ExtraPoolPath(*node.args));
     }
 
     // After the threads that potentially access these pointers have been stopped,
@@ -520,6 +521,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
                    strprintf("Upper limit of memory usage (in megabytes) for keeping extra transactions in memory for compact block reconstructions (default: %s)",
                              DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN_SIZE / 1000000),
                    ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-persistextrapool", strprintf("Persist extra transactions to disk for compact block reconstruction (default: %u)", DEFAULT_PERSIST_EXTRA_POOL), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-blocksonly", strprintf("Whether to reject transactions from network peers. Disables automatic broadcast and rebroadcast of transactions, unless the source peer has the 'forcerelay' permission. RPC transactions are not affected. (default: %u)", DEFAULT_BLOCKSONLY), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-coinstatsindex", strprintf("Maintain coinstats index used by the gettxoutsetinfo RPC (default: %u)", DEFAULT_COINSTATSINDEX), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-conf=<file>", strprintf("Specify path to read-only configuration file. Relative paths will be prefixed by datadir location (only useable from command line, not configuration file) (default: %s)", BITCOIN_CONF_FILENAME), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
@@ -2178,7 +2180,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
                       peerman_opts.max_extra_txs, peerman_opts.max_extra_txs_size,
                       ExtraPoolPath(args));
         if (!extra_pool.empty()) {
-            node.peerman->SetExtraPool(std::move(extra_pool), extra_pool_pos, extra_pool_memusage);
+            node.peerman->SetExtraPool(std::move(extra_pool), extra_pool_memusage);
         }
     }
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 The Bitcoin Core developers
+// Copyright (c) 2026 The Bitcoin Knots developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -28,23 +28,23 @@ using node::ShouldPersistExtraPool;
 
 BOOST_FIXTURE_TEST_SUITE(extrapool_persist_tests, BasicTestingSetup)
 
-BOOST_AUTO_TEST_CASE(should_persist_rejecttokens_enabled)
+BOOST_AUTO_TEST_CASE(should_persist_persistextrapool_enabled)
 {
-    // When rejecttokens=1, ShouldPersistExtraPool returns true
-    m_args.ForceSetArg("-rejecttokens", "1");
+    // When persistextrapool=1, ShouldPersistExtraPool returns true
+    m_args.ForceSetArg("-persistextrapool", "1");
     BOOST_CHECK(ShouldPersistExtraPool(m_args));
 }
 
-BOOST_AUTO_TEST_CASE(should_persist_rejecttokens_disabled)
+BOOST_AUTO_TEST_CASE(should_persist_persistextrapool_disabled)
 {
-    // When rejecttokens=0, ShouldPersistExtraPool returns false
-    m_args.ForceSetArg("-rejecttokens", "0");
+    // When persistextrapool=0, ShouldPersistExtraPool returns false
+    m_args.ForceSetArg("-persistextrapool", "0");
     BOOST_CHECK(!ShouldPersistExtraPool(m_args));
 }
 
-BOOST_AUTO_TEST_CASE(should_persist_rejecttokens_unset)
+BOOST_AUTO_TEST_CASE(should_persist_persistextrapool_unset)
 {
-    // When rejecttokens is not set, ShouldPersistExtraPool returns false (default)
+    // When persistextrapool is not set, ShouldPersistExtraPool returns false (default)
     BOOST_CHECK(!ShouldPersistExtraPool(m_args));
 }
 
@@ -70,11 +70,10 @@ BOOST_AUTO_TEST_CASE(round_trip_happy_path)
         mtx.vout[0].scriptPubKey = CScript() << OP_TRUE;
         pool.push_back(MakeTransactionRef(std::move(mtx)));
     }
-    size_t original_pos = 3; // ring buffer position
 
     // Dump to a temp file
     fs::path dump_path = m_args.GetDataDirNet() / "test_extrapool.dat";
-    BOOST_CHECK(DumpExtraPool(pool, original_pos, dump_path));
+    BOOST_CHECK(DumpExtraPool(pool, dump_path));
 
     // Load back
     std::vector<CTransactionRef> loaded_pool;
@@ -85,7 +84,9 @@ BOOST_AUTO_TEST_CASE(round_trip_happy_path)
 
     // Verify
     BOOST_CHECK_EQUAL(loaded_pool.size(), pool.size());
-    BOOST_CHECK_EQUAL(loaded_pos, original_pos);
+    // Position is now derived from count, not preserved from dump
+    // With all non-null entries, position should equal the count (clamped to max_count)
+    BOOST_CHECK_EQUAL(loaded_pos, pool.size());
     BOOST_CHECK(loaded_memusage > 0);
 
     for (size_t i = 0; i < pool.size(); ++i) {
@@ -127,10 +128,8 @@ BOOST_AUTO_TEST_CASE(property_memory_limited_eviction)
             pool.push_back(MakeTransactionRef(std::move(mtx)));
         }
 
-        size_t original_pos = rng.randrange(N);
-
         // First, dump and load with unlimited memory to find total memusage
-        BOOST_CHECK(DumpExtraPool(pool, original_pos, path));
+        BOOST_CHECK(DumpExtraPool(pool, path));
 
         std::vector<CTransactionRef> full_pool;
         size_t full_pos = 0, full_memusage = 0;
@@ -209,9 +208,6 @@ BOOST_AUTO_TEST_CASE(property_round_trip)
             pool[i] = MakeTransactionRef(std::move(mtx));
         }
 
-        // Random position (clamped to pool size)
-        size_t original_pos = pool_size > 0 ? rng.randrange(pool_size) : 0;
-
         // Count non-null entries
         size_t non_null_count = 0;
         for (const auto& tx : pool) {
@@ -219,7 +215,7 @@ BOOST_AUTO_TEST_CASE(property_round_trip)
         }
 
         // Dump
-        BOOST_CHECK(DumpExtraPool(pool, original_pos, path));
+        BOOST_CHECK(DumpExtraPool(pool, path));
 
         // Load with generous limits
         std::vector<CTransactionRef> loaded_pool;
@@ -231,12 +227,10 @@ BOOST_AUTO_TEST_CASE(property_round_trip)
         // Verify: loaded pool has exactly non_null_count entries
         BOOST_CHECK_EQUAL(loaded_pool.size(), non_null_count);
 
-        // Verify: position is clamped to loaded count
+        // Verify: position is derived from count (clamped to max_count)
+        // With all non-null entries loaded, position should equal the count
         BOOST_CHECK(loaded_pos <= loaded_pool.size());
-        // If original_pos <= non_null_count, it should be preserved
-        if (original_pos <= non_null_count) {
-            BOOST_CHECK_EQUAL(loaded_pos, original_pos);
-        }
+        BOOST_CHECK_EQUAL(loaded_pos, non_null_count);
 
         // Verify: transactions match in order (non-null entries from original)
         size_t loaded_idx = 0;
@@ -294,11 +288,8 @@ BOOST_AUTO_TEST_CASE(property_count_limited_loading)
         // Choose limit L strictly less than N (L between 1 and N-1)
         size_t L = 1 + rng.randrange(N - 1);
 
-        // Choose a random ring buffer position (may exceed L)
-        size_t original_pos = rng.randrange(N);
-
         // Dump full pool
-        BOOST_CHECK(DumpExtraPool(pool, original_pos, path));
+        BOOST_CHECK(DumpExtraPool(pool, path));
 
         // Load with count limit L and generous memory limit
         std::vector<CTransactionRef> loaded_pool;
@@ -357,8 +348,9 @@ BOOST_AUTO_TEST_CASE(load_bad_version_returns_empty)
         file << bad_version;
         uint64_t count = 0;
         file << count;
-        uint64_t position = 0;
-        file << position;
+        // Note: position is no longer persisted, only version and count
+        // Must explicitly close AutoFile after writing
+        BOOST_REQUIRE(file.fclose() == 0);
     }
 
     std::vector<CTransactionRef> pool;
@@ -391,7 +383,7 @@ BOOST_AUTO_TEST_CASE(load_corrupt_transaction_partial_load)
     }
 
     // Dump the valid pool
-    BOOST_CHECK(DumpExtraPool(original_pool, /*pool_pos=*/2, path));
+    BOOST_CHECK(DumpExtraPool(original_pool, path));
 
     // Read the file content, then truncate it partway through a later transaction
     // The header is 24 bytes (3 x uint64_t).
@@ -403,7 +395,7 @@ BOOST_AUTO_TEST_CASE(load_corrupt_transaction_partial_load)
         std::fseek(f, 0, SEEK_END);
         long file_size = std::ftell(f);
         std::fseek(f, 0, SEEK_SET);
-        BOOST_REQUIRE(file_size > 24);
+        BOOST_REQUIRE(file_size > 16);
         file_contents.resize(static_cast<size_t>(file_size));
         size_t read = std::fread(file_contents.data(), 1, file_contents.size(), f);
         BOOST_CHECK_EQUAL(read, file_contents.size());
@@ -458,9 +450,10 @@ BOOST_AUTO_TEST_CASE(load_count_exceeds_upper_bound)
         file << version;
         uint64_t count = 10000000; // 10 million - way above the bound
         file << count;
-        uint64_t position = 0;
-        file << position;
+        // Note: position is no longer persisted, only version and count
         // No actual transaction data needed - count check happens first
+        // Must explicitly close AutoFile after writing
+        BOOST_REQUIRE(file.fclose() == 0);
     }
 
     std::vector<CTransactionRef> pool;
@@ -492,8 +485,8 @@ BOOST_AUTO_TEST_CASE(load_count_limited)
         original_pool.push_back(MakeTransactionRef(std::move(mtx)));
     }
 
-    // Dump with position 7
-    BOOST_CHECK(DumpExtraPool(original_pool, /*pool_pos=*/7, path));
+    // Dump
+    BOOST_CHECK(DumpExtraPool(original_pool, path));
 
     // Load with max_count=4 (less than the 10 in the file)
     std::vector<CTransactionRef> loaded_pool;
@@ -537,8 +530,8 @@ BOOST_AUTO_TEST_CASE(load_memory_limited_eviction)
         original_pool.push_back(MakeTransactionRef(std::move(mtx)));
     }
 
-    // Dump with position 3
-    BOOST_CHECK(DumpExtraPool(original_pool, /*pool_pos=*/3, path));
+    // Dump
+    BOOST_CHECK(DumpExtraPool(original_pool, path));
 
     // First, load with unlimited memory to determine total memusage
     std::vector<CTransactionRef> full_pool;
@@ -613,10 +606,8 @@ BOOST_AUTO_TEST_CASE(property_partial_load_resilience)
             pool.push_back(MakeTransactionRef(std::move(mtx)));
         }
 
-        size_t original_pos = rng.randrange(N);
-
         // Dump valid file
-        BOOST_CHECK(DumpExtraPool(pool, original_pos, valid_path));
+        BOOST_CHECK(DumpExtraPool(pool, valid_path));
 
         // Read entire valid file into memory buffer
         std::vector<uint8_t> file_contents;
@@ -633,10 +624,10 @@ BOOST_AUTO_TEST_CASE(property_partial_load_resilience)
             std::fclose(f);
         }
 
-        // The header is 24 bytes (version + count + position, each uint64_t).
+        // The header is 16 bytes (version + count, each uint64_t).
         // Truncate at a random point within the transaction data region.
         // Ensure truncation point is after the header but before the end of file.
-        const size_t header_size = 24;
+        const size_t header_size = 16;
         if (file_contents.size() <= header_size + 1) {
             // File too small to truncate meaningfully; skip this iteration
             fs::remove(valid_path);
