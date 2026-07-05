@@ -433,10 +433,48 @@ void Chainstate::MaybeUpdateMempoolForReorg(
 * signature and script validity results will be reused if we validate this
 * transaction again during block validation.
 * */
+/** Per-input script-verification flags with the reduced-data (RDTS) flags stripped for
+ *  inputs spending UTXOs created before `reduced_data_start_height` ("grandfathered").
+ *  Returns an empty vector (meaning: use `flags` uniformly) when no input needs the
+ *  exemption. If `prevheights` is non-null it is filled with each input's creation height
+ *  (for BIP68), reusing the same UTXO lookup. Shared by ConnectBlock (consensus) and the
+ *  mempool opt-in path below so the two cannot drift. */
+static std::vector<unsigned int> ReducedDataFlagsPerInput(const CTransaction& tx, const CCoinsViewCache& view,
+                unsigned int flags, int reduced_data_start_height, std::vector<int>* prevheights = nullptr)
+                EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+{
+    std::vector<unsigned int> flags_per_input;
+    for (size_t j = 0; j < tx.vin.size(); j++) {
+        // Coin::nHeight is a 31-bit unsigned field, so it always fits in an int.
+        const int coin_height{static_cast<int>(view.AccessCoin(tx.vin[j].prevout).nHeight)};
+        if (prevheights) (*prevheights)[j] = coin_height;
+        if (coin_height < reduced_data_start_height) {
+            flags_per_input.resize(tx.vin.size(), flags);
+            flags_per_input[j] = flags & ~REDUCED_DATA_MANDATORY_VERIFY_FLAGS;
+        }
+    }
+    return flags_per_input;
+}
+
+/** Mempool opt-in variant: the tx is evaluated against the next block, so the activation
+ *  height is derived from the current tip. Pre-activation nothing is exempted. Only used
+ *  when the caller opts in via the "reduced-data" ignore-reject. */
+static std::vector<unsigned int> ReducedDataFlagsPerInput(const CTransaction& tx, const CCoinsViewCache& view,
+                unsigned int flags, Chainstate& chainstate)
+                EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+{
+    const CBlockIndex* tip = chainstate.m_chain.Tip();
+    const int reduced_data_start_height = DeploymentActiveAfter(tip, chainstate.m_chainman, Consensus::DEPLOYMENT_REDUCED_DATA)
+        ? chainstate.m_chainman.m_versionbitscache.StateSinceHeight(tip, chainstate.m_chainman.GetConsensus(), Consensus::DEPLOYMENT_REDUCED_DATA)
+        : 0; // not active: exempt nothing
+    return ReducedDataFlagsPerInput(tx, view, flags, reduced_data_start_height);
+}
+
 static bool CheckInputsFromMempoolAndCache(const CTransaction& tx, TxValidationState& state,
                 const CCoinsViewCache& view, const CTxMemPool& pool,
                 unsigned int flags, PrecomputedTransactionData& txdata, CCoinsViewCache& coins_tip,
-                ValidationCache& validation_cache)
+                ValidationCache& validation_cache,
+                const std::vector<unsigned int>& flags_per_input = {})
                 EXCLUSIVE_LOCKS_REQUIRED(cs_main, pool.cs)
 {
     AssertLockHeld(cs_main);
@@ -468,7 +506,7 @@ static bool CheckInputsFromMempoolAndCache(const CTransaction& tx, TxValidationS
     }
 
     // Call CheckInputScripts() to cache signature and script validity against current tip consensus rules.
-    return CheckInputScripts(tx, state, view, flags, /* cacheSigStore= */ true, /* cacheFullScriptStore= */ true, txdata, validation_cache);
+    return CheckInputScripts(tx, state, view, flags, /* cacheSigStore= */ true, /* cacheFullScriptStore= */ true, txdata, validation_cache, /*pvChecks=*/nullptr, flags_per_input);
 }
 
 namespace {
@@ -1516,9 +1554,18 @@ bool MemPoolAccept::PolicyScriptChecks(const ATMPArgs& args, Workspace& ws)
 
     const unsigned int scriptVerifyFlags = PolicyScriptVerifyFlags(args.m_ignore_rejects);
 
+    // Reduced-data (RDTS): by default a grandfathered spend is rejected at relay
+    // (intentional). If the caller opts in via the "reduced-data" ignore-reject, exempt
+    // inputs spending pre-activation UTXOs per-input, matching consensus. Non-grandfathered
+    // inputs are unaffected, so a genuinely reduced-data-invalid spend is still rejected.
+    std::vector<unsigned int> flags_per_input;
+    if (args.m_ignore_rejects.count(rejectmsg_reduced_data)) {
+        flags_per_input = ReducedDataFlagsPerInput(tx, m_view, scriptVerifyFlags, m_active_chainstate);
+    }
+
     // Check input scripts and signatures.
     // This is done last to help prevent CPU exhaustion denial-of-service attacks.
-    if (!CheckInputScripts(tx, state, m_view, scriptVerifyFlags, true, false, ws.m_precomputed_txdata, GetValidationCache())) {
+    if (!CheckInputScripts(tx, state, m_view, scriptVerifyFlags, true, false, ws.m_precomputed_txdata, GetValidationCache(), /*pvChecks=*/nullptr, flags_per_input)) {
         // Detect a failure due to a missing witness so that p2p code can handle rejection caching appropriately.
         if (!tx.HasWitness() && SpendsNonAnchorWitnessProg(tx, m_view)) {
             state.Invalid(TxValidationResult::TX_WITNESS_STRIPPED,
@@ -1554,8 +1601,14 @@ bool MemPoolAccept::ConsensusScriptChecks(const ATMPArgs& args, Workspace& ws)
     // invalid blocks (using TestBlockValidity), however allowing such
     // transactions into the mempool can be exploited as a DoS attack.
     unsigned int currentBlockScriptVerifyFlags{GetBlockScriptFlags(*m_active_chainstate.m_chain.Tip(), m_active_chainstate.m_chainman)};
+    // Match the grandfather exemption applied in PolicyScriptChecks when opted in, so the
+    // two checks stay consistent (a policy pass with a consensus-check fail is a bug).
+    std::vector<unsigned int> flags_per_input;
+    if (args.m_ignore_rejects.count(rejectmsg_reduced_data)) {
+        flags_per_input = ReducedDataFlagsPerInput(tx, m_view, currentBlockScriptVerifyFlags, m_active_chainstate);
+    }
     if (!CheckInputsFromMempoolAndCache(tx, state, m_view, m_pool, currentBlockScriptVerifyFlags,
-                                        ws.m_precomputed_txdata, m_active_chainstate.CoinsTip(), GetValidationCache())) {
+                                        ws.m_precomputed_txdata, m_active_chainstate.CoinsTip(), GetValidationCache(), flags_per_input)) {
         LogError("BUG! PLEASE REPORT THIS! CheckInputScripts failed against latest-block but not STANDARD flags %s, %s", hash.ToString(), state.ToString());
         return Assume(false);
     }
@@ -2970,14 +3023,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
             // BIP68 lock checks (as opposed to nLockTime checks) must
             // be in ConnectBlock because they require the UTXO set
             prevheights.resize(tx.vin.size());
-            flags_per_input.clear();
-            for (size_t j = 0; j < tx.vin.size(); j++) {
-                prevheights[j] = view.AccessCoin(tx.vin[j].prevout).nHeight;
-                if (prevheights[j] < reduced_data_start_height) {
-                    flags_per_input.resize(tx.vin.size(), flags);
-                    flags_per_input[j] = flags & ~REDUCED_DATA_MANDATORY_VERIFY_FLAGS;
-                }
-            }
+            flags_per_input = ReducedDataFlagsPerInput(tx, view, flags, reduced_data_start_height, &prevheights);
 
             if (!SequenceLocks(tx, nLockTimeFlags, prevheights, *pindex)) {
                 state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-txns-nonfinal",
