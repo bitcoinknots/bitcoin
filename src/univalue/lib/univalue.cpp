@@ -111,8 +111,16 @@ void UniValue::push_back(UniValue val)
 void UniValue::push_backV(const std::vector<UniValue>& vec)
 {
     checkType(VARR);
-
-    values.insert(values.end(), vec.begin(), vec.end());
+    // Guard against self-append: if vec is our own values, take a snapshot before modifying
+    if (&vec == &values) {
+        // Self-append case: vec is our own values vector, must snapshot before modifying
+        std::vector<UniValue> snapshot = vec;
+        for (const auto& v : snapshot) {
+            push_back(v);
+        }
+    } else {
+        values.insert(values.end(), vec.begin(), vec.end());
+    }
 }
 
 void UniValue::pushKVEnd(std::string key, UniValue val)
@@ -134,13 +142,37 @@ void UniValue::pushKV(std::string key, UniValue val)
         pushKVEnd(std::move(key), std::move(val));
 }
 
-void UniValue::pushKVs(UniValue obj)
+void UniValue::pushKVs(const UniValue& obj)
 {
     checkType(VOBJ);
     obj.checkType(VOBJ);
 
-    for (size_t i = 0; i < obj.keys.size(); i++)
-        pushKVEnd(std::move(obj.keys.at(i)), std::move(obj.values.at(i)));
+    // Check if obj may be invalidated by modifications to this object.
+    // This happens when: (1) obj is this (self-merge), or
+    // (2) obj is a sub-object/array within this object's values (nested alias).
+    // We detect case (2) by checking if obj's address matches any of our values.
+    bool may_alias = (&obj == this);
+    if (!may_alias && typ == VOBJ) {
+        // Check if obj is one of our values by direct comparison (not relational pointer arithmetic)
+        for (const auto& v : values) {
+            if (&obj == &v) {
+                may_alias = true;
+                break;
+            }
+        }
+    }
+
+    if (may_alias) {
+        // obj aliases this or is a nested value: must snapshot to ensure stable iteration
+        std::vector<std::string> source_keys = obj.keys;
+        std::vector<UniValue> source_values = obj.values;
+        for (size_t i = 0; i < source_keys.size(); i++)
+            pushKVEnd(std::move(source_keys[i]), std::move(source_values[i]));
+    } else {
+        // obj is independent: iterate directly to avoid unnecessary copy overhead
+        for (size_t i = 0; i < obj.keys.size(); i++)
+            pushKVEnd(obj.keys[i], obj.values[i]);
+    }
 }
 
 void UniValue::getObjMap(std::map<std::string,UniValue>& kv) const

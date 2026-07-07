@@ -572,12 +572,23 @@ else()
   try_append_cxx_flags("-Wduplicated-branches" TARGET warn_interface SKIP_LINK)
   try_append_cxx_flags("-Wduplicated-cond" TARGET warn_interface SKIP_LINK)
   try_append_cxx_flags("-Wlogical-op" TARGET warn_interface SKIP_LINK)
-  try_append_cxx_flags("-Woverloaded-virtual" TARGET warn_interface SKIP_LINK)
-  try_append_cxx_flags("-Wsuggest-override" TARGET warn_interface SKIP_LINK)
   try_append_cxx_flags("-Wimplicit-fallthrough" TARGET warn_interface SKIP_LINK)
-  try_append_cxx_flags("-Wunreachable-code-loop-increment" TARGET warn_interface SKIP_LINK)
-  try_append_cxx_flags("-Wdocumentation" TARGET warn_interface SKIP_LINK)
-  try_append_cxx_flags("-Wself-assign" TARGET warn_interface SKIP_LINK)
+  # Add C++-only flags using generator expressions to avoid passing them to C files
+  try_append_cxx_flags("-Woverloaded-virtual" TARGET warn_interface SKIP_LINK
+    IF_CHECK_PASSED "$<$<COMPILE_LANGUAGE:CXX>:-Woverloaded-virtual>"
+  )
+  try_append_cxx_flags("-Wsuggest-override" TARGET warn_interface SKIP_LINK
+    IF_CHECK_PASSED "$<$<COMPILE_LANGUAGE:CXX>:-Wsuggest-override>"
+  )
+  try_append_cxx_flags("-Wunreachable-code-loop-increment" TARGET warn_interface SKIP_LINK
+    IF_CHECK_PASSED "$<$<COMPILE_LANGUAGE:CXX>:-Wunreachable-code-loop-increment>"
+  )
+  try_append_cxx_flags("-Wdocumentation" TARGET warn_interface SKIP_LINK
+    IF_CHECK_PASSED "$<$<COMPILE_LANGUAGE:CXX>:-Wdocumentation>"
+  )
+  try_append_cxx_flags("-Wself-assign" TARGET warn_interface SKIP_LINK
+    IF_CHECK_PASSED "$<$<COMPILE_LANGUAGE:CXX>:-Wself-assign>"
+  )
   try_append_cxx_flags("-Wbidi-chars=any" TARGET warn_interface SKIP_LINK)
   try_append_cxx_flags("-Wundef" TARGET warn_interface SKIP_LINK)
 

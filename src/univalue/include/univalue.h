@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -17,6 +18,10 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#ifdef WITH_YYJSON
+#include <yyjson/yyjson.h>
+#endif
 
 // NOLINTNEXTLINE(misc-no-recursion)
 class UniValue {
@@ -28,8 +33,13 @@ public:
         using std::runtime_error::runtime_error;
     };
 
+#ifndef WITH_YYJSON
     UniValue() { typ = VNULL; }
     UniValue(UniValue::VType type, std::string str = {}) : typ{type}, val{std::move(str)} {}
+#else
+    UniValue();
+    UniValue(UniValue::VType type, std::string str = {});
+#endif
     template <typename Ref, typename T = std::remove_cv_t<std::remove_reference_t<Ref>>,
               std::enable_if_t<std::is_floating_point_v<T> ||                      // setFloat
                                    std::is_same_v<bool, T> ||                      // setBool
@@ -64,11 +74,17 @@ public:
     void setArray();
     void setObject();
 
+#ifndef WITH_YYJSON
     enum VType getType() const { return typ; }
     const std::string& getValStr() const { return val; }
     bool empty() const { return (values.size() == 0); }
-
     size_t size() const { return values.size(); }
+#else
+    enum VType getType() const { return typ; }
+    const std::string& getValStr() const;
+    bool empty() const;
+    size_t size() const;
+#endif
 
     void reserve(size_t new_cap);
 
@@ -78,6 +94,7 @@ public:
     const UniValue& operator[](size_t index) const;
     bool exists(const std::string& key) const { size_t i; return findKey(key, i); }
 
+#ifndef WITH_YYJSON
     bool isNull() const { return (typ == VNULL); }
     bool isTrue() const { return (typ == VBOOL) && (val == "1"); }
     bool isFalse() const { return (typ == VBOOL) && (val != "1"); }
@@ -86,6 +103,16 @@ public:
     bool isNum() const { return (typ == VNUM); }
     bool isArray() const { return (typ == VARR); }
     bool isObject() const { return (typ == VOBJ); }
+#else
+    bool isNull() const { return (typ == VNULL); }
+    bool isTrue() const;
+    bool isFalse() const;
+    bool isBool() const { return (typ == VBOOL); }
+    bool isStr() const { return (typ == VSTR); }
+    bool isNum() const { return (typ == VNUM); }
+    bool isArray() const { return (typ == VARR); }
+    bool isObject() const { return (typ == VOBJ); }
+#endif
 
     void push_back(UniValue val);
     void push_backV(const std::vector<UniValue>& vec);
@@ -94,23 +121,69 @@ public:
 
     void pushKVEnd(std::string key, UniValue val);
     void pushKV(std::string key, UniValue val);
-    void pushKVs(UniValue obj);
+    void pushKVs(const UniValue& obj);
 
     std::string write(unsigned int prettyIndent = 0,
                       unsigned int indentLevel = 0) const;
 
     bool read(std::string_view raw);
 
+    // Copy/move constructors and assignment operators
+#ifndef WITH_YYJSON
+    UniValue(const UniValue& other) : typ(other.typ), val(other.val), keys(other.keys), values(other.values) {}
+    UniValue(UniValue&& other) noexcept : typ(other.typ), val(std::move(other.val)), keys(std::move(other.keys)), values(std::move(other.values)) {}
+    UniValue& operator=(const UniValue& other) { if (this != &other) { typ = other.typ; val = other.val; keys = other.keys; values = other.values; } return *this; }
+    UniValue& operator=(UniValue&& other) noexcept { if (this != &other) { typ = other.typ; val = std::move(other.val); keys = std::move(other.keys); values = std::move(other.values); } return *this; }
+    ~UniValue() = default;
+#else
+    UniValue(const UniValue& other);
+    UniValue(UniValue&& other) noexcept;
+    UniValue& operator=(const UniValue& other);
+    UniValue& operator=(UniValue&& other) noexcept;
+    ~UniValue();
+#endif
+
 private:
+    // Common members - mutable only when WITH_YYJSON for lazy materialization
+#ifdef WITH_YYJSON
+    mutable
+#endif
     UniValue::VType typ;
+#ifdef WITH_YYJSON
+    mutable
+#endif
     std::string val;                       // numbers are stored as C++ strings
+#ifdef WITH_YYJSON
+    mutable
+#endif
     std::vector<std::string> keys;
+#ifdef WITH_YYJSON
+    mutable
+#endif
     std::vector<UniValue> values;
+
+#ifdef WITH_YYJSON
+    // yyjson primary storage
+    mutable std::shared_ptr<yyjson_mut_doc> m_yyjson_doc; //!< Shared pointer to yyjson mutable document (primary storage)
+    mutable yyjson_mut_val* m_yyjson_node{nullptr};    //!< Pointer to the root node in the yyjson tree
+    mutable bool m_materialized{false};                //!< Whether lazy caches (val/keys/values) have been populated
+
+    void materialize() const;              // Populate lazy caches from yyjson
+    void materializeIfNeeded() const;      // Centralized guard to materialize on-demand if needed
+    static void yyjson_doc_deleter(yyjson_mut_doc* doc); //!< Custom deleter for yyjson document shared_ptr
+#endif
 
     void checkType(const VType& expected) const;
     bool findKey(const std::string& key, size_t& retIdx) const;
+
+#ifdef WITH_YYJSON
+    // yyjson-specific write method
+    std::string writeYyjson(unsigned int prettyIndent, unsigned int indentLevel) const;
+#else
+    // Original write methods
     void writeArray(unsigned int prettyIndent, unsigned int indentLevel, std::string& s) const;
     void writeObject(unsigned int prettyIndent, unsigned int indentLevel, std::string& s) const;
+#endif
 
 public:
     // Strict type-specific getters, these throw std::runtime_error if the
@@ -133,7 +206,19 @@ template <class It>
 void UniValue::push_backV(It first, It last)
 {
     checkType(VARR);
+#ifdef WITH_YYJSON
+    // Always snapshot the input range to avoid iterator invalidation from self-append
+    // This handles cases like arr.push_backV(arr.getValues().begin(), arr.getValues().end())
+    std::vector<UniValue> snapshot;
+    for (auto it = first; it != last; ++it) {
+        snapshot.push_back(*it);
+    }
+    for (const auto& v : snapshot) {
+        push_back(v);
+    }
+#else
     values.insert(values.end(), first, last);
+#endif
 }
 
 template <typename Int>
