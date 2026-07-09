@@ -172,7 +172,7 @@ bool LoadExtraPool(std::vector<CTransactionRef>& pool,
         }
 
         size_t to_load = std::min(static_cast<size_t>(count), max_count);
-        pool.resize(to_load);
+        pool.clear();
         memusage = 0;
 
         for (size_t i = 0; i < to_load; ++i) {
@@ -190,23 +190,21 @@ bool LoadExtraPool(std::vector<CTransactionRef>& pool,
                 // Check cumulative memory before adding
                 if (memusage + tx_usage > max_mem_bytes && !pool.empty()) {
                     LogDebug(BCLog::NET, "Extra pool memory limit reached, stopping load at %d transactions\n", i);
-                    pool.resize(i);
                     break;
                 }
                 
-                pool[i] = std::move(tx);
+                pool.push_back(std::move(tx));
                 memusage += tx_usage;
             } catch (const std::exception&) {
                 LogWarning("Extra pool deserialization failed at transaction %d. Keeping %d already loaded.\n", i, i);
-                pool.resize(i);
                 break;
             }
         }
 
         // Derive pool_pos from count (next insertion position is at the end of loaded data)
         // This maintains ring buffer invariant: TXs at [0, pool.size()), next write at pool.size() % max_count
-        pool_pos = std::min(static_cast<size_t>(count), max_count);
-        if (pool_pos >= max_count) pool_pos = 0;
+        // Guard against zero-capacity case (max_count == 0) to prevent division by zero
+        pool_pos = max_count > 0 ? pool.size() % max_count : 0;
 
         // Memory eviction: if over limit, evict from position forward using ring buffer pattern
         if (memusage > max_mem_bytes && !pool.empty()) {

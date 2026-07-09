@@ -375,7 +375,11 @@ BOOST_AUTO_TEST_CASE(load_corrupt_transaction_partial_load)
     for (int i = 0; i < 5; ++i) {
         CMutableTransaction mtx;
         mtx.vin.resize(1);
-        mtx.vin[0].prevout = COutPoint(Txid::FromUint256(uint256(i + 100)), 0);
+        uint256 hash;
+        hash.SetNull();
+        uint64_t unique_val = static_cast<uint64_t>(i) + 100;
+        std::memcpy(hash.begin(), &unique_val, sizeof(unique_val));
+        mtx.vin[0].prevout = COutPoint(Txid::FromUint256(hash), 0);
         mtx.vout.resize(1);
         mtx.vout[0].nValue = (i + 1) * 5000;
         mtx.vout[0].scriptPubKey = CScript() << OP_TRUE;
@@ -386,7 +390,7 @@ BOOST_AUTO_TEST_CASE(load_corrupt_transaction_partial_load)
     BOOST_CHECK(DumpExtraPool(original_pool, path));
 
     // Read the file content, then truncate it partway through a later transaction
-    // The header is 24 bytes (3 x uint64_t).
+    // The header is 16 bytes (version + count, each uint64_t).
     // Strategy: read full file, truncate to keep ~60% of tx data
     std::vector<uint8_t> file_contents;
     {
@@ -403,7 +407,7 @@ BOOST_AUTO_TEST_CASE(load_corrupt_transaction_partial_load)
     }
 
     // Truncate at roughly 60% of the file (after header), which should be mid-transaction
-    const size_t header_size = 24; // 3 x uint64_t
+    const size_t header_size = 16; // version + count, each uint64_t
     size_t tx_data_size = file_contents.size() - header_size;
     size_t truncate_point = header_size + (tx_data_size * 3 / 5);
 
@@ -478,7 +482,11 @@ BOOST_AUTO_TEST_CASE(load_count_limited)
     for (int i = 0; i < 10; ++i) {
         CMutableTransaction mtx;
         mtx.vin.resize(1);
-        mtx.vin[0].prevout = COutPoint(Txid::FromUint256(uint256(i + 200)), 0);
+        uint256 hash;
+        hash.SetNull();
+        uint64_t unique_val = static_cast<uint64_t>(i) + 200;
+        std::memcpy(hash.begin(), &unique_val, sizeof(unique_val));
+        mtx.vin[0].prevout = COutPoint(Txid::FromUint256(hash), 0);
         mtx.vout.resize(1);
         mtx.vout[0].nValue = (i + 1) * 2000;
         mtx.vout[0].scriptPubKey = CScript() << OP_TRUE;
@@ -521,7 +529,11 @@ BOOST_AUTO_TEST_CASE(load_memory_limited_eviction)
     for (int i = 0; i < 10; ++i) {
         CMutableTransaction mtx;
         mtx.vin.resize(1);
-        mtx.vin[0].prevout = COutPoint(Txid::FromUint256(uint256(i + 300)), 0);
+        uint256 hash;
+        hash.SetNull();
+        uint64_t unique_val = static_cast<uint64_t>(i) + 300;
+        std::memcpy(hash.begin(), &unique_val, sizeof(unique_val));
+        mtx.vin[0].prevout = COutPoint(Txid::FromUint256(hash), 0);
         mtx.vout.resize(5); // multiple outputs to increase memory usage
         for (int j = 0; j < 5; ++j) {
             mtx.vout[j].nValue = (i + 1) * 1000 + j;
@@ -675,6 +687,109 @@ BOOST_AUTO_TEST_CASE(property_partial_load_resilience)
         fs::remove(valid_path);
         fs::remove(corrupt_path);
     }
+}
+
+// Test for oversized transaction handling (demonstrates null entry bug)
+BOOST_AUTO_TEST_CASE(load_oversized_transaction_creates_null_entry)
+{
+    fs::path path = m_args.GetDataDirNet() / "oversized_extrapool.dat";
+
+    // Helper to create a normal TX
+    auto create_tx = [](int id) {
+        CMutableTransaction mtx;
+        mtx.vin.resize(1);
+        uint256 hash;
+        hash.SetNull();
+        uint64_t unique_val = static_cast<uint64_t>(id);
+        std::memcpy(hash.begin(), &unique_val, sizeof(unique_val));
+        mtx.vin[0].prevout = COutPoint(Txid::FromUint256(hash), 0);
+        mtx.vout.resize(1);
+        mtx.vout[0].nValue = id * 1000;
+        mtx.vout[0].scriptPubKey = CScript() << OP_TRUE;
+        return MakeTransactionRef(std::move(mtx));
+    };
+
+    std::vector<CTransactionRef> pool;
+    pool.push_back(create_tx(1));  // Valid
+
+    // Create oversized TX: 20,000+ minimal outputs -> ~220KB+ (exceeds 100KB limit)
+    {
+        CMutableTransaction mtx;
+        mtx.vin.resize(1);
+        mtx.vin[0].prevout = COutPoint(Txid::FromUint256(uint256(2)), 0);
+        for (int i = 0; i < 20000; ++i) {
+            mtx.vout.emplace_back(1, CScript() << OP_TRUE);
+        }
+        pool.push_back(MakeTransactionRef(std::move(mtx)));
+    }
+
+    pool.push_back(create_tx(3));  // Valid
+
+    // Dump
+    BOOST_CHECK(DumpExtraPool(pool, path));
+
+    // Load
+    std::vector<CTransactionRef> loaded_pool;
+    size_t loaded_pos = 0, loaded_memusage = 0;
+    BOOST_CHECK(LoadExtraPool(loaded_pool, loaded_pos, loaded_memusage,
+                              100, 100000000, path));
+
+    // Verify: pool size equals number of valid TXs loaded (2, not 3)
+    BOOST_CHECK_EQUAL(loaded_pool.size(), 2u);
+
+    // Check no null entries exist
+    BOOST_CHECK(loaded_pool[0] != nullptr);
+    BOOST_CHECK(loaded_pool[1] != nullptr);
+
+    // Verify valid TXs match (skipped oversized, so indices 0 and 1 are TXs 1 and 3)
+    BOOST_CHECK_EQUAL(loaded_pool[0]->GetHash().ToString(), pool[0]->GetHash().ToString());
+    BOOST_CHECK_EQUAL(loaded_pool[1]->GetHash().ToString(), pool[2]->GetHash().ToString());
+
+    // Memusage should count both valid TXs
+    size_t expected_mem = RecursiveDynamicUsage(*loaded_pool[0]) +
+                           RecursiveDynamicUsage(*loaded_pool[1]);
+    BOOST_CHECK_EQUAL(loaded_memusage, expected_mem);
+
+    fs::remove(path);
+}
+
+// Test zero-capacity case (max_count = 0)
+BOOST_AUTO_TEST_CASE(load_zero_capacity)
+{
+    fs::path path = m_args.GetDataDirNet() / "zero_capacity_extrapool.dat";
+
+    // Create a pool with some transactions
+    std::vector<CTransactionRef> pool;
+    for (int i = 0; i < 3; ++i) {
+        CMutableTransaction mtx;
+        mtx.vin.resize(1);
+        uint256 hash;
+        hash.SetNull();
+        uint64_t unique_val = static_cast<uint64_t>(i) + 400;
+        std::memcpy(hash.begin(), &unique_val, sizeof(unique_val));
+        mtx.vin[0].prevout = COutPoint(Txid::FromUint256(hash), 0);
+        mtx.vout.resize(1);
+        mtx.vout[0].nValue = (i + 1) * 3000;
+        mtx.vout[0].scriptPubKey = CScript() << OP_TRUE;
+        pool.push_back(MakeTransactionRef(std::move(mtx)));
+    }
+
+    // Dump with normal capacity
+    BOOST_CHECK(DumpExtraPool(pool, path));
+
+    // Load with max_count = 0 (zero capacity)
+    std::vector<CTransactionRef> loaded_pool;
+    size_t loaded_pos = 99, loaded_memusage = 99;
+    BOOST_CHECK(LoadExtraPool(loaded_pool, loaded_pos, loaded_memusage,
+                              /*max_count=*/0, /*max_mem_bytes=*/100000000,
+                              path));
+
+    // Verify: pool is empty when max_count is 0
+    BOOST_CHECK(loaded_pool.empty());
+    BOOST_CHECK_EQUAL(loaded_pos, 0u);
+    BOOST_CHECK_EQUAL(loaded_memusage, 0u);
+
+    fs::remove(path);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -123,7 +123,7 @@ class ExtraPoolPersistTest(BitcoinTestFramework):
         self.log.info("Sending transactions to populate extra pool...")
         token_txns = []
         num_token_txs = 10
-        for i in range(num_token_txs):
+        for _ in range(num_token_txs):
             tx = self.create_token_tx(wallet)
             token_txns.append(tx)
             peer.send_message(msg_tx(tx))
