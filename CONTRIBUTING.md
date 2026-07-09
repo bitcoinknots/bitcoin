@@ -6,7 +6,7 @@ welcome to contribute towards development in the form of peer review, testing
 and patches. This document explains the practical process and guidelines for
 contributing.
 
-First, in terms of structure, there is no particular concept of "knots
+First, in terms of structure, there is no particular concept of "Knots
 developers" in the sense of privileged people. Open source often naturally
 revolves around a meritocracy where contributors earn trust from the developer
 community over time. Nevertheless, some hierarchy is necessary for practical
@@ -50,15 +50,15 @@ you are encouraged to leave a comment if you are planning to work on it. This
 will help other contributors monitor which issues are actively being addressed
 and is also an effective way to request assistance if and when you need it.
 
-Bitcoin Knots Communication Channels
-------------------------------------
+Communication Channels
+----------------------
 
 Most communication about Bitcoin Knots development happens on Discord, in the
 `#dev` channel.  You can join the Bitcoin Knots Discord with this [invitation
 link](https://discord.gg/3Ccegp9YrU).
 
 The easiest way to participate on Discord is with the web client,
-[https://discord.com/channels/@me](https://discord.com/channels/@me).
+[https://discord.com/app](https://discord.com/app).
 
 Discussion about codebase improvements happens in GitHub issues and pull
 requests.
@@ -77,7 +77,7 @@ To contribute a patch, the workflow is as follows:
   1. Create topic branch
   1. Commit patches
 
-For all issues and pull requests, the https://github.com/bitcoinknots/bitcoin repository should be used.
+For issues and pull requests use https://github.com/bitcoinknots/bitcoin
 
 The project coding conventions in the [developer notes](doc/developer-notes.md)
 must be followed.
@@ -205,10 +205,8 @@ pull request to pull request.
 
 ### Rebasing Changes
 
-When a pull request conflicts with the target branch, you may be asked to rebase it on top of the current target branch.
-
-    git fetch https://github.com/bitcoinknots/bitcoin  # Fetch the latest upstream commit
-    git rebase FETCH_HEAD  # Rebuild commits on top of the new base
+It is preferred to rebase pull requests onto the oldest commit they're applicable to.
+For bugfixes, the PR branch that introduced the bug is ideal.
 
 This project aims to have a clean git history, where code changes are only made in non-merge commits. This simplifies
 auditability because merge commits can be assumed to not contain arbitrary code changes. Merge commits should be signed,
