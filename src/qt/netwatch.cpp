@@ -175,7 +175,7 @@ void LogEntry::clear()
             break;
         default: assert(false);
     }
-    delete m_data;
+    ::operator delete(m_data);
 }
 
 LogEntry::~LogEntry()
