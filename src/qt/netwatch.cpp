@@ -690,8 +690,12 @@ void NetWatchLogModel::LogTransaction(const CTransactionRef& tx)
 void NetWatchLogModel::setClientModel(ClientModel *model)
 {
     if (m_client_model) {
-        delete m_validation_interface;
-        m_validation_interface = nullptr;
+        if (m_validation_interface) {
+            Assert(m_client_model->node().context()->validation_signals);
+            m_client_model->node().context()->validation_signals->UnregisterValidationInterface(m_validation_interface);
+            delete m_validation_interface;
+            m_validation_interface = nullptr;
+        }
 
         disconnect(m_client_model->getOptionsModel(), &OptionsModel::displayUnitChanged, this, &NetWatchLogModel::updateDisplayUnit);
         disconnect(m_client_model->getOptionsModel(), &OptionsModel::fontForMoneyChanged, this, &NetWatchLogModel::updateDisplayUnit);
