@@ -275,7 +275,10 @@ std::string UniValue::writeYyjson(unsigned int prettyIndent, unsigned int indent
 
     // Use yyjson_mut_write for standard indentation (0 or 2) and when indentLevel is 1 (root level)
     // For non-standard indentation or non-root levels, fall back to writeYyjsonValueInternal
-    bool use_fast_path = can_use_yyjson_direct && doc_to_use && (prettyIndent == 0 || prettyIndent == 2) && indentLevel == 1;
+    // Additionally, require m_yyjson_node to be the document root to avoid serializing
+    // the entire document when writing a materialized child node
+    bool use_fast_path = can_use_yyjson_direct && doc_to_use && (prettyIndent == 0 || prettyIndent == 2) && indentLevel == 1 &&
+                         m_yyjson_node && m_yyjson_node == yyjson_mut_doc_get_root(doc_to_use);
 
     if (use_fast_path) {
         // For empty containers, yyjson's pretty-printing indentation doesn't match the legacy behaviour
@@ -283,15 +286,10 @@ std::string UniValue::writeYyjson(unsigned int prettyIndent, unsigned int indent
         // Check for emptiness without calling empty() to avoid forcing materialization
         bool is_empty_container = false;
         if (typ == VARR || typ == VOBJ) {
-            if (m_yyjson_node) {
-                // Check the yyjson tree directly to avoid materialization
-                is_empty_container = (yyjson_mut_get_type(m_yyjson_node) == YYJSON_TYPE_ARR)
-                    ? (yyjson_mut_arr_size(m_yyjson_node) == 0)
-                    : (yyjson_mut_obj_size(m_yyjson_node) == 0);
-            } else {
-                // Fallback to empty() if no yyjson node (shouldn't happen in fast path)
-                is_empty_container = empty();
-            }
+            // Check the yyjson tree directly to avoid materialization
+            is_empty_container = (yyjson_mut_get_type(m_yyjson_node) == YYJSON_TYPE_ARR)
+                ? (yyjson_mut_arr_size(m_yyjson_node) == 0)
+                : (yyjson_mut_obj_size(m_yyjson_node) == 0);
         }
         if (is_empty_container) {
             return writeYyjsonValueInternal(*this, prettyIndent, indentLevel);
@@ -307,6 +305,20 @@ std::string UniValue::writeYyjson(unsigned int prettyIndent, unsigned int indent
         std::string result(output, len);
         free(output);
         return postProcessYyjsonOutput(std::move(result));
+    }
+
+    // If we have a yyjson node but it's not the root, serialize just that node
+    // Only use yyjson's write for indentation levels it supports (0 or 2 spaces)
+    if (m_yyjson_node && !use_fast_path && (prettyIndent == 0 || prettyIndent == 2)) {
+        yyjson_write_flag flags = prettyIndent ? YYJSON_WRITE_PRETTY_TWO_SPACES : YYJSON_WRITE_NOFLAG;
+        size_t len = 0;
+        char* output = yyjson_mut_val_write_opts(m_yyjson_node, flags, nullptr, &len, nullptr);
+        if (output) {
+            std::string result(output, len);
+            free(output);
+            return postProcessYyjsonOutput(std::move(result));
+        }
+        // Fall through to writeYyjsonValueInternal on failure
     }
 
     // For VSTR without document, use temporary document

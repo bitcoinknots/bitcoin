@@ -6,11 +6,13 @@
 #ifndef BITCOIN_UNIVALUE_INCLUDE_UNIVALUE_H
 #define BITCOIN_UNIVALUE_INCLUDE_UNIVALUE_H
 
+#include <atomic>
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -23,6 +25,27 @@
 #include <yyjson/yyjson.h>
 #endif
 
+/**
+ * @class UniValue
+ * @brief A universal value class for JSON data representation.
+ *
+ * UniValue provides a flexible way to represent and manipulate JSON data in C++.
+ * It supports all JSON types: null, boolean, number, string, array, and object.
+ *
+ * @par Thread Safety (WITH_YYJSON)
+ * When compiled with WITH_YYJSON=ON, UniValue uses yyjson as the primary storage backend.
+ * - Reading from const UniValue& is thread-safe: lazy materialization uses std::mutex
+ *   to ensure thread-safe access and support rematerialization when state changes.
+ * - Copying containers preserves the yyjson tree via yyjson_mut_val_mut_copy(), avoiding
+ *   the performance regression that occurred when copies unconditionally discarded trees.
+ * - Modifying non-const UniValue objects requires external synchronization.
+ *
+ * @par Performance Considerations (WITH_YYJSON)
+ * - Containers (arrays/objects) use yyjson as primary storage for efficient building
+ * - Lazy materialization: legacy representation (keys/values) is populated on-demand
+ * - Copy operations deep-copy yyjson trees to maintain performance through chained operations
+ * - Use std::move when passing containers to push_back/pushKV to avoid unnecessary copies
+ */
 // NOLINTNEXTLINE(misc-no-recursion)
 class UniValue {
 public:
@@ -121,7 +144,7 @@ public:
 
     void pushKVEnd(std::string key, UniValue val);
     void pushKV(std::string key, UniValue val);
-    void pushKVs(const UniValue& obj);
+    void pushKVs(UniValue obj);
 
     std::string write(unsigned int prettyIndent = 0,
                       unsigned int indentLevel = 0) const;
@@ -166,10 +189,12 @@ private:
     // yyjson primary storage
     mutable std::shared_ptr<yyjson_mut_doc> m_yyjson_doc; //!< Shared pointer to yyjson mutable document (primary storage)
     mutable yyjson_mut_val* m_yyjson_node{nullptr};    //!< Pointer to the root node in the yyjson tree
-    mutable bool m_materialized{false};                //!< Whether lazy caches (val/keys/values) have been populated
+    mutable std::atomic<bool> m_materialized{false};  //!< Whether lazy caches (val/keys/values) have been populated
+    mutable std::mutex m_materialize_mutex;          //!< Protects materialization to allow re-entry when m_materialized changes
 
     void materialize() const;              // Populate lazy caches from yyjson
     void materializeIfNeeded() const;      // Centralized guard to materialize on-demand if needed
+    void materialize_unsafe() const;      // Populate lazy caches without locking (caller must hold m_materialize_mutex)
     static void yyjson_doc_deleter(yyjson_mut_doc* doc); //!< Custom deleter for yyjson document shared_ptr
 #endif
 

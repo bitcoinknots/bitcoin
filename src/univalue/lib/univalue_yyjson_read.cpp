@@ -192,21 +192,20 @@ bool UniValue::read(std::string_view str_in) {
 
     if (str_in.empty()) return false;
 
-    // yyjson_read requires non-const char*, so make a mutable copy
-    std::string str_copy(str_in);
-
     // Parse with yyjson: NUMBER_AS_RAW preserves exact number strings,
     // STOP_WHEN_DONE stops at first non-JSON token
+    // yyjson_read requires non-const char*, but doesn't modify the buffer,
+    // so we can safely cast away constness
     yyjson_read_flag flags = YYJSON_READ_NUMBER_AS_RAW | YYJSON_READ_STOP_WHEN_DONE;
-    yyjson_doc* doc = yyjson_read(str_copy.data(), str_copy.size(), flags);
+    yyjson_doc* doc = yyjson_read(const_cast<char*>(str_in.data()), str_in.size(), flags);
     if (!doc) {
         return false;
     }
 
     // Check for trailing content
     size_t consumed = yyjson_doc_get_read_size(doc);
-    const char* after = str_copy.data() + consumed;
-    const char* end = str_copy.data() + str_copy.size();
+    const char* after = str_in.data() + consumed;
+    const char* end = str_in.data() + str_in.size();
 
     // yyjson with STOP_WHEN_DONE stops at the first non-JSON token.
     // Original UniValue parser accepts trailing whitespace, so we do too.
