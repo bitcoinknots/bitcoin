@@ -356,6 +356,17 @@ class WalletMiniscriptTest(BitcoinTestFramework):
         res = imp(f"tr({key},l:pk({TPUBS[0]}/*))", False)
         assert not res["success"], res
         assert err in res["error"]["message"], res
+        # Every OP_IF/OP_NOTIF-emitting fragment must be caught, so that dropping any
+        # single case from the parser's switch cannot silently re-enable it. The above
+        # cover or_c/or_d (branch) and or_i (l:); the rest are pinned individually here.
+        for frag in (
+            f"andor(pk({TPUBS[0]}/*),pk({TPUBS[1]}/*),pk({TPUBS[2]}/*))",  # ANDOR
+            f"j:pk({TPUBS[0]}/*)",                                          # j: (WRAP_J)
+            f"and_v(v:pk({TPUBS[0]}/*),dv:older(144))",                     # d: (WRAP_D)
+        ):
+            res = imp(f"tr({key},{frag})", False)
+            assert not res["success"], res
+            assert err in res["error"]["message"], res
         # A non-branching Tapscript miniscript is accepted (single and multi-leaf).
         assert (res := imp(f"tr({key},{nobranch})", False))["success"], res
         assert (res := imp(f"tr({key},{{pk({TPUBS[0]}/*),pk({TPUBS[1]}/*)}})", False))["success"], res
