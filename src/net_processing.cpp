@@ -40,6 +40,7 @@
 #include <txorphanage.h>
 #include <txrequest.h>
 #include <util/check.h>
+#include <util/hasher.h>
 #include <util/strencodings.h>
 #include <util/time.h>
 #include <util/trace.h>
@@ -51,6 +52,7 @@
 #include <memory>
 #include <optional>
 #include <typeinfo>
+#include <unordered_set>
 #include <utility>
 
 /** Headers download timeout.
@@ -715,6 +717,8 @@ private:
 
     FastRandomContext m_rng GUARDED_BY(NetEventsInterface::g_msgproc_mutex);
 
+    /** Copied into short-lived tx INV deduplication sets to avoid generating salts per message. */
+    const SaltedTxidHasher m_txhash_hasher;
     FeeFilterRounder m_fee_filter_rounder GUARDED_BY(NetEventsInterface::g_msgproc_mutex);
 
     const CChainParams& m_chainparams;
@@ -3896,6 +3900,8 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         }
 
         const bool reject_tx_invs{RejectIncomingTxs(pfrom)};
+        std::unordered_set<uint256, SaltedTxidHasher> seen_txids{0, m_txhash_hasher};
+        std::unordered_set<uint256, SaltedTxidHasher> seen_wtxids{0, m_txhash_hasher};
 
         LOCK(cs_main);
 
@@ -3934,6 +3940,9 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
                     pfrom.fDisconnect = true;
                     return;
                 }
+                // MSG_WITNESS_TX is treated as a txid, despite only being specified for getdata.
+                auto& seen_hashes{inv.IsMsgWtx() ? seen_wtxids : seen_txids};
+                if (!seen_hashes.insert(inv.hash).second) continue;
                 const GenTxid gtxid = ToGenTxid(inv);
                 const bool fAlreadyHave = AlreadyHaveTx(gtxid);
                 LogPrint(BCLog::NET, "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHave ? "have" : "new", pfrom.GetId());
