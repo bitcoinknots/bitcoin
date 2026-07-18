@@ -128,7 +128,11 @@ hardening_cmake := $(BASEDIR)/../cmake/module/Hardening.cmake
 hardening_probe_extra_args_darwin := -DCMAKE_OSX_SYSROOT=$(OSX_SDK) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(OSX_MIN_VERSION)
 
 define run_hardening_probe
-$(1)_hardening_probe_dir := $(WORK_PATH)/hardening_probe/$(2)
+# Key the cache on the probe inputs, not just the triplet. host and build can
+# use different compilers for the same triplet, and each needs the flags its
+# own compiler accepts.
+$(1)_hardening_probe_key := $(shell printf '%s' "$(3)|$(4)|$(5)|$(7)|$(hardening_probe_extra_args_$(6))" | $(build_SHA256SUM) | cut -c1-$(HASH_LENGTH))
+$(1)_hardening_probe_dir := $(WORK_PATH)/hardening_probe/$(2)/$$($(1)_hardening_probe_key)
 $(1)_hardening_mk := $$($(1)_hardening_probe_dir)/hardening.mk
 $(1)_needs_probe :=
 ifeq ($$(wildcard $$($(1)_hardening_mk)),)
