@@ -13,6 +13,62 @@
 static constexpr size_t MAX_JSON_DEPTH = 512;
 
 /**
+ * @brief Check if JSON string exceeds maximum nesting depth without parsing
+ *
+ * Scans the input string counting bracket/brace nesting levels, ignoring
+ * brackets/braces inside JSON strings. Returns false if depth exceeds MAX_JSON_DEPTH.
+ *
+ * @param str JSON string to check
+ * @return true if depth is acceptable, false if too deep
+ */
+static bool checkJsonDepthBeforeParse(std::string_view str) {
+    size_t current_depth = 0;
+    bool in_string = false;
+    bool escape_next = false;
+
+    for (char c : str) {
+        if (escape_next) {
+            escape_next = false;
+            continue;
+        }
+
+        if (c == '\\') {
+            escape_next = true;
+            continue;
+        }
+
+        if (in_string) {
+            if (c == '"') {
+                in_string = false;
+            }
+            continue;
+        }
+
+        // Not in string, check for whitespace (skip)
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            continue;
+        }
+
+        // Check for opening brackets/braces
+        if (c == '[' || c == '{') {
+            current_depth++;
+            if (current_depth > MAX_JSON_DEPTH) {
+                return false;
+            }
+        } else if (c == ']' || c == '}') {
+            if (current_depth > 0) {
+                current_depth--;
+            }
+            // If current_depth < 0, it means unbalanced brackets, but we'll let yyjson handle that
+        } else if (c == '"') {
+            in_string = true;
+        }
+    }
+
+    return true;
+}
+
+/**
  * @brief Deep copy a yyjson value into a mutable document
  *
  * Copies the entire value tree from the source (which may be from yyjson_read's
@@ -192,6 +248,11 @@ bool UniValue::read(std::string_view str_in) {
 
     if (str_in.empty()) return false;
 
+    // Check depth limit before parsing to avoid expensive parse of deeply nested JSON
+    if (!checkJsonDepthBeforeParse(str_in)) {
+        return false;
+    }
+
     // Parse with yyjson: NUMBER_AS_RAW preserves exact number strings,
     // STOP_WHEN_DONE stops at first non-JSON token
     // yyjson_read requires non-const char*, but doesn't modify the buffer,
@@ -298,8 +359,13 @@ bool UniValue::read(std::string_view str_in) {
             break;
     }
 
-    // Primitives are materialized, containers are not (lazy materialization)
-    m_materialized = (typ != VARR && typ != VOBJ);
+    // Eager materialization: materialize containers immediately
+    if (typ == VARR || typ == VOBJ) {
+        materialize();
+        m_materialized = true;
+    } else {
+        m_materialized = true;
+    }
 
     return true;
 }

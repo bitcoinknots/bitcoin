@@ -21,7 +21,8 @@ const UniValue NullUniValue;
 /**
  * @brief Check if this UniValue represents true ("1")
  *
- * Triggers lazy materialization if the value hasn't been materialized yet.
+ * With eager materialization, primitives are always materialized, so this is a direct check.
+ * For containers parsed from JSON, ensures legacy representation is populated.
  *
  * @return true if this is a boolean value equal to "1", false otherwise
  * @note In UniValue's encoding: "1" = true, "" (empty) = false
@@ -35,7 +36,8 @@ bool UniValue::isTrue() const {
 /**
  * @brief Check if this UniValue represents false ("")
  *
- * Triggers lazy materialization if the value hasn't been materialized yet.
+ * With eager materialization, primitives are always materialized, so this is a direct check.
+ * For containers parsed from JSON, ensures legacy representation is populated.
  *
  * @return true if this is a boolean value not equal to "1", false otherwise
  * @note In UniValue's encoding: "1" = true, "" (empty) = false
@@ -102,7 +104,7 @@ UniValue::UniValue() : typ(VNULL) {
     m_yyjson_doc = nullptr;
     m_yyjson_node = nullptr;
     val.clear();
-    m_materialized.store(true);  // Primitives are always materialized
+    m_materialized = true;  // Primitives are always materialized
 }
 
 /**
@@ -118,10 +120,12 @@ UniValue::UniValue() : typ(VNULL) {
  * @param type The value type (VOBJ, VARR, VNULL, VSTR, VNUM, or VBOOL)
  * @param str The string value (for VSTR, VNUM, VBOOL) or ignored for containers
  */
-UniValue::UniValue(UniValue::VType type, std::string str) : typ(type) {
+UniValue::UniValue(UniValue::VType type, std::string str)
+     : typ(type), m_materialized(false) {
     // Containers need yyjson documents for tree building
     if (type == VOBJ || type == VARR) {
         m_yyjson_doc = std::shared_ptr<yyjson_mut_doc>(yyjson_mut_doc_new(nullptr), yyjson_doc_deleter);
+        if (!m_yyjson_doc) throw std::bad_alloc();
 
         switch (type) {
             case VOBJ:
@@ -135,8 +139,10 @@ UniValue::UniValue(UniValue::VType type, std::string str) : typ(type) {
                 m_yyjson_node = nullptr;
                 break;
         }
+        if (!m_yyjson_node) throw std::bad_alloc();
         setYyjsonRoot(m_yyjson_doc.get(), m_yyjson_node);
-        m_materialized.store(false);  // Containers are lazily materialized
+        // Eager materialization: populate legacy representation immediately
+        materialize();
     } else {
         // Primitive types: store in val only, no document needed
         m_yyjson_doc = nullptr;
@@ -160,7 +166,7 @@ UniValue::UniValue(UniValue::VType type, std::string str) : typ(type) {
                 val.clear();
                 break;
         }
-        m_materialized.store(true);  // Primitives are always materialized
+        m_materialized = true;  // Primitives are always materialized
     }
 }
 
@@ -179,7 +185,7 @@ UniValue::~UniValue() {}
  * @param other The UniValue to copy from
  */
 UniValue::UniValue(const UniValue& other)
-    : typ(other.typ)
+    : typ(other.typ), m_materialized(false)
 {
     // Initialize yyjson state to null (will be set below if needed)
     m_yyjson_doc = nullptr;
@@ -188,7 +194,7 @@ UniValue::UniValue(const UniValue& other)
     // For primitives, copy val directly (it's already populated)
     if (other.typ != VARR && other.typ != VOBJ) {
         val = other.val;
-        m_materialized.store(true);
+        m_materialized = true;
     } else {
         // For containers: preserve yyjson tree if available to maintain performance
         if (other.m_yyjson_doc && other.m_yyjson_node) {
@@ -201,23 +207,24 @@ UniValue::UniValue(const UniValue& other)
                 const_cast<UniValue&>(other).materialize();
                 keys = other.keys;
                 values = other.values;
-                m_materialized.store(true);
+                m_materialized = true;
             } else {
                 setYyjsonRoot(m_yyjson_doc.get(), m_yyjson_node);
-                m_materialized.store(false);  // New tree, not yet materialized
+                // Eager materialization: populate legacy representation immediately
+                materialize();
             }
-        } else if (other.m_materialized.load()) {
+        } else if (other.m_materialized) {
             // Other is already materialized without yyjson tree, copy keys/values directly
             keys = other.keys;
             values = other.values;
-            m_materialized.store(true);
+            m_materialized = true;
         } else {
             // Other has no yyjson state and is not materialized
             // Materialize other first to ensure we get the correct data
             const_cast<UniValue&>(other).materialize();
             keys = other.keys;
             values = other.values;
-            m_materialized.store(true);
+            m_materialized = true;
         }
     }
 }
@@ -242,12 +249,12 @@ UniValue::UniValue(UniValue&& other) noexcept
     values = std::move(other.values);
     m_yyjson_doc = std::move(other.m_yyjson_doc);
     m_yyjson_node = other.m_yyjson_node;
-    m_materialized.store(other.m_materialized.load());
+    m_materialized = other.m_materialized;
 
     // Reset other to safe state
     other.typ = VNULL;
     other.m_yyjson_node = nullptr;
-    other.m_materialized.store(false);
+    other.m_materialized = false;
 }
 
 /**
@@ -273,7 +280,7 @@ UniValue& UniValue::operator=(const UniValue& other) {
         std::vector<std::string> other_keys;
         std::vector<UniValue> other_values;
         bool other_has_yyjson = other.m_yyjson_doc && other.m_yyjson_node;
-        bool other_materialized = other.m_materialized.load();
+        bool other_materialized = other.m_materialized;
         
         // Snapshot yyjson state to use after clear() - retain strong reference to doc
         std::shared_ptr<yyjson_mut_doc> other_doc;
@@ -312,7 +319,7 @@ UniValue& UniValue::operator=(const UniValue& other) {
         if (other_typ != VARR && other_typ != VOBJ) {
             typ = other_typ;
             val = other_val;
-            m_materialized.store(true);
+            m_materialized = true;
         } else {
             // For containers: preserve yyjson tree if available to maintain performance
             if (other_has_yyjson) {
@@ -325,18 +332,19 @@ UniValue& UniValue::operator=(const UniValue& other) {
                     typ = other_typ;
                     keys = std::move(other_keys);
                     values = std::move(other_values);
-                    m_materialized.store(other_materialized);
+                    m_materialized = other_materialized;
                 } else {
                     typ = other_typ;
                     setYyjsonRoot(m_yyjson_doc.get(), m_yyjson_node);
-                    m_materialized.store(false);  // New tree, not yet materialized
+                    // Eager materialization: populate legacy representation immediately
+                    materialize();
                 }
             } else {
                 // Other has no yyjson tree, use snapshotted keys/values
                 typ = other_typ;
                 keys = std::move(other_keys);
                 values = std::move(other_values);
-                m_materialized.store(other_materialized);
+                m_materialized = other_materialized;
             }
         }
     }
@@ -364,12 +372,12 @@ UniValue& UniValue::operator=(UniValue&& other) noexcept {
         values = std::move(other.values);
         m_yyjson_doc = std::move(other.m_yyjson_doc);
         m_yyjson_node = other.m_yyjson_node;  // Move node pointer (other's doc is now null after move)
-        m_materialized.store(other.m_materialized.load());
+        m_materialized = other.m_materialized;
 
         // Reset other to safe state
         other.typ = VNULL;
         other.m_yyjson_node = nullptr;
-        other.m_materialized.store(false);
+        other.m_materialized = false;
     }
     return *this;
 }
@@ -387,7 +395,7 @@ void UniValue::clear() {
     values.clear();
     m_yyjson_doc.reset();
     m_yyjson_node = nullptr;
-    m_materialized.store(false);
+    m_materialized = false;
 }
 
 /**
@@ -402,7 +410,7 @@ void UniValue::setNull() {
     m_yyjson_node = nullptr;
     typ = VNULL;
     val.clear();
-    m_materialized.store(true);  // Primitives are always materialized
+    m_materialized = true;  // Primitives are always materialized
 }
 
 /**
@@ -423,7 +431,7 @@ void UniValue::setBool(bool val_) {
     } else {
         val.clear();  // Empty string for false
     }
-    m_materialized.store(true);  // Primitives are always materialized
+    m_materialized = true;  // Primitives are always materialized
 }
 
 /**
@@ -474,6 +482,9 @@ static bool validNumStr(const std::string& s) {
         firstDigit++;
         raw++; // Also advance raw past the sign
     }
+
+    if (firstDigit == end)
+        return false;
 
     if (!json_isdigit(static_cast<unsigned char>(*firstDigit)))
         return false;
@@ -531,12 +542,11 @@ void UniValue::setNumStr(std::string str) {
     }
 
     clear();
-    m_yyjson_doc = std::shared_ptr<yyjson_mut_doc>(yyjson_mut_doc_new(nullptr), yyjson_doc_deleter);
-    m_yyjson_node = yyjson_mut_rawncpy(m_yyjson_doc.get(), str.data(), str.size());
-    setYyjsonRoot(m_yyjson_doc.get(), m_yyjson_node);
+    m_yyjson_doc = nullptr;
+    m_yyjson_node = nullptr;
     typ = VNUM;
-    val = str;  // Store number string for fast access
-    m_materialized.store(true);  // Primitives are always materialized
+    val = std::move(str);
+    m_materialized = true;  // Primitives are always materialized
 }
 
 /**
@@ -556,7 +566,7 @@ void UniValue::setInt(uint64_t val_) {
     m_yyjson_node = nullptr;
     typ = VNUM;
     val = str;  // Store number string for fast access
-    m_materialized.store(true);  // Primitives are always materialized
+    m_materialized = true;  // Primitives are always materialized
 }
 
 /**
@@ -576,27 +586,21 @@ void UniValue::setInt(int64_t val_) {
     m_yyjson_node = nullptr;
     typ = VNUM;
     val = str;  // Store number string for fast access
-    m_materialized.store(true);  // Primitives are always materialized
+    m_materialized = true;  // Primitives are always materialized
 }
 
 /**
  * @brief Set this UniValue to a floating-point number
  *
- * Converts the double to a string with 15 digits of precision.
+ * Converts the double to a string with 16 digits of precision.
  * Optimization: Primitives don't need their own yyjson documents.
  *
  * @param val_ The floating-point value
  */
 void UniValue::setFloat(double val_) {
-    clear();
     std::ostringstream ss;
     ss << std::setprecision(16) << val_;
-    std::string str = ss.str();
-    m_yyjson_doc = nullptr;
-    m_yyjson_node = nullptr;
-    typ = VNUM;
-    val = str;  // Store number string for fast access
-    m_materialized.store(true);  // Primitives are always materialized
+    setNumStr(ss.str());
 }
 
 /**
@@ -613,7 +617,7 @@ void UniValue::setStr(std::string str) {
     m_yyjson_node = nullptr;
     typ = VSTR;
     val = str;  // Store string for fast access
-    m_materialized.store(true);  // Primitives are always materialized
+    m_materialized = true;  // Primitives are always materialized
 }
 
 /**
@@ -627,8 +631,8 @@ void UniValue::setArray() {
     m_yyjson_node = yyjson_mut_arr(m_yyjson_doc.get());
     setYyjsonRoot(m_yyjson_doc.get(), m_yyjson_node);
     typ = VARR;
-    // Don't populate val/keys/values for containers - use lazy materialization
-    m_materialized.store(false);
+    // Eager materialization: populate legacy representation immediately
+    materialize();
 }
 
 /**
@@ -639,11 +643,13 @@ void UniValue::setArray() {
 void UniValue::setObject() {
     clear();
     m_yyjson_doc = std::shared_ptr<yyjson_mut_doc>(yyjson_mut_doc_new(nullptr), yyjson_doc_deleter);
+    if (!m_yyjson_doc) throw std::bad_alloc();
+
     m_yyjson_node = yyjson_mut_obj(m_yyjson_doc.get());
     setYyjsonRoot(m_yyjson_doc.get(), m_yyjson_node);
     typ = VOBJ;
-    // Don't populate val/keys/values for containers - use lazy materialization
-    m_materialized.store(false);
+    // Eager materialization: populate legacy representation immediately
+    materialize();
 }
 
 /**
@@ -658,17 +664,21 @@ void UniValue::checkType(const VType& expected) const {
     }
 }
 /**
- * @brief Materialize the yyjson tree into the legacy UniValue representation (internal, unlocked)
+ * @brief Materialize the yyjson tree into the legacy UniValue representation
  *
  * Populates the `val`, `keys`, and `values` members from the yyjson tree.
- * This version does NOT lock the mutex - callers must hold m_materialize_mutex.
+ * This is the main materialization method - callers ensure thread safety through eager materialization.
  *
+ * SPECIAL NOTE: Neither UniValue nor yyjson are thread safe.  Depsite
+ * this returning a const, the contents can change.  The caller must provide
+ * their own thread safety mechanism.
+ * 
  * For primitives: Extracts the value from the yyjson node into `val`
  * For arrays: Builds the `values` vector from the yyjson array
  * For objects: Builds both `keys` and `values` vectors from the yyjson object
  */
-void UniValue::materialize_unsafe() const {
-    if (m_materialized.load()) return;
+void UniValue::materialize() const {
+    if (m_materialized) return;
     if (!m_yyjson_doc || !m_yyjson_node) return;
 
     yyjson_type ytype = yyjson_mut_get_type(m_yyjson_node);
@@ -768,7 +778,7 @@ void UniValue::materialize_unsafe() const {
         default:
             break;
     }
-    m_materialized.store(true);
+    m_materialized = true;
 }
 
 /**
@@ -782,27 +792,20 @@ void UniValue::materialize_unsafe() const {
  * For objects: Builds both `keys` and `values` vectors from the yyjson object
  *
  * Supports rematerialization when m_materialized is set to false (e.g., after
- * push_back/pushKV add to the yyjson tree). Uses mutex for thread-safety.
+ * push_back/pushKV add to the yyjson tree). Uses eager materialization for performance.
  *
- * @note Thread-safe: Uses std::mutex to protect materialization and allow
- * re-entry when the object transitions back to non-materialized state.
+ * @note With eager materialization, containers are materialized immediately on construction/modification.
  */
-void UniValue::materialize() const {
-    std::lock_guard<std::mutex> lock(m_materialize_mutex);
-    materialize_unsafe();
-}
+// With eager materialization, this is typically a no-op
+// since containers are materialized immediately on construction/modification
+// materialize() now directly implements the materialization logic
 
 /**
- * @brief Centralized guard to materialize on-demand if needed
+ * @brief Ensure the UniValue is materialized (eager materialization)
  *
- * Calls materialize() which uses a mutex to ensure thread-safe materialization.
- * Supports rematerialization when m_materialized changes state.
- *
- * This is safe because:
- * 1. We only populate the cache (val/keys/values) which is logically equivalent to the yyjson tree
- * 2. The cache members are mutable when WITH_YYJSON=ON, so this can be done in const context
- * 3. Materialization is idempotent - calling it multiple times has the same result
- * 4. All state checks are performed under mutex synchronization in materialize()
+ * With eager materialization, containers are materialized immediately on construction
+ * or modification, so this is typically a no-op. However, it ensures the legacy
+ * representation is populated if needed.
  */
 void UniValue::materializeIfNeeded() const {
     materialize();
@@ -813,8 +816,8 @@ void UniValue::materializeIfNeeded() const {
  * @brief Find a key in an object
  *
  * Searches for a key in the object's keys vector.
- * Triggers materialization if the object hasn't been materialized yet.
- * Thread-safe: uses mutex to synchronize materialization check and cache access.
+ * With eager materialization, containers are materialized immediately on construction,
+ * so this typically accesses already-populated data.
  *
  * @param key The key to find
  * @param retIdx Output parameter for the index if found
@@ -824,10 +827,8 @@ bool UniValue::findKey(const std::string& key, size_t& retIdx) const {
     if (typ != VOBJ) return false;
 
     if (m_yyjson_doc && m_yyjson_node) {
-        // Synchronize materialization check and cache access to prevent data races
-        std::lock_guard<std::mutex> lock(m_materialize_mutex);
-        if (!m_materialized.load()) {
-            materialize_unsafe();
+        if (!m_materialized) {
+            materialize();
         }
         for (size_t i = 0; i < keys.size(); ++i) {
             if (keys[i] == key) {
@@ -850,18 +851,15 @@ bool UniValue::findKey(const std::string& key, size_t& retIdx) const {
 /**
  * @brief Get the string representation of this value
  *
- * Triggers materialization if the value hasn't been materialized yet.
- * For primitives with yyjson documents, extracts the value from the tree.
- * Thread-safe: uses mutex to synchronize materialization check and cache access.
+ * With eager materialization, primitives are always materialized directly.
+ * For containers parsed from JSON, extracts the value from the tree if needed.
  *
  * @return Reference to the val string
  */
 const std::string& UniValue::getValStr() const {
     if (m_yyjson_doc && m_yyjson_node) {
-        // Synchronize materialization check and cache access to prevent data races
-        std::lock_guard<std::mutex> lock(m_materialize_mutex);
-        if (!m_materialized.load()) {
-            materialize_unsafe();
+        if (!m_materialized) {
+            materialize();
         }
     }
     return val;
@@ -870,17 +868,15 @@ const std::string& UniValue::getValStr() const {
 /**
  * @brief Check if this container is empty
  *
- * Triggers materialization if the container hasn't been materialized yet.
- * Thread-safe: uses mutex to synchronize materialization check and cache access.
+ * With eager materialization, containers are materialized immediately on construction,
+ * so this typically accesses already-populated data.
  *
  * @return true if empty, false otherwise
  */
 bool UniValue::empty() const {
     if ((typ == VOBJ || typ == VARR) && m_yyjson_doc && m_yyjson_node) {
-        // Synchronize materialization check and cache access to prevent data races
-        std::lock_guard<std::mutex> lock(m_materialize_mutex);
-        if (!m_materialized.load()) {
-            materialize_unsafe();
+        if (!m_materialized) {
+            materialize();
         }
     }
     return values.empty();
@@ -889,18 +885,15 @@ bool UniValue::empty() const {
 /**
  * @brief Get the size of this container
  *
- * Triggers materialization if the container hasn't been materialized yet.
- * After materialization, returns the cached size.
- * Thread-safe: uses mutex to synchronize materialization check and cache access.
+ * With eager materialization, containers are materialized immediately on construction,
+ * so this typically returns the already-cached size.
  *
  * @return Number of elements in the container
  */
 size_t UniValue::size() const {
     if ((typ == VOBJ || typ == VARR) && m_yyjson_doc && m_yyjson_node) {
-        // Synchronize materialization check and cache access to prevent data races
-        std::lock_guard<std::mutex> lock(m_materialize_mutex);
-        if (!m_materialized.load()) {
-            materialize_unsafe();
+        if (!m_materialized) {
+            materialize();
         }
     }
     // For containers, return the materialized size
@@ -909,19 +902,26 @@ size_t UniValue::size() const {
 }
 
 /**
- * @brief Reserve capacity for an array
+ * @brief Reserve capacity for an array or object
  *
- * Triggers materialization if the array hasn't been materialized yet.
- * Then reserves the requested capacity in the values vector.
+ * With eager materialization, containers are materialized immediately on construction.
+ * Reserves the requested capacity in the values vector.
+ * For objects, also reserves capacity in the keys vector.
+ * Note: yyjson's reservation is array-only; objects must be materialized first.
  *
  * @param new_cap The new capacity to reserve
  */
 void UniValue::reserve(size_t new_cap) {
-    checkType(VARR);
-    if (m_yyjson_doc && m_yyjson_node && !m_materialized.load()) {
+    if (typ != VARR && typ != VOBJ) {
+        checkType(VARR);
+    }
+    if (m_yyjson_doc && m_yyjson_node && !m_materialized) {
         materialize();
     }
     values.reserve(new_cap);
+    if (typ == VOBJ) {
+        keys.reserve(new_cap);
+    }
 }
 
 /**
@@ -988,26 +988,27 @@ void UniValue::push_back(UniValue val) {
             if (!yyjson_mut_arr_append((yyjson_mut_val*)m_yyjson_node, new_val)) {
                 throw std::runtime_error("yyjson_mut_arr_append failed");
             }
-            // Successfully added to yyjson tree, set m_materialized to false and return
-            m_materialized.store(false);
+            // Mark as not materialized so legacy representation will be rebuilt on demand
+            m_materialized = false;
             return;
         } else {
             // use_legacy_path is true: container without yyjson tree
-            // Need to materialize first to ensure yyjson tree and legacy representation stay in sync
-            if (m_yyjson_doc && m_yyjson_node) {
-                materialize();
-            }
+            // With incremental materialization, the tree and values should already be in sync
+            // No need to materialize here
         }
     }
     // Fallback to legacy representation
     // This is used when:
     // 1. The target array doesn't have yyjson tree
     // 2. The value is a container without yyjson tree (after materializing if needed)
+    if (m_yyjson_doc && m_yyjson_node && !m_materialized) {
+        materialize();
+    }
     values.push_back(std::move(val));
     // Clear yyjson state to ensure writeYyjson() uses legacy representation
     m_yyjson_doc.reset();
     m_yyjson_node = nullptr;
-    m_materialized.store(true);  // Legacy representation is now up to date
+    m_materialized = true;  // Legacy representation is now up to date
 }
 
 /**
@@ -1047,10 +1048,7 @@ void UniValue::pushKV(std::string key, UniValue val) {
 
         if (use_legacy_path) {
             // Can't add container without yyjson tree to yyjson object
-            // Need to materialize first to ensure yyjson tree and legacy representation stay in sync
-            if (m_yyjson_doc && m_yyjson_node) {
-                materialize();
-            }
+            // With incremental materialization, the tree and keys/values should already be in sync
             // Fall through to legacy representation
         } else {
             // Optimization: Handle values with yyjson tree (both materialized and non-materialized)
@@ -1089,14 +1087,15 @@ void UniValue::pushKV(std::string key, UniValue val) {
                 throw std::bad_alloc();
             }
 
-            // Optimization: Use yyjson_mut_obj_put which handles both new and existing keys
-            // in a single operation, avoiding the separate check+remove+add pattern
+            // Use yyjson_mut_obj_put which handles both new and existing keys
+            // in a single operation: replaces the first matching key's value in place
+            // (preserving key order), removes any further duplicates, or appends
+            // at the end if the key is new.
             if (!yyjson_mut_obj_put((yyjson_mut_val*)m_yyjson_node, new_key, new_val)) {
                 throw std::runtime_error("yyjson_mut_obj_put failed");
             }
-            // Successfully added to yyjson tree, set m_materialized to false
-            // and return (no need for legacy fallback)
-            m_materialized.store(false);
+            // Mark as not materialized so legacy representation will be rebuilt on demand
+            m_materialized = false;
             return;
         }
     }
@@ -1104,7 +1103,10 @@ void UniValue::pushKV(std::string key, UniValue val) {
     // This is used when:
     // 1. The target object doesn't have yyjson tree
     // 2. The value is a container without yyjson tree (after materializing if needed)
-    if (m_materialized.load() && findKey(key, idx)) {
+    if (m_yyjson_doc && m_yyjson_node && !m_materialized) {
+        materialize();
+    }
+    if (m_materialized && findKey(key, idx)) {
         values[idx] = std::move(val);
     } else {
         keys.push_back(std::move(key));
@@ -1113,7 +1115,7 @@ void UniValue::pushKV(std::string key, UniValue val) {
     // Clear yyjson state to ensure writeYyjson() uses legacy representation
     m_yyjson_doc.reset();
     m_yyjson_node = nullptr;
-    m_materialized.store(true);  // Legacy representation is now up to date
+    m_materialized = true;  // Legacy representation is now up to date
 }
 
 /**
@@ -1188,27 +1190,28 @@ void UniValue::pushKVEnd(std::string key, UniValue val) {
             if (!yyjson_mut_obj_add((yyjson_mut_val*)m_yyjson_node, new_key, new_val)) {
                 throw std::runtime_error("yyjson_mut_obj_add failed");
             }
-            // Successfully added to yyjson tree, set m_materialized to false and return
-            m_materialized.store(false);
+            // Mark as not materialized so legacy representation will be rebuilt on demand
+            m_materialized = false;
             return;
         } else {
             // use_legacy_path is true: container without yyjson tree
-            // Need to materialize first to ensure yyjson tree and legacy representation stay in sync
-            if (m_yyjson_doc && m_yyjson_node) {
-                materialize();
-            }
+            // With incremental materialization, the tree and keys/values should already be in sync
+            // No need to materialize here
         }
     }
     // Fallback to legacy representation
     // This is used when:
     // 1. The target object doesn't have yyjson tree
     // 2. The value is a container without yyjson tree (after materializing if needed)
+    if (m_yyjson_doc && m_yyjson_node && !m_materialized) {
+        materialize();
+    }
     keys.push_back(std::move(key));
     values.push_back(std::move(val));
     // Clear yyjson state to ensure writeYyjson() uses legacy representation
     m_yyjson_doc.reset();
     m_yyjson_node = nullptr;
-    m_materialized.store(true);  // Legacy representation is now up to date
+    m_materialized = true;  // Legacy representation is now up to date
 }
 
 /**
@@ -1225,7 +1228,7 @@ void UniValue::pushKVs(UniValue obj) {
     obj.checkType(VOBJ);
 
     // Materialize obj if needed
-    if (!obj.m_materialized.load()) {
+    if (!obj.m_materialized) {
         obj.materialize();
     }
 
@@ -1238,7 +1241,7 @@ void UniValue::pushKVs(UniValue obj) {
  *
  * Searches for the key in the object and returns the corresponding value.
  * Returns NullUniValue if the key is not found or if this is not an object.
- * Thread-safe: uses mutex to synchronize materialization check and cache access.
+ * With eager materialization, containers are materialized immediately on construction.
  *
  * @param key The key to look up
  * @return Reference to the value, or NullUniValue if not found
@@ -1249,9 +1252,8 @@ const UniValue& UniValue::operator[](const std::string& key) const {
 
     // Check if we have yyjson tree that needs materialization
     if (m_yyjson_doc && m_yyjson_node) {
-        std::lock_guard<std::mutex> lock(m_materialize_mutex);
-        if (!m_materialized.load()) {
-            materialize_unsafe();
+        if (!m_materialized) {
+            materialize();
         }
         // Search for key in materialized cache
         for (size_t i = 0; i < keys.size(); ++i) {
@@ -1277,7 +1279,7 @@ const UniValue& UniValue::operator[](const std::string& key) const {
  * For arrays: Returns the element at the index.
  * For objects: Returns the value at the index (indexing by insertion order).
  * Returns NullUniValue if the index is out of bounds or if this is not a container.
- * Thread-safe: uses mutex to synchronize materialization check and cache access.
+ * With eager materialization, containers are materialized immediately on construction.
  *
  * @param index The index to access
  * @return Reference to the value, or NullUniValue if index is invalid
@@ -1286,10 +1288,8 @@ const UniValue& UniValue::operator[](size_t index) const {
     if (typ != VOBJ && typ != VARR)
         return NullUniValue;
     if (m_yyjson_doc && m_yyjson_node) {
-        // Synchronize materialization check and cache access to prevent data races
-        std::lock_guard<std::mutex> lock(m_materialize_mutex);
-        if (!m_materialized.load()) {
-            materialize_unsafe();
+        if (!m_materialized) {
+            materialize();
         }
     }
     if (index < values.size()) {
@@ -1321,7 +1321,7 @@ const UniValue& UniValue::find_value(std::string_view key) const {
  * Verifies that the object contains all the keys specified in memberTypes
  * and that each key has the expected type.
  *
- * Triggers materialization if the object hasn't been materialized yet.
+ * With eager materialization, containers are materialized immediately on construction.
  *
  * @param memberTypes Map of key names to expected types
  * @return true if the object matches the expected structure, false otherwise
@@ -1329,7 +1329,7 @@ const UniValue& UniValue::find_value(std::string_view key) const {
 bool UniValue::checkObject(const std::map<std::string,UniValue::VType>& memberTypes) const {
     if (typ != VOBJ) return false;
 
-    if (m_yyjson_doc && m_yyjson_node && !m_materialized.load()) {
+    if (m_yyjson_doc && m_yyjson_node && !m_materialized) {
         materialize();
     }
 
@@ -1349,8 +1349,6 @@ bool UniValue::checkObject(const std::map<std::string,UniValue::VType>& memberTy
  * @brief Append multiple values to an array
  *
  * Convenience method to append all values from a vector.
- *
- * @param vec The vector of values to append
  */
 void UniValue::push_backV(const std::vector<UniValue>& vec)
 {
@@ -1359,8 +1357,7 @@ void UniValue::push_backV(const std::vector<UniValue>& vec)
     // This handles cases like arr.push_backV(arr.values) and nested cases like arr.push_backV(arr[0].values)
     // The snapshot ensures stable iteration even if push_back causes reallocation of this->values
     std::vector<UniValue> snapshot = vec;
-    for (const auto& v : snapshot) {
-        push_back(v);
+    for (auto& v : snapshot) {
+        push_back(std::move(v));
     }
 }
-

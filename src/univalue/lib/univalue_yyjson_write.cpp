@@ -218,11 +218,13 @@ static std::string writeYyjsonStrPrimitive(const UniValue& uv, unsigned int pret
     if (output) {
         result = std::string(output, len);
         free(output);
+        yyjson_mut_doc_free(temp_doc);
+        // Use the shared post-processing function to handle DEL and \uXXXX
+        return postProcessYyjsonOutput(std::move(result));
     }
+    // Fallback to writeYyjsonValueInternal if yyjson_mut_write_opts fails
     yyjson_mut_doc_free(temp_doc);
-
-    // Use the shared post-processing function to handle DEL and \uXXXX
-    return postProcessYyjsonOutput(std::move(result));
+    return writeYyjsonValueInternal(uv, prettyIndent, 1);
 }
 
 /**

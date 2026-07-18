@@ -6,13 +6,11 @@
 #ifndef BITCOIN_UNIVALUE_INCLUDE_UNIVALUE_H
 #define BITCOIN_UNIVALUE_INCLUDE_UNIVALUE_H
 
-#include <atomic>
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -34,15 +32,14 @@
  *
  * @par Thread Safety (WITH_YYJSON)
  * When compiled with WITH_YYJSON=ON, UniValue uses yyjson as the primary storage backend.
- * - Reading from const UniValue& is thread-safe: lazy materialization uses std::mutex
- *   to ensure thread-safe access and support rematerialization when state changes.
+ * - Reading from const UniValue& requires that the UniValue is only accessed from one thread at a time.
  * - Copying containers preserves the yyjson tree via yyjson_mut_val_mut_copy(), avoiding
  *   the performance regression that occurred when copies unconditionally discarded trees.
- * - Modifying non-const UniValue objects requires external synchronization.
+ * - Modifying non-const UniValue objects requires that only one thread accesses the object.
  *
  * @par Performance Considerations (WITH_YYJSON)
  * - Containers (arrays/objects) use yyjson as primary storage for efficient building
- * - Lazy materialization: legacy representation (keys/values) is populated on-demand
+ * - Eager materialization: legacy representation (keys/values) is populated immediately on construction/modification
  * - Copy operations deep-copy yyjson trees to maintain performance through chained operations
  * - Use std::move when passing containers to push_back/pushKV to avoid unnecessary copies
  */
@@ -167,7 +164,7 @@ public:
 #endif
 
 private:
-    // Common members - mutable only when WITH_YYJSON for lazy materialization
+    // Common members - mutable only when WITH_YYJSON for eager materialization
 #ifdef WITH_YYJSON
     mutable
 #endif
@@ -189,12 +186,13 @@ private:
     // yyjson primary storage
     mutable std::shared_ptr<yyjson_mut_doc> m_yyjson_doc; //!< Shared pointer to yyjson mutable document (primary storage)
     mutable yyjson_mut_val* m_yyjson_node{nullptr};    //!< Pointer to the root node in the yyjson tree
-    mutable std::atomic<bool> m_materialized{false};  //!< Whether lazy caches (val/keys/values) have been populated
-    mutable std::mutex m_materialize_mutex;          //!< Protects materialization to allow re-entry when m_materialized changes
+    mutable bool m_materialized{false};  //!< Whether legacy caches (val/keys/values) have been populated
+    
+    // Eager materialization: containers are materialized immediately
+    // when constructed or modified, so no mutex needed
 
-    void materialize() const;              // Populate lazy caches from yyjson
-    void materializeIfNeeded() const;      // Centralized guard to materialize on-demand if needed
-    void materialize_unsafe() const;      // Populate lazy caches without locking (caller must hold m_materialize_mutex)
+    void materialize() const;              // Populate caches from yyjson (eager for containers)
+    void materializeIfNeeded() const;      // Guard to ensure materialization
     static void yyjson_doc_deleter(yyjson_mut_doc* doc); //!< Custom deleter for yyjson document shared_ptr
 #endif
 

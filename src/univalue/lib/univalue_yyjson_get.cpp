@@ -14,10 +14,8 @@
 /**
  * @brief Get the keys of this object
  *
- * Triggers materialization if the object hasn't been materialized yet.
- * Note: Materializes on-demand using mutable cache members when WITH_YYJSON=ON.
- * This is safe because materialization only populates the keys/values cache
- * and doesn't change the logical state of the object.
+ * With eager materialization, containers are materialized immediately on construction.
+ * This ensures the legacy representation is always populated.
  *
  * @return Reference to the vector of object keys
  * @throws std::runtime_error if this is not an object
@@ -32,10 +30,8 @@ const std::vector<std::string>& UniValue::getKeys() const {
 /**
  * @brief Get the values of this object or array
  *
- * Triggers materialization if the container hasn't been materialized yet.
- * Note: Materializes on-demand using mutable cache members when WITH_YYJSON=ON.
- * This is safe because materialization only populates the keys/values cache
- * and doesn't change the logical state of the object.
+ * With eager materialization, containers are materialized immediately on construction.
+ * This ensures the legacy representation is always populated.
  *
  * @return Reference to the vector of values
  * @throws std::runtime_error if this is not an object or array
@@ -50,7 +46,8 @@ const std::vector<UniValue>& UniValue::getValues() const {
 /**
  * @brief Get the boolean value
  *
- * Triggers materialization if the value hasn't been materialized yet.
+ * With eager materialization, primitives are always materialized, so this is a direct check.
+ * For containers parsed from JSON, ensures legacy representation is populated.
  *
  * @return true if the value is "1", false if "" (empty string)
  * @throws std::runtime_error if this is not a boolean
@@ -64,7 +61,8 @@ bool UniValue::get_bool() const {
 /**
  * @brief Get the string value
  *
- * Triggers materialization if the value hasn't been materialized yet.
+ * With eager materialization, primitives are always materialized, so this is a direct access.
+ * For containers parsed from JSON, ensures legacy representation is populated.
  *
  * @return Reference to the string value
  * @throws std::runtime_error if this is not a string
@@ -78,7 +76,7 @@ const std::string& UniValue::get_str() const {
 /**
  * @brief Get the floating-point value
  *
- * Triggers materialization if the value hasn't been materialized yet.
+ * With eager materialization, primitives are always materialized, so this is a direct parse.
  * Parses the string representation using ParseDouble for strict, locale-independent parsing.
  *
  * @return The double-precision floating-point value
@@ -97,7 +95,7 @@ double UniValue::get_real() const {
 /**
  * @brief Get a reference to this UniValue as an object
  *
- * Triggers materialization if the object hasn't been materialized yet.
+ * With eager materialization, containers are materialized immediately on construction.
  *
  * @return Reference to this UniValue
  * @throws std::runtime_error if this is not an object
@@ -111,7 +109,7 @@ const UniValue& UniValue::get_obj() const {
 /**
  * @brief Get a reference to this UniValue as an array
  *
- * Triggers materialization if the array hasn't been materialized yet.
+ * With eager materialization, containers are materialized immediately on construction.
  *
  * @return Reference to this UniValue
  * @throws std::runtime_error if this is not an array
@@ -125,7 +123,7 @@ const UniValue& UniValue::get_array() const {
 /**
  * @brief Populate a map with all key-value pairs from this object
  *
- * Triggers materialization if the object hasn't been materialized yet.
+ * With eager materialization, containers are materialized immediately on construction.
  *
  * @param kv Output map to populate
  */
@@ -134,6 +132,7 @@ void UniValue::getObjMap(std::map<std::string,UniValue>& kv) const {
 
     materializeIfNeeded();
 
+    kv.clear();
     for (size_t i = 0; i < keys.size(); ++i) {
         kv[keys[i]] = values[i];
     }
