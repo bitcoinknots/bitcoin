@@ -409,6 +409,11 @@ protected:
     std::optional<unsigned int> GetArgFlags(const std::string& name) const;
 
     /**
+     * Return the registered help text for a known arg (e.g. "-foo"), or nullopt.
+     */
+    std::optional<std::string> GetArgHelpText(const std::string& name) const;
+
+    /**
      * Get settings file path, or return false if read-write settings were
      * disabled with -nosettings.
      */
