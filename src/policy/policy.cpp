@@ -582,16 +582,30 @@ std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsV
     return ret;
 }
 
-int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte)
+int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte, const unsigned int weight_per_scriptsig_byte)
 {
     int64_t mod_weight{0};
 
+    // A scriptSig is only charged the full WITNESS_SCALE_FACTOR in inputs that
+    // are not witness spends, so only those can be repriced.
+    const bool adjust_scriptsig{weight_per_scriptsig_byte != WITNESS_SCALE_FACTOR};
+
     // Add in any extra weight for data bytes
-    if (weight_per_data_byte > 1) {
+    if (weight_per_data_byte > 1 || adjust_scriptsig) {
         for (const CTxIn& txin : tx.vin) {
             const CTxOut &utxo = view.AccessCoin(txin.prevout).out;
             auto[script, consensus_weight_per_byte] = GetScriptForTransactionInput(utxo.scriptPubKey, txin);
-            if (weight_per_data_byte > consensus_weight_per_byte) {
+            if (adjust_scriptsig && consensus_weight_per_byte == WITNESS_SCALE_FACTOR) {
+                // Reprice the scriptSig, except for data bytes, which stay at
+                // the dearer of the two costs so that repricing the scriptSig
+                // cannot be used to smuggle in cheaper data.
+                const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness);
+                const int64_t sigsize = txin.scriptSig.size();
+                const int64_t data_bytes = std::min<int64_t>(sigsize, int64_t(dcb.first) + int64_t(dcb.second));
+                const int64_t data_weight = std::max(weight_per_data_byte, weight_per_scriptsig_byte);
+                mod_weight += data_bytes * (data_weight - consensus_weight_per_byte);
+                mod_weight += (sigsize - data_bytes) * (int64_t(weight_per_scriptsig_byte) - consensus_weight_per_byte);
+            } else if (weight_per_data_byte > consensus_weight_per_byte) {
                 const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness);
                 mod_weight += int64_t(dcb.first + dcb.second) * (weight_per_data_byte - consensus_weight_per_byte);
             }
@@ -605,5 +619,5 @@ int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& vi
         }
     }
 
-    return int32_t(std::min(mod_weight, int64_t{std::numeric_limits<int32_t>::max()}));
+    return int32_t(std::clamp(mod_weight, int64_t{std::numeric_limits<int32_t>::min()}, int64_t{std::numeric_limits<int32_t>::max()}));
 }
