@@ -202,6 +202,22 @@ or the state of the mempool by an RPC that returned before this RPC. For
 example, a wallet transaction that was BIP-125-replaced in the mempool prior to
 this RPC may not yet be reflected as such in this RPC response.
 
+## Corepolicy settings
+
+Headless deployments can read and change the node's corepolicy/mempool settings
+(the same options offered by the GUI) with two RPCs:
+
+- `dumpsettings ( detailed )` returns the current settings as `name: value`. With
+  `detailed=true`, each entry includes the value, its type, and help text, so a
+  configuration UI can be generated from the node instead of being hard-coded.
+- `setsettings {"name": value, ...}` validates the whole batch first (nothing is
+  applied if any value is invalid), then applies and persists the valid changes.
+  Each per-setting result reports whether that change needs a restart to take effect.
+
+Setting names match the corresponding `bitcoin.conf` option names. Run
+`bitcoin-cli help dumpsettings` / `help setsettings` for details, and
+`bitcoin-cli dumpsettings true` for the full list with types and help text.
+
 ## Limitations
 
 There is a known issue in the JSON-RPC interface that can cause a node to crash if
