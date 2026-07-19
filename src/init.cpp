@@ -771,6 +771,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
                    strprintf("Refuse to relay or mine transactions involving non-bitcoin tokens (default: %u)",
                              DEFAULT_REJECT_TOKENS),
                    ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
+    argsman.AddArg("-scriptsigcost", strprintf("Treat scriptSig data in non-witness inputs as N vbytes per actual byte; 0.25 extends the witness discount to them (default: %s)", DEFAULT_WEIGHT_PER_SCRIPTSIG_BYTE / 4.0), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-subdustfeepenalty",
                    strprintf("Reduce effective fee by the dust threshold for each sub-dust output, making dust-creating transactions require higher fees (default: %u)",
                              DEFAULT_SUBDUSTFEEPENALTY),
@@ -1213,6 +1214,13 @@ bool AppInitParameterInteraction(const ArgsManager& args)
 
     if (auto parsed = args.GetFixedPointArg("-datacarriercost", 2)) {
         g_weight_per_data_byte = ((*parsed * WITNESS_SCALE_FACTOR) + 99) / 100;
+    }
+
+    if (auto parsed = args.GetFixedPointArg("-scriptsigcost", 2)) {
+        if (*parsed < 0) {
+            return InitError(strprintf(_("Specified -scriptsigcost (%s) cannot be negative"), args.GetArg("-scriptsigcost", "")));
+        }
+        g_weight_per_scriptsig_byte = ((*parsed * WITNESS_SCALE_FACTOR) + 99) / 100;
     }
 
     g_script_size_policy_limit = args.GetIntArg("-maxscriptsize", g_script_size_policy_limit);
