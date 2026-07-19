@@ -89,7 +89,7 @@ _bitcoin-cli() {
             _files
             return 0
             ;;
-        getrawmempool|setnetworkactive|setscriptthreadsenabled)
+        dumpsettings|getrawmempool|setnetworkactive|setscriptthreadsenabled)
             _values 'arg' 'false' 'true'
             return 0
             ;;
