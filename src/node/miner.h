@@ -216,6 +216,8 @@ private:
     void onlyUnconfirmed(CTxMemPool::setEntries& testSet);
     /** Test if a new package would "fit" in the block */
     bool TestPackage(uint64_t packageSize, int64_t packageSigOpsCost) const;
+    /** Minimum fee a package of the given size must pay, raised as the block fills up */
+    CAmount MinFeeForPackage(uint64_t packageSize) const;
     /** Perform checks on each transaction in a package:
       * locktime, premature-witness, serialized size (if necessary)
       * These checks should always succeed, and they're here
@@ -236,6 +238,13 @@ int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParam
 
 /** Update an old GenerateCoinbaseCommitment from CreateNewBlock after the block txs have changed */
 void RegenerateCommitments(CBlock& block, ChainstateManager& chainman);
+
+/**
+ * Scale a package's minimum fee up as the block fills past the ramp start, so that space later
+ * in the block costs progressively more. `limit` is a block resource limit, so it is bounded by
+ * MAX_BLOCK_WEIGHT.
+ */
+CAmount ScaledBlockMinFee(CAmount base_fee, uint64_t used, uint64_t limit, unsigned int ramp);
 
 /** Apply -blockmintxfee and -blockmaxweight options from ArgsManager to BlockAssembler options. */
 void ApplyArgsManOptions(const ArgsManager& gArgs, BlockAssembler::Options& options);

@@ -75,6 +75,8 @@ struct BlockCreateOptions {
     size_t nBlockMaxWeight{DEFAULT_BLOCK_MAX_WEIGHT};
     size_t nBlockMaxSize{DEFAULT_BLOCK_MAX_SIZE};
     CFeeRate blockMinFeeRate{DEFAULT_BLOCK_MIN_TX_FEE};
+    // Percentage a block must be filled to before blockMinFeeRate is scaled up; 100 disables the ramp
+    unsigned int blockMinFeeRateRampStart{DEFAULT_BLOCK_MIN_TX_FEE_RAMP_START};
     // Whether to call TestBlockValidity() at the end of CreateNewBlock().
     bool test_block_validity{true};
     bool print_modified_fee{DEFAULT_PRINT_MODIFIED_FEE};

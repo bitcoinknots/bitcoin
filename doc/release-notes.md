@@ -81,6 +81,16 @@ Notable changes
   (e.g. containers), automatic sizing may not match effective limits. The
   previous behavior can be restored by setting `-dbcache` explicitly. (#34641)
 
+- Block creation now demands a progressively higher feerate as the block fills
+  up, in the spirit of Satoshi's original client, so a block is only extended
+  when the space is paid for. The new `-blockmintxfeerampstart` option is the
+  percentage a block must be filled to before `-blockmintxfee` starts being
+  scaled up, defaulting to `50` as it did originally. Unlike the original, which
+  jumped straight to twice the minimum feerate at that point, the requirement
+  rises continuously from the unscaled minimum. Setting it to `100` restores the
+  previous behaviour, and it has no effect if `-blockmintxfee` is set to `0`.
+  (knots#338)
+
 ### New spam filters
 
 - Transactions creating outputs with a value less than the expected value to
