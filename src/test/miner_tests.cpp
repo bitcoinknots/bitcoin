@@ -41,6 +41,7 @@ struct MinerTestingSetup : public TestingSetup {
     void TestPackageSelection(const CScript& scriptPubKey, const std::vector<CTransactionRef>& txFirst) EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
     void TestBasicMining(const CScript& scriptPubKey, const std::vector<CTransactionRef>& txFirst, int baseheight) EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
     void TestPrioritisedMining(const CScript& scriptPubKey, const std::vector<CTransactionRef>& txFirst) EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
+    void TestDiscountedVsizeWeightLimit(const CScript& scriptPubKey, const std::vector<CTransactionRef>& txFirst) EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
     bool TestSequenceLocks(const CTransaction& tx, CTxMemPool& tx_mempool) EXCLUSIVE_LOCKS_REQUIRED(::cs_main)
     {
         CCoinsViewMemPool view_mempool{&m_node.chainman->ActiveChainstate().CoinsTip(), tx_mempool};
@@ -570,6 +571,64 @@ void MinerTestingSetup::TestBasicMining(const CScript& scriptPubKey, const std::
     BOOST_CHECK_EQUAL(block.vtx.size(), 5U);
 }
 
+// A policy-only weight discount (negative extra weight) makes an entry's vsize
+// smaller than its real consensus weight. TestPackage() extrapolates block usage
+// from that vsize, so the assembler must not rely on it alone: AddToBlock()
+// accumulates the real weight, and the block must still respect nBlockMaxWeight.
+void MinerTestingSetup::TestDiscountedVsizeWeightLimit(const CScript& scriptPubKey, const std::vector<CTransactionRef>& txFirst)
+{
+    CTxMemPool& tx_mempool{MakeMempool()};
+    auto mining{MakeMining()};
+    BlockAssembler::Options options;
+    options.coinbase_output_script = scriptPubKey;
+    options.block_reserved_weight = DEFAULT_BLOCK_RESERVED_WEIGHT;
+
+    LOCK(tx_mempool.cs);
+    TestMemPoolEntryHelper entry;
+
+    // One sizeable transaction per available coinbase, each with half its weight
+    // discounted away for policy purposes (the maximum the coinblocks discount
+    // applies).
+    // The fee has to clear blockMinFeeRate against the *discounted* vsize,
+    // otherwise addPackageTxs() bails out before the weight limit can bind.
+    constexpr CAmount fee{1000000};
+    int32_t tx_weight{0};
+    for (size_t i = 0; i < txFirst.size(); ++i) {
+        CMutableTransaction tx;
+        tx.vin.resize(1);
+        tx.vin[0].scriptSig = CScript() << OP_1;
+        tx.vin[0].prevout.hash = txFirst[i]->GetHash();
+        tx.vin[0].prevout.n = 0;
+        tx.vout.assign(200, CTxOut{(5000000000LL - fee) / 200, CScript() << OP_1});
+        tx_weight = GetTransactionWeight(CTransaction(tx));
+        AddToMempool(tx_mempool, entry.Fee(fee).SpendsCoinbase(true).ExtraWeight(-tx_weight / 2).FromTx(tx));
+    }
+    BOOST_REQUIRE(tx_weight > 0);
+    BOOST_REQUIRE_EQUAL(tx_mempool.size(), txFirst.size());
+
+    // Pick a limit that lands inside the window where the discounted estimate
+    // (4 * vsize == tx_weight / 2) still appears to fit but the real weight does
+    // not: room for one transaction plus one discounted estimate.
+    options.nBlockMaxWeight = options.block_reserved_weight + tx_weight + (tx_weight / 2) + 1;
+
+    const auto block_template{mining->createNewBlock(options)};
+    BOOST_REQUIRE(block_template);
+    const CBlock& block{block_template->getBlock()};
+
+    // Mirror BlockAssembler::nBlockWeight: the reserved weight it starts from
+    // plus the real weight of every transaction it selected.
+    uint64_t assembled{options.block_reserved_weight};
+    for (size_t i = 1; i < block.vtx.size(); ++i) {
+        assembled += GetTransactionWeight(*block.vtx[i]);
+    }
+    // The limit must actually bind, otherwise this test proves nothing.
+    BOOST_REQUIRE(block.vtx.size() > 1);
+    BOOST_REQUIRE(block.vtx.size() - 1 < txFirst.size());
+    BOOST_CHECK_MESSAGE(assembled <= options.nBlockMaxWeight,
+                        "assembled weight " << assembled << " exceeds nBlockMaxWeight "
+                                            << options.nBlockMaxWeight);
+}
+
 void MinerTestingSetup::TestPrioritisedMining(const CScript& scriptPubKey, const std::vector<CTransactionRef>& txFirst)
 {
     auto mining{MakeMining()};
@@ -728,6 +787,11 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     SetMockTime(0);
 
     TestPackageSelection(scriptPubKey, txFirst);
+
+    m_node.chainman->ActiveChain().Tip()->nHeight--;
+    SetMockTime(0);
+
+    TestDiscountedVsizeWeightLimit(scriptPubKey, txFirst);
 
     m_node.chainman->ActiveChain().Tip()->nHeight--;
     SetMockTime(0);
