@@ -644,6 +644,11 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     blockmintxfee = new BitcoinAmountField(tabMining);
     CreateOptionUI(verticalLayout_Mining, blockmintxfee, tr("Only mine transactions paying a fee of at least %s per kvB."));
 
+    blockmintxfeerampstart = new QSpinBox(tabMining);
+    blockmintxfeerampstart->setMinimum(0);
+    blockmintxfeerampstart->setMaximum(100);
+    CreateOptionUI(verticalLayout_Mining, blockmintxfeerampstart, tr("Once a block is %s% full, progressively raise the fee required above that minimum (100% to disable; no effect if the minimum is 0)."));
+
     blockmaxsize = new QSpinBox(tabMining);
     blockmaxsize->setMinimum(1);
     blockmaxsize->setMaximum((MAX_BLOCK_SERIALIZED_SIZE - 1000) / 1000);
@@ -997,6 +1002,7 @@ void OptionsDialog::setMapper()
     /* Mining tab */
 
     mapper->addMapping(blockmintxfee, OptionsModel::blockmintxfee);
+    mapper->addMapping(blockmintxfeerampstart, OptionsModel::blockmintxfeerampstart);
     mapper->addMapping(blockmaxsize, OptionsModel::blockmaxsize);
     mapper->addMapping(blockprioritysize, OptionsModel::blockprioritysize);
     mapper->addMapping(blockmaxweight, OptionsModel::blockmaxweight);

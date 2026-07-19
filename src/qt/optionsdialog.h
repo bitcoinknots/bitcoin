@@ -167,7 +167,7 @@ private:
     QSpinBox *dustdynamic_mempool_kvB;
 
     BitcoinAmountField *blockmintxfee;
-    QSpinBox *blockmaxsize, *blockprioritysize, *blockmaxweight;
+    QSpinBox *blockmaxsize, *blockprioritysize, *blockmaxweight, *blockmintxfeerampstart;
 };
 
 #endif // BITCOIN_QT_OPTIONSDIALOG_H

@@ -115,6 +115,7 @@ public:
         dustrelayfee,
         dustdynamic,            // QString
         blockmintxfee,
+        blockmintxfeerampstart,
         blockmaxsize,
         blockprioritysize,
         blockmaxweight,
