@@ -21,6 +21,7 @@
 #include <policy/policy.h>
 #include <pow.h>
 #include <primitives/transaction.h>
+#include <util/check.h>
 #include <util/moneystr.h>
 #include <util/time.h>
 #include <validation.h>
@@ -86,6 +87,8 @@ BlockCreateOptions BlockCreateOptions::Clamped() const
     // Limit weight to between block_reserved_weight and MAX_BLOCK_WEIGHT for sanity:
     // block_reserved_weight can safely exceed -blockmaxweight, but the rest of the block template will be empty.
     options.nBlockMaxWeight = std::clamp<size_t>(options.nBlockMaxWeight, options.block_reserved_weight, MAX_BLOCK_WEIGHT);
+    // Bound the ramp here too, since options can be supplied directly rather than parsed.
+    options.blockMinFeeRateRampStart = std::min<unsigned int>(options.blockMinFeeRateRampStart, 100);
     return options;
 }
 
@@ -121,6 +124,7 @@ void ApplyArgsManOptions(const ArgsManager& args, BlockAssembler::Options& optio
     if (const auto blockmintxfee{args.GetArg("-blockmintxfee")}) {
         if (const auto parsed{ParseMoney(*blockmintxfee)}) options.blockMinFeeRate = CFeeRate{*parsed};
     }
+    options.blockMinFeeRateRampStart = std::clamp<int64_t>(args.GetIntArg("-blockmintxfeerampstart", options.blockMinFeeRateRampStart), 0, 100);
     options.print_modified_fee = args.GetBoolArg("-printpriority", options.print_modified_fee);
     options.block_reserved_weight = args.GetIntArg("-blockreservedweight", options.block_reserved_weight);
 }
@@ -253,6 +257,60 @@ bool BlockAssembler::TestPackage(uint64_t packageSize, int64_t packageSigOpsCost
         return false;
     }
     return true;
+}
+
+CAmount ScaledBlockMinFee(CAmount base_fee, uint64_t used, uint64_t limit, unsigned int ramp)
+{
+    if (ramp >= 100 || base_fee <= 0) {
+        return base_fee;
+    }
+    Assume(limit <= MAX_BLOCK_WEIGHT);
+
+    const uint64_t ramp_start{limit * ramp / 100};
+    if (used <= ramp_start) {
+        return base_fee;
+    }
+    if (used >= limit) {
+        return MAX_MONEY;
+    }
+
+    // Raise the price as the block approaches full: the multiplier is 1 at the ramp start and
+    // grows without bound as the block fills, so ever higher feerates are needed to get in.
+    //
+    // Two deliberate deviations from Satoshi's client, which used
+    // nMinFee *= MAX_BLOCK_SIZE_GEN / (MAX_BLOCK_SIZE_GEN - nNewBlockSize):
+    //  - The numerator is the size of the ramp rather than the whole limit, so the multiplier
+    //    starts at 1 and rises continuously. The original divided the full limit, jumping
+    //    straight to 2x at the ramp start and stepping through integer multiples from there.
+    //  - Fullness excludes the candidate transaction itself. Including it, as the original did,
+    //    would make the threshold depend on the candidate's size, breaking the assumption in
+    //    addPackageTxs that a package failing this check can never be followed by one that passes.
+    const CAmount numerator{static_cast<CAmount>(limit - ramp_start)};
+    const CAmount denominator{static_cast<CAmount>(limit - used)};
+    // Saturate rather than overflow. Reaching this needs a package whose unscaled minimum fee
+    // is already MAX_MONEY/numerator (5.25 BTC for a 4M weight block), and the scaled minimum
+    // is never smaller than the unscaled one, so demanding MAX_MONEY here rejects the same
+    // packages the exact result would. Below it the product cannot exceed MAX_MONEY.
+    if (base_fee > MAX_MONEY / numerator) {
+        return MAX_MONEY;
+    }
+    return base_fee * numerator / denominator;
+}
+
+CAmount BlockAssembler::MinFeeForPackage(uint64_t packageSize) const
+{
+    // Measure fullness against whichever of the weight or size limits is tighter, since only one
+    // of the two may have been configured. Products are bounded by MAX_BLOCK_WEIGHT^2.
+    // Both fractions only grow as the block fills, so the feerate demanded only rises, which is
+    // what lets addPackageTxs stop at the first package that cannot pay it. Switching dimension
+    // mid-block can shift the result by a rounding unit, at most one marginal package.
+    uint64_t used{nBlockWeight}, limit{m_options.nBlockMaxWeight};
+    if (fNeedSizeAccounting && nBlockSize * m_options.nBlockMaxWeight > nBlockWeight * m_options.nBlockMaxSize) {
+        used = nBlockSize;
+        limit = m_options.nBlockMaxSize;
+    }
+    return ScaledBlockMinFee(m_options.blockMinFeeRate.GetFee(packageSize), used, limit,
+                             m_options.blockMinFeeRateRampStart);
 }
 
 // Perform transaction-level checks before adding to block:
@@ -439,8 +497,9 @@ void BlockAssembler::addPackageTxs(const CTxMemPool& mempool, int& nPackagesSele
             packageSigOpsCost = modit->nSigOpCostWithAncestors;
         }
 
-        if (packageFees < m_options.blockMinFeeRate.GetFee(packageSize)) {
-            // Everything else we might consider has a lower fee rate
+        if (packageFees < MinFeeForPackage(packageSize)) {
+            // Everything else we might consider has a lower fee rate, and the minimum only ever
+            // rises as the block fills, so nothing further can qualify.
             return;
         }
 

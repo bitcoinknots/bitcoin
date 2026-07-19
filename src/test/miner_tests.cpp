@@ -735,4 +735,94 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     TestPrioritisedMining(scriptPubKey, txFirst);
 }
 
+BOOST_AUTO_TEST_CASE(block_min_fee_ramp)
+{
+    using node::ScaledBlockMinFee;
+
+    // A ramp of 100 disables scaling no matter how full the block is.
+    for (const uint64_t used : {0UL, 50UL, 99UL, 100UL}) {
+        BOOST_CHECK_EQUAL(ScaledBlockMinFee(1000, used, 100, 100), 1000);
+    }
+
+    // Hand-computed points on the curve. With a ramp of 50 the multiplier is 50/(100 - used).
+    BOOST_CHECK_EQUAL(ScaledBlockMinFee(1000, 49, 100, 50), 1000);
+    BOOST_CHECK_EQUAL(ScaledBlockMinFee(1000, 50, 100, 50), 1000); // exactly at the ramp start
+    BOOST_CHECK_EQUAL(ScaledBlockMinFee(1000, 75, 100, 50), 2000);
+    BOOST_CHECK_EQUAL(ScaledBlockMinFee(1000, 90, 100, 50), 5000);
+    BOOST_CHECK_EQUAL(ScaledBlockMinFee(1000, 100, 100, 50), MAX_MONEY); // full
+    BOOST_CHECK_EQUAL(ScaledBlockMinFee(1000, 101, 100, 50), MAX_MONEY); // past full
+    // A ramp of 0 scales from the first byte, with a multiplier of 100/(100 - used).
+    BOOST_CHECK_EQUAL(ScaledBlockMinFee(1000, 0, 100, 0), 1000);
+    BOOST_CHECK_EQUAL(ScaledBlockMinFee(1000, 50, 100, 0), 2000);
+    // A base fee of zero cannot be scaled, so the ramp has no effect.
+    BOOST_CHECK_EQUAL(ScaledBlockMinFee(0, 90, 100, 50), 0);
+
+    // Sweep the domain, checking the properties the block assembler relies on.
+    for (const uint64_t limit : {2000UL, 90000UL, 300000UL, 4000000UL}) {
+        for (unsigned int ramp = 0; ramp <= 100; ++ramp) {
+            for (const CAmount base_fee : {CAmount{0}, CAmount{1}, CAmount{1000},
+                                           CAmount{525000000}, MAX_MONEY}) {
+                CAmount previous{0};
+                for (uint64_t used = 0; used <= limit; used += std::max<uint64_t>(limit / 512, 1)) {
+                    const CAmount scaled{ScaledBlockMinFee(base_fee, used, limit, ramp)};
+                    BOOST_CHECK(scaled >= 0);
+                    BOOST_CHECK(scaled <= MAX_MONEY);
+                    // Never cheaper than the unscaled fee: the multiplier is at least 1.
+                    BOOST_CHECK(scaled >= base_fee);
+                    // addPackageTxs stops at the first package that cannot pay this fee, which
+                    // is only sound because the fee never decreases as the block fills up.
+                    BOOST_CHECK(scaled >= previous);
+                    previous = scaled;
+                    // Below the ramp start the fee is untouched.
+                    if (ramp == 100 || used <= limit * ramp / 100) {
+                        BOOST_CHECK_EQUAL(scaled, base_fee);
+                    }
+                }
+            }
+        }
+    }
+
+    // Exhaustive over every small limit and every position within it, so that each boundary
+    // (empty block, ramp start, one unit from full, exactly full) is hit for every ramp rather
+    // than only where a stride happens to land.
+    for (uint64_t limit = 1; limit <= 64; ++limit) {
+        for (unsigned int ramp = 0; ramp <= 100; ++ramp) {
+            for (const CAmount base_fee : {CAmount{1}, CAmount{1000}, MAX_MONEY}) {
+                CAmount previous{0};
+                for (uint64_t used = 0; used <= limit; ++used) {
+                    const CAmount scaled{ScaledBlockMinFee(base_fee, used, limit, ramp)};
+                    BOOST_CHECK(scaled >= base_fee);
+                    BOOST_CHECK(scaled <= MAX_MONEY);
+                    BOOST_CHECK(scaled >= previous);
+                    previous = scaled;
+                }
+                // A full block always demands more than anything can pay.
+                BOOST_CHECK_EQUAL(ScaledBlockMinFee(base_fee, limit, limit, ramp),
+                                  ramp >= 100 ? base_fee : MAX_MONEY);
+            }
+        }
+    }
+
+    // Straddle the saturation boundary at every ramp, since that is the one input where the
+    // exact result is replaced by MAX_MONEY, and it is also where a multiply would overflow.
+    for (unsigned int ramp = 0; ramp < 100; ++ramp) {
+        const uint64_t limit{MAX_BLOCK_WEIGHT};
+        const uint64_t ramp_start{limit * ramp / 100};
+        const CAmount boundary{MAX_MONEY / static_cast<CAmount>(limit - ramp_start)};
+        for (const CAmount base_fee : {boundary - 1, boundary, boundary + 1}) {
+            for (const uint64_t used : {ramp_start + 1, limit - 1}) {
+                const CAmount scaled{ScaledBlockMinFee(base_fee, used, limit, ramp)};
+                BOOST_CHECK(scaled >= base_fee);
+                BOOST_CHECK(scaled <= MAX_MONEY);
+            }
+        }
+    }
+
+    // Saturation only replaces the exact result when the unscaled fee is already enormous, so
+    // no transaction that could have paid the exact fee is rejected by the saturated one.
+    const CAmount huge{MAX_MONEY / 4000000 + 1};
+    BOOST_CHECK_EQUAL(ScaledBlockMinFee(huge, 3999999, 4000000, 0), MAX_MONEY);
+    BOOST_CHECK(huge > 525000000); // 5.25 BTC, as documented at the saturation guard
+}
+
 BOOST_AUTO_TEST_SUITE_END()

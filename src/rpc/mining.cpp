@@ -647,6 +647,7 @@ static RPCHelpMan getblocktemplate()
                 }},
                 {"longpollid", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "delay processing request until the result would vary significantly from the \"longpollid\" of a prior template"},
                 {"minfeerate", RPCArg::Type::NUM, RPCArg::DefaultHint{"set by -blockmintxfee"}, "only include transactions with a minimum sats/vbyte (disables template cache)"},
+                {"minfeeraterampstart", RPCArg::Type::NUM, RPCArg::DefaultHint{"set by -blockmintxfeerampstart"}, "percentage the block must be filled to before \"minfeerate\" is scaled up; 100 disables scaling (disables template cache)"},
                 {"data", RPCArg::Type::STR_HEX, RPCArg::Optional::OMITTED, "proposed block data to check, encoded in hexadecimal; valid only for mode=\"proposal\""},
             },
             },
@@ -802,6 +803,15 @@ static RPCHelpMan getblocktemplate()
         }
         if (!oparam["minfeerate"].isNull()) {
             options.blockMinFeeRate = CFeeRate{AmountFromValue(oparam["minfeerate"]), COIN /* sat/vB */};
+        }
+        if (!oparam["minfeeraterampstart"].isNull()) {
+            // Rejected rather than clamped: clamping an out-of-range value would silently
+            // disable the ramp, so a typo would quietly fill blocks at the base feerate.
+            const int64_t ramp{oparam["minfeeraterampstart"].getInt<int64_t>()};
+            if (ramp < 0 || ramp > 100) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "minfeeraterampstart must be between 0 and 100");
+            }
+            options.blockMinFeeRateRampStart = ramp;
         }
         options = options.Clamped();
         bypass_cache |= !(options == options_def);

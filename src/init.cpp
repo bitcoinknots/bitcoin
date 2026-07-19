@@ -784,6 +784,9 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-blockmaxweight=<n>", strprintf("Set maximum BIP141 block weight (default: %d)", DEFAULT_BLOCK_MAX_WEIGHT), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockreservedweight=<n>", strprintf("Reserve space for the fixed-size block header plus the largest coinbase transaction the mining software may add to the block. (default: %d).", DEFAULT_BLOCK_RESERVED_WEIGHT), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockmintxfee=<amt>", strprintf("Set lowest fee rate (in %s/kvB) for transactions to be included in block creation. (default: %s)", CURRENCY_UNIT, FormatMoney(DEFAULT_BLOCK_MIN_TX_FEE)), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
+    // Negation and elision are disallowed because both parse as 0, which is the most aggressive
+    // setting rather than the "off" a user writing -noblockmintxfeerampstart would expect (100).
+    argsman.AddArg("-blockmintxfeerampstart=<n>", strprintf("Percentage a block must be filled to before -blockmintxfee is scaled up, requiring progressively higher feerates as the block fills. Has no effect if -blockmintxfee is 0. 100 disables scaling. (default: %u)", DEFAULT_BLOCK_MIN_TX_FEE_RAMP_START), ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION | ArgsManager::DISALLOW_ELISION, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockprioritysize=<n>", strprintf("Set maximum size of high-priority/low-fee transactions in bytes (default: %d)", DEFAULT_BLOCK_PRIORITY_SIZE), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockversion=<n>", "Override block version to test forking scenarios", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::BLOCK_CREATION);
 
@@ -1191,6 +1194,16 @@ bool AppInitParameterInteraction(const ArgsManager& args)
     if (args.IsArgSet("-blockmintxfee")) {
         if (!ParseMoney(args.GetArg("-blockmintxfee", ""))) {
             return InitError(AmountErrMsg("blockmintxfee", args.GetArg("-blockmintxfee", "")));
+        }
+    }
+
+    if (args.IsArgSet("-blockmintxfeerampstart")) {
+        // Parsed strictly rather than with GetIntArg, which maps unparseable values to 0: the
+        // most aggressive ramp, and not something to select by typo.
+        const std::string ramp_str{args.GetArg("-blockmintxfeerampstart", "")};
+        const auto ramp{ToIntegral<int64_t>(ramp_str)};
+        if (!ramp || *ramp < 0 || *ramp > 100) {
+            return InitError(strprintf(_("Specified -blockmintxfeerampstart (%s) must be a number between 0 and 100"), ramp_str));
         }
     }
 

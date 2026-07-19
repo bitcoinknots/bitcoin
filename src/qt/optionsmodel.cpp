@@ -115,6 +115,7 @@ static const char* SettingName(OptionsModel::OptionID option)
     case OptionsModel::dustrelayfee: return "dustrelayfee";
     case OptionsModel::dustdynamic: return "dustdynamic";
     case OptionsModel::blockmintxfee: return "blockmintxfee";
+    case OptionsModel::blockmintxfeerampstart: return "blockmintxfeerampstart";
     case OptionsModel::blockmaxsize: return "blockmaxsize";
     case OptionsModel::blockprioritysize: return "blockprioritysize";
     case OptionsModel::blockmaxweight: return "blockmaxweight";
@@ -783,6 +784,8 @@ QVariant OptionsModel::getOption(OptionID option, const std::string& suffix) con
         } else {
             return qlonglong(DEFAULT_BLOCK_MIN_TX_FEE);
         }
+    case blockmintxfeerampstart:
+        return qlonglong(gArgs.GetIntArg("-blockmintxfeerampstart", DEFAULT_BLOCK_MIN_TX_FEE_RAMP_START));
     case blockmaxsize:
         return qlonglong(gArgs.GetIntArg("-blockmaxsize", DEFAULT_BLOCK_MAX_SIZE) / 1000);
     case blockprioritysize:
@@ -1454,6 +1457,13 @@ bool OptionsModel::setOption(OptionID option, const QVariant& value, const std::
             std::string strNv = FormatMoney(value.toLongLong());
             gArgs.ForceSetArg("-blockmintxfee", strNv);
             gArgs.ModifyRWConfigFile("blockmintxfee", strNv);
+        }
+        break;
+    case blockmintxfeerampstart:
+        if (changed()) {
+            std::string strNv = value.toString().toStdString();
+            gArgs.ForceSetArg("-blockmintxfeerampstart", strNv);
+            gArgs.ModifyRWConfigFile("blockmintxfeerampstart", strNv);
         }
         break;
     case blockmaxsize:
