@@ -88,6 +88,7 @@ const std::vector<std::string> RPC_COMMANDS_NOT_SAFE_FOR_FUZZING{
     "savefeeestimates",      // disabled as a precautionary measure: may take a file path argument in the future
     "savemempool",           // disabled as a precautionary measure: may take a file path argument in the future
     "setban",                // avoid DNS lookups
+    "setsettings",           // avoid writing to disk and mutating global policy state
     "stop",                  // avoid shutdown state
 };
 
@@ -107,6 +108,7 @@ const std::vector<std::string> RPC_COMMANDS_SAFE_FOR_FUZZING{
     "deriveaddresses",
     "descriptorprocesspsbt",
     "disconnectnode",
+    "dumpsettings",
     "echo",
     "echojson",
     "estimaterawfee",
