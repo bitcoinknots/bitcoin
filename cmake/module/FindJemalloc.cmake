@@ -16,7 +16,6 @@ This is a wrapper around find_package()/pkg_check_modules() commands that:
 
 include(FindPackageHandleStandardArgs)
 
-# First try to use CMake's find_package for jemalloc
 find_package(Jemalloc ${Jemalloc_FIND_VERSION} NO_MODULE QUIET)
 if(Jemalloc_FOUND)
   find_package_handle_standard_args(Jemalloc
@@ -30,31 +29,18 @@ if(Jemalloc_FOUND)
   endif()
   mark_as_advanced(Jemalloc_DIR)
 else()
-  # Fall back to pkg-config for Unix-like systems
-  find_package(PkgConfig QUIET)
-  if(PkgConfig_FOUND)
-    pkg_check_modules(PC_Jemalloc QUIET jemalloc>=${Jemalloc_FIND_VERSION})
-  endif()
-  
-  # If pkg-config didn't find it, try direct library search
-  if(NOT PC_Jemalloc_FOUND)
-    find_library(JEMALLOC_LIBRARY NAMES jemalloc)
-    find_path(JEMALLOC_INCLUDE_DIR NAMES jemalloc/jemalloc.h jemalloc.h)
+  find_package(PkgConfig REQUIRED)
+  if(Jemalloc_FIND_VERSION)
+    set(_jemalloc_pc_arg "jemalloc>=${Jemalloc_FIND_VERSION}")
   else()
-    set(JEMALLOC_LIBRARY ${PC_Jemalloc_LIBRARIES})
-    set(JEMALLOC_INCLUDE_DIR ${PC_Jemalloc_INCLUDE_DIRS})
+    set(_jemalloc_pc_arg "jemalloc")
   endif()
-  
+  pkg_check_modules(PC_Jemalloc QUIET IMPORTED_TARGET ${_jemalloc_pc_arg})
   find_package_handle_standard_args(Jemalloc
-    REQUIRED_VARS JEMALLOC_LIBRARY JEMALLOC_INCLUDE_DIR
+    REQUIRED_VARS PC_Jemalloc_FOUND
+    VERSION_VAR PC_Jemalloc_VERSION
   )
-  
-  if(NOT TARGET Jemalloc::Jemalloc)
-    add_library(Jemalloc::Jemalloc UNKNOWN IMPORTED)
-    set_target_properties(Jemalloc::Jemalloc PROPERTIES
-      IMPORTED_LOCATION "${JEMALLOC_LIBRARY}"
-      INTERFACE_INCLUDE_DIRECTORIES "${JEMALLOC_INCLUDE_DIR}"
-    )
+  if(Jemalloc_FOUND)
+    add_library(Jemalloc::Jemalloc ALIAS PkgConfig::PC_Jemalloc)
   endif()
-  mark_as_advanced(JEMALLOC_LIBRARY JEMALLOC_INCLUDE_DIR)
 endif()
