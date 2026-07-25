@@ -931,7 +931,7 @@ void RPCConsole::setClientModel(ClientModel *model, int bestblock_height, int64_
         ui->blocksDir->setText(model->blocksDir());
         ui->startupTime->setText(model->formatClientStartupTime());
         if (g_software_expiry > 0) {
-            m_label_softwareexpiry->setText(QDateTime::fromSecsSinceEpoch(g_software_expiry).toString());
+            m_label_softwareexpiry->setText(GUIUtil::dateTimeStr(g_software_expiry));
         } else {
             //: Software expiry, if it never expires
             m_label_softwareexpiry->setText(tr("Never"));
