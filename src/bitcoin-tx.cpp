@@ -751,7 +751,7 @@ static void MutateTx(CMutableTransaction& tx, const std::string& command,
 static void OutputTxJSON(const CTransaction& tx)
 {
     UniValue entry(UniValue::VOBJ);
-    TxToUniv(tx, /*block_hash=*/uint256(), entry);
+    TxToUniv(tx, /*block_hash=*/uint256(), entry, /*include_hex=*/true, /*txundo=*/nullptr, TxVerbosity::SHOW_DETAILS, /*policy_vsize=*/POLICY_VSIZE_OMIT);
 
     std::string jsonOutput = entry.write(4);
     tfm::format(std::cout, "%s\n", jsonOutput);
