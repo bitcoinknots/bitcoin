@@ -566,7 +566,7 @@ std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsV
     std::pair<size_t, size_t> ret{0, 0};
 
     for (const CTxIn& txin : tx.vin) {
-        const CTxOut &utxo = view.AccessCoin(txin.prevout).out;
+        const CTxOut& utxo = view.AccessCoin(txin.prevout).out;
         auto[script, consensus_weight_per_byte] = GetScriptForTransactionInput(utxo.scriptPubKey, txin);
         const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness);
         ret.first += dcb.first;
@@ -582,14 +582,38 @@ std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsV
     return ret;
 }
 
-int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte)
+int64_t CalculateExtraTxWeight(const CTransaction& tx, const std::vector<Coin>& prevouts, const unsigned int weight_per_data_byte)
 {
     int64_t mod_weight{0};
 
-    // Add in any extra weight for data bytes
+    if (weight_per_data_byte > 1) {
+        for (size_t i = 0; i < tx.vin.size(); ++i) {
+            const CTxOut& utxo = prevouts.at(i).out;
+            auto[script, consensus_weight_per_byte] = GetScriptForTransactionInput(utxo.scriptPubKey, tx.vin[i]);
+            if (weight_per_data_byte > consensus_weight_per_byte) {
+                const auto dcb = script.DatacarrierBytes(0, &tx.vin[i].scriptWitness);
+                mod_weight += int64_t(dcb.first + dcb.second) * (weight_per_data_byte - consensus_weight_per_byte);
+            }
+        }
+        if (weight_per_data_byte > WITNESS_SCALE_FACTOR) {
+            for (size_t i{tx.vout.size()}; i; ) {
+                const CTxOut& txout = tx.vout[--i];
+                const auto dcb = txout.scriptPubKey.DatacarrierBytes(tx.vout.size() - i);
+                mod_weight += (dcb.first + dcb.second) * (weight_per_data_byte - WITNESS_SCALE_FACTOR);
+            }
+        }
+    }
+
+    return mod_weight;
+}
+
+int64_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte)
+{
+    int64_t mod_weight{0};
+
     if (weight_per_data_byte > 1) {
         for (const CTxIn& txin : tx.vin) {
-            const CTxOut &utxo = view.AccessCoin(txin.prevout).out;
+            const CTxOut& utxo = view.AccessCoin(txin.prevout).out;
             auto[script, consensus_weight_per_byte] = GetScriptForTransactionInput(utxo.scriptPubKey, txin);
             if (weight_per_data_byte > consensus_weight_per_byte) {
                 const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness);

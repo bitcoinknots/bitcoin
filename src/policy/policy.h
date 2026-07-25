@@ -19,6 +19,7 @@
 
 class CCoinsViewCache;
 class CFeeRate;
+class Coin;
 class CScript;
 namespace kernel {
 struct MemPoolOptions;
@@ -241,6 +242,7 @@ std::pair<CScript, unsigned int> GetScriptForTransactionInput(CScript prevScript
 
 std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsViewCache& view);
 
-int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte);
+int64_t CalculateExtraTxWeight(const CTransaction& tx, const std::vector<Coin>& prevouts, const unsigned int weight_per_data_byte);
+int64_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte);
 
 #endif // BITCOIN_POLICY_POLICY_H
