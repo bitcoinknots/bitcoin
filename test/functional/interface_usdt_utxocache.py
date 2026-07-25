@@ -294,6 +294,10 @@ class UTXOCacheTracepointTest(BitcoinTestFramework):
         self.log.info("reconsider the previously invalidated block")
         self.nodes[0].reconsiderblock(block_hash)
 
+        # Poll perf buffer before getblock, since getblock verbosity 2 may
+        # trigger utxocache:add tracepoints via policy vsize calculation
+        bpf.perf_buffer_poll(timeout=200)
+
         block = self.nodes[0].getblock(block_hash, 2)
         for (block_index, tx) in enumerate(block["tx"]):
             for vin in tx["vin"]:
@@ -319,8 +323,6 @@ class UTXOCacheTracepointTest(BitcoinTestFramework):
                         "value": int(vout["value"] * COIN),
                         "is_coinbase": block_index == 0,
                     })
-
-        bpf.perf_buffer_poll(timeout=200)
 
         assert_equal(EXPECTED_HANDLE_ADD_SUCCESS, len(expected_utxocache_adds), len(actual_utxocache_adds))
         assert_equal(EXPECTED_HANDLE_SPENT_SUCCESS, len(expected_utxocache_spents), len(actual_utxocache_spents))
