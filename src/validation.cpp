@@ -2921,11 +2921,12 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
     // For BIP9 deployments, get the activation height dynamically. When RDTS is
     // inactive the start height is 0, so no input is treated as pre-activation and
     // flags_per_input stays empty (keeping the script-execution cache enabled).
-    const auto reduced_data_start_height = DeploymentActiveAt(*pindex, m_chainman, Consensus::DEPLOYMENT_REDUCED_DATA)
+    const bool reduced_data_active{DeploymentActiveAt(*pindex, m_chainman, Consensus::DEPLOYMENT_REDUCED_DATA)};
+    const auto reduced_data_start_height = reduced_data_active
         ? m_chainman.m_versionbitscache.StateSinceHeight(pindex->pprev, params.GetConsensus(), Consensus::DEPLOYMENT_REDUCED_DATA)
         : 0;
 
-    const CheckTxInputsRules chk_input_rules{DeploymentActiveAt(*pindex, m_chainman, Consensus::DEPLOYMENT_REDUCED_DATA) ? CheckTxInputsRules::OutputSizeLimit : CheckTxInputsRules::None};
+    const CheckTxInputsRules chk_input_rules{reduced_data_active ? CheckTxInputsRules::OutputSizeLimit : CheckTxInputsRules::None};
 
     // Check generation tx output sizes if REDUCED_DATA is active
     if (chk_input_rules.test(CheckTxInputsRules::OutputSizeLimit)) {
