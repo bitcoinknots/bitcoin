@@ -42,7 +42,7 @@ WalletFrame::WalletFrame(const PlatformStyle* _platformStyle, QWidget* parent)
 
     m_label_alerts = new QLabel(this);
     m_label_alerts->setVisible(false);
-    m_label_alerts->setStyleSheet("QLabel { background-color: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop:0 #F0D0A0, stop:1 #F8D488); color:#000000; }");
+    m_label_alerts->setStyleSheet("QLabel { background-color: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop:0 #F0D0A0, stop:1 #F8D488); color:#000000; padding:1ex; }");
     m_label_alerts->setWordWrap(true);
     m_label_alerts->setMargin(3);
     m_label_alerts->setTextInteractionFlags(Qt::TextSelectableByMouse);
