@@ -3,6 +3,10 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <node/transaction.h>
+
+#include <coins.h>
+#include <consensus/tx_verify.h>
 #include <consensus/validation.h>
 #include <index/txindex.h>
 #include <net.h>
@@ -10,11 +14,14 @@
 #include <node/blockstorage.h>
 #include <node/context.h>
 #include <node/types.h>
+#include <policy/settings.h>
+#include <primitives/block.h>
 #include <txmempool.h>
+#include <undo.h>
 #include <validation.h>
 #include <validationinterface.h>
-#include <node/transaction.h>
 
+#include <algorithm>
 #include <future>
 
 namespace node {
@@ -166,5 +173,36 @@ CTransactionRef GetTransaction(const CBlockIndex* const block_index, const CTxMe
         }
     }
     return nullptr;
+}
+
+const CTxUndo* FindTxUndo(const CTransaction& tx, const CBlock& block, const CBlockUndo& block_undo)
+{
+    auto it = std::find_if(block.vtx.begin(), block.vtx.end(),
+        [&tx](const CTransactionRef& t) { return t->GetHash() == tx.GetHash(); });
+    if (it != block.vtx.end() && it != block.vtx.begin()) {
+        return &block_undo.vtxundo.at(it - block.vtx.begin() - 1);
+    }
+    return nullptr;
+}
+
+int64_t GetPolicyVirtualTransactionSize(const CTransaction& tx, const std::vector<Coin>& prevouts)
+{
+    if (prevouts.size() != tx.vin.size()) return -1;
+    for (const auto& coin : prevouts) {
+        if (coin.IsSpent()) return -1;
+    }
+    CCoinsView view_dummy;
+    CCoinsViewCache view(&view_dummy);
+    for (size_t i = 0; i < tx.vin.size(); ++i) {
+        view.AddCoin(tx.vin[i].prevout, Coin{prevouts[i]}, true);
+    }
+    int64_t sigop_cost = GetTransactionSigOpCost(tx, view, STANDARD_SCRIPT_VERIFY_FLAGS);
+    int64_t extra_weight = CalculateExtraTxWeight(tx, prevouts, ::g_weight_per_data_byte);
+    return GetVirtualTransactionSize(GetTransactionWeight(tx) + extra_weight, sigop_cost, ::nBytesPerSigOp);
+}
+
+int64_t GetPolicyVirtualTransactionSize(const CTransaction& tx, const CTxUndo& txundo)
+{
+    return GetPolicyVirtualTransactionSize(tx, txundo.vprevout);
 }
 } // namespace node
