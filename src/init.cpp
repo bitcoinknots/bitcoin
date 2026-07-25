@@ -2109,6 +2109,27 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         do_reindex_chainstate,
         kernel_cache_sizes,
         args);
+
+    // A data directory advanced by a client that was not enforcing BIP110/RDTS
+    // can contain blocks that violate RDTS mandatory signaling. Normal startup
+    // does not re-validate inherited history, so correct such state now: mark
+    // the offending blocks invalid and reorganize to the best valid chain. If
+    // the data needed to rewind has been pruned, report it as a load failure so
+    // the reindex prompt below offers recovery, rather than running on (or
+    // partially rewinding) an invalid chain. A full reindex re-enforces the rule
+    // during validation, so the correction only needs to run after this initial
+    // load, not after a reindex retry.
+    //
+    // The block index is shared, so the invalid marks apply to any background
+    // (assumeutxo) chainstate too; only the active chainstate is reorganized here.
+    if (status == ChainstateLoadStatus::SUCCESS && !ShutdownRequested(node)) {
+        bilingual_str rdts_error;
+        if (!node.chainman->ActiveChainstate().CorrectRdtsInvalidBlocks(rdts_error)) {
+            status = ChainstateLoadStatus::FAILURE;
+            error = rdts_error;
+        }
+    }
+
     if (status == ChainstateLoadStatus::FAILURE && !do_reindex && !ShutdownRequested(node)) {
         // If reindex=auto, directly start the reindex
         bool fAutoReindex = (args.GetArg("-reindex", "0") == "auto");
