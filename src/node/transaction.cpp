@@ -3,6 +3,10 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <node/transaction.h>
+
+#include <coins.h>
+#include <consensus/tx_verify.h>
 #include <consensus/validation.h>
 #include <index/txindex.h>
 #include <net.h>
@@ -10,12 +14,19 @@
 #include <node/blockstorage.h>
 #include <node/context.h>
 #include <node/types.h>
+#include <policy/settings.h>
+#include <primitives/block.h>
 #include <txmempool.h>
+#include <undo.h>
+#include <util/hasher.h>
+#include <util/overflow.h>
 #include <validation.h>
 #include <validationinterface.h>
-#include <node/transaction.h>
 
+#include <algorithm>
 #include <future>
+#include <optional>
+#include <unordered_map>
 
 namespace node {
 static TransactionError HandleATMPError(const TxValidationState& state, std::string& err_string_out)
@@ -166,5 +177,54 @@ CTransactionRef GetTransaction(const CBlockIndex* const block_index, const CTxMe
         }
     }
     return nullptr;
+}
+
+const CTxUndo* FindTxUndo(const CTransaction& tx, const CBlock& block, const CBlockUndo& block_undo)
+{
+    auto it = std::find_if(block.vtx.begin(), block.vtx.end(),
+        [&tx](const CTransactionRef& t) { return t->GetHash() == tx.GetHash(); });
+    if (it != block.vtx.end() && it != block.vtx.begin()) {
+        return &block_undo.vtxundo.at(it - block.vtx.begin() - 1);
+    }
+    return nullptr;
+}
+
+namespace {
+/** Serves a transaction's spent coins to a CCoinsViewCache without CCoinsViewCache::AddCoin, which drops unspendable outputs and fires utxocache tracepoints. */
+class SpentCoinsView : public CCoinsView
+{
+    const std::vector<Coin>& m_prevouts;
+    std::unordered_map<COutPoint, size_t, SaltedOutpointHasher> m_index;
+
+public:
+    SpentCoinsView(const CTransaction& tx, const std::vector<Coin>& prevouts) : m_prevouts{prevouts}
+    {
+        for (size_t i{0}; i < tx.vin.size(); ++i) m_index.emplace(tx.vin[i].prevout, i);
+    }
+    std::optional<Coin> GetCoin(const COutPoint& outpoint) const override
+    {
+        const auto it{m_index.find(outpoint)};
+        if (it == m_index.end()) return std::nullopt;
+        return m_prevouts[it->second];
+    }
+};
+} // namespace
+
+int64_t GetPolicyVirtualTransactionSize(const CTransaction& tx, const std::vector<Coin>& prevouts)
+{
+    if (prevouts.size() != tx.vin.size()) return -1;
+    for (const auto& coin : prevouts) {
+        if (coin.IsSpent()) return -1;
+    }
+    SpentCoinsView spent{tx, prevouts};
+    CCoinsViewCache view{&spent};
+    const int64_t sigop_cost{GetTransactionSigOpCost(tx, view, STANDARD_SCRIPT_VERIFY_FLAGS)};
+    const int32_t extra_weight{CalculateExtraTxWeight(tx, prevouts, ::g_weight_per_data_byte)};
+    return GetVirtualTransactionSize(SaturatingAdd(int32_t(GetTransactionWeight(tx)), extra_weight), sigop_cost, ::nBytesPerSigOp);
+}
+
+int64_t GetPolicyVirtualTransactionSize(const CTransaction& tx, const CTxUndo& txundo)
+{
+    return GetPolicyVirtualTransactionSize(tx, txundo.vprevout);
 }
 } // namespace node
