@@ -215,6 +215,14 @@ public:
     //! Check if transaction is in mempool.
     virtual bool isInMempool(const uint256& txid) = 0;
 
+    //! Get policy-adjusted virtual transaction size, from the mempool entry or,
+    //! failing that, from the undo data of the given block (may be null for an
+    //! unconfirmed transaction). Returns -1 if unavailable.
+    virtual int64_t getPolicyVirtualTransactionSize(const uint256& txid, const uint256& block_hash) = 0;
+
+    //! Compute policy-adjusted virtual transaction size from prevout coins.
+    virtual int64_t getPolicyVirtualTransactionSize(const CTransaction& tx, const std::vector<Coin>& prevouts) = 0;
+
     //! Check if transaction has descendants in mempool.
     virtual bool hasDescendantsInMempool(const uint256& txid) = 0;
 
