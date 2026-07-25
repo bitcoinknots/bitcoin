@@ -119,10 +119,6 @@ static bool ParseArgs(NodeContext& node, int argc, char* argv[])
         return InitError(Untranslated(strprintf("Error parsing command line arguments: %s", error)));
     }
 
-    if (auto error = common::InitConfig(args)) {
-        return InitError(error->message, error->details);
-    }
-
     // Error out when loose non-argument tokens are encountered on command line
     for (int i = 1; i < argc; i++) {
         if (!IsSwitchChar(argv[i][0])) {
@@ -134,7 +130,9 @@ static bool ParseArgs(NodeContext& node, int argc, char* argv[])
 
 static bool ProcessInitCommands(ArgsManager& args)
 {
-    // Process help and version before taking care about datadir
+    // Process help and version before taking care about datadir, so these do
+    // not create or touch the datadir. This means the config file has not been
+    // read yet, so only command line arguments affect the output.
     if (HelpRequested(args) || args.GetBoolArg("-version", false)) {
         std::string strUsage = CLIENT_NAME " daemon version " + FormatFullVersion() + "\n";
 
@@ -278,6 +276,10 @@ MAIN_FUNCTION
     if (!ParseArgs(node, argc, argv)) return EXIT_FAILURE;
     // Process early info return commands such as -help or -version
     if (ProcessInitCommands(args)) return EXIT_SUCCESS;
+    if (auto error = common::InitConfig(args)) {
+        InitError(error->message, error->details);
+        return EXIT_FAILURE;
+    }
 
     // Start application
     if (!AppInit(node) || !Assert(node.shutdown_signal)->wait()) {
