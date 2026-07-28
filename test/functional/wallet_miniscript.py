@@ -326,7 +326,8 @@ class WalletMiniscriptTest(BitcoinTestFramework):
         """Reduced-data (RDTS): Taproot miniscript leaves that emit OP_IF/OP_NOTIF are
         rejected at parse time (the guard lives in the shared descriptor parser, so
         import active/watch-only alike), consistent with the tr() nesting-depth cap.
-        P2WSH branching and non-branching Tapscript are unaffected."""
+        P2WSH miniscript is unaffected even when it branches; only branching
+        fragments in Taproot (Tapscript) leaves are rejected."""
         self.log.info("Testing the reduced-data OP_IF-in-tapscript guard")
         self.nodes[0].createwallet(
             wallet_name="ms_rdts", descriptors=True, disable_private_keys=True
