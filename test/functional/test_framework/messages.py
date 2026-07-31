@@ -99,6 +99,74 @@ def hash256(s):
     return sha256(sha256(s))
 
 
+def blake2b(s):
+    return hashlib.blake2b(s, digest_size=32).digest()
+
+
+def tagged_hash(tag, data):
+    tag_hash = sha256(tag.encode())
+    return sha256(tag_hash + tag_hash + data)
+
+
+def blake2b_header_hash_components(header):
+    xor_key = header.m_xor_key.to_bytes(16, "little")
+    xor_key_hash = tagged_hash("Bitcoin block hash PoW XOR key", xor_key)
+    prevblock_ordered = ser_uint256(header.hashPrevBlock)[::-1]
+    prevblock_hidden = bytearray(tagged_hash("Bitcoin prevblock header, hashed", prevblock_ordered))
+    prevblock_hidden[:6] = b"\x00" * 6
+    h1 = tagged_hash(
+        "Bitcoin block header 1",
+        header.get_complete_version().to_bytes(4, "little")
+        + prevblock_ordered
+        + header.m_height.to_bytes(4, "little", signed=True)
+        + ser_uint256(header.hashMerkleRoot)
+        + header.nTime.to_bytes(4, "little")
+        + b"\x00"
+        + header.nBits.to_bytes(4, "little")
+        + header.m_txcount.to_bytes(4, "little")
+        + header.m_reserved.to_bytes(1, "little")
+        + header.m_xor_key_mask_clear_bits.to_bytes(1, "little")
+        + xor_key_hash,
+    )
+    h2 = tagged_hash("Merge-mining hook", h1 + b"\x00" * 32 + ser_uint256(header.m_mm_rhs))
+    hash1 = blake2b(
+        b"\x00" * 4
+        + h2
+        + header.m_extranonce.to_bytes(16, "little")
+    )
+    hash2 = blake2b(
+        prevblock_hidden
+        + header.nNonce.to_bytes(4, "little")
+        + header.m_nonce2.to_bytes(4, "little")
+        + header.m_nonce3.to_bytes(8, "little")
+        + hash1
+    )
+    mask = bytes(32)
+    if header.m_xor_key:
+        mask = bytearray(tagged_hash("Bitcoin block hash PoW XOR mask", xor_key))
+        clear_bytes, remaining_bits = divmod(header.m_xor_key_mask_clear_bits, 8)
+        mask[:clear_bytes] = b"\x00" * clear_bytes
+        mask[clear_bytes] &= 0xff >> remaining_bits
+        mask = bytes(mask)
+    result = bytes(a ^ b for a, b in zip(hash2, mask))
+    return {
+        "xor_key_hash": xor_key_hash,
+        "h1": h1,
+        "h2": h2,
+        "hash1": hash1,
+        "hash2": hash2,
+        "mask": mask,
+        "result": result,
+    }
+
+
+def powhash(header):
+    """Return the proof-of-work hash selected by the serialized header format."""
+    if not header.m_header_v2:
+        return hash256(CBlockHeader.serialize(header))
+    return blake2b_header_hash_components(header)["result"][::-1]
+
+
 def ser_compact_size(l):
     r = b""
     if l < 253:
@@ -693,7 +761,9 @@ class CTransaction:
 
 class CBlockHeader:
     __slots__ = ("hash", "hashMerkleRoot", "hashPrevBlock", "nBits", "nNonce",
-                 "nTime", "nVersion", "sha256")
+                 "nTime", "nVersion", "sha256", "m_header_v2", "m_nonce2",
+                 "m_nonce3", "m_extranonce", "m_txcount", "m_reserved",
+                 "m_xor_key_mask_clear_bits", "m_xor_key", "m_height", "m_mm_rhs")
 
     def __init__(self, header=None):
         if header is None:
@@ -705,6 +775,16 @@ class CBlockHeader:
             self.nTime = header.nTime
             self.nBits = header.nBits
             self.nNonce = header.nNonce
+            self.m_header_v2 = header.m_header_v2
+            self.m_nonce2 = header.m_nonce2
+            self.m_nonce3 = header.m_nonce3
+            self.m_extranonce = header.m_extranonce
+            self.m_txcount = header.m_txcount
+            self.m_reserved = header.m_reserved
+            self.m_xor_key_mask_clear_bits = header.m_xor_key_mask_clear_bits
+            self.m_xor_key = header.m_xor_key
+            self.m_height = header.m_height
+            self.m_mm_rhs = header.m_mm_rhs
             self.sha256 = header.sha256
             self.hash = header.hash
             self.calc_sha256()
@@ -716,40 +796,79 @@ class CBlockHeader:
         self.nTime = 0
         self.nBits = 0
         self.nNonce = 0
+        self.m_header_v2 = False
+        self.m_nonce2 = 0
+        self.m_nonce3 = 0
+        self.m_extranonce = 0
+        self.m_txcount = 0
+        self.m_reserved = 0
+        self.m_xor_key_mask_clear_bits = 0
+        self.m_xor_key = 0
+        self.m_height = 0
+        self.m_mm_rhs = 0
         self.sha256 = None
         self.hash = None
 
     def deserialize(self, f):
-        self.nVersion = int.from_bytes(f.read(4), "little", signed=True)
+        version = int.from_bytes(f.read(4), "little")
+        self.m_header_v2 = bool(version & 0x80000000)
+        self.nVersion = version & 0x7fffffff
         self.hashPrevBlock = deser_uint256(f)
         self.hashMerkleRoot = deser_uint256(f)
         self.nTime = int.from_bytes(f.read(4), "little")
         self.nBits = int.from_bytes(f.read(4), "little")
         self.nNonce = int.from_bytes(f.read(4), "little")
+        if self.m_header_v2:
+            self.m_nonce2 = int.from_bytes(f.read(4), "little")
+            self.m_nonce3 = int.from_bytes(f.read(8), "little")
+            self.m_extranonce = int.from_bytes(f.read(16), "little")
+            self.m_txcount = int.from_bytes(f.read(2), "little")
+            self.m_reserved = int.from_bytes(f.read(1), "little")
+            self.m_xor_key_mask_clear_bits = int.from_bytes(f.read(1), "little")
+            self.m_xor_key = int.from_bytes(f.read(16), "little")
+            self.m_height = int.from_bytes(f.read(4), "little", signed=True)
+            self.m_mm_rhs = deser_uint256(f)
+        else:
+            self.m_nonce2 = 0
+            self.m_nonce3 = 0
+            self.m_extranonce = 0
+            self.m_txcount = 0
+            self.m_reserved = 0
+            self.m_xor_key_mask_clear_bits = 0
+            self.m_xor_key = 0
+            self.m_height = 0
+            self.m_mm_rhs = 0
         self.sha256 = None
         self.hash = None
 
+    def get_complete_version(self):
+        return (0x80000000 if self.m_header_v2 else 0) | (self.nVersion & 0x7fffffff)
+
     def serialize(self):
         r = b""
-        r += self.nVersion.to_bytes(4, "little", signed=True)
+        r += self.get_complete_version().to_bytes(4, "little")
         r += ser_uint256(self.hashPrevBlock)
         r += ser_uint256(self.hashMerkleRoot)
         r += self.nTime.to_bytes(4, "little")
         r += self.nBits.to_bytes(4, "little")
         r += self.nNonce.to_bytes(4, "little")
+        if self.m_header_v2:
+            r += self.m_nonce2.to_bytes(4, "little")
+            r += self.m_nonce3.to_bytes(8, "little")
+            r += self.m_extranonce.to_bytes(16, "little")
+            r += self.m_txcount.to_bytes(2, "little")
+            r += self.m_reserved.to_bytes(1, "little")
+            r += self.m_xor_key_mask_clear_bits.to_bytes(1, "little")
+            r += self.m_xor_key.to_bytes(16, "little")
+            r += self.m_height.to_bytes(4, "little", signed=True)
+            r += ser_uint256(self.m_mm_rhs)
         return r
 
     def calc_sha256(self):
         if self.sha256 is None:
-            r = b""
-            r += self.nVersion.to_bytes(4, "little", signed=True)
-            r += ser_uint256(self.hashPrevBlock)
-            r += ser_uint256(self.hashMerkleRoot)
-            r += self.nTime.to_bytes(4, "little")
-            r += self.nBits.to_bytes(4, "little")
-            r += self.nNonce.to_bytes(4, "little")
-            self.sha256 = uint256_from_str(hash256(r))
-            self.hash = hash256(r)[::-1].hex()
+            rawhash = powhash(self)
+            self.sha256 = uint256_from_str(rawhash)
+            self.hash = rawhash[::-1].hex()
 
     def rehash(self):
         self.sha256 = None
@@ -761,8 +880,8 @@ class CBlockHeader:
             % (self.nVersion, self.hashPrevBlock, self.hashMerkleRoot,
                time.ctime(self.nTime), self.nBits, self.nNonce)
 
-BLOCK_HEADER_SIZE = len(CBlockHeader().serialize())
-assert_equal(BLOCK_HEADER_SIZE, 80)
+BLOCK_HEADER_SIZE = 80
+assert_equal(len(CBlockHeader().serialize()), BLOCK_HEADER_SIZE)
 
 class CBlock(CBlockHeader):
     __slots__ = ("vtx",)
