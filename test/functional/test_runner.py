@@ -431,6 +431,8 @@ BASE_SCRIPTS = [
     'rpc_help.py',
     'p2p_handshake.py',
     'p2p_handshake.py --v2transport',
+    'p2p_bip110_stale_outbound.py',
+    'p2p_bip110_stale_outbound.py --v2transport',
     'feature_dirsymlinks.py',
     'feature_help.py',
     'feature_shutdown.py',
