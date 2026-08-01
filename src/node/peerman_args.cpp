@@ -2,6 +2,8 @@
 
 #include <common/args.h>
 #include <net_processing.h>
+#include <node/interface_ui.h>
+#include <util/translation.h>
 
 #include <algorithm>
 #include <limits>
@@ -11,7 +13,13 @@ namespace node {
 void ApplyArgsManOptions(const ArgsManager& argsman, PeerManager::Options& options)
 {
     if (auto value{argsman.GetIntArg("-maxstaleoutbound")}) {
-        options.maxstaleoutbound = std::clamp<int64_t>(*value, 0, std::numeric_limits<unsigned int>::max());
+        // A stale peer only ever occupies an automatic outbound slot, so
+        // tolerating more than the outbound count has no effect; cap it there.
+        options.maxstaleoutbound = std::clamp<int64_t>(*value, 0, MAX_STALE_OUTBOUND_CONNECTIONS);
+        if (*value > MAX_STALE_OUTBOUND_CONNECTIONS) {
+            InitWarning(strprintf(_("Reducing -maxstaleoutbound from %d to %d, the maximum supported value."),
+                                  *value, MAX_STALE_OUTBOUND_CONNECTIONS));
+        }
     }
 
     if (auto value{argsman.GetBoolArg("-txreconciliation")}) options.reconcile_txs = *value;

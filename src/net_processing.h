@@ -35,6 +35,13 @@ static const unsigned int MAX_CMPCTBLOCKS_INFLIGHT_PER_BLOCK = 3;
 /** Number of headers sent in one getheaders result. We rely on the assumption that if a peer sends
  *  less than this number, we reached its tip. Changing this value is a protocol upgrade. */
 static const unsigned int MAX_HEADERS_RESULTS = 2000;
+/** Maximum number of tolerated automatic outbound peers lacking NODE_REDUCED_DATA
+ *  (BIP-110). Only full-relay and block-relay outbound connections are demoted,
+ *  so this is their combined count: a stale peer can occupy no other slot. These
+ *  are additional to the outbound target but count within -maxconnections, each
+ *  displacing an inbound slot while connected. */
+static constexpr int MAX_STALE_OUTBOUND_CONNECTIONS{MAX_OUTBOUND_FULL_RELAY_CONNECTIONS + MAX_BLOCK_RELAY_ONLY_CONNECTIONS};
+/** -maxstaleoutbound default */
 static constexpr int DEFAULT_MAXSTALEOUTBOUND{8};
 
 struct CNodeStateStats {
