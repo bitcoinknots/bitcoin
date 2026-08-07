@@ -130,6 +130,10 @@ def bctest(testDir, testObj, buildenv):
 
     if outputData:
         data_mismatch, formatting_mismatch = False, False
+
+        if outputType == 'json' and testObj["exec"] == "./bitcoin-tx":
+            outputData = strip_vsize_line(outputData)
+
         # Parse command output and expected output
         try:
             a_parsed = parse_output(res.stdout, outputType)
@@ -176,6 +180,11 @@ def bctest(testDir, testObj, buildenv):
         if want_error not in res.stderr:
             logging.error(f"Error mismatch:\nExpected: {want_error}\nReceived: {res.stderr.rstrip()}\nres: {str(res)}")
             raise Exception
+
+def strip_vsize_line(s):
+    """Strip the vsize JSON line from bitcoin-tx output, since vsize
+    requires prevout context that bitcoin-tx does not have."""
+    return re.sub(r' *"vsize":.*\n', '', s)
 
 def parse_output(a, fmt):
     """Parse the output according to specified format.

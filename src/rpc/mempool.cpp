@@ -562,8 +562,7 @@ UniValue MempoolTxsToJSON(const CTxMemPool& pool, bool verbose, uint64_t sequenc
         txentry.pushKV("entry_sequence", e.GetSequence());
 
         if (verbose) {
-            // We could also calculate fees etc for this transaction, but yolo.
-            TxToUniv(e.GetTx(), /*block_hash=*/uint256::ZERO, /*entry=*/txentry, /*include_hex=*/false);
+            TxToUniv(e.GetTx(), /*block_hash=*/uint256::ZERO, /*entry=*/txentry, /*include_hex=*/false, /*txundo=*/nullptr, TxVerbosity::SHOW_DETAILS, /*policy_vsize=*/e.GetTxSize());
         } else {
             txentry.pushKV("txid", e.GetTx().GetHash().ToString());
         }

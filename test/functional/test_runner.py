@@ -404,6 +404,8 @@ BASE_SCRIPTS = [
     'mempool_dust.py',
     'mempool_subdust_fee_penalty.py',
     'mempool_sigoplimit.py',
+    'feature_policy_vsize.py',
+    'feature_policy_vsize_opnet.py',
     'rpc_deriveaddresses.py',
     'rpc_deriveaddresses.py --usecli',
     'p2p_ping.py',

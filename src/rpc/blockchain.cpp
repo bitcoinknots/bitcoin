@@ -228,8 +228,14 @@ UniValue blockToJSON(BlockManager& blockman, const CBlock& block, const CBlockIn
                 const CTransactionRef& tx = block.vtx.at(i);
                 // coinbase transaction (i.e. i == 0) doesn't have undo data
                 const CTxUndo* txundo = (have_undo && i > 0) ? &blockUndo.vtxundo.at(i - 1) : nullptr;
+                int64_t policy_vsize = POLICY_VSIZE_DEFAULT;
+                if (!tx->IsCoinBase()) {
+                    const int64_t computed = txundo ? node::GetPolicyVirtualTransactionSize(*tx, *txundo) : -1;
+                    // Omit rather than report a size that ignores policy weight
+                    policy_vsize = computed >= 0 ? computed : POLICY_VSIZE_OMIT;
+                }
                 UniValue objTx(UniValue::VOBJ);
-                TxToUniv(*tx, /*block_hash=*/uint256(), /*entry=*/objTx, /*include_hex=*/true, txundo, verbosity);
+                TxToUniv(*tx, /*block_hash=*/uint256(), /*entry=*/objTx, /*include_hex=*/true, txundo, verbosity, policy_vsize);
                 txs.push_back(std::move(objTx));
             }
             break;

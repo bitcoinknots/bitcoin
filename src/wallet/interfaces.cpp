@@ -433,6 +433,20 @@ public:
         }
         return {};
     }
+    int64_t getPolicyVirtualTransactionSize(const uint256& txid) override
+    {
+        uint256 block_hash;
+        {
+            LOCK(m_wallet->cs_wallet);
+            auto mi = m_wallet->mapWallet.find(txid);
+            if (mi != m_wallet->mapWallet.end()) {
+                if (const auto* conf = std::get_if<TxStateConfirmed>(&mi->second.m_state)) {
+                    block_hash = conf->confirmed_block_hash;
+                }
+            }
+        }
+        return m_wallet->chain().getPolicyVirtualTransactionSize(txid, block_hash);
+    }
     std::optional<PSBTError> fillPSBT(int sighash_type,
         bool sign,
         bool bip32derivs,

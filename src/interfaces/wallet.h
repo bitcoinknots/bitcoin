@@ -216,6 +216,9 @@ public:
         bool& in_mempool,
         int& num_blocks) = 0;
 
+    //! Get policy-adjusted virtual transaction size from mempool, or -1 if unavailable.
+    virtual int64_t getPolicyVirtualTransactionSize(const uint256& txid) = 0;
+
     //! Fill PSBT.
     virtual std::optional<common::PSBTError> fillPSBT(int sighash_type,
         bool sign,

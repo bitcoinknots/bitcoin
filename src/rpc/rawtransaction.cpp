@@ -56,7 +56,8 @@ using node::PSBTAnalysis;
 
 static void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry,
                      Chainstate& active_chainstate, const CTxUndo* txundo = nullptr,
-                     TxVerbosity verbosity = TxVerbosity::SHOW_DETAILS)
+                     TxVerbosity verbosity = TxVerbosity::SHOW_DETAILS,
+                     int64_t policy_vsize = POLICY_VSIZE_DEFAULT)
 {
     CHECK_NONFATAL(verbosity >= TxVerbosity::SHOW_DETAILS);
     // Call into TxToUniv() in bitcoin-common to decode the transaction hex.
@@ -64,7 +65,12 @@ static void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& 
     // Blockchain contextual information (confirmations and blocktime) is not
     // available to code in bitcoin-common, so we query them here and push the
     // data into the returned UniValue.
-    TxToUniv(tx, /*block_hash=*/uint256(), entry, /*include_hex=*/true, txundo, verbosity);
+
+    if (policy_vsize == POLICY_VSIZE_DEFAULT && txundo && !tx.IsCoinBase()) {
+        policy_vsize = node::GetPolicyVirtualTransactionSize(tx, *txundo);
+    }
+
+    TxToUniv(tx, /*block_hash=*/uint256(), entry, /*include_hex=*/true, txundo, verbosity, policy_vsize);
 
     if (!hashBlock.IsNull()) {
         LOCK(cs_main);
@@ -95,7 +101,7 @@ std::vector<RPCResult> DecodeTxDoc(const std::string& txid_field_doc)
         {RPCResult::Type::STR_HEX, "txid", txid_field_doc},
         {RPCResult::Type::STR_HEX, "hash", "The transaction hash (differs from txid for witness transactions)"},
         {RPCResult::Type::NUM, "size", "The serialized transaction size"},
-        {RPCResult::Type::NUM, "vsize", "The virtual transaction size (differs from size for witness transactions)"},
+        {RPCResult::Type::NUM, "vsize", /*optional=*/true, "The virtual transaction size. When spent input data is available, accounts for sigop weight (-bytespersigop) and datacarrier weight (-datacarriercost). May be absent when the correct value cannot be determined."},
         {RPCResult::Type::NUM, "weight", "The transaction's weight (between vsize*4-3 and vsize*4)"},
         {RPCResult::Type::NUM, "version", "The version"},
         {RPCResult::Type::NUM_TIME, "locktime", "The lock time"},
@@ -407,32 +413,45 @@ static RPCHelpMan getrawtransaction()
         LOCK(cs_main);
         blockindex = chainman.m_blockman.LookupBlockIndex(hash_block); // May be nullptr for mempool transactions
     }
-    if (verbosity == 1) {
-        TxToJSON(*tx, hash_block, result, chainman.ActiveChainstate());
-        return result;
-    }
-
-    CBlockUndo blockUndo;
+    int64_t policy_vsize = POLICY_VSIZE_DEFAULT;
+    const CTxUndo* txundo{nullptr};
+    CBlockUndo block_undo;
     CBlock block;
 
-    if (tx->IsCoinBase() || !blockindex || WITH_LOCK(::cs_main, return !(blockindex->nStatus & BLOCK_HAVE_MASK))) {
-        TxToJSON(*tx, hash_block, result, chainman.ActiveChainstate());
-        return result;
-    }
-    if (!chainman.m_blockman.ReadBlockUndo(blockUndo, *blockindex)) {
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Undo data expected but can't be read. This could be due to disk corruption or a conflict with a pruning event.");
-    }
-    if (!chainman.m_blockman.ReadBlock(block, *blockindex)) {
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Block data expected but can't be read. This could be due to disk corruption or a conflict with a pruning event.");
+    if (!tx->IsCoinBase() && blockindex && WITH_LOCK(::cs_main, return blockindex->nStatus & BLOCK_HAVE_MASK)) {
+        const bool have_undo = chainman.m_blockman.ReadBlockUndo(block_undo, *blockindex);
+        if (!have_undo && verbosity >= 2) {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Undo data expected but can't be read. This could be due to disk corruption or a conflict with a pruning event.");
+        }
+        const bool have_block = have_undo && chainman.m_blockman.ReadBlock(block, *blockindex);
+        if (have_undo && !have_block && verbosity >= 2) {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Block data expected but can't be read. This could be due to disk corruption or a conflict with a pruning event.");
+        }
+        if (have_block) {
+            txundo = node::FindTxUndo(*tx, block, block_undo);
+        }
     }
 
-    CTxUndo* undoTX {nullptr};
-    auto it = std::find_if(block.vtx.begin(), block.vtx.end(), [tx](CTransactionRef t){ return *t == *tx; });
-    if (it != block.vtx.end()) {
-        // -1 as blockundo does not have coinbase tx
-        undoTX = &blockUndo.vtxundo.at(it - block.vtx.begin() - 1);
+    if (txundo) {
+        policy_vsize = node::GetPolicyVirtualTransactionSize(*tx, *txundo);
+    } else if (!tx->IsCoinBase() && node.mempool) {
+        LOCK(node.mempool->cs);
+        auto it = node.mempool->mapTx.find(tx->GetHash());
+        if (it != node.mempool->mapTx.end()) {
+            policy_vsize = it->GetTxSize();
+        }
     }
-    TxToJSON(*tx, hash_block, result, chainman.ActiveChainstate(), undoTX, TxVerbosity::SHOW_DETAILS_AND_PREVOUT);
+    if (policy_vsize < 0 && !tx->IsCoinBase()) {
+        // Omit rather than report a size that ignores policy weight
+        policy_vsize = POLICY_VSIZE_OMIT;
+    }
+
+    if (verbosity == 1) {
+        TxToJSON(*tx, hash_block, result, chainman.ActiveChainstate(), /*txundo=*/nullptr, TxVerbosity::SHOW_DETAILS, policy_vsize);
+        return result;
+    }
+
+    TxToJSON(*tx, hash_block, result, chainman.ActiveChainstate(), txundo, TxVerbosity::SHOW_DETAILS_AND_PREVOUT, policy_vsize);
     return result;
 },
     };
@@ -831,8 +850,21 @@ static RPCHelpMan signrawtransactionwithkey()
     // Parse the prevtxs array
     ParsePrevouts(request.params[2], &keystore, coins);
 
+    int nHashType = ParseSighashString(request.params[3]);
+    std::map<int, bilingual_str> input_errors;
+    std::optional<CAmount> inputs_amount_sum;
+    bool complete = SignTransaction(mtx, &keystore, coins, nHashType, input_errors, &inputs_amount_sum);
+
+    std::vector<Coin> prevouts;
+    prevouts.reserve(mtx.vin.size());
+    for (const CTxIn& txin : mtx.vin) {
+        auto it = coins.find(txin.prevout);
+        prevouts.push_back(it != coins.end() ? it->second : Coin());
+    }
+    int64_t policy_vsize = node::GetPolicyVirtualTransactionSize(CTransaction(mtx), prevouts);
+
     UniValue result(UniValue::VOBJ);
-    SignTransaction(mtx, &keystore, coins, request.params[3], result);
+    SignTransactionResultToJSON(mtx, complete, coins, input_errors, result, inputs_amount_sum, policy_vsize);
     return result;
 },
     };

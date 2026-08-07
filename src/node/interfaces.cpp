@@ -55,6 +55,7 @@
 #include <sync.h>
 #include <txmempool.h>
 #include <uint256.h>
+#include <undo.h>
 #include <univalue.h>
 #include <util/check.h>
 #include <util/result.h>
@@ -712,6 +713,33 @@ public:
         if (!m_node.mempool) return false;
         LOCK(m_node.mempool->cs);
         return m_node.mempool->exists(GenTxid::Txid(txid));
+    }
+    int64_t getPolicyVirtualTransactionSize(const uint256& txid, const uint256& block_hash) override
+    {
+        if (m_node.mempool) {
+            LOCK(m_node.mempool->cs);
+            auto it = m_node.mempool->mapTx.find(txid);
+            if (it != m_node.mempool->mapTx.end()) {
+                return it->GetTxSize();
+            }
+        }
+        if (block_hash.IsNull() || !m_node.chainman) return -1;
+        const CBlockIndex* pindex{WITH_LOCK(::cs_main, return m_node.chainman->m_blockman.LookupBlockIndex(block_hash))};
+        if (!pindex || !WITH_LOCK(::cs_main, return pindex->nStatus & BLOCK_HAVE_MASK)) return -1;
+        CBlockUndo block_undo;
+        CBlock block;
+        if (!m_node.chainman->m_blockman.ReadBlockUndo(block_undo, *pindex)) return -1;
+        if (!m_node.chainman->m_blockman.ReadBlock(block, *pindex)) return -1;
+        for (const auto& tx : block.vtx) {
+            if (tx->GetHash() != txid) continue;
+            const CTxUndo* txundo{node::FindTxUndo(*tx, block, block_undo)};
+            return txundo ? node::GetPolicyVirtualTransactionSize(*tx, *txundo) : -1;
+        }
+        return -1;
+    }
+    int64_t getPolicyVirtualTransactionSize(const CTransaction& tx, const std::vector<Coin>& prevouts) override
+    {
+        return node::GetPolicyVirtualTransactionSize(tx, prevouts);
     }
     bool hasDescendantsInMempool(const uint256& txid) override
     {

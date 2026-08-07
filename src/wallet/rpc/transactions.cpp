@@ -803,8 +803,17 @@ RPCHelpMan gettransaction()
     entry.pushKV("hex", EncodeHexTx(*wtx.tx));
 
     if (verbose) {
+        uint256 block_hash;
+        if (const auto* conf = std::get_if<TxStateConfirmed>(&wtx.m_state)) {
+            block_hash = conf->confirmed_block_hash;
+        }
+        int64_t policy_vsize = pwallet->chain().getPolicyVirtualTransactionSize(wtx.GetHash(), block_hash);
+        if (policy_vsize < 0 && !wtx.tx->IsCoinBase()) {
+            // Omit rather than report a size that ignores policy weight
+            policy_vsize = POLICY_VSIZE_OMIT;
+        }
         UniValue decoded(UniValue::VOBJ);
-        TxToUniv(*wtx.tx, /*block_hash=*/uint256(), /*entry=*/decoded, /*include_hex=*/false);
+        TxToUniv(*wtx.tx, /*block_hash=*/uint256(), /*entry=*/decoded, /*include_hex=*/false, /*txundo=*/nullptr, TxVerbosity::SHOW_DETAILS, policy_vsize);
         entry.pushKV("decoded", std::move(decoded));
     }
 

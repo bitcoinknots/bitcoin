@@ -18,6 +18,7 @@
 #include <index/txindex.h>
 #include <node/blockstorage.h>
 #include <node/context.h>
+#include <node/transaction.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
 #include <rpc/blockchain.h>
@@ -905,8 +906,34 @@ static bool rest_tx(const std::any& context, HTTPRequest* req, const std::string
     }
 
     case RESTResponseFormat::JSON: {
+        int64_t policy_vsize = POLICY_VSIZE_DEFAULT;
+        if (!tx->IsCoinBase() && !hashBlock.IsNull()) {
+            const CBlockIndex* pindex = WITH_LOCK(cs_main, return node->chainman->m_blockman.LookupBlockIndex(hashBlock));
+            if (pindex && WITH_LOCK(cs_main, return pindex->nStatus & BLOCK_HAVE_MASK)) {
+                CBlockUndo block_undo;
+                CBlock block;
+                if (node->chainman->m_blockman.ReadBlockUndo(block_undo, *pindex) &&
+                    node->chainman->m_blockman.ReadBlock(block, *pindex)) {
+                    const CTxUndo* txundo = node::FindTxUndo(*tx, block, block_undo);
+                    if (txundo) {
+                        policy_vsize = node::GetPolicyVirtualTransactionSize(*tx, *txundo);
+                    }
+                }
+            }
+        }
+        if (policy_vsize == POLICY_VSIZE_DEFAULT && !tx->IsCoinBase() && node->mempool) {
+            LOCK(node->mempool->cs);
+            auto it = node->mempool->mapTx.find(tx->GetHash());
+            if (it != node->mempool->mapTx.end()) {
+                policy_vsize = it->GetTxSize();
+            }
+        }
+        if (policy_vsize < 0 && !tx->IsCoinBase()) {
+            // Omit rather than report a size that ignores policy weight
+            policy_vsize = POLICY_VSIZE_OMIT;
+        }
         UniValue objTx(UniValue::VOBJ);
-        TxToUniv(*tx, /*block_hash=*/hashBlock, /*entry=*/ objTx);
+        TxToUniv(*tx, /*block_hash=*/hashBlock, /*entry=*/objTx, /*include_hex=*/true, /*txundo=*/nullptr, TxVerbosity::SHOW_DETAILS, policy_vsize);
         std::string strJSON = objTx.write() + "\n";
         req->WriteHeader("Content-Type", "application/json");
         req->WriteReply(HTTP_OK, strJSON);
