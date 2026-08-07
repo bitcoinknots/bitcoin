@@ -119,6 +119,7 @@ private:
     int64_t m_count_with_ancestors{1};
     // Using int64_t instead of int32_t to avoid signed integer overflow issues.
     int64_t nSizeWithAncestors;
+    int64_t nWeightWithAncestors;
     CAmount nModFeesWithAncestors;
     int64_t nSigOpCostWithAncestors;
 
@@ -150,6 +151,7 @@ public:
           nSizeWithDescendants{GetTxSize()},
           nModFeesWithDescendants{nFee},
           nSizeWithAncestors{GetTxSize()},
+          nWeightWithAncestors{GetTxWeight()},
           nModFeesWithAncestors{nFee},
           nSigOpCostWithAncestors{sigOpCost} {
             CAmount nValueIn = tx->GetValueOut() + nFee;
@@ -200,7 +202,7 @@ public:
     // Adjusts the descendant state.
     void UpdateDescendantState(int32_t modifySize, CAmount modifyFee, int64_t modifyCount);
     // Adjusts the ancestor state
-    void UpdateAncestorState(int32_t modifySize, CAmount modifyFee, int64_t modifyCount, int64_t modifySigOps);
+    void UpdateAncestorState(int32_t modifySize, int64_t modifyWeight, CAmount modifyFee, int64_t modifyCount, int64_t modifySigOps);
     // Updates the modified fees with descendants/ancestors.
     void UpdateModifiedFee(CAmount fee_diff)
     {
@@ -223,6 +225,9 @@ public:
 
     uint64_t GetCountWithAncestors() const { return m_count_with_ancestors; }
     int64_t GetSizeWithAncestors() const { return nSizeWithAncestors; }
+    //! Consensus weight of this entry and all its in-mempool ancestors. Unlike
+    //! GetSizeWithAncestors(), this is never adjusted by policy.
+    int64_t GetWeightWithAncestors() const { return nWeightWithAncestors; }
     CAmount GetModFeesWithAncestors() const { return nModFeesWithAncestors; }
     int64_t GetSigOpCostWithAncestors() const { return nSigOpCostWithAncestors; }
 
