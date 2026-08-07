@@ -553,6 +553,20 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
         if (w != wf) datacarriercost->setValue(wf / 4);
     });
 
+    scriptsigcost = new QDoubleSpinBox(groupBox_Spamfiltering);
+    scriptsigcost->setDecimals(2);
+    scriptsigcost->setStepType(QAbstractSpinBox::DefaultStepType);
+    scriptsigcost->setSingleStep(0.25);
+    scriptsigcost->setMinimum(0.25);
+    scriptsigcost->setMaximum(MAX_BLOCK_SERIALIZED_SIZE);
+    scriptsigcost->setToolTip(tr("Signature data in pre-segwit inputs is charged 1 vbyte per actual byte, while the equivalent data in a segwit input is charged only 0.25 vB/B. Setting 0.25 vB/B here extends that same discount to pre-segwit inputs, and a higher value biases against them. This only affects how transactions are prioritized for relay and mining; it never changes their consensus weight."));
+    CreateOptionUI(verticalLayout_Spamfiltering, scriptsigcost, tr("Weigh pre-segwit signature data as %s virtual bytes per actual byte."));
+    connect(scriptsigcost, QOverload<double>::of(&QDoubleSpinBox::valueChanged), [&](double d){
+        const double w = d * 4;
+        const double wf = floor(w);
+        if (w != wf) scriptsigcost->setValue(wf / 4);
+    });
+
     rejectnonstddatacarrier = new QCheckBox(groupBox_Spamfiltering);
     rejectnonstddatacarrier->setText(tr("Ignore data embedded with non-standard formats"));
     rejectnonstddatacarrier->setToolTip(tr("Some attempts to spam Bitcoin intentionally use non-standard formats in an attempt to bypass the datacarrier limits. Without this option, %1 will attempt to detect these and enforce the intended limits. By enabling this option, your node will ignore these transactions entirely (when detected) even if they fall within the configured limits otherwise."));
@@ -964,6 +978,7 @@ void OptionsDialog::setMapper()
     mapper->addMapping(maxscriptsize, OptionsModel::maxscriptsize);
     mapper->addMapping(maxtxlegacysigops, OptionsModel::maxtxlegacysigops);
     mapper->addMapping(datacarriercost, OptionsModel::datacarriercost);
+    mapper->addMapping(scriptsigcost, OptionsModel::scriptsigcost);
     mapper->addMapping(datacarriersize, OptionsModel::datacarriersize);
     mapper->addMapping(rejectnonstddatacarrier, OptionsModel::rejectnonstddatacarrier);
     mapper->addMapping(dustrelayfee, OptionsModel::dustrelayfee);

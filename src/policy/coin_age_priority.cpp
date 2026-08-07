@@ -148,9 +148,9 @@ bool BlockAssembler::isStillDependent(const CTxMemPool& mempool, CTxMemPool::txi
 
 bool BlockAssembler::TestForBlock(CTxMemPool::txiter iter)
 {
-    uint64_t packageSize = iter->GetSizeWithAncestors();
+    uint64_t packageWeight = iter->GetWeightWithAncestors();
     int64_t packageSigOps = iter->GetSigOpCostWithAncestors();
-    if (!TestPackage(packageSize, packageSigOps)) {
+    if (!TestPackage(packageWeight, packageSigOps)) {
         // If the block is so close to full that no more txs will fit
         // or if we've tried more than 50 times to fill remaining space
         // then flag that the block is finished

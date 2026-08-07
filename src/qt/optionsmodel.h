@@ -110,6 +110,7 @@ public:
         maxscriptsize,
         maxtxlegacysigops,
         datacarriercost,        // double
+        scriptsigcost,          // double
         datacarriersize,
         rejectnonstddatacarrier,  // bool
         dustrelayfee,

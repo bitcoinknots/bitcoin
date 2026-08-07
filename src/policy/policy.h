@@ -64,6 +64,8 @@ static constexpr unsigned int DEFAULT_BYTES_PER_SIGOP{20};
 static constexpr unsigned int DEFAULT_BYTES_PER_SIGOP_STRICT{20};
 /** Default for -datacarriercost (multiplied by WITNESS_SCALE_FACTOR) */
 static constexpr unsigned int DEFAULT_WEIGHT_PER_DATA_BYTE{4};
+/** Default for -scriptsigcost (multiplied by WITNESS_SCALE_FACTOR); neutral, ie no discount */
+static constexpr unsigned int DEFAULT_WEIGHT_PER_SCRIPTSIG_BYTE{WITNESS_SCALE_FACTOR};
 /** Default for -rejecttokens */
 static constexpr bool DEFAULT_REJECT_TOKENS{false};
 /** Default for -subdustfeepenalty */
@@ -243,6 +245,15 @@ std::pair<CScript, unsigned int> GetScriptForTransactionInput(CScript prevScript
 
 std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsViewCache& view);
 
-int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte);
+/**
+ * Policy-only weight adjustment, relative to the consensus weight of the transaction.
+ *
+ * Data bytes are priced at the higher of weight_per_data_byte and (for legacy
+ * scriptSigs) weight_per_scriptsig_byte, so a scriptSig discount can never be
+ * used to cheapen embedded data. The result may be negative when
+ * weight_per_scriptsig_byte is below WITNESS_SCALE_FACTOR; it never affects
+ * consensus weight, only the vsize used for policy.
+ */
+int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte, const unsigned int weight_per_scriptsig_byte = DEFAULT_WEIGHT_PER_SCRIPTSIG_BYTE);
 
 #endif // BITCOIN_POLICY_POLICY_H
