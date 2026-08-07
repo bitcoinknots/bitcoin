@@ -263,6 +263,10 @@ static const std::string rejectmsg_lowfee_mempool = "mempool min fee not met";
 static const std::string rejectmsg_lowfee_relay = "min relay fee not met";
 static const std::string rejectmsg_mempoolfull = "mempool full";
 static const std::string rejectmsg_zero_mempool_entry_seq = "zero mempool entry sequence";
+// Opt-in (e.g. for miners): relay/accept spends of pre-activation ("grandfathered")
+// UTXOs that violate reduced-data rules, which consensus exempts but relay policy
+// rejects by default.
+static const std::string rejectmsg_reduced_data = "reduced-data";
 
 /**
  * Try to add a transaction to the mempool. This is an internal function and is exposed only for testing.

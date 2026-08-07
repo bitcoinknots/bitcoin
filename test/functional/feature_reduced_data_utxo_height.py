@@ -31,12 +31,17 @@ from test_framework.messages import (
     CTxInWitness,
     CTxOut,
 )
+from test_framework.key import compute_xonly_pubkey, generate_privkey
 from test_framework.p2p import P2PDataStore
 from test_framework.script import (
     CScript,
+    OP_ELSE,
+    OP_ENDIF,
+    OP_IF,
     OP_TRUE,
     OP_DROP,
     hash256,
+    taproot_construct,
 )
 from test_framework.script_util import (
     script_to_p2wsh_script,
@@ -113,6 +118,30 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         ]
         spending_tx.rehash()
 
+        return funding_tx, spending_tx
+
+    def create_taproot_opif_funding_and_spend(self, wallet, node):
+        """Create a Taproot output with an OP_IF script leaf (a reduced-data violation
+        that, unlike an oversized push, is not masked by other standardness rules), plus
+        a script-path spending tx to a standard output. Returns (funding_tx, spending_tx)."""
+        internal_pubkey, _ = compute_xonly_pubkey(generate_privkey())
+        leaf = CScript([OP_IF, OP_TRUE, OP_ELSE, OP_TRUE, OP_ENDIF])
+        taproot_info = taproot_construct(internal_pubkey, [("leaf", leaf)])
+
+        funding_txid = wallet.send_to(from_node=node, scriptPubKey=taproot_info.scriptPubKey, amount=100000)['txid']
+        funding_tx = CTransaction()
+        funding_tx.deserialize(BytesIO(bytes.fromhex(node.getrawtransaction(funding_txid))))
+        funding_tx.rehash()
+        vout = next(i for i, o in enumerate(funding_tx.vout) if o.scriptPubKey == taproot_info.scriptPubKey)
+
+        spending_tx = CTransaction()
+        spending_tx.vin = [CTxIn(COutPoint(funding_tx.sha256, vout))]
+        spending_tx.vout = [CTxOut(funding_tx.vout[vout].nValue - 1000, script_to_p2wsh_script(CScript([OP_TRUE])))]
+        leaf_info = taproot_info.leaves["leaf"]
+        control_block = bytes([leaf_info.version + taproot_info.negflag]) + internal_pubkey + leaf_info.merklebranch
+        spending_tx.wit.vtxinwit.append(CTxInWitness())
+        spending_tx.wit.vtxinwit[0].scriptWitness.stack = [b'\x01', leaf, control_block]  # b'\x01' selects the OP_IF branch
+        spending_tx.rehash()
         return funding_tx, spending_tx
 
     def create_test_block(self, txs, signal=False):
@@ -237,6 +266,11 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
 
         self.log.info(f"Created old P2WSH UTXO at height {old_utxo_height} (< {ACTIVATION_HEIGHT})")
 
+        # Also create a grandfathered Taproot OP_IF UTXO (for the miner-override test below).
+        old_opif_funding, old_opif_spending = self.create_taproot_opif_funding_and_spend(wallet, node)
+        block = self.create_test_block([old_opif_funding], signal=False)
+        assert_equal(node.submitblock(block.serialize().hex()), None)
+
         # ======================================================================
         # Test 2: Mine to activation height
         # ======================================================================
@@ -281,6 +315,35 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         self.mine_blocks(5, signal=False)
         current_height = node.getblockcount()
         self.log.info(f"Current height: {current_height}")
+
+        # ======================================================================
+        # Test 3b: miner override. A grandfathered reduced-data spend is rejected at
+        # relay by default (intentional), but can be opted into via the "reduced-data"
+        # ignore-reject. A non-grandfathered spend stays rejected even with the override.
+        # ======================================================================
+        self.log.info("Test 3b: miner override of the reduced-data relay rejection...")
+        override = ["reduced-data"]
+
+        # Default: grandfathered OP_IF-tapscript spend is rejected at relay, and the
+        # rejection is specifically the reduced-data script-verify failure (not some
+        # unrelated reason, which would make the override test below meaningless).
+        res = node.testmempoolaccept(rawtxs=[old_opif_spending.serialize().hex()])[0]
+        assert not res["allowed"], f"grandfathered spend unexpectedly relayed by default: {res}"
+        assert "script-verify-flag-failed" in res["reject-reason"], f"unexpected reject reason: {res}"
+
+        # With the override: it is accepted.
+        res = node.testmempoolaccept(rawtxs=[old_opif_spending.serialize().hex()], ignore_rejects=override)[0]
+        assert res["allowed"], f"override failed to relay grandfathered spend: {res}"
+
+        # The override does not help a newly-created (non-grandfathered) reduced-data
+        # spend: it is still rejected for the same reduced-data script-verify failure.
+        new_opif_funding, new_opif_spending = self.create_taproot_opif_funding_and_spend(wallet, node)
+        block = self.create_test_block([new_opif_funding], signal=False)
+        assert_equal(node.submitblock(block.serialize().hex()), None)
+        res = node.testmempoolaccept(rawtxs=[new_opif_spending.serialize().hex()], ignore_rejects=override)[0]
+        assert not res["allowed"], f"override wrongly relayed a non-grandfathered spend: {res}"
+        assert "script-verify-flag-failed" in res["reject-reason"], f"unexpected reject reason: {res}"
+        self.log.info("✓ SUCCESS: override relays grandfathered spend only, default still rejects")
 
         # ======================================================================
         # Test 4: Spend OLD UTXO with oversized witness - should be ACCEPTED
