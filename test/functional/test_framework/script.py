@@ -8,6 +8,7 @@ This file is modified from python-bitcoinlib.
 """
 
 from collections import namedtuple
+import struct
 import unittest
 
 from .key import TaggedHash, tweak_add_pubkey, compute_xonly_pubkey
@@ -609,6 +610,7 @@ SIGHASH_ALL = 1
 SIGHASH_NONE = 2
 SIGHASH_SINGLE = 3
 SIGHASH_ANYONECANPAY = 0x80
+SIGHASH_UNIFIED = 0x20  # opt in to the hardfork signature hash
 
 def FindAndDelete(script, sig):
     """Consensus critical, see FindAndDelete() in Satoshi codebase"""
@@ -697,6 +699,73 @@ def sign_input_legacy(tx, input_index, input_scriptpubkey, privkey, sighash_type
     der_sig = privkey.sign_ecdsa(sighash)
     tx.vin[input_index].scriptSig = bytes(CScript([der_sig + bytes([sighash_type])])) + tx.vin[input_index].scriptSig
     tx.rehash()
+
+def UnifiedSignatureHash(script_code, txTo, inIdx, hashtype, spent_utxos, sigversion_witness):
+    """Independent implementation of the hardfork sighash for BASE/WITNESS_V0.
+
+    Deliberately written from the specification rather than by mirroring the
+    C++, so that agreement between the two is evidence rather than tautology.
+    Returns None for the cases the rules reject.
+    """
+    assert inIdx < len(txTo.vin)
+    assert len(spent_utxos) == len(txTo.vin)
+
+    # Only defined for signatures that opted in.
+    if not (hashtype & SIGHASH_UNIFIED):
+        return None
+    if hashtype & ~(0x1f | SIGHASH_ANYONECANPAY | SIGHASH_UNIFIED):
+        return None
+    output_type = hashtype & 0x1f
+    if output_type not in (SIGHASH_ALL, SIGHASH_NONE, SIGHASH_SINGLE):
+        return None
+    anyonecanpay = bool(hashtype & SIGHASH_ANYONECANPAY)
+
+    ss = bytes([1 if sigversion_witness else 0])
+    ss += struct.pack("<i", hashtype)
+    ss += struct.pack("<i", txTo.version)
+    ss += struct.pack("<I", txTo.nLockTime)
+
+    if not anyonecanpay:
+        ss += sha256(b"".join(i.prevout.serialize() for i in txTo.vin))
+        ss += sha256(b"".join(struct.pack("<q", u.nValue) for u in spent_utxos))
+        ss += sha256(b"".join(ser_string(u.scriptPubKey) for u in spent_utxos))
+        ss += sha256(b"".join(struct.pack("<I", i.nSequence) for i in txTo.vin))
+
+    if output_type == SIGHASH_ALL:
+        ss += sha256(b"".join(o.serialize() for o in txTo.vout))
+    elif output_type == SIGHASH_SINGLE:
+        if inIdx >= len(txTo.vout):
+            return None
+        ss += sha256(txTo.vout[inIdx].serialize())
+
+    if anyonecanpay:
+        ss += txTo.vin[inIdx].prevout.serialize()
+        ss += spent_utxos[inIdx].serialize()
+        ss += struct.pack("<I", txTo.vin[inIdx].nSequence)
+    else:
+        ss += struct.pack("<I", inIdx)
+    ss += ser_string(script_code)
+
+    return TaggedHash("UnifiedSighash", ss)
+
+
+def sign_input_unified(tx, input_index, input_scriptpubkey, privkey, spent_utxos, witness=False, sighash_type=SIGHASH_ALL):
+    """Add a hardfork-sighash ECDSA signature for a given transaction input.
+
+    The opt-in bit is set here, since it is part of what the signature commits
+    to as well as what tells a verifier which message to build.
+    """
+    sighash_type |= SIGHASH_UNIFIED
+    sighash = UnifiedSignatureHash(input_scriptpubkey, tx, input_index, sighash_type, spent_utxos, witness)
+    assert sighash is not None
+    der_sig = privkey.sign_ecdsa(sighash)
+    sig = der_sig + bytes([sighash_type])
+    if witness:
+        tx.wit.vtxinwit[input_index].scriptWitness.stack.insert(0, sig)
+    else:
+        tx.vin[input_index].scriptSig = bytes(CScript([sig])) + tx.vin[input_index].scriptSig
+    tx.rehash()
+
 
 def sign_input_segwitv0(tx, input_index, input_scriptpubkey, input_amount, privkey, sighash_type=SIGHASH_ALL):
     """Add segwitv0 ECDSA signature for a given transaction input. Note that the signature
