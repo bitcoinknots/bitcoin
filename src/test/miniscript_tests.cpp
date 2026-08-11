@@ -263,7 +263,7 @@ class TestSignatureChecker : public BaseSignatureChecker {
 public:
     TestSignatureChecker(const Satisfier& in_ctx LIFETIMEBOUND) : ctx(in_ctx) {}
 
-    bool CheckECDSASignature(const std::vector<unsigned char>& sig, const std::vector<unsigned char>& pubkey, const CScript& scriptcode, SigVersion sigversion) const override {
+    bool CheckECDSASignature(const std::vector<unsigned char>& sig, const std::vector<unsigned char>& pubkey, const CScript& scriptcode, SigVersion sigversion, SighashRules sighash_rules = SighashRules::LEGACY) const override {
         CPubKey pk(pubkey);
         if (!pk.IsValid()) return false;
         // Instead of actually running signature validation, check if the signature matches the precomputed one for this key.
