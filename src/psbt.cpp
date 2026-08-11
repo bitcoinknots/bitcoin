@@ -298,7 +298,7 @@ bool PSBTInputSigned(const PSBTInput& input)
     return !input.final_script_sig.empty() || !input.final_script_witness.IsNull();
 }
 
-bool PSBTInputSignedAndVerified(const PartiallySignedTransaction psbt, unsigned int input_index, const PrecomputedTransactionData* txdata)
+bool PSBTInputSignedAndVerified(const PartiallySignedTransaction psbt, unsigned int input_index, const PrecomputedTransactionData* txdata, SighashRules sighash_rules)
 {
     CTxOut utxo;
     assert(input_index < psbt.inputs.size());
@@ -321,7 +321,8 @@ bool PSBTInputSignedAndVerified(const PartiallySignedTransaction psbt, unsigned 
     }
 
     if (txdata) {
-        return VerifyScript(input.final_script_sig, utxo.scriptPubKey, &input.final_script_witness, STANDARD_SCRIPT_VERIFY_FLAGS, MutableTransactionSignatureChecker{&(*psbt.tx), input_index, utxo.nValue, *txdata, MissingDataBehavior::FAIL});
+        const unsigned int flags{STANDARD_SCRIPT_VERIFY_FLAGS | (sighash_rules == SighashRules::UNIFIED ? uint32_t{SCRIPT_VERIFY_UNIFIED_SIGHASH} : uint32_t{0})};
+        return VerifyScript(input.final_script_sig, utxo.scriptPubKey, &input.final_script_witness, flags, MutableTransactionSignatureChecker{&(*psbt.tx), input_index, utxo.nValue, *txdata, MissingDataBehavior::FAIL});
     } else {
         return VerifyScript(input.final_script_sig, utxo.scriptPubKey, &input.final_script_witness, STANDARD_SCRIPT_VERIFY_FLAGS, MutableTransactionSignatureChecker{&(*psbt.tx), input_index, utxo.nValue, MissingDataBehavior::FAIL});
     }
@@ -375,12 +376,12 @@ PrecomputedTransactionData PrecomputePSBTData(const PartiallySignedTransaction& 
     return txdata;
 }
 
-bool SignPSBTInput(const SigningProvider& provider, PartiallySignedTransaction& psbt, int index, const PrecomputedTransactionData* txdata, int sighash,  SignatureData* out_sigdata, bool finalize)
+bool SignPSBTInput(const SigningProvider& provider, PartiallySignedTransaction& psbt, int index, const PrecomputedTransactionData* txdata, int sighash,  SignatureData* out_sigdata, bool finalize, SighashRules sighash_rules)
 {
     PSBTInput& input = psbt.inputs.at(index);
     const CMutableTransaction& tx = *psbt.tx;
 
-    if (PSBTInputSignedAndVerified(psbt, index, txdata)) {
+    if (PSBTInputSignedAndVerified(psbt, index, txdata, sighash_rules)) {
         return true;
     }
 
@@ -414,11 +415,18 @@ bool SignPSBTInput(const SigningProvider& provider, PartiallySignedTransaction& 
     }
 
     sigdata.witness = false;
+    // Counted before signing so the check below can tell what this call added
+    // from what the PSBT already carried: FillSignatureData copies existing
+    // partial signatures into sigdata, and taproot signatures live in their own
+    // fields rather than in `signatures`.
+    const size_t sigs_before{sigdata.signatures.size() + sigdata.taproot_script_sigs.size()
+                             + (sigdata.taproot_key_path_sig.empty() ? 0 : 1)};
     bool sig_complete;
     if (txdata == nullptr) {
         sig_complete = ProduceSignature(provider, DUMMY_SIGNATURE_CREATOR, utxo.scriptPubKey, sigdata);
     } else {
         MutableTransactionSignatureCreator creator(tx, index, utxo.nValue, txdata, sighash);
+        creator.SetSighashRules(sighash_rules);
         sig_complete = ProduceSignature(provider, creator, utxo.scriptPubKey, sigdata);
     }
     // Verify that a witness signature was produced in case one was required.
@@ -426,6 +434,21 @@ bool SignPSBTInput(const SigningProvider& provider, PartiallySignedTransaction& 
 
     // If we are not finalizing, set sigdata.complete to false to not set the scriptWitness
     if (!finalize && sigdata.complete) sigdata.complete = false;
+
+    // The creator adds the opt-in bit to the type it signs with, so the declared
+    // type has to move with it, or the input advertises a type its own signature
+    // does not use and any signer or finalizer that enforces the field rejects
+    // it. Only when this call actually produced a signature: a finalizer or an
+    // update pass holds no key, and rewriting a type it did not sign for would
+    // lock out a co-signer that declared something else. SIGHASH_DEFAULT cannot
+    // carry the bit, so it becomes the explicit type that means the same thing,
+    // matching what the creator does.
+    const size_t sigs_after{sigdata.signatures.size() + sigdata.taproot_script_sigs.size()
+                            + (sigdata.taproot_key_path_sig.empty() ? 0 : 1)};
+    if (sighash_rules == SighashRules::UNIFIED && txdata != nullptr && sigs_after > sigs_before) {
+        const int declared{sighash == SIGHASH_DEFAULT ? SIGHASH_ALL : sighash};
+        input.sighash_type = declared | SIGHASH_UNIFIED;
+    }
 
     input.FromSignatureData(sigdata);
 
@@ -480,7 +503,7 @@ void RemoveUnnecessaryTransactions(PartiallySignedTransaction& psbtx, const int&
     }
 }
 
-bool FinalizePSBT(PartiallySignedTransaction& psbtx)
+bool FinalizePSBT(PartiallySignedTransaction& psbtx, SighashRules sighash_rules)
 {
     // Finalize input signatures -- in case we have partial signatures that add up to a complete
     //   signature, but have not combined them yet (e.g. because the combiner that created this
@@ -489,17 +512,17 @@ bool FinalizePSBT(PartiallySignedTransaction& psbtx)
     bool complete = true;
     const PrecomputedTransactionData txdata = PrecomputePSBTData(psbtx);
     for (unsigned int i = 0; i < psbtx.tx->vin.size(); ++i) {
-        complete &= SignPSBTInput(DUMMY_SIGNING_PROVIDER, psbtx, i, &txdata, SIGHASH_ALL, nullptr, true);
+        complete &= SignPSBTInput(DUMMY_SIGNING_PROVIDER, psbtx, i, &txdata, SIGHASH_ALL, nullptr, true, sighash_rules);
     }
 
     return complete;
 }
 
-bool FinalizeAndExtractPSBT(PartiallySignedTransaction& psbtx, CMutableTransaction& result)
+bool FinalizeAndExtractPSBT(PartiallySignedTransaction& psbtx, CMutableTransaction& result, SighashRules sighash_rules)
 {
     // It's not safe to extract a PSBT that isn't finalized, and there's no easy way to check
     //   whether a PSBT is finalized without finalizing it, so we just do this.
-    if (!FinalizePSBT(psbtx)) {
+    if (!FinalizePSBT(psbtx, sighash_rules)) {
         return false;
     }
 

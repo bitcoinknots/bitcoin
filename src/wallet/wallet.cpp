@@ -2321,13 +2321,33 @@ bool CWallet::SignTransaction(CMutableTransaction& tx) const
     return SignTransaction(tx, coins, SIGHASH_DEFAULT, input_errors);
 }
 
+bool CWallet::HardforkActiveForNextBlock() const
+{
+    // The next block sits one above the tip, and a height is fixed by the blocks
+    // already connected, so this reaches the same answer the node will enforce.
+    // Reading the height is one call, so there is no window in which the chain
+    // moves between two lookups.
+    //
+    // No height means no answer, and returning false signs under the legacy
+    // rules: still valid, just without replay protection. That is the safe
+    // direction to fail in, since the alternative hands out signatures the next
+    // block would reject.
+    const std::optional<int> height{chain().getHeight()};
+    if (!height) return false;
+    // Same comparison DeploymentActiveAfter makes for a buried deployment, so
+    // the wallet and consensus cannot disagree about which block activates.
+    return *height + 1 >= Params().GetConsensus().Blake2bHeight;
+}
+
 bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum) const
 {
+    const SighashRules sighash_rules{HardforkActiveForNextBlock()};
+
     // Try to sign with all ScriptPubKeyMans
     for (ScriptPubKeyMan* spk_man : GetAllScriptPubKeyMans()) {
         // spk_man->SignTransaction will return true if the transaction is complete,
         // so we can exit early and return true if that happens
-        if (spk_man->SignTransaction(tx, coins, sighash, input_errors, inputs_amount_sum)) {
+        if (spk_man->SignTransaction(tx, coins, sighash, input_errors, inputs_amount_sum, sighash_rules)) {
             return true;
         }
     }
@@ -2336,8 +2356,10 @@ bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint,
     return false;
 }
 
-std::optional<PSBTError> CWallet::FillPSBT(PartiallySignedTransaction& psbtx, bool& complete, int sighash_type, bool sign, bool bip32derivs, size_t * n_signed, bool finalize) const
+std::optional<PSBTError> CWallet::FillPSBT(PartiallySignedTransaction& psbtx, bool& complete, int sighash_type, bool sign, bool bip32derivs, size_t * n_signed, bool finalize, std::vector<bilingual_str>* warnings) const
 {
+    // The transaction is being built for the next block, so use its rules.
+    const SighashRules sighash_rules{HardforkActiveForNextBlock()};
     if (n_signed) {
         *n_signed = 0;
     }
@@ -2369,7 +2391,7 @@ std::optional<PSBTError> CWallet::FillPSBT(PartiallySignedTransaction& psbtx, bo
     // Fill in information from ScriptPubKeyMans
     for (ScriptPubKeyMan* spk_man : GetAllScriptPubKeyMans()) {
         int n_signed_this_spkm = 0;
-        const auto error{spk_man->FillPSBT(psbtx, txdata, sighash_type, sign, bip32derivs, &n_signed_this_spkm, finalize)};
+        const auto error{spk_man->FillPSBT(psbtx, txdata, sighash_type, sign, bip32derivs, &n_signed_this_spkm, finalize, sighash_rules, warnings)};
         if (error) {
             return error;
         }
@@ -2384,7 +2406,7 @@ std::optional<PSBTError> CWallet::FillPSBT(PartiallySignedTransaction& psbtx, bo
     // Complete if every input is now signed
     complete = true;
     for (size_t i = 0; i < psbtx.inputs.size(); ++i) {
-        complete &= PSBTInputSignedAndVerified(psbtx, i, &txdata);
+        complete &= PSBTInputSignedAndVerified(psbtx, i, &txdata, sighash_rules);
     }
 
     return {};
