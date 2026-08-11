@@ -51,6 +51,10 @@ static void SetupBitcoinTxArgs(ArgsManager &argsman)
     argsman.AddArg("-create", "Create new, empty TX.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-json", "Select JSON output", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-txid", "Output only the hex-encoded transaction id of the resultant transaction.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-unifiedsighash", "Sign with the hardfork signature hash, which is opt-in per signature and gives replay protection. "
+                                 "This tool has no chain access and cannot tell whether the hardfork is active, so it has to be told. "
+                                 "Existing signatures of that kind are also only recognised when this is set (default: false)",
+                   ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     SetupChainParamsBaseOptions(argsman);
 
     argsman.AddArg("delin=N", "Delete input N from TX", ArgsManager::ALLOW_ANY, OptionsCategory::COMMANDS);
@@ -675,6 +679,24 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
 
     bool fHashSingle = ((nHashType & ~SIGHASH_ANYONECANPAY) == SIGHASH_SINGLE);
 
+    // This tool has no chain access, so it cannot work out whether the hardfork
+    // is active and must be told with -unifiedsighash.
+    const SighashRules sighash_rules{gArgs.GetBoolArg("-unifiedsighash", false)};
+    PrecomputedTransactionData txdata;
+    if (sighash_rules == SighashRules::UNIFIED) {
+        std::vector<CTxOut> spent_outputs;
+        spent_outputs.reserve(mergedTx.vin.size());
+        for (const CTxIn& txin : mergedTx.vin) {
+            const Coin& coin = view.AccessCoin(txin.prevout);
+            if (coin.IsSpent()) break;
+            spent_outputs.emplace_back(coin.out);
+        }
+        if (spent_outputs.size() != mergedTx.vin.size()) {
+            throw std::runtime_error("-unifiedsighash needs the previous output of every input; supply them all");
+        }
+        txdata.Init(CTransaction(mergedTx), std::move(spent_outputs), /*force=*/true);
+    }
+
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn& txin = mergedTx.vin[i];
@@ -685,12 +707,21 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
         const CScript& prevPubKey = coin.out.scriptPubKey;
         const CAmount& amount = coin.out.nValue;
 
-        SignatureData sigdata = DataFromTransaction(mergedTx, i, coin.out);
+        // Recognising an existing opt-in signature needs the same rules it was
+        // made under, and the spent outputs it commits to.
+        SignatureData sigdata = DataFromTransaction(mergedTx, i, coin.out, sighash_rules, sighash_rules == SighashRules::UNIFIED ? &txdata : nullptr);
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
-        if (!fHashSingle || (i < mergedTx.vout.size()))
-            ProduceSignature(keystore, MutableTransactionSignatureCreator(mergedTx, i, amount, nHashType), prevPubKey, sigdata);
+        if (!fHashSingle || (i < mergedTx.vout.size())) {
+            MutableTransactionSignatureCreator creator(mergedTx, i, amount, sighash_rules == SighashRules::UNIFIED ? &txdata : nullptr, nHashType);
+            creator.SetSighashRules(sighash_rules);
+            ProduceSignature(keystore, creator, prevPubKey, sigdata);
+        }
 
-        if (amount == MAX_MONEY && !sigdata.scriptWitness.IsNull()) {
+        // The unified message commits to the amount of every input, not just
+        // witness ones, so a missing amount would be signed over as MAX_MONEY
+        // and the result emitted as though it were good.
+        if (amount == MAX_MONEY && (!sigdata.scriptWitness.IsNull() ||
+                                    sighash_rules == SighashRules::UNIFIED)) {
             throw std::runtime_error(strprintf("Missing amount for CTxOut with scriptPubKey=%s", HexStr(prevPubKey)));
         }
 
