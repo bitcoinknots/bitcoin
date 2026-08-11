@@ -47,6 +47,15 @@ PSBTOperationsDialog::PSBTOperationsDialog(
     m_ui->broadcastTransactionButton->setEnabled(false);
 }
 
+namespace {
+//! The rules the wallet would sign under now, or legacy rules with no wallet.
+SighashRules SighashRulesForWallet(const WalletModel* model)
+{
+    return model && model->wallet().hardforkActiveForNextBlock() ? SighashRules::UNIFIED
+                                                                 : SighashRules::LEGACY;
+}
+} // namespace
+
 PSBTOperationsDialog::~PSBTOperationsDialog()
 {
     delete m_ui;
@@ -56,7 +65,9 @@ void PSBTOperationsDialog::openWithPSBT(PartiallySignedTransaction psbtx)
 {
     m_transaction_data = psbtx;
 
-    bool complete = FinalizePSBT(psbtx); // Make sure all existing signatures are fully combined before checking for completeness.
+    // Make sure all existing signatures are fully combined before checking for completeness.
+    const SighashRules sighash_rules{SighashRulesForWallet(m_wallet_model)};
+    bool complete = FinalizePSBT(psbtx, sighash_rules);
     if (m_wallet_model) {
         size_t n_could_sign;
         const auto err{m_wallet_model->wallet().fillPSBT(SIGHASH_ALL, /*sign=*/false, /*bip32derivs=*/true, &n_could_sign, m_transaction_data, complete)};
@@ -110,7 +121,7 @@ void PSBTOperationsDialog::signTransaction()
 void PSBTOperationsDialog::broadcastTransaction()
 {
     CMutableTransaction mtx;
-    if (!FinalizeAndExtractPSBT(m_transaction_data, mtx)) {
+    if (!FinalizeAndExtractPSBT(m_transaction_data, mtx, SighashRulesForWallet(m_wallet_model))) {
         // This is never expected to fail unless we were given a malformed PSBT
         // (e.g. with an invalid signature.)
         showStatus(tr("Unknown error processing transaction."), StatusLevel::ERR);

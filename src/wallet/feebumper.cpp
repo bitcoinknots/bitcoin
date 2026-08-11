@@ -342,7 +342,9 @@ bool SignTransaction(CWallet& wallet, CMutableTransaction& mtx) {
         wallet.FillPSBT(psbtx, complete, SIGHASH_ALL, false /* sign */, true /* bip32derivs */);
         auto err{wallet.FillPSBT(psbtx, complete, SIGHASH_ALL, true /* sign */, false  /* bip32derivs */)};
         if (err) return false;
-        complete = FinalizeAndExtractPSBT(psbtx, mtx);
+        complete = FinalizeAndExtractPSBT(psbtx, mtx,
+                                          wallet.HardforkActiveForNextBlock()
+                                              ? SighashRules::UNIFIED : SighashRules::LEGACY);
         return complete;
     } else {
         return wallet.SignTransaction(mtx);
