@@ -31,6 +31,14 @@ enum
     SIGHASH_NONE = 2,
     SIGHASH_SINGLE = 3,
     SIGHASH_ANYONECANPAY = 0x80,
+    /** Opt in to the hardfork signature hash.
+     *
+     * Set in the hash type byte by the spender. A node that has not activated
+     * the fork computes the legacy message for the same byte, so the signature
+     * does not verify there, which is what protects an opted-in transaction from
+     * replay. The legacy algorithm is unchanged, so a spender who never sets the
+     * bit is unaffected. */
+    SIGHASH_UNIFIED = 0x20,
 
     SIGHASH_DEFAULT = 0, //!< Taproot only; implied when sighash byte is missing, and equivalent to SIGHASH_ALL
     SIGHASH_OUTPUT_MASK = 3,
@@ -150,6 +158,20 @@ enum : uint32_t {
     // OP_IF is also forbidden inside Tapscript
     SCRIPT_VERIFY_REDUCED_DATA = (1U << 21),
 
+    // Accept the hardfork signature hash, opted into per signature by
+    // SIGHASH_UNIFIED. Removes CVE-2013-2292 and CVE-2020-14199 for the inputs
+    // that opt in, which is not the same as closing them: an attacker picks the
+    // hash type and simply does not opt in.
+    //
+    // Unlike every other flag here, this one is a switch rather than a
+    // restriction. It makes opted-in signatures valid that were not, and it
+    // makes others invalid that were: a byte like 0x21 reads as ALL under the
+    // legacy algorithm today and means "opted in" once this applies, so the
+    // message it is checked against changes. So the usual "policy is at least
+    // as strict as consensus" reasoning runs backwards, and the mempool must
+    // derive it from the block being built rather than from the tip.
+    SCRIPT_VERIFY_UNIFIED_SIGHASH = (1U << 22),
+
     // Constants to point to the highest flag in use. Add new flags above this line.
     //
     SCRIPT_VERIFY_END_MARKER
@@ -161,6 +183,21 @@ static constexpr unsigned int REDUCED_DATA_MANDATORY_VERIFY_FLAGS{0
     | SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_TAPROOT_VERSION
     | SCRIPT_VERIFY_DISCOURAGE_OP_SUCCESS
 };
+
+/** Which signature hash rules a caller is asking for.
+ *
+ * Callers that reach chain state derive this from the rules of the block being
+ * built; offline tools take it from the user. */
+enum class SighashRules {
+    LEGACY,   //!< the algorithms in use before the hardfork
+    UNIFIED,  //!< the hardfork algorithm, opted into per signature
+};
+
+/** The rules a verifier is running under, taken from its script flags. */
+constexpr SighashRules SighashRulesFromFlags(unsigned int flags)
+{
+    return (flags & SCRIPT_VERIFY_UNIFIED_SIGHASH) ? SighashRules::UNIFIED : SighashRules::LEGACY;
+}
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError* serror);
 
@@ -254,6 +291,15 @@ static constexpr size_t TAPROOT_CONTROL_MAX_SIZE_REDUCED = TAPROOT_CONTROL_BASE_
 extern const HashWriter HASHER_TAPSIGHASH; //!< Hasher with tag "TapSighash" pre-fed to it.
 extern const HashWriter HASHER_TAPLEAF;    //!< Hasher with tag "TapLeaf" pre-fed to it.
 extern const HashWriter HASHER_TAPBRANCH;  //!< Hasher with tag "TapBranch" pre-fed to it.
+extern const HashWriter HASHER_UNIFIED_SIGHASH; //!< Hasher for the hardfork BASE/WITNESS_V0 sighash.
+
+/** Compute the hardfork signature hash for a BASE or WITNESS_V0 input.
+ *
+ * Returns false if the required transaction data is not precomputed, or for a
+ * SIGHASH_SINGLE input with no matching output. Callers must treat false as
+ * "signature invalid" rather than substituting a placeholder hash. */
+template <class T>
+bool SignatureHashUnified(uint256& hash_out, const CScript& scriptCode, const T& txTo, unsigned int nIn, int32_t nHashType, SigVersion sigversion, const PrecomputedTransactionData& cache);
 
 /** Data structure to cache SHA256 midstates for the ECDSA sighash calculations
  *  (bare, P2SH, P2WPKH, P2WSH). */
@@ -280,7 +326,10 @@ uint256 SignatureHash(const CScript& scriptCode, const T& txTo, unsigned int nIn
 class BaseSignatureChecker
 {
 public:
-    virtual bool CheckECDSASignature(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion) const
+    /** sighash_rules comes from SCRIPT_VERIFY_UNIFIED_SIGHASH at the call site, so the
+     *  script flags are the only thing that decides which signature hash
+     *  applies. Checkers must not carry their own copy of that decision. */
+    virtual bool CheckECDSASignature(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion, SighashRules sighash_rules = SighashRules::LEGACY) const
     {
         return false;
     }
@@ -333,7 +382,7 @@ protected:
 public:
     GenericTransactionSignatureChecker(const T* txToIn, unsigned int nInIn, const CAmount& amountIn, MissingDataBehavior mdb) : txTo(txToIn), m_mdb(mdb), nIn(nInIn), amount(amountIn), txdata(nullptr) {}
     GenericTransactionSignatureChecker(const T* txToIn, unsigned int nInIn, const CAmount& amountIn, const PrecomputedTransactionData& txdataIn, MissingDataBehavior mdb) : txTo(txToIn), m_mdb(mdb), nIn(nInIn), amount(amountIn), txdata(&txdataIn) {}
-    bool CheckECDSASignature(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion) const override;
+    bool CheckECDSASignature(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion, SighashRules sighash_rules = SighashRules::LEGACY) const override;
     bool CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror = nullptr) const override;
     bool CheckLockTime(const CScriptNum& nLockTime) const override;
     bool CheckSequence(const CScriptNum& nSequence) const override;
@@ -352,9 +401,9 @@ protected:
 public:
     DeferringSignatureChecker(const BaseSignatureChecker& checker) : m_checker(checker) {}
 
-    bool CheckECDSASignature(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion) const override
+    bool CheckECDSASignature(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion, SighashRules sighash_rules = SighashRules::LEGACY) const override
     {
-        return m_checker.CheckECDSASignature(scriptSig, vchPubKey, scriptCode, sigversion);
+        return m_checker.CheckECDSASignature(scriptSig, vchPubKey, scriptCode, sigversion, sighash_rules);
     }
 
     bool CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror = nullptr) const override
