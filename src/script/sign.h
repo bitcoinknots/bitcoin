@@ -31,6 +31,8 @@ class BaseSignatureCreator {
 public:
     virtual ~BaseSignatureCreator() = default;
     virtual const BaseSignatureChecker& Checker() const =0;
+    /** Whether signatures are produced with the hardfork signature hash. */
+    virtual SighashRules GetSighashRules() const { return SighashRules::LEGACY; }
 
     /** Create a singular (non-script) signature. */
     virtual bool CreateSig(const SigningProvider& provider, std::vector<unsigned char>& vchSig, const CKeyID& keyid, const CScript& scriptCode, SigVersion sigversion) const =0;
@@ -44,13 +46,20 @@ class MutableTransactionSignatureCreator : public BaseSignatureCreator
     unsigned int nIn;
     int nHashType;
     CAmount amount;
-    const MutableTransactionSignatureChecker checker;
+    MutableTransactionSignatureChecker checker;
     const PrecomputedTransactionData* m_txdata;
+    SighashRules m_sighash_rules{SighashRules::LEGACY};
 
 public:
     MutableTransactionSignatureCreator(const CMutableTransaction& tx LIFETIMEBOUND, unsigned int input_idx, const CAmount& amount, int hash_type);
     MutableTransactionSignatureCreator(const CMutableTransaction& tx LIFETIMEBOUND, unsigned int input_idx, const CAmount& amount, const PrecomputedTransactionData* txdata, int hash_type);
     const BaseSignatureChecker& Checker() const override { return checker; }
+    /** Produce hardfork-sighash signatures. Callers must set this to match the
+     *  consensus rules the transaction is intended for. ProduceSignature()
+     *  reads it back through GetSighashRules() to judge completeness under the same
+     *  rules, so the two cannot disagree. */
+    void SetSighashRules(SighashRules rules) { m_sighash_rules = rules; }
+    SighashRules GetSighashRules() const override { return m_sighash_rules; }
     bool CreateSig(const SigningProvider& provider, std::vector<unsigned char>& vchSig, const CKeyID& keyid, const CScript& scriptCode, SigVersion sigversion) const override;
     bool CreateSchnorrSig(const SigningProvider& provider, std::vector<unsigned char>& sig, const XOnlyPubKey& pubkey, const uint256* leaf_hash, const uint256* merkle_root, SigVersion sigversion) const override;
 };
@@ -100,13 +109,25 @@ struct SignatureData {
 bool ProduceSignature(const SigningProvider& provider, const BaseSignatureCreator& creator, const CScript& scriptPubKey, SignatureData& sigdata);
 
 /** Extract signature data from a transaction input, and insert it. */
-SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nIn, const CTxOut& txout);
+/** Extract signature data from a (partially) signed input.
+ *
+ * sighash_rules must match the rules the existing signatures were made under, and
+ * txdata must then be supplied: the hardfork signature hash commits to every
+ * spent output, so recognising one of those signatures needs the whole
+ * transaction's context, not just this input's. Without it an existing
+ * signature is invisible and the input looks unsigned. */
+SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nIn, const CTxOut& txout, SighashRules sighash_rules = SighashRules::LEGACY, const PrecomputedTransactionData* txdata = nullptr);
 void UpdateInput(CTxIn& input, const SignatureData& data);
 
 /** Check whether a scriptPubKey is known to be segwit. */
 bool IsSegWitOutput(const SigningProvider& provider, const CScript& script);
 
 /** Sign the CMutableTransaction */
-bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* provider, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum = nullptr);
+/** Sign a transaction.
+ *
+ * sighash_rules selects the hardfork signature hash; it must match the consensus
+ * rules of the block the transaction is intended for, so callers derive it from
+ * chain state rather than defaulting it. */
+bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* provider, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum = nullptr, SighashRules sighash_rules = SighashRules::LEGACY);
 
 #endif // BITCOIN_SCRIPT_SIGN_H
