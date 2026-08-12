@@ -70,6 +70,9 @@ extern const BaseSignatureChecker& DUMMY_CHECKER;
 extern const BaseSignatureCreator& DUMMY_SIGNATURE_CREATOR;
 /** A signature creator that just produces 72-byte empty signatures. */
 extern const BaseSignatureCreator& DUMMY_MAXIMUM_SIGNATURE_CREATOR;
+/** As DUMMY_SIGNATURE_CREATOR, but sizes taproot signatures for the opt-in,
+ *  which appends a hash type byte the default spend does not have. */
+extern const BaseSignatureCreator& DUMMY_UNIFIED_SIGNATURE_CREATOR;
 
 typedef std::pair<CPubKey, std::vector<unsigned char>> SigPair;
 
