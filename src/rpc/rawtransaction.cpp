@@ -1931,7 +1931,8 @@ static RPCHelpMan analyzepsbt()
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, strprintf("TX decode failed %s", error));
     }
 
-    PSBTAnalysis psbta = AnalyzePSBT(psbtx);
+    const SighashRules sighash_rules{WITH_LOCK(cs_main, return HardforkActiveForNextBlock(EnsureAnyChainman(request.context)))};
+    PSBTAnalysis psbta = AnalyzePSBT(psbtx, sighash_rules);
 
     UniValue result(UniValue::VOBJ);
     UniValue inputs_result(UniValue::VARR);

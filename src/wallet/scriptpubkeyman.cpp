@@ -263,7 +263,13 @@ SigningResult ScriptPubKeyMan::SignMessageBIP322(MessageSignatureFormat format, 
     std::map<COutPoint, Coin> coins;
     coins[to_sign.vin[0].prevout] = Coin(to_spend.vout[0], 1, false);
 
-    // Sign the transaction
+    // Sign the transaction.
+    //
+    // Deliberately does not opt in to the hardfork signature hash, and must not
+    // be changed to. This is a BIP322 message signature, not a spend: it is
+    // verified against a hash type of exactly SIGHASH_ALL, so opting in would
+    // produce a signature this node's own verifier rejects, and would not be
+    // recognised by other implementations either.
     std::map<int, bilingual_str> errors;
     if (!::SignTransaction(to_sign, keystore, coins, SIGHASH_ALL, errors)) {
         // TODO: this may be a multisig which successfully signed but needed additional signatures
