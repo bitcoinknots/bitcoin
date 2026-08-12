@@ -882,6 +882,68 @@ class UnifiedSighashTest(BitcoinTestFramework):
         node.sendrawtransaction(final["hex"])
         self.log.info("  finalizepsbt verified the opt-in signature and extracted it")
 
+        self.log.info("analyzepsbt recognises an opt-in signature as a signature")
+        # analyzepsbt verifies the signatures it finds. Verifying them under the
+        # wrong rules does not fail loudly: it reports a fully signed input as
+        # unsigned and lists signatures as missing that are not, which is how a
+        # caller that never learned about the fork would behave.
+        an_op, an_utxo = self.make_utxo(3 * COIN, key_to_p2wpkh_script(self.pubkey))
+        self.mine(1)
+        an_tx = self.build_witness_spend([an_op], [an_utxo])
+        an_psbt = node.utxoupdatepsbt(node.converttopsbt(an_tx.serialize().hex()))
+        # Finalized, so the input carries a complete witness for analyzepsbt to
+        # verify. Under the wrong rules that verification fails and the input is
+        # reported unsigned.
+        an_signed = node.descriptorprocesspsbt(an_psbt, [descsum_create(f"wpkh({self.privkey_wif})")],
+                                               "ALL", True, True)["psbt"]
+        analysis = node.analyzepsbt(an_signed)
+        assert_equal(analysis["inputs"][0]["is_final"], True)
+        assert_equal(analysis["next"], "extractor")
+        assert "missing" not in analysis["inputs"][0], analysis["inputs"][0]
+        self.log.info("  analyzepsbt reported the input final rather than missing signatures")
+
+        self.log.info("analyzepsbt sizes an opted-in taproot input at its real length")
+        # The estimate dummy-finalizes every input. An opted-in taproot signature
+        # cannot use SIGHASH_DEFAULT, so it carries a hash type byte and is 65
+        # bytes rather than 64. Sizing the dummy at 64 underpays the fee by one
+        # byte per input. Four inputs so the shortfall is a whole vbyte.
+        sz_ins, sz_spent = [], []
+        for _ in range(4):
+            sz_op, sz_utxo, sz_info = self.make_taproot_utxo(2 * COIN)
+            sz_ins.append(sz_op)
+            sz_spent.append(sz_utxo)
+        self.mine(1)
+        sz_tx = CTransaction()
+        sz_tx.version = 2
+        sz_tx.vin = [CTxIn(o) for o in sz_ins]
+        sz_tx.vout = [CTxOut(8 * COIN - 50000, sz_info.scriptPubKey)]
+        sz_psbt = node.utxoupdatepsbt(node.converttopsbt(sz_tx.serialize().hex()))
+        sz_estimate = node.analyzepsbt(sz_psbt)["estimated_vsize"]
+        sz_done = node.descriptorprocesspsbt(sz_psbt, [descsum_create(f"tr({self.privkey_wif})")],
+                                             "DEFAULT", True, True)
+        assert sz_done["complete"], sz_done
+        sz_decoded = node.decoderawtransaction(sz_done["hex"])
+        assert_equal(len(sz_decoded["vin"][0]["txinwitness"][0]) // 2, 65)
+        assert_equal(sz_estimate, sz_decoded["vsize"])
+        self.log.info(f"  estimate {sz_estimate} matched the signed size for a 65-byte signature")
+
+        self.log.info("A PSBT declares the hash type its signature actually uses")
+        # The creator adds the opt-in bit to what it signs with. If the declared
+        # sighash_type stays behind, the PSBT advertises a type its own signature
+        # does not use, and any signer or finalizer that enforces the field
+        # rejects it.
+        dec_op, dec_utxo = self.make_utxo(3 * COIN, key_to_p2wpkh_script(self.pubkey))
+        self.mine(1)
+        dec_tx = self.build_witness_spend([dec_op], [dec_utxo])
+        dec_psbt = node.utxoupdatepsbt(node.converttopsbt(dec_tx.serialize().hex()))
+        dec_signed = node.descriptorprocesspsbt(dec_psbt, [descsum_create(f"wpkh({self.privkey_wif})")],
+                                                "ALL", True, False)["psbt"]
+        dec = node.decodepsbt(dec_signed)["inputs"][0]
+        assert_equal(dec["sighash"], "ALL|UNIFIED")
+        sig_hex = list(dec["partial_signatures"].values())[0]
+        assert_equal(int(sig_hex[-2:], 16), SIGHASH_ALL | SIGHASH_UNIFIED)
+        self.log.info("  declared sighash type matches the signature's own byte")
+
         self.log.info("The opt-in bit cannot be flipped by a third party")
         # The bit is committed to by the signature it appears in, so neither
         # direction of tampering produces something that still verifies. If it
