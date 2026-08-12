@@ -33,7 +33,7 @@ FUZZ_TARGET(psbt)
     }
     const PartiallySignedTransaction psbt = psbt_mut;
 
-    const PSBTAnalysis analysis = AnalyzePSBT(psbt);
+    const PSBTAnalysis analysis = AnalyzePSBT(psbt, /*sighash_rules=*/SighashRules::LEGACY);
     (void)PSBTRoleName(analysis.next);
     for (const PSBTInputAnalysis& input_analysis : analysis.inputs) {
         (void)PSBTRoleName(input_analysis.next);
@@ -66,11 +66,11 @@ FUZZ_TARGET(psbt)
     }
 
     psbt_mut = psbt;
-    (void)FinalizePSBT(psbt_mut);
+    (void)FinalizePSBT(psbt_mut, /*sighash_rules=*/SighashRules::LEGACY);
 
     psbt_mut = psbt;
     CMutableTransaction result;
-    if (FinalizeAndExtractPSBT(psbt_mut, result)) {
+    if (FinalizeAndExtractPSBT(psbt_mut, result, /*sighash_rules=*/SighashRules::LEGACY)) {
         const PartiallySignedTransaction psbt_from_tx{result};
     }
 

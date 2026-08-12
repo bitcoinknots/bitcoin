@@ -1229,14 +1229,14 @@ PrecomputedTransactionData PrecomputePSBTData(const PartiallySignedTransaction& 
 bool PSBTInputSigned(const PSBTInput& input);
 
 /** Checks whether a PSBTInput is already signed by doing script verification using final fields. */
-bool PSBTInputSignedAndVerified(const PartiallySignedTransaction psbt, unsigned int input_index, const PrecomputedTransactionData* txdata, SighashRules sighash_rules = SighashRules::LEGACY);
+bool PSBTInputSignedAndVerified(const PartiallySignedTransaction psbt, unsigned int input_index, const PrecomputedTransactionData* txdata, SighashRules sighash_rules);
 
 /** Signs a PSBTInput, verifying that all provided data matches what is being signed.
  *
  * txdata should be the output of PrecomputePSBTData (which can be shared across
  * multiple SignPSBTInput calls). If it is nullptr, a dummy signature will be created.
  **/
-bool SignPSBTInput(const SigningProvider& provider, PartiallySignedTransaction& psbt, int index, const PrecomputedTransactionData* txdata, int sighash = SIGHASH_ALL, SignatureData* out_sigdata = nullptr, bool finalize = true, SighashRules sighash_rules = SighashRules::LEGACY);
+bool SignPSBTInput(const SigningProvider& provider, PartiallySignedTransaction& psbt, int index, const PrecomputedTransactionData* txdata, int sighash, SignatureData* out_sigdata, bool finalize, SighashRules sighash_rules);
 
 /**  Reduces the size of the PSBT by dropping unnecessary `non_witness_utxos` (i.e. complete previous transactions) from a psbt when all inputs are segwit v1. */
 void RemoveUnnecessaryTransactions(PartiallySignedTransaction& psbtx, const int& sighash_type);
@@ -1256,7 +1256,7 @@ void UpdatePSBTOutput(const SigningProvider& provider, PartiallySignedTransactio
  * @param[in,out] psbtx PartiallySignedTransaction to finalize
  * return True if the PSBT is now complete, false otherwise
  */
-bool FinalizePSBT(PartiallySignedTransaction& psbtx, SighashRules sighash_rules = SighashRules::LEGACY);
+bool FinalizePSBT(PartiallySignedTransaction& psbtx, SighashRules sighash_rules);
 
 /**
  * Finalizes a PSBT if possible, and extracts it to a CMutableTransaction if it could be finalized.
@@ -1265,7 +1265,7 @@ bool FinalizePSBT(PartiallySignedTransaction& psbtx, SighashRules sighash_rules 
  * @param[out] result CMutableTransaction representing the complete transaction, if successful
  * @return True if we successfully extracted the transaction, false otherwise
  */
-bool FinalizeAndExtractPSBT(PartiallySignedTransaction& psbtx, CMutableTransaction& result, SighashRules sighash_rules = SighashRules::LEGACY);
+bool FinalizeAndExtractPSBT(PartiallySignedTransaction& psbtx, CMutableTransaction& result, SighashRules sighash_rules);
 
 /**
  * Combines PSBTs with the same underlying transaction, resulting in a single PSBT with all partial signatures from each input.

@@ -119,7 +119,7 @@ bool ProduceSignature(const SigningProvider& provider, const BaseSignatureCreato
  * spent output, so recognising one of those signatures needs the whole
  * transaction's context, not just this input's. Without it an existing
  * signature is invisible and the input looks unsigned. */
-SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nIn, const CTxOut& txout, SighashRules sighash_rules = SighashRules::LEGACY, const PrecomputedTransactionData* txdata = nullptr);
+SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nIn, const CTxOut& txout, SighashRules sighash_rules, const PrecomputedTransactionData* txdata = nullptr);
 void UpdateInput(CTxIn& input, const SignatureData& data);
 
 /** Check whether a scriptPubKey is known to be segwit. */
@@ -131,6 +131,6 @@ bool IsSegWitOutput(const SigningProvider& provider, const CScript& script);
  * sighash_rules selects the hardfork signature hash; it must match the consensus
  * rules of the block the transaction is intended for, so callers derive it from
  * chain state rather than defaulting it. */
-bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* provider, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum = nullptr, SighashRules sighash_rules = SighashRules::LEGACY);
+bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* provider, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum, SighashRules sighash_rules);
 
 #endif // BITCOIN_SCRIPT_SIGN_H
