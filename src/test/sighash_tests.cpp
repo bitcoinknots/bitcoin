@@ -516,6 +516,568 @@ BOOST_AUTO_TEST_CASE(unified_sighash_sign_and_verify_roundtrip)
     BOOST_CHECK(verify(legacy_tx, /*hf=*/true));
 }
 
+BOOST_AUTO_TEST_CASE(unified_sighash_taproot_keypath_roundtrip)
+{
+    FillableSigningProvider keystore;
+    const CKey key{GenerateRandomKey()};
+    BOOST_CHECK(keystore.AddKey(key));
+    const XOnlyPubKey xpk{key.GetPubKey()};
+
+    TaprootBuilder builder;
+    builder.Finalize(xpk);
+    const CScript spk{GetScriptForDestination(builder.GetOutput())};
+    const uint256 merkle_root{};
+
+    CMutableTransaction tx;
+    std::vector<CTxOut> spent;
+    BuildUnifiedTestTx(tx, spent, spk, spk);
+    const auto txdata{MakeUnifiedTxdata(tx, spent)};
+
+    auto verify = [&](const CMutableTransaction& t, bool hf) {
+        MutableTransactionSignatureChecker checker{&t, 0, spent[0].nValue, txdata, MissingDataBehavior::ASSERT_FAIL};
+        ScriptError err{SCRIPT_ERR_UNKNOWN_ERROR};
+        const unsigned int flags{SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_TAPROOT |
+                                 (hf ? uint32_t{SCRIPT_VERIFY_UNIFIED_SIGHASH} : uint32_t{0})};
+        return VerifyScript(t.vin[0].scriptSig, spk, &t.vin[0].scriptWitness, flags, checker, &err);
+    };
+
+    auto sign = [&](CMutableTransaction& t, bool hf, int hashtype) {
+        MutableTransactionSignatureCreator creator{t, 0, spent[0].nValue, &txdata, hashtype};
+        creator.SetSighashRules(hf ? SighashRules::UNIFIED : SighashRules::LEGACY);
+        std::vector<unsigned char> sig;
+        if (!creator.CreateSchnorrSig(keystore, sig, xpk, nullptr, &merkle_root, SigVersion::TAPROOT)) return false;
+        t.vin[0].scriptWitness.stack = {sig};
+        return true;
+    };
+
+    // Opting in. BIP341 already commits the hash type byte, so setting the bit
+    // is enough to move the message; no new format is involved.
+    CMutableTransaction unified_tx{tx};
+    BOOST_CHECK(sign(unified_tx, /*hf=*/true, SIGHASH_DEFAULT));
+    BOOST_CHECK_EQUAL(unified_tx.vin[0].scriptWitness.stack[0].size(), 65U);
+    BOOST_CHECK_EQUAL(unified_tx.vin[0].scriptWitness.stack[0].back(), SIGHASH_UNIFIED | SIGHASH_ALL);
+    BOOST_CHECK(verify(unified_tx, /*hf=*/true));
+    // A node that has not activated the fork rejects the byte as an undefined
+    // hash type, which is what stops the spend being replayed there.
+    BOOST_CHECK(!verify(unified_tx, /*hf=*/false));
+
+    // Existing taproot spends keep working after activation, unchanged.
+    CMutableTransaction legacy_tx{tx};
+    BOOST_CHECK(sign(legacy_tx, /*hf=*/false, SIGHASH_DEFAULT));
+    BOOST_CHECK_EQUAL(legacy_tx.vin[0].scriptWitness.stack[0].size(), 64U);
+    BOOST_CHECK(verify(legacy_tx, /*hf=*/false));
+    BOOST_CHECK(verify(legacy_tx, /*hf=*/true));
+
+    // Every output type carries the bit, and each is rejected without the fork.
+    for (const int base_type : {SIGHASH_ALL, SIGHASH_NONE, SIGHASH_SINGLE}) {
+        for (const int acp : {0, int{SIGHASH_ANYONECANPAY}}) {
+            CMutableTransaction t{tx};
+            BOOST_CHECK(sign(t, /*hf=*/true, base_type | acp));
+            BOOST_CHECK_EQUAL(t.vin[0].scriptWitness.stack[0].back(), SIGHASH_UNIFIED | base_type | acp);
+            BOOST_CHECK(verify(t, /*hf=*/true));
+            BOOST_CHECK(!verify(t, /*hf=*/false));
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(unified_sighash_taproot_hashtype_sweep)
+{
+    // Every one of the 256 hash type bytes, for a taproot input. Two properties
+    // matter and neither is safe to take on faith:
+    //
+    //   1. BIP341 is untouched. It accepts exactly the bytes it always did, so
+    //      no spend that exists today changes meaning, and it never accepts an
+    //      opted-in byte. That second half is the replay protection: a node
+    //      that has not activated the fork computes BIP341 and refuses.
+    //   2. The unified algorithm accepts exactly the six opted-in bytes, and
+    //      produces a different message than BIP341 does for the same byte.
+    const CKey key{GenerateRandomKey()};
+    const XOnlyPubKey xpk{key.GetPubKey()};
+    TaprootBuilder builder;
+    builder.Finalize(xpk);
+    const CScript spk{GetScriptForDestination(builder.GetOutput())};
+
+    CMutableTransaction tx;
+    std::vector<CTxOut> spent;
+    BuildUnifiedTestTx(tx, spent, spk, spk);
+    BOOST_REQUIRE(!tx.vout.empty()); // SIGHASH_SINGLE needs a matching output.
+    const auto txdata{MakeUnifiedTxdata(tx, spent)};
+
+    auto fresh_execdata = [] {
+        ScriptExecutionData e;
+        e.m_annex_init = true;
+        e.m_annex_present = false;
+        return e;
+    };
+
+    int opted_in_accepted{0};
+    for (int i = 0; i < 256; ++i) {
+        const uint8_t hash_type(i);
+        const bool bip341_defined{hash_type <= 0x03 || (hash_type >= 0x81 && hash_type <= 0x83)};
+        const uint8_t base_type(hash_type & ~SIGHASH_UNIFIED);
+        const bool opt_in_defined{(hash_type & SIGHASH_UNIFIED) &&
+                                  ((base_type >= 0x01 && base_type <= 0x03) ||
+                                   (base_type >= 0x81 && base_type <= 0x83))};
+
+        ScriptExecutionData ed_bip341{fresh_execdata()}, ed_hf{fresh_execdata()};
+        uint256 bip341_hash, hf_hash;
+        const bool got_bip341{SignatureHashSchnorr(bip341_hash, ed_bip341, tx, 0, hash_type,
+                                                   SigVersion::TAPROOT, txdata, MissingDataBehavior::FAIL)};
+        const bool got_hf{SignatureHashUnified(hf_hash, CScript{}, tx, 0, hash_type,
+                                          SigVersion::TAPROOT, txdata, &ed_hf)};
+
+        // 1. BIP341 unchanged, and blind to the opt-in bit in either direction.
+        BOOST_CHECK_EQUAL(got_bip341, bip341_defined);
+        // 2. The unified algorithm takes the opted-in bytes and nothing else.
+        BOOST_CHECK_EQUAL(got_hf, opt_in_defined);
+
+        // 3. The same acceptance rule for a script path spend. Run separately
+        // because a tapscript message needs the leaf and separator, and a check
+        // narrowed to the key path would pass on the key-path sweep alone.
+        ScriptExecutionData ed_tapscript{fresh_execdata()};
+        ed_tapscript.m_tapleaf_hash_init = true;
+        ed_tapscript.m_tapleaf_hash = ComputeTapleafHash(TAPROOT_LEAF_TAPSCRIPT, CScript{} << OP_1);
+        ed_tapscript.m_codeseparator_pos_init = true;
+        ed_tapscript.m_codeseparator_pos = 0xFFFFFFFFUL;
+        uint256 tapscript_hash;
+        const bool got_tapscript{SignatureHashUnified(tapscript_hash, CScript{}, tx, 0, hash_type,
+                                                      SigVersion::TAPSCRIPT, txdata, &ed_tapscript)};
+        BOOST_CHECK_EQUAL(got_tapscript, opt_in_defined);
+        if (opt_in_defined) {
+            // A script path spend commits to the leaf, so it must not collide
+            // with the key path message for the same byte.
+            BOOST_CHECK(tapscript_hash != hf_hash);
+        }
+
+        if (opt_in_defined) {
+            ++opted_in_accepted;
+            uint256 legacy_msg;
+            ScriptExecutionData ed_legacy{fresh_execdata()};
+            // The byte it derives from is still a valid BIP341 spend, and the
+            // two messages differ, which is what makes the spend unusable there.
+            BOOST_CHECK(SignatureHashSchnorr(legacy_msg, ed_legacy, tx, 0, base_type,
+                                             SigVersion::TAPROOT, txdata, MissingDataBehavior::FAIL));
+            BOOST_CHECK(hf_hash != legacy_msg);
+        }
+    }
+    // 0x41-0x43 and 0xc1-0xc3, and nothing else.
+    BOOST_CHECK_EQUAL(opted_in_accepted, 6);
+}
+
+BOOST_AUTO_TEST_CASE(unified_sighash_annex_is_wired_to_the_interpreter)
+{
+    // Elsewhere the annex commitment is shown to move the message when it is
+    // set by hand. That is not the same claim as the interpreter deriving the
+    // right value from a real witness, which is what consensus depends on, so
+    // this spends an output with an annex actually present.
+    FillableSigningProvider keystore;
+    const CKey key{GenerateRandomKey()};
+    BOOST_CHECK(keystore.AddKey(key));
+    const XOnlyPubKey xpk{key.GetPubKey()};
+    TaprootBuilder builder;
+    builder.Finalize(xpk);
+    const CScript spk{GetScriptForDestination(builder.GetOutput())};
+    const uint256 merkle_root{};
+
+    CMutableTransaction tx;
+    std::vector<CTxOut> spent;
+    BuildUnifiedTestTx(tx, spent, spk, spk);
+    const auto txdata{MakeUnifiedTxdata(tx, spent)};
+
+    // BIP341: a final witness element beginning with 0x50 is the annex.
+    const std::vector<unsigned char> annex{0x50, 0x01, 0x02, 0x03};
+
+    auto sign_committing_to = [&](const std::vector<unsigned char>& committed_annex, bool present) {
+        ScriptExecutionData execdata;
+        execdata.m_annex_init = true;
+        execdata.m_annex_present = present;
+        if (present) execdata.m_annex_hash = (HashWriter{} << committed_annex).GetSHA256();
+        uint256 hash;
+        BOOST_REQUIRE(SignatureHashUnified(hash, CScript{}, tx, 0, SIGHASH_ALL | SIGHASH_UNIFIED,
+                                      SigVersion::TAPROOT, txdata, &execdata));
+        std::vector<unsigned char> sig(64);
+        BOOST_REQUIRE(key.SignSchnorr(hash, sig, &merkle_root, {}));
+        sig.push_back(SIGHASH_ALL | SIGHASH_UNIFIED);
+        return sig;
+    };
+    auto verify = [&](const std::vector<unsigned char>& sig, bool attach_annex,
+                      const std::vector<unsigned char>& which) {
+        CMutableTransaction t{tx};
+        t.vin[0].scriptWitness.stack = attach_annex ? std::vector<std::vector<unsigned char>>{sig, which}
+                                                    : std::vector<std::vector<unsigned char>>{sig};
+        MutableTransactionSignatureChecker checker{&t, 0, spent[0].nValue, txdata, MissingDataBehavior::ASSERT_FAIL};
+        ScriptError err{SCRIPT_ERR_UNKNOWN_ERROR};
+        return VerifyScript(t.vin[0].scriptSig, spk, &t.vin[0].scriptWitness,
+                            SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_TAPROOT | SCRIPT_VERIFY_UNIFIED_SIGHASH,
+                            checker, &err);
+    };
+
+    // Signed committing to this annex, and spent with it: the interpreter must
+    // have derived the same hash the signer did.
+    const auto sig_with_annex{sign_committing_to(annex, true)};
+    BOOST_CHECK(verify(sig_with_annex, /*attach_annex=*/true, annex));
+
+    // The annex cannot be changed in flight.
+    const std::vector<unsigned char> other_annex{0x50, 0x09, 0x09};
+    BOOST_CHECK(!verify(sig_with_annex, /*attach_annex=*/true, other_annex));
+
+    // Nor removed.
+    BOOST_CHECK(!verify(sig_with_annex, /*attach_annex=*/false, annex));
+
+    // Nor added to a signature that did not commit to one. Control: that same
+    // signature spends when no annex is attached, so the rejection above is the
+    // annex commitment rather than a broken signature.
+    const auto sig_without_annex{sign_committing_to({}, false)};
+    BOOST_CHECK(verify(sig_without_annex, /*attach_annex=*/false, annex));
+    BOOST_CHECK(!verify(sig_without_annex, /*attach_annex=*/true, annex));
+}
+
+BOOST_AUTO_TEST_CASE(unified_sighash_codeseparator_is_wired_to_the_interpreter)
+{
+    // Same distinction as the annex: setting the position by hand and watching
+    // the message move is not the same as the interpreter recording the
+    // position of an OP_CODESEPARATOR it actually executed. This spends a leaf
+    // containing one, so only a signature made over the recorded position can
+    // satisfy it.
+    const CKey key{GenerateRandomKey()};
+    const XOnlyPubKey xpk{key.GetPubKey()};
+
+    // Position is counted per opcode from zero, so the pubkey push is 0 and the
+    // separator is 1.
+    const CScript leaf{CScript() << ToByteVector(xpk) << OP_CODESEPARATOR << OP_CHECKSIG};
+    constexpr uint32_t EXPECTED_POS{1};
+
+    const CKey internal{GenerateRandomKey()};
+    TaprootBuilder builder;
+    builder.Add(0, leaf, TAPROOT_LEAF_TAPSCRIPT);
+    builder.Finalize(XOnlyPubKey{internal.GetPubKey()});
+    const CScript spk{GetScriptForDestination(builder.GetOutput())};
+    const TaprootSpendData spenddata{builder.GetSpendData()};
+    const auto& blocks{spenddata.scripts.at({std::vector<unsigned char>(leaf.begin(), leaf.end()), TAPROOT_LEAF_TAPSCRIPT})};
+    BOOST_REQUIRE(!blocks.empty());
+    const std::vector<unsigned char> control{*blocks.begin()};
+
+    CMutableTransaction tx;
+    std::vector<CTxOut> spent;
+    BuildUnifiedTestTx(tx, spent, spk, spk);
+    const auto txdata{MakeUnifiedTxdata(tx, spent)};
+
+    auto sign_for_pos = [&](uint32_t pos) {
+        ScriptExecutionData execdata;
+        execdata.m_annex_init = true;
+        execdata.m_annex_present = false;
+        execdata.m_tapleaf_hash_init = true;
+        execdata.m_tapleaf_hash = ComputeTapleafHash(TAPROOT_LEAF_TAPSCRIPT, leaf);
+        execdata.m_codeseparator_pos_init = true;
+        execdata.m_codeseparator_pos = pos;
+        uint256 hash;
+        BOOST_REQUIRE(SignatureHashUnified(hash, CScript{}, tx, 0, SIGHASH_ALL | SIGHASH_UNIFIED,
+                                      SigVersion::TAPSCRIPT, txdata, &execdata));
+        std::vector<unsigned char> sig(64);
+        BOOST_REQUIRE(key.SignSchnorr(hash, sig, nullptr, {}));
+        sig.push_back(SIGHASH_ALL | SIGHASH_UNIFIED);
+        return sig;
+    };
+    auto spends = [&](const std::vector<unsigned char>& sig) {
+        CMutableTransaction t{tx};
+        t.vin[0].scriptWitness.stack = {sig, std::vector<unsigned char>(leaf.begin(), leaf.end()), control};
+        MutableTransactionSignatureChecker checker{&t, 0, spent[0].nValue, txdata, MissingDataBehavior::ASSERT_FAIL};
+        ScriptError err{SCRIPT_ERR_UNKNOWN_ERROR};
+        return VerifyScript(t.vin[0].scriptSig, spk, &t.vin[0].scriptWitness,
+                            SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_TAPROOT | SCRIPT_VERIFY_UNIFIED_SIGHASH,
+                            checker, &err);
+    };
+
+    // Only the position the interpreter recorded satisfies the leaf.
+    BOOST_CHECK(spends(sign_for_pos(EXPECTED_POS)));
+    // 0xFFFFFFFF is the value used when no separator executed, so a signature
+    // made as though there were none does not spend a script containing one.
+    BOOST_CHECK(!spends(sign_for_pos(0xFFFFFFFF)));
+    BOOST_CHECK(!spends(sign_for_pos(0)));
+    BOOST_CHECK(!spends(sign_for_pos(2)));
+}
+
+BOOST_AUTO_TEST_CASE(unified_sighash_bit_does_not_collide_in_the_midstate_cache)
+{
+    // Knots caches SHA256 midstates for the legacy signature hash, indexed by
+    // ANYONECANPAY and output type only. SIGHASH_UNIFIED is not part of that index,
+    // so a byte carrying it shares a cache slot with the byte without it.
+    //
+    // That is safe only because the midstate stops short of the hash type,
+    // which is appended per call. Nothing else checks that, and a change to
+    // either the cache index or the point the midstate is taken would silently
+    // make two different signatures hash alike.
+    const CScript script{CScript() << OP_1 << OP_CHECKSIG};
+    CMutableTransaction tx;
+    std::vector<CTxOut> spent;
+    BuildUnifiedTestTx(tx, spent, script, script);
+
+    for (const int32_t base : std::initializer_list<int32_t>{SIGHASH_ALL, SIGHASH_NONE, SIGHASH_SINGLE,
+                                                            SIGHASH_ALL | SIGHASH_ANYONECANPAY}) {
+        const int32_t with_bit{base | SIGHASH_UNIFIED};
+        // The two share a cache slot: the index is derived from ANYONECANPAY
+        // and the output type, and SIGHASH_UNIFIED changes neither.
+
+        // Warm on one, then compute the other through the same cache.
+        SigHashCache shared;
+        const uint256 first{SignatureHash(script, tx, 0, base, spent[0].nValue, SigVersion::BASE, nullptr, &shared)};
+        const uint256 second{SignatureHash(script, tx, 0, with_bit, spent[0].nValue, SigVersion::BASE, nullptr, &shared)};
+        BOOST_CHECK(first != second);
+
+        // And the other way round, so neither order poisons the other.
+        SigHashCache reversed;
+        const uint256 rev_first{SignatureHash(script, tx, 0, with_bit, spent[0].nValue, SigVersion::BASE, nullptr, &reversed)};
+        const uint256 rev_second{SignatureHash(script, tx, 0, base, spent[0].nValue, SigVersion::BASE, nullptr, &reversed)};
+        BOOST_CHECK(rev_first == second);
+        BOOST_CHECK(rev_second == first);
+
+        // A cold cache agrees with a warm one.
+        BOOST_CHECK_EQUAL(SignatureHash(script, tx, 0, base, spent[0].nValue, SigVersion::BASE, nullptr, nullptr).GetHex(), first.GetHex());
+        BOOST_CHECK_EQUAL(SignatureHash(script, tx, 0, with_bit, spent[0].nValue, SigVersion::BASE, nullptr, nullptr).GetHex(), second.GetHex());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(unified_sighash_taproot_tail_is_load_bearing)
+{
+    // The taproot tail carries the annex, leaf hash and codeseparator position.
+    // Elsewhere these are asserted to be necessary; here each one is shown to
+    // be, by changing it and requiring the message to move. A commitment that
+    // does not move is not a commitment.
+    const CKey key{GenerateRandomKey()};
+    const XOnlyPubKey xpk{key.GetPubKey()};
+
+    // Two leaves spendable by the same key. This is the case the leaf hash
+    // exists for: without it a signature made for one would satisfy the other.
+    const CScript leaf_a{CScript() << ToByteVector(xpk) << OP_CHECKSIG};
+    const CScript leaf_b{CScript() << ToByteVector(xpk) << OP_CHECKSIGVERIFY << OP_1};
+    BOOST_REQUIRE(leaf_a != leaf_b);
+
+    TaprootBuilder builder;
+    builder.Add(1, leaf_a, TAPROOT_LEAF_TAPSCRIPT);
+    builder.Add(1, leaf_b, TAPROOT_LEAF_TAPSCRIPT);
+    builder.Finalize(xpk);
+    const CScript spk{GetScriptForDestination(builder.GetOutput())};
+
+    CMutableTransaction tx;
+    std::vector<CTxOut> spent;
+    BuildUnifiedTestTx(tx, spent, spk, spk);
+    const auto txdata{MakeUnifiedTxdata(tx, spent)};
+
+    auto base = [] {
+        ScriptExecutionData e;
+        e.m_annex_init = true;
+        e.m_annex_present = false;
+        e.m_tapleaf_hash_init = true;
+        e.m_codeseparator_pos_init = true;
+        e.m_codeseparator_pos = 0xFFFFFFFF;
+        return e;
+    };
+    auto msg = [&](const ScriptExecutionData& e, SigVersion sv, uint256& out) {
+        ScriptExecutionData copy{e};
+        return SignatureHashUnified(out, CScript{}, tx, 0, SIGHASH_ALL | SIGHASH_UNIFIED, sv, txdata, &copy);
+    };
+
+    ScriptExecutionData ed_a{base()};
+    ed_a.m_tapleaf_hash = ComputeTapleafHash(TAPROOT_LEAF_TAPSCRIPT, leaf_a);
+    uint256 hash_a;
+    BOOST_REQUIRE(msg(ed_a, SigVersion::TAPSCRIPT, hash_a));
+
+    // 1. A different leaf is a different message, so a signature made for one
+    //    leaf cannot be replayed into the other.
+    ScriptExecutionData ed_b{base()};
+    ed_b.m_tapleaf_hash = ComputeTapleafHash(TAPROOT_LEAF_TAPSCRIPT, leaf_b);
+    uint256 hash_b;
+    BOOST_REQUIRE(msg(ed_b, SigVersion::TAPSCRIPT, hash_b));
+    BOOST_CHECK(hash_a != hash_b);
+
+    // 2. An annex is committed to, so it cannot be added or removed in flight.
+    ScriptExecutionData ed_annex{ed_a};
+    ed_annex.m_annex_present = true;
+    ed_annex.m_annex_hash = uint256::ONE;
+    uint256 hash_annex;
+    BOOST_REQUIRE(msg(ed_annex, SigVersion::TAPSCRIPT, hash_annex));
+    BOOST_CHECK(hash_a != hash_annex);
+
+    // 3. The codeseparator position is committed to.
+    ScriptExecutionData ed_cs{ed_a};
+    ed_cs.m_codeseparator_pos = 0;
+    uint256 hash_cs;
+    BOOST_REQUIRE(msg(ed_cs, SigVersion::TAPSCRIPT, hash_cs));
+    BOOST_CHECK(hash_a != hash_cs);
+
+    // 4. The script type byte separates key path from script path, so a
+    //    tapscript signature is not reusable as a key path spend.
+    uint256 hash_keypath;
+    ScriptExecutionData ed_key{base()};
+    BOOST_REQUIRE(msg(ed_key, SigVersion::TAPROOT, hash_keypath));
+    BOOST_CHECK(hash_a != hash_keypath);
+
+    // 5. And the same separation against the other script types, so a segwit v0
+    //    or legacy signature is never reusable against a taproot input.
+    uint256 hash_base, hash_v0;
+    BOOST_REQUIRE(SignatureHashUnified(hash_base, CScript{}, tx, 0, SIGHASH_ALL | SIGHASH_UNIFIED, SigVersion::BASE, txdata));
+    BOOST_REQUIRE(SignatureHashUnified(hash_v0, CScript{}, tx, 0, SIGHASH_ALL | SIGHASH_UNIFIED, SigVersion::WITNESS_V0, txdata));
+    BOOST_CHECK(hash_base != hash_v0);
+    BOOST_CHECK(hash_base != hash_keypath);
+    BOOST_CHECK(hash_v0 != hash_keypath);
+    BOOST_CHECK(hash_base != hash_a);
+    BOOST_CHECK(hash_v0 != hash_a);
+}
+
+BOOST_AUTO_TEST_CASE(unified_sighash_leaf_substitution_is_rejected)
+{
+    // The attack the leaf hash exists to stop, carried out rather than argued
+    // about: two leaves spendable by the same key, sign for one, then present
+    // the other with that signature. The script itself would be satisfied,
+    // since it is the same key checking the same signature; only the leaf hash
+    // in the message stands between the two.
+    FillableSigningProvider keystore;
+    const CKey key{GenerateRandomKey()};
+    BOOST_CHECK(keystore.AddKey(key));
+    const XOnlyPubKey xpk{key.GetPubKey()};
+
+    // Same shape, different bytes, so both are satisfied by one signature.
+    const CScript leaf_a{CScript() << ToByteVector(xpk) << OP_CHECKSIG};
+    const CScript leaf_b{CScript() << OP_1 << OP_DROP << ToByteVector(xpk) << OP_CHECKSIG};
+
+    const CKey internal{GenerateRandomKey()};
+    TaprootBuilder builder;
+    builder.Add(1, leaf_a, TAPROOT_LEAF_TAPSCRIPT);
+    builder.Add(1, leaf_b, TAPROOT_LEAF_TAPSCRIPT);
+    builder.Finalize(XOnlyPubKey{internal.GetPubKey()});
+    const CScript spk{GetScriptForDestination(builder.GetOutput())};
+    const TaprootSpendData spenddata{builder.GetSpendData()};
+
+    auto control_for = [&](const CScript& leaf) {
+        const auto& blocks{spenddata.scripts.at({std::vector<unsigned char>(leaf.begin(), leaf.end()), TAPROOT_LEAF_TAPSCRIPT})};
+        BOOST_REQUIRE(!blocks.empty());
+        return *blocks.begin();
+    };
+
+    CMutableTransaction tx;
+    std::vector<CTxOut> spent;
+    BuildUnifiedTestTx(tx, spent, spk, spk);
+    const auto txdata{MakeUnifiedTxdata(tx, spent)};
+
+    // Sign for leaf A.
+    MutableTransactionSignatureCreator creator{tx, 0, spent[0].nValue, &txdata, SIGHASH_ALL};
+    creator.SetSighashRules(SighashRules::UNIFIED);
+    const uint256 leaf_a_hash{ComputeTapleafHash(TAPROOT_LEAF_TAPSCRIPT, leaf_a)};
+    std::vector<unsigned char> sig;
+    BOOST_REQUIRE(creator.CreateSchnorrSig(keystore, sig, xpk, &leaf_a_hash, nullptr, SigVersion::TAPSCRIPT));
+
+    auto verify_with = [&](const CScript& leaf) {
+        CMutableTransaction t{tx};
+        t.vin[0].scriptWitness.stack = {sig, std::vector<unsigned char>(leaf.begin(), leaf.end()), control_for(leaf)};
+        MutableTransactionSignatureChecker checker{&t, 0, spent[0].nValue, txdata, MissingDataBehavior::ASSERT_FAIL};
+        ScriptError err{SCRIPT_ERR_UNKNOWN_ERROR};
+        return VerifyScript(t.vin[0].scriptSig, spk, &t.vin[0].scriptWitness,
+                            SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_TAPROOT | SCRIPT_VERIFY_UNIFIED_SIGHASH,
+                            checker, &err);
+    };
+
+    // The leaf it was made for spends.
+    BOOST_CHECK(verify_with(leaf_a));
+    // The other leaf does not, though the same key satisfies the same opcode.
+    BOOST_CHECK(!verify_with(leaf_b));
+
+    // Control, so the rejection above cannot be passing for an unrelated reason
+    // such as a malformed control block: leaf B spends perfectly well once the
+    // signature is made for leaf B. The only difference is which leaf hash went
+    // into the message.
+    const uint256 leaf_b_hash{ComputeTapleafHash(TAPROOT_LEAF_TAPSCRIPT, leaf_b)};
+    sig.clear();
+    BOOST_REQUIRE(creator.CreateSchnorrSig(keystore, sig, xpk, &leaf_b_hash, nullptr, SigVersion::TAPSCRIPT));
+    BOOST_CHECK(verify_with(leaf_b));
+    BOOST_CHECK(!verify_with(leaf_a));
+}
+
+BOOST_AUTO_TEST_CASE(unified_sighash_tapscript_roundtrip)
+{
+    // The script path reaches the checker by a different route than the key
+    // path, so it gets its own coverage rather than being assumed to follow.
+    FillableSigningProvider keystore;
+    const CKey key{GenerateRandomKey()};
+    BOOST_CHECK(keystore.AddKey(key));
+    const XOnlyPubKey xpk{key.GetPubKey()};
+
+    const CScript leaf{CScript() << ToByteVector(xpk) << OP_CHECKSIG};
+    const CKey internal{GenerateRandomKey()};
+    const XOnlyPubKey internal_xpk{internal.GetPubKey()};
+
+    TaprootBuilder builder;
+    builder.Add(0, leaf, TAPROOT_LEAF_TAPSCRIPT);
+    builder.Finalize(internal_xpk);
+    const CScript spk{GetScriptForDestination(builder.GetOutput())};
+    const TaprootSpendData spenddata{builder.GetSpendData()};
+    const auto control_blocks{spenddata.scripts.at({std::vector<unsigned char>(leaf.begin(), leaf.end()), TAPROOT_LEAF_TAPSCRIPT})};
+    BOOST_REQUIRE(!control_blocks.empty());
+    const std::vector<unsigned char> control{*control_blocks.begin()};
+
+    CMutableTransaction tx;
+    std::vector<CTxOut> spent;
+    BuildUnifiedTestTx(tx, spent, spk, spk);
+    const auto txdata{MakeUnifiedTxdata(tx, spent)};
+    const uint256 leaf_hash{ComputeTapleafHash(TAPROOT_LEAF_TAPSCRIPT, leaf)};
+
+    auto verify = [&](const CMutableTransaction& t, bool hf) {
+        MutableTransactionSignatureChecker checker{&t, 0, spent[0].nValue, txdata, MissingDataBehavior::ASSERT_FAIL};
+        ScriptError err{SCRIPT_ERR_UNKNOWN_ERROR};
+        const unsigned int flags{SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_TAPROOT |
+                                 (hf ? uint32_t{SCRIPT_VERIFY_UNIFIED_SIGHASH} : uint32_t{0})};
+        return VerifyScript(t.vin[0].scriptSig, spk, &t.vin[0].scriptWitness, flags, checker, &err);
+    };
+
+    auto sign = [&](CMutableTransaction& t, bool hf) {
+        MutableTransactionSignatureCreator creator{t, 0, spent[0].nValue, &txdata, SIGHASH_DEFAULT};
+        creator.SetSighashRules(hf ? SighashRules::UNIFIED : SighashRules::LEGACY);
+        std::vector<unsigned char> sig;
+        if (!creator.CreateSchnorrSig(keystore, sig, xpk, &leaf_hash, nullptr, SigVersion::TAPSCRIPT)) return false;
+        t.vin[0].scriptWitness.stack = {sig, std::vector<unsigned char>(leaf.begin(), leaf.end()), control};
+        return true;
+    };
+
+    CMutableTransaction unified_tx{tx};
+    BOOST_CHECK(sign(unified_tx, /*hf=*/true));
+    BOOST_CHECK_EQUAL(unified_tx.vin[0].scriptWitness.stack[0].size(), 65U);
+    BOOST_CHECK(verify(unified_tx, /*hf=*/true));
+    BOOST_CHECK(!verify(unified_tx, /*hf=*/false));
+
+    CMutableTransaction legacy_tx{tx};
+    BOOST_CHECK(sign(legacy_tx, /*hf=*/false));
+    BOOST_CHECK_EQUAL(legacy_tx.vin[0].scriptWitness.stack[0].size(), 64U);
+    BOOST_CHECK(verify(legacy_tx, /*hf=*/false));
+    BOOST_CHECK(verify(legacy_tx, /*hf=*/true));
+}
+
+BOOST_AUTO_TEST_CASE(unified_sighash_taproot_rejects_bare_opt_in_byte)
+{
+    // SIGHASH_DEFAULT means "no byte at all", so a byte carrying only the
+    // opt-in bit would be a second encoding of the same meaning. Signing never
+    // produces one; verification must refuse it rather than treat it as ALL.
+    const CKey key{GenerateRandomKey()};
+    const XOnlyPubKey xpk{key.GetPubKey()};
+    TaprootBuilder builder;
+    builder.Finalize(xpk);
+    const CScript spk{GetScriptForDestination(builder.GetOutput())};
+
+    CMutableTransaction tx;
+    std::vector<CTxOut> spent;
+    BuildUnifiedTestTx(tx, spent, spk, spk);
+    const auto txdata{MakeUnifiedTxdata(tx, spent)};
+
+    ScriptExecutionData execdata;
+    execdata.m_annex_init = true;
+    execdata.m_annex_present = false;
+    uint256 hash;
+    BOOST_CHECK(!SignatureHashUnified(hash, CScript{}, tx, 0, SIGHASH_UNIFIED, SigVersion::TAPROOT, txdata, &execdata));
+    // A taproot signature also needs the annex state, which lives outside the
+    // transaction: without it the annex would not be committed to.
+    ScriptExecutionData uninit;
+    BOOST_CHECK(!SignatureHashUnified(hash, CScript{}, tx, 0, SIGHASH_UNIFIED | SIGHASH_ALL, SigVersion::TAPROOT, txdata, &uninit));
+    BOOST_CHECK(!SignatureHashUnified(hash, CScript{}, tx, 0, SIGHASH_UNIFIED | SIGHASH_ALL, SigVersion::TAPROOT, txdata, nullptr));
+}
+
 BOOST_AUTO_TEST_CASE(unified_sighash_anyonecanpay_is_position_independent)
 {
     const CScript script{CScript() << OP_1 << OP_CHECKSIG};
@@ -819,7 +1381,15 @@ BOOST_AUTO_TEST_CASE(unified_sighash_vectors)
         }
         const unsigned int in_idx{(unsigned int)test[2].getInt<int>()};
         const int32_t hash_type{test[3].getInt<int>()};
-        const SigVersion sv{test[4].get_bool() ? SigVersion::WITNESS_V0 : SigVersion::BASE};
+        const int script_type{test[4].getInt<int>()};
+        SigVersion sv{SigVersion::BASE};
+        switch (script_type) {
+        case 0: sv = SigVersion::BASE; break;
+        case 1: sv = SigVersion::WITNESS_V0; break;
+        case 2: sv = SigVersion::TAPROOT; break;
+        case 3: sv = SigVersion::TAPSCRIPT; break;
+        default: BOOST_FAIL("bad script type at " << idx);
+        }
 
         std::vector<CTxOut> spent;
         for (const UniValue& utxo : test[5].getValues()) {
@@ -834,15 +1404,29 @@ BOOST_AUTO_TEST_CASE(unified_sighash_vectors)
         PrecomputedTransactionData txdata;
         txdata.Init(tx, std::move(spent), /*force=*/true);
 
+        // Taproot carries context from outside the transaction; for these
+        // vectors there is no annex and no OP_CODESEPARATOR.
+        ScriptExecutionData execdata;
+        execdata.m_annex_init = true;
+        execdata.m_annex_present = false;
+        if (sv == SigVersion::TAPSCRIPT) {
+            execdata.m_tapleaf_hash_init = true;
+            execdata.m_tapleaf_hash = ComputeTapleafHash(TAPROOT_LEAF_TAPSCRIPT, script_code);
+            execdata.m_codeseparator_pos_init = true;
+            execdata.m_codeseparator_pos = 0xFFFFFFFF;
+        }
+        const bool taproot{sv == SigVersion::TAPROOT || sv == SigVersion::TAPSCRIPT};
+
         uint256 got;
-        BOOST_REQUIRE_MESSAGE(SignatureHashUnified(got, script_code, tx, in_idx, hash_type, sv, txdata),
+        BOOST_REQUIRE_MESSAGE(SignatureHashUnified(got, script_code, tx, in_idx, hash_type, sv, txdata,
+                                              taproot ? &execdata : nullptr),
                               "vector " << idx << " should be computable");
         BOOST_CHECK_MESSAGE(got == expected,
                             "vector " << idx << ": got " << got.GetHex() << " want " << expected.GetHex());
         ++checked;
     }
     BOOST_CHECK_EQUAL(checked, tests.size() - 1);
-    BOOST_CHECK_GE(checked, 100u);
+    BOOST_CHECK_GE(checked, 140u);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
