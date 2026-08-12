@@ -423,7 +423,12 @@ bool SignPSBTInput(const SigningProvider& provider, PartiallySignedTransaction& 
                              + (sigdata.taproot_key_path_sig.empty() ? 0 : 1)};
     bool sig_complete;
     if (txdata == nullptr) {
-        sig_complete = ProduceSignature(provider, DUMMY_SIGNATURE_CREATOR, utxo.scriptPubKey, sigdata);
+        // Size estimation only. Pick the creator whose taproot signature is the
+        // length the real one will be, or the estimate is short by a byte per input.
+        const BaseSignatureCreator& dummy{sighash_rules == SighashRules::UNIFIED
+                                              ? DUMMY_UNIFIED_SIGNATURE_CREATOR
+                                              : DUMMY_SIGNATURE_CREATOR};
+        sig_complete = ProduceSignature(provider, dummy, utxo.scriptPubKey, sigdata);
     } else {
         MutableTransactionSignatureCreator creator(tx, index, utxo.nValue, txdata, sighash);
         creator.SetSighashRules(sighash_rules);
