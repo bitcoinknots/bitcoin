@@ -605,9 +605,10 @@ class UnifiedSighashTest(BitcoinTestFramework):
         self.log.info("  bumpfee re-signed with the fork's rules and was mined")
 
         self.log.info("Every address type the wallet makes still spends after the fork")
-        # Taproot in particular: it is deliberately untouched, so its spends
-        # must look exactly as they did before. feature_taproot runs without the
-        # fork scheduled, so nothing else checks that.
+        # Taproot included: an opted-in spend uses the same signature hash as
+        # every other script type, not BIP341's. The cost is that
+        # SIGHASH_DEFAULT can no longer be used, since it appends no byte to
+        # carry the bit.
         # One transaction with an output of each type, so none of them can be
         # spent as change by the next send before the sweep sees it.
         outputs = [{w.getnewaddress(address_type=t): 1}
@@ -623,10 +624,11 @@ class UnifiedSighashTest(BitcoinTestFramework):
         for idx, vin in enumerate(sweep.vin):
             stack = sweep.wit.vtxinwit[idx].scriptWitness.stack
             if len(stack) == 1 and len(stack[0]) in (64, 65):
-                # Taproot key path. 64 bytes means SIGHASH_DEFAULT, and there is
-                # no hash type byte at all, so it cannot have opted in.
+                # Taproot key path. Opting in costs the byte that
+                # SIGHASH_DEFAULT saves, so an opted-in spend is 65 bytes.
                 taproot_inputs += 1
-                assert_equal(len(stack[0]), 64)
+                assert_equal(len(stack[0]), 65)
+                assert_equal(stack[0][-1], SIGHASH_ALL | SIGHASH_UNIFIED)
             elif stack:
                 optin_inputs += 1
                 assert_equal(stack[0][-1], SIGHASH_ALL | SIGHASH_UNIFIED)

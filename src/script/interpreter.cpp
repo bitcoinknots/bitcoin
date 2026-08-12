@@ -374,7 +374,7 @@ static bool EvalChecksigTapscript(const valtype& sig, const valtype& pubkey, Scr
     if (pubkey.size() == 0) {
         return set_error(serror, SCRIPT_ERR_PUBKEYTYPE);
     } else if (pubkey.size() == 32) {
-        if (success && !checker.CheckSchnorrSignature(sig, pubkey, sigversion, execdata, serror)) {
+        if (success && !checker.CheckSchnorrSignature(sig, pubkey, sigversion, execdata, serror, SighashRulesFromFlags(flags))) {
             return false; // serror is set
         }
     } else {
@@ -1623,12 +1623,16 @@ void SigHashCache::Store(int32_t hash_type, const CScript& script_code, const Ha
  * uint256::ONE bug, which is not carried across the fork.
  */
 template <class T>
-bool SignatureHashUnified(uint256& hash_out, const CScript& scriptCode, const T& txTo, unsigned int nIn, int32_t nHashType, SigVersion sigversion, const PrecomputedTransactionData& cache)
+bool SignatureHashUnified(uint256& hash_out, const CScript& scriptCode, const T& txTo, unsigned int nIn, int32_t nHashType, SigVersion sigversion, const PrecomputedTransactionData& cache, const ScriptExecutionData* execdata, MissingDataBehavior mdb)
 {
     assert(nIn < txTo.vin.size());
-    assert(sigversion == SigVersion::BASE || sigversion == SigVersion::WITNESS_V0);
+    const bool taproot{sigversion == SigVersion::TAPROOT || sigversion == SigVersion::TAPSCRIPT};
+    assert(sigversion == SigVersion::BASE || sigversion == SigVersion::WITNESS_V0 || taproot);
+    // Taproot carries context that lives outside the transaction, and dropping
+    // any of it would be unsafe rather than untidy.
+    if (taproot && (execdata == nullptr || !execdata->m_annex_init)) return HandleMissingData(mdb);
 
-    if (!(cache.m_bip341_taproot_ready && cache.m_spent_outputs_ready)) return false;
+    if (!(cache.m_bip341_taproot_ready && cache.m_spent_outputs_ready)) return HandleMissingData(mdb);
 
     // This message is only defined for signatures that opted in.
     if (!(nHashType & SIGHASH_UNIFIED)) return false;
@@ -1643,9 +1647,20 @@ bool SignatureHashUnified(uint256& hash_out, const CScript& scriptCode, const T&
 
     HashWriter ss{HASHER_UNIFIED_SIGHASH};
 
-    // Domain-separate the two script types, so a signature made for a bare or
-    // P2SH input is never valid for a witness v0 input and vice versa.
-    ss << static_cast<uint8_t>(sigversion == SigVersion::WITNESS_V0 ? 1 : 0);
+    // Domain-separate the script types, so a signature made for one is never
+    // valid for another. Deliberately not defaulted: a script version added
+    // later must be given its own value here rather than silently sharing the
+    // one for bare inputs, which would be a cross-type collision of exactly the
+    // kind this byte exists to prevent.
+    uint8_t script_type;
+    switch (sigversion) {
+    case SigVersion::BASE: script_type = 0; break;
+    case SigVersion::WITNESS_V0: script_type = 1; break;
+    case SigVersion::TAPROOT: script_type = 2; break;
+    case SigVersion::TAPSCRIPT: script_type = 3; break;
+    default: assert(false);
+    }
+    ss << script_type;
     ss << nHashType;
 
     // Transaction level data.
@@ -1678,7 +1693,23 @@ bool SignatureHashUnified(uint256& hash_out, const CScript& scriptCode, const T&
     } else {
         ss << static_cast<uint32_t>(nIn);
     }
-    ss << scriptCode;
+
+    // The tail is what each script type needs beyond the shared body.
+    if (!taproot) {
+        ss << scriptCode;
+    } else {
+        // The annex is committed to, or it would be malleable.
+        ss << static_cast<uint8_t>(execdata->m_annex_present ? 1 : 0);
+        if (execdata->m_annex_present) ss << execdata->m_annex_hash;
+        if (sigversion == SigVersion::TAPSCRIPT) {
+            // Without the leaf hash a signature for one script leaf would be
+            // valid for any other leaf under the same key.
+            if (!execdata->m_tapleaf_hash_init || !execdata->m_codeseparator_pos_init) return HandleMissingData(mdb);
+            ss << execdata->m_tapleaf_hash;
+            ss << static_cast<uint8_t>(0); // key version
+            ss << execdata->m_codeseparator_pos;
+        }
+    }
 
     hash_out = ss.GetSHA256();
     return true;
@@ -1810,7 +1841,7 @@ bool GenericTransactionSignatureChecker<T>::CheckECDSASignature(const std::vecto
         // midstate cache for that case; the bound is no worse than BIP143
         // without it.
         if (!this->txdata) return HandleMissingData(m_mdb);
-        if (!SignatureHashUnified(sighash, scriptCode, *txTo, nIn, nHashType, sigversion, *this->txdata)) return false;
+        if (!SignatureHashUnified(sighash, scriptCode, *txTo, nIn, nHashType, sigversion, *this->txdata, nullptr, m_mdb)) return false;
     } else {
         sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, sigversion, this->txdata, &m_sighash_cache);
     }
@@ -1822,7 +1853,7 @@ bool GenericTransactionSignatureChecker<T>::CheckECDSASignature(const std::vecto
 }
 
 template <class T>
-bool GenericTransactionSignatureChecker<T>::CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey_in, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror) const
+bool GenericTransactionSignatureChecker<T>::CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey_in, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror, SighashRules sighash_rules) const
 {
     assert(sigversion == SigVersion::TAPROOT || sigversion == SigVersion::TAPSCRIPT);
     // Schnorr signatures have 32-byte public keys. The caller is responsible for enforcing this.
@@ -1845,7 +1876,13 @@ bool GenericTransactionSignatureChecker<T>::CheckSchnorrSignature(Span<const uns
     }
     uint256 sighash;
     if (!this->txdata) return HandleMissingData(m_mdb);
-    if (!SignatureHashSchnorr(sighash, execdata, *txTo, nIn, hashtype, sigversion, *this->txdata, m_mdb)) {
+    if (sighash_rules == SighashRules::UNIFIED && (hashtype & SIGHASH_UNIFIED)) {
+        // Opted in: one algorithm for every script type, so taproot uses the
+        // same signature hash as the rest rather than BIP341's.
+        if (!SignatureHashUnified(sighash, CScript{}, *txTo, nIn, hashtype, sigversion, *this->txdata, &execdata, m_mdb)) {
+            return set_error(serror, SCRIPT_ERR_SCHNORR_SIG_HASHTYPE);
+        }
+    } else if (!SignatureHashSchnorr(sighash, execdata, *txTo, nIn, hashtype, sigversion, *this->txdata, m_mdb)) {
         return set_error(serror, SCRIPT_ERR_SCHNORR_SIG_HASHTYPE);
     }
     if (!VerifySchnorrSignature(sig, pubkey, sighash)) return set_error(serror, SCRIPT_ERR_SCHNORR_SIG);
@@ -1939,8 +1976,8 @@ bool GenericTransactionSignatureChecker<T>::CheckSequence(const CScriptNum& nSeq
 // explicit instantiation
 // Explicit instantiation: sign.cpp calls this, and relying on it being
 // instantiated as a side effect of a call elsewhere in this file is fragile.
-template bool SignatureHashUnified(uint256&, const CScript&, const CTransaction&, unsigned int, int32_t, SigVersion, const PrecomputedTransactionData&);
-template bool SignatureHashUnified(uint256&, const CScript&, const CMutableTransaction&, unsigned int, int32_t, SigVersion, const PrecomputedTransactionData&);
+template bool SignatureHashUnified(uint256&, const CScript&, const CTransaction&, unsigned int, int32_t, SigVersion, const PrecomputedTransactionData&, const ScriptExecutionData*, MissingDataBehavior);
+template bool SignatureHashUnified(uint256&, const CScript&, const CMutableTransaction&, unsigned int, int32_t, SigVersion, const PrecomputedTransactionData&, const ScriptExecutionData*, MissingDataBehavior);
 
 template class GenericTransactionSignatureChecker<CTransaction>;
 template class GenericTransactionSignatureChecker<CMutableTransaction>;
@@ -2079,7 +2116,7 @@ static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, 
         execdata.m_annex_init = true;
         if (stack.size() == 1) {
             // Key path spending (stack size is 1 after removing optional annex)
-            if (!checker.CheckSchnorrSignature(stack.front(), program, SigVersion::TAPROOT, execdata, serror)) {
+            if (!checker.CheckSchnorrSignature(stack.front(), program, SigVersion::TAPROOT, execdata, serror, SighashRulesFromFlags(flags))) {
                 return false; // serror is set
             }
             return set_success(serror);
