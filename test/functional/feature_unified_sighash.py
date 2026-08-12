@@ -2,7 +2,7 @@
 # Copyright (c) 2026-present The Bitcoin Knots developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""End-to-end test of the hardfork signature hash for legacy and segwit v0 inputs.
+"""End-to-end test of the hardfork signature hash.
 
 Drives a real node across the activation height and checks, against an
 independent Python implementation of the sighash:
@@ -16,7 +16,9 @@ independent Python implementation of the sighash:
   * the value of every input is committed to (CVE-2020-14199),
   * SIGHASH_SINGLE with no matching output is no longer spendable via the
     legacy sentinel hash,
-  * non-canonical sighash bytes are rejected.
+  * non-canonical sighash bytes are rejected,
+  * taproot opts in through the byte BIP341 already commits, so it is protected
+    too, at the cost of SIGHASH_DEFAULT.
 """
 
 import os
@@ -25,7 +27,7 @@ from decimal import Decimal
 
 from test_framework.address import address_to_scriptpubkey
 from test_framework.blocktools import COINBASE_MATURITY, create_block, create_coinbase
-from test_framework.key import ECKey
+from test_framework.key import ECKey, compute_xonly_pubkey, sign_schnorr, tweak_add_privkey
 from test_framework.descriptors import descsum_create
 from test_framework.wallet_util import bytes_to_wif
 from test_framework.messages import CTransaction, CTxIn, CTxOut, COutPoint, COIN, msg_tx, tx_from_hex
@@ -50,6 +52,10 @@ from test_framework.script import (
     SIGHASH_UNIFIED,
     SIGHASH_SINGLE,
     UnifiedSignatureHash,
+    UNIFIED_SCRIPT_TYPE_TAPROOT,
+    UNIFIED_SCRIPT_TYPE_TAPSCRIPT,
+    TaprootSignatureHash,
+    taproot_construct,
     sign_input_unified,
     sign_input_legacy,
     sign_input_segwitv0,
@@ -58,6 +64,9 @@ from test_framework.script import (
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, assert_raises_rpc_error
 from test_framework.wallet import MiniWallet
+
+# An internal key nobody holds, so a tr() built on it is script-path only.
+NUMS_INTERNAL_KEY = "4d54bb9928a0683b7e383de72943b214b0716f58aa54c7ba6bcea2328bc9c768"
 
 # The fork is scheduled at a height, the same buried deployment the proof of
 # work change activates at. Blocks are still mocked forward at a fixed spacing
@@ -92,6 +101,56 @@ class UnifiedSighashTest(BitcoinTestFramework):
         spk = key_to_p2pkh_script(self.pubkey)
         funding = self.wallet.send_to(from_node=self.nodes[0], scriptPubKey=spk, amount=value)
         return COutPoint(int(funding["txid"], 16), funding["sent_vout"]), CTxOut(value, spk)
+
+    def make_taproot_utxo(self, value):
+        """Fund a key-path-only taproot output we control."""
+        internal_key = compute_xonly_pubkey(self.privkey.get_bytes())[0]
+        info = taproot_construct(internal_key)
+        funding = self.wallet.send_to(from_node=self.nodes[0], scriptPubKey=info.scriptPubKey, amount=value)
+        return COutPoint(int(funding["txid"], 16), funding["sent_vout"]), CTxOut(value, info.scriptPubKey), info
+
+    def make_tapscript_utxo(self, value):
+        """Fund a script-path-only taproot output: <our pubkey> OP_CHECKSIG in a leaf."""
+        internal_key = compute_xonly_pubkey(self.privkey.get_bytes())[0]
+        leaf = CScript([internal_key, OP_CHECKSIG])
+        info = taproot_construct(internal_key, [("only", leaf)])
+        funding = self.wallet.send_to(from_node=self.nodes[0], scriptPubKey=info.scriptPubKey, amount=value)
+        return COutPoint(int(funding["txid"], 16), funding["sent_vout"]), CTxOut(value, info.scriptPubKey), info
+
+    def sign_tapscript(self, tx, spent_utxos, info, hash_type, index=0):
+        """Sign a script-path spend against the independent implementation."""
+        leaf = info.leaves["only"]
+        msg = UnifiedSignatureHash(None, tx, index, hash_type, spent_utxos, False,
+                              script_type=UNIFIED_SCRIPT_TYPE_TAPSCRIPT, leaf_script=leaf.script,
+                              leaf_ver=leaf.version)
+        assert msg is not None, f"hash type {hash_type:#x} rejected by the spec implementation"
+        sig = sign_schnorr(self.privkey.get_bytes(), msg) + bytes([hash_type])
+        control = bytes([leaf.version + info.negflag]) + info.internal_pubkey + leaf.merklebranch
+        tx.wit.vtxinwit[index].scriptWitness.stack = [sig, leaf.script, control]
+
+    def build_taproot_spend(self, outpoint, utxo):
+        tx = CTransaction()
+        tx.version = 2
+        tx.vin.append(CTxIn(outpoint, b"", 0xfffffffe))
+        tx.vout.append(CTxOut(utxo.nValue - 5000, self.sink_spk))
+        tx.wit.vtxinwit.append(CTxInWitness())
+        return tx
+
+    def sign_taproot_keypath(self, tx, spent_utxos, info, hash_type, index=0):
+        """Sign a key-path spend, opting in when the bit is set.
+
+        Opting in means the same algorithm every other script type uses, not
+        BIP341's, so this routes to the independent implementation of it."""
+        if hash_type & SIGHASH_UNIFIED:
+            msg = UnifiedSignatureHash(None, tx, index, hash_type, spent_utxos, False,
+                                  script_type=UNIFIED_SCRIPT_TYPE_TAPROOT)
+            assert msg is not None, f"hash type {hash_type:#x} rejected by the spec implementation"
+        else:
+            msg = TaprootSignatureHash(tx, spent_utxos, hash_type, input_index=index)
+        sig = sign_schnorr(tweak_add_privkey(self.privkey.get_bytes(), info.tweak), msg)
+        if hash_type:
+            sig += bytes([hash_type])
+        tx.wit.vtxinwit[index].scriptWitness.stack = [sig]
 
     def build_spend(self, outpoints, spent_utxos, n_outputs=1):
         tx = CTransaction()
@@ -222,6 +281,16 @@ class UnifiedSighashTest(BitcoinTestFramework):
         assert_equal(node.getblockcount(), early_height - 1)
         node.disconnect_p2ps()
         self.log.info("  a pre-activation block carrying one is rejected at consensus")
+
+        # Taproot opts in through the same bit. Kept until after activation so
+        # both sides of the boundary are exercised on one output.
+        self.op_tr, self.utxo_tr, self.info_tr = self.make_taproot_utxo(4 * COIN)
+        self.mine(1)
+        tr_tx = self.build_taproot_spend(self.op_tr, self.utxo_tr)
+        self.sign_taproot_keypath(tr_tx, [self.utxo_tr], self.info_tr, SIGHASH_ALL | SIGHASH_UNIFIED)
+        reason = self.submit(tr_tx)
+        assert reason is not None, "taproot opt-in must not be usable before activation"
+        self.log.info(f"  pre-activation rejection of opt-in taproot signature: {reason}")
 
         # Reserved for the reorg-eviction test far below: it must stay confirmed
         # across a rollback, or the spend is dropped for missing inputs and the
@@ -422,6 +491,59 @@ class UnifiedSighashTest(BitcoinTestFramework):
             bad_tx.rehash()
             assert self.submit(bad_tx) is not None, f"hashtype {bad_hashtype:#x} must be rejected"
 
+        self.log.info("Taproot opts in through the same algorithm as every other type")
+        # The same output that was refused before activation is now spendable
+        # with the identical signature, so the boundary is what changed.
+        # Fund the other two cases first, so one block confirms all of them and
+        # nothing is mined out from under a later assertion.
+        op_d, utxo_d, info_d = self.make_taproot_utxo(2 * COIN)
+        op_b, utxo_b_tr, info_b = self.make_taproot_utxo(2 * COIN)
+        self.mine(1)
+
+        tr_tx = self.build_taproot_spend(self.op_tr, self.utxo_tr)
+        self.sign_taproot_keypath(tr_tx, [self.utxo_tr], self.info_tr, SIGHASH_ALL | SIGHASH_UNIFIED)
+        assert_equal(self.submit(tr_tx), None)
+        assert_equal(len(tr_tx.wit.vtxinwit[0].scriptWitness.stack[0]), 65)
+
+        # Existing taproot spends are untouched: SIGHASH_DEFAULT still produces
+        # a bare 64-byte signature and still validates.
+        default_tx = self.build_taproot_spend(op_d, utxo_d)
+        self.sign_taproot_keypath(default_tx, [utxo_d], info_d, 0)
+        assert_equal(len(default_tx.wit.vtxinwit[0].scriptWitness.stack[0]), 64)
+        assert_equal(self.submit(default_tx), None)
+
+        # A byte carrying only the opt-in bit is not a second spelling of
+        # SIGHASH_DEFAULT; it is undefined and stays that way. It cannot even be
+        # signed for, so the test signs a valid one and rewrites the byte, which
+        # also shows the byte cannot be tampered with after the fact.
+        bare_tx = self.build_taproot_spend(op_b, utxo_b_tr)
+        self.sign_taproot_keypath(bare_tx, [utxo_b_tr], info_b, SIGHASH_ALL | SIGHASH_UNIFIED)
+        tampered = bare_tx.wit.vtxinwit[0].scriptWitness.stack[0][:-1] + bytes([SIGHASH_UNIFIED])
+        bare_tx.wit.vtxinwit[0].scriptWitness.stack = [tampered]
+        reason = self.submit(bare_tx)
+        assert reason is not None, "a bare opt-in byte must not be accepted"
+
+        # Tapscript through the independent implementation too, since the script
+        # path commits to the leaf hash and codeseparator position that the key
+        # path does not, and nothing else here would catch getting those wrong.
+        op_ts, utxo_ts, info_ts = self.make_tapscript_utxo(2 * COIN)
+        self.mine(1)
+        ts_spend = self.build_taproot_spend(op_ts, utxo_ts)
+        self.sign_tapscript(ts_spend, [utxo_ts], info_ts, SIGHASH_ALL | SIGHASH_UNIFIED)
+        assert_equal(self.submit(ts_spend), None)
+        self.nodes[0].sendrawtransaction(ts_spend.serialize().hex())
+        self.log.info("  tapscript signed from the spec alone was accepted")
+
+        # Relay them for real rather than only testing acceptance, so the path
+        # from the wire through the mempool into a block is what gets checked.
+        self.nodes[0].sendrawtransaction(tr_tx.serialize().hex())
+        self.nodes[0].sendrawtransaction(default_tx.serialize().hex())
+        blockhash = self.mine(1)[0]
+        mined = self.nodes[0].getblock(blockhash)["tx"]
+        assert tr_tx.rehash() in mined and default_tx.rehash() in mined
+        self.log.info("  opt-in and SIGHASH_DEFAULT taproot spends both mined; "
+                      f"bare opt-in byte rejected: {reason}")
+
         self.log.info("Segwit v0: P2WPKH follows the same rules")
         wpkh_spk = key_to_p2wpkh_script(self.pubkey)
         # BIP143 keeps the implicit P2PKH script as the scriptCode for P2WPKH.
@@ -603,6 +725,46 @@ class UnifiedSighashTest(BitcoinTestFramework):
         blockhash = self.mine(1)[0]
         assert bumped["txid"] in node.getblock(blockhash)["tx"]
         self.log.info("  bumpfee re-signed with the fork's rules and was mined")
+
+        self.log.info("All four script types opted in, in one transaction")
+        # The realistic shape after activation, and the one place the four
+        # message formats share a single PrecomputedTransactionData. Each input
+        # commits to every other input's amount and script, so all four
+        # signatures depend on the same aggregates while producing four
+        # different messages.
+        op_l4, utxo_l4 = self.make_p2pk_utxo(3 * COIN)
+        wit_spk = key_to_p2wpkh_script(self.pubkey)
+        op_w4, utxo_w4 = self.make_utxo(3 * COIN, wit_spk)
+        op_t4, utxo_t4, info_t4 = self.make_taproot_utxo(3 * COIN)
+        op_s4, utxo_s4, info_s4 = self.make_tapscript_utxo(3 * COIN)
+        self.mine(1)
+
+        spent4 = [utxo_l4, utxo_w4, utxo_t4, utxo_s4]
+        mixed = CTransaction()
+        mixed.version = 2
+        for op in (op_l4, op_w4, op_t4, op_s4):
+            mixed.vin.append(CTxIn(op, b"", 0xfffffffe))
+        mixed.vout.append(CTxOut(sum(u.nValue for u in spent4) - 5000, self.sink_spk))
+        for _ in range(4):
+            mixed.wit.vtxinwit.append(CTxInWitness())
+        # The signers prepend to what is already there, so the key each input
+        # needs has to be in place first: in the scriptSig for the bare input,
+        # on the witness stack for the segwit v0 one.
+        mixed.vin[0].scriptSig = bytes(CScript([self.pubkey]))
+        mixed.wit.vtxinwit[1].scriptWitness.stack = [self.pubkey]
+
+        sign_input_unified(mixed, 0, utxo_l4.scriptPubKey, self.privkey, spent4)
+        # BIP143 keeps the implicit P2PKH script as the scriptCode for P2WPKH.
+        sign_input_unified(mixed, 1, key_to_p2pkh_script(self.pubkey), self.privkey, spent4, witness=True)
+        self.sign_taproot_keypath(mixed, spent4, info_t4, SIGHASH_ALL | SIGHASH_UNIFIED, index=2)
+        self.sign_tapscript(mixed, spent4, info_s4, SIGHASH_ALL | SIGHASH_UNIFIED, index=3)
+
+        reason = self.submit(mixed)
+        assert reason is None, f"four-type transaction rejected: {reason}"
+        self.nodes[0].sendrawtransaction(mixed.serialize().hex())
+        blockhash = self.mine(1)[0]
+        assert mixed.rehash() in node.getblock(blockhash)["tx"]
+        self.log.info("  legacy, segwit v0, taproot and tapscript signed and mined together")
 
         self.log.info("Every address type the wallet makes still spends after the fork")
         # Taproot included: an opted-in spend uses the same signature hash as
@@ -844,6 +1006,31 @@ class UnifiedSighashTest(BitcoinTestFramework):
         assert accepted["allowed"], accepted
         node.sendrawtransaction(processed["hex"])
         self.log.info("  descriptorprocesspsbt produced a valid fork signature")
+
+        self.log.info("A tapscript spend signed through the wallet's satisfier")
+        # Script path rather than key path: the internal key is a NUMS point
+        # nobody holds, so the only way to spend is through the leaf, which
+        # reaches the signature creator by a different route than a key path
+        # spend does.
+        ts_desc = descsum_create(f"tr({NUMS_INTERNAL_KEY},pk({self.privkey_wif}))")
+        ts_spk = address_to_scriptpubkey(node.deriveaddresses(ts_desc)[0])
+        ts_funding = self.wallet.send_to(from_node=node, scriptPubKey=ts_spk, amount=3 * COIN)
+        self.mine(1)
+        ts_tx = CTransaction()
+        ts_tx.version = 2
+        ts_tx.vin.append(CTxIn(COutPoint(int(ts_funding["txid"], 16), ts_funding["sent_vout"]), b"", 0xfffffffe))
+        ts_tx.vout.append(CTxOut(3 * COIN - 5000, self.sink_spk))
+        ts_psbt = node.utxoupdatepsbt(node.converttopsbt(ts_tx.serialize().hex()))
+        ts_processed = node.descriptorprocesspsbt(ts_psbt, [ts_desc], "ALL", True, True)
+        assert ts_processed["complete"], ts_processed
+        ts_final = tx_from_hex(ts_processed["hex"])
+        ts_stack = ts_final.wit.vtxinwit[0].scriptWitness.stack
+        # Signature, leaf script, control block.
+        assert_equal(len(ts_stack), 3)
+        assert_equal(len(ts_stack[0]), 65)
+        assert_equal(ts_stack[0][-1], SIGHASH_ALL | SIGHASH_UNIFIED)
+        node.sendrawtransaction(ts_processed["hex"])
+        self.log.info("  the script path opted in through miniscript satisfaction")
 
         self.log.info("Reorg back across the activation height")
         # A fork-signed transaction mined above the activation height, then the
