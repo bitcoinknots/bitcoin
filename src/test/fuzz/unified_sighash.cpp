@@ -43,13 +43,28 @@ FUZZ_TARGET(unified_sighash)
 
     const unsigned int in_pos{provider.ConsumeIntegralInRange<unsigned int>(0, tx.vin.size() - 1)};
     const int32_t hash_type{provider.ConsumeIntegral<int32_t>()};
-    const SigVersion sigversion{provider.ConsumeBool() ? SigVersion::BASE : SigVersion::WITNESS_V0};
+    static constexpr SigVersion ALL_VERSIONS[]{SigVersion::BASE, SigVersion::WITNESS_V0,
+                                               SigVersion::TAPROOT, SigVersion::TAPSCRIPT};
+    const SigVersion sigversion{ALL_VERSIONS[provider.ConsumeIntegralInRange<size_t>(0, 3)]};
+    const bool taproot{sigversion == SigVersion::TAPROOT || sigversion == SigVersion::TAPSCRIPT};
     const CScript script_code{ConsumeScript(provider)};
+
+    // Taproot draws its extra context from the interpreter rather than the
+    // transaction, so the fuzzer supplies it the same way.
+    ScriptExecutionData execdata;
+    execdata.m_annex_init = true;
+    execdata.m_annex_present = provider.ConsumeBool();
+    if (execdata.m_annex_present) execdata.m_annex_hash = ConsumeUInt256(provider);
+    execdata.m_tapleaf_hash_init = true;
+    execdata.m_tapleaf_hash = ConsumeUInt256(provider);
+    execdata.m_codeseparator_pos_init = true;
+    execdata.m_codeseparator_pos = provider.ConsumeIntegral<uint32_t>();
+    const ScriptExecutionData* const ed{taproot ? &execdata : nullptr};
 
     const PrecomputedTransactionData txdata{MakeTxdata(tx, spent)};
 
     uint256 hash;
-    const bool ok{SignatureHashUnified(hash, script_code, tx, in_pos, hash_type, sigversion, txdata)};
+    const bool ok{SignatureHashUnified(hash, script_code, tx, in_pos, hash_type, sigversion, txdata, ed)};
 
     // Only canonical hash types may be accepted.
     const int32_t output_type{hash_type & 0x1f};
@@ -71,26 +86,66 @@ FUZZ_TARGET(unified_sighash)
     // Deterministic, and independent of which PrecomputedTransactionData object
     // carries the data.
     uint256 again;
-    Assert(SignatureHashUnified(again, script_code, tx, in_pos, hash_type, sigversion, txdata));
+    Assert(SignatureHashUnified(again, script_code, tx, in_pos, hash_type, sigversion, txdata, ed));
     Assert(again == hash);
     const PrecomputedTransactionData fresh{MakeTxdata(tx, spent)};
     uint256 from_fresh;
-    Assert(SignatureHashUnified(from_fresh, script_code, tx, in_pos, hash_type, sigversion, fresh));
+    Assert(SignatureHashUnified(from_fresh, script_code, tx, in_pos, hash_type, sigversion, fresh, ed));
     Assert(from_fresh == hash);
 
-    // The two script types never share a message, so a signature made for one
-    // can never be replayed as the other.
-    const SigVersion other{sigversion == SigVersion::BASE ? SigVersion::WITNESS_V0 : SigVersion::BASE};
-    uint256 other_hash;
-    Assert(SignatureHashUnified(other_hash, script_code, tx, in_pos, hash_type, other, txdata));
-    Assert(other_hash != hash);
+    // No two script types ever share a message, so a signature made for one can
+    // never be replayed as another.
+    for (const SigVersion other : ALL_VERSIONS) {
+        if (other == sigversion) continue;
+        const bool other_taproot{other == SigVersion::TAPROOT || other == SigVersion::TAPSCRIPT};
+        uint256 other_hash;
+        Assert(SignatureHashUnified(other_hash, script_code, tx, in_pos, hash_type, other, txdata,
+                               other_taproot ? &execdata : nullptr));
+        Assert(other_hash != hash);
+    }
 
-    // The scriptCode is committed to.
-    CScript altered{script_code};
-    altered << OP_NOP;
-    uint256 altered_hash;
-    Assert(SignatureHashUnified(altered_hash, altered, tx, in_pos, hash_type, sigversion, txdata));
-    Assert(altered_hash != hash);
+    if (taproot) {
+        // Each piece of the taproot tail is committed to, so none of it can be
+        // changed in flight. The leaf hash and codeseparator position only
+        // enter the message for tapscript.
+        ScriptExecutionData flipped{execdata};
+        flipped.m_annex_present = !execdata.m_annex_present;
+        if (flipped.m_annex_present) flipped.m_annex_hash = execdata.m_tapleaf_hash;
+        uint256 flipped_hash;
+        Assert(SignatureHashUnified(flipped_hash, script_code, tx, in_pos, hash_type, sigversion, txdata, &flipped));
+        Assert(flipped_hash != hash);
+
+        if (sigversion == SigVersion::TAPSCRIPT) {
+            ScriptExecutionData other_leaf{execdata};
+            std::vector<unsigned char> leaf_bytes{execdata.m_tapleaf_hash.begin(), execdata.m_tapleaf_hash.end()};
+            leaf_bytes[0] ^= 0xff;
+            other_leaf.m_tapleaf_hash = uint256{leaf_bytes};
+            uint256 leaf_hash;
+            Assert(SignatureHashUnified(leaf_hash, script_code, tx, in_pos, hash_type, sigversion, txdata, &other_leaf));
+            Assert(leaf_hash != hash);
+
+            ScriptExecutionData other_cs{execdata};
+            other_cs.m_codeseparator_pos = ~execdata.m_codeseparator_pos;
+            uint256 cs_hash;
+            Assert(SignatureHashUnified(cs_hash, script_code, tx, in_pos, hash_type, sigversion, txdata, &other_cs));
+            Assert(cs_hash != hash);
+        }
+
+        // Missing context is refused rather than treated as absent.
+        ScriptExecutionData uninitialised;
+        uint256 unused;
+        Assert(!SignatureHashUnified(unused, script_code, tx, in_pos, hash_type, sigversion, txdata, &uninitialised));
+        Assert(!SignatureHashUnified(unused, script_code, tx, in_pos, hash_type, sigversion, txdata, nullptr));
+    }
+
+    // The scriptCode is committed to, for the types whose message carries it.
+    if (!taproot) {
+        CScript altered{script_code};
+        altered << OP_NOP;
+        uint256 altered_hash;
+        Assert(SignatureHashUnified(altered_hash, altered, tx, in_pos, hash_type, sigversion, txdata));
+        Assert(altered_hash != hash);
+    }
 
     // This input's own value is committed to, always, including under
     // ANYONECANPAY where the aggregate commitments are absent.
@@ -98,7 +153,7 @@ FUZZ_TARGET(unified_sighash)
         std::vector<CTxOut> bumped{spent};
         bumped[in_pos].nValue += 1;
         uint256 bumped_hash;
-        Assert(SignatureHashUnified(bumped_hash, script_code, tx, in_pos, hash_type, sigversion, MakeTxdata(tx, bumped)));
+        Assert(SignatureHashUnified(bumped_hash, script_code, tx, in_pos, hash_type, sigversion, MakeTxdata(tx, bumped), ed));
         Assert(bumped_hash != hash);
     }
 
@@ -109,7 +164,7 @@ FUZZ_TARGET(unified_sighash)
             std::vector<CTxOut> bumped{spent};
             bumped[other_pos].nValue += 1;
             uint256 bumped_hash;
-            Assert(SignatureHashUnified(bumped_hash, script_code, tx, in_pos, hash_type, sigversion, MakeTxdata(tx, bumped)));
+            Assert(SignatureHashUnified(bumped_hash, script_code, tx, in_pos, hash_type, sigversion, MakeTxdata(tx, bumped), ed));
             if (hash_type & SIGHASH_ANYONECANPAY) {
                 Assert(bumped_hash == hash);
             } else {
