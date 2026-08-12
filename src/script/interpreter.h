@@ -293,14 +293,6 @@ extern const HashWriter HASHER_TAPLEAF;    //!< Hasher with tag "TapLeaf" pre-fe
 extern const HashWriter HASHER_TAPBRANCH;  //!< Hasher with tag "TapBranch" pre-fed to it.
 extern const HashWriter HASHER_UNIFIED_SIGHASH; //!< Hasher for the hardfork BASE/WITNESS_V0 sighash.
 
-/** Compute the hardfork signature hash for a BASE or WITNESS_V0 input.
- *
- * Returns false if the required transaction data is not precomputed, or for a
- * SIGHASH_SINGLE input with no matching output. Callers must treat false as
- * "signature invalid" rather than substituting a placeholder hash. */
-template <class T>
-bool SignatureHashUnified(uint256& hash_out, const CScript& scriptCode, const T& txTo, unsigned int nIn, int32_t nHashType, SigVersion sigversion, const PrecomputedTransactionData& cache);
-
 /** Data structure to cache SHA256 midstates for the ECDSA sighash calculations
  *  (bare, P2SH, P2WPKH, P2WSH). */
 class SigHashCache
@@ -334,7 +326,7 @@ public:
         return false;
     }
 
-    virtual bool CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror = nullptr) const
+    virtual bool CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror = nullptr, SighashRules sighash_rules = SighashRules::LEGACY) const
     {
         return false;
     }
@@ -361,6 +353,20 @@ enum class MissingDataBehavior
     FAIL,         //!< Just act as if the signature was invalid
 };
 
+/** Compute the hardfork signature hash for any script type.
+ *
+ * scriptCode is used by BASE and WITNESS_V0 only; TAPROOT and TAPSCRIPT take
+ * their tail from execdata, which those two require.
+ *
+ * Returns false for a SIGHASH_SINGLE input with no matching output, and for a
+ * hash type that did not opt in or is not canonical. Data the caller was
+ * required to supply and did not goes through mdb, so a consensus caller
+ * surfaces the bug rather than treating a valid signature as invalid. Callers
+ * must treat false as "signature invalid" rather than substituting a
+ * placeholder hash. */
+template <class T>
+bool SignatureHashUnified(uint256& hash_out, const CScript& scriptCode, const T& txTo, unsigned int nIn, int32_t nHashType, SigVersion sigversion, const PrecomputedTransactionData& cache, const ScriptExecutionData* execdata = nullptr, MissingDataBehavior mdb = MissingDataBehavior::FAIL);
+
 template<typename T>
 bool SignatureHashSchnorr(uint256& hash_out, ScriptExecutionData& execdata, const T& tx_to, uint32_t in_pos, uint8_t hash_type, SigVersion sigversion, const PrecomputedTransactionData& cache, MissingDataBehavior mdb);
 
@@ -383,7 +389,7 @@ public:
     GenericTransactionSignatureChecker(const T* txToIn, unsigned int nInIn, const CAmount& amountIn, MissingDataBehavior mdb) : txTo(txToIn), m_mdb(mdb), nIn(nInIn), amount(amountIn), txdata(nullptr) {}
     GenericTransactionSignatureChecker(const T* txToIn, unsigned int nInIn, const CAmount& amountIn, const PrecomputedTransactionData& txdataIn, MissingDataBehavior mdb) : txTo(txToIn), m_mdb(mdb), nIn(nInIn), amount(amountIn), txdata(&txdataIn) {}
     bool CheckECDSASignature(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion, SighashRules sighash_rules = SighashRules::LEGACY) const override;
-    bool CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror = nullptr) const override;
+    bool CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror = nullptr, SighashRules sighash_rules = SighashRules::LEGACY) const override;
     bool CheckLockTime(const CScriptNum& nLockTime) const override;
     bool CheckSequence(const CScriptNum& nSequence) const override;
 
@@ -406,9 +412,9 @@ public:
         return m_checker.CheckECDSASignature(scriptSig, vchPubKey, scriptCode, sigversion, sighash_rules);
     }
 
-    bool CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror = nullptr) const override
+    bool CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror = nullptr, SighashRules sighash_rules = SighashRules::LEGACY) const override
     {
-        return m_checker.CheckSchnorrSignature(sig, pubkey, sigversion, execdata, serror);
+        return m_checker.CheckSchnorrSignature(sig, pubkey, sigversion, execdata, serror, sighash_rules);
     }
 
     bool CheckLockTime(const CScriptNum& nLockTime) const override

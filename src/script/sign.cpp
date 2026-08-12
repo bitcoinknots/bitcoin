@@ -94,12 +94,26 @@ bool MutableTransactionSignatureCreator::CreateSchnorrSig(const SigningProvider&
         execdata.m_tapleaf_hash_init = true;
         execdata.m_tapleaf_hash = *leaf_hash;
     }
+    // Opting in is the same bit as for the other sighash versions. BIP341
+    // already commits the hash type byte, so the bit alone separates the
+    // message; SIGHASH_DEFAULT cannot carry it because it appends no byte, so
+    // signing for this chain uses the explicit type that means the same thing.
+    int hashtype{nHashType};
+    if (m_sighash_rules == SighashRules::UNIFIED) {
+        if ((hashtype & ~SIGHASH_UNIFIED) == SIGHASH_DEFAULT) hashtype = SIGHASH_ALL;
+        hashtype |= SIGHASH_UNIFIED;
+    }
+
     uint256 hash;
-    if (!SignatureHashSchnorr(hash, execdata, m_txto, nIn, nHashType, sigversion, *m_txdata, MissingDataBehavior::FAIL)) return false;
+    if (m_sighash_rules == SighashRules::UNIFIED) {
+        if (!SignatureHashUnified(hash, CScript{}, m_txto, nIn, hashtype, sigversion, *m_txdata, &execdata)) return false;
+    } else if (!SignatureHashSchnorr(hash, execdata, m_txto, nIn, hashtype, sigversion, *m_txdata, MissingDataBehavior::FAIL)) {
+        return false;
+    }
     sig.resize(64);
     // Use uint256{} as aux_rnd for now.
     if (!key.SignSchnorr(hash, sig, merkle_root, {})) return false;
-    if (nHashType) sig.push_back(nHashType);
+    if (hashtype) sig.push_back(hashtype);
     return true;
 }
 
@@ -719,7 +733,7 @@ class DummySignatureChecker final : public BaseSignatureChecker
 public:
     DummySignatureChecker() = default;
     bool CheckECDSASignature(const std::vector<unsigned char>& sig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion, SighashRules sighash_rules = SighashRules::LEGACY) const override { return sig.size() != 0; }
-    bool CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror) const override { return sig.size() != 0; }
+    bool CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror, SighashRules sighash_rules = SighashRules::LEGACY) const override { return sig.size() != 0; }
     bool CheckLockTime(const CScriptNum& nLockTime) const override { return true; }
     bool CheckSequence(const CScriptNum& nSequence) const override { return true; }
 };
