@@ -206,7 +206,7 @@ QString PSBTOperationsDialog::renderTransaction(const PartiallySignedTransaction
         tx_description.append("<br>");
     }
 
-    PSBTAnalysis analysis = AnalyzePSBT(psbtx);
+    PSBTAnalysis analysis = AnalyzePSBT(psbtx, SighashRulesForWallet(m_wallet_model));
     tx_description.append(bullet_point);
     if (!*analysis.fee) {
         // This happens if the transaction is missing input UTXO information.
@@ -277,7 +277,7 @@ size_t PSBTOperationsDialog::couldSignInputs(const PartiallySignedTransaction &p
 }
 
 void PSBTOperationsDialog::showTransactionStatus(const PartiallySignedTransaction &psbtx) {
-    PSBTAnalysis analysis = AnalyzePSBT(psbtx);
+    PSBTAnalysis analysis = AnalyzePSBT(psbtx, SighashRulesForWallet(m_wallet_model));
     size_t n_could_sign = couldSignInputs(psbtx);
 
     switch (analysis.next) {

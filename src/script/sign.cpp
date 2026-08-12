@@ -746,8 +746,11 @@ class DummySignatureCreator final : public BaseSignatureCreator {
 private:
     char m_r_len = 32;
     char m_s_len = 32;
+    SighashRules m_sighash_rules{SighashRules::LEGACY};
 public:
-    DummySignatureCreator(char r_len, char s_len) : m_r_len(r_len), m_s_len(s_len) {}
+    DummySignatureCreator(char r_len, char s_len, SighashRules sighash_rules = SighashRules::LEGACY)
+        : m_r_len(r_len), m_s_len(s_len), m_sighash_rules(sighash_rules) {}
+    SighashRules GetSighashRules() const override { return m_sighash_rules; }
     const BaseSignatureChecker& Checker() const override { return DUMMY_CHECKER; }
     bool CreateSig(const SigningProvider& provider, std::vector<unsigned char>& vchSig, const CKeyID& keyid, const CScript& scriptCode, SigVersion sigversion) const override
     {
@@ -767,6 +770,10 @@ public:
     bool CreateSchnorrSig(const SigningProvider& provider, std::vector<unsigned char>& sig, const XOnlyPubKey& pubkey, const uint256* leaf_hash, const uint256* tweak, SigVersion sigversion) const override
     {
         sig.assign(64, '\000');
+        // An opted-in taproot signature cannot use SIGHASH_DEFAULT, so it carries
+        // an explicit hash type byte and is 65 bytes. Sizing it at 64 here
+        // underestimates the fee by a byte for every such input.
+        if (m_sighash_rules == SighashRules::UNIFIED) sig.push_back(SIGHASH_ALL | SIGHASH_UNIFIED);
         return true;
     }
 };
@@ -775,6 +782,7 @@ public:
 
 const BaseSignatureCreator& DUMMY_SIGNATURE_CREATOR = DummySignatureCreator(32, 32);
 const BaseSignatureCreator& DUMMY_MAXIMUM_SIGNATURE_CREATOR = DummySignatureCreator(33, 32);
+const BaseSignatureCreator& DUMMY_UNIFIED_SIGNATURE_CREATOR = DummySignatureCreator(32, 32, SighashRules::UNIFIED);
 
 bool IsSegWitOutput(const SigningProvider& provider, const CScript& script)
 {
