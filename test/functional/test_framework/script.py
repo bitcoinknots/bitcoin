@@ -700,12 +700,24 @@ def sign_input_legacy(tx, input_index, input_scriptpubkey, privkey, sighash_type
     tx.vin[input_index].scriptSig = bytes(CScript([der_sig + bytes([sighash_type])])) + tx.vin[input_index].scriptSig
     tx.rehash()
 
-def UnifiedSignatureHash(script_code, txTo, inIdx, hashtype, spent_utxos, sigversion_witness):
-    """Independent implementation of the hardfork sighash for BASE/WITNESS_V0.
+# Script types, domain-separating the signature hash.
+UNIFIED_SCRIPT_TYPE_BASE = 0
+UNIFIED_SCRIPT_TYPE_WITNESS_V0 = 1
+UNIFIED_SCRIPT_TYPE_TAPROOT = 2
+UNIFIED_SCRIPT_TYPE_TAPSCRIPT = 3
+
+
+def UnifiedSignatureHash(script_code, txTo, inIdx, hashtype, spent_utxos, sigversion_witness,
+                    script_type=None, annex=None, leaf_script=None,
+                    leaf_ver=LEAF_VERSION_TAPSCRIPT, codeseparator_pos=-1):
+    """Independent implementation of the hardfork sighash, all script types.
 
     Deliberately written from the specification rather than by mirroring the
     C++, so that agreement between the two is evidence rather than tautology.
     Returns None for the cases the rules reject.
+
+    script_type defaults to the BASE/WITNESS_V0 choice implied by
+    sigversion_witness; pass it explicitly for taproot and tapscript.
     """
     assert inIdx < len(txTo.vin)
     assert len(spent_utxos) == len(txTo.vin)
@@ -720,7 +732,11 @@ def UnifiedSignatureHash(script_code, txTo, inIdx, hashtype, spent_utxos, sigver
         return None
     anyonecanpay = bool(hashtype & SIGHASH_ANYONECANPAY)
 
-    ss = bytes([1 if sigversion_witness else 0])
+    if script_type is None:
+        script_type = UNIFIED_SCRIPT_TYPE_WITNESS_V0 if sigversion_witness else UNIFIED_SCRIPT_TYPE_BASE
+    taproot = script_type in (UNIFIED_SCRIPT_TYPE_TAPROOT, UNIFIED_SCRIPT_TYPE_TAPSCRIPT)
+
+    ss = bytes([script_type])
     ss += struct.pack("<i", hashtype)
     ss += struct.pack("<i", txTo.version)
     ss += struct.pack("<I", txTo.nLockTime)
@@ -744,7 +760,18 @@ def UnifiedSignatureHash(script_code, txTo, inIdx, hashtype, spent_utxos, sigver
         ss += struct.pack("<I", txTo.vin[inIdx].nSequence)
     else:
         ss += struct.pack("<I", inIdx)
-    ss += ser_string(script_code)
+
+    # The tail: what each script type needs beyond the shared body.
+    if not taproot:
+        ss += ser_string(script_code)
+    else:
+        ss += bytes([1 if annex is not None else 0])
+        if annex is not None:
+            ss += sha256(ser_string(annex))
+        if script_type == UNIFIED_SCRIPT_TYPE_TAPSCRIPT:
+            ss += TaggedHash("TapLeaf", bytes([leaf_ver]) + ser_string(leaf_script))
+            ss += bytes([0])  # key version
+            ss += struct.pack("<i", codeseparator_pos)
 
     return TaggedHash("UnifiedSighash", ss)
 
