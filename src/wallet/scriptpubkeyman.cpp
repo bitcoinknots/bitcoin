@@ -271,7 +271,8 @@ SigningResult ScriptPubKeyMan::SignMessageBIP322(MessageSignatureFormat format, 
     // produce a signature this node's own verifier rejects, and would not be
     // recognised by other implementations either.
     std::map<int, bilingual_str> errors;
-    if (!::SignTransaction(to_sign, keystore, coins, SIGHASH_ALL, errors)) {
+    if (!::SignTransaction(to_sign, keystore, coins, SIGHASH_ALL, errors,
+                           /*inputs_amount_sum=*/nullptr, /*sighash_rules=*/SighashRules::LEGACY)) {
         // TODO: this may be a multisig which successfully signed but needed additional signatures
         return SigningResult::SIGNING_FAILED;
     }
