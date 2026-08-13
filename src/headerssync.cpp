@@ -287,7 +287,7 @@ std::vector<CBlockHeader> HeadersSyncState::PopHeadersReadyForAcceptance()
 
     while (m_redownloaded_headers.size() > REDOWNLOAD_BUFFER_SIZE ||
             (m_redownloaded_headers.size() > 0 && m_process_all_remaining_headers)) {
-        ret.emplace_back(m_redownloaded_headers.front().GetFullHeader(m_redownload_buffer_first_prev_hash));
+        ret.emplace_back(CBlockHeader(m_redownloaded_headers.front(), m_redownload_buffer_first_prev_hash));
         m_redownloaded_headers.pop_front();
         m_redownload_buffer_first_prev_hash = ret.back().GetHash();
     }

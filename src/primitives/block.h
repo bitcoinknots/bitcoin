@@ -11,6 +11,25 @@
 #include <uint256.h>
 #include <util/time.h>
 
+#include <concepts>
+#include <type_traits>
+#include <utility>
+
+// A compressed CBlockHeader, which leaves out the prevhash
+struct CompressedHeader {
+    // header
+    int32_t nVersion{0};
+    uint256 hashMerkleRoot;
+    uint32_t nTime{0};
+    uint32_t nBits{0};
+    uint32_t nNonce{0};
+
+    CompressedHeader()
+    {
+        hashMerkleRoot.SetNull();
+    }
+};
+
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
  * requirements.  When they solve the proof-of-work, they broadcast the block
@@ -18,20 +37,22 @@
  * in the block is a special one that creates a new coin owned by the creator
  * of the block.
  */
-class CBlockHeader
+class CBlockHeader : public CompressedHeader
 {
 public:
     // header
-    int32_t nVersion;
     uint256 hashPrevBlock;
-    uint256 hashMerkleRoot;
-    uint32_t nTime;
-    uint32_t nBits;
-    uint32_t nNonce;
 
     CBlockHeader()
     {
         SetNull();
+    }
+
+    template <typename T> requires std::same_as<std::remove_cvref_t<T>, CompressedHeader>
+    CBlockHeader(T&& compressed_header, const uint256& hash_prev_block)
+    : CompressedHeader(std::forward<T>(compressed_header)),
+      hashPrevBlock(hash_prev_block)
+    {
     }
 
     SERIALIZE_METHODS(CBlockHeader, obj) { READWRITE(obj.nVersion, obj.hashPrevBlock, obj.hashMerkleRoot, obj.nTime, obj.nBits, obj.nNonce); }
