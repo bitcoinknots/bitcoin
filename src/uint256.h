@@ -182,6 +182,9 @@ std::optional<uintN_t> FromUserHex(std::string_view input)
 }
 } // namespace detail
 
+class uint128 : public base_blob<128> {
+};
+
 /** 160-bit opaque blob.
  * @note This type is called uint160 for historical reasons only. It is an opaque
  * blob of 160 bits and has no integer operations.
