@@ -164,6 +164,7 @@ std::shared_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     assert(pindexPrev != nullptr);
     nHeight = pindexPrev->nHeight + 1;
 
+    pblock->m_header_v2 = chainparams.GetConsensus().IsBlake2bHeight(nHeight);
     pblock->nVersion = m_chainstate.m_chainman.m_versionbitscache.ComputeBlockVersion(pindexPrev, chainparams.GetConsensus());
     // -regtest only: allow overriding block.nVersion with
     // -blockversion=N to test forking scenarios

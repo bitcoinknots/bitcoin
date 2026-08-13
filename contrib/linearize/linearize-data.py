@@ -21,8 +21,61 @@ from collections import namedtuple
 settings = {}
 
 def calc_hash_str(blk_hdr):
-    blk_hdr_hash = hashlib.sha256(hashlib.sha256(blk_hdr).digest()).digest()
-    return blk_hdr_hash[::-1].hex()
+    version = struct.unpack("<I", blk_hdr[:4])[0]
+    if not version & 0x80000000:
+        blk_hdr_hash = hashlib.sha256(hashlib.sha256(blk_hdr).digest()).digest()
+        return blk_hdr_hash[::-1].hex()
+
+    def tagged_hash(tag, data):
+        tag_hash = hashlib.sha256(tag.encode()).digest()
+        return hashlib.sha256(tag_hash + tag_hash + data).digest()
+
+    def blake2b(data):
+        return hashlib.blake2b(data, digest_size=32).digest()
+
+    reserved1 = blk_hdr[108:110]
+    reserved = blk_hdr[110:111]
+    xor_key = blk_hdr[112:128]
+    xor_key_hash = tagged_hash("Bitcoin block hash PoW XOR key", xor_key)
+    xor_key_mask_clear_bits = blk_hdr[111:112]
+    prevblock_ordered = blk_hdr[4:36][::-1]
+    prevblock_hidden = bytearray(tagged_hash("Bitcoin prevblock header, hashed", prevblock_ordered))
+    prevblock_hidden[:6] = b"\x00" * 6
+    h1 = tagged_hash(
+        "Bitcoin block header 1",
+        (version & 0x7fffffff).to_bytes(4, "little", signed=True)
+        + prevblock_ordered
+        + blk_hdr[36:68]    # hashMerkleRoot
+        + blk_hdr[68:72]    # time
+        + b"\x00"
+        + blk_hdr[72:76]    # nBits
+        + reserved1
+        + reserved
+        + xor_key_mask_clear_bits
+        + xor_key_hash,
+    )
+    hash1 = blake2b(
+        b"\x00" * 4
+        + h1
+        + blk_hdr[92:108]   # extranonce
+    )
+    asic_input = (
+        prevblock_hidden
+        + blk_hdr[76:80]  # nonce
+        + blk_hdr[80:84]  # nonce2
+        + blk_hdr[84:92]  # nonce3
+        + hash1
+    )
+    hash2 = blake2b(asic_input)
+    mask = bytes(32)
+    if any(xor_key):
+        mask = bytearray(tagged_hash("Bitcoin block hash PoW XOR mask", xor_key))
+        clear_bytes, remaining_bits = divmod(xor_key_mask_clear_bits[0], 8)
+        mask[:clear_bytes] = b"\x00" * clear_bytes
+        mask[clear_bytes] &= 0xff >> remaining_bits
+        mask = bytes(mask)
+    result = bytes(a ^ b for a, b in zip(hash2, mask))
+    return result.hex()
 
 def get_blk_dt(blk_hdr):
     members = struct.unpack("<I", blk_hdr[68:68+4])
@@ -224,8 +277,10 @@ class BlockDataCopier:
                 continue
             inLenLE = inhdr[4:]
             su = struct.unpack("<I", inLenLE)
-            inLen = su[0] - 80 # length without header
             blk_hdr = self.read_xored(self.inF, 80)
+            if blk_hdr[3] & 0x80:
+                blk_hdr += self.read_xored(self.inF, 48)
+            inLen = su[0] - len(blk_hdr)
             inExtent = BlockExtent(self.inFn, self.inF.tell(), inhdr, blk_hdr, inLen)
 
             self.hash_str = calc_hash_str(blk_hdr)
