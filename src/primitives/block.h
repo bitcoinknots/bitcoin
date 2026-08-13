@@ -28,6 +28,16 @@ struct CompressedHeader {
     {
         hashMerkleRoot.SetNull();
     }
+
+    NodeSeconds Time() const
+    {
+        return NodeSeconds{std::chrono::seconds{nTime}};
+    }
+
+    int64_t GetBlockTime() const
+    {
+        return (int64_t)nTime;
+    }
 };
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
@@ -73,16 +83,6 @@ public:
     }
 
     uint256 GetHash() const;
-
-    NodeSeconds Time() const
-    {
-        return NodeSeconds{std::chrono::seconds{nTime}};
-    }
-
-    int64_t GetBlockTime() const
-    {
-        return (int64_t)nTime;
-    }
 };
 
 
