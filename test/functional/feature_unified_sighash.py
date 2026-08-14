@@ -210,6 +210,19 @@ class UnifiedSighashTest(BitcoinTestFramework):
         assert_equal(out.returncode, 0)
         return out.stdout.strip()
 
+    def reject(self, tx, why):
+        """Assert tx is refused, and refused for a signature that did not verify.
+
+        "It was rejected" on its own passes when the node refused it for an
+        unrelated reason: a missing input, a fee, a policy rule. Every case here
+        is about a signature, so pin that rather than accept any refusal.
+        """
+        reason = self.submit(tx)
+        assert reason is not None, why
+        assert "script-verify-flag-failed" in reason, \
+            f"{why}: refused, but for the wrong reason: {reason}"
+        return reason
+
     def submit(self, tx):
         """Try to accept tx into the mempool; return None on success or the reject reason."""
         res = self.nodes[0].testmempoolaccept([tx.serialize().hex()])[0]
@@ -259,8 +272,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
         unified_tx = self.build_spend([op_a, op_b], [utxo_a, utxo_b])
         sign_input_unified(unified_tx, 0, utxo_a.scriptPubKey, self.privkey, [utxo_a, utxo_b])
         sign_input_unified(unified_tx, 1, utxo_b.scriptPubKey, self.privkey, [utxo_a, utxo_b])
-        reason = self.submit(unified_tx)
-        assert reason is not None, "opting in must not be usable before activation"
+        reason = self.reject(unified_tx, "opting in must not be usable before activation")
         self.log.info(f"  pre-activation rejection of opt-in signature: {reason}")
 
         # The mempool refusing it is policy. A miner can skip the mempool, so
@@ -288,8 +300,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
         self.mine(1)
         tr_tx = self.build_taproot_spend(self.op_tr, self.utxo_tr)
         self.sign_taproot_keypath(tr_tx, [self.utxo_tr], self.info_tr, SIGHASH_ALL | SIGHASH_UNIFIED)
-        reason = self.submit(tr_tx)
-        assert reason is not None, "taproot opt-in must not be usable before activation"
+        reason = self.reject(tr_tx, "taproot opt-in must not be usable before activation")
         self.log.info(f"  pre-activation rejection of opt-in taproot signature: {reason}")
 
         # Reserved for the reorg-eviction test far below: it must stay confirmed
@@ -429,8 +440,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
         # Sign input 0 while being lied to about input 1's value.
         sign_input_unified(lie_tx, 0, utxo_e.scriptPubKey, self.privkey, lied)
         sign_input_unified(lie_tx, 1, utxo_f.scriptPubKey, self.privkey, [utxo_e, utxo_f])
-        reason = self.submit(lie_tx)
-        assert reason is not None, "a lie about another input's value must invalidate the signature"
+        reason = self.reject(lie_tx, "a lie about another input's value must invalidate the signature")
         self.log.info(f"  rejected: {reason}")
         # Signing input 0 honestly makes the same transaction valid, which
         # proves the rejection was caused by the lie and nothing else.
@@ -469,8 +479,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
         der = self.privkey.sign_ecdsa((1).to_bytes(32, "big"))
         single_tx.vin[1].scriptSig = bytes(CScript([der + bytes([SIGHASH_SINGLE | SIGHASH_UNIFIED]), self.pubkey]))
         single_tx.rehash()
-        reason = self.submit(single_tx)
-        assert reason is not None, "the SIGHASH_SINGLE sentinel must not be spendable"
+        reason = self.reject(single_tx, "the SIGHASH_SINGLE sentinel must not be spendable")
         self.log.info(f"  rejected: {reason}")
 
         self.log.info("Opting in with a non-canonical hash type is rejected")
@@ -489,7 +498,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
             der = self.privkey.sign_ecdsa(good)
             bad_tx.vin[0].scriptSig = bytes(CScript([der + bytes([bad_hashtype]), self.pubkey]))
             bad_tx.rehash()
-            assert self.submit(bad_tx) is not None, f"hashtype {bad_hashtype:#x} must be rejected"
+            self.reject(bad_tx, f"hashtype {bad_hashtype:#x} must be rejected")
 
         self.log.info("Taproot opts in through the same algorithm as every other type")
         # The same output that was refused before activation is now spendable
@@ -520,8 +529,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
         self.sign_taproot_keypath(bare_tx, [utxo_b_tr], info_b, SIGHASH_ALL | SIGHASH_UNIFIED)
         tampered = bare_tx.wit.vtxinwit[0].scriptWitness.stack[0][:-1] + bytes([SIGHASH_UNIFIED])
         bare_tx.wit.vtxinwit[0].scriptWitness.stack = [tampered]
-        reason = self.submit(bare_tx)
-        assert reason is not None, "a bare opt-in byte must not be accepted"
+        reason = self.reject(bare_tx, "a bare opt-in byte must not be accepted")
 
         # Tapscript through the independent implementation too, since the script
         # path commits to the leaf hash and codeseparator position that the key
@@ -570,7 +578,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
         der = self.privkey.sign_ecdsa(sighash_base)
         crossed.wit.vtxinwit[0].scriptWitness.stack = [der + bytes([SIGHASH_ALL | SIGHASH_UNIFIED]), self.pubkey]
         crossed.rehash()
-        assert self.submit(crossed) is not None, "BASE and WITNESS_V0 must be domain-separated"
+        self.reject(crossed, "BASE and WITNESS_V0 must be domain-separated")
 
         self.log.info("Segwit v0: P2WSH 2-of-2 exercises several signatures in one input")
         key2 = ECKey()
@@ -628,7 +636,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
         der_w = self.privkey.sign_ecdsa(wrong_hash) + bytes([SIGHASH_ALL | SIGHASH_UNIFIED])
         wrong.vin[0].scriptSig = bytes(CScript([der_w, bytes(redeem)]))
         wrong.rehash()
-        assert self.submit(wrong) is not None
+        self.reject(wrong, "a signature over the wrong scriptCode must not verify")
 
         self.log.info("P2SH-wrapped P2WPKH")
         sh_wpkh_spk = key_to_p2sh_p2wpkh_script(self.pubkey)
@@ -900,6 +908,13 @@ class UnifiedSighashTest(BitcoinTestFramework):
         assert_equal(analysis["inputs"][0]["is_final"], True)
         assert_equal(analysis["next"], "extractor")
         assert "missing" not in analysis["inputs"][0], analysis["inputs"][0]
+        # The size estimate is built by a second pass that finalizes with dummy
+        # data. Without the real transaction data it cannot verify an opt-in
+        # signature, and the estimate is dropped from the result with no error,
+        # so assert the fields rather than only the parts that were obviously
+        # broken.
+        assert "estimated_vsize" in analysis, sorted(analysis.keys())
+        assert "estimated_feerate" in analysis, sorted(analysis.keys())
         self.log.info("  analyzepsbt reported the input final rather than missing signatures")
 
         self.log.info("analyzepsbt sizes an opted-in taproot input at its real length")
@@ -961,7 +976,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
         assert sig[-1] == (SIGHASH_ALL | SIGHASH_UNIFIED)
         stripped.vin[0].scriptSig = bytes(CScript([sig[:-1] + bytes([SIGHASH_ALL]), self.pubkey]))
         stripped.rehash()
-        assert self.submit(stripped) is not None, "stripping the opt-in bit must invalidate"
+        self.reject(stripped, "stripping the opt-in bit must invalidate")
 
         # And the reverse: adding the bit to a legacy signature.
         legacy_one = self.build_spend([op_fl], [utxo_fl])
@@ -971,7 +986,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
         lsig = list(CScript(legacy_one.vin[0].scriptSig))[0]
         forged.vin[0].scriptSig = bytes(CScript([lsig[:-1] + bytes([SIGHASH_ALL | SIGHASH_UNIFIED]), self.pubkey]))
         forged.rehash()
-        assert self.submit(forged) is not None, "adding the opt-in bit must invalidate"
+        self.reject(forged, "adding the opt-in bit must invalidate")
         self.log.info("  both directions of tampering are rejected")
 
         self.log.info("Opting in is per signature, not per transaction")
@@ -1046,7 +1061,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
         bad_full = self.privkey.sign_ecdsa(h_full2) + bytes([SIGHASH_ALL | SIGHASH_UNIFIED])
         bad_cs.wit.vtxinwit[0].scriptWitness.stack = [bad_tail, bad_full, raw]
         bad_cs.rehash()
-        assert self.submit(bad_cs) is not None, "the separator must change the second scriptCode"
+        self.reject(bad_cs, "the separator must change the second scriptCode")
         self.log.info("  both signatures verify with the separator honoured")
 
         self.log.info("PSBT signing produces fork signatures too")
@@ -1195,7 +1210,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
         block_tx = self.build_spend([op_l], [utxo_l])
         lied_utxo = CTxOut(utxo_l.nValue + 1, utxo_l.scriptPubKey)
         sign_input_unified(block_tx, 0, utxo_l.scriptPubKey, self.privkey, [lied_utxo])
-        assert self.submit(block_tx) is not None
+        self.reject(block_tx, "an opt-in signature over a lied amount must not verify")
 
         peer = node.add_p2p_connection(P2PDataStore())
         tip = int(node.getbestblockhash(), 16)
