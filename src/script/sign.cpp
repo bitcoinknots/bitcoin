@@ -62,6 +62,11 @@ bool MutableTransactionSignatureCreator::CreateSig(const SigningProvider& provid
     // takes away. Refuse rather than manufacture it.
     if ((hashtype & SIGHASH_UNIFIED) && m_sighash_rules != SighashRules::UNIFIED) return false;
 
+    // If an input is signed with SIGHASH_SINGLE but there is no output at the same index, the
+    // signature commits to no output at all. Which means such a signature stays valid if the
+    // output is swapped, which is a footgun. So don't produce it.
+    if ((hashtype & SIGHASH_OUTPUT_MASK) == SIGHASH_SINGLE && nIn >= m_txto.vout.size()) return false;
+
     uint256 hash;
     if (m_sighash_rules == SighashRules::UNIFIED) {
         if (!m_txdata) return false;
@@ -821,8 +826,6 @@ bool IsSegWitOutput(const SigningProvider& provider, const CScript& script)
 
 bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* keystore, const std::map<COutPoint, Coin>& coins, int nHashType, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum, SighashRules sighash_rules)
 {
-    bool fHashSingle = ((nHashType & ~SIGHASH_ANYONECANPAY) == SIGHASH_SINGLE);
-
     // Asked for by name, so say why it cannot be given. Without this the signer
     // simply produces nothing and the input is reported with whatever script
     // error the empty result happens to raise, which points nowhere near the
@@ -885,15 +888,12 @@ bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* keystore, 
         // write-back below replaces whatever this read could not see.
         const bool input_had_data{!txin.scriptSig.empty() || !txin.scriptWitness.IsNull()};
         SignatureData sigdata = DataFromTransaction(mtx, i, coin->second.out, &txdata);
-        // Only sign SIGHASH_SINGLE if there's a corresponding output:
-        if (!fHashSingle || (i < mtx.vout.size())) {
-            MutableTransactionSignatureCreator creator(mtx, i, amount, &txdata, nHashType);
-            creator.SetSighashRules(sighash_rules);
-            ProduceSignature(*keystore, creator, prevPubKey, sigdata);
-            if ((!sigdata.witness) && inputs_amount_sum && *inputs_amount_sum) {
-                inputs_amount_sum->reset();
-                inputs_amount_sum = nullptr;
-            }
+        MutableTransactionSignatureCreator creator(mtx, i, amount, &txdata, nHashType);
+        creator.SetSighashRules(sighash_rules);
+        ProduceSignature(*keystore, creator, prevPubKey, sigdata);
+        if ((!sigdata.witness) && inputs_amount_sum && *inputs_amount_sum) {
+            inputs_amount_sum->reset();
+            inputs_amount_sum = nullptr;
         }
 
         // Reading an opt-in signature back needs every spent output, so without
