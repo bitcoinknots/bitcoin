@@ -30,7 +30,7 @@ struct CompressedHeader {
     // Sv1 extranonce:
     uint128 m_extranonce{};
     // Header 1 effectively-nonce, reserved:
-    uint8_t m_reserved{0};
+    uint8_t m_flags{0};
 
     uint8_t m_xor_key_mask_clear_bits{0};
     uint128 m_xor_key{};
@@ -88,13 +88,13 @@ public:
         SER_READ(obj, obj.m_header_v2 = v & v2_flag);
         SER_READ(obj, obj.nVersion = v & ~v2_flag);
         if (obj.m_header_v2) {
-            READWRITE(obj.m_nonce2, obj.m_nonce3, obj.m_extranonce, obj.m_txcount, obj.m_reserved, obj.m_xor_key_mask_clear_bits, obj.m_xor_key, obj.m_height, obj.m_mm_rhs);
+            READWRITE(obj.m_nonce2, obj.m_nonce3, obj.m_extranonce, obj.m_txcount, obj.m_flags, obj.m_xor_key_mask_clear_bits, obj.m_xor_key, obj.m_height, obj.m_mm_rhs);
         } else {
             SER_READ(obj, obj.m_nonce2 = 0);
             SER_READ(obj, obj.m_nonce3 = 0);
             SER_READ(obj, obj.m_extranonce.SetNull());
             SER_READ(obj, obj.m_txcount = 0);
-            SER_READ(obj, obj.m_reserved = 0);
+            SER_READ(obj, obj.m_flags = 0);
             SER_READ(obj, obj.m_xor_key_mask_clear_bits = 0);
             SER_READ(obj, obj.m_xor_key.SetNull());
             SER_READ(obj, obj.m_height = 0);
@@ -115,7 +115,7 @@ public:
         m_nonce3 = 0;
         m_extranonce.SetNull();
         m_txcount = 0;
-        m_reserved = 0;
+        m_flags = 0;
         m_xor_key_mask_clear_bits = 0;
         m_xor_key.SetNull();
         m_height = 0;
@@ -133,7 +133,7 @@ public:
         if (m_nonce3) return false;
         if (!m_extranonce.IsNull()) return false;
         if (m_txcount) return false;
-        if (m_reserved) return false;
+        if (m_flags) return false;
         if (m_xor_key_mask_clear_bits) return false;
         if (!m_xor_key.IsNull()) return false;
         if (!m_mm_rhs.IsNull()) return false;

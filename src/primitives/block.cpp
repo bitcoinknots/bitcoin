@@ -49,7 +49,7 @@ uint256 CBlockHeader::GetHash() const
     h1 << (uint8_t)0;  // Reserved for extended 40-bit time
     h1 << nBits;
     h1 << (uint32_t)m_txcount;
-    h1 << m_reserved;
+    h1 << m_flags;
     h1 << m_xor_key_mask_clear_bits;
     h1 << xor_key_hash.GetSHA256();
     Assert(h1.BytesWritten() == 0x40 + 119);
@@ -60,11 +60,13 @@ uint256 CBlockHeader::GetHash() const
     h2 << m_mm_rhs;
     Assert(h2.BytesWritten() == 0x40 + 0x60);
 
+    const uint256 h2_hash{h2.GetSHA256()};
+
     // These fields get sent to mining machines over Sv1
     DataStream ss;
-    ss << (uint32_t)0;     // Final 3 bytes are part of Sv1 "coinb1" (first is implied by hasher)
-    ss << h2.GetSHA256();  // Remainder of Sv1 "coinb1"
-    ss << m_extranonce;    // Sv1 "extranonce"
+    ss << (uint32_t)0;   // Final 3 bytes are part of Sv1 "coinb1" (first is implied by hasher)
+    ss << h2_hash;       // Remainder of Sv1 "coinb1"
+    ss << m_extranonce;  // Sv1 "extranonce"
     Assert(ss.size() == 52);
 
     uint256 hash;
@@ -72,13 +74,24 @@ uint256 CBlockHeader::GetHash() const
 
     // Presumably the actual mining ASIC hardware sees these
     ss.clear();
-    std::fill_n(prevblock_hidden.begin(), 6, uint8_t{0});
-    ss << prevblock_hidden;
-    ss << nNonce;
-    ss << m_nonce2;
-    ss << m_nonce3;
-    ss << hash;
-    Assert(ss.size() == 80);
+    switch (m_flags & 3) {
+        case 3:
+            ss << zeros << zeros;
+            [[fallthrough]];
+        case 2:
+            ss << zeros << zeros << zeros;
+            ss << h2_hash << nNonce << m_nonce2 << m_nonce3 << hash;
+            break;
+        case 0:
+        {
+            std::fill_n(prevblock_hidden.begin(), 6, uint8_t{0});
+            ss << prevblock_hidden << nNonce << m_nonce2 << m_nonce3 << hash;
+            break;
+        }
+        case 1:
+            ss << nNonce << m_nonce2 << m_nonce3 << hash << h2_hash;
+            break;
+    }
 
     Assert(0 == blake2b_nokey((void*)hash.begin(), hash.size(), (void*)ss.data(), ss.size()));
 
