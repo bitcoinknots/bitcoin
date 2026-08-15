@@ -278,6 +278,34 @@ class PSBTTest(BitcoinTestFramework):
         self.generate(self.nodes[0], 6)
         w.walletcreatefundedpsbt([], {self.nodes[0].getnewaddress():10})['psbt']
 
+    def test_sighash_single(self):
+        self.log.info("Test that SIGHASH_SINGLE won't sign an input with no matching output")
+        node = self.nodes[0]
+        node.createwallet("sighash_single")
+        wallet = node.get_wallet_rpc("sighash_single")
+        def_wallet = node.get_wallet_rpc(self.default_wallet_name)
+
+        addr_types = ["legacy", "bech32", "bech32m"] if self.options.descriptors else ["legacy", "bech32"]
+        for addr_type in addr_types:
+            addrs = [wallet.getnewaddress("", addr_type) for _ in range(2)]
+            for addr in addrs:
+                def_wallet.sendtoaddress(addr, 1)
+            self.generatetoaddress(node, 1, def_wallet.getnewaddress())
+            node.syncwithvalidationinterfacequeue()
+            ins = [{"txid": u["txid"], "vout": u["vout"]} for u in wallet.listunspent(addresses=addrs)]
+            assert_equal(len(ins), 2)
+
+            raw = node.createrawtransaction(ins, [{wallet.getnewaddress(): 1.9999}])
+            for sighash in ["SINGLE", "SINGLE|ANYONECANPAY"]:
+                signed = wallet.walletprocesspsbt(node.converttopsbt(raw), True, sighash)["psbt"]
+                state = wallet.analyzepsbt(signed)["inputs"]
+                # Output at index 0 exists, so input 0 signs and finalizes.
+                assert state[0]["is_final"]
+                # No output at index 1, so SIGHASH_SINGLE won't sign input 1.
+                assert not state[1]["is_final"]
+
+        wallet.unloadwallet()
+
     def assert_change_type(self, psbtx, expected_type):
         """Assert that the given PSBT has a change output with the given type."""
 
@@ -1194,6 +1222,8 @@ class PSBTTest(BitcoinTestFramework):
 
         if self.options.descriptors:
             self.test_addresstype_legacy_with_no_legacy_change()
+
+        self.test_sighash_single()
 
 
 if __name__ == '__main__':
