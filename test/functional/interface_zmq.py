@@ -258,7 +258,7 @@ class ZMQTest (BitcoinTestFramework):
             assert block.is_valid()
             assert_equal(block.vtx[0].hash, tx.hash)
             assert_equal(len(block.vtx), 1)
-            assert_equal(genhashes[x], hash256_reversed(hex[:80]).hex())
+            assert_equal(genhashes[x], block.hash)
 
             if self.is_wallet_compiled():
                 # Should receive wallet tx

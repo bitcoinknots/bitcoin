@@ -40,6 +40,7 @@ from test_framework.blocktools import (
     target_str,
 )
 from test_framework.messages import (
+    CBlock,
     CBlockHeader,
     COIN,
     from_hex,
@@ -632,8 +633,9 @@ class BlockchainTest(BitcoinTestFramework):
         blockhash = self.generate(node, 1)[0]
 
         def assert_hexblock_hashes(verbosity):
-            block = node.getblock(blockhash, verbosity)
-            assert_equal(blockhash, hash256(bytes.fromhex(block[:160]))[::-1].hex())
+            block = from_hex(CBlock(), node.getblock(blockhash, verbosity))
+            block.rehash()
+            assert_equal(blockhash, block.hash)
 
         def assert_fee_not_in_block(hash, verbosity):
             block = node.getblock(hash, verbosity)
