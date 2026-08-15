@@ -250,7 +250,7 @@ int blake2b_final( blake2b_state *S, void *out, size_t outlen )
   uint8_t buffer[BLAKE2B_OUTBYTES] = {0};
   size_t i;
 
-  if( out == NULL || outlen < S->outlen )
+  if( out == nullptr || outlen < S->outlen )
     return -1;
 
   if( blake2b_is_lastblock( S ) )
@@ -275,11 +275,11 @@ int blake2b( void *out, size_t outlen, const void *in, size_t inlen, const void 
   blake2b_state S[1];
 
   /* Verify parameters */
-  if ( NULL == in && inlen > 0 ) return -1;
+  if ( nullptr == in && inlen > 0 ) return -1;
 
-  if ( NULL == out ) return -1;
+  if ( nullptr == out ) return -1;
 
-  if( NULL == key && keylen > 0 ) return -1;
+  if( nullptr == key && keylen > 0 ) return -1;
 
   if( !outlen || outlen > BLAKE2B_OUTBYTES ) return -1;
 
@@ -306,7 +306,7 @@ int blake2( void *out, size_t outlen, const void *in, size_t inlen, const void *
 #if defined(SUPERCOP)
 int crypto_hash( unsigned char *out, unsigned char *in, unsigned long long inlen )
 {
-  return blake2b( out, BLAKE2B_OUTBYTES, in, inlen, NULL, 0 );
+  return blake2b( out, BLAKE2B_OUTBYTES, in, inlen, nullptr, 0 );
 }
 #endif
 

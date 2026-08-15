@@ -15,6 +15,7 @@
 #ifndef BLAKE2_IMPL_H
 #define BLAKE2_IMPL_H
 
+#include <bit>
 #include <stdint.h>
 #include <string.h>
 
@@ -32,26 +33,26 @@
 
 static BLAKE2_INLINE uint32_t load32( const void *src )
 {
-#if defined(NATIVE_LITTLE_ENDIAN)
+ if constexpr (std::endian::native == std::endian::little) {
   uint32_t w;
   memcpy(&w, src, sizeof w);
   return w;
-#else
+ } else {
   const uint8_t *p = ( const uint8_t * )src;
   return (( uint32_t )( p[0] ) <<  0) |
          (( uint32_t )( p[1] ) <<  8) |
          (( uint32_t )( p[2] ) << 16) |
          (( uint32_t )( p[3] ) << 24) ;
-#endif
+ }
 }
 
 static BLAKE2_INLINE uint64_t load64( const void *src )
 {
-#if defined(NATIVE_LITTLE_ENDIAN)
+ if constexpr (std::endian::native == std::endian::little) {
   uint64_t w;
   memcpy(&w, src, sizeof w);
   return w;
-#else
+ } else {
   const uint8_t *p = ( const uint8_t * )src;
   return (( uint64_t )( p[0] ) <<  0) |
          (( uint64_t )( p[1] ) <<  8) |
@@ -61,51 +62,51 @@ static BLAKE2_INLINE uint64_t load64( const void *src )
          (( uint64_t )( p[5] ) << 40) |
          (( uint64_t )( p[6] ) << 48) |
          (( uint64_t )( p[7] ) << 56) ;
-#endif
+ }
 }
 
 static BLAKE2_INLINE uint16_t load16( const void *src )
 {
-#if defined(NATIVE_LITTLE_ENDIAN)
+ if constexpr (std::endian::native == std::endian::little) {
   uint16_t w;
   memcpy(&w, src, sizeof w);
   return w;
-#else
+ } else {
   const uint8_t *p = ( const uint8_t * )src;
   return ( uint16_t )((( uint32_t )( p[0] ) <<  0) |
                       (( uint32_t )( p[1] ) <<  8));
-#endif
+ }
 }
 
 static BLAKE2_INLINE void store16( void *dst, uint16_t w )
 {
-#if defined(NATIVE_LITTLE_ENDIAN)
+ if constexpr (std::endian::native == std::endian::little) {
   memcpy(dst, &w, sizeof w);
-#else
+ } else {
   uint8_t *p = ( uint8_t * )dst;
   *p++ = ( uint8_t )w; w >>= 8;
   *p++ = ( uint8_t )w;
-#endif
+ }
 }
 
 static BLAKE2_INLINE void store32( void *dst, uint32_t w )
 {
-#if defined(NATIVE_LITTLE_ENDIAN)
+ if constexpr (std::endian::native == std::endian::little) {
   memcpy(dst, &w, sizeof w);
-#else
+ } else {
   uint8_t *p = ( uint8_t * )dst;
   p[0] = (uint8_t)(w >>  0);
   p[1] = (uint8_t)(w >>  8);
   p[2] = (uint8_t)(w >> 16);
   p[3] = (uint8_t)(w >> 24);
-#endif
+ }
 }
 
 static BLAKE2_INLINE void store64( void *dst, uint64_t w )
 {
-#if defined(NATIVE_LITTLE_ENDIAN)
+ if constexpr (std::endian::native == std::endian::little) {
   memcpy(dst, &w, sizeof w);
-#else
+ } else {
   uint8_t *p = ( uint8_t * )dst;
   p[0] = (uint8_t)(w >>  0);
   p[1] = (uint8_t)(w >>  8);
@@ -115,7 +116,7 @@ static BLAKE2_INLINE void store64( void *dst, uint64_t w )
   p[5] = (uint8_t)(w >> 40);
   p[6] = (uint8_t)(w >> 48);
   p[7] = (uint8_t)(w >> 56);
-#endif
+ }
 }
 
 static BLAKE2_INLINE uint64_t load48( const void *src )
