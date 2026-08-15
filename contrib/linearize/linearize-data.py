@@ -32,7 +32,7 @@ def calc_hash_str(blk_hdr):
     def blake2b(data):
         return hashlib.blake2b(data, digest_size=32).digest()
 
-    reserved = blk_hdr[110:111]
+    flags = blk_hdr[110:111]
     xor_key = blk_hdr[112:128]
     xor_key_hash = tagged_hash("Bitcoin block hash PoW XOR key", xor_key)
     xor_key_mask_clear_bits = blk_hdr[111:112]
@@ -50,7 +50,7 @@ def calc_hash_str(blk_hdr):
         + blk_hdr[72:76]    # nBits
         + blk_hdr[108:110]  # tx count
         + b"\x00" * 2
-        + reserved
+        + flags
         + xor_key_mask_clear_bits
         + xor_key_hash,
     )
@@ -58,15 +58,23 @@ def calc_hash_str(blk_hdr):
     hash1 = blake2b(
         b"\x00" * 4
         + h2
-        + blk_hdr[92:108]   # extranonce
+        + blk_hdr[88:104]   # extranonce
     )
-    asic_input = (
-        prevblock_hidden
-        + blk_hdr[76:80]  # nonce
-        + blk_hdr[80:84]  # nonce2
-        + blk_hdr[84:92]  # nonce3
+    asic_tail = (
+        blk_hdr[76:80]      # nonce
+        + blk_hdr[80:84]    # nonce2
+        + blk_hdr[84:92]    # nonce3
         + hash1
     )
+    asic_profile = flags[0] & 3
+    if asic_profile == 0:
+        asic_input = prevblock_hidden + asic_tail
+    elif asic_profile == 1:
+        asic_input = asic_tail + h2
+    elif asic_profile == 2:
+        asic_input = (b"\x00" * 48) + h2 + asic_tail
+    elif asic_profile == 3:
+        asic_input = (b"\x00" * 80) + h2 + asic_tail
     hash2 = blake2b(asic_input)
     mask = bytes(32)
     if any(xor_key):

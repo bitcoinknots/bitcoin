@@ -124,7 +124,7 @@ def blake2b_header_hash_components(header):
         + b"\x00"
         + header.nBits.to_bytes(4, "little")
         + header.m_txcount.to_bytes(4, "little")
-        + header.m_reserved.to_bytes(1, "little")
+        + header.m_flags.to_bytes(1, "little")
         + header.m_xor_key_mask_clear_bits.to_bytes(1, "little")
         + xor_key_hash,
     )
@@ -134,13 +134,22 @@ def blake2b_header_hash_components(header):
         + h2
         + header.m_extranonce.to_bytes(16, "little")
     )
-    hash2 = blake2b(
-        prevblock_hidden
-        + header.nNonce.to_bytes(4, "little")
+    asic_tail = (
+        header.nNonce.to_bytes(4, "little")
         + header.m_nonce2.to_bytes(4, "little")
         + header.m_nonce3.to_bytes(8, "little")
         + hash1
     )
+    asic_profile = header.m_flags & 3
+    if asic_profile == 0:
+        asic_input = prevblock_hidden + asic_tail
+    elif asic_profile == 1:
+        asic_input = asic_tail + h2
+    elif asic_profile == 2:
+        asic_input = b"\x00" * 48 + h2 + asic_tail
+    elif asic_profile == 3:
+        asic_input = b"\x00" * 80 + h2 + asic_tail
+    hash2 = blake2b(asic_input)
     mask = bytes(32)
     if header.m_xor_key:
         mask = bytearray(tagged_hash("Bitcoin block hash PoW XOR mask", xor_key))
@@ -154,6 +163,8 @@ def blake2b_header_hash_components(header):
         "h1": h1,
         "h2": h2,
         "hash1": hash1,
+        "asic_profile": asic_profile,
+        "asic_input": asic_input,
         "hash2": hash2,
         "mask": mask,
         "result": result,
@@ -762,7 +773,7 @@ class CTransaction:
 class CBlockHeader:
     __slots__ = ("hash", "hashMerkleRoot", "hashPrevBlock", "nBits", "nNonce",
                  "nTime", "nVersion", "sha256", "m_header_v2", "m_nonce2",
-                 "m_nonce3", "m_extranonce", "m_txcount", "m_reserved",
+                 "m_nonce3", "m_extranonce", "m_txcount", "m_flags",
                  "m_xor_key_mask_clear_bits", "m_xor_key", "m_height", "m_mm_rhs")
 
     def __init__(self, header=None):
@@ -780,7 +791,7 @@ class CBlockHeader:
             self.m_nonce3 = header.m_nonce3
             self.m_extranonce = header.m_extranonce
             self.m_txcount = header.m_txcount
-            self.m_reserved = header.m_reserved
+            self.m_flags = header.m_flags
             self.m_xor_key_mask_clear_bits = header.m_xor_key_mask_clear_bits
             self.m_xor_key = header.m_xor_key
             self.m_height = header.m_height
@@ -801,7 +812,7 @@ class CBlockHeader:
         self.m_nonce3 = 0
         self.m_extranonce = 0
         self.m_txcount = 0
-        self.m_reserved = 0
+        self.m_flags = 0
         self.m_xor_key_mask_clear_bits = 0
         self.m_xor_key = 0
         self.m_height = 0
@@ -823,7 +834,7 @@ class CBlockHeader:
             self.m_nonce3 = int.from_bytes(f.read(8), "little")
             self.m_extranonce = int.from_bytes(f.read(16), "little")
             self.m_txcount = int.from_bytes(f.read(2), "little")
-            self.m_reserved = int.from_bytes(f.read(1), "little")
+            self.m_flags = int.from_bytes(f.read(1), "little")
             self.m_xor_key_mask_clear_bits = int.from_bytes(f.read(1), "little")
             self.m_xor_key = int.from_bytes(f.read(16), "little")
             self.m_height = int.from_bytes(f.read(4), "little", signed=True)
@@ -833,7 +844,7 @@ class CBlockHeader:
             self.m_nonce3 = 0
             self.m_extranonce = 0
             self.m_txcount = 0
-            self.m_reserved = 0
+            self.m_flags = 0
             self.m_xor_key_mask_clear_bits = 0
             self.m_xor_key = 0
             self.m_height = 0
@@ -857,7 +868,7 @@ class CBlockHeader:
             r += self.m_nonce3.to_bytes(8, "little")
             r += self.m_extranonce.to_bytes(16, "little")
             r += self.m_txcount.to_bytes(2, "little")
-            r += self.m_reserved.to_bytes(1, "little")
+            r += self.m_flags.to_bytes(1, "little")
             r += self.m_xor_key_mask_clear_bits.to_bytes(1, "little")
             r += self.m_xor_key.to_bytes(16, "little")
             r += self.m_height.to_bytes(4, "little", signed=True)
