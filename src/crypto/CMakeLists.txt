@@ -4,7 +4,7 @@
 
 add_library(bitcoin_crypto STATIC EXCLUDE_FROM_ALL
   aes.cpp
-  blake2b-ref.cpp
+  blake2b.cpp
   chacha20.cpp
   chacha20poly1305.cpp
   hex_base.cpp

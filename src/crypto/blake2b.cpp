@@ -19,7 +19,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include <crypto/blake2.h>
+#include <crypto/blake2b.h>
 #include <crypto/common.h>
 #include <support/cleanse.h>
 

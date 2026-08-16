@@ -12,8 +12,8 @@
    More information about the BLAKE2 hash function can be found at
    https://blake2.net.
 */
-#ifndef BLAKE2_H
-#define BLAKE2_H
+#ifndef BITCOIN_CRYPTO_BLAKE2B_H
+#define BITCOIN_CRYPTO_BLAKE2B_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -85,4 +85,4 @@ extern "C" {
 }
 #endif
 
-#endif
+#endif // BITCOIN_CRYPTO_BLAKE2B_H

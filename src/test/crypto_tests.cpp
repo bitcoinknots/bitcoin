@@ -3,7 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <crypto/aes.h>
-#include <crypto/blake2.h>
+#include <crypto/blake2b.h>
 #include <crypto/chacha20.h>
 #include <crypto/chacha20poly1305.h>
 #include <crypto/hkdf_sha256_32.h>
