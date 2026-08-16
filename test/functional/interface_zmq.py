@@ -22,6 +22,7 @@ from test_framework.blocktools import (
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.messages import (
     CBlock,
+    CBlockHeader,
     hash256,
     tx_from_hex,
     CTransaction,
@@ -143,6 +144,7 @@ class ZMQTest (BitcoinTestFramework):
             self.test_reorg()
             self.test_multiple_interfaces()
             self.test_ipv6()
+            self.test_powchange_rawblock()
         finally:
             # Destroy the ZMQ context.
             self.log.debug("Destroying ZMQ context")
@@ -320,6 +322,44 @@ class ZMQTest (BitcoinTestFramework):
         assert_equal(self.nodes[1].getzmqnotifications(), [])
         if unix:
             os.unlink(socket_path)
+
+    def test_powchange_rawblock(self):
+        self.log.info("Test raw block notification with an extended header")
+        node = self.nodes[0]
+        address = f"tcp://127.0.0.1:{self.zmq_port_base + 1}"
+        socket = self.ctx.socket(zmq.SUB)
+        subscriber = ZMQSubscriber(socket, b"rawblock")
+        socket.set(zmq.RCVTIMEO, 1000)
+
+        change_height = node.getblockcount() + 1
+        self.restart_node(0, [
+            f"-testactivationheight=blake2b@{change_height}",
+            f"-zmqpubrawblock={address}",
+        ])
+        socket.connect(address)
+
+        try:
+            while True:
+                block_hash = self.generatetoaddress(
+                    node, 1, ADDRESS_BCRT1_UNSPENDABLE, sync_fun=self.no_op,
+                )[0]
+                try:
+                    raw_block = subscriber.receive()
+                    break
+                except zmq.error.Again:
+                    self.log.debug("Didn't receive extended raw block notification, trying again.")
+
+            block = CBlock()
+            block.deserialize(BytesIO(raw_block))
+            assert block.m_header_v2
+            assert_equal(len(CBlockHeader(block).serialize()), 164)
+            assert_equal(block.m_height, node.getblockcount())
+            assert_equal(block.m_txcount, len(block.vtx))
+            assert_equal(block.m_flags & 3, 0)
+            assert block.is_valid()
+            assert_equal(block_hash, block.hash)
+        finally:
+            socket.close()
 
     def test_reorg(self):
 
