@@ -4,6 +4,9 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Exercise the height-activated proof-of-work change on regtest."""
 
+import json
+from pathlib import Path
+
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.messages import (
     CBlockHeader,
@@ -28,9 +31,48 @@ class PowChangeTest(BitcoinTestFramework):
     def get_header(self, blockhash):
         return from_hex(CBlockHeader(), self.nodes[0].getblockheader(blockhash, False))
 
+    def test_header_vectors(self):
+        vectors_path = Path(self.config["environment"]["SRCDIR"]) / "src/test/data/block_header_v2.json"
+        with vectors_path.open(encoding="utf8") as vectors_file:
+            vectors = json.load(vectors_file)["headers"]
+
+        for vector in vectors:
+            fields = vector["fields"]
+            header = CBlockHeader()
+            header.m_header_v2 = True
+            header.nVersion = fields["nVersion"]
+            header.hashPrevBlock = int(fields["hashPrevBlock"], 16)
+            header.hashMerkleRoot = int(fields["hashMerkleRoot"], 16)
+            header.nTime = fields["nTime"]
+            header.nBits = fields["nBits"]
+            header.nNonce = fields["nNonce"]
+            header.m_nonce2 = fields["m_nonce2"]
+            header.m_nonce3 = fields["m_nonce3"]
+            header.m_extranonce = int(fields["m_extranonce"], 16)
+            header.m_time_offset = fields["m_time_offset"]
+            header.m_txcount = fields["m_txcount"]
+            header.m_flags = fields["m_flags"]
+            header.m_xor_key_mask_clear_bits = fields["m_xor_key_mask_clear_bits"]
+            header.m_xor_key = int(fields["m_xor_key"], 16)
+            header.m_height = fields["m_height"]
+            header.m_mm_rhs = int(fields["m_mm_rhs"], 16)
+
+            assert_equal(len(header.serialize()), 164)
+            assert_equal(header.serialize().hex(), vector["serialized"])
+            components = blake2b_header_hash_components(header)
+            assert_equal(components["asic_profile"], vector["asic_profile"])
+            assert_equal(components["asic_input"].hex(), vector["asic_input"])
+            for component in ("xor_key_hash", "h1", "h2", "mask"):
+                assert_equal(components[component].hex(), vector[component])
+            assert_equal(components["hash1"].hex(), vector["blake2b_1"])
+            assert_equal(components["hash2"].hex(), vector["blake2b_2"])
+            assert_equal(components["result"].hex(), vector["block_hash"])
+            assert_equal(powhash(header)[::-1].hex(), vector["block_hash"])
+
     def run_test(self):
         node = self.nodes[0]
         addr = node.get_deterministic_priv_key().address
+        self.test_header_vectors()
 
         self.log.info("Blocks before the activation height use SHA256d")
         self.generatetoaddress(node, CHANGE_HEIGHT - 2, addr)
