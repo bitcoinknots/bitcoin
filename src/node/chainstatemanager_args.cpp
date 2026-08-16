@@ -31,6 +31,11 @@ util::Result<void> ApplyArgsManOptions(const ArgsManager& args, ChainstateManage
 
     if (auto value{args.GetBoolArg("-checkpoints")}) opts.checkpoints_enabled = *value;
 
+    opts.park_deep_reorg = args.GetBoolArg("-parkdeepreorg", !opts.chainparams.IsTestChain());
+    if (auto value{args.GetIntArg("-parkreorgdepth")}) {
+        opts.park_reorg_depth = static_cast<int>(*value);
+    }
+
     if (auto value{args.GetArg("-minimumchainwork")}) {
         if (auto min_work{uint256::FromUserHex(*value)}) {
             opts.minimum_chain_work = UintToArith256(*min_work);

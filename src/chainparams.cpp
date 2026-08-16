@@ -138,16 +138,8 @@ const CChainParams &Params() {
 
 std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, const ChainType chain)
 {
-    g_rdts_consent = static_cast<RDTSConsentFlag>(args.GetIntArg("rdts_consent_flag", static_cast<int64_t>(g_rdts_consent)));
-    g_enable_rdts = g_rdts_consent != RDTSConsentFlag::UNSUPPORTED_UNSAFE_NO_ENFORCEMENT;
-    if (g_rdts_consent == RDTSConsentFlag::UNSUPPORTED_UNSAFE_NO_ENFORCEMENT && !g_enable_rdts) {
-        for (const auto& rulesok : args.GetArgs(CONSENSUSRULES_CONFIG_NAME)) {
-            if (rulesok == CONSENSUSRULES_REQUIRED) {
-                g_enable_rdts = true;
-                break;
-            }
-        }
-    }
+    g_rdts_consent = RDTSConsentFlag::IMPLICIT;
+    g_enable_rdts = true;
 
     switch (chain) {
     case ChainType::MAIN:

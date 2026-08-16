@@ -1,4 +1,4 @@
-BIPs that are implemented by Bitcoin Knots:
+BIPs that are implemented by Bitcoin Purity (inherited from Bitcoin Knots / Core unless noted):
 
 * [`BIP 9`](https://github.com/bitcoin/bips/blob/master/bip-0009.mediawiki): The changes allowing multiple soft-forks to be deployed in parallel have been implemented since **v0.12.1**  ([PR #7575](https://github.com/bitcoin/bitcoin/pull/7575))
 * [`BIP 11`](https://github.com/bitcoin/bips/blob/master/bip-0011.mediawiki): Multisig outputs are standard since **v0.6.0** ([PR #669](https://github.com/bitcoin/bitcoin/pull/669)).
@@ -34,7 +34,7 @@ BIPs that are implemented by Bitcoin Knots:
 * [`BIP 90`](https://github.com/bitcoin/bips/blob/master/bip-0090.mediawiki): Trigger mechanism for activation of BIPs 34, 65, and 66 has been simplified to block height checks since **v0.14.0** ([PR #8391](https://github.com/bitcoin/bitcoin/pull/8391)).
 * [`BIP 93`](https://github.com/bitcoin/bips/blob/master/bip-0093.mediawiki): Support for importing codex32 seeds via the `importdescriptors` RPC method is available as of **v25.0.knots20230823** ([PR #27351](https://github.com/bitcoin/bitcoin/pull/27351)).
 * [`BIP 94`](https://github.com/bitcoin/bips/blob/master/bip-0094.mediawiki): Testnet 4 (`-testnet4`) supported as of **v28.0** ([PR #29775](https://github.com/bitcoin/bitcoin/pull/29775)).
-* [`BIP 110`](https://github.com/bitcoin/bips/blob/master/bip-0110.mediawiki): ReducedData Temporary Softfork (RDTS) consensus rules are implemented as of **FIXME: update version** ([PR #238](https://github.com/bitcoinknots/bitcoin/pull/238)).
+* [`BIP 110`](https://github.com/bitcoin/bips/blob/master/bip-0110.mediawiki): Reduced Data (RDTS) rules from Knots ([PR #238](https://github.com/bitcoinknots/bitcoin/pull/238)) are **permanent consensus** in Bitcoin Purity from `nPurityActivationHeight` (see [purity-consensus.md](purity-consensus.md)). They are no longer a one-year temporary soft fork.
 * [`BIP 111`](https://github.com/bitcoin/bips/blob/master/bip-0111.mediawiki): `NODE_BLOOM` service bit added, and enforced for all peer versions as of **v0.13.0** ([PR #6579](https://github.com/bitcoin/bitcoin/pull/6579) and [PR #6641](https://github.com/bitcoin/bitcoin/pull/6641)).
 * [`BIP 112`](https://github.com/bitcoin/bips/blob/master/bip-0112.mediawiki): The CHECKSEQUENCEVERIFY opcode has been implemented since **v0.12.1** ([PR #7524](https://github.com/bitcoin/bitcoin/pull/7524)), and has been *buried* since **v0.19.0** ([PR #16060](https://github.com/bitcoin/bitcoin/pull/16060)).
 * [`BIP 113`](https://github.com/bitcoin/bips/blob/master/bip-0113.mediawiki): Median time past lock-time calculations have been implemented since **v0.12.1** ([PR #6566](https://github.com/bitcoin/bitcoin/pull/6566)), and has been *buried* since **v0.19.0** ([PR #16060](https://github.com/bitcoin/bitcoin/pull/16060)).

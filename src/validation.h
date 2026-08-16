@@ -758,6 +758,14 @@ public:
     /** Remove invalidity status from a block and its descendants. */
     void ResetBlockFailureFlags(CBlockIndex* pindex) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
+    /** Park a block so it is not selected as most-work (local policy). */
+    bool ParkBlock(BlockValidationState& state, CBlockIndex* pindex)
+        EXCLUSIVE_LOCKS_REQUIRED(!m_chainstate_mutex)
+        LOCKS_EXCLUDED(::cs_main);
+
+    /** Clear parked status from a block, its ancestors and descendants. */
+    void UnparkBlock(CBlockIndex* pindex) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+
     /** Replay blocks that aren't fully applied to the database. */
     bool ReplayBlocks();
 

@@ -2189,6 +2189,76 @@ static RPCHelpMan reconsiderblock()
     };
 }
 
+static RPCHelpMan parkblock()
+{
+    return RPCHelpMan{"parkblock",
+                "Mark a block as parked so it will not be selected as the active chain (local policy).\n"
+                "Cannot park a block that is already on the active chain; use invalidateblock instead.\n",
+                {
+                    {"blockhash", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "the hash of the block to park"},
+                },
+                RPCResult{RPCResult::Type::NONE, "", ""},
+                RPCExamples{
+                    HelpExampleCli("parkblock", "\"blockhash\"")
+            + HelpExampleRpc("parkblock", "\"blockhash\"")
+                },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    ChainstateManager& chainman = EnsureAnyChainman(request.context);
+    uint256 hash(ParseHashV(request.params[0], "blockhash"));
+    CBlockIndex* pblockindex;
+    {
+        LOCK(chainman.GetMutex());
+        pblockindex = chainman.m_blockman.LookupBlockIndex(hash);
+        if (!pblockindex) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+        }
+    }
+    BlockValidationState state;
+    chainman.ActiveChainstate().ParkBlock(state, pblockindex);
+    if (!state.IsValid()) {
+        throw JSONRPCError(RPC_MISC_ERROR, state.ToString());
+    }
+    return UniValue::VNULL;
+},
+    };
+}
+
+static RPCHelpMan unparkblock()
+{
+    return RPCHelpMan{"unparkblock",
+                "Remove parked status from a block and reconsider it for activation.\n",
+                {
+                    {"blockhash", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "the hash of the block to unpark"},
+                },
+                RPCResult{RPCResult::Type::NONE, "", ""},
+                RPCExamples{
+                    HelpExampleCli("unparkblock", "\"blockhash\"")
+            + HelpExampleRpc("unparkblock", "\"blockhash\"")
+                },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    ChainstateManager& chainman = EnsureAnyChainman(request.context);
+    uint256 hash(ParseHashV(request.params[0], "blockhash"));
+    {
+        LOCK(chainman.GetMutex());
+        CBlockIndex* pblockindex = chainman.m_blockman.LookupBlockIndex(hash);
+        if (!pblockindex) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+        }
+        chainman.ActiveChainstate().UnparkBlock(pblockindex);
+        chainman.RecalculateBestHeader();
+    }
+    BlockValidationState state;
+    chainman.ActiveChainstate().ActivateBestChain(state);
+    if (!state.IsValid()) {
+        throw JSONRPCError(RPC_DATABASE_ERROR, state.ToString());
+    }
+    return UniValue::VNULL;
+},
+    };
+}
+
 static RPCHelpMan getchaintxstats()
 {
     return RPCHelpMan{"getchaintxstats",
@@ -4182,6 +4252,8 @@ void RegisterBlockchainRPCCommands(CRPCTable& t)
         {"hidden", &getblockfileinfo},
         {"hidden", &invalidateblock},
         {"hidden", &reconsiderblock},
+        {"blockchain", &parkblock},
+        {"blockchain", &unparkblock},
         {"blockchain", &waitfornewblock},
         {"blockchain", &waitforblock},
         {"blockchain", &waitforblockheight},

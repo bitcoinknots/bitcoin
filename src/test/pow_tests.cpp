@@ -7,6 +7,7 @@
 #include <pow.h>
 #include <test/util/random.h>
 #include <test/util/setup_common.h>
+#include <uint256.h>
 #include <util/chaintype.h>
 
 #include <boost/test/unit_test.hpp>
@@ -206,6 +207,21 @@ BOOST_AUTO_TEST_CASE(ChainParams_TESTNET4_sanity)
 BOOST_AUTO_TEST_CASE(ChainParams_SIGNET_sanity)
 {
     sanity_check_chainparams(*m_node.args, ChainType::SIGNET);
+}
+
+BOOST_AUTO_TEST_CASE(asert_half_life_doubles_target)
+{
+    const arith_uint256 pow_limit = UintToArith256(uint256{"00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"});
+    arith_uint256 ref;
+    ref.SetCompact(0x1d00ffff);
+    // One half-life behind schedule => target doubles (difficulty halves).
+    const int64_t spacing = 600;
+    const int64_t half_life = 86400;
+    const int64_t height_diff = 0;
+    const int64_t time_diff = half_life + spacing; // (time_diff - spacing*(height_diff+1)) / half_life = 1
+    const arith_uint256 next = CalculateASERT(ref, spacing, time_diff, height_diff, pow_limit, half_life);
+    BOOST_CHECK(next > ref);
+    BOOST_CHECK(next <= pow_limit);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

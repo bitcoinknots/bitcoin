@@ -133,6 +133,11 @@ enum BlockStatus : uint32_t {
 
     BLOCK_STATUS_RESERVED    =   256, //!< Unused flag that was previously set on assumeutxo snapshot blocks and their
                                       //!< ancestors before they were validated, and unset when they were validated.
+
+    //! Local policy: block (or ancestor) parked pending operator unparkblock.
+    BLOCK_PARKED             =   512,
+    BLOCK_PARKED_CHILD       =  1024,
+    BLOCK_PARKED_MASK        =   BLOCK_PARKED | BLOCK_PARKED_CHILD,
 };
 
 /** The block chain is a tree shaped structure starting with the

@@ -2,17 +2,12 @@
 
 ## Supported Versions
 
-See our website for versions of Bitcoin Knots that are currently supported with
-security updates: https://bitcoinknots.org/
+Security updates are tracked in this repository:
+https://github.com/saltduck/bitcoinpurity
 
 ## Reporting a Vulnerability
 
-To report security issues send an email to luke+security+knots@dashjr.org (not for support).
+To report security issues, open a private report or an issue at
+https://github.com/saltduck/bitcoinpurity/issues (not for general support).
 
-The following OpenPGP key should be used to communicate sensitive information:
-
-| Name | Fingerprint |
-|------|-------------|
-| Luke Dashjr | FAC0 98FE 8DF9 975F 9024  1881 3666 E2B1 782A 18E1 |
-
-You can import a key by running the following command with that individual’s fingerprint: `gpg --keyserver hkps://keys.openpgp.org --recv-keys "<fingerprint>"` Ensure that you put quotes around fingerprints containing spaces.
+Do not disclose unfixed vulnerabilities in public pull requests.

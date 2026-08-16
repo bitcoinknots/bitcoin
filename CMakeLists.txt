@@ -26,7 +26,7 @@ get_directory_property(precious_variables CACHE_VARIABLES)
 #=============================
 # Project / Package metadata
 #=============================
-set(CLIENT_NAME "Bitcoin Knots")
+set(CLIENT_NAME "Bitcoin Purity")
 set(CLIENT_VERSION_MAJOR 29)
 set(CLIENT_VERSION_MINOR 4)
 set(CLIENT_VERSION_BUILD 0)
@@ -34,7 +34,7 @@ set(CLIENT_VERSION_RC 0)
 set(CLIENT_VERSION_IS_RELEASE "true")
 set(COPYRIGHT_YEAR "2026")
 
-set(CLIENT_VERSION_SUFFIX ".knots20260508")
+set(CLIENT_VERSION_SUFFIX ".purity20260816")
 
 # During the enabling of the CXX and CXXOBJ languages, we modify
 # CMake's compiler/linker invocation strings by appending the content
@@ -55,7 +55,7 @@ set(CMAKE_TRY_COMPILE_PLATFORM_VARIABLES
 project(BitcoinCore
   VERSION ${CLIENT_VERSION_MAJOR}.${CLIENT_VERSION_MINOR}.${CLIENT_VERSION_BUILD}
   DESCRIPTION "Bitcoin client software"
-  HOMEPAGE_URL "https://bitcoinknots.org/"
+  HOMEPAGE_URL "https://github.com/saltduck/bitcoinpurity"
   LANGUAGES NONE
 )
 
@@ -66,7 +66,7 @@ endif()
 
 set(COPYRIGHT_HOLDERS "The %s developers")
 set(COPYRIGHT_HOLDERS_FINAL "The ${CLIENT_NAME} developers")
-set(CLIENT_BUGREPORT "https://github.com/bitcoinknots/bitcoin/issues")
+set(CLIENT_BUGREPORT "https://github.com/saltduck/bitcoinpurity/issues")
 
 #=============================
 # Language setup
@@ -318,36 +318,14 @@ if(BUILD_FOR_FUZZING)
   )
 endif()
 
-set(RDTS_CONSENT "UNSET" CACHE STRING "RDTS (BIP110) consent behaviour.")
+set(RDTS_CONSENT "IMPLICIT" CACHE STRING "RDTS is always enforced in Bitcoin Purity.")
 set(RDTS_CONSENT_OPTIONS "RUNTIME_CHECK" "RUNTIME_WARN" "IMPLICIT")
-set_property(CACHE RDTS_CONSENT PROPERTY STRINGS "UNSET" ${RDTS_CONSENT_OPTIONS})
-list(APPEND RDTS_CONSENT_OPTIONS "UNSUPPORTED_UNSAFE_NO_ENFORCEMENT")
-if(RDTS_CONSENT MATCHES "^(1|ON|YES|TRUE|Y)$")
+set_property(CACHE RDTS_CONSENT PROPERTY STRINGS ${RDTS_CONSENT_OPTIONS})
+if(RDTS_CONSENT STREQUAL "UNSUPPORTED_UNSAFE_NO_ENFORCEMENT" OR RDTS_CONSENT STREQUAL "UNSET")
   set(RDTS_CONSENT "IMPLICIT")
 endif()
-if(BUILD_DAEMON OR BUILD_GUI OR BUILD_KERNEL_LIB)
-  if(NOT RDTS_CONSENT IN_LIST RDTS_CONSENT_OPTIONS)
-    message(FATAL_ERROR
-      "RDTS_CONSENT is not set.\n"
-      "This version of Bitcoin Knots applies the BIP110 (RDTS) network upgrade, which fixes critical vulnerabilities in long-standing network design. To avoid applying this upgrade by accident, please choose whether to accept it now, or defer explicit confirmation until runtime.\n"
-      "Important: Because this upgrade already has broad community support, reverting to an older software version does not reject it. Running outdated software after any network upgrade only leaves your node vulnerable to displaying fake or fraudulent transactions. To effectively reject this upgrade, you need to run alternative software designed to split away from the upgraded network.\n"
-      "To accept this upgrade now, add to your CMake options:\n"
-      "  -D RDTS_CONSENT=IMPLICIT\n"
-      "Or to defer explicit confirmation until runtime (via GUI prompt or consensusrules=rdts config setting):\n"
-      "  -D RDTS_CONSENT=RUNTIME_CHECK    (causes bitcoind to exit if absent)\n"
-      "  -D RDTS_CONSENT=RUNTIME_WARN     (causes bitcoind to warn hourly if absent)\n"
-      "For more information, see: https://bitcoinknots.org/learn/2026-rdts"
-    )
-  endif()
-else()
-  # Nothing else enforces consensus rules, but RDTSConsentFlags::UNSET doesn't actually exist so would break the build
+if(NOT RDTS_CONSENT IN_LIST RDTS_CONSENT_OPTIONS)
   set(RDTS_CONSENT "IMPLICIT")
-endif()
-if(RDTS_CONSENT STREQUAL "UNSUPPORTED_UNSAFE_NO_ENFORCEMENT")
-  list(APPEND configure_warnings
-    "RDTS_CONSENT=UNSUPPORTED_UNSAFE_NO_ENFORCEMENT is NOT a supported option. Use at your own risk!
-Note that this will NOT make your node reject RDTS\; it will merely be insecure after RDTS activates."
-  )
 endif()
 
 # The external_lib_interface interface library aims to encapsulate build flags, which

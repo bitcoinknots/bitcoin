@@ -1,80 +1,57 @@
-Bitcoin Knots
-=============
+Bitcoin Purity
+==============
 
-https://bitcoinknots.org
+https://github.com/saltduck/bitcoinpurity
 
-For an immediately usable, binary version of the Bitcoin Knots software, see
-the website.
+Bitcoin Purity is a full node for Bitcoin as **pure money and a payment system**.
+It is not a data-storage platform, and it should not grow into a general-purpose
+application layer.
 
-What is Bitcoin Knots?
-----------------------
+This repository is a fork of [Bitcoin Knots](https://github.com/bitcoinknots/bitcoin)
+`v29.4.knots20260508`. Consensus rules from BIP110 (Reduced Data / RDTS) are
+kept and made **permanent** via a hard fork. There is **no transaction-level
+replay protection**: addresses, transaction formats, and sighash remain those
+of Bitcoin. The intent is that the legacy chain is eventually abandoned and
+Bitcoin Purity is Bitcoin.
 
-Bitcoin Knots connects to the Bitcoin peer-to-peer network to download and fully
-validate blocks and transactions. It also includes a wallet and graphical user
-interface, which can be optionally built.
+Binaries remain `bitcoind`, `bitcoin-qt`, and `bitcoin-cli`. The default data
+directory remains `~/.bitcoin`.
 
-Further information about Bitcoin Knots is available in the [doc folder](/doc).
+What is Bitcoin Purity?
+-----------------------
+
+Bitcoin Purity connects to the Bitcoin peer-to-peer network, downloads and
+fully validates blocks and transactions, and optionally provides a wallet and
+GUI.
+
+Project documents:
+
+- [Vision](doc/purity-vision.md)
+- [Consensus changes](doc/purity-consensus.md)
+- [Roadmap](doc/roadmap.md)
+- [Setup and build](doc/README.md)
+
+Short-term consensus (see [doc/purity-consensus.md](doc/purity-consensus.md)):
+
+1. BIP110/RDTS rules are always on and cannot be disabled.
+2. Difficulty uses 24-hour ASERT (`aserti3-1d`), anchored at BIP110 enforcement-chain block 961632. Proof-of-work remains SHA256d.
+3. Reorgs deeper than 6 blocks are parked for human review (Bitcoin Cash Node-style).
+4. Automatic freeze of double-spend coinbases and inputs is specified but **not implemented** yet.
 
 License
 -------
 
-Bitcoin Knots is released under the terms of the MIT license. See [COPYING](COPYING) for more
-information or see https://opensource.org/licenses/MIT.
+Bitcoin Purity is released under the MIT license. See [COPYING](COPYING).
 
 Development Process
 -------------------
 
-Development generally takes place as part of [Bitcoin Core](https://github.com/bitcoin/bitcoin), and is merged into
-Knots for each release.
-
-Even if your pull request to Core is closed, or if your feature is not
-suitable for Core (eg, because it builds on a feature not supported in Core;
-relies on centralised services; etc), it may still be eligible for inclusion
-in Bitcoin Knots. In this case, a pull request may be opened on the
-[Knots GitHub](https://github.com/bitcoinknots/bitcoin) for review and consideration.
-When accepted, you are expected to maintain the submitted branch in your own
-repository, and it will be automatically merged into new releases of Knots.
-
-Developer IRC can be found on Freenode at #bitcoin-dev.
+Development happens in this repository: [saltduck/bitcoinpurity](https://github.com/saltduck/bitcoinpurity).
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Testing
 -------
 
-Testing and code review is the bottleneck for development; we get more pull
-requests than we can review and test on short notice. Please be patient and help out by testing
-other people's pull requests, and remember this is a security-critical project where any mistake might cost people
-lots of money.
+Unit tests: `ctest` (see [src/test/README.md](/src/test/README.md)).
 
-### Automated Testing
-
-Developers are strongly encouraged to write [unit tests](src/test/README.md) for new code, and to
-submit new unit tests for old code. Unit tests can be compiled and run
-(assuming they weren't disabled during the generation of the build system) with: `ctest`. Further details on running
-and extending unit tests can be found in [/src/test/README.md](/src/test/README.md).
-
-There are also [regression and integration tests](/test), written
-in Python.
-These tests can be run (if the [test dependencies](/test) are installed) with: `build/test/functional/test_runner.py`
-(assuming `build` is your build directory).
-
-The CI (Continuous Integration) systems make sure that every pull request is built for Windows, Linux, and macOS,
-and that unit/sanity tests are run automatically.
-
-### Manual Quality Assurance (QA) Testing
-
-Changes should be tested by somebody other than the developer who wrote the
-code. This is especially important for large or high-risk changes. It is useful
-to add a test plan to the pull request description if testing the changes is
-not straightforward.
-
-Translations
-------------
-
-Changes to translations as well as new translations can be submitted to
-[Bitcoin Core's Transifex page](https://explore.transifex.com/bitcoin/bitcoin/).
-
-Translations are periodically pulled from Transifex and merged into the git repository. See the
-[translation process](doc/translation_process.md) for details on how this works.
-
-**Important**: We do not accept translation changes as GitHub pull requests because the next
-pull from Transifex would automatically overwrite them again.
+Functional tests: `build/test/functional/test_runner.py` (see [test/README.md](/test/README.md)).

@@ -53,6 +53,9 @@ FUZZ_TARGET(chain)
             BlockStatus::BLOCK_FAILED_CHILD,
             BlockStatus::BLOCK_FAILED_MASK,
             BlockStatus::BLOCK_OPT_WITNESS,
+            BlockStatus::BLOCK_PARKED,
+            BlockStatus::BLOCK_PARKED_CHILD,
+            BlockStatus::BLOCK_PARKED_MASK,
         });
         if (block_status & ~BLOCK_VALID_MASK) {
             continue;

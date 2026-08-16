@@ -1,18 +1,18 @@
-Contributing to Bitcoin Knots
-=============================
+Contributing to Bitcoin Purity
+==============================
 
-The Bitcoin Knots project operates an open contributor model where anyone is
+The Bitcoin Purity project operates an open contributor model where anyone is
 welcome to contribute towards development in the form of peer review, testing
 and patches. This document explains the practical process and guidelines for
 contributing.
 
-First, in terms of structure, there is no particular concept of "core
-developers" in the sense of privileged people. Open source often naturally
-revolves around a meritocracy where contributors earn trust from the developer
-community over time. Nevertheless, some hierarchy is necessary for practical
-purposes. As such, there are repository maintainers who are responsible for
-merging pull requests, the [release cycle](/doc/release-process.md), and
-moderation.
+Work happens in this repository:
+[saltduck/bitcoinpurity](https://github.com/saltduck/bitcoinpurity).
+Do not open PRs against Bitcoin Core or Bitcoin Knots for Purity-specific
+changes.
+
+Repository maintainers merge pull requests, run the
+[release cycle](/doc/release-process.md), and moderate.
 
 Getting Started
 ---------------
@@ -24,51 +24,28 @@ as a new contributor. It also will teach you much more about the code and
 process than opening pull requests. Please refer to the [peer review](#peer-review)
 section below.
 
-Before you start contributing, familiarize yourself with the Bitcoin Core build
-system and tests. Refer to the documentation in the repository on how to build
-Bitcoin Core and how to run the unit tests, functional tests, and fuzz tests.
+Before you start contributing, familiarize yourself with the build system and
+tests in this repository.
 
-There are many open issues of varying difficulty waiting to be fixed.
-If you're looking for somewhere to start contributing, check out the
-[good first issue](https://github.com/bitcoin/bitcoin/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22)
-list or changes that are
-[up for grabs](https://github.com/bitcoin/bitcoin/issues?utf8=%E2%9C%93&q=label%3A%22Up+for+grabs%22).
-Some of them might no longer be applicable. So if you are interested, but
-unsure, you might want to leave a comment on the issue first.
+Consensus and product direction are documented in:
 
-You may also participate in the [Bitcoin Core PR Review Club](https://bitcoincore.reviews/).
+- [doc/purity-vision.md](/doc/purity-vision.md)
+- [doc/purity-consensus.md](/doc/purity-consensus.md)
+- [doc/roadmap.md](/doc/roadmap.md)
 
-### Good First Issue Label
-
-The purpose of the `good first issue` label is to highlight which issues are
-suitable for a new contributor without a deep understanding of the codebase.
-
-However, good first issues can be solved by anyone. If they remain unsolved
-for a longer time, a frequent contributor might address them.
-
-You do not need to request permission to start working on an issue. However,
-you are encouraged to leave a comment if you are planning to work on it. This
-will help other contributors monitor which issues are actively being addressed
-and is also an effective way to request assistance if and when you need it.
+Do not modify vendored dependency source trees (`src/secp256k1`, `src/leveldb`,
+`src/crc32c`, `src/minisketch`).
 
 Communication Channels
 ----------------------
 
-Most communication about Bitcoin development happens on IRC, in the
-`#bitcoin-core-dev` channel on Libera Chat. The easiest way to participate on IRC is
-with the web client, [web.libera.chat](https://web.libera.chat/#bitcoin-core-dev). Chat
-history logs can be found
-on [https://www.erisian.com.au/bitcoin-core-dev/](https://www.erisian.com.au/bitcoin-core-dev/)
-and [https://gnusha.org/bitcoin-core-dev/](https://gnusha.org/bitcoin-core-dev/).
-
 Discussion about codebase improvements happens in GitHub issues and pull
-requests.
+requests on this repository.
 
-The developer
+The Bitcoin developer
 [mailing list](https://groups.google.com/g/bitcoindev)
-should be used to discuss complicated or controversial consensus or P2P protocol changes before working on
-a patch set.
-Archives can be found on [https://gnusha.org/pi/bitcoindev/](https://gnusha.org/pi/bitcoindev/).
+remains a historical venue for protocol discussion; Purity-specific work
+should be recorded here first.
 
 
 Contributor Workflow

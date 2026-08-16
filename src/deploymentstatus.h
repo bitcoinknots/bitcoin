@@ -20,6 +20,10 @@ inline bool DeploymentActiveAfter(const CBlockIndex* pindexPrev, const Consensus
 inline bool DeploymentActiveAfter(const CBlockIndex* pindexPrev, const Consensus::Params& params, Consensus::DeploymentPos dep, VersionBitsCache& versionbitscache)
 {
     assert(Consensus::ValidDeployment(dep));
+    if (dep == Consensus::DEPLOYMENT_REDUCED_DATA) {
+        const int height = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
+        if (height >= params.nPurityActivationHeight) return true;
+    }
     if (ThresholdState::ACTIVE != versionbitscache.State(pindexPrev, params, dep)) return false;
 
     const auto& deployment = params.vDeployments[dep];
@@ -62,6 +66,7 @@ inline bool DeploymentMustSignalAfter(const CBlockIndex* pindexPrev, const Conse
 {
     assert(Consensus::ValidDeployment(dep));
     const auto& deployment = params.vDeployments[dep];
+    if (pindexPrev != nullptr && pindexPrev->nHeight + 1 >= params.nPurityActivationHeight) return false;
     if (deployment.max_activation_height >= std::numeric_limits<int>::max()) return false;
     if (state != ThresholdState::STARTED) return false;  // If must_signal height is reached before start time, abstain from enforcement
     const int nPeriod = params.nMinerConfirmationWindow;

@@ -69,11 +69,14 @@ std::string FormatSubVersion(const std::string& name, int nClientVersion, const 
     if (!comments.empty()) comments_str = strprintf("(%s)", Join(comments, "; "));
     std::string ua = strprintf("/%s:%s%s/", name, FormatVersion(nClientVersion), comments_str);
     if (!base_name_only) {
-        static const auto ua_knots = []() -> std::string {
-            const auto pos{CLIENT_BUILD.find(".knots")};
-            return "Knots:" + CLIENT_BUILD.substr(pos + 6) + "/";
+        static const auto ua_purity = []() -> std::string {
+            const auto pos{CLIENT_BUILD.find(".purity")};
+            if (pos == std::string::npos) {
+                return "Purity/";
+            }
+            return "Purity:" + CLIENT_BUILD.substr(pos + 7) + "/";
         }();
-        ua += ua_knots;
+        ua += ua_purity;
     }
     return ua;
 }
@@ -92,7 +95,7 @@ std::string CopyrightHolders(const std::string& strPrefix)
 
 std::string LicenseInfo()
 {
-    const std::string URL_SOURCE_CODE = "<https://github.com/bitcoinknots/bitcoin>";
+    const std::string URL_SOURCE_CODE = "<https://github.com/saltduck/bitcoinpurity>";
 
     return CopyrightHolders(strprintf(_("Copyright (C) %i-%i"), 2009, COPYRIGHT_YEAR).translated + " ") + "\n" +
            "\n" +

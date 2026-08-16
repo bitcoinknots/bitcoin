@@ -1,0 +1,117 @@
+# Bitcoin Purity consensus (short-term hard fork)
+
+This document is the source of truth for the short-term hard fork. Code must
+match it. Long-term ideas belong in [roadmap.md](roadmap.md) and are **not**
+specified here as active rules.
+
+Activation height `nPurityActivationHeight` is **961634** on mainnet (the
+first block after the BIP110 enforcement-chain split at 961632, with a
+one-block margin). Historical Bitcoin / Knots validation is unchanged before
+that height so IBD still works.
+
+**Fork baseline:** the Knots/BIP110 *enforcement* chain that rejected
+non-signaling blocks at height 961632 — not the Core majority chain at the
+same height.
+
+## Unchanged
+
+- SHA256d proof-of-work.
+- P2P magic `f9beb4d9`, default port 8333.
+- Address formats, transaction serialization, sighash (no replay protection).
+- Block size / weight limits inherited from Bitcoin.
+
+## 1. Permanent RDTS (BIP110 rules)
+
+BIP110 Reduced Data rules become **always active** at
+`nPurityActivationHeight` and never expire. They cannot be turned off with
+`-consensusrules`, `rdts_consent_flag`, or similar.
+
+After activation, version-bit 4 mandatory signaling is not required. The
+rules are consensus, not a miner poll.
+
+### Output size
+
+Defined in `src/consensus/consensus.h`:
+
+- Non-empty non-`OP_RETURN` `scriptPubKey`: at most **34** bytes
+  (`MAX_OUTPUT_SCRIPT_SIZE`).
+- `OP_RETURN` outputs: at most **83** bytes (`MAX_OUTPUT_DATA_SIZE`).
+
+### Script (`SCRIPT_VERIFY_REDUCED_DATA`)
+
+Defined in `src/script/interpreter.h` / `interpreter.cpp`:
+
+- Script elements at most **256** bytes (`MAX_SCRIPT_ELEMENT_SIZE_REDUCED`),
+  with the documented P2SH redeemScript-push exemption.
+- Taproot control blocks limited to depth **7**
+  (`TAPROOT_CONTROL_MAX_SIZE_REDUCED`).
+- Taproot annex is invalid.
+- `OP_IF` / `OP_NOTIF` forbidden in Tapscript.
+
+Knots deployed this as a temporary BIP9 deployment
+(`max_activation_height = 965664`, `active_duration = 52416`). Purity does
+not wait for 965664: the enforcement chain stalled during mandatory
+signaling, so transaction-level RDTS must turn on at the hard fork.
+
+## 2. Difficulty: aserti3-1d
+
+Port of Bitcoin Cash **aserti3** (integer cubic approximation; no floating
+point). Specification:
+https://upgradespecs.bitcoincashnode.org/2020-11-15-asert/
+
+Parameter change vs BCH `aserti3-2d`:
+
+- Half-life `nDAAHalfLife` = **86400** seconds (24 hours), i.e. `aserti3-1d`.
+- Ideal block time remains 600 seconds.
+
+**Anchor** is enforcement-chain block **961632**:
+
+- `anchor_height` = 961632
+- `anchor_bits` = that block’s `nBits` (filled from the real block when known)
+- `anchor_parent_time` = timestamp of **parent** of 961632 (BCH convention)
+
+From `nPurityActivationHeight` onward, `GetNextWorkRequired` uses ASERT.
+Blocks before that height still use Bitcoin’s 2016-block DAA.
+
+Using an anchor in the past (while the enforcement chain has been behind
+schedule) drops difficulty at the first Purity block so production can resume.
+
+## 3. Deep-reorg parking (local policy, not consensus)
+
+Port of Bitcoin Cash Node parking. **Not** a consensus rule.
+
+- If connecting a block would rewind the active chain by **more than 6**
+  blocks, mark that block **parked** and do not reorg automatically.
+- Operator decides with `parkblock` / `unparkblock`. `invalidateblock` /
+  `reconsiderblock` remain available to reject or restore.
+- Do **not** port BCH Avalanche or automatic unparking.
+- Do **not** port BCH `-maxreorgdepth` auto-finalization.
+
+Default: parking enabled. Depth threshold: 6.
+
+## 4. Double-spend freeze (specified, not implemented)
+
+**Status: draft only. No code in this release.**
+
+Bitcoin Cash DSProofs are mempool notifications only and are **not** a freeze
+implementation.
+
+Intended future consensus (to be finalized before coding):
+
+- **When:** a reorg actually connects; an outpoint spent by txid A on the
+  disconnected chain is spent by a different txid B on the new chain.
+- **What:** freeze coinbase outputs of new-chain blocks that contain the
+  conflicting spend; freeze the original input outpoint so it cannot be
+  spent again.
+- **Not while parked:** detection may log; freeze applies only if the reorg
+  is accepted (unparked and connected), so the set is determined by chain
+  history rather than local park state.
+
+All nodes must compute the same freeze set. That requires a later spec
+revision covering IBD, assumevalid, and pruned nodes.
+
+## Testnets
+
+Regtest may activate Purity rules at low height for tests. Public testnet /
+signet parameters are chosen when those networks are actually used; they are
+not required to match mainnet dates.

@@ -127,6 +127,12 @@ struct Params {
     bool fPowNoRetargeting;
     int64_t nPowTargetSpacing;
     int64_t nPowTargetTimespan;
+    /** Height at which Purity hard-fork rules (permanent RDTS + aserti3-1d) begin. */
+    int nPurityActivationHeight{std::numeric_limits<int>::max()};
+    /** ASERT half-life in seconds (86400 = aserti3-1d). */
+    int64_t nDAAHalfLife{24 * 60 * 60};
+    /** ASERT anchor height (BIP110 enforcement-chain block 961632 on mainnet). */
+    int nAsertAnchorHeight{0};
     std::chrono::seconds PowTargetSpacing() const
     {
         return std::chrono::seconds{nPowTargetSpacing};

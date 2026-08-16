@@ -163,6 +163,8 @@ const std::vector<std::string> RPC_COMMANDS_SAFE_FOR_FUZZING{
     "gettxspendingprevout",
     "help",
     "invalidateblock",
+    "parkblock",
+    "unparkblock",
     "joinpsbts",
     "listbanned",
     "listmempooltransactions",

@@ -3679,9 +3679,10 @@ CBlockIndex* Chainstate::FindMostWorkChain()
             // for the most work chain if we come across them; we can't switch
             // to a chain unless we have all the non-active-chain parent blocks.
             bool fFailedChain = pindexTest->nStatus & BLOCK_FAILED_MASK;
+            bool fParkedChain = pindexTest->nStatus & BLOCK_PARKED_MASK;
             bool fMissingData = !(pindexTest->nStatus & BLOCK_HAVE_DATA);
-            if (fFailedChain || fMissingData) {
-                // Candidate chain is not usable (either invalid or missing data)
+            if (fFailedChain || fParkedChain || fMissingData) {
+                // Candidate chain is not usable (invalid, parked, or missing data)
                 if (fFailedChain && (m_chainman.m_best_invalid == nullptr || pindexNew->nChainWork > m_chainman.m_best_invalid->nChainWork)) {
                     m_chainman.m_best_invalid = pindexNew;
                 }
@@ -3690,6 +3691,9 @@ CBlockIndex* Chainstate::FindMostWorkChain()
                 while (pindexTest != pindexFailed) {
                     if (fFailedChain) {
                         pindexFailed->nStatus |= BLOCK_FAILED_CHILD;
+                        m_blockman.m_dirty_blockindex.insert(pindexFailed);
+                    } else if (fParkedChain) {
+                        pindexFailed->nStatus |= BLOCK_PARKED_CHILD;
                         m_blockman.m_dirty_blockindex.insert(pindexFailed);
                     } else if (fMissingData) {
                         // If we're missing data, then add back to m_blocks_unlinked,
@@ -3911,6 +3915,25 @@ bool Chainstate::ActivateBestChain(BlockValidationState& state, std::shared_ptr<
                 // Whether we have anything to do at all.
                 if (pindexMostWork == nullptr || pindexMostWork == m_chain.Tip()) {
                     break;
+                }
+
+                if (m_chainman.m_options.park_deep_reorg && m_chain.Tip() && pblock &&
+                    pblock->GetHash() == pindexMostWork->GetBlockHash()) {
+                    const CBlockIndex* fork = m_chain.FindFork(pindexMostWork);
+                    const int rewind = m_chain.Tip()->nHeight - (fork ? fork->nHeight : 0);
+                    if (rewind > m_chainman.m_options.park_reorg_depth) {
+                        CBlockIndex* to_park = pindexMostWork;
+                        if (fork) {
+                            to_park = pindexMostWork->GetAncestor(fork->nHeight + 1);
+                        }
+                        LogPrintf("Parking block %s at height %d (reorg depth %d exceeds %d); use unparkblock to accept or invalidateblock to reject\n",
+                                  to_park->GetBlockHash().ToString(), to_park->nHeight, rewind, m_chainman.m_options.park_reorg_depth);
+                        to_park->nStatus |= BLOCK_PARKED;
+                        m_blockman.m_dirty_blockindex.insert(to_park);
+                        setBlockIndexCandidates.erase(to_park);
+                        pindexMostWork = nullptr;
+                        continue;
+                    }
                 }
 
                 bool fInvalidFound = false;
@@ -4250,9 +4273,49 @@ void Chainstate::ResetBlockFailureFlags(CBlockIndex *pindex) {
     }
 }
 
+bool Chainstate::ParkBlock(BlockValidationState& state, CBlockIndex* pindex)
+{
+    AssertLockNotHeld(m_chainstate_mutex);
+    AssertLockNotHeld(::cs_main);
+    LOCK(m_chainstate_mutex);
+    LOCK(::cs_main);
+
+    if (m_chain.Contains(pindex)) {
+        return state.Error("Cannot park a block on the active chain; use invalidateblock");
+    }
+    pindex->nStatus |= BLOCK_PARKED;
+    m_blockman.m_dirty_blockindex.insert(pindex);
+    setBlockIndexCandidates.erase(pindex);
+    return true;
+}
+
+void Chainstate::UnparkBlock(CBlockIndex* pindex)
+{
+    AssertLockHeld(cs_main);
+    const int nHeight = pindex->nHeight;
+    for (auto& [_, block_index] : m_blockman.m_block_index) {
+        if (block_index.GetAncestor(nHeight) == pindex && (block_index.nStatus & BLOCK_PARKED_MASK)) {
+            block_index.nStatus &= ~BLOCK_PARKED_MASK;
+            m_blockman.m_dirty_blockindex.insert(&block_index);
+            TryAddBlockIndexCandidate(&block_index);
+        }
+    }
+    while (pindex != nullptr) {
+        if (pindex->nStatus & BLOCK_PARKED_MASK) {
+            pindex->nStatus &= ~BLOCK_PARKED_MASK;
+            m_blockman.m_dirty_blockindex.insert(pindex);
+            TryAddBlockIndexCandidate(pindex);
+        }
+        pindex = pindex->pprev;
+    }
+}
+
 void Chainstate::TryAddBlockIndexCandidate(CBlockIndex* pindex)
 {
     AssertLockHeld(cs_main);
+    if (pindex->nStatus & BLOCK_PARKED_MASK) {
+        return;
+    }
     // The block only is a candidate for the most-work-chain if it has the same
     // or more work than our current tip.
     if (m_chain.Tip() != nullptr && setBlockIndexCandidates.value_comp()(pindex, m_chain.Tip())) {
@@ -6009,8 +6072,8 @@ void ChainstateManager::CheckBlockIndex()
             if (!CBlockIndexWorkComparator()(pindex, c->m_chain.Tip()) && (pindexFirstNeverProcessed == nullptr || pindex == snap_base)) {
                 // If pindex was detected as invalid (pindexFirstInvalid is
                 // non-null), it is not required to be in
-                // setBlockIndexCandidates.
-                if (pindexFirstInvalid == nullptr) {
+                // setBlockIndexCandidates. Parked blocks are also excluded.
+                if (pindexFirstInvalid == nullptr && !(pindex->nStatus & BLOCK_PARKED_MASK)) {
                     // If pindex and all its parents back to the genesis block
                     // or an assumeutxo snapshot block downloaded transactions,
                     // and the transactions were not pruned (pindexFirstMissing
@@ -6890,31 +6953,7 @@ ChainstateManager::ChainstateManager(const util::SignalInterrupt& interrupt, Opt
       m_blockman{interrupt, std::move(blockman_options)},
       m_validation_cache{m_options.script_execution_cache_bytes, m_options.signature_cache_bytes}
 {
-    if (GetParams().IsTestChain()
-        ? (!g_enable_rdts)
-        : GetConsensus().vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].nStartTime == Consensus::BIP9Deployment::NEVER_ACTIVE) {
-        m_options.notifications.warningSet(kernel::Warning::RULES_NOT_CONSENTED,
-            strprintf(_("Warning: RDTS is not enabled. This node is therefore vulnerable to displaying fake or fraudulent transactions. To enable RDTS enforcement and disable this warning, add %s to your %s file."),
-                CONSENSUSRULES_CONFIG_NAME + "=" + CONSENSUSRULES_REQUIRED,
-#ifdef BUILDING_FOR_LIBBITCOINKERNEL
-                "bitcoin.conf"
-#else
-                gArgs.GetPathArg("-conf", BITCOIN_CONF_FILENAME).utf8string()
-#endif
-            )
-        );
-    } else if (g_rdts_warning) {
-        m_options.notifications.warningSet(kernel::Warning::RULES_NOT_CONSENTED,
-            strprintf(_("Warning: This software applies the BIP110/RDTS network upgrade, but explicit confirmation has not been configured. To confirm this upgrade and dismiss this warning, add %s to your %s file."),
-                CONSENSUSRULES_CONFIG_NAME + "=" + CONSENSUSRULES_REQUIRED,
-#ifdef BUILDING_FOR_LIBBITCOINKERNEL
-                "bitcoin.conf"
-#else
-                gArgs.GetPathArg("-conf", BITCOIN_CONF_FILENAME).utf8string()
-#endif
-            )
-        );
-    }
+    // RDTS is always enforced in Bitcoin Purity.
 }
 
 ChainstateManager::~ChainstateManager()
