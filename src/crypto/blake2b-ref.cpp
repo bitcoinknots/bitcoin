@@ -13,12 +13,15 @@
    https://blake2.net.
 */
 
+#include <bit>
+#include <cstddef>
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 
-#include "blake2.h"
-#include "blake2-impl.h"
+#include <crypto/blake2.h>
+#include <crypto/common.h>
+#include <support/cleanse.h>
 
 static const uint64_t blake2b_IV[8] =
 {
@@ -87,7 +90,7 @@ int blake2b_init_param( blake2b_state *S, const blake2b_param *P )
 
   /* IV XOR ParamBlock */
   for( i = 0; i < 8; ++i )
-    S->h[i] ^= load64( p + sizeof( S->h[i] ) * i );
+    S->h[i] ^= ReadLE64( p + sizeof( S->h[i] ) * i );
 
   S->outlen = P->digest_length;
   return 0;
@@ -105,9 +108,9 @@ int blake2b_init( blake2b_state *S, size_t outlen )
   P->key_length    = 0;
   P->fanout        = 1;
   P->depth         = 1;
-  store32( &P->leaf_length, 0 );
-  store32( &P->node_offset, 0 );
-  store32( &P->xof_length, 0 );
+  WriteLE32( (std::byte*)&P->leaf_length, 0 );
+  WriteLE32( (std::byte*)&P->node_offset, 0 );
+  WriteLE32( (std::byte*)&P->xof_length, 0 );
   P->node_depth    = 0;
   P->inner_length  = 0;
   memset( P->reserved, 0, sizeof( P->reserved ) );
@@ -129,9 +132,9 @@ int blake2b_init_key( blake2b_state *S, size_t outlen, const void *key, size_t k
   P->key_length    = (uint8_t)keylen;
   P->fanout        = 1;
   P->depth         = 1;
-  store32( &P->leaf_length, 0 );
-  store32( &P->node_offset, 0 );
-  store32( &P->xof_length, 0 );
+  WriteBE32( (std::byte*)&P->leaf_length, 0 );
+  WriteBE32( (std::byte*)&P->node_offset, 0 );
+  WriteBE32( (std::byte*)&P->xof_length, 0 );
   P->node_depth    = 0;
   P->inner_length  = 0;
   memset( P->reserved, 0, sizeof( P->reserved ) );
@@ -145,7 +148,7 @@ int blake2b_init_key( blake2b_state *S, size_t outlen, const void *key, size_t k
     memset( block, 0, BLAKE2B_BLOCKBYTES );
     memcpy( block, key, keylen );
     blake2b_update( S, block, BLAKE2B_BLOCKBYTES );
-    secure_zero_memory( block, BLAKE2B_BLOCKBYTES ); /* Burn the key from stack */
+    memory_cleanse( block, BLAKE2B_BLOCKBYTES ); /* Burn the key from stack */
   }
   return 0;
 }
@@ -153,13 +156,13 @@ int blake2b_init_key( blake2b_state *S, size_t outlen, const void *key, size_t k
 #define G(r,i,a,b,c,d)                      \
   do {                                      \
     a = a + b + m[blake2b_sigma[r][2*i+0]]; \
-    d = rotr64(d ^ a, 32);                  \
+    d = std::rotr((uint64_t)(d ^ a), 32);   \
     c = c + d;                              \
-    b = rotr64(b ^ c, 24);                  \
+    b = std::rotr((uint64_t)(b ^ c), 24);   \
     a = a + b + m[blake2b_sigma[r][2*i+1]]; \
-    d = rotr64(d ^ a, 16);                  \
+    d = std::rotr((uint64_t)(d ^ a), 16);   \
     c = c + d;                              \
-    b = rotr64(b ^ c, 63);                  \
+    b = std::rotr((uint64_t)(b ^ c), 63);   \
   } while(0)
 
 #define ROUND(r)                    \
@@ -181,7 +184,7 @@ static void blake2b_compress( blake2b_state *S, const uint8_t block[BLAKE2B_BLOC
   size_t i;
 
   for( i = 0; i < 16; ++i ) {
-    m[i] = load64( block + i * sizeof( m[i] ) );
+    m[i] = ReadLE64( block + i * sizeof( m[i] ) );
   }
 
   for( i = 0; i < 8; ++i ) {
@@ -262,10 +265,10 @@ int blake2b_final( blake2b_state *S, void *out, size_t outlen )
   blake2b_compress( S, S->buf );
 
   for( i = 0; i < 8; ++i ) /* Output full hash to temp buffer */
-    store64( buffer + sizeof( S->h[i] ) * i, S->h[i] );
+    WriteLE64( (std::byte*)(buffer + sizeof( S->h[i] ) * i), S->h[i] );
 
   memcpy( out, buffer, S->outlen );
-  secure_zero_memory(buffer, sizeof(buffer));
+  memory_cleanse(buffer, sizeof(buffer));
   return 0;
 }
 
