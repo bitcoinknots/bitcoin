@@ -22,7 +22,7 @@ class CChainParams;
 class ValidationSignals;
 
 static constexpr bool DEFAULT_CHECKPOINTS_ENABLED{true};
-static constexpr bool DEFAULT_PARK_DEEP_REORG{true};
+static constexpr bool DEFAULT_PARK_DEEP_REORG{false};
 static constexpr int DEFAULT_PARK_REORG_DEPTH{6};
 static constexpr auto DEFAULT_MAX_TIP_AGE{24h};
 
