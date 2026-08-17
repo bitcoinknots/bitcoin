@@ -19,8 +19,9 @@ std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, c
 
 /**
  * On mainnet, lock -purityactivationheight into <datadir>/purity_activation_height
- * on first use. Later invocations with a different value are ignored; the locked
- * height is ForceSet into args. Call after the datadir exists and before SelectParams.
+ * on first use. The height must be greater than Consensus::MAINNET_ASERT_ANCHOR_HEIGHT.
+ * Later invocations with a different value are ignored; the locked height is ForceSet
+ * into args. Call after the datadir exists and before SelectParams.
  */
 void ApplyPurityActivationHeightLock(ArgsManager& args);
 

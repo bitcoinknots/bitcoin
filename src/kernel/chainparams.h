@@ -151,7 +151,8 @@ public:
     /**
      * MainOptions holds configurations for creating a mainnet CChainParams.
      * purity_activation_height is set from -purityactivationheight and is
-     * locked into the datadir on first use.
+     * locked into the datadir on first use. When set, it must be greater than
+     * Consensus::MAINNET_ASERT_ANCHOR_HEIGHT.
      */
     struct MainOptions {
         std::optional<int> purity_activation_height{};
