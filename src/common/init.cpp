@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <chainparams.h>
+#include <chainparamsbase.h>
 #include <common/args.h>
 #include <common/init.h>
 #include <logging.h>
@@ -39,8 +40,10 @@ std::optional<ConfigError> InitConfig(ArgsManager& args, SettingsAbortFn setting
             return ConfigError{ConfigStatus::FAILED, strprintf(_("Error reading configuration file: %s"), error)};
         }
 
-        // Check for chain settings (Params() calls are only valid after this clause)
-        SelectParams(args.GetChainType());
+        // Select base params first so GetDataDirNet() works, then ensure the
+        // datadir exists before locking mainnet purity activation height.
+        const ChainType chain{args.GetChainType()};
+        SelectBaseParams(chain);
 
         // Create datadir if it does not exist.
         const auto base_path{args.GetDataDirBase()};
@@ -61,6 +64,13 @@ std::optional<ConfigError> InitConfig(ArgsManager& args, SettingsAbortFn setting
         if (!fs::exists(net_path)) {
             fs::create_directories(net_path / "wallets");
         }
+
+        if (chain == ChainType::MAIN) {
+            ApplyPurityActivationHeightLock(args);
+        }
+
+        // Check for chain settings (Params() calls are only valid after this clause)
+        SelectParams(chain);
 
         // Show an error or warn/log if there is a bitcoin.conf file in the
         // datadir that is being ignored.

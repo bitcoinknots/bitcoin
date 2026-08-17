@@ -18,6 +18,13 @@ class ArgsManager;
 std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, const ChainType chain);
 
 /**
+ * On mainnet, lock -purityactivationheight into <datadir>/purity_activation_height
+ * on first use. Later invocations with a different value are ignored; the locked
+ * height is ForceSet into args. Call after the datadir exists and before SelectParams.
+ */
+void ApplyPurityActivationHeightLock(ArgsManager& args);
+
+/**
  * Return the currently selected parameters. This won't change after app
  * startup, except for unit tests.
  */

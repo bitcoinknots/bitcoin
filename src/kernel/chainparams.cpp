@@ -89,7 +89,7 @@ static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits
  */
 class CMainParams : public CChainParams {
 public:
-    CMainParams() {
+    explicit CMainParams(const MainOptions& opts) {
         m_chain_type = ChainType::MAIN;
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
@@ -108,7 +108,10 @@ public:
         consensus.powLimit = uint256{"00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = 10 * 60;
-        consensus.nPurityActivationHeight = 961634;
+        // Set from -purityactivationheight; unset means hard fork never activates.
+        if (opts.purity_activation_height) {
+            consensus.nPurityActivationHeight = *opts.purity_activation_height;
+        }
         consensus.nDAAHalfLife = 24 * 60 * 60;
         consensus.nAsertAnchorHeight = 961632;
         consensus.fPowAllowMinDifficultyBlocks = false;
@@ -747,9 +750,9 @@ std::unique_ptr<const CChainParams> CChainParams::RegTest(const RegTestOptions& 
     return std::make_unique<const CRegTestParams>(options);
 }
 
-std::unique_ptr<const CChainParams> CChainParams::Main()
+std::unique_ptr<const CChainParams> CChainParams::Main(const MainOptions& options)
 {
-    return std::make_unique<const CMainParams>();
+    return std::make_unique<const CMainParams>(options);
 }
 
 std::unique_ptr<const CChainParams> CChainParams::TestNet()
@@ -775,7 +778,7 @@ std::vector<int> CChainParams::GetAvailableSnapshotHeights() const
 
 std::optional<ChainType> GetNetworkForMagic(const MessageStartChars& message)
 {
-    const auto mainnet_msg = CChainParams::Main()->MessageStart();
+    const auto mainnet_msg = CChainParams::Main({})->MessageStart();
     const auto testnet_msg = CChainParams::TestNet()->MessageStart();
     const auto testnet4_msg = CChainParams::TestNet4()->MessageStart();
     const auto regtest_msg = CChainParams::RegTest({})->MessageStart();

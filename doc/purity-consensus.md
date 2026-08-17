@@ -4,10 +4,15 @@ This document is the source of truth for the short-term hard fork. Code must
 match it. Long-term ideas belong in [roadmap.md](roadmap.md) and are **not**
 specified here as active rules.
 
-Activation height `nPurityActivationHeight` is **961634** on mainnet (the
-first block after the BIP110 enforcement-chain split at 961632, with a
-one-block margin). Historical Bitcoin / Knots validation is unchanged before
-that height so IBD still works.
+Activation height `nPurityActivationHeight` is set on mainnet via the
+`-purityactivationheight=<n>` option (or `purityactivationheight=<n>` in
+`bitcoin.conf`). On **first use** the value is written to
+`<datadir>/purity_activation_height` and becomes permanent for that datadir;
+later attempts to set a different value are ignored. Until the first lock,
+omit the option to leave the hard fork inactive. A provisional value such as
+**961636** (BIP110 enforcement-chain split at 961632 plus margin) may be used
+before the formal mainnet launch. Historical Bitcoin / Knots validation is
+unchanged before that height so IBD still works.
 
 **Fork baseline:** the Knots/BIP110 *enforcement* chain that rejected
 non-signaling blocks at height 961632 — not the Core majority chain at the

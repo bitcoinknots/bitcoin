@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
     kernel::CacheSizes cache_sizes{node::GetDefaultDBCache()};
 
     // SETUP: Chainstate
-    auto chainparams = CChainParams::Main();
+    auto chainparams = CChainParams::Main({});
     const ChainstateManager::Options chainman_opts{
         .chainparams = *chainparams,
         .datadir = abs_datadir,

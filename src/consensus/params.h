@@ -127,7 +127,11 @@ struct Params {
     bool fPowNoRetargeting;
     int64_t nPowTargetSpacing;
     int64_t nPowTargetTimespan;
-    /** Height at which Purity hard-fork rules (permanent RDTS + aserti3-1d) begin. */
+    /**
+     * Height at which Purity hard-fork rules (permanent RDTS + aserti3-1d) begin.
+     * Mainnet value comes from -purityactivationheight, locked into the datadir
+     * on first use. Unset => never activates.
+     */
     int nPurityActivationHeight{std::numeric_limits<int>::max()};
     /** ASERT half-life in seconds (86400 = aserti3-1d). */
     int64_t nDAAHalfLife{24 * 60 * 60};

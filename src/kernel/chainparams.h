@@ -149,6 +149,15 @@ public:
     const ChainTxData& TxData() const { return chainTxData; }
 
     /**
+     * MainOptions holds configurations for creating a mainnet CChainParams.
+     * purity_activation_height is set from -purityactivationheight and is
+     * locked into the datadir on first use.
+     */
+    struct MainOptions {
+        std::optional<int> purity_activation_height{};
+    };
+
+    /**
      * SigNetOptions holds configurations for creating a signet CChainParams.
      */
     struct SigNetOptions {
@@ -181,7 +190,7 @@ public:
 
     static std::unique_ptr<const CChainParams> RegTest(const RegTestOptions& options);
     static std::unique_ptr<const CChainParams> SigNet(const SigNetOptions& options);
-    static std::unique_ptr<const CChainParams> Main();
+    static std::unique_ptr<const CChainParams> Main(const MainOptions& options);
     static std::unique_ptr<const CChainParams> TestNet();
     static std::unique_ptr<const CChainParams> TestNet4();
 
