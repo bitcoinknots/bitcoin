@@ -1,7 +1,7 @@
 Bitcoin Purity
 ==============
 
-https://github.com/saltduck/bitcoinpurity
+https://bitcoinpurity.org
 
 Bitcoin Purity is a full node for Bitcoin as **pure money and a payment system**.
 It is not a data-storage platform, and it should not grow into a general-purpose
