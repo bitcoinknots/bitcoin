@@ -408,6 +408,51 @@ BOOST_AUTO_TEST_CASE(tx_oversized)
     }
 }
 
+/* RDTS output-size consensus limits (enforced once Purity/REDUCED_DATA is active):
+ * OP_RETURN outputs at most MAX_OUTPUT_DATA_SIZE (83) bytes, other non-empty
+ * outputs at most MAX_OUTPUT_SCRIPT_SIZE (34) bytes. */
+BOOST_AUTO_TEST_CASE(tx_rdts_output_size_limits)
+{
+    auto makeTx = [](const CScript& spk) {
+        CMutableTransaction tx;
+        tx.vin.resize(1);
+        tx.vout.emplace_back(1, spk);
+        return CTransaction(tx);
+    };
+
+    // OP_RETURN(1) + OP_PUSHDATA1(2) + 80-byte payload = 83 bytes: valid.
+    const CScript opreturn_max = CScript() << OP_RETURN << std::vector<unsigned char>(80);
+    BOOST_REQUIRE_EQUAL(opreturn_max.size(), MAX_OUTPUT_DATA_SIZE);
+    {
+        TxValidationState state;
+        BOOST_CHECK(Consensus::CheckOutputSizes(makeTx(opreturn_max), state));
+    }
+
+    // 84 bytes: invalid.
+    const CScript opreturn_over = CScript() << OP_RETURN << std::vector<unsigned char>(81);
+    BOOST_REQUIRE_EQUAL(opreturn_over.size(), MAX_OUTPUT_DATA_SIZE + 1);
+    {
+        TxValidationState state;
+        BOOST_CHECK_MESSAGE(!Consensus::CheckOutputSizes(makeTx(opreturn_over), state), "OP_RETURN output over 83 bytes should be invalid");
+        BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txns-vout-script-toolarge");
+    }
+
+    // Non-OP_RETURN outputs: 34 bytes valid, 35 bytes invalid.
+    const CScript nonnull_max = CScript() << OP_TRUE << std::vector<unsigned char>(32);
+    BOOST_REQUIRE_EQUAL(nonnull_max.size(), MAX_OUTPUT_SCRIPT_SIZE);
+    {
+        TxValidationState state;
+        BOOST_CHECK(Consensus::CheckOutputSizes(makeTx(nonnull_max), state));
+    }
+    const CScript nonnull_over = CScript() << OP_TRUE << std::vector<unsigned char>(33);
+    BOOST_REQUIRE_EQUAL(nonnull_over.size(), MAX_OUTPUT_SCRIPT_SIZE + 1);
+    {
+        TxValidationState state;
+        BOOST_CHECK_MESSAGE(!Consensus::CheckOutputSizes(makeTx(nonnull_over), state), "Non-OP_RETURN output over 34 bytes should be invalid");
+        BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txns-vout-script-toolarge");
+    }
+}
+
 BOOST_AUTO_TEST_CASE(basic_transaction_tests)
 {
     // Random real transaction (e2769b09e784f32f62ef849763d4f45b98e07ba658647343b915ff832b110436)
