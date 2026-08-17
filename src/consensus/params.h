@@ -38,6 +38,9 @@ enum DeploymentPos : uint16_t {
 };
 constexpr bool ValidDeployment(DeploymentPos dep) { return dep < MAX_VERSION_BITS_DEPLOYMENTS; }
 
+/** Mainnet aserti3-1d anchor: BIP110 enforcement-chain block 961632. */
+inline constexpr int MAINNET_ASERT_ANCHOR_HEIGHT{961632};
+
 /**
  * Struct for each individual consensus rule change using BIP9.
  */
@@ -130,7 +133,9 @@ struct Params {
     /**
      * Height at which Purity hard-fork rules (permanent RDTS + aserti3-1d) begin.
      * Mainnet value comes from -purityactivationheight, locked into the datadir
-     * on first use. Unset => never activates.
+     * on first use. Unset => never activates. When set, must be greater than
+     * MAINNET_ASERT_ANCHOR_HEIGHT so GetNextASERTWorkRequired can resolve the
+     * anchor as an ancestor of the last pre-fork block.
      */
     int nPurityActivationHeight{std::numeric_limits<int>::max()};
     /** ASERT half-life in seconds (86400 = aserti3-1d). */

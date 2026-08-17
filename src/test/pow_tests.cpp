@@ -4,11 +4,13 @@
 
 #include <chain.h>
 #include <chainparams.h>
+#include <consensus/params.h>
 #include <pow.h>
 #include <test/util/random.h>
 #include <test/util/setup_common.h>
 #include <uint256.h>
 #include <util/chaintype.h>
+#include <util/string.h>
 
 #include <boost/test/unit_test.hpp>
 
@@ -222,6 +224,23 @@ BOOST_AUTO_TEST_CASE(asert_half_life_doubles_target)
     const arith_uint256 next = CalculateASERT(ref, spacing, time_diff, height_diff, pow_limit, half_life);
     BOOST_CHECK(next > ref);
     BOOST_CHECK(next <= pow_limit);
+}
+
+BOOST_AUTO_TEST_CASE(asert_at_purity_activation_uses_anchor)
+{
+    ArgsManager args;
+    args.ForceSetArg("-datadir", fs::PathToString(m_args.GetDataDirBase()));
+    args.ForceSetArg("-purityactivationheight", util::ToString(Consensus::MAINNET_ASERT_ANCHOR_HEIGHT + 1));
+    const auto chainParams = CreateChainParams(args, ChainType::MAIN);
+    const auto& params = chainParams->GetConsensus();
+
+    CBlockIndex pindexLast;
+    pindexLast.nHeight = Consensus::MAINNET_ASERT_ANCHOR_HEIGHT;
+    pindexLast.nTime = 1231006505;
+    pindexLast.nBits = 0x1d00ffff;
+
+    const unsigned int asert_nbits = GetNextASERTWorkRequired(&pindexLast, nullptr, params);
+    BOOST_CHECK_EQUAL(GetNextWorkRequired(&pindexLast, nullptr, params), asert_nbits);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
