@@ -215,6 +215,21 @@ unsigned int GetNextASERTWorkRequired(const CBlockIndex* pindexPrev, const CBloc
     return nextTarget.GetCompact();
 }
 
+bool CheckDifficultyBits(unsigned int claimed_nbits, unsigned int required_nbits, int height, const Consensus::Params& params)
+{
+    if (height == params.nPurityActivationHeight) {
+        const auto claimed_target{DeriveTarget(claimed_nbits, params.powLimit)};
+        if (!claimed_target) return false;
+
+        const auto required_target{DeriveTarget(required_nbits, params.powLimit)};
+        if (!required_target) return false;
+
+        return *claimed_target <= *required_target;
+    }
+
+    return claimed_nbits == required_nbits;
+}
+
 // Bypasses the actual proof of work check during fuzz testing with a simplified validation checking whether
 // the most significant bit of the last byte of the hash is set.
 bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params& params)

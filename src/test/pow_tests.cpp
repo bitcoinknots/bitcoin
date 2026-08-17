@@ -10,6 +10,8 @@
 #include <uint256.h>
 #include <util/chaintype.h>
 
+#include <vector>
+
 #include <boost/test/unit_test.hpp>
 
 BOOST_FIXTURE_TEST_SUITE(pow_tests, BasicTestingSetup)
@@ -222,6 +224,103 @@ BOOST_AUTO_TEST_CASE(asert_half_life_doubles_target)
     const arith_uint256 next = CalculateASERT(ref, spacing, time_diff, height_diff, pow_limit, half_life);
     BOOST_CHECK(next > ref);
     BOOST_CHECK(next <= pow_limit);
+}
+
+/** Build a short header chain covering the ASERT anchor through the block before `tip_height`. */
+static std::vector<CBlockIndex> MakeAsertChain(const Consensus::Params& params, int tip_height, uint32_t nbits, int64_t extra_time = 0)
+{
+    const int first_height = params.nAsertAnchorHeight - 1;
+    BOOST_REQUIRE(tip_height >= params.nAsertAnchorHeight);
+    std::vector<CBlockIndex> blocks(tip_height - first_height + 1);
+    const uint32_t t0 = 1'700'000'000;
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        blocks[i].nHeight = first_height + static_cast<int>(i);
+        blocks[i].nTime = t0 + static_cast<uint32_t>(i) * params.nPowTargetSpacing;
+        blocks[i].nBits = nbits;
+        if (i > 0) {
+            blocks[i].pprev = &blocks[i - 1];
+        }
+    }
+    blocks.back().nTime += extra_time;
+    return blocks;
+}
+
+BOOST_AUTO_TEST_CASE(purity_asert_difficulty_is_a_floor)
+{
+    Consensus::Params params = CreateChainParams(*m_node.args, ChainType::MAIN)->GetConsensus();
+    params.nPurityActivationHeight = 961636;
+    const int activation = params.nPurityActivationHeight;
+
+    // On-schedule timestamps => ASERT target ≈ anchor target, leaving room both harder and easier.
+    const unsigned int anchor_nbits = 0x1a00ffff;
+    auto blocks = MakeAsertChain(params, activation - 1, anchor_nbits);
+    const unsigned int asert_nbits = GetNextASERTWorkRequired(&blocks.back(), nullptr, params);
+    BOOST_CHECK_EQUAL(GetNextWorkRequired(&blocks.back(), nullptr, params), asert_nbits);
+    BOOST_REQUIRE(DeriveTarget(asert_nbits, params.powLimit).has_value());
+
+    arith_uint256 asert_target;
+    asert_target.SetCompact(asert_nbits);
+
+    arith_uint256 harder_target = asert_target >> 1;
+    BOOST_REQUIRE(harder_target > 0);
+    const unsigned int harder_nbits = harder_target.GetCompact();
+    arith_uint256 harder_decoded;
+    harder_decoded.SetCompact(harder_nbits);
+    BOOST_REQUIRE(harder_decoded < asert_target);
+
+    arith_uint256 easier_target = asert_target << 1;
+    const arith_uint256 pow_limit = UintToArith256(params.powLimit);
+    BOOST_REQUIRE(easier_target <= pow_limit);
+    const unsigned int easier_nbits = easier_target.GetCompact();
+    arith_uint256 easier_decoded;
+    easier_decoded.SetCompact(easier_nbits);
+    BOOST_REQUIRE(easier_decoded > asert_target);
+
+    // Only the activation-height header may be harder than ASERT.
+    BOOST_CHECK(CheckDifficultyBits(asert_nbits, asert_nbits, activation, params));
+    BOOST_CHECK(CheckDifficultyBits(harder_nbits, asert_nbits, activation, params));
+    BOOST_CHECK(!CheckDifficultyBits(easier_nbits, asert_nbits, activation, params));
+
+    // Before and after activation, nBits must match exactly.
+    BOOST_CHECK(CheckDifficultyBits(asert_nbits, asert_nbits, activation - 1, params));
+    BOOST_CHECK(!CheckDifficultyBits(harder_nbits, asert_nbits, activation - 1, params));
+    BOOST_CHECK(!CheckDifficultyBits(easier_nbits, asert_nbits, activation - 1, params));
+    BOOST_CHECK(CheckDifficultyBits(asert_nbits, asert_nbits, activation + 1, params));
+    BOOST_CHECK(!CheckDifficultyBits(harder_nbits, asert_nbits, activation + 1, params));
+    BOOST_CHECK(!CheckDifficultyBits(easier_nbits, asert_nbits, activation + 1, params));
+
+    // Illegal compact / target above powLimit remain invalid at activation.
+    BOOST_CHECK(!CheckDifficultyBits(/* overflow */ ~0x00800000U, asert_nbits, activation, params));
+    BOOST_CHECK(!CheckDifficultyBits(UintToArith256(params.powLimit).GetCompact(/* fNegative */ true), asert_nbits, activation, params));
+    arith_uint256 over_limit = pow_limit << 1;
+    BOOST_CHECK(!CheckDifficultyBits(over_limit.GetCompact(), asert_nbits, activation, params));
+
+    // CheckProofOfWork still uses the claimed nBits: a hash that only meets ASERT
+    // must fail if the header declared a harder target.
+    BOOST_CHECK(CheckProofOfWork(ArithToUint256(asert_target), asert_nbits, params));
+    BOOST_CHECK(!CheckProofOfWork(ArithToUint256(asert_target), harder_nbits, params));
+}
+
+BOOST_AUTO_TEST_CASE(purity_asert_accepts_legacy_daa_high_difficulty)
+{
+    Consensus::Params params = CreateChainParams(*m_node.args, ChainType::MAIN)->GetConsensus();
+    params.nPurityActivationHeight = 961636;
+    const int activation = params.nPurityActivationHeight;
+
+    // Current-mainnet-like compact, well below powLimit.
+    const unsigned int legacy_nbits = 0x17078e04;
+    // ~30 days behind schedule eases ASERT well above the legacy target.
+    auto blocks = MakeAsertChain(params, activation - 1, legacy_nbits, /* extra_time */ 30 * 24 * 60 * 60);
+    const unsigned int asert_nbits = GetNextASERTWorkRequired(&blocks.back(), nullptr, params);
+
+    const auto legacy_target = DeriveTarget(legacy_nbits, params.powLimit);
+    const auto asert_target = DeriveTarget(asert_nbits, params.powLimit);
+    BOOST_REQUIRE(legacy_target.has_value() && asert_target.has_value());
+    BOOST_REQUIRE(*legacy_target < *asert_target);
+
+    BOOST_CHECK(CheckDifficultyBits(legacy_nbits, asert_nbits, activation, params));
+    BOOST_CHECK(CheckDifficultyBits(asert_nbits, asert_nbits, activation, params));
+    BOOST_CHECK(!CheckDifficultyBits(legacy_nbits, asert_nbits, activation + 1, params));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

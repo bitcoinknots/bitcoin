@@ -34,6 +34,16 @@ arith_uint256 CalculateASERT(const arith_uint256& refTarget, int64_t nPowTargetS
                              int64_t nHeightDiff, const arith_uint256& powLimit, int64_t nHalfLife);
 unsigned int GetNextASERTWorkRequired(const CBlockIndex* pindexPrev, const CBlockHeader* pblock, const Consensus::Params& params);
 
+/**
+ * Check a block's claimed nBits against the required value from GetNextWorkRequired.
+ *
+ * At nPurityActivationHeight only, ASERT is a maximum allowed target (minimum
+ * difficulty): the decoded claimed target must be <= the decoded required
+ * target. Invalid compact encodings and targets exceeding powLimit are rejected.
+ * At every other height, claimed_nbits must equal required_nbits.
+ */
+bool CheckDifficultyBits(unsigned int claimed_nbits, unsigned int required_nbits, int height, const Consensus::Params& params);
+
 /** Check whether a block hash satisfies the proof-of-work requirement specified by nBits */
 bool CheckProofOfWork(uint256 hash, unsigned int nBits, const Consensus::Params&);
 bool CheckProofOfWorkImpl(uint256 hash, unsigned int nBits, const Consensus::Params&);

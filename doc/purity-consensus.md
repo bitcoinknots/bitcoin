@@ -76,10 +76,26 @@ Parameter change vs BCH `aserti3-2d`:
 - `anchor_parent_time` = timestamp of **parent** of 961632 (BCH convention)
 
 From `nPurityActivationHeight` onward, `GetNextWorkRequired` uses ASERT.
-Blocks before that height still use Bitcoin’s 2016-block DAA.
+**Only at the activation-height block** is ASERT a minimum difficulty
+(maximum allowed target): that header is valid if its decoded `nBits`
+target is **less than or equal to** the ASERT target. Harder `nBits` are
+accepted so a block mined with the legacy 2016-block DAA (current mainnet
+high difficulty) can be the first Purity block when that target does not
+exceed the ASERT maximum.
+
+Compare the decoded `arith_uint256` targets, not the compact `nBits`
+integers. Illegal compact encodings and targets above `powLimit` are still
+rejected. `CheckProofOfWork` continues to check the block hash against the
+block’s own `nBits`, so a harder header must actually meet the harder
+target.
+
+Every other height still requires an exact `nBits` match: the 2016-block
+DAA before activation (Bitcoin Core behaviour), and the ASERT compact
+value from height `nPurityActivationHeight + 1` onward.
 
 Using an anchor in the past (while the enforcement chain has been behind
-schedule) drops difficulty at the first Purity block so production can resume.
+schedule) drops the ASERT floor at the first Purity block so production can
+resume.
 
 ## 3. Deep-reorg parking (local policy, not consensus)
 
