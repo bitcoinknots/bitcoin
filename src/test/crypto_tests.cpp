@@ -434,7 +434,7 @@ BOOST_AUTO_TEST_CASE(blake2b_256_testvectors)
 {
     const auto test = [](const std::string& input, const std::string& expected) {
         std::array<unsigned char, 32> output;
-        BOOST_REQUIRE_EQUAL(blake2b(output.data(), output.size(), input.data(), input.size(), nullptr, 0), 0);
+        BOOST_REQUIRE_EQUAL(blake2b_nokey(output.data(), output.size(), input.data(), input.size()), 0);
         BOOST_CHECK_EQUAL(HexStr(output), expected);
     };
 
