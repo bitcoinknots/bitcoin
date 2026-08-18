@@ -2732,7 +2732,10 @@ static unsigned int GetBlockScriptFlags(const CBlockIndex& block_index, const Ch
         flags |= SCRIPT_VERIFY_UNIFIED_SIGHASH;
     }
 
-    if (DeploymentActiveAt(block_index, chainman, Consensus::DEPLOYMENT_REDUCED_DATA)) {
+    // RDTS (see RdtsActiveAt). Genesis has no parent median-time-past and is
+    // never subject to the RDTS rules.
+    if (block_index.pprev != nullptr &&
+        consensusparams.RdtsActiveAt(block_index.nHeight, block_index.pprev->GetMedianTimePast())) {
         flags |= REDUCED_DATA_MANDATORY_VERIFY_FLAGS;
     }
 
@@ -2950,12 +2953,16 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
     std::vector<PrecomputedTransactionData> txsdata(block.vtx.size());
     CCheckQueueControl<CScriptCheck> control(fScriptChecks && parallel_script_checks ? &m_chainman.GetCheckQueue() : nullptr);
 
-    // For BIP9 deployments, get the activation height dynamically. When RDTS is
+    // RDTS (see RdtsActiveAt): active from the BLAKE2b fork height
+    // until the parent's median-time-past reaches expiry. When RDTS is
     // inactive the start height is 0, so no input is treated as pre-activation and
     // flags_per_input stays empty (keeping the script-execution cache enabled).
-    const bool reduced_data_active{DeploymentActiveAt(*pindex, m_chainman, Consensus::DEPLOYMENT_REDUCED_DATA)};
+    // Grandfathering below compares each input's creating height against the
+    // fork height: activation and the exemption boundary are the same instant
+    // by construction.
+    const bool reduced_data_active{params.GetConsensus().RdtsActiveAt(pindex->nHeight, Assert(pindex->pprev)->GetMedianTimePast())};
     const auto reduced_data_start_height = reduced_data_active
-        ? m_chainman.m_versionbitscache.StateSinceHeight(pindex->pprev, params.GetConsensus(), Consensus::DEPLOYMENT_REDUCED_DATA)
+        ? params.GetConsensus().RdtsActivationHeight()
         : 0;
 
     const CheckTxInputsRules chk_input_rules{reduced_data_active ? CheckTxInputsRules::OutputSizeLimit : CheckTxInputsRules::None};

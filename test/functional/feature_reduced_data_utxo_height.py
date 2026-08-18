@@ -48,11 +48,11 @@ from test_framework.util import (
 from test_framework.wallet import MiniWallet
 
 
-# BIP9 constants for regtest
-BIP9_PERIOD = 144  # blocks per period in regtest
-BIP9_THRESHOLD = 108  # 75% of 144
-VERSIONBITS_TOP_BITS = 0x20000000
-REDUCED_DATA_BIT = 4
+# RDTS activates at the BLAKE2b fork height (see -testactivationheight below)
+ACTIVATION_HEIGHT = 432
+# The first BLAKE2b block's coinbase must contain the headline; this value
+# must match the test framework's default -blake2b_headline argument
+HEADLINE = b'BLAKE2b functional test headline'
 
 # REDUCED_DATA enforces MAX_SCRIPT_ELEMENT_SIZE_REDUCED (256) instead of MAX_SCRIPT_ELEMENT_SIZE (520)
 MAX_ELEMENT_SIZE_STANDARD = 520
@@ -64,13 +64,10 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        # Activate REDUCED_DATA using BIP9 with min_activation_height=288
-        # Due to BIP9 design, period 0 is always DEFINED, so signaling happens in period 1
-        # This activates at height 432 (start of period 3)
-        # Format: deployment:start:timeout:min_activation_height:max_activation_height:active_duration
-        # start_time=0, timeout=999999999999 (never), min_activation_height=288, max=2147483647 (INT_MAX, disabled), active_duration=2147483647 (permanent)
+        # Activate RDTS at the BLAKE2b fork height, with a far-future expiry
         self.extra_args = [[
-            '-vbparams=reduced_data:0:999999999999:288:2147483647:2147483647',
+            f'-testactivationheight=blake2b@{ACTIVATION_HEIGHT}',
+            '-rdtsexpiry=2000000000',
         ]]
 
     def create_p2wsh_funding_and_spending_tx(self, wallet, node, witness_element_size):
@@ -115,24 +112,28 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
 
         return funding_tx, spending_tx
 
-    def create_test_block(self, txs, signal=False):
-        """Create a block with the given transactions."""
+    def create_test_block(self, txs):
+        """Create a block with the given transactions, v1 or v2 to match its height."""
         # Always get fresh tip and height to ensure blocks chain correctly
         tip = self.nodes[0].getbestblockhash()
         height = self.nodes[0].getblockcount() + 1
         tip_header = self.nodes[0].getblockheader(tip)
         block_time = tip_header['time'] + 1
-        block = create_block(int(tip, 16), create_coinbase(height), ntime=block_time, txlist=txs)
-        if signal:
-            block.nVersion = VERSIONBITS_TOP_BITS | (1 << REDUCED_DATA_BIT)
+        coinbase = create_coinbase(height)
+        if height == ACTIVATION_HEIGHT:
+            # The first BLAKE2b block must carry the headline in its coinbase
+            coinbase.vin[0].scriptSig = CScript(bytes(coinbase.vin[0].scriptSig) + HEADLINE)
+            coinbase.rehash()
+        block = create_block(int(tip, 16), coinbase, ntime=block_time, txlist=txs,
+                             height=height, header_v2=height >= ACTIVATION_HEIGHT)
         add_witness_commitment(block)
         block.solve()
         return block
 
-    def mine_blocks(self, count, signal=False):
-        """Mine blocks with optional BIP9 signaling for REDUCED_DATA."""
+    def mine_blocks(self, count):
+        """Mine python-crafted blocks on the current tip."""
         for _ in range(count):
-            block = self.create_test_block([], signal=signal)
+            block = self.create_test_block([])
             result = self.nodes[0].submitblock(block.serialize().hex())
             if result is not None:
                 raise AssertionError(f"submitblock failed: {result}")
@@ -146,62 +147,11 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         # Use MiniWallet for easy UTXO management
         wallet = MiniWallet(node)
 
-        self.log.info("Mining blocks to activate REDUCED_DATA via BIP9...")
+        self.log.info("Mining to the BLAKE2b fork height (RDTS activates there)...")
+        self.generate(wallet, ACTIVATION_HEIGHT)
+        assert_equal(node.getblockcount(), ACTIVATION_HEIGHT)
 
-        # BIP9 state timeline with start_time=0:
-        # - Period 0 (blocks 0-143): DEFINED (cannot signal yet)
-        # - Period 1 (blocks 144-287): STARTED (signal here with 108/144 threshold)
-        # - Period 2 (blocks 288-431): LOCKED_IN (if threshold met in period 1)
-        # - Period 3 (blocks 432-575): ACTIVE
-
-        # Mine through period 0 (DEFINED state)
-        self.log.info("Mining through period 0 (DEFINED)...")
-        self.generate(wallet, 144)
-        self.log.info(f"DEBUG: After period 0, height = {node.getblockcount()}")
-
-        # Mine 108 signaling blocks in period 1 (STARTED state)
-        self.log.info("Mining 108 signaling blocks in period 1 (blocks 144-251)...")
-        self.mine_blocks(108, signal=True)
-        self.log.info(f"DEBUG: After 108 signaling blocks, height = {node.getblockcount()}")
-
-        # Mine to end of period 1 (block 287)
-        self.log.info("Mining to end of period 1 (block 287)...")
-        self.mine_blocks(287 - 144 - 108, signal=False)
-        self.log.info(f"DEBUG: After period 1, height = {node.getblockcount()}")
-
-        # Check that we're LOCKED_IN at start of period 2
-        self.generate(wallet, 1)  # Mine block 288
-        self.log.info(f"DEBUG: After mining block 288, height = {node.getblockcount()}")
-        deployment_info = node.getdeploymentinfo()
-        rd_info = deployment_info['deployments']['reduced_data']
-        if 'bip9' in rd_info:
-            status = rd_info['bip9']['status']
-            self.log.info(f"At height {node.getblockcount()}, REDUCED_DATA status: {status}")
-            assert status == 'locked_in', f"Expected LOCKED_IN at block 288, got {status}"
-        else:
-            raise AssertionError("REDUCED_DATA deployment not found")
-
-        # Mine to block 432 (start of period 3) where activation occurs
-        self.log.info("Mining to block 432 for activation...")
-        self.generate(wallet, 432 - 288)
-
-        current_height = node.getblockcount()
-
-        # Check activation status
-        deployment_info = node.getdeploymentinfo()
-        rd_info = deployment_info['deployments']['reduced_data']
-        if 'bip9' in rd_info:
-            status = rd_info['bip9']['status']
-            self.log.info(f"At height {current_height}, REDUCED_DATA status: {status}")
-            if status == 'active':
-                ACTIVATION_HEIGHT = rd_info['bip9']['since']
-            else:
-                raise AssertionError(f"REDUCED_DATA not active at height {current_height}, status: {status}")
-        else:
-            raise AssertionError("REDUCED_DATA deployment not found")
-
-        self.log.info(f"✓ REDUCED_DATA activated at height {ACTIVATION_HEIGHT}")
-        assert ACTIVATION_HEIGHT == 432, f"Expected activation at 432, got {ACTIVATION_HEIGHT}"
+        self.log.info(f"✓ RDTS active from height {ACTIVATION_HEIGHT}")
 
         # Initialize wallet with some coins
         self.generate(wallet, COINBASE_MATURITY + 10)
@@ -231,7 +181,7 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         )
 
         # Confirm the funding transaction in a block
-        block = self.create_test_block([old_funding_tx], signal=False)
+        block = self.create_test_block([old_funding_tx])
         node.submitblock(block.serialize().hex())
         old_utxo_height = node.getblockcount()
 
@@ -245,20 +195,11 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         current_height = node.getblockcount()
         blocks_to_activation = ACTIVATION_HEIGHT - current_height
         if blocks_to_activation > 0:
-            self.mine_blocks(blocks_to_activation, signal=False)
+            self.mine_blocks(blocks_to_activation)
 
         current_height = node.getblockcount()
         assert_equal(current_height, ACTIVATION_HEIGHT)
         self.log.info(f"At activation height: {current_height}")
-
-        # Verify REDUCED_DATA is active
-        deployment_info = node.getdeploymentinfo()
-        rd_info = deployment_info['deployments']['reduced_data']
-        if 'bip9' in rd_info:
-            status = rd_info['bip9']['status']
-        else:
-            status = 'active' if rd_info.get('active') else 'unknown'
-        assert status == 'active', f"Expected 'active' at height {current_height}, got '{status}'"
 
         # ======================================================================
         # Test 3: Create NEW UTXO at/after activation
@@ -271,14 +212,14 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         )
 
         # Confirm the funding transaction in a block
-        block = self.create_test_block([new_funding_tx], signal=False)
+        block = self.create_test_block([new_funding_tx])
         node.submitblock(block.serialize().hex())
         new_utxo_height = node.getblockcount()
 
         self.log.info(f"Created new P2WSH UTXO at height {new_utxo_height} (>= {ACTIVATION_HEIGHT})")
 
         # Mine a few more blocks
-        self.mine_blocks(5, signal=False)
+        self.mine_blocks(5)
         current_height = node.getblockcount()
         self.log.info(f"Current height: {current_height}")
 
@@ -289,7 +230,7 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         self.log.info(f"        This violates REDUCED_DATA ({MAX_ELEMENT_SIZE_REDUCED} limit) but old UTXOs should be EXEMPT")
 
         # Try to mine block with old_spending_tx (has 300-byte witness element)
-        block = self.create_test_block([old_spending_tx], signal=False)
+        block = self.create_test_block([old_spending_tx])
         result = node.submitblock(block.serialize().hex())
         assert result is None, f"Expected success, got: {result}"
 
@@ -302,7 +243,7 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         self.log.info(f"        This violates REDUCED_DATA ({MAX_ELEMENT_SIZE_REDUCED} limit) and should be REJECTED")
 
         # Try to mine block with new_spending_tx (has 300-byte witness element)
-        block = self.create_test_block([new_spending_tx], signal=False)
+        block = self.create_test_block([new_spending_tx])
         result = node.submitblock(block.serialize().hex())
         assert result is not None and 'mandatory-script-verify-flag-failed' in result, f"Expected rejection, got: {result}"
 
@@ -327,7 +268,7 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         boundary_funding_tx, boundary_spending_tx = self.create_p2wsh_funding_and_spending_tx(
             wallet, node, VIOLATION_SIZE
         )
-        block = self.create_test_block([boundary_funding_tx], signal=False)
+        block = self.create_test_block([boundary_funding_tx])
         result = node.submitblock(block.serialize().hex())
         assert result is None, f"Expected success, got: {result}"
         boundary_height = node.getblockcount()
@@ -336,11 +277,11 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         self.log.info(f"        Created boundary UTXO at height {boundary_height} (exactly at activation)")
 
         # Mine a few blocks past activation
-        self.mine_blocks(5, signal=False)
+        self.mine_blocks(5)
 
         # Try to spend boundary UTXO - should be REJECTED (height ACTIVATION_HEIGHT >= ACTIVATION_HEIGHT)
         self.log.info(f"        Spending boundary UTXO with {VIOLATION_SIZE}-byte witness (should be REJECTED)")
-        block = self.create_test_block([boundary_spending_tx], signal=False)
+        block = self.create_test_block([boundary_spending_tx])
         result = node.submitblock(block.serialize().hex())
         assert result is not None and 'mandatory-script-verify-flag-failed' in result, f"Expected rejection, got: {result}"
 
@@ -364,20 +305,20 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         old_mixed_funding, old_mixed_spending = self.create_p2wsh_funding_and_spending_tx(
             wallet, node, VIOLATION_SIZE
         )
-        block = self.create_test_block([old_mixed_funding], signal=False)
+        block = self.create_test_block([old_mixed_funding])
         node.submitblock(block.serialize().hex())
         old_mixed_height = node.getblockcount()
         self.log.info(f"        Created old UTXO at height {old_mixed_height}")
 
         # Mine to after activation
         blocks_to_mine = ACTIVATION_HEIGHT - node.getblockcount() + 5
-        self.mine_blocks(blocks_to_mine, signal=False)
+        self.mine_blocks(blocks_to_mine)
 
         # Create NEW UTXO at height after activation
         new_mixed_funding, new_mixed_spending = self.create_p2wsh_funding_and_spending_tx(
             wallet, node, VIOLATION_SIZE
         )
-        block = self.create_test_block([new_mixed_funding], signal=False)
+        block = self.create_test_block([new_mixed_funding])
         node.submitblock(block.serialize().hex())
         new_mixed_height = node.getblockcount()
         self.log.info(f"        Created new UTXO at height {new_mixed_height}")
@@ -427,8 +368,8 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         self.log.info(f"        Both inputs have {VIOLATION_SIZE}-byte witness elements")
 
         # Try to mine block - should REJECT because new input violates
-        self.mine_blocks(2, signal=False)
-        block = self.create_test_block([mixed_tx], signal=False)
+        self.mine_blocks(2)
+        block = self.create_test_block([mixed_tx])
         result = node.submitblock(block.serialize().hex())
         assert result is not None and 'mandatory-script-verify-flag-failed' in result, f"Expected rejection, got: {result}"
 
@@ -455,11 +396,11 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         funding_tx, spend_tx = self.create_p2wsh_funding_and_spending_tx(wallet, node, VIOLATION_SIZE)
 
         # Branch A: funding at 431 (exempt).
-        block = self.create_test_block([funding_tx], signal=False)
+        block = self.create_test_block([funding_tx])
         assert_equal(node.submitblock(block.serialize().hex()), None)
         assert_equal(node.getblockcount(), ACTIVATION_HEIGHT - 1)
 
-        self.restart_node(0, extra_args=['-vbparams=reduced_data:0:999999999999:288:2147483647:2147483647', '-par=1'])  # Use single-threaded validation to maximize chance of hitting cache-related issues.
+        self.restart_node(0, extra_args=[f'-testactivationheight=blake2b@{ACTIVATION_HEIGHT}', '-rdtsexpiry=2000000000', '-par=1'])  # Use single-threaded validation to maximize chance of hitting cache-related issues.
 
         # Validate-only block at height 432. This calls TestBlockValidity(fJustCheck=true),
         # which populates the tx-wide script-execution cache under STRICT flags, even though
@@ -473,15 +414,15 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
 
         # Branch B: funding at 432 (non-exempt).
         # Make this empty block unique to avoid duplicate-invalid when rebuilding branch B.
-        block = self.create_test_block([], signal=False)
+        block = self.create_test_block([])
         block.nTime += 1
         block.solve()
         assert_equal(node.submitblock(block.serialize().hex()), None)  # 431
-        block = self.create_test_block([funding_tx], signal=False)
+        block = self.create_test_block([funding_tx])
         assert_equal(node.submitblock(block.serialize().hex()), None)  # 432
 
         # Same spend is now non-exempt and must be rejected.
-        attack_block = self.create_test_block([spend_tx], signal=False)  # 433
+        attack_block = self.create_test_block([spend_tx])  # 433
         result = node.submitblock(attack_block.serialize().hex())
         assert result is not None and 'Push value size limit exceeded' in result, \
             f"Expected rejection after boundary-crossing reorg, got: {result}"
@@ -504,7 +445,7 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         ✓ Test 8: Cache poisoning via activation-boundary reorg prevented
 
         Key validations:
-        • REDUCED_DATA activated via BIP9 signaling at height {ACTIVATION_HEIGHT}
+        • RDTS activated at the BLAKE2b fork height {ACTIVATION_HEIGHT}
         • UTXOs created before activation height are EXEMPT from rules
         • UTXOs created at/after activation height are SUBJECT to rules
         • Per-input validation flags work correctly (validation.cpp)
