@@ -190,7 +190,24 @@ UniValue blockheaderToJSON(const CBlockIndex& tip, const CBlockIndex& blockindex
     result.pushKV("target", GetTarget(blockindex, pow_limit).GetHex());
     result.pushKV("difficulty", GetDifficulty(blockindex));
     result.pushKV("chainwork", blockindex.nChainWork.GetHex());
-    result.pushKV("nTx", blockindex.nTx);
+    if (blockindex.nTx > 0) {
+        result.pushKV("nTx", blockindex.nTx);
+    } else if (blockindex.m_header_v2) {
+        // The block itself hasn't been seen yet, but a v2 header commits to
+        // the number of transactions in it.
+        result.pushKV("nTx", (uint64_t)blockindex.m_txcount);
+    }
+    result.pushKV("header_version", blockindex.m_header_v2 ? 2 : 0);
+    if (blockindex.m_header_v2) {
+        result.pushKV("nonce2", strprintf("%08x", blockindex.m_nonce2));
+        result.pushKV("nonce3", strprintf("%08x", blockindex.m_nonce3));
+        result.pushKV("extranonce", HexStr(blockindex.m_extranonce));
+        result.pushKV("time_offset", (uint64_t)blockindex.m_time_offset);
+        result.pushKV("header_flags", blockindex.m_flags);
+        result.pushKV("xor_key_mask_clear_bits", blockindex.m_xor_key_mask_clear_bits);
+        result.pushKV("xor_key", HexStr(blockindex.m_xor_key));
+        result.pushKV("mm_rhs", HexStr(blockindex.m_mm_rhs));
+    }
 
     if (blockindex.pprev)
         result.pushKV("previousblockhash", blockindex.pprev->GetBlockHash().GetHex());
@@ -793,7 +810,16 @@ static RPCHelpMan getblockheader()
                             {RPCResult::Type::STR_HEX, "target", "The difficulty target"},
                             {RPCResult::Type::NUM, "difficulty", "The difficulty"},
                             {RPCResult::Type::STR_HEX, "chainwork", "Expected number of hashes required to produce the current chain"},
-                            {RPCResult::Type::NUM, "nTx", "The number of transactions in the block"},
+                            {RPCResult::Type::NUM, "nTx", /*optional=*/true, "The number of transactions in the block; for entries where only the header has been seen this is the count committed in the v2 header, and it is omitted when unknown"},
+                            {RPCResult::Type::NUM, "header_version", "2 for a BLAKE2b v2 header, 0 otherwise"},
+                            {RPCResult::Type::STR_HEX, "nonce2", /*optional=*/true, "The second nonce (only present for v2 headers)"},
+                            {RPCResult::Type::STR_HEX, "nonce3", /*optional=*/true, "The third nonce (only present for v2 headers)"},
+                            {RPCResult::Type::STR_HEX, "extranonce", /*optional=*/true, "The 128-bit extranonce (only present for v2 headers)"},
+                            {RPCResult::Type::NUM, "time_offset", /*optional=*/true, "The offset subtracted from the block time on the wire, per header flags bit 2 (only present for v2 headers)"},
+                            {RPCResult::Type::NUM, "header_flags", /*optional=*/true, "The header flags: bits 0-1 ASIC profile, bit 2 time offset in use (only present for v2 headers)"},
+                            {RPCResult::Type::NUM, "xor_key_mask_clear_bits", /*optional=*/true, "The number of high bits cleared in the proof-of-work XOR mask (only present for v2 headers)"},
+                            {RPCResult::Type::STR_HEX, "xor_key", /*optional=*/true, "The 128-bit proof-of-work XOR key (only present for v2 headers)"},
+                            {RPCResult::Type::STR_HEX, "mm_rhs", /*optional=*/true, "The merge-mining hook right-hand side (only present for v2 headers)"},
                             {RPCResult::Type::STR_HEX, "previousblockhash", /*optional=*/true, "The hash of the previous block (if available)"},
                             {RPCResult::Type::STR_HEX, "nextblockhash", /*optional=*/true, "The hash of the next block (if available)"},
                         }},
@@ -972,7 +998,16 @@ static RPCHelpMan getblock()
                     {RPCResult::Type::STR_HEX, "target", "The difficulty target"},
                     {RPCResult::Type::NUM, "difficulty", "The difficulty"},
                     {RPCResult::Type::STR_HEX, "chainwork", "Expected number of hashes required to produce the chain up to this block (in hex)"},
-                    {RPCResult::Type::NUM, "nTx", "The number of transactions in the block"},
+                    {RPCResult::Type::NUM, "nTx", /*optional=*/true, "The number of transactions in the block; for entries where only the header has been seen this is the count committed in the v2 header, and it is omitted when unknown"},
+                    {RPCResult::Type::NUM, "header_version", "2 for a BLAKE2b v2 header, 0 otherwise"},
+                    {RPCResult::Type::STR_HEX, "nonce2", /*optional=*/true, "The second nonce (only present for v2 headers)"},
+                    {RPCResult::Type::STR_HEX, "nonce3", /*optional=*/true, "The third nonce (only present for v2 headers)"},
+                    {RPCResult::Type::STR_HEX, "extranonce", /*optional=*/true, "The 128-bit extranonce (only present for v2 headers)"},
+                    {RPCResult::Type::NUM, "time_offset", /*optional=*/true, "The offset subtracted from the block time on the wire, per header flags bit 2 (only present for v2 headers)"},
+                    {RPCResult::Type::NUM, "header_flags", /*optional=*/true, "The header flags: bits 0-1 ASIC profile, bit 2 time offset in use (only present for v2 headers)"},
+                    {RPCResult::Type::NUM, "xor_key_mask_clear_bits", /*optional=*/true, "The number of high bits cleared in the proof-of-work XOR mask (only present for v2 headers)"},
+                    {RPCResult::Type::STR_HEX, "xor_key", /*optional=*/true, "The 128-bit proof-of-work XOR key (only present for v2 headers)"},
+                    {RPCResult::Type::STR_HEX, "mm_rhs", /*optional=*/true, "The merge-mining hook right-hand side (only present for v2 headers)"},
                     {RPCResult::Type::STR_HEX, "previousblockhash", /*optional=*/true, "The hash of the previous block (if available)"},
                     {RPCResult::Type::STR_HEX, "nextblockhash", /*optional=*/true, "The hash of the next block (if available)"},
                 }},
