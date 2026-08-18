@@ -109,6 +109,21 @@ class TemporaryDeploymentTest(BitcoinTestFramework):
         info = node.getblockchaininfo()
         return info['blocks'] + 1 >= ACTIVATION_HEIGHT and info['mediantime'] < EXPIRY_TIME
 
+    def assert_gbt_rdts(self, node, *, active):
+        """Check getblocktemplate's RDTS surface: the rules entry."""
+        # 'blake2b' is a client-capability rule: required once the template
+        # is a v2 (BLAKE2b) header, ignored before the fork.
+        tmpl = node.getblocktemplate({'rules': ['segwit', 'blake2b']})
+        assert_equal('reduced_data' in tmpl['rules'], active)
+
+    def assert_rdts_deploymentinfo(self, node, *, active):
+        """Check the reduced_data entry in getdeploymentinfo."""
+        rd = node.getdeploymentinfo()['deployments']['reduced_data']
+        assert_equal(rd['type'], 'flagday')
+        assert_equal(rd['height'], ACTIVATION_HEIGHT)
+        assert_equal(rd['expiry_time'], EXPIRY_TIME)
+        assert_equal(rd['active'], active)
+
     def run_test(self):
         node_bip110 = self.nodes[0]
         node_core = self.nodes[1]
@@ -125,6 +140,12 @@ class TemporaryDeploymentTest(BitcoinTestFramework):
         self.sync_all()
 
         assert_equal(self.rdts_active_for_next_block(node_bip110), False)
+
+        # RPC surface pre-fork: no rules entry, deployment reported inactive.
+        self.assert_gbt_rdts(node_bip110, active=False)
+        self.assert_rdts_deploymentinfo(node_bip110, active=False)
+        # A node without RDTS scheduled reports no reduced_data entry.
+        assert 'reduced_data' not in node_core.getdeploymentinfo()['deployments']
 
         # Mine to just before the fork height
         self.log.info("Mining to just before the fork height...")
@@ -143,6 +164,10 @@ class TemporaryDeploymentTest(BitcoinTestFramework):
         assert_equal(node_bip110.getblockcount(), 432)
         assert_equal(self.rdts_active_for_next_block(node_bip110), True)
         self.log.info("Block 432 mined: the deployment is active")
+
+        # RPC surface post-fork: rules entry present, deployment reported active.
+        self.assert_gbt_rdts(node_bip110, active=True)
+        self.assert_rdts_deploymentinfo(node_bip110, active=True)
 
         # Disconnect nodes BEFORE creating invalid block to prevent P2P relay
         # (Bitcoin Core relays blocks via compact blocks before full validation completes)
@@ -251,6 +276,10 @@ class TemporaryDeploymentTest(BitcoinTestFramework):
         # Verify the deployment is over for the next block
         assert_equal(self.rdts_active_for_next_block(node_bip110), False)
         self.log.info("Block 576: the deployment has expired")
+
+        # RPC surface post-expiry: rules entry gone, deployment reported inactive.
+        self.assert_gbt_rdts(node_bip110, active=False)
+        self.assert_rdts_deploymentinfo(node_bip110, active=False)
 
         # =====================================================================
         # Phase 6: Test post-expiry convergence
