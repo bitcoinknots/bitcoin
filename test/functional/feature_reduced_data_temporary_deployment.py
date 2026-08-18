@@ -2,18 +2,19 @@
 # Copyright (c) 2025 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Test temporary BIP9 deployment with active_duration parameter.
+"""Test the temporary RDTS deployment with its median-time-past expiry.
 
-This test verifies that a BIP9 deployment with active_duration properly expires
-after the specified number of blocks. We use REDUCED_DATA as the test deployment
-with active_duration=144 blocks.
+This test verifies that the RDTS deployment activates at the BLAKE2b fork
+height and properly expires once the parent block's median-time-past reaches
+the expiry time.
 
 The test uses two nodes:
-- Node 0: BIP-110 enforcing (active_duration=144)
-- Node 1: Non-BIP-110 (never active, simulates Bitcoin Core)
+- Node 0: BIP-110 enforcing (fork height + expiry scheduled)
+- Node 1: Non-BIP-110 (fork height only, RDTS never active: simulates a node
+  that follows the hardfork but not RDTS)
 
 The test verifies:
-1. BIP9 state transitions: DEFINED -> STARTED -> LOCKED_IN -> ACTIVE
+1. Deployment transitions: inactive -> active (fork height) -> expired (MTP)
 2. Consensus rules ARE enforced during the active period (blocks 432-575)
 3. Chain split: BIP-110 node rejects invalid blocks, non-BIP-110 accepts
 4. Reorg: Longer valid chain wins when nodes reconnect
@@ -21,11 +22,11 @@ The test verifies:
 6. Post-expiry convergence: Both nodes accept the same blocks
 
 Expected timeline:
-- Period 0 (blocks 0-143): DEFINED
-- Period 1 (blocks 144-287): STARTED (signaling happens here)
-- Period 2 (blocks 288-431): LOCKED_IN
-- Period 3 (blocks 432-575): ACTIVE (144 blocks, rules enforced on node0 only)
-- Block 576+: EXPIRED (rules no longer enforced, nodes converge)
+- Blocks 0-431: pre-fork (v1 headers, RDTS inactive)
+- Block 432: BLAKE2b fork block (carries the headline; RDTS activates)
+- Blocks 432-575: ACTIVE (rules enforced on node0 only)
+- Block 576+: EXPIRED once the median-time-past reaches EXPIRY_TIME (both
+  nodes' clocks are frozen there so the boundary lands exactly at 576)
 """
 
 from test_framework.blocktools import (
@@ -44,45 +45,54 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 from test_framework.wallet import MiniWallet
 
-REDUCED_DATA_BIT = 4
-VERSIONBITS_TOP_BITS = 0x20000000
+# RDTS activates at the BLAKE2b fork height (see -testactivationheight below)
+ACTIVATION_HEIGHT = 432
+EXPIRY_TIME = 2000000000
+# The first BLAKE2b block's coinbase must contain the headline; this value
+# must match the test framework's default -blake2b_headline argument
+HEADLINE = b'BLAKE2b functional test headline'
 
 
 class TemporaryDeploymentTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
-        # Node 0: BIP-110 with active_duration=144 blocks
-        # Node 1: BIP-110 never active (simulates Bitcoin Core)
-        # NEVER_ACTIVE = -2 for start_time prevents deployment from ever leaving DEFINED state
+        # Node 0: BIP-110 enforcing (fork height + RDTS expiry)
+        # Node 1: fork height only; with no -rdtsexpiry the deployment is
+        # never scheduled, so RDTS is never active (simulates a non-BIP-110
+        # node on the same hardfork)
         self.extra_args = [
-            ['-vbparams=reduced_data:0:999999999999:0:2147483647:144', '-acceptnonstdtxn=1'],
-            ['-vbparams=reduced_data:-2:-1', '-acceptnonstdtxn=1'],
+            [f'-testactivationheight=blake2b@{ACTIVATION_HEIGHT}', f'-rdtsexpiry={EXPIRY_TIME}', '-acceptnonstdtxn=1'],
+            [f'-testactivationheight=blake2b@{ACTIVATION_HEIGHT}', '-acceptnonstdtxn=1'],
         ]
 
     def setup_network(self):
         self.setup_nodes()
         self.connect_nodes(0, 1)
 
-    def create_block_for_node(self, node, txs=None, signal=False, time_offset=0):
-        """Create a block for a specific node."""
+    def create_block_for_node(self, node, txs=None, time_offset=0):
+        """Create a block for a specific node, v1 or v2 to match its height."""
         if txs is None:
             txs = []
         tip = node.getbestblockhash()
         height = node.getblockcount() + 1
         tip_header = node.getblockheader(tip)
         block_time = tip_header['time'] + 1 + time_offset
-        block = create_block(int(tip, 16), create_coinbase(height), ntime=block_time, txlist=txs)
-        if signal:
-            block.nVersion = VERSIONBITS_TOP_BITS | (1 << REDUCED_DATA_BIT)
+        coinbase = create_coinbase(height)
+        if height == ACTIVATION_HEIGHT:
+            # The first BLAKE2b block must carry the headline in its coinbase
+            coinbase.vin[0].scriptSig = CScript(bytes(coinbase.vin[0].scriptSig) + HEADLINE)
+            coinbase.rehash()
+        block = create_block(int(tip, 16), coinbase, ntime=block_time, txlist=txs,
+                             height=height, header_v2=height >= ACTIVATION_HEIGHT)
         add_witness_commitment(block)
         block.solve()
         return block
 
-    def mine_blocks_on_node(self, node, count, signal=False):
+    def mine_blocks_on_node(self, node, count):
         """Mine count blocks on a specific node."""
         for _ in range(count):
-            block = self.create_block_for_node(node, signal=signal)
+            block = self.create_block_for_node(node)
             node.submitblock(block.serialize().hex())
 
     def create_tx_with_large_output(self, wallet):
@@ -94,13 +104,10 @@ class TemporaryDeploymentTest(BitcoinTestFramework):
         tx.rehash()
         return tx
 
-    def get_deployment_status(self, node):
-        """Get reduced_data deployment status."""
-        info = node.getdeploymentinfo()
-        rd = info['deployments']['reduced_data']
-        if 'bip9' in rd:
-            return rd['bip9']['status'], rd['bip9'].get('since', 'N/A')
-        return rd.get('status'), rd.get('since', 'N/A')
+    def rdts_active_for_next_block(self, node):
+        """Whether the RDTS rules apply to the next block on node's tip."""
+        info = node.getblockchaininfo()
+        return info['blocks'] + 1 >= ACTIVATION_HEIGHT and info['mediantime'] < EXPIRY_TIME
 
     def run_test(self):
         node_bip110 = self.nodes[0]
@@ -109,53 +116,33 @@ class TemporaryDeploymentTest(BitcoinTestFramework):
         wallet = MiniWallet(node_bip110)
 
         # =====================================================================
-        # Phase 1: Build common chain through BIP9 state transitions
+        # Phase 1: Build the common pre-fork chain
         # =====================================================================
-        self.log.info("Phase 1: Building common chain through BIP9 states")
+        self.log.info("Phase 1: Building the common pre-fork chain")
 
         self.log.info("Mining initial blocks for spendable coins...")
         self.generate(wallet, 101)
         self.sync_all()
 
-        status, _ = self.get_deployment_status(node_bip110)
-        assert_equal(status, 'defined')
+        assert_equal(self.rdts_active_for_next_block(node_bip110), False)
 
-        # Mine to end of period 0
-        self.log.info("Mining through period 0 (DEFINED)...")
-        self.generate(node_bip110, 42)
-        self.sync_all()
-        assert_equal(node_bip110.getblockcount(), 143)
-
-        # Period 1: Signal for activation
-        self.log.info("Mining period 1 with signaling (STARTED)...")
-        self.mine_blocks_on_node(node_bip110, 144, signal=True)
-        self.sync_all()
-        assert_equal(node_bip110.getblockcount(), 287)
-        status, _ = self.get_deployment_status(node_bip110)
-        assert_equal(status, 'started')
-
-        # Period 2: Lock in
-        self.log.info("Mining period 2 (LOCKED_IN)...")
-        self.mine_blocks_on_node(node_bip110, 144, signal=True)
+        # Mine to just before the fork height
+        self.log.info("Mining to just before the fork height...")
+        self.generate(node_bip110, ACTIVATION_HEIGHT - 1 - node_bip110.getblockcount())
         self.sync_all()
         assert_equal(node_bip110.getblockcount(), 431)
-        status, since = self.get_deployment_status(node_bip110)
-        assert_equal(status, 'locked_in')
-        assert_equal(since, 288)
 
         # =====================================================================
         # Phase 2: Test activation and chain split
         # =====================================================================
         self.log.info("Phase 2: Testing activation and chain split behavior")
 
-        # Mine block 432 (activation)
+        # Mine block 432 (the BLAKE2b fork block: RDTS activates here)
         self.mine_blocks_on_node(node_bip110, 1)
         self.sync_all()
         assert_equal(node_bip110.getblockcount(), 432)
-        status, since = self.get_deployment_status(node_bip110)
-        self.log.info(f"Block 432 - Status: {status}, Since: {since}")
-        assert_equal(status, 'active')
-        assert_equal(since, 432)
+        assert_equal(self.rdts_active_for_next_block(node_bip110), True)
+        self.log.info("Block 432 mined: the deployment is active")
 
         # Disconnect nodes BEFORE creating invalid block to prevent P2P relay
         # (Bitcoin Core relays blocks via compact blocks before full validation completes)
@@ -214,11 +201,17 @@ class TemporaryDeploymentTest(BitcoinTestFramework):
         # =====================================================================
         self.log.info("Phase 4: Testing rules enforced until expiry")
 
-        # Mine to block 574 (one before last active block)
-        # active_duration=144, activation at 432, so last active block is 432+144-1=575
-        blocks_to_574 = 574 - node_bip110.getblockcount()
-        self.log.info(f"Mining {blocks_to_574} blocks to reach block 574...")
-        self.generate(node_bip110, blocks_to_574)
+        # Mine toward expiry. Freeze both nodes' clocks at EXPIRY_TIME from
+        # height 569, so blocks 570-574 are stamped exactly EXPIRY_TIME and the
+        # median-time-past reaches it exactly when block 576 is validated:
+        # block 575 is the last RDTS block, as in the original schedule.
+        blocks_to_569 = 569 - node_bip110.getblockcount()
+        self.log.info(f"Mining {blocks_to_569} blocks to reach block 569...")
+        self.generate(node_bip110, blocks_to_569)
+        self.sync_all()
+        node_bip110.setmocktime(EXPIRY_TIME)
+        node_core.setmocktime(EXPIRY_TIME)
+        self.generate(node_bip110, 5)  # blocks 570-574, all at EXPIRY_TIME
         self.sync_all()
         assert_equal(node_bip110.getblockcount(), 574)
 
@@ -255,11 +248,9 @@ class TemporaryDeploymentTest(BitcoinTestFramework):
         self.sync_all()
         assert_equal(node_bip110.getblockcount(), 576)
 
-        # Verify state machine reports EXPIRED
-        status, since = self.get_deployment_status(node_bip110)
-        self.log.info(f"Block 576: Status={status}, Since={since}")
-        assert_equal(status, 'expired')
-        assert_equal(since, 576)
+        # Verify the deployment is over for the next block
+        assert_equal(self.rdts_active_for_next_block(node_bip110), False)
+        self.log.info("Block 576: the deployment has expired")
 
         # =====================================================================
         # Phase 6: Test post-expiry convergence
@@ -283,7 +274,7 @@ class TemporaryDeploymentTest(BitcoinTestFramework):
         # Summary
         # =====================================================================
         self.log.info("All tests passed:")
-        self.log.info("  - BIP9 state transitions (DEFINED -> STARTED -> LOCKED_IN -> ACTIVE -> EXPIRED)")
+        self.log.info("  - Deployment transitions (inactive -> active at the fork height -> expired by median-time-past)")
         self.log.info("  - Chain split at activation (BIP-110 rejects, Core accepts)")
         self.log.info("  - Reorg to longer valid chain on reconnect")
         self.log.info("  - Rules enforced during active period (432-575)")
