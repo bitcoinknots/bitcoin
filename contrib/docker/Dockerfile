@@ -9,7 +9,7 @@ RUN <<EORUN
         1|ON|YES|TRUE|Y) RDTS_CONSENT="IMPLICIT" ;;
     esac
     case "$RDTS_CONSENT" in
-        RUNTIME_CHECK|RUNTIME_WARN|IMPLICIT)
+        RUNTIME_CHECK|IMPLICIT)
             ;;
         *)
             red=$(printf '\033[31m')
@@ -28,8 +28,7 @@ To accept this upgrade now, add to your Docker build arguments:
 
 Or to defer explicit confirmation until runtime (via consensusrules=rdts config setting):
 
-  --build-arg RDTS_CONSENT=RUNTIME_CHECK    (exits if absent)
-  --build-arg RDTS_CONSENT=RUNTIME_WARN     (warns hourly if absent)
+  --build-arg RDTS_CONSENT=RUNTIME_CHECK
 
 For more information, see: https://bitcoinknots.org/learn/2026-rdts ${term_reset}
 EOF

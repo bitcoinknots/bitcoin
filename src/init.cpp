@@ -37,7 +37,6 @@
 #include <interfaces/node.h>
 #include <ipc/exception.h>
 #include <kernel/caches.h>
-#include <kernel/chainparams.h>
 #include <kernel/context.h>
 #include <kernel/warning.h>
 #include <key.h>
@@ -1584,6 +1583,13 @@ bool UserProtocolRulesCheck()
     return true;
 }
 
+enum class RDTSConsentFlag {
+    RUNTIME_CHECK,
+    IMPLICIT,
+};
+
+constexpr RDTSConsentFlag g_rdts_consent{RDTS_CONSENT};
+
 bool UserProtocolRulesConsent()
 {
     if (g_rdts_consent == RDTSConsentFlag::IMPLICIT) {
@@ -1731,19 +1737,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     }
 
     if (!(chainparams.IsTestChain() || UserProtocolRulesConsent())) {
-        if (g_rdts_consent == RDTSConsentFlag::RUNTIME_CHECK) {
-            return InitError(_("User has not consented to supported protocol rules. Exiting"));
-        } else {
-            LogError("User has not consented to supported protocol rules. This node will STILL enforce them. Warning every hour.");
-            g_rdts_warning = true;
-            scheduler.scheduleEvery([]{
-                LogError("This software applies the BIP110/RDTS network upgrade, which fixes critical vulnerabilities, but explicit user confirmation has not been configured.\n");
-                LogError("For more information, see: %s\n", "https://bitcoinknots.org/learn/2026-rdts");
-                LogError("To confirm this upgrade and dismiss this warning, add to your %s file: %s\n",
-                    gArgs.GetPathArg("-conf", BITCOIN_CONF_FILENAME).utf8string(),
-                    CONSENSUSRULES_CONFIG_NAME + "=" + CONSENSUSRULES_REQUIRED);
-            }, std::chrono::hours{1});
-        }
+        return InitError(_("User has not consented to supported protocol rules. Exiting"));
     }
 
     if (interfaces::Ipc* ipc = node.init->ipc()) {

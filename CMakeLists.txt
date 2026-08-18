@@ -313,7 +313,7 @@ if(BUILD_FOR_FUZZING)
 endif()
 
 set(RDTS_CONSENT "UNSET" CACHE STRING "RDTS (BIP110) consent behaviour.")
-set(RDTS_CONSENT_OPTIONS "RUNTIME_CHECK" "RUNTIME_WARN" "IMPLICIT")
+set(RDTS_CONSENT_OPTIONS "RUNTIME_CHECK" "IMPLICIT")
 set_property(CACHE RDTS_CONSENT PROPERTY STRINGS "UNSET" ${RDTS_CONSENT_OPTIONS})
 if(RDTS_CONSENT MATCHES "^(1|ON|YES|TRUE|Y)$")
   set(RDTS_CONSENT "IMPLICIT")
@@ -327,8 +327,7 @@ if(BUILD_DAEMON OR BUILD_GUI OR BUILD_KERNEL_LIB)
       "To accept this upgrade now, add to your CMake options:\n"
       "  -D RDTS_CONSENT=IMPLICIT\n"
       "Or to defer explicit confirmation until runtime (via GUI prompt or consensusrules=rdts config setting):\n"
-      "  -D RDTS_CONSENT=RUNTIME_CHECK    (causes bitcoind to exit if absent)\n"
-      "  -D RDTS_CONSENT=RUNTIME_WARN     (causes bitcoind to warn hourly if absent)\n"
+      "  -D RDTS_CONSENT=RUNTIME_CHECK\n"
       "For more information, see: https://bitcoinknots.org/learn/2026-rdts"
     )
   endif()

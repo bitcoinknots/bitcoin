@@ -3,8 +3,6 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <bitcoin-build-config.h> // IWYU pragma: keep
-
 #include <kernel/chainparams.h>
 
 #include <chainparamsseeds.h>
@@ -29,9 +27,6 @@
 #include <type_traits>
 
 using namespace util::hex_literals;
-
-RDTSConsentFlag g_rdts_consent{RDTS_CONSENT};
-bool g_rdts_warning{false};
 
 // Workaround MSVC bug triggering C7595 when calling consteval constructors in
 // initializer lists.
