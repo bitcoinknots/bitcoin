@@ -9,11 +9,16 @@
 #include <primitives/transaction.h>
 #include <serialize.h>
 #include <uint256.h>
+#include <util/overflow.h>
 #include <util/time.h>
 
 #include <concepts>
 #include <type_traits>
 #include <utility>
+
+namespace BlockHeaderFlag {
+    constexpr uint8_t UseTimeOffset = 4;
+};
 
 // A compressed CBlockHeader, which leaves out the prevhash
 struct CompressedHeader {
@@ -28,12 +33,13 @@ struct CompressedHeader {
     // Direct PoW/ASIC grinding:
     uint32_t nNonce{0};
     uint32_t m_nonce2{0};
-    uint64_t m_nonce3{0};
+    uint32_t m_nonce3{0};
     // Sv1 extranonce:
     uint128 m_extranonce{};
     // Header 1 effectively-nonce, reserved:
     uint8_t m_flags{0};
 
+    uint32_t m_time_offset{0};
     uint8_t m_xor_key_mask_clear_bits{0};
     uint128 m_xor_key{};
     uint256 m_mm_rhs;
@@ -57,6 +63,13 @@ struct CompressedHeader {
     uint32_t GetCompleteVersion() const
     {
         return (m_header_v2 ? VERSION_HEADER_V2_FLAG : uint32_t{0}) | ((uint32_t)nVersion & ~VERSION_HEADER_V2_FLAG);
+    }
+
+    uint32_t GetTimeOnWire() const {
+        if (0 == (m_flags & BlockHeaderFlag::UseTimeOffset)) {
+            return nTime;
+        }
+        return WrappingSubtract(nTime, m_time_offset);
     }
 };
 
@@ -88,17 +101,19 @@ public:
     }
 
     SERIALIZE_METHODS(CBlockHeader, obj) {
-        uint32_t v;
+        uint32_t v, time_on_wire;
         SER_WRITE(obj, v = obj.GetCompleteVersion());
-        READWRITE(v, obj.hashPrevBlock, obj.hashMerkleRoot, obj.nTime, obj.nBits, obj.nNonce);
+        SER_WRITE(obj, time_on_wire = obj.GetTimeOnWire());
+        READWRITE(v, obj.hashPrevBlock, obj.hashMerkleRoot, time_on_wire, obj.nBits, obj.nNonce);
         SER_READ(obj, obj.m_header_v2 = v & VERSION_HEADER_V2_FLAG);
         SER_READ(obj, obj.nVersion = v & ~VERSION_HEADER_V2_FLAG);
         if (obj.m_header_v2) {
-            READWRITE(obj.m_nonce2, obj.m_nonce3, obj.m_extranonce, obj.m_txcount, obj.m_flags, obj.m_xor_key_mask_clear_bits, obj.m_xor_key, obj.m_height, obj.m_mm_rhs);
+            READWRITE(obj.m_nonce2, obj.m_nonce3, obj.m_extranonce, obj.m_time_offset, obj.m_txcount, obj.m_flags, obj.m_xor_key_mask_clear_bits, obj.m_xor_key, obj.m_height, obj.m_mm_rhs);
         } else {
             SER_READ(obj, obj.m_nonce2 = 0);
             SER_READ(obj, obj.m_nonce3 = 0);
             SER_READ(obj, obj.m_extranonce.SetNull());
+            SER_READ(obj, obj.m_time_offset = 0);
             SER_READ(obj, obj.m_txcount = 0);
             SER_READ(obj, obj.m_flags = 0);
             SER_READ(obj, obj.m_xor_key_mask_clear_bits = 0);
@@ -106,6 +121,7 @@ public:
             SER_READ(obj, obj.m_height = 0);
             SER_READ(obj, obj.m_mm_rhs.SetNull());
         }
+        SER_READ(obj, obj.nTime = WrappingAdd(time_on_wire, (obj.m_flags & BlockHeaderFlag::UseTimeOffset) ? obj.m_time_offset : 0));
     }
 
     void SetNull()
@@ -120,6 +136,7 @@ public:
         m_nonce2 = 0;
         m_nonce3 = 0;
         m_extranonce.SetNull();
+        m_time_offset = 0;
         m_txcount = 0;
         m_flags = 0;
         m_xor_key_mask_clear_bits = 0;
@@ -138,6 +155,7 @@ public:
         if (m_nonce2) return false;
         if (m_nonce3) return false;
         if (!m_extranonce.IsNull()) return false;
+        if (m_time_offset) return false;
         if (m_txcount) return false;
         if (m_flags) return false;
         if (m_xor_key_mask_clear_bits) return false;

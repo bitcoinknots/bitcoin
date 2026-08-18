@@ -63,14 +63,22 @@ def calc_hash_str(blk_hdr):
     asic_tail = (
         blk_hdr[76:80]      # nonce
         + blk_hdr[80:84]    # nonce2
-        + blk_hdr[84:92]    # nonce3
+        + blk_hdr[104:108]  # time_offset
+        + blk_hdr[84:88]    # nonce3
         + hash1
     )
     asic_profile = flags[0] & 3
     if asic_profile == 0:
         asic_input = prevblock_hidden + asic_tail
     elif asic_profile == 1:
-        asic_input = asic_tail + h2
+        asic_input = (
+            blk_hdr[76:80]      # nonce
+            + blk_hdr[80:84]    # nonce2
+            + blk_hdr[84:88]    # nonce3
+            + blk_hdr[104:108]  # time_offset
+            + hash1
+            + h2
+        )
     elif asic_profile == 2:
         asic_input = (b"\x00" * 48) + h2 + asic_tail
     elif asic_profile == 3:
@@ -89,6 +97,8 @@ def calc_hash_str(blk_hdr):
 def get_blk_dt(blk_hdr):
     members = struct.unpack("<I", blk_hdr[68:68+4])
     nTime = members[0]
+    if blk_hdr[3] & 0x80 and blk_hdr[110] & 4:
+        nTime = (nTime + int.from_bytes(blk_hdr[104:108], "little")) & 0xffffffff
     dt = datetime.datetime.fromtimestamp(nTime)
     dt_ym = datetime.datetime(dt.year, dt.month, 1)
     return (dt_ym, nTime)

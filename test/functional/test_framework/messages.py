@@ -108,6 +108,9 @@ def tagged_hash(tag, data):
     return sha256(tag_hash + tag_hash + data)
 
 
+BLOCK_HEADER_FLAG_USE_TIME_OFFSET = 4
+
+
 def blake2b_header_hash_components(header):
     xor_key = header.m_xor_key.to_bytes(16, "little")
     xor_key_hash = tagged_hash("Bitcoin block hash PoW XOR key", xor_key)
@@ -120,7 +123,7 @@ def blake2b_header_hash_components(header):
         + prevblock_ordered
         + header.m_height.to_bytes(4, "little", signed=True)
         + ser_uint256(header.hashMerkleRoot)
-        + header.nTime.to_bytes(4, "little")
+        + header.get_time_on_wire().to_bytes(4, "little")
         + b"\x00"
         + header.nBits.to_bytes(4, "little")
         + header.m_txcount.to_bytes(4, "little")
@@ -137,14 +140,22 @@ def blake2b_header_hash_components(header):
     asic_tail = (
         header.nNonce.to_bytes(4, "little")
         + header.m_nonce2.to_bytes(4, "little")
-        + header.m_nonce3.to_bytes(8, "little")
+        + header.m_time_offset.to_bytes(4, "little")
+        + header.m_nonce3.to_bytes(4, "little")
         + hash1
     )
     asic_profile = header.m_flags & 3
     if asic_profile == 0:
         asic_input = prevblock_hidden + asic_tail
     elif asic_profile == 1:
-        asic_input = asic_tail + h2
+        asic_input = (
+            header.nNonce.to_bytes(4, "little")
+            + header.m_nonce2.to_bytes(4, "little")
+            + header.m_nonce3.to_bytes(4, "little")
+            + header.m_time_offset.to_bytes(4, "little")
+            + hash1
+            + h2
+        )
     elif asic_profile == 2:
         asic_input = b"\x00" * 48 + h2 + asic_tail
     elif asic_profile == 3:
@@ -773,7 +784,7 @@ class CTransaction:
 class CBlockHeader:
     __slots__ = ("hash", "hashMerkleRoot", "hashPrevBlock", "nBits", "nNonce",
                  "nTime", "nVersion", "sha256", "m_header_v2", "m_nonce2",
-                 "m_nonce3", "m_extranonce", "m_txcount", "m_flags",
+                 "m_nonce3", "m_extranonce", "m_time_offset", "m_txcount", "m_flags",
                  "m_xor_key_mask_clear_bits", "m_xor_key", "m_height", "m_mm_rhs")
 
     def __init__(self, header=None):
@@ -790,6 +801,7 @@ class CBlockHeader:
             self.m_nonce2 = header.m_nonce2
             self.m_nonce3 = header.m_nonce3
             self.m_extranonce = header.m_extranonce
+            self.m_time_offset = header.m_time_offset
             self.m_txcount = header.m_txcount
             self.m_flags = header.m_flags
             self.m_xor_key_mask_clear_bits = header.m_xor_key_mask_clear_bits
@@ -811,6 +823,7 @@ class CBlockHeader:
         self.m_nonce2 = 0
         self.m_nonce3 = 0
         self.m_extranonce = 0
+        self.m_time_offset = 0
         self.m_txcount = 0
         self.m_flags = 0
         self.m_xor_key_mask_clear_bits = 0
@@ -826,13 +839,14 @@ class CBlockHeader:
         self.nVersion = version & 0x7fffffff
         self.hashPrevBlock = deser_uint256(f)
         self.hashMerkleRoot = deser_uint256(f)
-        self.nTime = int.from_bytes(f.read(4), "little")
+        time_on_wire = int.from_bytes(f.read(4), "little")
         self.nBits = int.from_bytes(f.read(4), "little")
         self.nNonce = int.from_bytes(f.read(4), "little")
         if self.m_header_v2:
             self.m_nonce2 = int.from_bytes(f.read(4), "little")
-            self.m_nonce3 = int.from_bytes(f.read(8), "little")
+            self.m_nonce3 = int.from_bytes(f.read(4), "little")
             self.m_extranonce = int.from_bytes(f.read(16), "little")
+            self.m_time_offset = int.from_bytes(f.read(4), "little")
             self.m_txcount = int.from_bytes(f.read(2), "little")
             self.m_flags = int.from_bytes(f.read(1), "little")
             self.m_xor_key_mask_clear_bits = int.from_bytes(f.read(1), "little")
@@ -843,30 +857,41 @@ class CBlockHeader:
             self.m_nonce2 = 0
             self.m_nonce3 = 0
             self.m_extranonce = 0
+            self.m_time_offset = 0
             self.m_txcount = 0
             self.m_flags = 0
             self.m_xor_key_mask_clear_bits = 0
             self.m_xor_key = 0
             self.m_height = 0
             self.m_mm_rhs = 0
+        if self.m_flags & BLOCK_HEADER_FLAG_USE_TIME_OFFSET:
+            self.nTime = (time_on_wire + self.m_time_offset) & 0xffffffff
+        else:
+            self.nTime = time_on_wire
         self.sha256 = None
         self.hash = None
 
     def get_complete_version(self):
         return (0x80000000 if self.m_header_v2 else 0) | (self.nVersion & 0x7fffffff)
 
+    def get_time_on_wire(self):
+        if not (self.m_flags & BLOCK_HEADER_FLAG_USE_TIME_OFFSET):
+            return self.nTime
+        return (self.nTime - self.m_time_offset) & 0xffffffff
+
     def serialize(self):
         r = b""
         r += self.get_complete_version().to_bytes(4, "little")
         r += ser_uint256(self.hashPrevBlock)
         r += ser_uint256(self.hashMerkleRoot)
-        r += self.nTime.to_bytes(4, "little")
+        r += self.get_time_on_wire().to_bytes(4, "little")
         r += self.nBits.to_bytes(4, "little")
         r += self.nNonce.to_bytes(4, "little")
         if self.m_header_v2:
             r += self.m_nonce2.to_bytes(4, "little")
-            r += self.m_nonce3.to_bytes(8, "little")
+            r += self.m_nonce3.to_bytes(4, "little")
             r += self.m_extranonce.to_bytes(16, "little")
+            r += self.m_time_offset.to_bytes(4, "little")
             r += self.m_txcount.to_bytes(2, "little")
             r += self.m_flags.to_bytes(1, "little")
             r += self.m_xor_key_mask_clear_bits.to_bytes(1, "little")
