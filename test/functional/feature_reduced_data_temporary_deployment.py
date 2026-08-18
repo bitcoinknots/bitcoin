@@ -299,6 +299,12 @@ class TemporaryDeploymentTest(BitcoinTestFramework):
         final_height = node_bip110.getblockcount()
         self.log.info(f"Final height: {final_height}, both nodes synced")
 
+        # The enforcing node never latches the unknown-versionbits warning:
+        # v2 headers carry the serialized v2 flag in the version field across
+        # the whole post-fork stretch, and it must not read as an unknown
+        # versionbits deployment.
+        assert 'Unknown new rules' not in ''.join(node_bip110.getblockchaininfo()['warnings'])
+
         # =====================================================================
         # Summary
         # =====================================================================
