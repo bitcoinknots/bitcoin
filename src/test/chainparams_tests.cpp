@@ -139,6 +139,17 @@ BOOST_AUTO_TEST_CASE(purity_activation_height_lock_rejects_stale_below_anchor)
     BOOST_CHECK_THROW(ApplyPurityActivationHeightLock(args), std::runtime_error);
 }
 
+BOOST_AUTO_TEST_CASE(purity_activation_height_lock_requires_first_setting)
+{
+    const fs::path datadir = m_args.GetDataDirBase() / "purity_lock_requires_setting";
+    fs::create_directories(datadir);
+    BOOST_CHECK(!fs::exists(datadir / "purity_activation_height"));
+
+    ArgsManager args;
+    args.ForceSetArg("-datadir", fs::PathToString(datadir));
+    BOOST_CHECK_THROW(ApplyPurityActivationHeightLock(args), std::runtime_error);
+}
+
 BOOST_AUTO_TEST_CASE(purity_activation_height_lock_rejects_too_low_cli)
 {
     const fs::path datadir = m_args.GetDataDirBase() / "purity_lock_cli_too_low";

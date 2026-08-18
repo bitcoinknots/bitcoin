@@ -11,8 +11,8 @@ Activation height `nPurityActivationHeight` is set on mainnet via the
 the anchor as an ancestor. Values at or below the anchor are rejected at
 startup and are not locked. On **first use** a valid value is written to
 `<datadir>/purity_activation_height` and becomes permanent for that datadir;
-later attempts to set a different value are ignored. Until the first lock,
-omit the option to leave the hard fork inactive. A provisional value such as
+later attempts to set a different value are ignored. Mainnet startup now
+requires this value on first run (no implicit inactive mode). A provisional value such as
 **961636** (BIP110 enforcement-chain split at 961632 plus margin) may be used
 before the formal mainnet launch. Historical Bitcoin / Knots validation is
 unchanged before that height so IBD still works.

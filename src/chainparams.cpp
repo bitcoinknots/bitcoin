@@ -103,7 +103,13 @@ void ApplyPurityActivationHeightLock(ArgsManager& args)
             throw std::runtime_error(strprintf("Failed to write Purity activation height lock file %s", fs::PathToString(lock_path)));
         }
         LogPrintf("Locked Purity activation height to %d (%s)\n", height, fs::PathToString(lock_path));
+        return;
     }
+
+    throw std::runtime_error(strprintf(
+        "Missing required -purityactivationheight on first mainnet run. "
+        "Set -purityactivationheight=<n> (must be > %d) to create %s",
+        Consensus::MAINNET_ASERT_ANCHOR_HEIGHT, fs::PathToString(lock_path)));
 }
 
 void ReadMainArgs(const ArgsManager& args, CChainParams::MainOptions& options)
