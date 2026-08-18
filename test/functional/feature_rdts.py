@@ -4,7 +4,7 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test ReducedData Temporary Softfork (RDTS) consensus rules.
 
-This test verifies all 7 consensus rules enforced by DEPLOYMENT_REDUCED_DATA:
+This test verifies all 7 consensus rules enforced by RDTS:
 
 1. Output scriptPubKeys exceeding 34 bytes are invalid (except OP_RETURN up to 83 bytes)
 2. OP_PUSHDATA* with payloads larger than 256 bytes are invalid (except BIP16 redeemScript)
@@ -303,7 +303,7 @@ class ReducedDataTest(BitcoinTestFramework):
 
         Bitcoin currently defines witness v0 (P2WPKH/P2WSH) and v1 (Taproot).
         Versions v2-v16 are reserved for future upgrades and are currently undefined.
-        After DEPLOYMENT_REDUCED_DATA, spending these undefined versions is invalid.
+        Under RDTS, spending these undefined versions is invalid.
         """
         self.log.info("Testing undefined witness version rejection...")
 
@@ -396,7 +396,7 @@ class ReducedDataTest(BitcoinTestFramework):
         assert_equal(result['allowed'], True)
         self.log.info("  ✓ Taproot key-path spend without annex: ACCEPTED")
 
-        # Test 4.2: Taproot key-path spend WITH annex (invalid after DEPLOYMENT_REDUCED_DATA)
+        # Test 4.2: Taproot key-path spend WITH annex (invalid under RDTS)
         self.log.info("  Test 4.2: Taproot key-path spend with annex (should be rejected)")
 
         # Create another funding transaction
@@ -644,7 +644,7 @@ class ReducedDataTest(BitcoinTestFramework):
         privkey = generate_privkey()
         internal_pubkey, _ = compute_xonly_pubkey(privkey)
 
-        # Test 7.1: Tapscript with OP_IF (invalid in Tapscript under DEPLOYMENT_REDUCED_DATA)
+        # Test 7.1: Tapscript with OP_IF (invalid in Tapscript under RDTS)
         self.log.info("  Test 7.1: Tapscript with OP_IF (should be rejected)")
 
         # Create a Tapscript with OP_IF: OP_1 OP_IF OP_1 OP_ENDIF
@@ -681,7 +681,7 @@ class ReducedDataTest(BitcoinTestFramework):
         assert_equal(result_if['allowed'], False)
         self.log.info(f"  ✓ Tapscript with OP_IF: REJECTED ({result_if['reject-reason']})")
 
-        # Test 7.2: Tapscript with OP_NOTIF (invalid in Tapscript under DEPLOYMENT_REDUCED_DATA)
+        # Test 7.2: Tapscript with OP_NOTIF (invalid in Tapscript under RDTS)
         self.log.info("  Test 7.2: Tapscript with OP_NOTIF (should be rejected)")
 
         # Create a Tapscript with OP_NOTIF: OP_0 OP_NOTIF OP_1 OP_ENDIF

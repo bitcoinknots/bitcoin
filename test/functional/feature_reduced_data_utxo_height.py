@@ -245,7 +245,7 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         # Try to mine block with new_spending_tx (has 300-byte witness element)
         block = self.create_test_block([new_spending_tx])
         result = node.submitblock(block.serialize().hex())
-        assert result is not None and 'mandatory-script-verify-flag-failed' in result, f"Expected rejection, got: {result}"
+        assert result is not None and 'Push value size limit exceeded' in result, f"Expected rejection, got: {result}"
 
         self.log.info(f"✓ SUCCESS: New UTXO with {VIOLATION_SIZE}-byte witness element was REJECTED (correctly enforced)")
 
@@ -283,7 +283,7 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         self.log.info(f"        Spending boundary UTXO with {VIOLATION_SIZE}-byte witness (should be REJECTED)")
         block = self.create_test_block([boundary_spending_tx])
         result = node.submitblock(block.serialize().hex())
-        assert result is not None and 'mandatory-script-verify-flag-failed' in result, f"Expected rejection, got: {result}"
+        assert result is not None and 'Push value size limit exceeded' in result, f"Expected rejection, got: {result}"
 
         self.log.info(f"✓ SUCCESS: UTXO at exactly activation height {ACTIVATION_HEIGHT} is SUBJECT to rules (not exempt)")
 
@@ -371,7 +371,7 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
         self.mine_blocks(2)
         block = self.create_test_block([mixed_tx])
         result = node.submitblock(block.serialize().hex())
-        assert result is not None and 'mandatory-script-verify-flag-failed' in result, f"Expected rejection, got: {result}"
+        assert result is not None and 'Push value size limit exceeded' in result, f"Expected rejection, got: {result}"
 
         self.log.info("✓ SUCCESS: Mixed transaction REJECTED (new input violated rules, even though old input was exempt)")
 
@@ -428,6 +428,35 @@ class ReducedDataUTXOHeightTest(BitcoinTestFramework):
             f"Expected rejection after boundary-crossing reorg, got: {result}"
 
         self.log.info("✓ SUCCESS: Cache poisoning via activation-boundary reorg correctly prevented")
+
+        # ======================================================================
+        # Test 9: UTXO created at exactly ACTIVATION_HEIGHT - 1 is EXEMPT
+        # ======================================================================
+        self.log.info(f"Test 9: Boundary test - UTXO at height {ACTIVATION_HEIGHT - 1} is exempt...")
+        rewind_to(ACTIVATION_HEIGHT - 2)
+        edge_funding_tx, edge_spending_tx = self.create_p2wsh_funding_and_spending_tx(
+            wallet, node, VIOLATION_SIZE
+        )
+        block = self.create_test_block([edge_funding_tx])
+        assert_equal(node.submitblock(block.serialize().hex()), None)
+        assert_equal(node.getblockcount(), ACTIVATION_HEIGHT - 1)
+        self.mine_blocks(5)  # cross the fork; rules now apply to new coins
+        block = self.create_test_block([edge_spending_tx])
+        result = node.submitblock(block.serialize().hex())
+        assert result is None, f"Expected success, got: {result}"
+        self.log.info(f"✓ SUCCESS: UTXO at height {ACTIVATION_HEIGHT - 1} (last pre-fork block) is EXEMPT")
+
+        # ======================================================================
+        # Test 10: -reindex replays the whole chain, including grandfathered
+        # spends, to the same tip (the height cutoff needs no stored state)
+        # ======================================================================
+        self.log.info("Test 10: -reindex reproduces identical grandfathering verdicts")
+        node.reconsiderblock(activation_tip)
+        tip_before_reindex = node.getbestblockhash()
+        self.restart_node(0, extra_args=[
+            f'-testactivationheight=blake2b@{ACTIVATION_HEIGHT}', '-rdtsexpiry=2000000000', '-reindex'])
+        self.wait_until(lambda: node.getbestblockhash() == tip_before_reindex, timeout=60)
+        self.log.info("✓ SUCCESS: -reindex reconnected the chain with exempt spends intact")
 
         # ======================================================================
         # Summary

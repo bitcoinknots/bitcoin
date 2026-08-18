@@ -5,7 +5,7 @@
 """Test that ignore_rejects cannot relax reduced-data (RDTS) consensus rules.
 
 PolicyScriptChecks must stay at least as strict as ConsensusScriptChecks: once
-DEPLOYMENT_REDUCED_DATA is active its flags are consensus, so a script-verify-flag
+RDTS is active its flags are consensus, so a script-verify-flag
 ignore_rejects that clears them lets a transaction pass the former and fail the
 latter. ConsensusScriptChecks treats that as a bug, logging "BUG! PLEASE REPORT
 THIS!" and tripping an Assume() that aborts on ABORT_ON_FAILED_ASSUME builds.
