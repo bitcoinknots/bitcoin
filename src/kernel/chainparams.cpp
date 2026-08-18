@@ -126,6 +126,13 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].active_duration = 52416; // ~1 year
         consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].threshold = 1109; // 55% of 2016
 
+        // RDTS: at the BLAKE2b hardfork RDTS stops using versionbits
+        // (the stall at 961633 prevented the deployment above from ever
+        // reaching ACTIVE; later commits retire it). Its rules apply to every
+        // block from Blake2bHeight, which is set at release cut, until the
+        // parent block's median-time-past reaches RdtsExpiryTime.
+        consensus.RdtsExpiryTime = 1819756800; // September 1st, 2027 00:00 UTC
+
         consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000dee8e2a309ad8a9820433c68"};
         consensus.defaultAssumeValid = uint256{"00000000000000000000611fd22f2df7c8fbd0688745c3a6c3bb5109cc2a12cb"}; // 912683
 
@@ -658,6 +665,14 @@ public:
                 consensus.CSVHeight = int{height};
                 break;
             }
+        }
+
+        // Optionally schedule the RDTS deployment (see -rdtsexpiry). RDTS
+        // activates at the BLAKE2b fork height scheduled above; only the
+        // expiry is separately settable, as on mainnet. Left unscheduled by
+        // default, so regtest behaviour is unchanged.
+        if (opts.rdts_expiry_time) {
+            consensus.RdtsExpiryTime = *opts.rdts_expiry_time;
         }
 
         for (const auto& [deployment_pos, version_bits_params] : opts.version_bits_parameters) {

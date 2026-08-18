@@ -166,6 +166,10 @@ public:
         std::unordered_map<Consensus::BuriedDeployment, int> activation_heights{};
         bool fastprune{false};
         bool enforce_bip94{false};
+        //! If set, RDTS rules apply to blocks from the blake2b activation
+        //! height until the parent block's median-time-past reaches this
+        //! value (see -rdtsexpiry). Requires a blake2b activation height.
+        std::optional<int64_t> rdts_expiry_time{};
     };
 
     static std::unique_ptr<const CChainParams> RegTest(const RegTestOptions& options);
