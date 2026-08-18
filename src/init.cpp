@@ -1218,6 +1218,9 @@ bool AppInitParameterInteraction(const ArgsManager& args)
         if (block_reserved_weight < MINIMUM_BLOCK_RESERVED_WEIGHT) {
             return InitError(strprintf(_("Specified -blockreservedweight (%d) is lower than minimum safety value of (%d)"), block_reserved_weight, MINIMUM_BLOCK_RESERVED_WEIGHT));
         }
+        if (block_reserved_weight > REDUCED_DATA_MAX_BLOCK_WEIGHT) {
+            InitWarning(strprintf(_("Specified -blockreservedweight (%d) exceeds the block weight limit that applies while RDTS is active (%d); block templates will contain no transactions while that limit applies"), block_reserved_weight, REDUCED_DATA_MAX_BLOCK_WEIGHT));
+        }
     }
 
     if (auto parsed = args.GetFixedPointArg("-datacarriercost", 2)) {

@@ -2974,6 +2974,16 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         ? params.GetConsensus().RdtsActivationHeight()
         : 0;
 
+    // The reduced weight limit is checked by ContextualCheckBlock for blocks
+    // arriving from the network; re-check it here so that a chainstate
+    // rebuild (-reindex-chainstate), VerifyDB and background validation also
+    // reject an inherited over-cap block, as they do for the other RDTS rules.
+    // Malleation is not a concern at this point: the witness commitment was
+    // verified before the block was stored.
+    if (reduced_data_active && GetBlockWeight(block) > REDUCED_DATA_MAX_BLOCK_WEIGHT) {
+        return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-weight-reduced_data", strprintf("%s : RDTS weight limit failed", __func__));
+    }
+
     const CheckTxInputsRules chk_input_rules{reduced_data_active ? CheckTxInputsRules::OutputSizeLimit : CheckTxInputsRules::None};
 
     // Check generation tx output sizes if REDUCED_DATA is active
@@ -4829,8 +4839,18 @@ static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& stat
     // large by filling up the coinbase witness, which doesn't change
     // the block hash, so we couldn't mark the block as permanently
     // failed).
-    if (GetBlockWeight(block) > MAX_BLOCK_WEIGHT) {
+    const int64_t block_weight{GetBlockWeight(block)};
+    if (block_weight > MAX_BLOCK_WEIGHT) {
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-weight", strprintf("%s : weight limit failed", __func__));
+    }
+
+    // RDTS: a reduced block-weight limit applies to exactly the blocks with
+    // RDTS active (see RdtsActiveAt). Checked here, after the coinbase
+    // witness, for the same malleability reason as the limit above.
+    if (pindexPrev != nullptr &&
+        chainman.GetConsensus().RdtsActiveAt(nHeight, pindexPrev->GetMedianTimePast()) &&
+        block_weight > REDUCED_DATA_MAX_BLOCK_WEIGHT) {
+        return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-weight-reduced_data", strprintf("%s : RDTS weight limit failed", __func__));
     }
 
     return true;

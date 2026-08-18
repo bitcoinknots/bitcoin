@@ -778,14 +778,14 @@ public:
      * chain extends past. The verdict is re-derived from the stored block
      * header (its height and PoW algorithm), so it needs no persisted per-block
      * marker and cannot misfire on a chain that was validated correctly. Only
-     * this header-derivable rule is handled; output-size and script-push
-     * violations require block data, which a normal startup does not read:
-     * they are caught by a chainstate rebuild (-reindex-chainstate) or a full
-     * -reindex, both of which re-run ConnectBlock. Also finishes a rewind that
-     * an earlier run left with the coins tip on a block already marked invalid
-     * (see LoadChainTip). Named for the RDTS era in which it was introduced;
-     * the rule it corrects (bad-version-blake2b) outlives the RDTS expiry, so
-     * this pass must stay.
+     * this header-derivable rule is handled; output-size, script-push and
+     * block-weight violations require block data, which a normal startup does
+     * not read: they are caught by a chainstate rebuild (-reindex-chainstate)
+     * or a full -reindex, both of which re-run ConnectBlock. Also finishes a
+     * rewind that an earlier run left with the coins tip on a block already
+     * marked invalid (see LoadChainTip). Named for the RDTS era in which it was
+     * introduced; the rule it corrects (bad-version-blake2b) outlives the RDTS
+     * expiry, so this pass must stay.
      * A no-op while the active chain is empty (the coins database had no best
      * block): the rebuild that follows enforces the rule through ConnectBlock.
      *
