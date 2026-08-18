@@ -767,17 +767,27 @@ public:
     [[nodiscard]] bool NeedsRedownload() const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
     /**
-     * Correct chain state inherited from a client that was not enforcing
-     * BIP110/RDTS. Such a data directory can contain blocks that violate RDTS
-     * mandatory signaling; normal startup does not re-validate inherited history,
-     * so an enforcing node would otherwise keep them. This marks every offending
-     * block in the index invalid (whether or not on the active chain) and
-     * reorganizes to the best valid chain, mirroring the approach BIP148 used.
-     * The verdict is re-derived from the stored block header (nVersion), so it
-     * needs no persisted per-block marker and cannot misfire on a chain that was
-     * validated correctly. Only the header-derivable mandatory-signaling rule is
-     * handled; output-size and script-push violations require block data and
-     * remain a -reindex-chainstate matter.
+     * Correct chain state inherited from a client that was not enforcing the
+     * BLAKE2b hardfork. Such a data directory can contain SHA256d blocks at or
+     * above the fork height; normal startup does not re-validate inherited
+     * history, so an enforcing node would otherwise keep them, and it could
+     * never reorganize away on work alone. This marks every offending block in
+     * the index invalid (whether or not on the active chain) and reorganizes to
+     * the best valid chain, mirroring the approach BIP148 used: the inherited
+     * branch truncates to the last shared pre-fork block, which the BLAKE2b
+     * chain extends past. The verdict is re-derived from the stored block
+     * header (its height and PoW algorithm), so it needs no persisted per-block
+     * marker and cannot misfire on a chain that was validated correctly. Only
+     * this header-derivable rule is handled; output-size and script-push
+     * violations require block data, which a normal startup does not read:
+     * they are caught by a chainstate rebuild (-reindex-chainstate) or a full
+     * -reindex, both of which re-run ConnectBlock. Also finishes a rewind that
+     * an earlier run left with the coins tip on a block already marked invalid
+     * (see LoadChainTip). Named for the RDTS era in which it was introduced;
+     * the rule it corrects (bad-version-blake2b) outlives the RDTS expiry, so
+     * this pass must stay.
+     * A no-op while the active chain is empty (the coins database had no best
+     * block): the rebuild that follows enforces the rule through ConnectBlock.
      *
      * Returns false if an offending block could not be corrected, setting @p error
      * to a user-facing reason (the data needed to rewind has been pruned, or the
@@ -788,10 +798,6 @@ public:
         EXCLUSIVE_LOCKS_REQUIRED(!m_chainstate_mutex)
         LOCKS_EXCLUDED(::cs_main);
 
-    /** All not-yet-invalid blocks in the index that fail BIP110/RDTS mandatory
-     *  signaling. The verdict is header-derived and independent of other blocks'
-     *  validity, so a single scan is sufficient. @sa CorrectRdtsInvalidBlocks */
-    [[nodiscard]] std::vector<CBlockIndex*> FindRdtsSignalingViolations() const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     /** Ensures we have a genesis block in the block tree, possibly writing one to disk. */
     bool LoadGenesisBlock();
 
@@ -1028,6 +1034,20 @@ public:
     std::function<void()> snapshot_download_completed = std::function<void()>();
 
     const CChainParams& GetParams() const { return m_options.chainparams; }
+
+    /** All not-yet-invalid blocks in the index that are SHA256d at or above
+     *  the BLAKE2b fork height (the index-side analog of bad-version-blake2b).
+     *  The verdict is header-derived and independent of other blocks'
+     *  validity, so a single scan is sufficient. Lives on the manager because
+     *  it needs only the block index. @sa Chainstate::CorrectRdtsInvalidBlocks */
+    [[nodiscard]] std::vector<CBlockIndex*> FindInheritedInvalidBlocks() EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    /** Whether the branch ending in @p index continued SHA256d proof-of-work
+     *  at or past the BLAKE2b fork height, i.e. its block at that height is not
+     *  a v2 header. Such a branch can only come from a data directory inherited
+     *  from a client that was not enforcing the hardfork; it is excluded from
+     *  the fork-warning heuristic (m_best_invalid), see
+     *  Chainstate::InvalidChainFound. False when the fork is unscheduled. */
+    bool ContinuesSha256dPastFork(const CBlockIndex& index) const;
     const Consensus::Params& GetConsensus() const { return m_options.chainparams.GetConsensus(); }
     bool ShouldCheckBlockIndex() const;
     const arith_uint256& MinimumChainWork() const { return *Assert(m_options.minimum_chain_work); }
