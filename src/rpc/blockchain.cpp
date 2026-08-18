@@ -1865,10 +1865,11 @@ RPCHelpMan getblockchaininfo()
 
 namespace {
 const std::vector<RPCResult> RPCHelpForDeployment{
-    {RPCResult::Type::STR, "type", "one of \"buried\", \"bip9\""},
-    {RPCResult::Type::NUM, "height", /*optional=*/true, "height of the first block which enforces the rules (only for \"buried\" type, or \"bip9\" type with \"active\" status)"},
+    {RPCResult::Type::STR, "type", "one of \"buried\", \"bip9\", \"flagday\""},
+    {RPCResult::Type::NUM, "height", /*optional=*/true, "height of the first block which enforces the rules (only for \"buried\" and \"flagday\" types, or \"bip9\" type with \"active\" status; for \"flagday\" this is the BLAKE2b hardfork height)"},
     {RPCResult::Type::NUM, "height_end", /*optional=*/true, "height of the last block which enforces the rules (only for \"bip9\" type with \"active\" status and temporary deployments)"},
-    {RPCResult::Type::BOOL, "active", "true if the rules are enforced for the mempool and the next block"},
+    {RPCResult::Type::BOOL, "active", "true if the rules are enforced for the mempool and the next block (the mempool applies the RDTS rules regardless of this flag)"},
+    {RPCResult::Type::NUM_TIME, "expiry_time", /*optional=*/true, "median time past at and after which the rules are no longer enforced (only for \"flagday\" type; a block is past expiry when its parent's median time past has reached this value)"},
     {RPCResult::Type::OBJ, "bip9", /*optional=*/true, "status of bip9 softforks (only for \"bip9\" type)",
     {
         {RPCResult::Type::NUM, "bit", /*optional=*/true, "the bit (0-28) in the block version field used to signal this softfork (only for \"started\" and \"locked_in\" status)"},
@@ -1892,6 +1893,28 @@ const std::vector<RPCResult> RPCHelpForDeployment{
     }},
 };
 
+// RDTS (a flag-day deployment, not a versionbits one): rules apply to every
+// block from the BLAKE2b hardfork height until the parent block's
+// median-time-past reaches RdtsExpiryTime. Reported as-of the queried block,
+// with "active" meaning the next block, like the versionbits entries. Omitted
+// entirely when unscheduled (plain regtest), as NEVER_ACTIVE deployments are.
+void RdtsFlagDayDescPushBack(const CBlockIndex* blockindex, UniValue& softforks, const ChainstateManager& chainman)
+{
+    const Consensus::Params& params{chainman.GetConsensus()};
+    if (params.Blake2bHeight == std::numeric_limits<int>::max() ||
+        params.RdtsExpiryTime == std::numeric_limits<int64_t>::min()) return;
+
+    UniValue rv(UniValue::VOBJ);
+    rv.pushKV("type", "flagday");
+    rv.pushKV("height", params.RdtsActivationHeight());
+    rv.pushKV("expiry_time", params.RdtsExpiryTime);
+    // "active" describes the NEXT block, as the versionbits entries do, so the
+    // queried block is that block's parent and its median-time-past is exactly
+    // the parent median-time-past RdtsActiveAt expects.
+    rv.pushKV("active", params.RdtsActiveAt(blockindex->nHeight + 1, blockindex->GetMedianTimePast()));
+    softforks.pushKV("reduced_data", std::move(rv));
+}
+
 UniValue DeploymentInfo(const CBlockIndex* blockindex, const ChainstateManager& chainman)
 {
     UniValue softforks(UniValue::VOBJ);
@@ -1902,8 +1925,7 @@ UniValue DeploymentInfo(const CBlockIndex* blockindex, const ChainstateManager& 
     SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_SEGWIT);
     SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_TESTDUMMY);
     SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_TAPROOT);
-    // RDTS is now a flag-day deployment, not a versionbits one; its reporting
-    // is added separately (see the reduced_data entry).
+    RdtsFlagDayDescPushBack(blockindex, softforks, chainman);
     return softforks;
 }
 } // anon namespace
