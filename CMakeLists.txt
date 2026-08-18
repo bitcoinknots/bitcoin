@@ -315,7 +315,6 @@ endif()
 set(RDTS_CONSENT "UNSET" CACHE STRING "RDTS (BIP110) consent behaviour.")
 set(RDTS_CONSENT_OPTIONS "RUNTIME_CHECK" "RUNTIME_WARN" "IMPLICIT")
 set_property(CACHE RDTS_CONSENT PROPERTY STRINGS "UNSET" ${RDTS_CONSENT_OPTIONS})
-list(APPEND RDTS_CONSENT_OPTIONS "UNSUPPORTED_UNSAFE_NO_ENFORCEMENT")
 if(RDTS_CONSENT MATCHES "^(1|ON|YES|TRUE|Y)$")
   set(RDTS_CONSENT "IMPLICIT")
 endif()
@@ -336,12 +335,6 @@ if(BUILD_DAEMON OR BUILD_GUI OR BUILD_KERNEL_LIB)
 else()
   # Nothing else enforces consensus rules, but RDTSConsentFlags::UNSET doesn't actually exist so would break the build
   set(RDTS_CONSENT "IMPLICIT")
-endif()
-if(RDTS_CONSENT STREQUAL "UNSUPPORTED_UNSAFE_NO_ENFORCEMENT")
-  list(APPEND configure_warnings
-    "RDTS_CONSENT=UNSUPPORTED_UNSAFE_NO_ENFORCEMENT is NOT a supported option. Use at your own risk!
-Note that this will NOT make your node reject RDTS\; it will merely be insecure after RDTS activates."
-  )
 endif()
 
 # The external_lib_interface interface library aims to encapsulate build flags, which

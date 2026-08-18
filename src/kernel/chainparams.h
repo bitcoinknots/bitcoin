@@ -28,7 +28,6 @@ enum class RDTSConsentFlag {
     RUNTIME_CHECK,
     IMPLICIT,
     RUNTIME_WARN,
-    UNSUPPORTED_UNSAFE_NO_ENFORCEMENT,
 };
 
 extern RDTSConsentFlag g_rdts_consent;

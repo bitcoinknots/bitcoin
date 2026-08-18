@@ -1733,16 +1733,6 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     if (!(chainparams.IsTestChain() || UserProtocolRulesConsent())) {
         if (g_rdts_consent == RDTSConsentFlag::RUNTIME_CHECK) {
             return InitError(_("User has not consented to supported protocol rules. Exiting"));
-        } else if (g_rdts_consent == RDTSConsentFlag::UNSUPPORTED_UNSAFE_NO_ENFORCEMENT) {
-            LogError("User has not consented to supported protocol rules. This node will NOT enforce them. Warning every hour.");
-            g_local_services = ServiceFlags(g_local_services & ~NODE_REDUCED_DATA);
-            scheduler.scheduleEvery([]{
-                LogError("RDTS is not enabled. This node is therefore vulnerable to displaying fake or fraudulent transactions.\n");
-                LogError("For more information, see: %s\n", "https://bitcoinknots.org/learn/2026-rdts");
-                LogError("To enable RDTS enforcement and disable this warning, add to %s: %s\n",
-                    gArgs.GetPathArg("-conf", BITCOIN_CONF_FILENAME).utf8string(),
-                    CONSENSUSRULES_CONFIG_NAME + "=" + CONSENSUSRULES_REQUIRED);
-            }, std::chrono::hours{1});
         } else {
             LogError("User has not consented to supported protocol rules. This node will STILL enforce them. Warning every hour.");
             g_rdts_warning = true;
