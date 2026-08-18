@@ -2370,7 +2370,16 @@ void Chainstate::CheckForkWarningConditions()
 void Chainstate::InvalidChainFound(CBlockIndex* pindexNew)
 {
     AssertLockHeld(cs_main);
-    if (!m_chainman.m_best_invalid || pindexNew->nChainWork > m_chainman.m_best_invalid->nChainWork) {
+    // m_best_invalid feeds the fork warning ("we do not appear to fully agree
+    // with our peers"). A branch that continued SHA256d past the BLAKE2b fork
+    // height is the pre-fork majority chain, expected to outweigh ours by far
+    // (the fork block's target is shifted 2^20 easier); it is invalid by
+    // design, not a sign of corruption or a needed upgrade, so it is kept out
+    // of that heuristic. Only inherited data directories hold such branches
+    // (headers at or above the fork height are rejected at acceptance), and
+    // this keeps them consistent with freshly synced nodes.
+    if (!m_chainman.ContinuesSha256dPastFork(*pindexNew) &&
+            (!m_chainman.m_best_invalid || pindexNew->nChainWork > m_chainman.m_best_invalid->nChainWork)) {
         m_chainman.m_best_invalid = pindexNew;
     }
     SetBlockFailureFlags(pindexNew);
@@ -3706,8 +3715,9 @@ CBlockIndex* Chainstate::FindMostWorkChain()
             bool fMissingData = !(pindexTest->nStatus & BLOCK_HAVE_DATA);
             if (fFailedChain || fMissingData) {
                 // Candidate chain is not usable (either invalid or missing data)
-                if (fFailedChain && (m_chainman.m_best_invalid == nullptr || pindexNew->nChainWork > m_chainman.m_best_invalid->nChainWork)) {
-                    m_chainman.m_best_invalid = pindexNew;
+                if (fFailedChain && !m_chainman.ContinuesSha256dPastFork(*pindexNew) &&
+                        (m_chainman.m_best_invalid == nullptr || pindexNew->nChainWork > m_chainman.m_best_invalid->nChainWork)) {
+                    m_chainman.m_best_invalid = pindexNew;  // see InvalidChainFound
                 }
                 CBlockIndex *pindexFailed = pindexNew;
                 // Remove the entire chain from the set.
@@ -5236,7 +5246,31 @@ bool Chainstate::LoadChainTip()
         if (is_candidate) setBlockIndexCandidates.insert(target);
         target = target->pprev;
     }
-    PruneBlockIndexCandidates();
+
+    // The coins database can name a block that is marked invalid: a flush
+    // writes the block index synchronously and the coins afterwards, so a
+    // crash in between (after an invalidateblock or after the startup
+    // correction of inherited blocks) leaves the marks durable and the old
+    // coins tip in place. Pruning the candidates against such a tip would
+    // remove every valid block and leave nothing to reorganize to. Prune
+    // against its last valid ancestor instead, so that ActivateBestChain can
+    // rewind to it.
+    const CBlockIndex* prune_floor{tip};
+    while (prune_floor->pprev != nullptr && (prune_floor->nStatus & BLOCK_FAILED_MASK)) {
+        prune_floor = prune_floor->pprev;
+    }
+    if (prune_floor != tip) {
+        LogWarning("Loaded chain tip %s (height %d) is marked invalid; the chain will be rewound to %s (height %d)\n",
+                   tip->GetBlockHash().ToString(), tip->nHeight,
+                   prune_floor->GetBlockHash().ToString(), prune_floor->nHeight);
+        auto it = setBlockIndexCandidates.begin();
+        while (it != setBlockIndexCandidates.end() && setBlockIndexCandidates.value_comp()(*it, prune_floor)) {
+            setBlockIndexCandidates.erase(it++);
+        }
+        assert(!setBlockIndexCandidates.empty());
+    } else {
+        PruneBlockIndexCandidates();
+    }
 
     tip = m_chain.Tip();
     LogPrintf("Loaded best chain: hashBestChain=%s height=%d date=%s progress=%f\n",
@@ -5520,47 +5554,44 @@ bool Chainstate::NeedsRedownload() const
     return false;
 }
 
-std::vector<CBlockIndex*> Chainstate::FindRdtsSignalingViolations() const
+std::vector<CBlockIndex*> ChainstateManager::FindInheritedInvalidBlocks()
 {
     AssertLockHeld(cs_main);
 
     std::vector<CBlockIndex*> violators;
 
-    const Consensus::Params& params{m_chainman.GetConsensus()};
-    // RDTS is the only Knots deployment that sets a mandatory-signaling
-    // deadline; this is deliberately scoped to it. A future deployment with
-    // max_activation_height set would need its own handling.
-    const Consensus::DeploymentPos dep{Consensus::DEPLOYMENT_REDUCED_DATA};
-    const auto& deployment{params.vDeployments[dep]};
-
-    // Only a configured mandatory-signaling deadline can be violated. A
-    // non-enforcing node leaves max_activation_height at its INT_MAX default,
-    // so it is naturally excluded here.
-    if (deployment.max_activation_height >= std::numeric_limits<int>::max()) return violators;
-
-    // A block must signal only within [max_activation_height - 2P, max_activation_height - P).
-    const int period{static_cast<int>(params.nMinerConfirmationWindow)};
-    const int window_begin{deployment.max_activation_height - (2 * period)};
-    const int window_end{deployment.max_activation_height - period};
+    const Consensus::Params& params{GetConsensus()};
 
     // One pass over the whole block index (not just the active chain, so a
-    // violator on a side branch is corrected too). The cheap height comparison
-    // gates the more expensive versionbits State() lookup. Within the window a
-    // block was required to signal iff the deployment is STARTED for its branch,
-    // the same condition ConnectBlock/ContextualCheckBlockHeaderVolatile applies.
-    // The verdict is re-derived from the stored header, so it does not change as
-    // other blocks are invalidated and one scan suffices.
+    // violator on a side branch is corrected too). A stored SHA256d block at
+    // or above the BLAKE2b fork height is the index-side analog of
+    // bad-version-blake2b: any branch that continued the old PoW past the fork
+    // was inherited from a client that was not enforcing the hardfork.
+    // Invalidating these truncates such a branch to the last shared pre-fork
+    // block, and the BLAKE2b chain, which extends past it, then outweighs it.
+    // The verdict is re-derived from the stored header alone, so it does not
+    // change as other blocks are invalidated and one scan suffices.
+    // Checkpoints are deliberately not consulted: separation is performed by
+    // the PoW change, and checkpoints are optional (-checkpoints=0).
     for (auto& [_, index] : m_blockman.m_block_index) {
         if (index.nStatus & BLOCK_FAILED_MASK) continue;             // already handled
-        if (index.nHeight < window_begin || index.nHeight >= window_end) continue;
-        if (m_chainman.m_versionbitscache.State(index.pprev, params, dep) != ThresholdState::STARTED) continue;
-        const bool signals_top{(index.nVersion & VERSIONBITS_TOP_MASK) == VERSIONBITS_TOP_BITS};
-        const bool signals_bit{(index.nVersion & (uint32_t{1} << deployment.bit)) != 0};
-        if (signals_top && signals_bit) continue;                    // signaled correctly
-        violators.push_back(&index);
+        if (params.IsBlake2bHeight(index.nHeight) && !index.m_header_v2) {
+            violators.push_back(&index);
+        }
     }
 
     return violators;
+}
+
+bool ChainstateManager::ContinuesSha256dPastFork(const CBlockIndex& index) const
+{
+    const Consensus::Params& params{GetConsensus()};
+    if (!params.IsBlake2bHeight(index.nHeight)) return false;
+    // Above the fork height a branch is either BLAKE2b from the fork block on
+    // or SHA256d throughout (bad-version-blake2b admits no v1 block above a v2
+    // one), so the fork block's header decides for the whole branch.
+    const CBlockIndex* fork_block{index.GetAncestor(params.DeploymentHeight(Consensus::DEPLOYMENT_BLAKE2B))};
+    return fork_block != nullptr && !fork_block->m_header_v2;
 }
 
 bool Chainstate::CorrectRdtsInvalidBlocks(bilingual_str& error)
@@ -5569,10 +5600,37 @@ bool Chainstate::CorrectRdtsInvalidBlocks(bilingual_str& error)
     AssertLockNotHeld(::cs_main);
 
     std::vector<CBlockIndex*> violators;
+    bool tip_failed{false};
     {
         LOCK(cs_main);
-        violators = FindRdtsSignalingViolations();
+        // No active chain yet: the coins database had no best block (a
+        // chainstate directory removed by hand, or a run killed before its
+        // first flush), so LoadChainTip was skipped. There is nothing to
+        // reorganize away from, and InvalidateBlock and InvalidChainFound both
+        // require a tip. The rebuild that follows connects every block through
+        // ConnectBlock, which enforces the same rule; any header-only violator
+        // is corrected by the next normal startup.
+        if (m_chain.Tip() == nullptr) return true;
+        const CBlockIndex& tip{*m_chain.Tip()};
+        const Consensus::Params& params{m_chainman.GetConsensus()};
+        // The expiry is a fixed date while the fork is a height: a fork
+        // scheduled late enough that the expiry has already passed would make
+        // RDTS never apply, silently. Say so.
+        if (params.Blake2bHeight != std::numeric_limits<int>::max() &&
+                params.RdtsExpiryTime != std::numeric_limits<int64_t>::min() &&
+                tip.nHeight < params.Blake2bHeight && tip.GetMedianTimePast() >= params.RdtsExpiryTime) {
+            LogWarning("RDTS: the BLAKE2b hardfork height %d has not been reached but the chain's median-time-past (%d) "
+                       "already exceeds the RDTS expiry (%d); the RDTS rules will never be enforced on this chain\n",
+                       params.Blake2bHeight, tip.GetMedianTimePast(), params.RdtsExpiryTime);
+        }
+        // A previous correction (or an invalidateblock) cut short between the
+        // block-index write and the coins write leaves the active tip marked
+        // invalid. LoadChainTip kept its valid ancestors as candidates;
+        // reconnecting the best chain below finishes the rewind.
+        tip_failed = tip.nStatus & BLOCK_FAILED_MASK;
+        violators = m_chainman.FindInheritedInvalidBlocks();
     }
+    if (violators.empty() && !tip_failed) return true;
 
     // Invalidate lowest height first: doing so also fails a violator's descendants,
     // so a higher violator on the same branch is skipped below. This calls
@@ -5582,7 +5640,20 @@ bool Chainstate::CorrectRdtsInvalidBlocks(bilingual_str& error)
     std::sort(violators.begin(), violators.end(),
               [](const CBlockIndex* a, const CBlockIndex* b) { return a->nHeight < b->nHeight; });
 
-    bool invalidated{false};
+    // A late upgrade rewinds every block from the fork height to the inherited
+    // tip, which can take minutes; say so rather than sit on the last init
+    // message.
+    m_chainman.GetNotifications().progress(_("Correcting inherited chain state…"), 0, false);
+    if (tip_failed) {
+        LogPrintf("RDTS: the active chain tip is marked invalid (a previous correction was interrupted "
+                  "before the coins database was written); rewinding to the last valid block\n");
+    }
+    if (!violators.empty()) {
+        LogPrintf("RDTS: %d block(s) inherited from a client that was not enforcing the "
+                  "BLAKE2b hardfork are invalid under it; correcting\n", violators.size());
+    }
+
+    bool invalidated{tip_failed};
     for (CBlockIndex* target : violators) {
         // m_interrupt here is the shutdown signal, so an interrupt means shutdown:
         // return success and let the caller's shutdown check exit; any uncorrected
@@ -5590,6 +5661,7 @@ bool Chainstate::CorrectRdtsInvalidBlocks(bilingual_str& error)
         if (m_chainman.m_interrupt) return true;
 
         bool needs_reindex{false};
+        int rewind{0};  // active-chain blocks to disconnect, 0 for a side branch
         {
             LOCK(cs_main);
             if (target->nStatus & BLOCK_FAILED_MASK) continue;  // already failed as a descendant
@@ -5602,6 +5674,7 @@ bool Chainstate::CorrectRdtsInvalidBlocks(bilingual_str& error)
             // disconnect needs local data; the reconnect side is safe because
             // FindMostWorkChain skips candidate chains with missing data.
             if (m_chain.Contains(target)) {
+                rewind = m_chain.Height() - target->nHeight + 1;
                 for (const CBlockIndex* b{m_chain.Tip()}; b != target->pprev; b = b->pprev) {
                     if (m_blockman.IsBlockPruned(*b)) {
                         needs_reindex = true;
@@ -5613,18 +5686,20 @@ bool Chainstate::CorrectRdtsInvalidBlocks(bilingual_str& error)
         if (needs_reindex) {
             LogError("RDTS: cannot correct inherited invalid block %s at height %d: required block "
                      "data has been pruned\n", target->GetBlockHash().ToString(), target->nHeight);
-            error = _("A block that violates the BIP110/RDTS mandatory-signaling rule was inherited from a client that was not enforcing it, and correcting it needs block data that has been pruned");
+            error = _("A block inherited from a client that was not enforcing the BLAKE2b hardfork is invalid under it, and correcting it needs block data that has been pruned");
             return false;
         }
 
-        LogPrintf("RDTS: block %s at height %d violates mandatory signaling and was "
-                  "inherited from a non-enforcing client; marking it invalid\n",
-                  target->GetBlockHash().ToString(), target->nHeight);
+        LogPrintf("RDTS: block %s at height %d is invalid under the BLAKE2b "
+                  "hardfork and was inherited from a non-enforcing client; "
+                  "marking it invalid%s\n",
+                  target->GetBlockHash().ToString(), target->nHeight,
+                  rewind ? strprintf(" and rewinding the active chain by %d block(s)", rewind) : "");
 
         BlockValidationState state;
         if (!InvalidateBlock(state, target) || !state.IsValid()) {
             LogError("RDTS: failed to invalidate %s: %s\n", target->GetBlockHash().ToString(), state.ToString());
-            error = _("Failed to correct a block that violates the BIP110/RDTS mandatory-signaling rule");
+            error = _("Failed to correct an inherited block that is invalid under the BLAKE2b hardfork");
             return false;
         }
         invalidated = true;
@@ -5635,10 +5710,19 @@ bool Chainstate::CorrectRdtsInvalidBlocks(bilingual_str& error)
         BlockValidationState state;
         if (!ActivateBestChain(state) || !state.IsValid()) {
             LogError("RDTS: failed to activate best chain after correction: %s\n", state.ToString());
-            error = _("Failed to correct a block that violates the BIP110/RDTS mandatory-signaling rule");
+            error = _("Failed to correct an inherited block that is invalid under the BLAKE2b hardfork");
+            return false;
+        }
+        // Make the corrected state durable now rather than at the next
+        // periodic flush: a crash before then would have to repeat the rewind
+        // (see LoadChainTip for how an interrupted flush is recovered).
+        if (!FlushStateToDisk(state, FlushStateMode::ALWAYS)) {
+            LogError("RDTS: failed to flush the corrected chain state: %s\n", state.ToString());
+            error = _("Failed to correct an inherited block that is invalid under the BLAKE2b hardfork");
             return false;
         }
     }
+    m_chainman.GetNotifications().progress(bilingual_str{}, 100, false);
     return true;
 }
 
@@ -5677,8 +5761,9 @@ bool ChainstateManager::LoadBlockIndex()
                     chainstate->TryAddBlockIndexCandidate(pindex);
                 }
             }
-            if (pindex->nStatus & BLOCK_FAILED_MASK && (!m_best_invalid || pindex->nChainWork > m_best_invalid->nChainWork)) {
-                m_best_invalid = pindex;
+            if (pindex->nStatus & BLOCK_FAILED_MASK && !ContinuesSha256dPastFork(*pindex) &&
+                    (!m_best_invalid || pindex->nChainWork > m_best_invalid->nChainWork)) {
+                m_best_invalid = pindex;  // see Chainstate::InvalidChainFound
             }
             if (pindex->IsValid(BLOCK_VALID_TREE) && (m_best_header == nullptr || CBlockIndexWorkComparator()(m_best_header, pindex)))
                 m_best_header = pindex;

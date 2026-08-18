@@ -2025,24 +2025,27 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         kernel_cache_sizes,
         args);
 
-    // A data directory advanced by a client that was not enforcing BIP110/RDTS
-    // can contain blocks that violate RDTS mandatory signaling. Normal startup
-    // does not re-validate inherited history, so correct such state now: mark
-    // the offending blocks invalid and reorganize to the best valid chain. If
-    // the data needed to rewind has been pruned, report it as a load failure so
+    // A data directory advanced by a client that was not enforcing the
+    // BLAKE2b hardfork can contain SHA256d blocks at or above the fork height.
+    // Normal startup does not re-validate inherited history, so correct such
+    // state now: mark the offending blocks invalid and reorganize to the best
+    // valid chain (the BLAKE2b chain, which extends past the last shared
+    // pre-fork block, then outweighs the truncated inherited branch). If the
+    // data needed to rewind has been pruned, report it as a load failure so
     // the reindex prompt below offers recovery, rather than running on (or
     // partially rewinding) an invalid chain.
     //
-    // Skip this on any reindex: -reindex and -reindex-chainstate re-connect blocks
-    // through ConnectBlock, which re-enforces the rule and rejects violators during
-    // the rebuild, so the correction is redundant. It is also unsafe there: a
-    // chainstate reindex returns here with the active chain not yet built, and
-    // correcting against an empty chain would fail an internal consistency check.
+    // Skip this on any reindex: both -reindex and -reindex-chainstate reconnect
+    // blocks through ConnectBlock, which re-runs the bad-version-blake2b header
+    // check (it is contextual/volatile) and rejects the offending blocks during
+    // the rebuild, so the correction is redundant. The same holds whenever the
+    // active chain has not been built yet (a coins database with no best block,
+    // reindex or not); the correction itself is a no-op in that state.
     //
     // The block index is shared, so the invalid marks apply to any background
     // (assumeutxo) chainstate too; only the active chainstate is reorganized here.
-    // Safe while every snapshot base stays below the RDTS window (as today); a
-    // future snapshot base above the window would need re-review.
+    // Safe while every snapshot base stays below the BLAKE2b fork height (as
+    // today); a future snapshot base above it would need re-review.
     if (status == ChainstateLoadStatus::SUCCESS && !ShutdownRequested(node) &&
             !do_reindex && !do_reindex_chainstate) {
         bilingual_str rdts_error;
