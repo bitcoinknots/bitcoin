@@ -1575,11 +1575,12 @@ static ChainstateLoadResult InitAndLoadChainstate(
 
 bool UserProtocolRulesCheck()
 {
-    const auto rules_requested{gArgs.GetArgs(CONSENSUSRULES_CONFIG_NAME)};
-    if (rules_requested.empty()) {
-        return true;
+    for (const auto& rule : gArgs.GetArgs(CONSENSUSRULES_CONFIG_NAME)) {
+        // Accepted and ignored: configurations written while RDTS consent was required still carry it
+        if (rule == "rdts") continue;
+        return InitError(strprintf(_("Unknown rule specified in -%s: %s"), CONSENSUSRULES_CONFIG_NAME, rule));
     }
-    return InitError(strprintf(_("Unknown rule specified in -%s: %s"), CONSENSUSRULES_CONFIG_NAME, rules_requested.front()));
+    return true;
 }
 
 bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
