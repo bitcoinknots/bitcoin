@@ -45,7 +45,7 @@ uint256 CBlockHeader::GetHash() const
     h1 << prevblock_ordered_sane;
     h1 << m_height;
     h1 << hashMerkleRoot;
-    h1 << nTime;
+    h1 << GetTimeOnWire();
     h1 << (uint8_t)0;  // Reserved for extended 40-bit time
     h1 << nBits;
     h1 << (uint32_t)m_txcount;
@@ -80,16 +80,16 @@ uint256 CBlockHeader::GetHash() const
             [[fallthrough]];
         case 2:
             ss << zeros << zeros << zeros;
-            ss << h2_hash << nNonce << m_nonce2 << m_nonce3 << hash;
+            ss << h2_hash << nNonce << m_nonce2 << m_time_offset << m_nonce3 << hash;
             break;
         case 0:
         {
             std::fill_n(prevblock_hidden.begin(), 6, uint8_t{0});
-            ss << prevblock_hidden << nNonce << m_nonce2 << m_nonce3 << hash;
+            ss << prevblock_hidden << nNonce << m_nonce2 << m_time_offset << m_nonce3 << hash;
             break;
         }
         case 1:
-            ss << nNonce << m_nonce2 << m_nonce3 << hash << h2_hash;
+            ss << nNonce << m_nonce2 << m_nonce3 << m_time_offset << hash << h2_hash;
             break;
     }
 
