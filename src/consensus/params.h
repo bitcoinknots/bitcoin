@@ -109,6 +109,20 @@ struct Params {
     /** Block height at which BLAKE2b hardfork becomes active */
     int Blake2bHeight{std::numeric_limits<int>::max()};
     uint8_t Blake2bTargetShift{20};
+    /**
+     * RDTS (BIP110 ReducedData Temporary Softfork) deployment expiry.
+     *
+     * At the BLAKE2b hardfork RDTS stops using versionbits: its rules are
+     * enforced for exactly the blocks from Blake2bHeight (see RdtsActiveAt)
+     * until expiry. A block is past expiry when its parent's median-time-past
+     * has reached RdtsExpiryTime, so the boundary is monotone along any chain
+     * and the rules for the next block are knowable in advance.
+     *
+     * The default leaves the deployment unscheduled (expiry precedes every
+     * median-time-past, and Blake2bHeight itself defaults to unscheduled), so
+     * behaviour is unchanged on chains that do not set it.
+     */
+    int64_t RdtsExpiryTime{std::numeric_limits<int64_t>::min()};
     /** Don't warn about unknown BIP 9 activations below this height.
      * This prevents us from warning about the CSV and segwit activations. */
     int MinBIP9WarningHeight;
@@ -170,6 +184,16 @@ struct Params {
     bool IsBlake2bHeight(int height) const
     {
         return height >= Blake2bHeight;
+    }
+
+    /** RDTS activates at the BLAKE2b hardfork; there is no separate schedule. */
+    int RdtsActivationHeight() const { return Blake2bHeight; }
+
+    /** Whether the RDTS rules apply to a block at the given height whose
+     *  parent has the given median-time-past. */
+    bool RdtsActiveAt(int height, int64_t mtp_prev) const
+    {
+        return IsBlake2bHeight(height) && mtp_prev < RdtsExpiryTime;
     }
 };
 
