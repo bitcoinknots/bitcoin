@@ -38,6 +38,17 @@ Short-term consensus (see [doc/purity-consensus.md](doc/purity-consensus.md)):
 3. Reorgs deeper than 6 blocks are parked for human review by default (local chain-selection policy, not consensus). Operators may change the threshold with `-parkreorgdepth=<n>` or disable parking with `-parkdeepreorg=0`.
 4. Automatic freeze of double-spend coinbases and inputs is specified but **not implemented** yet.
 
+How to run Bitcoin Purity?
+--------------------------
+
+See [doc/INSTALL.md](doc/INSTALL.md)
+
+At the first time you run Bitcoin Purity, you have to assign -purityactivationheight=<height> to activate the purity rules. This is a one-time operation.
+
+The purityactivationheight is the height of the block that the purity rules are activated. It is a consensus parameter. Please follow the official instruction and don't set it to arbitrary value.
+
+Once the purity rules are activated, you can run Bitcoin Purity without the -purityactivationheight parameter.
+
 License
 -------
 

@@ -16,7 +16,7 @@ pkg_add git cmake boost libevent
 See [dependencies.md](dependencies.md) for a complete overview.
 
 ### 2. Clone Bitcoin Repo
-Clone the Bitcoin Core repository to a directory. All build scripts and commands will run from this directory.
+Clone the Bitcoin Purity repository to a directory. All build scripts and commands will run from this directory.
 ``` bash
 git clone https://github.com/bitcoin/bitcoin.git
 ```
@@ -58,7 +58,7 @@ export BDB_PREFIX="[path displayed above]"
 #### GUI Dependencies
 ###### Qt5
 
-Bitcoin Core includes a GUI built with the cross-platform Qt Framework. To compile the GUI, we need to install
+Bitcoin Purity includes a GUI built with the cross-platform Qt Framework. To compile the GUI, we need to install
 the necessary parts of Qt, the libqrencode and pass `-DBUILD_GUI=ON`. Skip if you don't intend to use the GUI.
 
 ```bash
@@ -80,7 +80,7 @@ Otherwise, if you don't need QR encoding support, use the `-DWITH_QRENCODE=OFF` 
 #### Notifications
 ###### ZeroMQ
 
-Bitcoin Core can provide notifications via ZeroMQ. To compile ZMQ support, install the following dependency and pass `-DWITH_ZMQ=ON` when configuring.
+Bitcoin Purity can provide notifications via ZeroMQ. To compile ZMQ support, install the following dependency and pass `-DWITH_ZMQ=ON` when configuring.
 ```bash
 pkg_add zeromq
 ```
@@ -93,11 +93,11 @@ To run the test suite (recommended), you will need to have Python 3 installed:
 pkg_add python py3-zmq  # Select the newest version of the python package if necessary.
 ```
 
-## Building Bitcoin Core
+## Building Bitcoin Purity
 
 ### 1. Configuration
 
-There are many ways to configure Bitcoin Core, here are a few common examples:
+There are many ways to configure Bitcoin Purity, here are a few common examples:
 
 ##### Descriptor Wallet and GUI:
 This enables descriptor wallet support and the GUI, assuming SQLite and Qt 5 are installed.
