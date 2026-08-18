@@ -11,6 +11,7 @@ from test_framework.util import assert_equal
 class ParkDeepReorgTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
+        self.setup_clean_chain = True
         self.extra_args = [
             ["-parkdeepreorg=1", "-parkreorgdepth=6"],
             ["-parkdeepreorg=0"],
@@ -26,8 +27,8 @@ class ParkDeepReorgTest(BitcoinTestFramework):
         assert_equal(self.nodes[0].getblockcount(), 10)
 
         self.disconnect_nodes(0, 1)
-        self.generate(self.nodes[0], 8)
-        self.generate(self.nodes[1], 10)
+        self.generate(self.nodes[0], 8, sync_fun=self.no_op)
+        self.generate(self.nodes[1], 10, sync_fun=self.no_op)
         assert_equal(self.nodes[0].getblockcount(), 18)
         assert_equal(self.nodes[1].getblockcount(), 20)
 
