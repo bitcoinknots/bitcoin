@@ -703,7 +703,6 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
 
     SetupChainParamsBaseOptions(argsman);
     argsman.AddArg("-consensusrules=<rules>", strprintf("Enforce the specified consensus rules (default: none). Must be %s to use this software.", CONSENSUSRULES_REQUIRED), ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
-    argsman.AddArg("-rdts_consent_flag=<n>", strprintf("Test RDTS consent flag <n> (default: %u)", static_cast<int64_t>(g_rdts_consent)), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::DEBUG_TEST);
 
     argsman.AddArg("-acceptnonstddatacarrier",
                    strprintf("Relay and mine non-OP_RETURN datacarrier injection (default: %u)",
