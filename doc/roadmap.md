@@ -8,7 +8,8 @@ See [purity-consensus.md](purity-consensus.md).
 2. Make BIP110/RDTS rules permanently active; remove the opt-out.
 3. Switch difficulty adjustment to 24-hour ASERT (`aserti3-1d`), anchor
    enforcement-chain block 961632. Keep SHA256d.
-4. Enable Bitcoin Cash Node-style deep-reorg parking (depth greater than 6).
+4. Enable Bitcoin Cash Node-style deep-reorg parking (depth greater than 6,
+   local policy via `-parkreorgdepth`, not consensus).
 5. Specify automatic double-spend freeze; **do not implement it yet**.
 
 No replay protection.

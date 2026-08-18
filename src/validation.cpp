@@ -3917,6 +3917,8 @@ bool Chainstate::ActivateBestChain(BlockValidationState& state, std::shared_ptr<
                     break;
                 }
 
+                // Local policy, not consensus: park rather than automatically
+                // activate a competing chain whose rewind exceeds park_reorg_depth.
                 if (m_chainman.m_options.park_deep_reorg && m_chain.Tip() && pblock &&
                     pblock->GetHash() == pindexMostWork->GetBlockHash()) {
                     const CBlockIndex* fork = m_chain.FindFork(pindexMostWork);

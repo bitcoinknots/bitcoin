@@ -23,7 +23,10 @@ class ValidationSignals;
 
 static constexpr bool DEFAULT_CHECKPOINTS_ENABLED{true};
 static constexpr bool DEFAULT_PARK_DEEP_REORG{false};
+//! Local chain-selection policy: park a competing chain if activating it
+//! would rewind more than this many active-chain blocks. Not a consensus rule.
 static constexpr int DEFAULT_PARK_REORG_DEPTH{6};
+static constexpr int MIN_PARK_REORG_DEPTH{1};
 static constexpr auto DEFAULT_MAX_TIP_AGE{24h};
 
 namespace kernel {
@@ -38,7 +41,8 @@ struct ChainstateManagerOpts {
     fs::path datadir;
     std::optional<int32_t> check_block_index{};
     bool checkpoints_enabled{DEFAULT_CHECKPOINTS_ENABLED};
-    //! Park a competing chain if activating it would rewind more than park_reorg_depth blocks.
+    //! Local policy: park a competing chain if activating it would rewind more
+    //! than park_reorg_depth blocks. Not a consensus parameter; nodes may differ.
     bool park_deep_reorg{DEFAULT_PARK_DEEP_REORG};
     int park_reorg_depth{DEFAULT_PARK_REORG_DEPTH};
     //! If set, it will override the minimum work we will assume exists on some valid chain.

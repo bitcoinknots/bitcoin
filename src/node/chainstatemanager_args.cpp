@@ -7,6 +7,7 @@
 #include <arith_uint256.h>
 #include <common/args.h>
 #include <common/system.h>
+#include <kernel/chainstatemanager_opts.h>
 #include <logging.h>
 #include <node/coins_view_args.h>
 #include <node/database_args.h>
@@ -19,6 +20,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <limits>
 #include <string>
 
 namespace node {
@@ -33,6 +35,16 @@ util::Result<void> ApplyArgsManOptions(const ArgsManager& args, ChainstateManage
 
     opts.park_deep_reorg = args.GetBoolArg("-parkdeepreorg", !opts.chainparams.IsTestChain());
     if (auto value{args.GetIntArg("-parkreorgdepth")}) {
+        // park_reorg_depth is a node-local chain-selection policy, not consensus.
+        // Reject values that cannot be represented as a positive int without truncation.
+        if (*value < MIN_PARK_REORG_DEPTH) {
+            return util::Error{Untranslated(strprintf(
+                "-parkreorgdepth must be at least %d (got %d); use -parkdeepreorg=0 to disable parking",
+                MIN_PARK_REORG_DEPTH, *value))};
+        }
+        if (*value > std::numeric_limits<int>::max()) {
+            return util::Error{Untranslated(strprintf("-parkreorgdepth value (%d) is too large", *value))};
+        }
         opts.park_reorg_depth = static_cast<int>(*value);
     }
 

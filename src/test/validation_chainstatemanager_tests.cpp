@@ -872,6 +872,34 @@ BOOST_FIXTURE_TEST_CASE(chainstatemanager_args, BasicTestingSetup)
 
     BOOST_CHECK(!get_opts({"-minimumchainwork=xyz"}));                                                               // invalid hex characters
     BOOST_CHECK(!get_opts({"-minimumchainwork=01234567890123456789012345678901234567890123456789012345678901234"})); // > 64 hex chars
+
+    // -parkreorgdepth is a node-local policy parameter, not consensus.
+    BOOST_CHECK_EQUAL(get_valid_opts({}).park_reorg_depth, DEFAULT_PARK_REORG_DEPTH);
+    BOOST_CHECK_EQUAL(get_valid_opts({"-parkreorgdepth=1"}).park_reorg_depth, 1);
+    BOOST_CHECK_EQUAL(get_valid_opts({"-parkreorgdepth=4"}).park_reorg_depth, 4);
+    BOOST_CHECK_EQUAL(get_valid_opts({"-parkreorgdepth=6"}).park_reorg_depth, 6);
+    {
+        const auto result{get_opts({"-parkreorgdepth=0"})};
+        BOOST_CHECK(!result);
+        BOOST_CHECK_EQUAL(util::ErrorString(result).original,
+                          "-parkreorgdepth must be at least 1 (got 0); use -parkdeepreorg=0 to disable parking");
+    }
+    {
+        const auto result{get_opts({"-parkreorgdepth=-1"})};
+        BOOST_CHECK(!result);
+        BOOST_CHECK_EQUAL(util::ErrorString(result).original,
+                          "-parkreorgdepth must be at least 1 (got -1); use -parkdeepreorg=0 to disable parking");
+    }
+    {
+        const auto result{get_opts({"-parkreorgdepth=2147483648"})};
+        BOOST_CHECK(!result);
+        BOOST_CHECK_EQUAL(util::ErrorString(result).original, "-parkreorgdepth value (2147483648) is too large");
+    }
+
+    // On mainnet (this fixture), parking is enabled unless -parkdeepreorg=0.
+    BOOST_CHECK_EQUAL(get_valid_opts({}).park_deep_reorg, true);
+    BOOST_CHECK_EQUAL(get_valid_opts({"-parkdeepreorg=1"}).park_deep_reorg, true);
+    BOOST_CHECK_EQUAL(get_valid_opts({"-parkdeepreorg=0"}).park_deep_reorg, false);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

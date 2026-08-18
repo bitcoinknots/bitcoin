@@ -35,7 +35,7 @@ Short-term consensus (see [doc/purity-consensus.md](doc/purity-consensus.md)):
 
 1. BIP110/RDTS rules are always on and cannot be disabled.
 2. Difficulty uses 24-hour ASERT (`aserti3-1d`), anchored at BIP110 enforcement-chain block 961632. Proof-of-work remains SHA256d.
-3. Reorgs deeper than 6 blocks are parked for human review (Bitcoin Cash Node-style).
+3. Reorgs deeper than 6 blocks are parked for human review by default (local chain-selection policy, not consensus). Operators may change the threshold with `-parkreorgdepth=<n>` or disable parking with `-parkdeepreorg=0`.
 4. Automatic freeze of double-spend coinbases and inputs is specified but **not implemented** yet.
 
 License

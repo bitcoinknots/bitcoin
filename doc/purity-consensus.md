@@ -102,16 +102,30 @@ resume.
 
 ## 3. Deep-reorg parking (local policy, not consensus)
 
-Port of Bitcoin Cash Node parking. **Not** a consensus rule.
+Port of Bitcoin Cash Node parking. **Not** a consensus rule. Different nodes
+may use different thresholds. A block or chain is not consensus-invalid merely
+because a node parks it; parking only affects that node's chain selection.
 
-- If connecting a block would rewind the active chain by **more than 6**
-  blocks, mark that block **parked** and do not reorg automatically.
-- Operator decides with `parkblock` / `unparkblock`. `invalidateblock` /
-  `reconsiderblock` remain available to reject or restore.
+Default local policy:
+
+- Parking is enabled on mainnet (`-parkdeepreorg=1`) and disabled by default
+  on test chains.
+- The default threshold is **6** (`-parkreorgdepth=6`).
+- If connecting a competing chain would rewind the active chain by **more
+  than 6** blocks (`rewind > 6`), mark the competing chain **parked** and do
+  not reorg automatically.
+- Reorgs of 6 blocks or fewer proceed under normal most-work chain selection.
+
+Operators may override the threshold with `-parkreorgdepth=<n>` (minimum 1).
+For example, `parkreorgdepth=4` means reorg depths 1–4 may activate
+automatically, while depth 5 or greater is parked for manual review. Disable
+the mechanism with `-parkdeepreorg=0`.
+
+Parked chains can be reviewed with `parkblock` / `unparkblock`.
+`invalidateblock` / `reconsiderblock` remain available to reject or restore.
+
 - Do **not** port BCH Avalanche or automatic unparking.
 - Do **not** port BCH `-maxreorgdepth` auto-finalization.
-
-Default: parking enabled. Depth threshold: 6.
 
 ## 4. Double-spend freeze (specified, not implemented)
 

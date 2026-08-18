@@ -26,7 +26,9 @@ Rules are specified in [doc/purity-consensus.md](purity-consensus.md):
 - Difficulty uses aserti3-1d (24-hour half-life), anchored at BIP110
   enforcement-chain block 961632. Proof-of-work remains SHA256d.
 - Reorgs deeper than 6 blocks are parked for manual `unparkblock` or
-  `invalidateblock`.
+  `invalidateblock`. This is local chain-selection policy, not consensus;
+  operators may override the threshold with `-parkreorgdepth=<n>` or
+  disable it with `-parkdeepreorg=0`.
 
 There is no transaction-level replay protection.
 
