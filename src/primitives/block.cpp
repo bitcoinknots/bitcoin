@@ -20,6 +20,8 @@ uint256 CBlockHeader::GetHash() const
 
     // BLAKE2b
 
+    static constexpr uint128 zeros{};
+
     // The pooling miner doesn't know m_xor_key (only the hash of it) until it finds a block
     auto xor_key_hash = TaggedHash("Bitcoin block hash PoW XOR key");
     xor_key_hash << m_xor_key;
@@ -52,10 +54,16 @@ uint256 CBlockHeader::GetHash() const
     h1 << xor_key_hash.GetSHA256();
     Assert(h1.BytesWritten() == 0x40 + 117);
 
+    auto h2 = TaggedHash("Merge-mining hook");
+    h2 << h1.GetSHA256();
+    h2 << zeros << zeros;
+    h2 << m_mm_rhs;
+    Assert(h2.BytesWritten() == 0x40 + 0x60);
+
     // These fields get sent to mining machines over Sv1
     DataStream ss;
     ss << (uint32_t)0;     // Final 3 bytes are part of Sv1 "coinb1" (first is implied by hasher)
-    ss << h1.GetSHA256();  // Remainder of Sv1 "coinb1"
+    ss << h2.GetSHA256();  // Remainder of Sv1 "coinb1"
     ss << m_extranonce;    // Sv1 "extranonce"
     Assert(ss.size() == 52);
 

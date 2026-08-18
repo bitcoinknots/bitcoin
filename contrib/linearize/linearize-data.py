@@ -55,9 +55,10 @@ def calc_hash_str(blk_hdr):
         + xor_key_mask_clear_bits
         + xor_key_hash,
     )
+    h2 = tagged_hash("Merge-mining hook", h1 + b"\x00" * 32 + blk_hdr[132:164])
     hash1 = blake2b(
         b"\x00" * 4
-        + h1
+        + h2
         + blk_hdr[92:108]   # extranonce
     )
     asic_input = (
@@ -280,7 +281,7 @@ class BlockDataCopier:
             su = struct.unpack("<I", inLenLE)
             blk_hdr = self.read_xored(self.inF, 80)
             if blk_hdr[3] & 0x80:
-                blk_hdr += self.read_xored(self.inF, 52)
+                blk_hdr += self.read_xored(self.inF, 84)
             inLen = su[0] - len(blk_hdr)
             inExtent = BlockExtent(self.inFn, self.inF.tell(), inhdr, blk_hdr, inLen)
 

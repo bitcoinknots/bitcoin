@@ -35,6 +35,7 @@ struct CompressedHeader {
 
     uint8_t m_xor_key_mask_clear_bits{0};
     uint128 m_xor_key{};
+    uint256 m_mm_rhs;
 
     CompressedHeader()
     {
@@ -87,7 +88,7 @@ public:
         SER_READ(obj, obj.m_header_v2 = v & v2_flag);
         SER_READ(obj, obj.nVersion = v & ~v2_flag);
         if (obj.m_header_v2) {
-            READWRITE(obj.m_nonce2, obj.m_nonce3, obj.m_extranonce, obj.m_reserved1, obj.m_reserved, obj.m_xor_key_mask_clear_bits, obj.m_xor_key, obj.m_height);
+            READWRITE(obj.m_nonce2, obj.m_nonce3, obj.m_extranonce, obj.m_reserved1, obj.m_reserved, obj.m_xor_key_mask_clear_bits, obj.m_xor_key, obj.m_height, obj.m_mm_rhs);
         } else {
             SER_READ(obj, obj.m_nonce2 = 0);
             SER_READ(obj, obj.m_nonce3 = 0);
@@ -97,6 +98,7 @@ public:
             SER_READ(obj, obj.m_xor_key_mask_clear_bits = 0);
             SER_READ(obj, obj.m_xor_key.SetNull());
             SER_READ(obj, obj.m_height = 0);
+            SER_READ(obj, obj.m_mm_rhs.SetNull());
         }
     }
 
@@ -117,6 +119,7 @@ public:
         m_xor_key_mask_clear_bits = 0;
         m_xor_key.SetNull();
         m_height = 0;
+        m_mm_rhs.SetNull();
     }
 
     bool IsNull() const
@@ -133,6 +136,7 @@ public:
         if (m_reserved) return false;
         if (m_xor_key_mask_clear_bits) return false;
         if (!m_xor_key.IsNull()) return false;
+        if (!m_mm_rhs.IsNull()) return false;
         if (m_height) return false;
         return true;
     }

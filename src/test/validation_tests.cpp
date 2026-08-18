@@ -85,6 +85,21 @@ BOOST_AUTO_TEST_CASE(subsidy_limit_test)
     BOOST_CHECK_EQUAL(nSum, CAmount{2099999997690000});
 }
 
+BOOST_AUTO_TEST_CASE(block_header_hidden_v2_fields)
+{
+    Consensus::Params params{};
+    const auto check_hidden_field = [&](const CBlock& block) {
+        BlockValidationState state;
+        BOOST_CHECK(!CheckBlock(block, state, params, /*fCheckPOW=*/false, /*fCheckMerkleRoot=*/false));
+        BOOST_CHECK(state.GetResult() == BlockValidationResult::BLOCK_MUTATED);
+        BOOST_CHECK_EQUAL(state.GetRejectReason(), "error-headerv1-with-v2-fields");
+    };
+
+    CBlock hidden_mm_rhs;
+    hidden_mm_rhs.m_mm_rhs = uint256::ONE;
+    check_hidden_field(hidden_mm_rhs);
+}
+
 BOOST_AUTO_TEST_CASE(signet_parse_tests)
 {
     ArgsManager signet_argsman;
