@@ -48,6 +48,9 @@ from test_framework.wallet import MiniWallet
 # RDTS activates at the BLAKE2b fork height (see -testactivationheight below)
 ACTIVATION_HEIGHT = 432
 EXPIRY_TIME = 2000000000
+# Consensus weight limits: the reduced one applies while RDTS is active
+REDUCED_DATA_MAX_BLOCK_WEIGHT = 700000
+MAX_BLOCK_WEIGHT = 4000000
 # The first BLAKE2b block's coinbase must contain the headline; this value
 # must match the test framework's default -blake2b_headline argument
 HEADLINE = b'BLAKE2b functional test headline'
@@ -95,6 +98,24 @@ class TemporaryDeploymentTest(BitcoinTestFramework):
             block = self.create_block_for_node(node)
             node.submitblock(block.serialize().hex())
 
+    def create_heavy_block(self, node, num_outputs):
+        """A block whose coinbase carries num_outputs maximum-size OP_RETURN
+        outputs (~368 WU each), RDTS-compliant at any weight: 1950 outputs is
+        ~718k WU (over the RDTS cap), 1850 is ~682k WU (under it)."""
+        tip = node.getbestblockhash()
+        height = node.getblockcount() + 1
+        block_time = node.getblockheader(tip)['time'] + 1
+        coinbase = create_coinbase(height)
+        pad = CScript([OP_RETURN, b'x' * 80])  # 83 bytes, exactly the data cap
+        for _ in range(num_outputs):
+            coinbase.vout.append(CTxOut(0, pad))
+        coinbase.rehash()
+        block = create_block(int(tip, 16), coinbase, ntime=block_time,
+                             height=height, header_v2=height >= ACTIVATION_HEIGHT)
+        add_witness_commitment(block)
+        block.solve()
+        return block
+
     def create_tx_with_large_output(self, wallet):
         """Create a transaction with 84-byte OP_RETURN (violates BIP-110's 83-byte limit)."""
         tx_dict = wallet.create_self_transfer()
@@ -110,11 +131,14 @@ class TemporaryDeploymentTest(BitcoinTestFramework):
         return info['blocks'] + 1 >= ACTIVATION_HEIGHT and info['mediantime'] < EXPIRY_TIME
 
     def assert_gbt_rdts(self, node, *, active):
-        """Check getblocktemplate's RDTS surface: the rules entry."""
+        """Check getblocktemplate's RDTS surface: the rules entry and the
+        advertised weight limit (external miners must see the real cap)."""
         # 'blake2b' is a client-capability rule: required once the template
         # is a v2 (BLAKE2b) header, ignored before the fork.
         tmpl = node.getblocktemplate({'rules': ['segwit', 'blake2b']})
         assert_equal('reduced_data' in tmpl['rules'], active)
+        assert_equal(tmpl['weightlimit'],
+                     REDUCED_DATA_MAX_BLOCK_WEIGHT if active else MAX_BLOCK_WEIGHT)
 
     def assert_rdts_deploymentinfo(self, node, *, active):
         """Check the reduced_data entry in getdeploymentinfo."""
@@ -146,6 +170,11 @@ class TemporaryDeploymentTest(BitcoinTestFramework):
         self.assert_rdts_deploymentinfo(node_bip110, active=False)
         # A node without RDTS scheduled reports no reduced_data entry.
         assert 'reduced_data' not in node_core.getdeploymentinfo()['deployments']
+
+        # Pre-fork only the 4M weight limit applies: a ~718k WU block connects.
+        heavy = self.create_heavy_block(node_bip110, 1950)
+        assert_equal(node_bip110.submitblock(heavy.serialize().hex()), None)
+        self.sync_all()
 
         # Mine to just before the fork height
         self.log.info("Mining to just before the fork height...")
@@ -220,6 +249,17 @@ class TemporaryDeploymentTest(BitcoinTestFramework):
         assert_equal(node_core.getbestblockhash(), node_bip110.getbestblockhash())
         assert_equal(node_core.getblockcount(), 437)
         self.log.info(f"Reorg complete: both nodes at height {node_core.getblockcount()}")
+
+        # =====================================================================
+        # Phase 3b: the RDTS weight limit
+        # =====================================================================
+        self.log.info("Phase 3b: 700k WU limit enforced while the deployment is active")
+        heavy = self.create_heavy_block(node_bip110, 1950)   # ~718k WU, over the cap
+        assert_equal(node_bip110.submitblock(heavy.serialize().hex()), 'bad-blk-weight-reduced_data')
+        under = self.create_heavy_block(node_bip110, 1850)   # ~682k WU, under the cap
+        assert_equal(node_bip110.submitblock(under.serialize().hex()), None)
+        self.sync_all()
+        self.log.info("  oversize rejected, under-cap accepted")
 
         # =====================================================================
         # Phase 4: Test rules enforced until expiry
@@ -298,6 +338,11 @@ class TemporaryDeploymentTest(BitcoinTestFramework):
 
         final_height = node_bip110.getblockcount()
         self.log.info(f"Final height: {final_height}, both nodes synced")
+
+        # Past expiry the 4M limit is back: the same heavy shape connects.
+        heavy = self.create_heavy_block(node_bip110, 1950)
+        assert_equal(node_bip110.submitblock(heavy.serialize().hex()), None)
+        self.sync_all()
 
         # The enforcing node never latches the unknown-versionbits warning:
         # v2 headers carry the serialized v2 flag in the version field across

@@ -778,8 +778,8 @@ public:
      * chain extends past. The verdict is re-derived from the stored block
      * header (its height and PoW algorithm), so it needs no persisted per-block
      * marker and cannot misfire on a chain that was validated correctly. Only
-     * this header-derivable rule is handled; output-size and script-push
-     * violations require block data and remain a -reindex matter.
+     * this header-derivable rule is handled; output-size, script-push and
+     * block-weight violations require block data and remain a -reindex matter.
      * A no-op while the active chain is empty (the coins database had no best
      * block): the rebuild that follows enforces the rule through ConnectBlock.
      *
