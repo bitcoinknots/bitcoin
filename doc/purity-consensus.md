@@ -6,7 +6,10 @@ specified here as active rules.
 
 Activation height `nPurityActivationHeight` is set on mainnet via the
 `-purityactivationheight=<n>` option (or `purityactivationheight=<n>` in
-`bitcoin.conf`). On **first use** the value is written to
+`bitcoin.conf`). The value must be **greater than** the ASERT anchor height
+**961632** (i.e. at least **961633**), so the first ASERT-adjusted block has
+the anchor as an ancestor. Values at or below the anchor are rejected at
+startup and are not locked. On **first use** a valid value is written to
 `<datadir>/purity_activation_height` and becomes permanent for that datadir;
 later attempts to set a different value are ignored. Until the first lock,
 omit the option to leave the hard fork inactive. A provisional value such as

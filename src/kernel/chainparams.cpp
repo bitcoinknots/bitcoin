@@ -27,6 +27,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <stdexcept>
 #include <type_traits>
 
 using namespace util::hex_literals;
@@ -108,12 +109,19 @@ public:
         consensus.powLimit = uint256{"00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = 10 * 60;
+        consensus.nDAAHalfLife = 24 * 60 * 60;
+        consensus.nAsertAnchorHeight = Consensus::MAINNET_ASERT_ANCHOR_HEIGHT;
         // Set from -purityactivationheight; unset means hard fork never activates.
+        // Activation must be strictly after the ASERT anchor: GetNextASERTWorkRequired
+        // looks up GetAncestor(nAsertAnchorHeight) from the previous block.
         if (opts.purity_activation_height) {
+            if (*opts.purity_activation_height <= consensus.nAsertAnchorHeight) {
+                throw std::runtime_error(strprintf(
+                    "-purityactivationheight height (%d) must be greater than ASERT anchor height %d",
+                    *opts.purity_activation_height, consensus.nAsertAnchorHeight));
+            }
             consensus.nPurityActivationHeight = *opts.purity_activation_height;
         }
-        consensus.nDAAHalfLife = 24 * 60 * 60;
-        consensus.nAsertAnchorHeight = 961632;
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.enforce_BIP94 = false;
         consensus.fPowNoRetargeting = false;

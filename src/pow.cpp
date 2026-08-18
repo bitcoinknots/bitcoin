@@ -192,10 +192,14 @@ arith_uint256 CalculateASERT(const arith_uint256& refTarget, const int64_t nPowT
 
 unsigned int GetNextASERTWorkRequired(const CBlockIndex* pindexPrev, const CBlockHeader* pblock, const Consensus::Params& params)
 {
-    assert(pindexPrev != nullptr);
+    Assert(pindexPrev != nullptr);
+    // Requires pindexPrev->nHeight >= nAsertAnchorHeight so the anchor exists as
+    // an ancestor. Mainnet enforces nPurityActivationHeight > nAsertAnchorHeight
+    // at startup; Assert (not assert) so a missing ancestor cannot become a
+    // nullptr dereference if NDEBUG is defined.
     const CBlockIndex* pindexAnchorBlock = pindexPrev->GetAncestor(params.nAsertAnchorHeight);
-    assert(pindexAnchorBlock != nullptr);
-    assert(pindexPrev->nHeight >= pindexAnchorBlock->nHeight);
+    Assert(pindexAnchorBlock != nullptr);
+    Assert(pindexPrev->nHeight >= pindexAnchorBlock->nHeight);
 
     const arith_uint256 powLimit = UintToArith256(params.powLimit);
 
