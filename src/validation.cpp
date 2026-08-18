@@ -4936,8 +4936,18 @@ static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& stat
     // large by filling up the coinbase witness, which doesn't change
     // the block hash, so we couldn't mark the block as permanently
     // failed).
-    if (GetBlockWeight(block) > MAX_BLOCK_WEIGHT) {
+    const int64_t block_weight{GetBlockWeight(block)};
+    if (block_weight > MAX_BLOCK_WEIGHT) {
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-weight", strprintf("%s : weight limit failed", __func__));
+    }
+
+    // RDTS: a reduced block-weight limit applies to exactly the blocks with
+    // RDTS active (see RdtsActiveAt). Checked here, after the coinbase
+    // witness, for the same malleability reason as the limit above.
+    if (pindexPrev != nullptr &&
+        chainman.GetConsensus().RdtsActiveAt(nHeight, pindexPrev->GetMedianTimePast()) &&
+        block_weight > REDUCED_DATA_MAX_BLOCK_WEIGHT) {
+        return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-weight-reduced_data", strprintf("%s : RDTS weight limit failed", __func__));
     }
 
     return true;

@@ -99,6 +99,7 @@ BlockAssembler::BlockAssembler(Chainstate& chainstate, const CTxMemPool* mempool
 {
     // Whether we need to account for byte usage (in addition to weight usage)
     fNeedSizeAccounting = (options.nBlockMaxSize < MAX_BLOCK_SERIALIZED_SIZE);
+    m_effective_max_weight = m_options.nBlockMaxWeight;
 }
 
 void ApplyArgsManOptions(const ArgsManager& args, BlockAssembler::Options& options)
@@ -164,6 +165,14 @@ std::shared_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     CBlockIndex* pindexPrev = m_chainstate.m_chain.Tip();
     assert(pindexPrev != nullptr);
     nHeight = pindexPrev->nHeight + 1;
+
+    // While RDTS is active the consensus block-weight limit drops to
+    // REDUCED_DATA_MAX_BLOCK_WEIGHT (see RdtsActiveAt, the same predicate the
+    // validation rules key off); never assemble past it.
+    m_effective_max_weight = m_options.nBlockMaxWeight;
+    if (chainparams.GetConsensus().RdtsActiveAt(nHeight, pindexPrev->GetMedianTimePast())) {
+        m_effective_max_weight = std::min<size_t>(m_effective_max_weight, REDUCED_DATA_MAX_BLOCK_WEIGHT);
+    }
 
     pblock->m_header_v2 = chainparams.GetConsensus().IsBlake2bHeight(nHeight);
     pblock->nVersion = m_chainstate.m_chainman.m_versionbitscache.ComputeBlockVersion(pindexPrev, chainparams.GetConsensus());
@@ -253,7 +262,7 @@ void BlockAssembler::onlyUnconfirmed(CTxMemPool::setEntries& testSet)
 bool BlockAssembler::TestPackage(uint64_t packageSize, int64_t packageSigOpsCost) const
 {
     // TODO: switch to weight-based accounting for packages instead of vsize-based accounting.
-    if (nBlockWeight + WITNESS_SCALE_FACTOR * packageSize >= m_options.nBlockMaxWeight) {
+    if (nBlockWeight + WITNESS_SCALE_FACTOR * packageSize >= m_effective_max_weight) {
         return false;
     }
     if (nBlockSigOpsCost + packageSigOpsCost >= MAX_BLOCK_SIGOPS_COST) {
@@ -463,7 +472,7 @@ void BlockAssembler::addPackageTxs(const CTxMemPool& mempool, int& nPackagesSele
             ++nConsecutiveFailed;
 
             if (nConsecutiveFailed > MAX_CONSECUTIVE_FAILURES && nBlockWeight +
-                    BLOCK_FULL_ENOUGH_WEIGHT_DELTA > m_options.nBlockMaxWeight) {
+                    BLOCK_FULL_ENOUGH_WEIGHT_DELTA > m_effective_max_weight) {
                 // Give up if we're close to full and haven't succeeded in a while
                 break;
             }
