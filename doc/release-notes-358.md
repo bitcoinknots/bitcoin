@@ -5,7 +5,17 @@ RDTS rules are enforced for every block from the BLAKE2b hardfork height
 until the parent block's median-time-past reaches 2027-09-01 00:00 UTC,
 replacing the prior versionbits schedule, which the chain stall prevented from
 ever reaching activation at height 965664. The expiry preserves the previous
-schedule's approximately one year of enforcement.
+schedule's approximately one year of enforcement. It is a fixed date: should
+the hardfork happen later than planned, the enforcement window shortens
+accordingly.
+
+While the RDTS deployment is active, blocks are additionally limited to
+800,000 weight units, roughly 290 to 330 kB of transactions per block on the
+current transaction mix. The limit lifts at expiry together with the other
+RDTS rules, and `getblocktemplate` reports the reduced limit in
+`weightlimit` while it applies. A `-blockreservedweight` above the reduced
+limit leaves no room for transactions while it applies; the node warns about
+this at startup.
 
 There is no mandatory-signalling window any longer: the proof-of-work change
 itself separates this chain from the one continuing under SHA256d, since a
@@ -24,10 +34,12 @@ chain state". If the block data needed for that rewind has been pruned
 more than a couple of days after the hardfork will usually have pruned them),
 the node refuses to start and offers a rebuild instead, which for a pruned
 node means re-downloading the chain. Only this header-derivable rule
-is corrected automatically; violations that require block data to detect
-remain a `-reindex` matter. The invalidated SHA256d chain is not counted by
-the "we do not appear to fully agree with our peers" warning: it is expected
-to outweigh the BLAKE2b chain and is invalid by design.
+is corrected automatically; violations that require block data to detect,
+such as the weight limit above, are caught by a chainstate rebuild
+(`-reindex-chainstate`) or a full `-reindex`. The invalidated
+SHA256d chain is not counted by the "we do not appear to fully agree with our
+peers" warning: it is expected to outweigh the BLAKE2b chain and is invalid
+by design.
 
 Nodes must be configured with the correct `-blake2b_headline` value, published
 at the hardfork. A node started with the wrong value will reject the first

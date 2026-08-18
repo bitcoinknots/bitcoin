@@ -1080,8 +1080,9 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
     // "reduced_data" unprefixed, as before the deployment's removal
     // (gbt_force semantics: clients need no special support, there is no
     // client-side block construction involved).
-    if (pindexPrev != nullptr &&
-        consensusParams.RdtsActiveAt(pindexPrev->nHeight + 1, pindexPrev->GetMedianTimePast())) {
+    const bool rdts_active{pindexPrev != nullptr &&
+        consensusParams.RdtsActiveAt(pindexPrev->nHeight + 1, pindexPrev->GetMedianTimePast())};
+    if (rdts_active) {
         aRules.push_back("reduced_data");
     }
 
@@ -1110,7 +1111,9 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
     result.pushKV("sigoplimit", nSigOpLimit);
     result.pushKV("sizelimit", nSizeLimit);
     if (!fPreSegWit) {
-        result.pushKV("weightlimit", (int64_t)MAX_BLOCK_WEIGHT);
+        // While RDTS is active the consensus weight limit is reduced;
+        // external miners (e.g. DATUM) must see the real cap.
+        result.pushKV("weightlimit", (int64_t)(rdts_active ? REDUCED_DATA_MAX_BLOCK_WEIGHT : MAX_BLOCK_WEIGHT));
     }
     result.pushKV("curtime", block_header.GetBlockTime());
     result.pushKV("bits", strprintf("%08x", block_header.nBits));

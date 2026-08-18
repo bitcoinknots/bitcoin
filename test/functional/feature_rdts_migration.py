@@ -44,11 +44,15 @@ Cases:
                agree with our peers" warning (which is re-derived from the
                index at every start), while a genuinely invalid heavier
                BLAKE2b-era branch still does.
+  A_CONTENT    an inherited BLAKE2b block that violates a *content* rule (the
+               RDTS weight cap) is deliberately NOT corrected: the pass is
+               header-derivable-only. Documented boundary, not an oversight.
 """
 import os
 import shutil
 
 from test_framework.blocktools import create_block, create_coinbase, add_witness_commitment
+from test_framework.messages import CTxOut
 from test_framework.script import CScript, OP_RETURN, OP_NOP
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.test_node import ErrorMatch
@@ -70,6 +74,7 @@ BIG_SCRIPT = CScript([OP_RETURN] + [OP_NOP] * 70000)
 # The first BLAKE2b block's coinbase must contain the headline; this value must
 # match the test framework's default -blake2b_headline argument.
 HEADLINE = b'BLAKE2b functional test headline'
+REDUCED_DATA_MAX_BLOCK_WEIGHT = 800000
 
 
 def fork_arg(height=FORK_HEIGHT):
@@ -78,12 +83,15 @@ def fork_arg(height=FORK_HEIGHT):
 
 class RdtsMigrationTest(BitcoinTestFramework):
     def set_test_params(self):
-        self.num_nodes = 10
+        self.num_nodes = 11
         self.setup_clean_chain = True
         # Every node first builds a SHA256d chain with the fork unscheduled,
         # exactly as a non-enforcing client would; enforcement arrives via a
-        # restart with -testactivationheight=blake2b@FORK_HEIGHT.
-        self.extra_args = [[], [], [], [], [], ['-prune=1', '-fastprune'], [], [], [], []]
+        # restart with -testactivationheight=blake2b@FORK_HEIGHT. The
+        # exception is the A_CONTENT node (last), which needs the fork
+        # scheduled to mine BLAKE2b blocks at all, but leaves RDTS unscheduled
+        # so it can inherit an over-cap block.
+        self.extra_args = [[], [], [], [], [], ['-prune=1', '-fastprune'], [], [], [], [], [fork_arg()]]
 
     def setup_network(self):
         self.setup_nodes()  # driven directly, no connections
@@ -155,7 +163,7 @@ class RdtsMigrationTest(BitcoinTestFramework):
     # ---- test ----------------------------------------------------------
 
     def run_test(self):
-        n_clean, n_active, n_nonactive, n_bound, n_multi, n_prune, n_rc, n_empty, n_warn, n_crash = self.nodes
+        n_clean, n_active, n_nonactive, n_bound, n_multi, n_prune, n_rc, n_empty, n_warn, n_crash, n_content = self.nodes
 
         # A_CLEAN: an inherited chain that never reached the fork height has
         # no offending blocks and must be left alone.
@@ -378,6 +386,36 @@ class RdtsMigrationTest(BitcoinTestFramework):
         self.submit_tip(n_warn, v2=True, time_offset=2)  # a sibling of the invalidated block, not a duplicate
         assert self.has_fork_warning(n_warn), n_warn.getblockchaininfo()['warnings']
         self.log.info("  A_WARNING CONFIRMED: SHA256d branch excluded, BLAKE2b-era invalid branch still warns")
+
+        # A_CONTENT: content-rule violations inside inherited BLAKE2b blocks
+        # (here the RDTS weight cap) are NOT corrected: detecting them needs
+        # block data, so the pass is header-derivable-only by design. This node
+        # runs with the fork scheduled (needed to mine BLAKE2b at all) but RDTS
+        # unscheduled, so it accepts the oversized block; the restart then
+        # schedules RDTS.
+        self.log.info("A_CONTENT: inherited over-cap BLAKE2b block is deliberately not corrected")
+        self.mine_to(n_content, FORK_HEIGHT - 1)
+        tip = n_content.getbestblockhash()
+        cb = create_coinbase(FORK_HEIGHT)
+        cb.vin[0].scriptSig = CScript(bytes(cb.vin[0].scriptSig) + HEADLINE)
+        pad = CScript([OP_RETURN, b'x' * 80])
+        for _ in range(2200):  # ~810k WU, over the RDTS cap
+            cb.vout.append(CTxOut(0, pad))
+        cb.rehash()
+        heavy = self.make_block(n_content, tip, n_content.getblockheader(tip)['time'],
+                                FORK_HEIGHT, v2=True, coinbase=cb)
+        assert_equal(n_content.submitblock(heavy.serialize().hex()), None)
+        assert_equal(n_content.getblockcount(), FORK_HEIGHT)
+        assert heavy.get_weight() > REDUCED_DATA_MAX_BLOCK_WEIGHT
+        n_content = self.restart(10, [fork_arg(), '-rdtsexpiry=2000000000'])
+        assert_equal(n_content.getbestblockhash(), heavy.hash)
+        # A chainstate rebuild re-runs ConnectBlock, which re-checks the cap:
+        # that (or a full -reindex) is the documented remedy.
+        n_content = self.restart(10, [fork_arg(), '-rdtsexpiry=2000000000', '-reindex-chainstate'])
+        self.wait_until(lambda: self.chaintip_status(n_content, heavy.hash) == 'invalid')
+        assert_equal(n_content.getblockcount(), FORK_HEIGHT - 1)
+        self.log.info("  A_CONTENT CONFIRMED: not corrected at startup; "
+                      "a chainstate rebuild rejects it")
 
         self.log.info("")
         self.log.info("RESULT: an enforcing node auto-corrects inherited pre-hardfork history on "
