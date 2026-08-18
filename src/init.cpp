@@ -1583,22 +1583,11 @@ bool UserProtocolRulesCheck()
     return true;
 }
 
-enum class RDTSConsentFlag {
-    RUNTIME_CHECK,
-    IMPLICIT,
-};
-
-constexpr RDTSConsentFlag g_rdts_consent{RDTS_CONSENT};
-
 bool UserProtocolRulesConsent()
 {
-    if (g_rdts_consent == RDTSConsentFlag::IMPLICIT) {
-        LogPrintf("User already consented to '%s' consensus rules (at installation)\n", CONSENSUSRULES_REQUIRED);
-        return true;
-    }
     for (const auto& rulesok : gArgs.GetArgs(CONSENSUSRULES_CONFIG_NAME)) {
         if (rulesok == CONSENSUSRULES_REQUIRED) {
-            LogPrintf("User already consented to '%s' consensus rules (in config)\n", CONSENSUSRULES_REQUIRED);
+            LogPrintf("User already consented to '%s' consensus rules\n", CONSENSUSRULES_REQUIRED);
             return true;
         }
     }

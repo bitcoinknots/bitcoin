@@ -313,11 +313,8 @@ if(BUILD_FOR_FUZZING)
 endif()
 
 set(RDTS_CONSENT "UNSET" CACHE STRING "RDTS (BIP110) consent behaviour.")
-set(RDTS_CONSENT_OPTIONS "RUNTIME_CHECK" "IMPLICIT")
+set(RDTS_CONSENT_OPTIONS "RUNTIME_CHECK")
 set_property(CACHE RDTS_CONSENT PROPERTY STRINGS "UNSET" ${RDTS_CONSENT_OPTIONS})
-if(RDTS_CONSENT MATCHES "^(1|ON|YES|TRUE|Y)$")
-  set(RDTS_CONSENT "IMPLICIT")
-endif()
 if(BUILD_DAEMON OR BUILD_GUI OR BUILD_KERNEL_LIB)
   if(NOT RDTS_CONSENT IN_LIST RDTS_CONSENT_OPTIONS)
     message(FATAL_ERROR
@@ -325,15 +322,10 @@ if(BUILD_DAEMON OR BUILD_GUI OR BUILD_KERNEL_LIB)
       "This version of Bitcoin Knots applies the BIP110 (RDTS) network upgrade, which fixes critical vulnerabilities in long-standing network design. To avoid applying this upgrade by accident, please choose whether to accept it now, or defer explicit confirmation until runtime.\n"
       "Important: Because this upgrade already has broad community support, reverting to an older software version does not reject it. Running outdated software after any network upgrade only leaves your node vulnerable to displaying fake or fraudulent transactions. To effectively reject this upgrade, you need to run alternative software designed to split away from the upgraded network.\n"
       "To accept this upgrade now, add to your CMake options:\n"
-      "  -D RDTS_CONSENT=IMPLICIT\n"
-      "Or to defer explicit confirmation until runtime (via GUI prompt or consensusrules=rdts config setting):\n"
       "  -D RDTS_CONSENT=RUNTIME_CHECK\n"
       "For more information, see: https://bitcoinknots.org/learn/2026-rdts"
     )
   endif()
-else()
-  # Nothing else enforces consensus rules, but RDTSConsentFlags::UNSET doesn't actually exist so would break the build
-  set(RDTS_CONSENT "IMPLICIT")
 endif()
 
 # The external_lib_interface interface library aims to encapsulate build flags, which

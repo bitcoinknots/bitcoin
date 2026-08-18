@@ -5,11 +5,8 @@ ARG RDTS_CONSENT="UNSET"
 
 RUN <<EORUN
   cat <<\EOSCRIPT >/tmp/rdts_check
-    case "$(echo "$RDTS_CONSENT" | tr '[:lower:]' '[:upper:]')" in
-        1|ON|YES|TRUE|Y) RDTS_CONSENT="IMPLICIT" ;;
-    esac
     case "$RDTS_CONSENT" in
-        RUNTIME_CHECK|IMPLICIT)
+        RUNTIME_CHECK)
             ;;
         *)
             red=$(printf '\033[31m')
@@ -23,10 +20,6 @@ This version of Bitcoin Knots applies the BIP110 (RDTS) network upgrade, which f
 Important: Because this upgrade already has broad community support, reverting to an older software version does not reject it. Running outdated software after any network upgrade only leaves your node vulnerable to displaying fake or fraudulent transactions. To effectively reject this upgrade, you need to run alternative software designed to split away from the upgraded network.
 
 To accept this upgrade now, add to your Docker build arguments:
-
-  --build-arg RDTS_CONSENT=IMPLICIT
-
-Or to defer explicit confirmation until runtime (via consensusrules=rdts config setting):
 
   --build-arg RDTS_CONSENT=RUNTIME_CHECK
 
