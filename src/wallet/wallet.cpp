@@ -2341,7 +2341,7 @@ bool CWallet::HardforkActiveForNextBlock() const
 
 bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum) const
 {
-    const SighashRules sighash_rules{HardforkActiveForNextBlock()};
+    const SighashRules sighash_rules{HardforkActiveForNextBlock() ? SighashRules::UNIFIED : SighashRules::LEGACY};
 
     // Try to sign with all ScriptPubKeyMans
     for (ScriptPubKeyMan* spk_man : GetAllScriptPubKeyMans()) {
@@ -2359,7 +2359,7 @@ bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint,
 std::optional<PSBTError> CWallet::FillPSBT(PartiallySignedTransaction& psbtx, bool& complete, int sighash_type, bool sign, bool bip32derivs, size_t * n_signed, bool finalize, std::vector<bilingual_str>* warnings) const
 {
     // The transaction is being built for the next block, so use its rules.
-    const SighashRules sighash_rules{HardforkActiveForNextBlock()};
+    const SighashRules sighash_rules{HardforkActiveForNextBlock() ? SighashRules::UNIFIED : SighashRules::LEGACY};
     if (n_signed) {
         *n_signed = 0;
     }

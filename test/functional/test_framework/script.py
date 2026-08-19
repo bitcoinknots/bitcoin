@@ -725,16 +725,23 @@ def UnifiedSignatureHash(script_code, txTo, inIdx, hashtype, spent_utxos, sigver
     # Only defined for signatures that opted in.
     if not (hashtype & SIGHASH_UNIFIED):
         return None
-    if hashtype & ~(0x1f | SIGHASH_ANYONECANPAY | SIGHASH_UNIFIED):
-        return None
+    # Which outputs are signed is read as the legacy algorithm reads it: SINGLE
+    # and NONE by their low bits, everything else as ALL. Bits outside that field
+    # carry no meaning here and are committed to like the rest of the byte.
     output_type = hashtype & 0x1f
-    if output_type not in (SIGHASH_ALL, SIGHASH_NONE, SIGHASH_SINGLE):
-        return None
     anyonecanpay = bool(hashtype & SIGHASH_ANYONECANPAY)
 
     if script_type is None:
         script_type = UNIFIED_SCRIPT_TYPE_WITNESS_V0 if sigversion_witness else UNIFIED_SCRIPT_TYPE_BASE
     taproot = script_type in (UNIFIED_SCRIPT_TYPE_TAPROOT, UNIFIED_SCRIPT_TYPE_TAPSCRIPT)
+
+    # Taproot and tapscript keep BIP341's reading, which refuses a hash type it
+    # does not define, so the bytes it reserved stay reserved.
+    if taproot:
+        if hashtype & ~(0x1f | SIGHASH_ANYONECANPAY | SIGHASH_UNIFIED):
+            return None
+        if output_type not in (SIGHASH_ALL, SIGHASH_NONE, SIGHASH_SINGLE):
+            return None
 
     ss = bytes([script_type])
     ss += struct.pack("<i", hashtype)
@@ -747,12 +754,12 @@ def UnifiedSignatureHash(script_code, txTo, inIdx, hashtype, spent_utxos, sigver
         ss += sha256(b"".join(ser_string(u.scriptPubKey) for u in spent_utxos))
         ss += sha256(b"".join(struct.pack("<I", i.nSequence) for i in txTo.vin))
 
-    if output_type == SIGHASH_ALL:
-        ss += sha256(b"".join(o.serialize() for o in txTo.vout))
-    elif output_type == SIGHASH_SINGLE:
+    if output_type == SIGHASH_SINGLE:
         if inIdx >= len(txTo.vout):
             return None
         ss += sha256(txTo.vout[inIdx].serialize())
+    elif output_type != SIGHASH_NONE:
+        ss += sha256(b"".join(o.serialize() for o in txTo.vout))
 
     if anyonecanpay:
         ss += txTo.vin[inIdx].prevout.serialize()
