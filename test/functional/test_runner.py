@@ -381,6 +381,7 @@ BASE_SCRIPTS = [
     'mempool_compatibility.py',
     'mempool_accept_wtxid.py',
     'mempool_dust.py',
+    'mempool_tokens.py',
     'mempool_sigoplimit.py',
     'rpc_deriveaddresses.py',
     'rpc_deriveaddresses.py --usecli',
