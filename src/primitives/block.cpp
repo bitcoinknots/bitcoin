@@ -48,11 +48,11 @@ uint256 CBlockHeader::GetHash() const
     h1 << nTime;
     h1 << (uint8_t)0;  // Reserved for extended 40-bit time
     h1 << nBits;
-    h1 << m_reserved1;
+    h1 << (uint32_t)m_txcount;
     h1 << m_reserved;
     h1 << m_xor_key_mask_clear_bits;
     h1 << xor_key_hash.GetSHA256();
-    Assert(h1.BytesWritten() == 0x40 + 117);
+    Assert(h1.BytesWritten() == 0x40 + 119);
 
     auto h2 = TaggedHash("Merge-mining hook");
     h2 << h1.GetSHA256();

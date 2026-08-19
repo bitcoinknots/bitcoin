@@ -33,7 +33,6 @@ def calc_hash_str(blk_hdr):
     def blake2b(data):
         return hashlib.blake2b(data, digest_size=32).digest()
 
-    reserved1 = blk_hdr[108:110]
     reserved = blk_hdr[110:111]
     xor_key = blk_hdr[112:128]
     xor_key_hash = tagged_hash("Bitcoin block hash PoW XOR key", xor_key)
@@ -50,7 +49,8 @@ def calc_hash_str(blk_hdr):
         + blk_hdr[68:72]    # time
         + b"\x00"
         + blk_hdr[72:76]    # nBits
-        + reserved1
+        + blk_hdr[108:110]  # tx count
+        + b"\x00" * 2
         + reserved
         + xor_key_mask_clear_bits
         + xor_key_hash,

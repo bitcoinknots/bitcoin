@@ -4363,6 +4363,13 @@ static bool CheckMerkleRoot(const CBlock& block, BlockValidationState& state)
 {
     if (block.m_checked_merkle_root) return true;
 
+    if (block.m_txcount != (block.m_header_v2 ? block.vtx.size() : 0)) {
+        return state.Invalid(
+            /*result=*/BlockValidationResult::BLOCK_MUTATED,
+            /*reject_reason=*/"bad-txnlist-size",
+            /*debug_message=*/"Transaction list size doesn't match header");
+    }
+
     bool mutated;
     uint256 merkle_root = BlockMerkleRoot(block, &mutated);
     if (block.hashMerkleRoot != merkle_root) {

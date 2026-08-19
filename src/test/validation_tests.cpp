@@ -95,6 +95,10 @@ BOOST_AUTO_TEST_CASE(block_header_hidden_v2_fields)
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "error-headerv1-with-v2-fields");
     };
 
+    CBlock hidden_txcount;
+    hidden_txcount.m_txcount = 1;
+    check_hidden_field(hidden_txcount);
+
     CBlock hidden_mm_rhs;
     hidden_mm_rhs.m_mm_rhs = uint256::ONE;
     check_hidden_field(hidden_mm_rhs);
