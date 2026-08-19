@@ -1628,21 +1628,25 @@ bool SignatureHashUnified(uint256& hash_out, const CScript& scriptCode, const T&
     assert(nIn < txTo.vin.size());
     const bool taproot{sigversion == SigVersion::TAPROOT || sigversion == SigVersion::TAPSCRIPT};
     assert(sigversion == SigVersion::BASE || sigversion == SigVersion::WITNESS_V0 || taproot);
-    // Taproot carries context that lives outside the transaction, and dropping
-    // any of it would be unsafe rather than untidy.
+    // Taproot commits to context that is not in the transaction, so refuse to
+    // sign without it rather than sign over less.
     if (taproot && (execdata == nullptr || !execdata->m_annex_init)) return HandleMissingData(mdb);
 
     if (!(cache.m_bip341_taproot_ready && cache.m_spent_outputs_ready)) return HandleMissingData(mdb);
 
     // This message is only defined for signatures that opted in.
     if (!(nHashType & SIGHASH_UNIFIED)) return false;
-    // Only canonical hash types. Legacy treats every value whose low bits are
-    // neither SINGLE nor NONE as ALL, which silently gives dozens of byte
-    // values the same meaning. Since this applies only to signatures that opted
-    // in, tightening it breaks nothing that already exists.
-    if (nHashType & ~(0x1f | SIGHASH_ANYONECANPAY | SIGHASH_UNIFIED)) return false;
+    // Each script type keeps the reading it has today, so opting in changes the
+    // message and nothing else. The legacy algorithm takes SINGLE and NONE by
+    // their low bits and everything else as ALL, and bare, P2SH and segwit v0
+    // keep that. BIP341 instead refuses a hash type it does not define, at
+    // consensus rather than by policy, and taproot and tapscript keep that: the
+    // bytes it reserved stay reserved.
     const int32_t output_type{nHashType & 0x1f};
-    if (output_type != SIGHASH_ALL && output_type != SIGHASH_NONE && output_type != SIGHASH_SINGLE) return false;
+    if (taproot) {
+        if (nHashType & ~(0x1f | SIGHASH_ANYONECANPAY | SIGHASH_UNIFIED)) return false;
+        if (output_type != SIGHASH_ALL && output_type != SIGHASH_NONE && output_type != SIGHASH_SINGLE) return false;
+    }
     const bool anyonecanpay{!!(nHashType & SIGHASH_ANYONECANPAY)};
 
     HashWriter ss{HASHER_UNIFIED_SIGHASH};
@@ -1672,13 +1676,13 @@ bool SignatureHashUnified(uint256& hash_out, const CScript& scriptCode, const T&
         ss << cache.m_spent_scripts_single_hash;
         ss << cache.m_sequences_single_hash;
     }
-    if (output_type == SIGHASH_ALL) {
-        ss << cache.m_outputs_single_hash;
-    } else if (output_type == SIGHASH_SINGLE) {
+    if (output_type == SIGHASH_SINGLE) {
         if (nIn >= txTo.vout.size()) return false;
         HashWriter single_output{};
         single_output << txTo.vout[nIn];
         ss << single_output.GetSHA256();
+    } else if (output_type != SIGHASH_NONE) {
+        ss << cache.m_outputs_single_hash;   // ALL, and every value that is not NONE or SINGLE
     }
 
     // Data about the input being signed. Under ANYONECANPAY the aggregate

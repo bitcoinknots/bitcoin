@@ -359,8 +359,8 @@ enum class MissingDataBehavior
  * their tail from execdata, which those two require.
  *
  * Returns false for a SIGHASH_SINGLE input with no matching output, and for a
- * hash type that did not opt in or is not canonical. Data the caller was
- * required to supply and did not goes through mdb, so a consensus caller
+ * hash type that did not opt in. Data the caller was required to supply and did
+ * not goes through mdb, so a consensus caller
  * surfaces the bug rather than treating a valid signature as invalid. Callers
  * must treat false as "signature invalid" rather than substituting a
  * placeholder hash. */

@@ -66,20 +66,22 @@ FUZZ_TARGET(unified_sighash)
     uint256 hash;
     const bool ok{SignatureHashUnified(hash, script_code, tx, in_pos, hash_type, sigversion, txdata, ed)};
 
-    // Only canonical hash types may be accepted.
     const int32_t output_type{hash_type & 0x1f};
-    // Defined only for signatures that opted in, and only for a real output
-    // type with no undefined bits set.
-    const bool canonical{(hash_type & SIGHASH_UNIFIED) &&
-                         !(hash_type & ~(0x1f | SIGHASH_ANYONECANPAY | SIGHASH_UNIFIED)) &&
-                         (output_type == SIGHASH_ALL || output_type == SIGHASH_NONE || output_type == SIGHASH_SINGLE)};
-    if (!canonical) {
+    // Defined for every signature that opted in, and for no other.
+    if (!(hash_type & SIGHASH_UNIFIED)) {
         Assert(!ok);
         return;
     }
-    // SIGHASH_SINGLE without a matching output is the only other refusal.
     if (!ok) {
-        Assert(output_type == SIGHASH_SINGLE && in_pos >= tx.vout.size());
+        // Taproot and tapscript keep BIP341's reading, which refuses a hash type
+        // it does not define. Everywhere else SIGHASH_SINGLE without a matching
+        // output is the only refusal left.
+        const bool undefined_for_bip341{taproot &&
+            ((hash_type & ~(0x1f | SIGHASH_ANYONECANPAY | SIGHASH_UNIFIED)) ||
+             (output_type != SIGHASH_ALL && output_type != SIGHASH_NONE &&
+              output_type != SIGHASH_SINGLE))};
+        Assert(undefined_for_bip341 ||
+               (output_type == SIGHASH_SINGLE && in_pos >= tx.vout.size()));
         return;
     }
 
@@ -99,8 +101,14 @@ FUZZ_TARGET(unified_sighash)
         if (other == sigversion) continue;
         const bool other_taproot{other == SigVersion::TAPROOT || other == SigVersion::TAPSCRIPT};
         uint256 other_hash;
-        Assert(SignatureHashUnified(other_hash, script_code, tx, in_pos, hash_type, other, txdata,
-                               other_taproot ? &execdata : nullptr));
+        // Taproot and tapscript keep BIP341's reading, so a hash type the
+        // legacy reading accepts may have no message there at all. That is a
+        // stronger separation than a differing hash, not a weaker one.
+        if (!SignatureHashUnified(other_hash, script_code, tx, in_pos, hash_type, other, txdata,
+                                  other_taproot ? &execdata : nullptr)) {
+            Assert(other_taproot);
+            continue;
+        }
         Assert(other_hash != hash);
     }
 

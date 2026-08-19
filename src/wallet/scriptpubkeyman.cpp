@@ -46,9 +46,12 @@ bool SighashTypesAgree(int declared, int requested, SighashRules sighash_rules)
     if ((declared & SIGHASH_UNIFIED) == 0 && (requested & SIGHASH_UNIFIED) == 0) {
         return declared == requested;
     }
+    // Only a hash type that really is SIGHASH_DEFAULT means ALL. Stripping the
+    // opt-in bit off 0x20 leaves zero as well, and that is a different type
+    // with a message of its own, so it must not be folded into ALL here.
     const auto normalise = [](int type) {
-        const int base{type & ~SIGHASH_UNIFIED};
-        return base == SIGHASH_DEFAULT ? int{SIGHASH_ALL} : base;
+        if (type == SIGHASH_DEFAULT) return int{SIGHASH_ALL};
+        return type & ~SIGHASH_UNIFIED;
     };
     return normalise(declared) == normalise(requested);
 }
