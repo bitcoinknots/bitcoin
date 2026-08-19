@@ -95,8 +95,9 @@ and not after; a signature made under the fork's rules is not valid before it.
 A mempool entry accepted under one answer can therefore be invalid under the
 other, whether the chain reached the height by a reorg or by ordinary forward
 progress, and the block assembler cannot skip an entry that has become invalid.
-Entries whose recorded state disagrees with the block being built are dropped in
-both cases; see *Implementation notes* below.
+An entry is dropped when its recorded state disagrees with the block being built
+*and* it carries a signature that opted in, since no other entry reads
+differently on the two sides; see *Implementation notes* below.
 
 ## Specification
 
@@ -114,16 +115,21 @@ A signature uses the algorithm below if and only if `SIGHASH_UNIFIED` is set. Th
 is committed to by the signature, so the bit cannot be added or removed by a
 third party without invalidating it.
 
-A hash type is valid for this algorithm only if:
+Each script type keeps the reading it has today. For bare, P2SH and segwit v0
+that is the legacy one: `SIGHASH_SINGLE` signs the output at the input's index,
+`SIGHASH_NONE` signs none, any other value signs them all, and
+`SIGHASH_ANYONECANPAY` has its usual meaning. Remaining bits carry no meaning and
+are committed to with the rest of the byte, so every distinct byte is a distinct
+message. Bytes outside the three named output types stay non-standard and stay
+valid for those script types, exactly as today, since the defined-hashtype check
+is policy rather than consensus there.
 
-* `SIGHASH_UNIFIED` is set,
-* no bits outside `0x1f | SIGHASH_UNIFIED | SIGHASH_ANYONECANPAY` are set,
-* `hash_type & 0x1f` is one of `SIGHASH_ALL`, `SIGHASH_NONE`, `SIGHASH_SINGLE`.
+For taproot and tapscript it is BIP341's: a hash type it does not define is
+refused, at consensus rather than by policy, so the bytes it reserved stay
+reserved. Only `SIGHASH_ALL`, `SIGHASH_NONE` and `SIGHASH_SINGLE`, with or
+without `SIGHASH_ANYONECANPAY`, carry the opt-in bit there.
 
-Otherwise the signature is invalid. The legacy algorithm treats every value whose
-low bits are not `NONE` or `SINGLE` as `ALL`, giving many distinct bytes the same
-meaning; that is not carried over. This applies only to signatures that opted in,
-so the stricter rule breaks nothing that exists.
+Opting in changes which message is signed and nothing else.
 
 Before activation, `SIGHASH_UNIFIED` is not a defined hash type. Under
 `SCRIPT_VERIFY_STRICTENC` such a signature is rejected outright, and without it
@@ -162,13 +168,17 @@ The message is the concatenation below, and the signature hash is
  32 bytes   sha_scripts
  32 bytes   sha_sequences
 
-  if hash_type & 0x1f == SIGHASH_ALL:
- 32 bytes   sha_outputs
   if hash_type & 0x1f == SIGHASH_SINGLE:
  32 bytes   SHA256( output at the same index as this input )
              invalid if no output exists at that index
-  if hash_type & 0x1f == SIGHASH_NONE:
+  else if hash_type & 0x1f == SIGHASH_NONE:
              nothing
+  otherwise:
+ 32 bytes   sha_outputs
+             every value that is not SINGLE or NONE signs all outputs,
+             as the legacy algorithm does. Script types 2 and 3 accept
+             only SIGHASH_ALL, SIGHASH_NONE and SIGHASH_SINGLE, so the
+             fallthrough is reachable for script types 0 and 1 only.
 
   if ANYONECANPAY is set:
  36 bytes   this input's outpoint
@@ -204,8 +214,8 @@ signature hash is computed, and opting in must not change how an existing script
 is evaluated. It is a no-op for every script that does not contain the signature
 being checked. Script type 1 does not perform it, matching BIP143.
 
-Two differences from the legacy algorithm, both reachable only by signatures that
-opted in:
+Three differences from the legacy algorithm, all reachable only by signatures
+that opted in:
 
 * `SIGHASH_SINGLE` with no output at the input's index is invalid, as in BIP341.
   The two algorithms this replaces both allow it: the legacy one returns the
@@ -213,6 +223,10 @@ opted in:
   Both are signable, and neither is carried over.
 * The script type byte separates the four script types, so a signature made for
   one can never be valid for another.
+* `SIGHASH_NONE` and `SIGHASH_SINGLE` still commit to every input's `nSequence`,
+  as BIP341 does. The legacy algorithm zeroes the others and BIP143 omits the
+  aggregate, so a protocol that relies on a counterparty being able to raise
+  `nSequence` under those types does not carry over.
 
 Under `ANYONECANPAY` the input's position is not committed to, so the input may
 still be moved into another transaction. Its own outpoint, spent output and
@@ -253,16 +267,14 @@ the same key. The codeseparator position serves the same purpose it serves
 elsewhere. These live outside the transaction, so the script interpreter supplies
 them rather than reading them from it.
 
-A hash type is valid for an opted-in taproot or tapscript signature under the
-same rule as every other script type: `SIGHASH_UNIFIED` set, no bits outside
-`0x1f | SIGHASH_UNIFIED | SIGHASH_ANYONECANPAY`, and low five bits one of
-`SIGHASH_ALL`, `SIGHASH_NONE` or `SIGHASH_SINGLE`.
+The hash type is read under BIP341's rule rather than the legacy one: a byte it
+does not define is refused. See *Hash type byte* above.
 
-`SIGHASH_DEFAULT` cannot be used with `SIGHASH_UNIFIED`. It means "append no hash type
-byte at all", so there would be nothing to carry the bit; a byte holding only
-`SIGHASH_UNIFIED` is rejected rather than treated as a second spelling of
-`SIGHASH_DEFAULT`. An opted-in taproot signature is therefore always 65 bytes,
-which is the size wallets already budget for.
+`SIGHASH_DEFAULT` cannot be used with `SIGHASH_UNIFIED`: it means "append no hash
+type byte at all", so there would be nothing to carry the bit. An opted-in taproot
+signature is therefore always 65 bytes, which is the size wallets already budget
+for. A byte holding only `SIGHASH_UNIFIED` is a distinct byte and so a distinct
+message, not a second spelling of `SIGHASH_DEFAULT`.
 
 ### What this fixes
 
@@ -275,7 +287,7 @@ in the number of inputs, closing CVE-2013-2292 for inputs that opt in.
 
 ## Test vectors
 
-`src/test/data/unified_sighash.json` contains 144 vectors covering all four script
+`src/test/data/unified_sighash.json` contains 166 vectors covering all four script
 types: scriptCode, raw transaction, input index, hash type, script type, the
 spent outputs, and the expected signature hash. Hashes are raw bytes, not the
 reversed display order. For tapscript vectors the scriptCode column holds the
@@ -284,7 +296,7 @@ leaf script, and the vectors assume no annex and no executed
 
 Three implementations agree on them: the reference one, a second written
 separately in `test/functional/test_framework/script.py`, and a third written
-from this document alone, which reproduces all 144. The third is what checks this
+from this document alone, which reproduces all 166. The third is what checks this
 text for completeness: an ambiguity in any script type would show up as a
 mismatch.
 
@@ -309,8 +321,10 @@ a numeric field in the hash type where this uses the tag.
 
 ## Decisions
 
-**`SIGHASH_UNIFIED = 0x20`.** Unused in Bitcoin, where the low five bits carry the
-output type and `0x80` carries `ANYONECANPAY`, so it is free to define.
+**`SIGHASH_UNIFIED = 0x20`.** The low five bits carry the output type and `0x80`
+carries `ANYONECANPAY`, which leaves `0x20` and `0x40` as the only bits free to
+define. Neither is untouched on mainnet, so the exception under *Compatibility*
+below is unavoidable either way.
 
 `0x40` carries the same role on other chains, where it selects their digest. A
 signer that recognises that byte would compute their message rather than this
@@ -338,6 +352,13 @@ the mandatory flags, and the legacy message commits to the byte whatever it is.
 So a bare, P2SH or segwit v0 signature whose hash type already has this bit set
 is consensus-valid today, and after activation it is read under the new algorithm
 and stops verifying.
+
+What that costs depends on who still holds the key. A signature can be replaced,
+so for a live wallet this is an inconvenience: sign again after activation. Where
+the signature was made in advance and the key deliberately destroyed, as a
+pre-signed refund or an inheritance path does, there is nothing left to sign
+with and the output cannot be spent. That is a loss of funds, and it is worth
+naming as one.
 
 Reaching that state takes deliberate effort. Such a transaction is non-standard,
 so no node relays it and it can only enter a block direct from a miner, and it
@@ -409,11 +430,19 @@ height, in either direction. Handling only the reorg leaves an entry accepted
 before activation sitting in the pool afterwards, and block production stops on
 that node from the first block that enforces the fork.
 
-An entry has to be dropped whenever the answer recorded on it disagrees with the
-block about to be built, in either direction, and whether it was accepted under
-the fork's rules is recorded on the entry rather than recomputed later.
-Recomputing means trusting that the chain still says the same thing about a
-height it may have replaced.
+An entry has to be dropped when the answer recorded on it disagrees with the
+block about to be built, in either direction, *and* the transaction carries a
+signature that opted in. Whether it was accepted under the fork's rules is
+recorded on the entry rather than recomputed later: recomputing means trusting
+that the chain still says the same thing about a height it may have replaced.
+
+The second condition matters as much as the first. Only an opted-in signature
+reads differently on the two sides, so dropping on the recorded state alone
+empties every mempool on the network at the crossing block and discards
+payments already in flight for a rule that does not apply to them. Detecting it
+is a read of the input bytes, not a verification: a 65-byte Schnorr signature,
+or a DER signature followed by one hash type byte, with that bit set. Err
+towards dropping when a push cannot be ruled out as a signature.
 
 Both directions matter because the flag is a switch. Gaining the fork invalidates
 an entry whose legacy signature carries the opt-in bit, and losing it invalidates
@@ -422,50 +451,25 @@ well as by reorg, and the forward path disconnects nothing, so an implementation
 that reconciles only on reorg leaves the first case in the pool and stops making
 blocks.
 
-### Combining with the proof-of-work change
+### Relationship to the proof-of-work change
 
-This is written to stand alone so it can be reviewed and tested on its own, so it
-declares its own activation trigger. The proof-of-work change declares the same
-`Blake2bHeight` and the same `DEPLOYMENT_BLAKE2B` buried deployment, so the two
-collide on exactly those declarations and nowhere else.
+This is built on that change rather than beside it, so `DEPLOYMENT_BLAKE2B` and
+`Blake2bHeight` are declared there and used here. Both sets of rules activate at
+that one deployment, so the fork takes effect at a single block and there is no
+window where one applies without the other.
 
-They are written to match that change verbatim, character for character and in
-the same position, so a merge sees the same lines added twice and keeps one
-copy. Merging the two therefore needs no resolution: not for the field, not for
-the deployment name, and not for the `-testactivationheight` case, which
-otherwise merges into two `case` labels for one value and stops compiling
-without git reporting anything.
-
-They are also isolated in a single commit, *consensus: declare the hardfork
-deployment*, which contains nothing else, so an assembly that rebases rather
-than merges can drop that one commit instead. Everything after it uses the names
-without caring which side declared them, and the tag
-
-```
-grep -rn HARDFORK-PLUMBING src
-```
-
-marks the same lines for anyone reading them in place. Both sides already
-activate at that deployment, so nothing else has to change.
-
-One further step is not visible from either side alone, and is handled here so
-that combining does not need it. Once the proof-of-work change applies, a block
-at or after the activation height must carry the v2 header, which states its own
-height and transaction count, and a node refuses one that does not: first
+Two things follow for anyone reading the tests. A block at or after the
+activation height must carry the v2 header, which states its own height and
+transaction count, and a node refuses one that does not: first
 `bad-version-blake2b`, then `bad-txnlist-size` once the version is right. Blocks
-a test solves for itself are built by `create_block`, which grows two arguments
-for this in that change and has neither here, so the helpers in
-`feature_unified_sighash.py` ask whether they exist before using them and build
-the block as it is today when they do not. Combining means passing the two
-directly and deleting the questions. The tests have been run both ways: on this
-branch alone, and on this branch applied to the proof-of-work base with the
-declaration commit dropped.
+the framework solves for itself therefore go through the two helpers at the top
+of `feature_unified_sighash.py` rather than calling `create_block` directly.
+Asking the node for a block template also requires naming the `blake2b` rule.
 
-The wallet asks whether the fork applies to the next block before it signs.
-That question only exists because this branch schedules the fork nowhere, so
-every network it runs on has it inactive. Combined, the deployment has a height
-and the wallet can sign under the fork's rules unconditionally, so the predicate
-and the plumbing that reaches it from the GUI go away with the rest.
+The wallet still asks whether the fork applies to the next block before it
+signs, because the deployment is scheduled on no network yet. Once it has a
+height everywhere the wallet runs, that question and the plumbing that carries
+its answer from the GUI can go.
 
 ## Interaction with PSBT
 
