@@ -643,6 +643,7 @@ static RPCHelpMan getblocktemplate()
                 {"rules", RPCArg::Type::ARR, RPCArg::Optional::NO, "A list of strings",
                 {
                     {"segwit", RPCArg::Type::STR, RPCArg::Optional::NO, "(literal) indicates client side segwit support"},
+                    {"header_v2", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "(literal) indicates client side HeaderV2 support"},
                     {"str", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "other client side supported softfork deployment"},
                 }},
                 {"longpollid", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "delay processing request until the result would vary significantly from the \"longpollid\" of a prior template"},
@@ -1020,6 +1021,12 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
         // indicate to miner that they must understand signet rules
         // when attempting to mine with this template
         aRules.push_back("!signet");
+    }
+    if (block.m_header_v2) {
+        aRules.push_back("!header_v2");
+        if (setClientRules.count("header_v2") != 1) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Support for 'header_v2' rule requires explicit client support");
+        }
     }
 
     UniValue vbavailable(UniValue::VOBJ);

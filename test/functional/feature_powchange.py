@@ -88,6 +88,9 @@ class PowChangeTest(BitcoinTestFramework):
         self.generatetoaddress(node, CHANGE_HEIGHT - 2, addr)
         pre_parent_hash = node.getbestblockhash()
         pre_parent = node.getblockheader(pre_parent_hash)
+        pre_template = node.getblocktemplate({"rules": ["segwit"]})
+        assert_equal(pre_template["height"], CHANGE_HEIGHT - 1)
+        assert "!header_v2" not in pre_template["rules"]
 
         invalid_pre_header = create_block(
             int(pre_parent_hash, 16),
@@ -111,8 +114,17 @@ class PowChangeTest(BitcoinTestFramework):
         assert_equal(pre_hash, powhash(pre_header)[::-1].hex())
 
         self.log.info("The activation block and its successors use BLAKE2b")
-        template = node.getblocktemplate({"rules": ["segwit"]})
+        assert_raises_rpc_error(
+            -8, "Support for 'header_v2' rule requires explicit client support",
+            node.getblocktemplate, {"rules": ["segwit"]},
+        )
+        assert_raises_rpc_error(
+            -8, "Support for 'header_v2' rule requires explicit client support",
+            node.getblocktemplate, {"rules": ["segwit", "blake2b"]},
+        )
+        template = node.getblocktemplate({"rules": ["segwit", "header_v2"]})
         assert_equal(template["height"], CHANGE_HEIGHT)
+        assert "!header_v2" in template["rules"]
         assert_equal(template["coinbaseaux"]["blake2b_headline"], b"BLAKE2b functional test headline".hex())
 
         invalid_activation_block = create_block(
@@ -133,7 +145,13 @@ class PowChangeTest(BitcoinTestFramework):
         assert_equal(post_header.m_txcount, 1)
         assert_equal(len(post_header.serialize()), 164)
         assert_equal(post_hash, powhash(post_header)[::-1].hex())
-        assert "blake2b_headline" not in node.getblocktemplate({"rules": ["segwit"]})["coinbaseaux"]
+        assert_raises_rpc_error(
+            -8, "Support for 'header_v2' rule requires explicit client support",
+            node.getblocktemplate, {"rules": ["segwit"]},
+        )
+        post_template = node.getblocktemplate({"rules": ["segwit", "header_v2"]})
+        assert "!header_v2" in post_template["rules"]
+        assert "blake2b_headline" not in post_template["coinbaseaux"]
 
         # A null XOR key disables anti-withholding regardless of how many mask
         # bits the pool requests to clear.
