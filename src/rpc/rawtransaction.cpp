@@ -740,7 +740,22 @@ static RPCHelpMan combinerawtransaction()
         // ... and merge in other signatures:
         for (const CMutableTransaction& txv : txVariants) {
             if (txv.vin.size() > i) {
-                sigdata.MergeSignatureData(DataFromTransaction(txv, i, coin.out, sighash_rules, &txdata));
+                // The precomputed data covers the prevouts, the sequences and
+                // the outputs, so a variant agreeing on those is described by it
+                // whatever its scriptSigs hold. Comparing txids instead would
+                // exclude every legacy multisig variant, because a partial
+                // signature lives in the scriptSig and so changes the txid.
+                const bool shares_aggregates{[&] {
+                    if (txv.vin.size() != txConst.vin.size()) return false;
+                    if (txv.vout != txConst.vout) return false;
+                    for (size_t k = 0; k < txv.vin.size(); ++k) {
+                        if (txv.vin[k].prevout != txConst.vin[k].prevout) return false;
+                        if (txv.vin[k].nSequence != txConst.vin[k].nSequence) return false;
+                    }
+                    return true;
+                }()};
+                sigdata.MergeSignatureData(DataFromTransaction(txv, i, coin.out, sighash_rules,
+                                                              shares_aggregates ? &txdata : nullptr));
             }
         }
         ProduceSignature(DUMMY_SIGNING_PROVIDER, MutableTransactionSignatureCreator(mergedTx, i, coin.out.nValue, 1), coin.out.scriptPubKey, sigdata);
