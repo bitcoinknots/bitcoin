@@ -223,7 +223,7 @@ public:
 
     CBlockHeader GetBlockHeader() const
     {
-        return CBlockHeader(static_cast<const CompressedHeader&>(*this), pprev ? pprev->GetBlockHash() : uint256{});
+        return CBlockHeader(static_cast<const CompressedHeader&>(*this), pprev ? pprev->GetBlockHash() : uint256{}, nHeight);
     }
 
     uint256 GetBlockHash() const
@@ -352,7 +352,7 @@ public:
 
     CBlockHeader GetBlockHeader() const
     {
-        return CBlockHeader{static_cast<const CompressedHeader&>(*this), hashPrev};
+        return CBlockHeader{static_cast<const CompressedHeader&>(*this), hashPrev, nHeight};
     }
 
     SERIALIZE_METHODS(CDiskBlockIndex, obj)

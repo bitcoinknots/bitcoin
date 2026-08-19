@@ -41,6 +41,7 @@ uint256 CBlockHeader::GetHash() const
     auto h1 = TaggedHash("Bitcoin block header 1");
     h1 << nVersion;
     h1 << prevblock_ordered_sane;
+    h1 << m_height;
     h1 << hashMerkleRoot;
     h1 << nTime;
     h1 << (uint8_t)0;  // Reserved for extended 40-bit time
@@ -49,7 +50,7 @@ uint256 CBlockHeader::GetHash() const
     h1 << m_reserved;
     h1 << m_xor_key_mask_clear_bits;
     h1 << xor_key_hash.GetSHA256();
-    Assert(h1.BytesWritten() == 0x40 + 113);
+    Assert(h1.BytesWritten() == 0x40 + 117);
 
     // These fields get sent to mining machines over Sv1
     DataStream ss;
