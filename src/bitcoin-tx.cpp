@@ -681,9 +681,13 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
 
     // This tool has no chain access, so it cannot work out whether the hardfork
     // is active and must be told with -unifiedsighash.
-    const SighashRules sighash_rules{gArgs.GetBoolArg("-unifiedsighash", false)};
+    const SighashRules sighash_rules{gArgs.GetBoolArg("-unifiedsighash", false) ? SighashRules::UNIFIED : SighashRules::LEGACY};
+    // Built whenever every previous output is known, not only when signing for
+    // the fork: reading an input that already carries an opt-in signature needs
+    // the same commitments, and that happens under either rule set.
     PrecomputedTransactionData txdata;
-    if (sighash_rules == SighashRules::UNIFIED) {
+    bool have_spent_outputs{false};
+    {
         std::vector<CTxOut> spent_outputs;
         spent_outputs.reserve(mergedTx.vin.size());
         for (const CTxIn& txin : mergedTx.vin) {
@@ -691,15 +695,20 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
             if (coin.IsSpent()) break;
             spent_outputs.emplace_back(coin.out);
         }
-        if (spent_outputs.size() != mergedTx.vin.size()) {
+        have_spent_outputs = spent_outputs.size() == mergedTx.vin.size();
+        if (sighash_rules == SighashRules::UNIFIED && !have_spent_outputs) {
             throw std::runtime_error("-unifiedsighash needs the previous output of every input; supply them all");
         }
-        txdata.Init(CTransaction(mergedTx), std::move(spent_outputs), /*force=*/true);
+        if (have_spent_outputs) {
+            txdata.Init(CTransaction(mergedTx), std::move(spent_outputs), /*force=*/true);
+        }
     }
 
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn& txin = mergedTx.vin[i];
+        // Recorded before signing: UpdateInput below replaces whatever is here.
+        const bool input_had_data{!txin.scriptSig.empty() || !txin.scriptWitness.IsNull()};
         const Coin& coin = view.AccessCoin(txin.prevout);
         if (coin.IsSpent()) {
             continue;
@@ -708,8 +717,18 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
         const CAmount& amount = coin.out.nValue;
 
         // Recognising an existing opt-in signature needs the same rules it was
-        // made under, and the spent outputs it commits to.
-        SignatureData sigdata = DataFromTransaction(mergedTx, i, coin.out, sighash_rules, sighash_rules == SighashRules::UNIFIED ? &txdata : nullptr);
+        // made under, and the spent outputs it commits to. What is not
+        // recognised here is overwritten below, so read the input under both
+        // rule sets and keep whichever finds something: a co-signer who did not
+        // pass -unifiedsighash would otherwise destroy the other party's work.
+        SignatureData sigdata = DataFromTransaction(mergedTx, i, coin.out, sighash_rules, sighash_rules == SighashRules::UNIFIED && have_spent_outputs ? &txdata : nullptr);
+        if (sighash_rules != SighashRules::UNIFIED && have_spent_outputs) {
+            // Merged rather than replaced: one input can hold a legacy partial
+            // signature from one party and an opt-in one from another, and a
+            // read under a single rule set sees only one of them.
+            sigdata.MergeSignatureData(DataFromTransaction(mergedTx, i, coin.out,
+                                                           SighashRules::UNIFIED, &txdata));
+        }
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if (!fHashSingle || (i < mergedTx.vout.size())) {
             MutableTransactionSignatureCreator creator(mergedTx, i, amount, sighash_rules == SighashRules::UNIFIED ? &txdata : nullptr, nHashType);
@@ -725,7 +744,23 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
             throw std::runtime_error(strprintf("Missing amount for CTxOut with scriptPubKey=%s", HexStr(prevPubKey)));
         }
 
-        UpdateInput(txin, sigdata);
+        // Without every previous output an opt-in signature cannot be read back,
+        // so an input carrying one would be replaced by whatever was recognised.
+        // Write only when that cannot lose anything: the result solves the input,
+        // or every previous output was available to read it with, or there was
+        // nothing there to begin with. Completeness is the test rather than a
+        // non-empty scriptSig, which ProduceSignature fills with a placeholder
+        // even when it solved nothing.
+        if (sigdata.complete || have_spent_outputs || !input_had_data) {
+            UpdateInput(txin, sigdata);
+        } else {
+            // Refusing to write is the safe half of the choice; doing it
+            // quietly is not, since the signature just made is discarded too.
+            throw std::runtime_error(strprintf(
+                "Input %u already carries signature data that cannot be read back "
+                "without every previous output, so the new signature was not "
+                "written. Supply the previous output of every input.", i));
+        }
     }
 
     tx = mergedTx;

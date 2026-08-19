@@ -16,7 +16,7 @@ independent Python implementation of the sighash:
   * the value of every input is committed to (CVE-2020-14199),
   * SIGHASH_SINGLE with no matching output is no longer spendable via the
     legacy sentinel hash,
-  * non-canonical sighash bytes are rejected,
+  * an opted-in hash type reads its output type the way legacy does,
   * taproot opts in through the byte BIP341 already commits, so it is protected
     too, at the cost of SIGHASH_DEFAULT.
 """
@@ -26,7 +26,7 @@ import subprocess
 from decimal import Decimal
 
 from test_framework.address import address_to_scriptpubkey
-from test_framework.blocktools import COINBASE_MATURITY, create_block, create_coinbase
+from test_framework.blocktools import COINBASE_MATURITY, add_witness_commitment, create_block, create_coinbase
 from test_framework.key import ECKey, compute_xonly_pubkey, sign_schnorr, tweak_add_privkey
 from test_framework.descriptors import descsum_create
 from test_framework.wallet_util import bytes_to_wif
@@ -35,6 +35,7 @@ from test_framework.p2p import P2PDataStore, P2PInterface
 from test_framework.messages import CTxInWitness
 from test_framework.script_util import (
     key_to_p2pkh_script,
+    keyhash_to_p2pkh_script,
     key_to_p2sh_p2wpkh_script,
     key_to_p2wpkh_script,
     script_to_p2sh_script,
@@ -42,6 +43,7 @@ from test_framework.script_util import (
 )
 from test_framework.script import (
     CScript,
+    hash160,
     OP_2,
     OP_CHECKMULTISIG,
     OP_CHECKSIG,
@@ -482,23 +484,85 @@ class UnifiedSighashTest(BitcoinTestFramework):
         reason = self.reject(single_tx, "the SIGHASH_SINGLE sentinel must not be spendable")
         self.log.info(f"  rejected: {reason}")
 
-        self.log.info("Opting in with a non-canonical hash type is rejected")
-        op_k, utxo_k = self.make_p2pk_utxo(4 * COIN)
+        self.log.info("An opted-in hash type reads its output type the way legacy does")
+        # Bytes whose low bits name no output type mean ALL, exactly as they do
+        # without the opt-in. They are non-standard for the same reason a legacy
+        # 0x05 is, so the mempool refuses them while consensus does not: prove
+        # both halves rather than only the one the mempool shows.
+        odd_txs = []
+        for odd_hashtype in (SIGHASH_UNIFIED, SIGHASH_UNIFIED | 0x04, SIGHASH_UNIFIED | 0x05,
+                             SIGHASH_UNIFIED | 0x1f, SIGHASH_UNIFIED | 0x40):
+            op_k, utxo_k = self.make_p2pk_utxo(4 * COIN)
+            self.mine(1)
+            odd_tx = self.build_spend([op_k], [utxo_k])
+            msg = UnifiedSignatureHash(utxo_k.scriptPubKey, odd_tx, 0, odd_hashtype, [utxo_k], False)
+            assert msg is not None, f"{odd_hashtype:#x} should have a defined message"
+            der = self.privkey.sign_ecdsa(msg)
+            odd_tx.vin[0].scriptSig = bytes(CScript([der + bytes([odd_hashtype]), self.pubkey]))
+            odd_tx.rehash()
+            reason = self.submit(odd_tx)
+            assert reason is not None, f"{odd_hashtype:#x} should be non-standard"
+            odd_txs.append((odd_hashtype, odd_tx))
+        self.log.info(f"  {len(odd_txs)} odd hash types refused by policy, as legacy ones are")
+
+        odd_peer = node.add_p2p_connection(P2PDataStore())
+        tip = int(node.getbestblockhash(), 16)
+        height = node.getblockcount() + 1
+        block = create_block(tip, create_coinbase(height),
+                             node.getblock(node.getbestblockhash())["time"] + 1)
+        block.vtx.extend(t for _, t in odd_txs)
+        block.hashMerkleRoot = block.calc_merkle_root()
+        block.solve()
+        odd_peer.send_blocks_and_test([block], node, success=True)
+        assert_equal(node.getbestblockhash(), block.hash)
+        self.log.info("  and accepted by consensus in a block, as legacy ones are")
+
+        # The same for segwit v0, so the newly readable bytes are covered for
+        # both script types that follow the legacy reading, and covered across
+        # implementations: the message comes from the independent implementation
+        # and a real node verifies the signature over it.
+        w_txs = []
+        for odd_hashtype in (SIGHASH_UNIFIED | 0x05, SIGHASH_UNIFIED | 0x40):
+            w_op, w_utxo = self.make_utxo(3 * COIN, key_to_p2wpkh_script(self.pubkey))
+            self.mine(1)
+            w_tx = self.build_witness_spend([w_op], [w_utxo])
+            code = keyhash_to_p2pkh_script(hash160(self.pubkey))
+            w_msg = UnifiedSignatureHash(code, w_tx, 0, odd_hashtype, [w_utxo], True)
+            assert w_msg is not None, f"{odd_hashtype:#x} should have a defined message"
+            w_sig = self.privkey.sign_ecdsa(w_msg) + bytes([odd_hashtype])
+            w_tx.wit.vtxinwit[0].scriptWitness.stack = [w_sig, self.pubkey]
+            w_tx.rehash()
+            assert self.submit(w_tx) is not None, f"{odd_hashtype:#x} should be non-standard"
+            w_txs.append(w_tx)
+
+        w_tip = int(node.getbestblockhash(), 16)
+        w_block = create_block(w_tip, create_coinbase(node.getblockcount() + 1),
+                               node.getblock(node.getbestblockhash())["time"] + 1)
+        w_block.vtx.extend(w_txs)
+        add_witness_commitment(w_block)
+        w_block.solve()
+        assert_equal(node.submitblock(w_block.serialize().hex()), None)
+        assert_equal(node.getbestblockhash(), w_block.hash)
+        self.log.info("  segwit v0 reads them the same way")
+
+        # Taproot does not: it keeps BIP341's reading, so the same bytes have no
+        # message at all there and no signature can be made for them.
+        for odd_hashtype in (SIGHASH_UNIFIED, SIGHASH_UNIFIED | 0x05, SIGHASH_UNIFIED | 0x40):
+            assert UnifiedSignatureHash(None, self.build_taproot_spend(self.op_tr, self.utxo_tr), 0,
+                                        odd_hashtype, [self.utxo_tr], False,
+                                        script_type=UNIFIED_SCRIPT_TYPE_TAPROOT) is None, \
+                f"taproot must refuse {odd_hashtype:#x}"
+        self.log.info("  taproot refuses them, keeping BIP341's reserved bytes reserved")
+
+        op_m, utxo_m = self.make_p2pk_utxo(4 * COIN)
         self.mine(1)
-        # The opt-in bit with no output type, with a reserved output type, and
-        # with an undefined bit set. Without the opt-in bit a byte is just a
-        # legacy hash type, so it is not part of this.
-        for bad_hashtype in (SIGHASH_UNIFIED, SIGHASH_UNIFIED | 0x04, SIGHASH_UNIFIED | 0x05,
-                             SIGHASH_UNIFIED | 0x1f, SIGHASH_UNIFIED | 0x20):
-            assert UnifiedSignatureHash(utxo_k.scriptPubKey, self.build_spend([op_k], [utxo_k]), 0,
-                                   bad_hashtype, [utxo_k], False) is None, bad_hashtype
-            bad_tx = self.build_spend([op_k], [utxo_k])
-            # Sign the canonical message but claim a non-canonical type.
-            good = UnifiedSignatureHash(utxo_k.scriptPubKey, bad_tx, 0, SIGHASH_ALL | SIGHASH_UNIFIED, [utxo_k], False)
-            der = self.privkey.sign_ecdsa(good)
-            bad_tx.vin[0].scriptSig = bytes(CScript([der + bytes([bad_hashtype]), self.pubkey]))
-            bad_tx.rehash()
-            self.reject(bad_tx, f"hashtype {bad_hashtype:#x} must be rejected")
+        mismatch = self.build_spend([op_m], [utxo_m])
+        signed_for = UnifiedSignatureHash(utxo_m.scriptPubKey, mismatch, 0,
+                                          SIGHASH_ALL | SIGHASH_UNIFIED, [utxo_m], False)
+        der = self.privkey.sign_ecdsa(signed_for)
+        mismatch.vin[0].scriptSig = bytes(CScript([der + bytes([SIGHASH_UNIFIED | 0x01 | 0x40]), self.pubkey]))
+        mismatch.rehash()
+        self.reject(mismatch, "a signature must match the hash type byte it carries")
 
         self.log.info("Taproot opts in through the same algorithm as every other type")
         # The same output that was refused before activation is now spendable
@@ -844,6 +908,30 @@ class UnifiedSighashTest(BitcoinTestFramework):
             assert accepted["allowed"], accepted
             node.sendrawtransaction(signed_hex)
             self.log.info("  bitcoin-tx -unifiedsighash produced an accepted opt-in signature")
+
+            # The same tool run again without the flag must not throw the
+            # signature away. It reads an input under the rules it is told to
+            # use, and what it fails to read it overwrites, so a second pass by
+            # a co-signer who did not pass the flag would destroy the first
+            # party's work.
+            op_k, utxo_k = self.make_utxo(3 * COIN, key_to_p2wpkh_script(self.pubkey))
+            self.mine(1)
+            keep_tx = self.build_witness_spend([op_k], [utxo_k])
+            prevtxs = (f"set=prevtxs:[{{\"txid\":\"{op_k.hash:064x}\",\"vout\":{op_k.n},"
+                       f"\"scriptPubKey\":\"{utxo_k.scriptPubKey.hex()}\","
+                       f"\"amount\":{utxo_k.nValue / COIN:.8f}}}]")
+            opted_hex = self.run_bitcoin_tx([
+                "-unifiedsighash", keep_tx.serialize_without_witness().hex(),
+                f"set=privatekeys:[\"{self.privkey_wif}\"]", prevtxs, "sign=ALL",
+            ])
+            again_hex = self.run_bitcoin_tx([opted_hex, prevtxs,
+                                             "set=privatekeys:[]", "sign=ALL"])
+            again = tx_from_hex(again_hex)
+            assert again.wit.vtxinwit and again.wit.vtxinwit[0].scriptWitness.stack, \
+                "a pass without -unifiedsighash destroyed the opt-in signature"
+            assert_equal(again.wit.vtxinwit[0].scriptWitness.stack[0][-1],
+                         SIGHASH_ALL | SIGHASH_UNIFIED)
+            self.log.info("  and a later pass without the flag leaves it alone")
 
         self.log.info("combinerawtransaction merges opt-in signatures")
         # Each party signs the same transaction separately and the halves are

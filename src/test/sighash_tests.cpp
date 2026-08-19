@@ -589,8 +589,8 @@ BOOST_AUTO_TEST_CASE(unified_sighash_taproot_hashtype_sweep)
     //      no spend that exists today changes meaning, and it never accepts an
     //      opted-in byte. That second half is the replay protection: a node
     //      that has not activated the fork computes BIP341 and refuses.
-    //   2. The unified algorithm accepts exactly the six opted-in bytes, and
-    //      produces a different message than BIP341 does for the same byte.
+    //   2. For taproot the unified algorithm accepts exactly the six opted-in
+    //      bytes, and produces a different message than BIP341 does for each.
     const CKey key{GenerateRandomKey()};
     const XOnlyPubKey xpk{key.GetPubKey()};
     TaprootBuilder builder;
@@ -615,6 +615,9 @@ BOOST_AUTO_TEST_CASE(unified_sighash_taproot_hashtype_sweep)
         const uint8_t hash_type(i);
         const bool bip341_defined{hash_type <= 0x03 || (hash_type >= 0x81 && hash_type <= 0x83)};
         const uint8_t base_type(hash_type & ~SIGHASH_UNIFIED);
+        // Taproot keeps BIP341's reading, so the opted-in bytes it accepts are
+        // exactly the ones BIP341 defines with the bit added. The legacy
+        // fallthrough applies to bare, P2SH and segwit v0, not here.
         const bool opt_in_defined{(hash_type & SIGHASH_UNIFIED) &&
                                   ((base_type >= 0x01 && base_type <= 0x03) ||
                                    (base_type >= 0x81 && base_type <= 0x83))};
@@ -651,16 +654,20 @@ BOOST_AUTO_TEST_CASE(unified_sighash_taproot_hashtype_sweep)
 
         if (opt_in_defined) {
             ++opted_in_accepted;
-            uint256 legacy_msg;
-            ScriptExecutionData ed_legacy{fresh_execdata()};
-            // The byte it derives from is still a valid BIP341 spend, and the
-            // two messages differ, which is what makes the spend unusable there.
-            BOOST_CHECK(SignatureHashSchnorr(legacy_msg, ed_legacy, tx, 0, base_type,
-                                             SigVersion::TAPROOT, txdata, MissingDataBehavior::FAIL));
-            BOOST_CHECK(hf_hash != legacy_msg);
+            // Where the byte without the opt-in bit is itself a BIP341 type, that
+            // spend is still valid there and the two messages differ, which is
+            // what makes an opted-in spend unusable on a chain without the fork.
+            const bool base_is_bip341{base_type <= 0x03 || (base_type >= 0x81 && base_type <= 0x83)};
+            if (base_is_bip341) {
+                uint256 legacy_msg;
+                ScriptExecutionData ed_legacy{fresh_execdata()};
+                BOOST_CHECK(SignatureHashSchnorr(legacy_msg, ed_legacy, tx, 0, base_type,
+                                                 SigVersion::TAPROOT, txdata, MissingDataBehavior::FAIL));
+                BOOST_CHECK(hf_hash != legacy_msg);
+            }
         }
     }
-    // 0x41-0x43 and 0xc1-0xc3, and nothing else.
+    // 0x21-0x23 and 0xa1-0xa3, and nothing else.
     BOOST_CHECK_EQUAL(opted_in_accepted, 6);
 }
 
@@ -1052,9 +1059,9 @@ BOOST_AUTO_TEST_CASE(unified_sighash_tapscript_roundtrip)
 
 BOOST_AUTO_TEST_CASE(unified_sighash_taproot_rejects_bare_opt_in_byte)
 {
-    // SIGHASH_DEFAULT means "no byte at all", so a byte carrying only the
-    // opt-in bit would be a second encoding of the same meaning. Signing never
-    // produces one; verification must refuse it rather than treat it as ALL.
+    // Taproot keeps BIP341's reading, which defines no type for low bits of
+    // zero, so a byte carrying only the opt-in bit is refused rather than read
+    // as ALL. Bare, P2SH and segwit v0 read it as ALL, as legacy does.
     const CKey key{GenerateRandomKey()};
     const XOnlyPubKey xpk{key.GetPubKey()};
     TaprootBuilder builder;
@@ -1070,12 +1077,15 @@ BOOST_AUTO_TEST_CASE(unified_sighash_taproot_rejects_bare_opt_in_byte)
     execdata.m_annex_init = true;
     execdata.m_annex_present = false;
     uint256 hash;
-    BOOST_CHECK(!SignatureHashUnified(hash, CScript{}, tx, 0, SIGHASH_UNIFIED, SigVersion::TAPROOT, txdata, &execdata));
+    BOOST_CHECK(!SignatureHashUnified(hash, CScript{}, tx, 0, SIGHASH_UNIFIED, SigVersion::TAPROOT, txdata, &execdata, MissingDataBehavior::FAIL));
+    // The same byte is ALL for the script types that follow the legacy reading.
+    BOOST_CHECK(SignatureHashUnified(hash, CScript() << OP_1, tx, 0, SIGHASH_UNIFIED, SigVersion::BASE, txdata));
+
     // A taproot signature also needs the annex state, which lives outside the
     // transaction: without it the annex would not be committed to.
     ScriptExecutionData uninit;
-    BOOST_CHECK(!SignatureHashUnified(hash, CScript{}, tx, 0, SIGHASH_UNIFIED | SIGHASH_ALL, SigVersion::TAPROOT, txdata, &uninit));
-    BOOST_CHECK(!SignatureHashUnified(hash, CScript{}, tx, 0, SIGHASH_UNIFIED | SIGHASH_ALL, SigVersion::TAPROOT, txdata, nullptr));
+    BOOST_CHECK(!SignatureHashUnified(hash, CScript{}, tx, 0, SIGHASH_UNIFIED | SIGHASH_ALL, SigVersion::TAPROOT, txdata, &uninit, MissingDataBehavior::FAIL));
+    BOOST_CHECK(!SignatureHashUnified(hash, CScript{}, tx, 0, SIGHASH_UNIFIED | SIGHASH_ALL, SigVersion::TAPROOT, txdata, nullptr, MissingDataBehavior::FAIL));
 }
 
 BOOST_AUTO_TEST_CASE(unified_sighash_anyonecanpay_is_position_independent)
@@ -1115,7 +1125,7 @@ BOOST_AUTO_TEST_CASE(unified_sighash_anyonecanpay_is_position_independent)
     BOOST_CHECK_NE(c, d);
 }
 
-BOOST_AUTO_TEST_CASE(unified_sighash_rejects_non_canonical_hashtypes)
+BOOST_AUTO_TEST_CASE(unified_sighash_reads_hashtypes_as_legacy_does)
 {
     const CScript script{CScript() << OP_1 << OP_CHECKSIG};
     CMutableTransaction tx;
@@ -1123,34 +1133,64 @@ BOOST_AUTO_TEST_CASE(unified_sighash_rejects_non_canonical_hashtypes)
     BuildUnifiedTestTx(tx, spent, script, script);
     const auto txdata{MakeUnifiedTxdata(tx, spent)};
 
-    uint256 hash;
-    for (const int32_t ht : std::initializer_list<int32_t>{SIGHASH_ALL | SIGHASH_UNIFIED, SIGHASH_NONE | SIGHASH_UNIFIED, SIGHASH_SINGLE | SIGHASH_UNIFIED,
-                             SIGHASH_ALL | SIGHASH_ANYONECANPAY | SIGHASH_UNIFIED,
-                             SIGHASH_NONE | SIGHASH_ANYONECANPAY | SIGHASH_UNIFIED,
-                             SIGHASH_SINGLE | SIGHASH_ANYONECANPAY | SIGHASH_UNIFIED}) {
-        BOOST_CHECK(SignatureHashUnified(hash, script, tx, 0, ht, SigVersion::BASE, txdata));
-    }
-    // Legacy silently treats most of these as SIGHASH_ALL, which gives dozens of
-    // distinct signature bytes the same meaning. Here the low bits must name a
-    // real output type and no unknown bit may be set. Written relative to
-    // SIGHASH_UNIFIED rather than as literals, so moving the bit cannot quietly turn
-    // these into cases that are rejected merely for not opting in.
-    for (const int32_t low : {0x00, 0x04, 0x05, 0x06, 0x1f}) {
-        for (const int32_t extra : {0, int{SIGHASH_ANYONECANPAY}}) {
+    // Same transaction with one output changed, to tell "commits to outputs"
+    // from "does not" rather than trusting the byte to mean what it says.
+    CMutableTransaction tx2{tx};
+    tx2.vout[1].nValue += 1;
+    const auto txdata2{MakeUnifiedTxdata(tx2, spent)};
+
+    auto digest = [&](const CMutableTransaction& t, const PrecomputedTransactionData& d,
+                      int32_t ht, uint256& out) {
+        return SignatureHashUnified(out, script, t, 0, ht, SigVersion::BASE, d);
+    };
+
+    // Anything whose low bits are neither NONE nor SINGLE is ALL, exactly as the
+    // legacy algorithm reads it. Unknown bits ride along and are committed to.
+    for (const int32_t low : {0x00, 0x01, 0x04, 0x05, 0x06, 0x1f}) {
+        for (const int32_t extra : {0, int{SIGHASH_ANYONECANPAY}, 0x40, 0x10, 0x08}) {
             const int32_t ht{SIGHASH_UNIFIED | low | extra};
-            BOOST_CHECK_MESSAGE(!SignatureHashUnified(hash, script, tx, 0, ht, SigVersion::BASE, txdata),
-                                strprintf("hashtype %#x should be rejected: bad output type", ht));
+            uint256 a, b;
+            BOOST_CHECK_MESSAGE(digest(tx, txdata, ht, a),
+                                strprintf("hashtype %#x should be accepted", ht));
+            BOOST_CHECK(digest(tx2, txdata2, ht, b));
+            if ((ht & 0x1f) == SIGHASH_NONE || (ht & 0x1f) == SIGHASH_SINGLE) continue;
+            BOOST_CHECK_MESSAGE(a != b,
+                                strprintf("hashtype %#x must commit to outputs like ALL", ht));
         }
     }
-    // An unknown bit alongside a valid output type is still rejected.
-    for (const int32_t unknown : {0x40, 0x04, 0x08, 0x10}) {
-        const int32_t ht{SIGHASH_UNIFIED | SIGHASH_ALL | unknown};
-        BOOST_CHECK_MESSAGE(!SignatureHashUnified(hash, script, tx, 0, ht, SigVersion::BASE, txdata),
-                            strprintf("hashtype %#x should be rejected: unknown bit", ht));
+
+    // NONE commits to no outputs, so changing one leaves the message alone.
+    {
+        uint256 a, b;
+        const int32_t ht{SIGHASH_UNIFIED | SIGHASH_NONE};
+        BOOST_CHECK(digest(tx, txdata, ht, a));
+        BOOST_CHECK(digest(tx2, txdata2, ht, b));
+        BOOST_CHECK_MESSAGE(a == b, "NONE must not commit to outputs");
     }
-    // And without the opt-in bit the message is not defined at all.
+
+    // SINGLE commits to the output at the input's index only, so changing the
+    // other one leaves the message alone.
+    {
+        uint256 a, b;
+        const int32_t ht{SIGHASH_UNIFIED | SIGHASH_SINGLE};
+        BOOST_CHECK(digest(tx, txdata, ht, a));
+        BOOST_CHECK(digest(tx2, txdata2, ht, b));
+        BOOST_CHECK_MESSAGE(a == b, "SINGLE must commit to its own output only");
+    }
+
+    // Every distinct byte is still its own message: the hash type is committed
+    // to whole, so two spellings of ALL do not collide.
+    {
+        uint256 a, b;
+        BOOST_CHECK(digest(tx, txdata, SIGHASH_UNIFIED | SIGHASH_ALL, a));
+        BOOST_CHECK(digest(tx, txdata, SIGHASH_UNIFIED | 0x05, b));
+        BOOST_CHECK_MESSAGE(a != b, "distinct hash type bytes must give distinct messages");
+    }
+
+    // Without the opt-in bit the message is not defined at all.
     for (const int32_t ht : {0x00, 0x01, 0x02, 0x03, 0x40, 0x81, 0x83}) {
-        BOOST_CHECK_MESSAGE(!SignatureHashUnified(hash, script, tx, 0, ht, SigVersion::BASE, txdata),
+        uint256 h;
+        BOOST_CHECK_MESSAGE(!digest(tx, txdata, ht, h),
                             strprintf("hashtype %#x should be rejected: did not opt in", ht));
     }
 }
