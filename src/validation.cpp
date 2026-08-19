@@ -277,10 +277,56 @@ bool CheckSequenceLocksAtTip(CBlockIndex* tip,
 // Returns the script flags which should be checked for a given block
 static unsigned int GetBlockScriptFlags(const CBlockIndex& block_index, const ChainstateManager& chainman);
 
-/** Whether the hardfork rules apply to `block_index` itself. Consensus.
+/** Whether any input carries a signature that opted into the hardfork message.
  *
- * The same buried deployment the proof of work change activates at, so every
- * rule the fork carries switches on at the same block. */
+ * Only such a signature reads differently on the two sides of the activation
+ * height, so only entries holding one have to be reconsidered when the chain
+ * crosses it. Reads the bytes rather than verifying anything, and errs towards
+ * true: a push that cannot be ruled out as a signature is treated as one.
+ */
+static bool CarriesOptInSignature(const CTransaction& tx)
+{
+    const auto opted_in = [](const std::vector<unsigned char>& push) {
+        // Schnorr: 64 bytes means SIGHASH_DEFAULT, which cannot carry the bit,
+        // and 65 appends the hash type.
+        if (push.size() == 65) return (push.back() & SIGHASH_UNIFIED) != 0;
+        // ECDSA: a DER signature with one hash type byte after it.
+        if (push.size() < 9 || push.size() > 73) return false;
+        if (push[0] != 0x30 || push[1] != push.size() - 3) return false;
+        return (push.back() & SIGHASH_UNIFIED) != 0;
+    };
+    // A push can itself be a script, a P2SH redeemScript or a witness script,
+    // and a signature inside one is still checked. One level down is enough:
+    // that inner script is what CHECKSIG runs, and anything deeper is data to it.
+    const auto scan = [&](const std::vector<unsigned char>& data, bool descend) {
+        if (opted_in(data)) return true;
+        if (!descend) return false;
+        const CScript inner{data.begin(), data.end()};
+        CScript::const_iterator pc{inner.begin()};
+        opcodetype op;
+        std::vector<unsigned char> push;
+        while (pc < inner.end()) {
+            if (!inner.GetOp(pc, op, push)) return false;  // not a script; already checked as data
+            if (opted_in(push)) return true;
+        }
+        return false;
+    };
+    for (const CTxIn& txin : tx.vin) {
+        for (const auto& item : txin.scriptWitness.stack) {
+            if (scan(item, /*descend=*/true)) return true;
+        }
+        CScript::const_iterator pc{txin.scriptSig.begin()};
+        opcodetype op;
+        std::vector<unsigned char> push;
+        while (pc < txin.scriptSig.end()) {
+            if (!txin.scriptSig.GetOp(pc, op, push)) return true;
+            if (scan(push, /*descend=*/true)) return true;
+        }
+    }
+    return false;
+}
+
+/** Whether the hardfork rules apply to `block_index` itself. Consensus. */
 static bool HardforkActiveForBlock(const CBlockIndex& block_index, const ChainstateManager& chainman)
 {
     return DeploymentActiveAt(block_index, chainman, Consensus::DEPLOYMENT_BLAKE2B);
@@ -289,8 +335,7 @@ static bool HardforkActiveForBlock(const CBlockIndex& block_index, const Chainst
 /** Whether the hardfork rules will apply to a block built on `pindexPrev`.
  *
  * A height is known before the block exists, so the mempool, the block builder
- * and the wallet reach the same answer consensus will, without a second clock
- * to keep aligned. */
+ * and the wallet can reach the same answer consensus will. */
 static bool HardforkActiveAfter(const CBlockIndex* pindexPrev, const ChainstateManager& chainman)
 {
     // Delegated rather than open-coded so this cannot drift from the comparison
@@ -425,22 +470,20 @@ void Chainstate::MaybeUpdateMempoolForReorg(
         AssertLockHeld(::cs_main);
         const CTransaction& tx = it->GetTx();
 
-        // A reorg can move the chain across the hardfork sighash activation.
-        // Script checks are not re-run for mempool entries, and the block
-        // assembler cannot skip an entry that has become invalid, so an entry
-        // accepted under a different fork state has to go: otherwise block
-        // production stops until the mempool is cleared by hand.
+        // Script checks are not re-run for mempool entries and the assembler
+        // cannot skip one that has become invalid, so an entry accepted under a
+        // fork state the next block does not share has to go, or block production
+        // stops until the mempool is cleared by hand. Compare the recorded state
+        // rather than recomputing it, because a reorg changes which block sits at
+        // a height.
+        //
+        // Only a signature that opted in reads differently on the two sides, so
+        // nothing else is touched. Evicting on the state alone would empty every
+        // mempool on the network at the crossing block and drop payments already
+        // in flight, for a rule that does not apply to them.
         if (m_chainman.GetConsensus().Blake2bHeight != std::numeric_limits<int>::max()) {
-            // Compare the state recorded when the entry was accepted rather
-            // than recomputing it: a reorg can lower the tip below the
-            // activation height, which is the only direction that invalidates
-            // anything, because this flag relaxes rather than restricts.
-            //
-            // Entries accepted while the fork was active all go, not only those
-            // that opted in, because opting in is not recorded per entry. They
-            // are still valid and will be resubmitted; leaving one behind stops
-            // block production instead.
-            if (it->GetHardforkActive() && !HardforkActiveAfter(m_chain.Tip(), m_chainman)) {
+            if (it->GetHardforkActive() != HardforkActiveAfter(m_chain.Tip(), m_chainman) &&
+                CarriesOptInSignature(tx)) {
                 return true;
             }
         }
@@ -2772,8 +2815,6 @@ static unsigned int GetBlockScriptFlags(const CBlockIndex& block_index, const Ch
         flags |= SCRIPT_VERIFY_NULLDUMMY;
     }
 
-    // Hardfork signature hash. The same buried deployment the proof of work
-    // change uses, so the whole fork switches on together.
     if (HardforkActiveForBlock(block_index, chainman)) {
         flags |= SCRIPT_VERIFY_UNIFIED_SIGHASH;
     }
@@ -3880,10 +3921,18 @@ bool Chainstate::ActivateBestChainStep(BlockValidationState& state, CBlockIndex*
         }
     }
 
-    if (fBlocksDisconnected) {
+    // Crossing the activation height changes which message every mempool entry
+    // has to satisfy, and the assembler cannot skip an entry that has become
+    // invalid. A reorg across it is handled by the sweep below, but an ordinary
+    // forward advance crosses it too and disconnects nothing, so without this
+    // the sweep never runs on the path the chain normally takes to activation.
+    const bool fork_state_changed{m_mempool != nullptr &&
+                                  HardforkActiveAfter(pindexOldTip, m_chainman) !=
+                                  HardforkActiveAfter(m_chain.Tip(), m_chainman)};
+    if (fBlocksDisconnected || fork_state_changed) {
         // If any blocks were disconnected, disconnectpool may be non empty.  Add
         // any disconnected transactions back to the mempool.
-        MaybeUpdateMempoolForReorg(disconnectpool, true);
+        MaybeUpdateMempoolForReorg(disconnectpool, fBlocksDisconnected);
     }
     if (m_mempool) m_mempool->check(this->CoinsTip(), this->m_chain.Height() + 1);
 
