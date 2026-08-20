@@ -350,6 +350,10 @@ enum ServiceFlags : uint64_t {
     // NODE_REDUCED_DATA means the node enforces ReducedData rules as applicable
     NODE_REDUCED_DATA = (1 << 27),
 
+    // NODE_BLAKE2B means the node enforces the BLAKE2b hardfork rules
+    // (BLAKE2b proof-of-work and ReducedData) as applicable
+    NODE_BLAKE2B = (1 << 28),
+
     NODE_MALICIOUS = (1 << 29),
 };
 
