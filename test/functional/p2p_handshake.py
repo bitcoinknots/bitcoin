@@ -111,36 +111,36 @@ class P2PHandshakeTest(BitcoinTestFramework):
         self.test_desirable_service_flags(node, [NODE_NONE, NODE_NETWORK, NODE_WITNESS],
                                           BASE_SERVICE_FLAGS_FULL, expect_disconnect=True)
 
-        self.log.info("Check that first 2 non-BIP110 peers connect, 3rd is rejected")
-        # Connect first 2 non-BIP110 peers and keep them connected
-        non_bip110_services = NODE_NETWORK | NODE_WITNESS
+        self.log.info("Check that first 2 stale peers connect, 3rd is rejected")
+        # Connect first 2 stale peers and keep them connected
+        stale_services = NODE_NETWORK | NODE_WITNESS
         if self.options.v2transport:
-            non_bip110_services |= NODE_P2P_V2
+            stale_services |= NODE_P2P_V2
         peer1 = node.add_outbound_p2p_connection(
             P2PInterface(), p2p_idx=0, wait_for_disconnect=False,
-            connection_type="outbound-full-relay", services=non_bip110_services,
+            connection_type="outbound-full-relay", services=stale_services,
             supports_v2_p2p=self.options.v2transport, advertise_v2_p2p=self.options.v2transport)
         peer1.sync_with_ping()
         peer2 = node.add_outbound_p2p_connection(
             P2PInterface(), p2p_idx=1, wait_for_disconnect=False,
-            connection_type="outbound-full-relay", services=non_bip110_services,
+            connection_type="outbound-full-relay", services=stale_services,
             supports_v2_p2p=self.options.v2transport, advertise_v2_p2p=self.options.v2transport)
         peer2.sync_with_ping()
         assert len(node.getpeerinfo()) == 2
-        # Third non-BIP110 peer should be rejected
-        with node.assert_debug_log(["peer lacks NODE_REDUCED_DATA and already have 2 non-BIP110 outbound peers"]):
+        # Third stale peer should be rejected
+        with node.assert_debug_log(["peer lacks NODE_REDUCED_DATA and already have 2 stale outbound peers"]):
             node.add_outbound_p2p_connection(
                 P2PInterface(), p2p_idx=2, wait_for_disconnect=True,
-                connection_type="outbound-full-relay", services=non_bip110_services,
+                connection_type="outbound-full-relay", services=stale_services,
                 supports_v2_p2p=self.options.v2transport, advertise_v2_p2p=self.options.v2transport)
-        # Clean up - disconnect the 2 non-BIP110 peers
+        # Clean up - disconnect the 2 stale peers
         peer1.peer_disconnect()
         peer2.peer_disconnect()
         peer1.wait_for_disconnect()
         peer2.wait_for_disconnect()
         self.wait_until(lambda: len(node.getpeerinfo()) == 0)
 
-        self.log.info("Check that BIP110 peers always connect")
+        self.log.info("Check that preferred peers always connect")
         self.test_desirable_service_flags(node, [NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA],
                                           BASE_SERVICE_FLAGS_FULL, expect_disconnect=False)
 
