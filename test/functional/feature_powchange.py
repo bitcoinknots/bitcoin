@@ -83,6 +83,22 @@ class PowChangeTest(BitcoinTestFramework):
         assert_equal(verbose_post_header["version"], post_header.nVersion)
         assert_equal(verbose_post_header["versionHex"], f"{post_header.nVersion:08x}")
 
+        self.log.info("The high two flag bits are reserved")
+        for high_flag in (0x40, 0x80):
+            invalid_flags = create_block(
+                int(post_hash, 16),
+                create_coinbase(CHANGE_HEIGHT + 1),
+                post_header.nTime + 1,
+                height=CHANGE_HEIGHT + 1,
+                header_v2=True,
+            )
+            invalid_flags.m_flags |= high_flag
+            invalid_flags.solve()
+            assert_raises_rpc_error(
+                -25, "bad-flags-highbits",
+                lambda: node.submitheader(hexdata=CBlockHeader(invalid_flags).serialize().hex()),
+            )
+
         # A null XOR key disables anti-withholding regardless of how many mask
         # bits the pool requests to clear.
         assert_equal(post_header.m_xor_key, 0)

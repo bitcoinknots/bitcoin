@@ -4345,6 +4345,11 @@ static bool CheckBlockHeader(const CBlockHeader& block, BlockValidationState& st
         if (!consensusParams.IsBlake2bHeight(block.m_height)) {
             return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-version-sha256d", strprintf("Blocks require SHA256d PoW until height %s", consensusParams.DeploymentHeight(Consensus::DEPLOYMENT_BLAKE2B)));
         }
+
+        // The top two bits of flags are reserved for future hardforks (serving the same purpose as nVersion's top bit did for BLAKE2b)
+        if (block.m_flags & 0xc0) {
+            return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-flags-highbits", "High flag bits are set");
+        }
     } else if (!block.AreHeaderV2FieldsNull()) {
         return state.Invalid(
             /*result=*/BlockValidationResult::BLOCK_MUTATED,
