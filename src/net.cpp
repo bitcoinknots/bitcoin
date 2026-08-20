@@ -1821,10 +1821,10 @@ void CConnman::CreateNodeFromAcceptedSocket(std::unique_ptr<Sock>&& sock,
     {
         LOCK(m_nodes_mutex);
         for (const CNode* pnode : m_nodes) {
-            // A demoted stale (non-BIP110) outbound peer gave up its outbound
+            // A demoted stale outbound peer gave up its outbound
             // slot, so it counts against the inbound limit here: it displaces an
             // inbound slot while connected, keeping the total within -maxconnections.
-            if (pnode->IsInboundConn() || pnode->m_is_non_bip110_outbound) nInbound++;
+            if (pnode->IsInboundConn() || pnode->m_is_stale_outbound) nInbound++;
         }
     }
 
@@ -2329,7 +2329,7 @@ void CConnman::ThreadDNSAddressSeed()
                 break;
             }
 
-            outbound_connection_count = GetBIP110FullOutboundConnCount();
+            outbound_connection_count = GetFullOutboundConnCount();
             if (outbound_connection_count >= SEED_OUTBOUND_CONNECTION_THRESHOLD) {
                 LogPrintf("P2P peers available. Finished fetching data from seed nodes.\n");
                 break;
@@ -2384,7 +2384,7 @@ void CConnman::ThreadDNSAddressSeed()
                         if (!interruptNet.sleep_for(w)) return;
                         to_wait -= w;
 
-                        if (GetBIP110FullOutboundConnCount() >= SEED_OUTBOUND_CONNECTION_THRESHOLD) {
+                        if (GetFullOutboundConnCount() >= SEED_OUTBOUND_CONNECTION_THRESHOLD) {
                             if (found > 0) {
                                 LogPrintf("%d addresses found from DNS seeds\n", found);
                                 LogPrintf("P2P peers available. Finished DNS seeding.\n");
@@ -2497,9 +2497,9 @@ void CConnman::StartExtraBlockRelayPeers()
     m_start_extra_block_relay_peers = true;
 }
 
-// Return the number of BIP110 outbound connections that are full relay (not blocks only).
-// Non-BIP110 outbound peers are excluded as they are "additional" and don't count toward limits.
-int CConnman::GetBIP110FullOutboundConnCount() const
+// Return the number of preferred outbound connections that are full relay (not blocks only).
+// Stale outbound peers are excluded as they are "additional" and don't count toward limits.
+int CConnman::GetFullOutboundConnCount() const
 {
     int nRelevant = 0;
     {
@@ -2549,7 +2549,7 @@ bool CConnman::DemoteToStaleOutbound(CNode& node, unsigned int max_stale)
 {
     // The version handler rejects a redundant VERSION before the stale gate, so
     // a peer is never demoted twice; assert that rather than guarding for it.
-    Assert(!node.m_is_non_bip110_outbound);
+    Assert(!node.m_is_stale_outbound);
     // m_nodes_mutex guards grantOutbound and m_network_conn_counts, and lets us
     // count peers without racing the socket handler. The stale count is derived
     // from the flag here rather than kept in a separate counter, so it can never
@@ -2565,25 +2565,25 @@ bool CConnman::DemoteToStaleOutbound(CNode& node, unsigned int max_stale)
     for (const CNode* pnode : m_nodes) {
         if (pnode->fDisconnect) continue;
         // A demoted stale peer draws on the inbound budget, like a real inbound.
-        if (pnode->m_is_non_bip110_outbound) {
+        if (pnode->m_is_stale_outbound) {
             ++num_stale;
             ++inbound_equiv;
         } else if (pnode->IsInboundConn()) {
             ++inbound_equiv;
         }
-        // Peers filling this outbound target, BIP110 or stale alike. A demoted
+        // Peers filling this outbound target, preferred or stale alike. A demoted
         // peer keeps its connection type, so this counts both, and node itself
         // is still in m_nodes here, so it counts towards its own target too.
         if (pnode->m_conn_type == conn_type) ++same_target;
     }
     if (num_stale >= max_stale) {
-        LogDebug(BCLog::NET, "peer lacks NODE_REDUCED_DATA and already have %u non-BIP110 outbound peers (limit %u), %s\n",
+        LogDebug(BCLog::NET, "peer lacks NODE_REDUCED_DATA and already have %u stale outbound peers (limit %u), %s\n",
                  num_stale, max_stale, node.DisconnectMsg(fLogIPs));
         node.fDisconnect = true;
         return false;
     }
     // Tolerating a stale peer is only worthwhile while it fills a gap in the
-    // outbound target. Once that target is met, by BIP110 peers, already
+    // outbound target. Once that target is met, by preferred peers, already
     // tolerated stale ones, or a mix, another stale peer buys us nothing.
     // same_target includes node, so compare with > and report the rest.
     const int max_same_target{node.IsFullOutboundConn() ? m_max_outbound_full_relay : m_max_outbound_block_relay};
@@ -2602,11 +2602,11 @@ bool CConnman::DemoteToStaleOutbound(CNode& node, unsigned int max_stale)
         node.fDisconnect = true;
         return false;
     }
-    node.m_is_non_bip110_outbound = true;
+    node.m_is_stale_outbound = true;
     node.grantOutbound.Release();
     if (node.IsManualOrFullOutboundConn()) --m_network_conn_counts[node.addr.GetNetwork()];
     ++num_stale;
-    LogDebug(BCLog::NET, "connected to non-BIP110 outbound peer (%u/%u), %s\n",
+    LogDebug(BCLog::NET, "connected to stale outbound peer (%u/%u), %s\n",
              num_stale, max_stale, node.ConnectionTypeAsString());
     return true;
 }
@@ -2779,7 +2779,7 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect, Spa
         {
             LOCK(m_nodes_mutex);
             for (const CNode* pnode : m_nodes) {
-                // Non-BIP110 outbound peers are "additional" - don't count toward limits
+                // Stale outbound peers are "additional" - don't count toward limits
                 if (pnode->IsFullOutboundConn() && pnode->CountsTowardOutboundTarget()) nOutboundFullRelay++;
                 if (pnode->IsBlockOnlyConn() && pnode->CountsTowardOutboundTarget()) nOutboundBlockRelay++;
 
