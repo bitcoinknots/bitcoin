@@ -166,6 +166,28 @@ class UnifiedSighashTest(BitcoinTestFramework):
             tx.vout.append(CTxOut(share, self.sink_spk))
         return tx
 
+    def seal_block(self, block):
+        """Recompute what the header commits to, then solve.
+
+        The v2 header commits to the transaction count, which create_block sets
+        when it builds the block, so a test that appends to vtx afterwards has
+        to refresh it.
+        """
+        if block.m_header_v2:
+            block.m_txcount = len(block.vtx)
+        block.hashMerkleRoot = block.calc_merkle_root()
+        block.solve()
+
+    def build_block(self, hashprev, coinbase, ntime, height):
+        """create_block, told how the block at this height must be shaped.
+
+        The header format and the proof-of-work algorithm both change at the
+        activation height, so a block the framework solves for itself has to
+        say which side it is on or the node refuses it.
+        """
+        return create_block(hashprev, coinbase, ntime, height=height,
+                            header_v2=height >= ACTIVATION_HEIGHT)
+
     def mine(self, n=1):
         """Mine n blocks, one per BLOCK_SPACING, so block times are exact."""
         hashes = []
@@ -285,11 +307,11 @@ class UnifiedSighashTest(BitcoinTestFramework):
         early_tip = int(node.getbestblockhash(), 16)
         early_height = node.getblockcount() + 1
         assert early_height < ACTIVATION_HEIGHT, "this must be below activation to mean anything"
-        early_block = create_block(early_tip, create_coinbase(early_height),
-                                   node.getblock(node.getbestblockhash())["time"] + 1)
+        early_block = self.build_block(early_tip, create_coinbase(early_height),
+                                       node.getblock(node.getbestblockhash())["time"] + 1,
+                                       early_height)
         early_block.vtx.append(unified_tx)
-        early_block.hashMerkleRoot = early_block.calc_merkle_root()
-        early_block.solve()
+        self.seal_block(early_block)
         early_peer.send_blocks_and_test([early_block], node, success=False,
                                         reject_reason="mandatory-script-verify-flag-failed")
         assert_equal(node.getblockcount(), early_height - 1)
@@ -359,12 +381,12 @@ class UnifiedSighashTest(BitcoinTestFramework):
         edge_peer = node.add_p2p_connection(P2PDataStore())
         edge_height = node.getblockcount() + 1
         assert_equal(edge_height, ACTIVATION_HEIGHT - 1)
-        edge_block = create_block(int(node.getbestblockhash(), 16),
-                                  create_coinbase(edge_height),
-                                  node.getblock(node.getbestblockhash())["time"] + 1)
+        edge_block = self.build_block(int(node.getbestblockhash(), 16),
+                                      create_coinbase(edge_height),
+                                      node.getblock(node.getbestblockhash())["time"] + 1,
+                                      edge_height)
         edge_block.vtx.append(edge_tx)
-        edge_block.hashMerkleRoot = edge_block.calc_merkle_root()
-        edge_block.solve()
+        self.seal_block(edge_block)
         edge_peer.send_blocks_and_test([edge_block], node, success=False,
                                        reject_reason="mandatory-script-verify-flag-failed")
         assert_equal(node.getblockcount(), ACTIVATION_HEIGHT - 2)
@@ -508,11 +530,10 @@ class UnifiedSighashTest(BitcoinTestFramework):
         odd_peer = node.add_p2p_connection(P2PDataStore())
         tip = int(node.getbestblockhash(), 16)
         height = node.getblockcount() + 1
-        block = create_block(tip, create_coinbase(height),
-                             node.getblock(node.getbestblockhash())["time"] + 1)
+        block = self.build_block(tip, create_coinbase(height),
+                                 node.getblock(node.getbestblockhash())["time"] + 1, height)
         block.vtx.extend(t for _, t in odd_txs)
-        block.hashMerkleRoot = block.calc_merkle_root()
-        block.solve()
+        self.seal_block(block)
         odd_peer.send_blocks_and_test([block], node, success=True)
         assert_equal(node.getbestblockhash(), block.hash)
         self.log.info("  and accepted by consensus in a block, as legacy ones are")
@@ -536,11 +557,12 @@ class UnifiedSighashTest(BitcoinTestFramework):
             w_txs.append(w_tx)
 
         w_tip = int(node.getbestblockhash(), 16)
-        w_block = create_block(w_tip, create_coinbase(node.getblockcount() + 1),
-                               node.getblock(node.getbestblockhash())["time"] + 1)
+        w_block = self.build_block(w_tip, create_coinbase(node.getblockcount() + 1),
+                                   node.getblock(node.getbestblockhash())["time"] + 1,
+                                   node.getblockcount() + 1)
         w_block.vtx.extend(w_txs)
         add_witness_commitment(w_block)
-        w_block.solve()
+        self.seal_block(w_block)
         assert_equal(node.submitblock(w_block.serialize().hex()), None)
         assert_equal(node.getbestblockhash(), w_block.hash)
         self.log.info("  segwit v0 reads them the same way")
@@ -1262,9 +1284,9 @@ class UnifiedSighashTest(BitcoinTestFramework):
                            [self.utxo_branch])
         roll_txid = node.sendrawtransaction(roll_tx.serialize().hex())
         # Control: same shape, same funding depth, signed under the legacy rules.
-        # It goes too, because the entry records that the fork was active when it
-        # was accepted rather than that it opted in. Asserted so the
-        # over-eviction stays visible.
+        # Its signature reads the same on both sides of the height, so the
+        # rollback must leave it alone. Asserted so that eviction cannot quietly
+        # widen back into every entry in the pool.
         ctl_tx = self.build_spend([self.op_branch_ctl], [self.utxo_branch_ctl])
         sign_input_legacy(ctl_tx, 0, self.utxo_branch_ctl.scriptPubKey, self.privkey)
         ctl_txid = node.sendrawtransaction(ctl_tx.serialize().hex())
@@ -1277,8 +1299,8 @@ class UnifiedSighashTest(BitcoinTestFramework):
         mempool_after = node.getrawmempool()
         assert roll_txid not in mempool_after, \
             "an opt-in entry survived a rollback below activation"
-        assert ctl_txid not in mempool_after, \
-            "entries accepted while the fork was active are dropped together"
+        assert ctl_txid in mempool_after, \
+            "a legacy entry that opted in nowhere must survive a rollback"
         # The assembler throws rather than skipping an entry it cannot validate,
         # so a surviving entry stops block production outright.
         node.getblocktemplate({"rules": ["segwit"]})
@@ -1304,10 +1326,9 @@ class UnifiedSighashTest(BitcoinTestFramework):
         tip = int(node.getbestblockhash(), 16)
         height = node.getblockcount() + 1
         block_time = node.getblock(node.getbestblockhash())["time"] + 1
-        block = create_block(tip, create_coinbase(height), block_time)
+        block = self.build_block(tip, create_coinbase(height), block_time, height)
         block.vtx.append(block_tx)
-        block.hashMerkleRoot = block.calc_merkle_root()
-        block.solve()
+        self.seal_block(block)
         peer.send_blocks_and_test([block], node, success=False,
                                   reject_reason="mandatory-script-verify-flag-failed")
         assert_equal(node.getblockcount(), height - 1)
