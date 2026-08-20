@@ -72,6 +72,17 @@ class PowChangeTest(BitcoinTestFramework):
     def run_test(self):
         node = self.nodes[0]
         addr = node.get_deterministic_priv_key().address
+
+        self.log.info("A BLAKE2b headline is required")
+        self.stop_node(0)
+        headline_arg_index = next(i for i, arg in enumerate(node.args) if arg.startswith("-blake2b_headline="))
+        headline_arg = node.args.pop(headline_arg_index)
+        node.assert_start_raises_init_error(
+            expected_msg="Error: This version requires blake2b_headline set manually",
+        )
+        node.args.insert(headline_arg_index, headline_arg)
+        self.start_node(0)
+
         self.test_header_vectors()
 
         self.log.info("Blocks before the activation height use SHA256d")
@@ -113,6 +124,20 @@ class PowChangeTest(BitcoinTestFramework):
         assert template["version"] & 0x80000000
         assert "!blake2b" in template["rules"]
 
+        template = node.getblocktemplate({"rules": ["segwit", "blake2b"]})
+        assert_equal(template["height"], CHANGE_HEIGHT)
+        assert_equal(template["coinbaseaux"]["blake2b_headline"], b"BLAKE2b functional test headline".hex())
+
+        invalid_activation_block = create_block(
+            int(pre_hash, 16),
+            create_coinbase(CHANGE_HEIGHT),
+            pre_header.nTime + 1,
+            height=CHANGE_HEIGHT,
+            header_v2=True,
+        )
+        invalid_activation_block.solve()
+        assert_equal(node.submitblock(invalid_activation_block.serialize().hex()), "bad-headline")
+
         post_hash = self.generatetoaddress(node, 1, addr)[0]
         post_header = self.get_header(post_hash)
         assert_equal(node.getblockcount(), CHANGE_HEIGHT)
@@ -124,6 +149,7 @@ class PowChangeTest(BitcoinTestFramework):
         verbose_post_header = node.getblockheader(post_hash)
         assert_equal(verbose_post_header["version"], post_header.nVersion)
         assert_equal(verbose_post_header["versionHex"], f"{post_header.nVersion:08x}")
+        assert "blake2b_headline" not in node.getblocktemplate({"rules": ["segwit", "blake2b"]})["coinbaseaux"]
 
         self.log.info("The high two flag bits are reserved")
         for high_flag in (0x40, 0x80):
