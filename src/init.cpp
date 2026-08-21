@@ -992,7 +992,7 @@ namespace { // Variables internal to initialization process only
 
 int nMaxConnections;
 int available_fds;
-ServiceFlags g_local_services = ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_REDUCED_DATA);
+ServiceFlags g_local_services = ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_BLAKE2B);
 int64_t peer_connect_timeout;
 std::set<BlockFilterType> g_enabled_filter_types;
 
@@ -1751,7 +1751,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
             return InitError(_("User has not consented to supported protocol rules. Exiting"));
         } else if (g_rdts_consent == RDTSConsentFlag::UNSUPPORTED_UNSAFE_NO_ENFORCEMENT) {
             LogError("User has not consented to supported protocol rules. This node will NOT enforce them. Warning every hour.");
-            g_local_services = ServiceFlags(g_local_services & ~NODE_REDUCED_DATA);
+            g_local_services = ServiceFlags(g_local_services & ~NODE_BLAKE2B);
             scheduler.scheduleEvery([]{
                 LogError("RDTS is not enabled. This node is therefore vulnerable to displaying fake or fraudulent transactions.\n");
                 LogError("For more information, see: %s\n", "https://bitcoinknots.org/learn/2026-rdts");
