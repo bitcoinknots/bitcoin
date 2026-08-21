@@ -3307,7 +3307,7 @@ static void UpdateTipLog(
     // Disable rate limiting in LogPrintLevel_ so this source location may log during IBD.
     LogPrintLevel_(BCLog::LogFlags::ALL, BCLog::Level::Info, /*should_ratelimit=*/false, "%s%s: new best=%s height=%d version=0x%08x log2_work=%f tx=%lu date='%s' progress=%f cache=%.1fMiB(%utxo)%s\n",
                    prefix, func_name,
-                   tip->GetBlockHash().ToString(), tip->nHeight, tip->nVersion,
+                   tip->GetBlockHash().ToString(), tip->nHeight, tip->GetCompleteVersion(),
                    log(tip->nChainWork.getdouble()) / log(2.0), tip->m_chain_tx_count,
                    FormatISO8601DateTime(tip->GetBlockTime()),
                    chainman.GuessVerificationProgress(tip),
@@ -4341,6 +4341,22 @@ void ChainstateManager::ReceivedBlockTransactions(const CBlock& block, CBlockInd
 
 static bool CheckBlockHeader(const CBlockHeader& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW = true)
 {
+    if (block.m_header_v2) {
+        if (!consensusParams.IsBlake2bHeight(block.m_height)) {
+            return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-version-sha256d", strprintf("Blocks require SHA256d PoW until height %s", consensusParams.DeploymentHeight(Consensus::DEPLOYMENT_BLAKE2B)));
+        }
+
+        // The top two bits of flags are reserved for future hardforks (serving the same purpose as nVersion's top bit did for BLAKE2b)
+        if (block.m_flags & 0xc0) {
+            return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-flags-highbits", "High flag bits are set");
+        }
+    } else if (!block.AreHeaderV2FieldsNull()) {
+        return state.Invalid(
+            /*result=*/BlockValidationResult::BLOCK_MUTATED,
+            /*reject_reason=*/"error-headerv1-with-v2-fields",
+            /*debug_message=*/"THIS SHOULD BE IMPOSSIBLE, PLEASE REPORT IT");
+    }
+
     // Check proof of work matches claimed amount
     if (fCheckPOW && !CheckProofOfWork(block.GetHash(), block.nBits, consensusParams))
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "high-hash", "proof of work failed");
@@ -4351,6 +4367,13 @@ static bool CheckBlockHeader(const CBlockHeader& block, BlockValidationState& st
 static bool CheckMerkleRoot(const CBlock& block, BlockValidationState& state)
 {
     if (block.m_checked_merkle_root) return true;
+
+    if (block.m_txcount != (block.m_header_v2 ? block.vtx.size() : 0)) {
+        return state.Invalid(
+            /*result=*/BlockValidationResult::BLOCK_MUTATED,
+            /*reject_reason=*/"bad-txnlist-size",
+            /*debug_message=*/"Transaction list size doesn't match header");
+    }
 
     bool mutated;
     uint256 merkle_root = BlockMerkleRoot(block, &mutated);
@@ -4429,6 +4452,8 @@ static bool CheckWitnessMalleation(const CBlock& block, bool expect_witness_comm
     return true;
 }
 
+std::vector<unsigned char> blake2b_headline;
+
 bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW, bool fCheckMerkleRoot)
 {
     // These are checks that are independent of context.
@@ -4467,6 +4492,16 @@ bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensu
     for (unsigned int i = 1; i < block.vtx.size(); i++)
         if (block.vtx[i]->IsCoinBase())
             return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-cb-multiple", "more than one coinbase");
+
+    if (block.m_height == consensusParams.DeploymentHeight(Consensus::DEPLOYMENT_BLAKE2B)) {
+        const auto& coinbase = block.vtx[0]->vin[0].scriptSig;
+        if (std::search(coinbase.begin(), coinbase.end(), blake2b_headline.begin(), blake2b_headline.end()) == coinbase.end()) {
+            return state.Invalid(
+                /*result=*/BlockValidationResult::BLOCK_MUTATED,
+                /*reject_reason=*/"bad-headline",
+                /*debug_message=*/"Headline is wrong");
+        }
+    }
 
     // Check transactions
     // Must check for duplicate inputs (see CVE-2018-17144)
@@ -4672,6 +4707,17 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
 static bool ContextualCheckBlockHeaderVolatile(const CBlockHeader& block, BlockValidationState& state, const ChainstateManager& chainman, const CBlockIndex* pindexPrev) EXCLUSIVE_LOCKS_REQUIRED(::cs_main)
 {
     const Consensus::Params& consensusParams = chainman.GetConsensus();
+    const auto height{pindexPrev ? (pindexPrev->nHeight + 1) : 0};
+
+    if (block.m_header_v2) {
+        if (block.m_height != height) {
+            return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-header-height", "Height in block header does not match prevblock height+1");
+        }
+    } else {
+        if (consensusParams.IsBlake2bHeight(height)) {
+            return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-version-blake2b", "New blocks require BLAKE2b PoW");
+        }
+    }
 
     // Mandatory signaling for deployments approaching max_activation_height
     for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++) {
