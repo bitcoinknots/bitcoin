@@ -1390,6 +1390,13 @@ bool DeploymentEnabled(const ChainstateManager& chainman, DEP dep)
     return DeploymentEnabled(chainman.GetConsensus(), dep);
 }
 
+/** Whether the hardfork rules apply to the next block built on the active tip.
+ *
+ * Everything that signs, verifies an existing signature, or finalizes a
+ * transaction must use this rather than the tip's own rules, because the
+ * transaction is destined for the next block. */
+bool HardforkActiveForNextBlock(const ChainstateManager& chainman) EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
+
 /** Identifies blocks that overwrote an existing coinbase output in the UTXO set (see BIP30) */
 bool IsBIP30Repeat(const CBlockIndex& block_index);
 
