@@ -47,5 +47,5 @@ CTxMemPoolEntry ConsumeTxMemPoolEntry(FuzzedDataProvider& fuzzed_data_provider, 
         /*spends_coinbase=*/ spends_coinbase,
         /*extra_weight=*/ extra_weight,
         /*sigops_cost=*/ sig_op_cost,
-        /*lp=*/ {}};
+        /*lp=*/ {}, /*hardfork_active=*/false};
 }
