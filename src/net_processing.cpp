@@ -3537,12 +3537,12 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         }
 
         pfrom.m_has_all_wanted_services = HasAllDesirableServiceFlags(nServices);
-        // BIP-110: tolerate up to -maxstaleoutbound outbound peers not enforcing
-        // the ReducedData rules, demoting each to an additional connection. Only
+        // Tolerate up to -maxstaleoutbound outbound peers not enforcing the
+        // BLAKE2b hardfork rules, demoting each to an additional connection. Only
         // the persistent outbound target types are gated; ADDR_FETCH (eg
         // -seednode) and FEELER are transient and count towards no target, so
         // spending the budget on them would only break bootstrapping.
-        if ((pfrom.IsFullOutboundConn() || pfrom.IsBlockOnlyConn()) && !(nServices & NODE_REDUCED_DATA)) {
+        if ((pfrom.IsFullOutboundConn() || pfrom.IsBlockOnlyConn()) && !(nServices & NODE_BLAKE2B)) {
             // Keep it as an additional connection, see CNode::m_is_stale_outbound.
             if (!m_connman.DemoteToStaleOutbound(pfrom, m_opts.maxstaleoutbound)) {
                 return;

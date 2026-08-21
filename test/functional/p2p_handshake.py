@@ -11,6 +11,7 @@ import time
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.messages import (
+    NODE_BLAKE2B,
     NODE_REDUCED_DATA,
     NODE_NETWORK,
     NODE_NETWORK_LIMITED,
@@ -36,13 +37,13 @@ from test_framework.util import (
 #  1. the peer's service flag NODE_NETWORK_LIMITED is set *and*
 #  2. the local chain is close to the tip (<24h)
 
-# Base service flags (without BIP-110)
+# Base service flags (without the preferential-peering bit)
 BASE_SERVICE_FLAGS_FULL = NODE_NETWORK | NODE_WITNESS
 BASE_SERVICE_FLAGS_PRUNED = NODE_NETWORK_LIMITED | NODE_WITNESS
 
-# Full service flags (with BIP-110)
-FULL_SERVICE_FLAGS_FULL = NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA
-FULL_SERVICE_FLAGS_PRUNED = NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_REDUCED_DATA
+# Full service flags (with the preferential-peering bit NODE_BLAKE2B)
+FULL_SERVICE_FLAGS_FULL = NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA | NODE_BLAKE2B
+FULL_SERVICE_FLAGS_PRUNED = NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_REDUCED_DATA | NODE_BLAKE2B
 
 
 class P2PHandshakeTest(BitcoinTestFramework):
@@ -107,13 +108,15 @@ class P2PHandshakeTest(BitcoinTestFramework):
         node = self.nodes[0]
 
         self.log.info("Check that peers lacking base service flags are disconnected")
-        # These should always be disconnected regardless of BIP-110 counter
+        # These should always be disconnected regardless of the stale-peer budget
         self.test_desirable_service_flags(node, [NODE_NONE, NODE_NETWORK, NODE_WITNESS],
                                           BASE_SERVICE_FLAGS_FULL, expect_disconnect=True)
 
         self.log.info("Check that first 2 stale peers connect, 3rd is rejected")
-        # Connect first 2 stale peers and keep them connected
-        stale_services = NODE_NETWORK | NODE_WITNESS
+        # Connect first 2 stale peers and keep them connected. A stale peer may
+        # well advertise NODE_REDUCED_DATA (eg an unupgraded Knots node); what
+        # makes it stale is the missing NODE_BLAKE2B.
+        stale_services = NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA
         if self.options.v2transport:
             stale_services |= NODE_P2P_V2
         peer1 = node.add_outbound_p2p_connection(
@@ -128,7 +131,7 @@ class P2PHandshakeTest(BitcoinTestFramework):
         peer2.sync_with_ping()
         assert len(node.getpeerinfo()) == 2
         # Third stale peer should be rejected
-        with node.assert_debug_log(["peer lacks NODE_REDUCED_DATA and already have 2 stale outbound peers"]):
+        with node.assert_debug_log(["peer lacks NODE_BLAKE2B and already have 2 stale outbound peers"]):
             node.add_outbound_p2p_connection(
                 P2PInterface(), p2p_idx=2, wait_for_disconnect=True,
                 connection_type="outbound-full-relay", services=stale_services,
@@ -141,15 +144,15 @@ class P2PHandshakeTest(BitcoinTestFramework):
         self.wait_until(lambda: len(node.getpeerinfo()) == 0)
 
         self.log.info("Check that preferred peers always connect")
-        self.test_desirable_service_flags(node, [NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA],
+        self.test_desirable_service_flags(node, [FULL_SERVICE_FLAGS_FULL],
                                           BASE_SERVICE_FLAGS_FULL, expect_disconnect=False)
 
         self.log.info("Check that limited peers are only desired if the local chain is close to the tip (<24h)")
         self.generate_at_mocktime(int(time.time()) - 25 * 3600)  # tip outside the 24h window, should fail
-        self.test_desirable_service_flags(node, [NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_REDUCED_DATA],
+        self.test_desirable_service_flags(node, [FULL_SERVICE_FLAGS_PRUNED],
                                           BASE_SERVICE_FLAGS_FULL, expect_disconnect=True)
         self.generate_at_mocktime(int(time.time()) - 23 * 3600)  # tip inside the 24h window, should succeed
-        self.test_desirable_service_flags(node, [NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_REDUCED_DATA],
+        self.test_desirable_service_flags(node, [FULL_SERVICE_FLAGS_PRUNED],
                                           BASE_SERVICE_FLAGS_PRUNED, expect_disconnect=False)
 
         self.log.info("Check that feeler connections get disconnected immediately")
