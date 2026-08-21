@@ -24,17 +24,6 @@
 #include <utility>
 #include <vector>
 
-enum class RDTSConsentFlag {
-    RUNTIME_CHECK,
-    IMPLICIT,
-    RUNTIME_WARN,
-    UNSUPPORTED_UNSAFE_NO_ENFORCEMENT,
-};
-
-extern RDTSConsentFlag g_rdts_consent;
-extern bool g_enable_rdts;
-extern bool g_rdts_warning;
-
 typedef std::map<int, uint256> MapCheckpoints;
 
 struct CCheckpointData {
