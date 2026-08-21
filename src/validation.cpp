@@ -277,6 +277,39 @@ bool CheckSequenceLocksAtTip(CBlockIndex* tip,
 // Returns the script flags which should be checked for a given block
 static unsigned int GetBlockScriptFlags(const CBlockIndex& block_index, const ChainstateManager& chainman);
 
+/** Whether the hardfork rules apply to `block_index` itself. Consensus.
+ *
+ * The same buried deployment the proof of work change activates at, so every
+ * rule the fork carries switches on at the same block. */
+static bool HardforkActiveForBlock(const CBlockIndex& block_index, const ChainstateManager& chainman)
+{
+    return DeploymentActiveAt(block_index, chainman, Consensus::DEPLOYMENT_BLAKE2B);
+}
+
+/** Whether the hardfork rules will apply to a block built on `pindexPrev`.
+ *
+ * A height is known before the block exists, so the mempool, the block builder
+ * and the wallet reach the same answer consensus will, without a second clock
+ * to keep aligned. */
+static bool HardforkActiveAfter(const CBlockIndex* pindexPrev, const ChainstateManager& chainman)
+{
+    // Delegated rather than open-coded so this cannot drift from the comparison
+    // consensus makes, including how it treats a null parent.
+    return DeploymentActiveAfter(pindexPrev, chainman, Consensus::DEPLOYMENT_BLAKE2B);
+}
+
+bool HardforkActiveForNextBlock(const ChainstateManager& chainman)
+{
+    AssertLockHeld(cs_main);
+    return HardforkActiveAfter(chainman.ActiveChain().Tip(), chainman);
+}
+
+/** The hardfork script flags for the block that would be built on top of `tip`. */
+static unsigned int UnifiedSighashFlagForNextBlock(const CBlockIndex& tip, const ChainstateManager& chainman)
+{
+    return HardforkActiveAfter(&tip, chainman) ? uint32_t{SCRIPT_VERIFY_UNIFIED_SIGHASH} : uint32_t{0};
+}
+
 /** Compute accurate total signature operation cost of a transaction.
  *  Not consensus-critical, since legacy sigops counting is always used in the protocol.
  */
@@ -391,6 +424,26 @@ void Chainstate::MaybeUpdateMempoolForReorg(
         AssertLockHeld(m_mempool->cs);
         AssertLockHeld(::cs_main);
         const CTransaction& tx = it->GetTx();
+
+        // A reorg can move the chain across the hardfork sighash activation.
+        // Script checks are not re-run for mempool entries, and the block
+        // assembler cannot skip an entry that has become invalid, so an entry
+        // accepted under a different fork state has to go: otherwise block
+        // production stops until the mempool is cleared by hand.
+        if (m_chainman.GetConsensus().Blake2bHeight != std::numeric_limits<int>::max()) {
+            // Compare the state recorded when the entry was accepted rather
+            // than recomputing it: a reorg can lower the tip below the
+            // activation height, which is the only direction that invalidates
+            // anything, because this flag relaxes rather than restricts.
+            //
+            // Entries accepted while the fork was active all go, not only those
+            // that opted in, because opting in is not recorded per entry. They
+            // are still valid and will be resubmitted; leaving one behind stops
+            // block production instead.
+            if (it->GetHardforkActive() && !HardforkActiveAfter(m_chain.Tip(), m_chainman)) {
+                return true;
+            }
+        }
 
         // The transaction must be final.
         if (!CheckFinalTxAtTip(*Assert(m_chain.Tip()), tx)) return true;
@@ -1079,7 +1132,9 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     if (!m_subpackage.m_changeset) {
         m_subpackage.m_changeset = m_pool.GetChangeSet();
     }
-    ws.m_tx_handle = m_subpackage.m_changeset->StageAddition(ptx, ws.m_base_fees, nAcceptTime, block_height_current, entry_sequence, coin_age, fSpendsCoinbase, /*extra_weight=*/ extra_weight, /*sigops_cost=*/ nSigOpsCost, lock_points.value());
+    ws.m_tx_handle = m_subpackage.m_changeset->StageAddition(ptx, ws.m_base_fees, nAcceptTime, block_height_current, entry_sequence, coin_age, fSpendsCoinbase, /*extra_weight=*/ extra_weight, /*sigops_cost=*/ nSigOpsCost, lock_points.value(),
+        /*hardfork_active=*/ HardforkActiveAfter(m_active_chainstate.m_chain.Tip(),
+                                                 m_active_chainstate.m_chainman));
 
     if (spk_reuse_mode != SRM_ALLOW) {
         m_subpackage.m_changeset->m_to_add.modify(ws.m_tx_handle, [=](CTxMemPoolEntry& e) {
@@ -1518,7 +1573,11 @@ bool MemPoolAccept::PolicyScriptChecks(const ATMPArgs& args, Workspace& ws)
     const CTransaction& tx = *ws.m_ptx;
     TxValidationState& state = ws.m_state;
 
-    const unsigned int scriptVerifyFlags = PolicyScriptVerifyFlags(args.m_ignore_rejects);
+    // ConsensusScriptChecks shares ws.m_precomputed_txdata with this call, and
+    // what that precomputes depends on SCRIPT_VERIFY_UNIFIED_SIGHASH, so both take
+    // that flag from the same place: the next block's rules.
+    const unsigned int scriptVerifyFlags = PolicyScriptVerifyFlags(args.m_ignore_rejects) |
+        UnifiedSighashFlagForNextBlock(*m_active_chainstate.m_chain.Tip(), m_active_chainstate.m_chainman);
 
     // Check input scripts and signatures.
     // This is done last to help prevent CPU exhaustion denial-of-service attacks.
@@ -1557,7 +1616,13 @@ bool MemPoolAccept::ConsensusScriptChecks(const ATMPArgs& args, Workspace& ws)
     // There is a similar check in CreateNewBlock() to prevent creating
     // invalid blocks (using TestBlockValidity), however allowing such
     // transactions into the mempool can be exploited as a DoS attack.
-    unsigned int currentBlockScriptVerifyFlags{GetBlockScriptFlags(*m_active_chainstate.m_chain.Tip(), m_active_chainstate.m_chainman)};
+    // GetBlockScriptFlags answers whether the fork applied to the tip. That is
+    // the consensus question and the wrong one here, since the next block is one
+    // higher and may be the one that activates. Drop that bit and take the next
+    // block's rules instead, matching PolicyScriptChecks so the two agree and
+    // the shared precomputed data is built once.
+    unsigned int currentBlockScriptVerifyFlags{GetBlockScriptFlags(*m_active_chainstate.m_chain.Tip(), m_active_chainstate.m_chainman) & ~uint32_t{SCRIPT_VERIFY_UNIFIED_SIGHASH}};
+    currentBlockScriptVerifyFlags |= UnifiedSighashFlagForNextBlock(*m_active_chainstate.m_chain.Tip(), m_active_chainstate.m_chainman);
     if (!CheckInputsFromMempoolAndCache(tx, state, m_view, m_pool, currentBlockScriptVerifyFlags,
                                         ws.m_precomputed_txdata, m_active_chainstate.CoinsTip(), GetValidationCache())) {
         LogError("BUG! PLEASE REPORT THIS! CheckInputScripts failed against latest-block but not STANDARD flags %s, %s", hash.ToString(), state.ToString());
@@ -2484,7 +2549,10 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
             assert(!coin.IsSpent());
             spent_outputs.emplace_back(coin.out);
         }
-        txdata.Init(tx, std::move(spent_outputs));
+        // The hardfork sighash needs the BIP341 commitments for every input,
+        // including on transactions carrying no witness at all, so force the
+        // precomputation rather than inferring it from the inputs.
+        txdata.Init(tx, std::move(spent_outputs), /*force=*/!!(flags & SCRIPT_VERIFY_UNIFIED_SIGHASH));
     }
     assert(txdata.m_spent_outputs.size() == tx.vin.size());
     assert(flags_per_input.empty() || flags_per_input.size() == tx.vin.size());
@@ -2702,6 +2770,12 @@ static unsigned int GetBlockScriptFlags(const CBlockIndex& block_index, const Ch
     // Enforce BIP147 NULLDUMMY (activated simultaneously with segwit)
     if (DeploymentActiveAt(block_index, chainman, Consensus::DEPLOYMENT_SEGWIT)) {
         flags |= SCRIPT_VERIFY_NULLDUMMY;
+    }
+
+    // Hardfork signature hash. The same buried deployment the proof of work
+    // change uses, so the whole fork switches on together.
+    if (HardforkActiveForBlock(block_index, chainman)) {
+        flags |= SCRIPT_VERIFY_UNIFIED_SIGHASH;
     }
 
     if (DeploymentActiveAt(block_index, chainman, Consensus::DEPLOYMENT_REDUCED_DATA)) {

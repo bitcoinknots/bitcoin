@@ -34,7 +34,7 @@ static void AddTx(const CTransactionRef& tx, const CAmount& nFee, CTxMemPool& po
             .inputs_coin_age = dPriority * tx->GetValueOut(),
             .in_chain_input_value = tx->GetValueOut(),
         },
-        spendsCoinbase, /*extra_weight=*/0, sigOpCost, lp));
+        spendsCoinbase, /*extra_weight=*/0, sigOpCost, lp, /*hardfork_active=*/false));
 }
 
 // Right now this is only testing eviction performance in an extremely small
