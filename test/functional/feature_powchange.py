@@ -290,7 +290,8 @@ class PowChangeTest(BitcoinTestFramework):
         assert_equal(node.submitheader(hexdata=CBlockHeader(v2_header_only).serialize().hex()), None)
         v2_header_only_json = node.getblockheader(v2_header_only.hash, True)
         assert_equal(v2_header_only_json["header_version"], 2)
-        assert_equal(v2_header_only_json["nTx"], 3)
+        assert_equal(v2_header_only_json["nTx"], 0)
+        assert_equal(v2_header_only_json["txcount"], 3)
 
         # A v1 header commits to no count, so nTx is omitted entirely until the
         # block itself arrives.
@@ -305,7 +306,8 @@ class PowChangeTest(BitcoinTestFramework):
         assert_equal(node.submitheader(hexdata=CBlockHeader(v1_header_only).serialize().hex()), None)
         v1_header_only_json = node.getblockheader(v1_header_only.hash, True)
         assert_equal(v1_header_only_json["header_version"], 0)
-        assert "nTx" not in v1_header_only_json
+        assert_equal(v1_header_only_json["nTx"], 0)
+        assert "txcount" not in v1_header_only_json
 
         # Fully downloaded blocks keep reporting their actual count.
         assert_equal(node.getblockheader(pre_hash, True)["nTx"], 1)
