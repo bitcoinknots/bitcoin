@@ -868,7 +868,7 @@ public:
     /** Whether this connection counts towards an automatic outbound target. */
     bool CountsTowardOutboundTarget() const { return !m_is_stale_outbound; }
 
-    /** Whether this outbound peer did not advertise NODE_REDUCED_DATA (BIP-110).
+    /** Whether this outbound peer did not advertise NODE_BLAKE2B.
      *  Such a peer is tolerated as an additional connection, like an addnode
      *  peer: it holds no automatic outbound semaphore slot and counts towards no
      *  outbound target, so we keep looking for a preferred peer to fill it. */
@@ -1261,7 +1261,7 @@ public:
     // Count the number of block-relay-only peers we have over our limit.
     int GetExtraBlockRelayCount() const;
 
-    /** Demote an outbound peer that did not advertise NODE_REDUCED_DATA to an
+    /** Demote an outbound peer that did not advertise NODE_BLAKE2B to an
      *  additional connection: give up its automatic outbound semaphore slot (so
      *  we keep looking for a preferred peer) and stop counting it as our outbound
      *  coverage of its network. A demoted peer draws on the inbound budget, so it

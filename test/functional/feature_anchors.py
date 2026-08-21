@@ -131,7 +131,7 @@ class AnchorsTest(BitcoinTestFramework):
             # This is necessary because on restart we will not attempt an anchor connection
             # to a host without our required services, even if its address is in the anchors.dat file
             new_data = bytearray(data)[:-32]
-            # Replace the 1-byte services field (0x00) with the CompactSize-encoded P2P_SERVICES (5 bytes for 0x08000009)
+            # Replace the 1-byte services field (0x00) with the CompactSize-encoded P2P_SERVICES (5 bytes for 0x18000009)
             services_bytes = ser_compact_size(P2P_SERVICES)
             new_data = new_data[:services_index] + services_bytes + new_data[services_index+1:]
             new_data_hash = hash256(new_data)

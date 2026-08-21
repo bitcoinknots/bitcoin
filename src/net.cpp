@@ -2577,7 +2577,7 @@ bool CConnman::DemoteToStaleOutbound(CNode& node, unsigned int max_stale)
         if (pnode->m_conn_type == conn_type) ++same_target;
     }
     if (num_stale >= max_stale) {
-        LogDebug(BCLog::NET, "peer lacks NODE_REDUCED_DATA and already have %u stale outbound peers (limit %u), %s\n",
+        LogDebug(BCLog::NET, "peer lacks NODE_BLAKE2B and already have %u stale outbound peers (limit %u), %s\n",
                  num_stale, max_stale, node.DisconnectMsg(fLogIPs));
         node.fDisconnect = true;
         return false;
@@ -2588,7 +2588,7 @@ bool CConnman::DemoteToStaleOutbound(CNode& node, unsigned int max_stale)
     // same_target includes node, so compare with > and report the rest.
     const int max_same_target{node.IsFullOutboundConn() ? m_max_outbound_full_relay : m_max_outbound_block_relay};
     if (same_target > max_same_target) {
-        LogDebug(BCLog::NET, "peer lacks NODE_REDUCED_DATA and the outbound target is already full (%d/%d), %s\n",
+        LogDebug(BCLog::NET, "peer lacks NODE_BLAKE2B and the outbound target is already full (%d/%d), %s\n",
                  same_target - 1, max_same_target, node.DisconnectMsg(fLogIPs));
         node.fDisconnect = true;
         return false;
@@ -2597,7 +2597,7 @@ bool CConnman::DemoteToStaleOutbound(CNode& node, unsigned int max_stale)
     // outbound target, so the peer must fit the inbound budget or a later
     // outbound connection would push us past -maxconnections.
     if (inbound_equiv >= m_max_inbound) {
-        LogDebug(BCLog::NET, "peer lacks NODE_REDUCED_DATA and no room within -maxconnections, %s\n",
+        LogDebug(BCLog::NET, "peer lacks NODE_BLAKE2B and no room within -maxconnections, %s\n",
                  node.DisconnectMsg(fLogIPs));
         node.fDisconnect = true;
         return false;
