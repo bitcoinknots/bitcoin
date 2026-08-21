@@ -136,6 +136,11 @@ static void ValidateCheckInputsForAllFlags(const CTransaction &tx, uint32_t fail
         // Randomly selects flag combinations
         uint32_t test_flags = (uint32_t) insecure_rand.randrange((SCRIPT_VERIFY_END_MARKER - 1) << 1);
 
+        // SCRIPT_VERIFY_UNIFIED_SIGHASH stays in the sweep. Nothing here opted
+        // in, so the flag must make no difference to any of it, and sweeping it
+        // is what holds that: a change letting the new rules reach a signature
+        // that did not ask for them would fail these.
+
         // Filter out incompatible flag choices
         if ((test_flags & SCRIPT_VERIFY_CLEANSTACK)) {
             // CLEANSTACK requires P2SH and WITNESS, see VerifyScript() in

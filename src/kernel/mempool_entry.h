@@ -100,6 +100,17 @@ private:
     const size_t nModSize;          //!< Cached modified size for priority
     const double entryPriority;     //!< Priority when entering the mempool
     const unsigned int entryHeight; //!< Chain height when entering the mempool
+    //! Whether the hardfork was active for the block this entry was accepted
+    //! for. Recorded rather than recomputed: a reorg changes which block sits at
+    //! entryHeight, so the chain can no longer answer what the rules were.
+    //!
+    //! This says the fork was active, not that the transaction opted in. Whether
+    //! a signature carried the bit is known only to the interpreter and is not
+    //! kept, so a reorg out of activation drops every entry accepted since it,
+    //! rather than only those that relied on it. Conservative in the safe
+    //! direction: the alternative leaves an invalid entry for the block
+    //! assembler, which throws rather than skipping it.
+    const bool m_hardfork_active;
     double cachedPriority;          //!< Last calculated priority
     unsigned int cachedHeight;      //!< Height at which priority was last calculated
     CAmount inChainInputValue;      //!< Sum of all txin values that are already in blockchain
@@ -128,7 +139,7 @@ public:
                     CoinAgeCache coin_age_cache,
                     bool spends_coinbase,
                     int32_t extra_weight,
-                    int64_t sigops_cost, LockPoints lp)
+                    int64_t sigops_cost, LockPoints lp, bool hardfork_active)
         : tx{tx},
           nFee{fee},
           nTxWeight{GetTransactionWeight(*tx)},
@@ -140,6 +151,7 @@ public:
           nModSize{CalculateModifiedSize(*tx, GetTxSize())},
           entryPriority{ComputePriority2(coin_age_cache.inputs_coin_age, nModSize)},
           entryHeight{entry_height},
+          m_hardfork_active{hardfork_active},
           cachedPriority{entryPriority},
           // Since entries arrive *after* the tip's height, their entry priority is for the height+1
           cachedHeight{entry_height + 1},
@@ -190,6 +202,7 @@ public:
     int32_t GetTxWeight() const { return nTxWeight; }
     std::chrono::seconds GetTime() const { return std::chrono::seconds{nTime}; }
     unsigned int GetHeight() const { return entryHeight; }
+    bool GetHardforkActive() const { return m_hardfork_active; }
     uint64_t GetSequence() const { return entry_sequence; }
     int32_t GetExtraWeight() const { return m_extra_weight; }
     int64_t GetSigOpCost() const { return sigOpCost; }

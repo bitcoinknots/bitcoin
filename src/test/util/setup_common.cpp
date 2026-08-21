@@ -450,7 +450,7 @@ std::pair<CMutableTransaction, CAmount> TestChain100Setup::CreateValidTransactio
     // - Default signature hashing type
     int nHashType = SIGHASH_ALL;
     std::map<int, bilingual_str> input_errors;
-    assert(SignTransaction(mempool_txn, &keystore, input_coins, nHashType, input_errors));
+    assert(SignTransaction(mempool_txn, &keystore, input_coins, nHashType, input_errors, /*inputs_amount_sum=*/nullptr, /*sighash_rules=*/SighashRules::LEGACY));
     CAmount current_fee = inputs_amount - std::accumulate(outputs.begin(), outputs.end(), CAmount(0),
         [](const CAmount& acc, const CTxOut& out) {
         return acc + out.nValue;
@@ -467,7 +467,7 @@ std::pair<CMutableTransaction, CAmount> TestChain100Setup::CreateValidTransactio
             mempool_txn.vout[fee_output.value()].nValue -= deduction;
             // Re-sign since an output has changed
             input_errors.clear();
-            assert(SignTransaction(mempool_txn, &keystore, input_coins, nHashType, input_errors));
+            assert(SignTransaction(mempool_txn, &keystore, input_coins, nHashType, input_errors, /*inputs_amount_sum=*/nullptr, /*sighash_rules=*/SighashRules::LEGACY));
             current_fee = target_fee;
         }
     }
@@ -555,7 +555,8 @@ std::vector<CTransactionRef> TestChain100Setup::PopulateMempool(FastRandomContex
             changeset->StageAddition(ptx, /*fee=*/(total_in - num_outputs * amount_per_output),
                     /*time=*/0, /*entry_height=*/ height, /*entry_sequence=*/0,
                     coin_age,
-                    /*spends_coinbase=*/false, /*extra_weight=*/0, /*sigops_cost=*/4, lp);
+                    /*spends_coinbase=*/false, /*extra_weight=*/0, /*sigops_cost=*/4, lp,
+                    /*hardfork_active=*/false);
             changeset->Apply();
         }
         --num_transactions;
@@ -592,7 +593,8 @@ void TestChain100Setup::MockMempoolMinFee(const CFeeRate& target_feerate)
         changeset->StageAddition(tx, /*fee=*/tx_fee,
                 /*time=*/0, /*entry_height=*/1, /*entry_sequence=*/0,
                 COIN_AGE_CACHE_ZERO,
-                /*spends_coinbase=*/true, /*extra_weight=*/0, /*sigops_cost=*/1, lp);
+                /*spends_coinbase=*/true, /*extra_weight=*/0, /*sigops_cost=*/1, lp,
+                /*hardfork_active=*/false);
         changeset->Apply();
     }
     m_node.mempool->TrimToSize(0);

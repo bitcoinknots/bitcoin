@@ -110,15 +110,24 @@ static UniValue FinishTransaction(const std::shared_ptr<CWallet> pwallet, const 
     // so external signers are not asked to sign more than once.
     bool complete;
     pwallet->FillPSBT(psbtx, complete, SIGHASH_DEFAULT, /*sign=*/false, /*bip32derivs=*/true);
-    const auto err{pwallet->FillPSBT(psbtx, complete, SIGHASH_DEFAULT, /*sign=*/true, /*bip32derivs=*/false)};
+    std::vector<bilingual_str> warnings;
+    const auto err{pwallet->FillPSBT(psbtx, complete, SIGHASH_DEFAULT, /*sign=*/true, /*bip32derivs=*/false,
+                                     /*n_signed=*/nullptr, /*finalize=*/true, &warnings)};
     if (err) {
         throw JSONRPCPSBTError(*err);
     }
 
     CMutableTransaction mtx;
-    complete = FinalizeAndExtractPSBT(psbtx, mtx);
+    // Finalizing decides whether the signatures present are enough, so it has
+    // to ask under the rules the next block will apply. Assuming the fork is
+    // active reports a transaction complete before activation whose opted-in
+    // signatures the network still rejects.
+    complete = FinalizeAndExtractPSBT(psbtx, mtx,
+                                      pwallet->HardforkActiveForNextBlock()
+                                          ? SighashRules::UNIFIED : SighashRules::LEGACY);
 
     UniValue result(UniValue::VOBJ);
+    PushWarnings(warnings, result);
 
     const bool psbt_opt_in{options.exists("psbt") && options["psbt"].get_bool()};
     bool add_to_wallet{options.exists("add_to_wallet") ? options["add_to_wallet"].get_bool() : true};
@@ -1382,7 +1391,8 @@ RPCHelpMan send()
                     {RPCResult::Type::BOOL, "complete", "If the transaction has a complete set of signatures"},
                     {RPCResult::Type::STR_HEX, "txid", /*optional=*/true, "The transaction id for the send. Only 1 transaction is created regardless of the number of addresses."},
                     {RPCResult::Type::STR_HEX, "hex", /*optional=*/true, "If add_to_wallet is false, the hex-encoded raw transaction with signature(s)"},
-                    {RPCResult::Type::STR, "psbt", /*optional=*/true, "If more signatures are needed, or if add_to_wallet is false, the base64-encoded (partially) signed transaction"}
+                    {RPCResult::Type::STR, "psbt", /*optional=*/true, "If more signatures are needed, or if add_to_wallet is false, the base64-encoded (partially) signed transaction"},
+                    RPCResult{RPCResult::Type::ARR, "warnings", /*optional=*/true, "Warnings detected during processing", {{RPCResult::Type::STR, "", ""}}},
                 }
         },
         RPCExamples{""
@@ -1495,7 +1505,8 @@ RPCHelpMan sendall()
                     {RPCResult::Type::BOOL, "complete", "If the transaction has a complete set of signatures"},
                     {RPCResult::Type::STR_HEX, "txid", /*optional=*/true, "The transaction id for the send. Only 1 transaction is created regardless of the number of addresses."},
                     {RPCResult::Type::STR_HEX, "hex", /*optional=*/true, "If add_to_wallet is false, the hex-encoded raw transaction with signature(s)"},
-                    {RPCResult::Type::STR, "psbt", /*optional=*/true, "If more signatures are needed, or if add_to_wallet is false, the base64-encoded (partially) signed transaction"}
+                    {RPCResult::Type::STR, "psbt", /*optional=*/true, "If more signatures are needed, or if add_to_wallet is false, the base64-encoded (partially) signed transaction"},
+                    RPCResult{RPCResult::Type::ARR, "warnings", /*optional=*/true, "Warnings detected during processing", {{RPCResult::Type::STR, "", ""}}},
                 }
         },
         RPCExamples{""
@@ -1729,6 +1740,7 @@ RPCHelpMan walletprocesspsbt()
                     {
                         {RPCResult::Type::STR, "psbt", "The base64-encoded partially signed transaction"},
                         {RPCResult::Type::BOOL, "complete", "If the transaction has a complete set of signatures"},
+                        RPCResult{RPCResult::Type::ARR, "warnings", /*optional=*/true, "Warnings detected during processing", {{RPCResult::Type::STR, "", ""}}},
                         {RPCResult::Type::STR_HEX, "hex", /*optional=*/true, "The hex-encoded network transaction if complete"},
                     }
                 },
@@ -1797,7 +1809,9 @@ RPCHelpMan walletprocesspsbt()
 
     if (sign) EnsureWalletIsUnlocked(*pwallet);
 
-    const auto err{wallet.FillPSBT(psbtx, complete, nHashType, sign, bip32derivs, nullptr, finalize)};
+    std::vector<bilingual_str> warnings;
+    const auto err{wallet.FillPSBT(psbtx, complete, nHashType, sign, bip32derivs, nullptr, finalize,
+                                   &warnings)};
     if (err) {
         throw JSONRPCPSBTError(*err);
     }
@@ -1807,10 +1821,13 @@ RPCHelpMan walletprocesspsbt()
     ssTx << psbtx;
     result.pushKV("psbt", EncodeBase64(ssTx.str()));
     result.pushKV("complete", complete);
+    PushWarnings(warnings, result);
     if (complete) {
         CMutableTransaction mtx;
         // Returns true if complete, which we already think it is.
-        CHECK_NONFATAL(FinalizeAndExtractPSBT(psbtx, mtx));
+        CHECK_NONFATAL(FinalizeAndExtractPSBT(psbtx, mtx,
+                                              wallet.HardforkActiveForNextBlock()
+                                                  ? SighashRules::UNIFIED : SighashRules::LEGACY));
         DataStream ssTx_final;
         ssTx_final << TX_WITH_WITNESS(mtx);
         result.pushKV("hex", HexStr(ssTx_final));
