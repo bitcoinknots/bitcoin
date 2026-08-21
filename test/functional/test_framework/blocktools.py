@@ -98,7 +98,7 @@ def create_block(hashprev=None, coinbase=None, ntime=None, *, version=None, tmpl
     block.nTime = ntime or tmpl.get('curtime') or int(time.time() + 600)
     block_height = height if height is not None else tmpl.get('height')
     if header_v2 is None:
-        header_v2 = '!blake2b' in tmpl.get('rules')
+        header_v2 = '!blake2b' in (tmpl.get('rules') or ())
     if header_v2 and block_height is None:
         raise ValueError("A v2 block requires a height")
     block.m_header_v2 = header_v2
