@@ -69,8 +69,8 @@ BOOST_AUTO_TEST_CASE(outbound_slow_chain_eviction)
     connman.Handshake(
         /*node=*/dummyNode1,
         /*successfully_connected=*/true,
-        /*remote_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA),
-        /*local_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA),
+        /*remote_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA | NODE_BLAKE2B),
+        /*local_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA | NODE_BLAKE2B),
         /*version=*/PROTOCOL_VERSION,
         /*relay_txs=*/true);
 
@@ -299,7 +299,7 @@ BOOST_FIXTURE_TEST_CASE(block_relay_only_eviction, OutboundTest)
     connman->ClearTestNodes();
 }
 
-//! BIP-110: peers that don't advertise NODE_REDUCED_DATA are tolerated as
+//! Peers that don't advertise NODE_BLAKE2B are tolerated as
 //! *additional* connections, so they must never count towards the automatic
 //! outbound targets. Otherwise ThreadOpenConnections opens replacements for them
 //! (it skips them) while the eviction logic disconnects good peers to compensate
@@ -413,7 +413,7 @@ BOOST_FIXTURE_TEST_CASE(stale_outbound_peers_are_additional, OutboundTest)
     connman->ClearTestNodes();
 }
 
-//! BIP-110: a stale peer is not our outbound coverage of its network either, so
+//! A stale peer is not our outbound coverage of its network either, so
 //! it cannot strip the "only peer on this network" eviction protection from a
 //! preferred peer sharing that network.
 BOOST_FIXTURE_TEST_CASE(stale_outbound_is_not_network_coverage, OutboundTest)
@@ -439,7 +439,7 @@ BOOST_FIXTURE_TEST_CASE(stale_outbound_is_not_network_coverage, OutboundTest)
     connman->ClearTestNodes();
 }
 
-//! BIP-110: a demoted stale outbound peer draws on the inbound budget. It is
+//! A demoted stale outbound peer draws on the inbound budget. It is
 //! refused (so the caller disconnects it) when either -maxstaleoutbound are
 //! already tolerated or the inbound budget is full; the latter keeps a later
 //! outbound connection from pushing us past -maxconnections.
