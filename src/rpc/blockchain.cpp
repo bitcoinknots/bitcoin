@@ -190,12 +190,13 @@ UniValue blockheaderToJSON(const CBlockIndex& tip, const CBlockIndex& blockindex
     result.pushKV("target", GetTarget(blockindex, pow_limit).GetHex());
     result.pushKV("difficulty", GetDifficulty(blockindex));
     result.pushKV("chainwork", blockindex.nChainWork.GetHex());
+    result.pushKV("nTx", blockindex.nTx);
     if (blockindex.nTx > 0) {
-        result.pushKV("nTx", blockindex.nTx);
+        result.pushKV("txcount", blockindex.nTx);
     } else if (blockindex.m_header_v2) {
         // The block itself hasn't been seen yet, but a v2 header commits to
         // the number of transactions in it.
-        result.pushKV("nTx", (uint64_t)blockindex.m_txcount);
+        result.pushKV("txcount", (uint64_t)blockindex.m_txcount);
     }
     result.pushKV("header_version", blockindex.m_header_v2 ? 2 : 0);
     if (blockindex.m_header_v2) {
@@ -810,7 +811,8 @@ static RPCHelpMan getblockheader()
                             {RPCResult::Type::STR_HEX, "target", "The difficulty target"},
                             {RPCResult::Type::NUM, "difficulty", "The difficulty"},
                             {RPCResult::Type::STR_HEX, "chainwork", "Expected number of hashes required to produce the current chain"},
-                            {RPCResult::Type::NUM, "nTx", /*optional=*/true, "The number of transactions in the block; for entries where only the header has been seen this is the count committed in the v2 header, and it is omitted when unknown"},
+                            {RPCResult::Type::NUM, "nTx", "The number of transactions in the block, or 0 if only the block header is available (DEPRECATED)"},
+                            {RPCResult::Type::NUM, "txcount", /*optional=*/true, "The number of transactions in the block; for entries where only the header has been seen this is the count committed in the v2 header, and it is omitted when unknown"},
                             {RPCResult::Type::NUM, "header_version", "2 for a BLAKE2b v2 header, 0 otherwise"},
                             {RPCResult::Type::STR_HEX, "nonce2", /*optional=*/true, "The second nonce (only present for v2 headers)"},
                             {RPCResult::Type::STR_HEX, "nonce3", /*optional=*/true, "The third nonce (only present for v2 headers)"},
@@ -998,7 +1000,8 @@ static RPCHelpMan getblock()
                     {RPCResult::Type::STR_HEX, "target", "The difficulty target"},
                     {RPCResult::Type::NUM, "difficulty", "The difficulty"},
                     {RPCResult::Type::STR_HEX, "chainwork", "Expected number of hashes required to produce the chain up to this block (in hex)"},
-                    {RPCResult::Type::NUM, "nTx", /*optional=*/true, "The number of transactions in the block; for entries where only the header has been seen this is the count committed in the v2 header, and it is omitted when unknown"},
+                    {RPCResult::Type::NUM, "nTx", "The number of transactions in the block, or 0 if only the block header is available (DEPRECATED)"},
+                    {RPCResult::Type::NUM, "txcount", /*optional=*/true, "The number of transactions in the block; for entries where only the header has been seen this is the count committed in the v2 header, and it is omitted when unknown"},
                     {RPCResult::Type::NUM, "header_version", "2 for a BLAKE2b v2 header, 0 otherwise"},
                     {RPCResult::Type::STR_HEX, "nonce2", /*optional=*/true, "The second nonce (only present for v2 headers)"},
                     {RPCResult::Type::STR_HEX, "nonce3", /*optional=*/true, "The third nonce (only present for v2 headers)"},
