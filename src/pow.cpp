@@ -18,6 +18,10 @@
  */
 static unsigned int ApplyBlake2bTargetShift(unsigned int nBits, const Consensus::Params& params)
 {
+    if (params.fPowAllowMinDifficultyBlocks && params.nSubsidyHalvingInterval == 210000) {
+        // testnets but not regtest
+        return 0x1a00ffff;
+    }
     arith_uint256 bnNew;
     bnNew.SetCompact(nBits);
     const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
@@ -39,7 +43,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     // Only change once per difficulty adjustment interval
     if ((pindexLast->nHeight+1) % params.DifficultyAdjustmentInterval() != 0)
     {
-        if (params.fPowAllowMinDifficultyBlocks)
+        if (params.fPowAllowMinDifficultyBlocks && !pblock->m_header_v2)
         {
             // Special difficulty rule for testnet:
             // If the new block's timestamp is more than 2* 10 minutes

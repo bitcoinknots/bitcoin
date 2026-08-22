@@ -128,6 +128,7 @@ BasicTestingSetup::BasicTestingSetup(const ChainType chainType, TestOpts opts)
             "-debugexclude=libevent",
             "-debugexclude=leveldb",
             "-blake2b_headline=",
+            "-allow_mainnet_test_only",
         },
         opts.extra_args);
     if (G_TEST_COMMAND_LINE_ARGUMENTS) {
