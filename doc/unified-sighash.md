@@ -160,7 +160,7 @@ The message is the concatenation below, and the signature hash is
              3 tapscript
   4 bytes   hash type, little endian
   4 bytes   transaction version, little endian
-  4 bytes   transaction locktime, little endian
+  5 bytes   transaction locktime, little endian, zero-extended
 
   if ANYONECANPAY is not set:
  32 bytes   sha_prevouts
@@ -201,6 +201,14 @@ The message is the concatenation below, and the signature hash is
   1 byte    key version, 0
   4 bytes   codeseparator position, little endian, 0xffffffff if none
 ```
+
+The locktime occupies four bytes in a transaction but five here. Four run out
+on 2106-02-07, and a later hardfork that widened the field would otherwise have
+to change this message and invalidate every signature already made under it. The
+fifth byte is zero until something sets it, so it costs nothing now and cannot
+be added later. Height and time are not distinguished here: the message commits
+to the value, and `LOCKTIME_THRESHOLD` decides which it means during validation,
+which leaves that split untouched by the wider field.
 
 `scriptCode` is what the legacy rules already use: the scriptPubKey for a bare
 input, the redeemScript for P2SH, the witnessScript for P2WSH, and for P2WPKH the
