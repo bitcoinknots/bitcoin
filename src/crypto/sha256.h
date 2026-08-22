@@ -24,6 +24,11 @@ public:
     CSHA256& Write(const unsigned char* data, size_t len);
     void Finalize(unsigned char hash[OUTPUT_SIZE]);
     CSHA256& Reset();
+
+    uint64_t BytesWritten() const
+    {
+        return bytes;
+    }
 };
 
 namespace sha256_implementation {
