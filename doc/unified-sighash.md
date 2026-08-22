@@ -361,12 +361,26 @@ So a bare, P2SH or segwit v0 signature whose hash type already has this bit set
 is consensus-valid today, and after activation it is read under the new algorithm
 and stops verifying.
 
-What that costs depends on who still holds the key. A signature can be replaced,
-so for a live wallet this is an inconvenience: sign again after activation. Where
-the signature was made in advance and the key deliberately destroyed, as a
-pre-signed refund or an inheritance path does, there is nothing left to sign
-with and the output cannot be spent. That is a loss of funds, and it is worth
-naming as one.
+This costs almost nobody anything. Opting in is per signature, so the legacy
+algorithm keeps working exactly as it does today and a spender who never sets
+the bit is never affected: signing again, under the old rules, is always
+available. The only signatures that stop verifying are ones that already set
+this bit while being made under the legacy algorithm, which is non-standard and
+which no wallet produces.
+
+A scan of the chain to block 961,636 finds 17 of them: six with hash type `0x21`
+and eleven with `0x65`, spread over eleven blocks between heights 505,057 and
+509,793, all within a month of each other in January and February 2018, and none
+since. The `0x40` in `0x65` is the fork identifier another chain's software used
+at the time, which is what that clustering looks like. This counts signatures
+already confirmed, so those outputs are long spent; a transaction signed in
+advance and held is not on the chain and cannot be counted from it.
+
+One case has no remedy. If such a signature was made in advance and the key then
+destroyed, as a pre-signed refund or an inheritance path does, there is nothing
+left to sign with and that output cannot be spent. It takes deliberate effort to
+arrive there, but the outcome is a loss of funds, so it is named rather than
+left implied.
 
 Reaching that state takes deliberate effort. Such a transaction is non-standard,
 so no node relays it and it can only enter a block direct from a miner, and it
