@@ -169,6 +169,15 @@ static const CBlockIndex* ParseHashOrHeight(const UniValue& param, ChainstateMan
     }
 }
 
+//! Hex-encode a 32-bit header field in wire byte order, ie the same bytes in
+//! the same order as they appear in the serialised header.
+static std::string HeaderFieldHex(const uint32_t field)
+{
+    DataStream ss{};
+    ss << field;
+    return HexStr(ss);
+}
+
 UniValue blockheaderToJSON(const CBlockIndex& tip, const CBlockIndex& blockindex, const uint256 pow_limit)
 {
     // Serialize passed information without accessing chain state of the active chain!
@@ -200,8 +209,8 @@ UniValue blockheaderToJSON(const CBlockIndex& tip, const CBlockIndex& blockindex
     }
     result.pushKV("header_version", blockindex.m_header_v2 ? 2 : 0);
     if (blockindex.m_header_v2) {
-        result.pushKV("nonce2", strprintf("%08x", blockindex.m_nonce2));
-        result.pushKV("nonce3", strprintf("%08x", blockindex.m_nonce3));
+        result.pushKV("nonce2", HeaderFieldHex(blockindex.m_nonce2));
+        result.pushKV("nonce3", HeaderFieldHex(blockindex.m_nonce3));
         result.pushKV("extranonce", HexStr(blockindex.m_extranonce));
         result.pushKV("time_offset", (uint64_t)blockindex.m_time_offset);
         result.pushKV("header_flags", blockindex.m_flags);
@@ -792,8 +801,8 @@ static RPCHelpMan getblockheader()
                             {RPCResult::Type::NUM, "nTx", "The number of transactions in the block, or 0 if only the block header is available (DEPRECATED)"},
                             {RPCResult::Type::NUM, "txcount", /*optional=*/true, "The number of transactions in the block; for entries where only the header has been seen this is the count committed in the v2 header, and it is omitted when unknown"},
                             {RPCResult::Type::NUM, "header_version", "2 for a BLAKE2b v2 header, 0 otherwise"},
-                            {RPCResult::Type::STR_HEX, "nonce2", /*optional=*/true, "The second nonce (only present for v2 headers)"},
-                            {RPCResult::Type::STR_HEX, "nonce3", /*optional=*/true, "The third nonce (only present for v2 headers)"},
+                            {RPCResult::Type::STR_HEX, "nonce2", /*optional=*/true, "The second nonce, in wire byte order (only present for v2 headers)"},
+                            {RPCResult::Type::STR_HEX, "nonce3", /*optional=*/true, "The third nonce, in wire byte order (only present for v2 headers)"},
                             {RPCResult::Type::STR_HEX, "extranonce", /*optional=*/true, "The 128-bit extranonce (only present for v2 headers)"},
                             {RPCResult::Type::NUM, "time_offset", /*optional=*/true, "The offset subtracted from the block time on the wire, per header flags bit 2 (only present for v2 headers)"},
                             {RPCResult::Type::NUM, "header_flags", /*optional=*/true, "The header flags: bits 0-1 ASIC profile, bit 2 time offset in use (only present for v2 headers)"},
@@ -977,8 +986,8 @@ static RPCHelpMan getblock()
                     {RPCResult::Type::NUM, "nTx", "The number of transactions in the block, or 0 if only the block header is available (DEPRECATED)"},
                     {RPCResult::Type::NUM, "txcount", /*optional=*/true, "The number of transactions in the block; for entries where only the header has been seen this is the count committed in the v2 header, and it is omitted when unknown"},
                     {RPCResult::Type::NUM, "header_version", "2 for a BLAKE2b v2 header, 0 otherwise"},
-                    {RPCResult::Type::STR_HEX, "nonce2", /*optional=*/true, "The second nonce (only present for v2 headers)"},
-                    {RPCResult::Type::STR_HEX, "nonce3", /*optional=*/true, "The third nonce (only present for v2 headers)"},
+                    {RPCResult::Type::STR_HEX, "nonce2", /*optional=*/true, "The second nonce, in wire byte order (only present for v2 headers)"},
+                    {RPCResult::Type::STR_HEX, "nonce3", /*optional=*/true, "The third nonce, in wire byte order (only present for v2 headers)"},
                     {RPCResult::Type::STR_HEX, "extranonce", /*optional=*/true, "The 128-bit extranonce (only present for v2 headers)"},
                     {RPCResult::Type::NUM, "time_offset", /*optional=*/true, "The offset subtracted from the block time on the wire, per header flags bit 2 (only present for v2 headers)"},
                     {RPCResult::Type::NUM, "header_flags", /*optional=*/true, "The header flags: bits 0-1 ASIC profile, bit 2 time offset in use (only present for v2 headers)"},
