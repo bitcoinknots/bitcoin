@@ -222,8 +222,8 @@ class PowChangeTest(BitcoinTestFramework):
         assert_equal(mm_json["time_offset"], merge_mined_block.m_time_offset)
         assert_equal(len(mm_json["nonce2"]), 8)
         assert_equal(len(mm_json["nonce3"]), 8)
-        assert_equal(mm_json["nonce2"], f"{merge_mined_block.m_nonce2:08x}")
-        assert_equal(mm_json["nonce3"], f"{merge_mined_block.m_nonce3:08x}")
+        assert_equal(mm_json["nonce2"], merge_mined_block.m_nonce2.to_bytes(4, "little").hex())
+        assert_equal(mm_json["nonce3"], merge_mined_block.m_nonce3.to_bytes(4, "little").hex())
 
         invalid_txcount = create_block(
             merge_mined_block.sha256,
