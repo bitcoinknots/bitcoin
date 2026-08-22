@@ -414,6 +414,12 @@ active. It takes `-unifiedsighash` to sign this way, and the same flag is needed
 recognise an existing signature of this kind when combining. Without it the tool
 produces legacy signatures, which stay valid but carry no replay protection.
 
+`libbitcoinconsensus` is in the same position and takes
+`bitcoinconsensus_SCRIPT_FLAGS_VERIFY_UNIFIED_SIGHASH`. It also needs the spent
+outputs whenever that flag is set, for the reason taproot already needs them
+there: the message commits to every spent amount and scriptPubKey, on inputs
+carrying no witness as well.
+
 Everything with chain access decides on its own, from the rules of the block
 being built rather than the tip's: the wallet, `signrawtransactionwithkey`, the
 PSBT RPCs, `combinerawtransaction`, and the GUI.
