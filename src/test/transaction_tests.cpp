@@ -122,6 +122,11 @@ bool CheckTxScripts(const CTransaction& tx, const std::map<COutPoint, CScript>& 
     const std::map<COutPoint, int64_t>& map_prevout_values, unsigned int flags,
     const PrecomputedTransactionData& txdata, const std::string& strTest, bool expect_valid)
 {
+    // SCRIPT_VERIFY_UNIFIED_SIGHASH stays in the sweep. Nothing in this corpus
+    // opted in, so the flag must make no difference to any of it, and sweeping
+    // it here is what holds that: a change that let the new rules reach a
+    // signature that did not ask for them would fail these vectors.
+
     bool tx_valid = true;
     ScriptError err = expect_valid ? SCRIPT_ERR_UNKNOWN_ERROR : SCRIPT_ERR_OK;
     for (unsigned int i = 0; i < tx.vin.size() && tx_valid; ++i) {
@@ -597,8 +602,8 @@ BOOST_AUTO_TEST_CASE(test_big_witness_transaction)
 SignatureData CombineSignatures(const CMutableTransaction& input1, const CMutableTransaction& input2, const CTransactionRef tx)
 {
     SignatureData sigdata;
-    sigdata = DataFromTransaction(input1, 0, tx->vout[0]);
-    sigdata.MergeSignatureData(DataFromTransaction(input2, 0, tx->vout[0]));
+    sigdata = DataFromTransaction(input1, 0, tx->vout[0], /*sighash_rules=*/SighashRules::LEGACY);
+    sigdata.MergeSignatureData(DataFromTransaction(input2, 0, tx->vout[0], /*sighash_rules=*/SighashRules::LEGACY));
     ProduceSignature(DUMMY_SIGNING_PROVIDER, MutableTransactionSignatureCreator(input1, 0, tx->vout[0].nValue, SIGHASH_ALL), tx->vout[0].scriptPubKey, sigdata);
     return sigdata;
 }
