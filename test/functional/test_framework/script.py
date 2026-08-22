@@ -744,9 +744,15 @@ def UnifiedSignatureHash(script_code, txTo, inIdx, hashtype, spent_utxos, sigver
             return None
 
     ss = bytes([script_type])
-    ss += struct.pack("<i", hashtype)
-    ss += struct.pack("<i", txTo.version)
+    # Widths match the node: the hash type is one byte widened to four, and
+    # version and the code separator are unsigned there.
+    if not 0 <= hashtype <= 0xFF:
+        return None
+    ss += struct.pack("<I", hashtype)
+    ss += struct.pack("<I", txTo.version & 0xFFFFFFFF)
     ss += struct.pack("<I", txTo.nLockTime)
+    # Five bytes, not four: the high one is reserved for a wider locktime.
+    ss += b"\x00"
 
     if not anyonecanpay:
         ss += sha256(b"".join(i.prevout.serialize() for i in txTo.vin))
@@ -778,7 +784,7 @@ def UnifiedSignatureHash(script_code, txTo, inIdx, hashtype, spent_utxos, sigver
         if script_type == UNIFIED_SCRIPT_TYPE_TAPSCRIPT:
             ss += TaggedHash("TapLeaf", bytes([leaf_ver]) + ser_string(leaf_script))
             ss += bytes([0])  # key version
-            ss += struct.pack("<i", codeseparator_pos)
+            ss += struct.pack("<I", codeseparator_pos & 0xFFFFFFFF)
 
     return TaggedHash("UnifiedSighash", ss)
 

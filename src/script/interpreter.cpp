@@ -1667,9 +1667,14 @@ bool SignatureHashUnified(uint256& hash_out, const CScript& scriptCode, const T&
     ss << script_type;
     ss << nHashType;
 
-    // Transaction level data.
+    // Transaction level data. The locktime is committed to as five bytes rather
+    // than the four it occupies today: four run out on 2106-02-07, and a
+    // hardfork that widened the field later would otherwise have to change this
+    // message and invalidate every signature made under it. The fifth byte is
+    // zero until something sets it.
     ss << txTo.version;
     ss << txTo.nLockTime;
+    ss << uint8_t{0};
     if (!anyonecanpay) {
         ss << cache.m_prevouts_single_hash;
         ss << cache.m_spent_amounts_single_hash;
