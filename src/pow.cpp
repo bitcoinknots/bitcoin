@@ -39,7 +39,7 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     // Only change once per difficulty adjustment interval
     if ((pindexLast->nHeight+1) % params.DifficultyAdjustmentInterval() != 0)
     {
-        if (params.fPowAllowMinDifficultyBlocks)
+        if (params.fPowAllowMinDifficultyBlocks && !pblock->m_header_v2)
         {
             // Special difficulty rule for testnet:
             // If the new block's timestamp is more than 2* 10 minutes
@@ -92,7 +92,7 @@ unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nF
     arith_uint256 bnNew;
 
     // Special difficulty rule for Testnet4
-    if (params.enforce_BIP94) {
+    if (params.enforce_BIP94 && !params.IsBlake2bHeight(pindexLast->nHeight + 1)) {
         // Here we use the first block of the difficulty period. This way
         // the real difficulty is always preserved in the first block as
         // it is not allowed to use the min-difficulty exception.
