@@ -2321,27 +2321,9 @@ bool CWallet::SignTransaction(CMutableTransaction& tx) const
     return SignTransaction(tx, coins, SIGHASH_DEFAULT, input_errors);
 }
 
-bool CWallet::HardforkActiveForNextBlock() const
-{
-    // The next block sits one above the tip, and a height is fixed by the blocks
-    // already connected, so this reaches the same answer the node will enforce.
-    // Reading the height is one call, so there is no window in which the chain
-    // moves between two lookups.
-    //
-    // No height means no answer, and returning false signs under the legacy
-    // rules: still valid, just without replay protection. That is the safe
-    // direction to fail in, since the alternative hands out signatures the next
-    // block would reject.
-    const std::optional<int> height{chain().getHeight()};
-    if (!height) return false;
-    // Same comparison DeploymentActiveAfter makes for a buried deployment, so
-    // the wallet and consensus cannot disagree about which block activates.
-    return *height + 1 >= Params().GetConsensus().Blake2bHeight;
-}
-
 bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum) const
 {
-    const SighashRules sighash_rules{HardforkActiveForNextBlock() ? SighashRules::UNIFIED : SighashRules::LEGACY};
+    const SighashRules sighash_rules{SighashRulesForSigning(Params().GetConsensus())};
 
     // Try to sign with all ScriptPubKeyMans
     for (ScriptPubKeyMan* spk_man : GetAllScriptPubKeyMans()) {
@@ -2358,8 +2340,8 @@ bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint,
 
 std::optional<PSBTError> CWallet::FillPSBT(PartiallySignedTransaction& psbtx, bool& complete, int sighash_type, bool sign, bool bip32derivs, size_t * n_signed, bool finalize, std::vector<bilingual_str>* warnings) const
 {
-    // The transaction is being built for the next block, so use its rules.
-    const SighashRules sighash_rules{HardforkActiveForNextBlock() ? SighashRules::UNIFIED : SighashRules::LEGACY};
+    // Signing opts in wherever the fork is scheduled, without asking the chain.
+    const SighashRules sighash_rules{SighashRulesForSigning(Params().GetConsensus())};
     if (n_signed) {
         *n_signed = 0;
     }
@@ -2496,7 +2478,7 @@ OutputType CWallet::TransactionChangeType(const std::optional<OutputType>& chang
     return m_default_address_type;
 }
 
-void CWallet::CommitTransaction(CTransactionRef tx, mapValue_t mapValue, std::vector<std::pair<std::string, std::string>> orderForm)
+void CWallet::CommitTransaction(CTransactionRef tx, mapValue_t mapValue, std::vector<std::pair<std::string, std::string>> orderForm, bilingual_str* broadcast_err)
 {
     LOCK(cs_wallet);
     WalletLogPrintf("CommitTransaction:\n%s\n", util::RemoveSuffixView(tx->ToString(), "\n"));
@@ -2533,6 +2515,13 @@ void CWallet::CommitTransaction(CTransactionRef tx, mapValue_t mapValue, std::ve
     std::string err_string;
     if (!SubmitTxMemoryPoolAndRelay(*wtx, err_string, true)) {
         WalletLogPrintf("CommitTransaction(): Transaction cannot be broadcast immediately, %s\n", err_string);
+        // The transaction stays in the wallet and is retried, so this is not
+        // fatal, but the caller has to be able to say so: the inputs are spent
+        // as far as this wallet is concerned and nothing has left the node.
+        if (broadcast_err) {
+            *broadcast_err = strprintf(_("Transaction was not broadcast yet and is being retried: %s"),
+                                       err_string);
+        }
         // TODO: if we expect the failure to be long term or permanent, instead delete wtx from the wallet and return failure.
     }
 }

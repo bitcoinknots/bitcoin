@@ -8,6 +8,7 @@
 #include <policy/policy.h>
 
 #include <coins.h>
+#include <common/args.h>
 #include <consensus/amount.h>
 #include <consensus/consensus.h>
 #include <consensus/validation.h>
@@ -606,4 +607,11 @@ int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& vi
     }
 
     return int32_t(std::min(mod_weight, int64_t{std::numeric_limits<int32_t>::max()}));
+}
+
+SighashRules SighashRulesForSigning(const Consensus::Params& params)
+{
+    if (gArgs.GetBoolArg("-walletoldsigs", DEFAULT_WALLET_OLD_SIGS)) return SighashRules::LEGACY;
+    return DeploymentEnabled(params, Consensus::DEPLOYMENT_BLAKE2B) ? SighashRules::UNIFIED
+                                                                    : SighashRules::LEGACY;
 }

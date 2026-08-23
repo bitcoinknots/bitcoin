@@ -666,8 +666,6 @@ public:
     OutputType TransactionChangeType(const std::optional<OutputType>& change_type, const std::vector<CRecipient>& vecSend) const;
 
     /** Fetch the inputs and sign with SIGHASH_ALL. */
-    /** Whether the hardfork rules apply to the block this wallet is building for. */
-    bool HardforkActiveForNextBlock() const;
 
     bool SignTransaction(CMutableTransaction& tx) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     /** Sign the tx given the input coins and sighash. */
@@ -707,7 +705,13 @@ public:
      * @param[in] mapValue key-values to be set on the transaction.
      * @param[in] orderForm BIP 70 / BIP 21 order form details to be set on the transaction.
      */
-    void CommitTransaction(CTransactionRef tx, mapValue_t mapValue, std::vector<std::pair<std::string, std::string>> orderForm);
+    /** Adds a transaction to the wallet and broadcasts it.
+     *
+     * The transaction is kept and retried later when it cannot be broadcast now,
+     * so `broadcast_err` is how a caller learns that happened. Without it the
+     * only trace is the debug log, and an RPC reports a send that did not leave
+     * the node as though it had. */
+    void CommitTransaction(CTransactionRef tx, mapValue_t mapValue, std::vector<std::pair<std::string, std::string>> orderForm, bilingual_str* broadcast_err = nullptr);
 
     /** Pass this transaction to node for mempool insertion and relay to peers if flag set to true */
     bool SubmitTxMemoryPoolAndRelay(CWalletTx& wtx, std::string& err_string, bool relay) const

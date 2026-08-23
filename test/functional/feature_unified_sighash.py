@@ -229,7 +229,10 @@ class UnifiedSighashTest(BitcoinTestFramework):
                             "bitcoin-tx" + self.config["environment"]["EXEEXT"])
 
     def run_bitcoin_tx(self, args):
-        out = subprocess.run([self.bitcoin_tx_path(), "-regtest"] + args,
+        # The tool decides from the chain parameters, so it has to be given the
+        # activation height the node was started with or it sees no fork at all.
+        out = subprocess.run([self.bitcoin_tx_path(), "-regtest",
+                              f"-testactivationheight=blake2b@{ACTIVATION_HEIGHT}"] + args,
                              capture_output=True, text=True)
         assert_equal(out.returncode, 0)
         return out.stdout.strip()
@@ -393,11 +396,10 @@ class UnifiedSighashTest(BitcoinTestFramework):
         node.disconnect_p2ps()
         self.log.info("  the last pre-activation block still refuses an opt-in signature")
 
-        # Naming the opt-in hash type before the fork is live cannot yield a
-        # usable signature: the message would be the legacy one under a byte
-        # claiming otherwise, which stops verifying at activation. Signing does
-        # not complete. The signer declines to build it and the verify step that
-        # follows would reject it in any case.
+        # Signing opts in wherever the fork is scheduled, without asking whether
+        # the height has been reached, so this produces a signature here. It is
+        # the mempool that refuses it, and it says why: too early rather than
+        # malformed, so a caller can tell it apart from a broken hash type.
         early_op, early_utxo = self.make_p2pk_utxo(3 * COIN)
         early_unsigned = self.build_spend([early_op], [early_utxo])
         early_unsigned.vin[0].scriptSig = b""
@@ -406,8 +408,11 @@ class UnifiedSighashTest(BitcoinTestFramework):
             [{"txid": f"{early_op.hash:064x}", "vout": early_op.n,
               "scriptPubKey": early_utxo.scriptPubKey.hex(),
               "amount": early_utxo.nValue / COIN}], "ALL|UNIFIED")
-        assert not early["complete"], early
-        self.log.info("  signing refuses ALL|UNIFIED before the fork is live")
+        assert early["complete"], early.get("errors")
+        early_check = node.testmempoolaccept([early["hex"]])[0]
+        assert not early_check["allowed"], early_check
+        assert "not active yet" in early_check["reject-reason"], early_check
+        self.log.info("  before activation an opt-in signature is refused as too early")
 
         op_x, utxo_x = self.make_p2pk_utxo(3 * COIN)
         self.mine(1)
@@ -753,7 +758,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
         assert_equal(self.submit(sh_w), None)
 
         self.log.info("The node signs for the fork itself, with no external signing")
-        # signrawtransactionwithkey must pick the rules for the next block.
+        # signrawtransactionwithkey opts in wherever the fork is scheduled.
         priv_wif = self.privkey_wif
         node_op, node_utxo = self.make_p2pk_utxo(3 * COIN)
         self.mine(1)
@@ -982,14 +987,14 @@ class UnifiedSighashTest(BitcoinTestFramework):
             self.log.info("bitcoin-tx is not built, skipping the offline signing check")
         else:
             self.log.info("bitcoin-tx can sign for the fork when told to")
-            # The offline tool has no chain access, so it has to be told with
-            # -unifiedsighash. Without it the signature is legacy: still valid, but with
-            # no replay protection, which is why the flag has to be explicit.
+            # The offline tool has no chain access, so it decides from the chain
+            # parameters it is given. Where the fork is scheduled it opts in, and
+            # -walletoldsigs is what asks for the legacy message instead.
             op_bt, utxo_bt = self.make_utxo(3 * COIN, key_to_p2wpkh_script(self.pubkey))
             self.mine(1)
             bt_tx = self.build_witness_spend([op_bt], [utxo_bt])
             signed_hex = self.run_bitcoin_tx([
-                "-unifiedsighash", bt_tx.serialize_without_witness().hex(),
+                bt_tx.serialize_without_witness().hex(),
                 f"set=privatekeys:[\"{self.privkey_wif}\"]",
                 f"set=prevtxs:[{{\"txid\":\"{op_bt.hash:064x}\",\"vout\":{op_bt.n},"
                 f"\"scriptPubKey\":\"{utxo_bt.scriptPubKey.hex()}\","
@@ -1001,7 +1006,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
             accepted = node.testmempoolaccept([signed_hex])[0]
             assert accepted["allowed"], accepted
             node.sendrawtransaction(signed_hex)
-            self.log.info("  bitcoin-tx -unifiedsighash produced an accepted opt-in signature")
+            self.log.info("  bitcoin-tx produced an accepted opt-in signature")
 
             # The hash type can also be named outright, the same spelling the RPCs
             # take and decodepsbt prints. The flag still says which message to sign,
@@ -1010,7 +1015,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
             self.mine(1)
             named_bt = self.build_witness_spend([op_n], [utxo_n])
             named_hex = self.run_bitcoin_tx([
-                "-unifiedsighash", named_bt.serialize_without_witness().hex(),
+                named_bt.serialize_without_witness().hex(),
                 f"set=privatekeys:[\"{self.privkey_wif}\"]",
                 f"set=prevtxs:[{{\"txid\":\"{op_n.hash:064x}\",\"vout\":{op_n.n},"
                 f"\"scriptPubKey\":\"{utxo_n.scriptPubKey.hex()}\","
@@ -1036,17 +1041,17 @@ class UnifiedSighashTest(BitcoinTestFramework):
                        f"\"scriptPubKey\":\"{utxo_k.scriptPubKey.hex()}\","
                        f"\"amount\":{utxo_k.nValue / COIN:.8f}}}]")
             opted_hex = self.run_bitcoin_tx([
-                "-unifiedsighash", keep_tx.serialize_without_witness().hex(),
+                keep_tx.serialize_without_witness().hex(),
                 f"set=privatekeys:[\"{self.privkey_wif}\"]", prevtxs, "sign=ALL",
             ])
-            again_hex = self.run_bitcoin_tx([opted_hex, prevtxs,
-                                             "set=privatekeys:[]", "sign=ALL"])
+            again_hex = self.run_bitcoin_tx(["-walletoldsigs", opted_hex, prevtxs,
+                                                              "set=privatekeys:[]", "sign=ALL"])
             again = tx_from_hex(again_hex)
             assert again.wit.vtxinwit and again.wit.vtxinwit[0].scriptWitness.stack, \
-                "a pass without -unifiedsighash destroyed the opt-in signature"
+                "a pass with -walletoldsigs destroyed the opt-in signature"
             assert_equal(again.wit.vtxinwit[0].scriptWitness.stack[0][-1],
                          SIGHASH_ALL | SIGHASH_UNIFIED)
-            self.log.info("  and a later pass without the flag leaves it alone")
+            self.log.info("  and a later pass under the legacy rules leaves it alone")
 
         self.log.info("combinerawtransaction merges opt-in signatures")
         # Each party signs the same transaction separately and the halves are
@@ -1487,6 +1492,29 @@ class UnifiedSighashTest(BitcoinTestFramework):
         signed = node.signrawtransactionwithkey(unsigned, [self.privkey_wif], [prevtx])
         assert signed["complete"], signed
         self.log.info("  refused without the amount, signs with it")
+
+        self.log.info("-walletoldsigs signs the legacy message instead")
+        # The escape hatch. Signing opts in wherever the fork is scheduled, so a
+        # signer that has to interoperate with software which does not know the
+        # fork, and a test running before the activation height, need a way to
+        # ask for the old message. The bit is absent and the node takes it.
+        self.restart_node(0, extra_args=self.extra_args[0] + ["-walletoldsigs"])
+        op_old, utxo_old = self.make_p2pk_utxo(3 * COIN)
+        self.mine(1)
+        old_unsigned = self.build_spend([op_old], [utxo_old])
+        old_unsigned.vin[0].scriptSig = b""
+        old_signed = node.signrawtransactionwithkey(
+            old_unsigned.serialize().hex(), [self.privkey_wif],
+            [{"txid": f"{op_old.hash:064x}", "vout": op_old.n,
+              "scriptPubKey": utxo_old.scriptPubKey.hex(),
+              "amount": utxo_old.nValue / COIN}])
+        assert old_signed["complete"], old_signed.get("errors")
+        old_sig = list(CScript(tx_from_hex(old_signed["hex"]).vin[0].scriptSig))[0]
+        assert_equal(old_sig[-1], SIGHASH_ALL)
+        assert not old_sig[-1] & SIGHASH_UNIFIED
+        accepted_old = node.testmempoolaccept([old_signed["hex"]])[0]
+        assert accepted_old["allowed"], accepted_old
+        self.log.info("  -walletoldsigs produced a legacy signature the node accepts")
 
 
 if __name__ == "__main__":
