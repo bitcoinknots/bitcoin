@@ -393,6 +393,22 @@ class UnifiedSighashTest(BitcoinTestFramework):
         node.disconnect_p2ps()
         self.log.info("  the last pre-activation block still refuses an opt-in signature")
 
+        # Naming the opt-in hash type before the fork is live cannot yield a
+        # usable signature: the message would be the legacy one under a byte
+        # claiming otherwise, which stops verifying at activation. Signing does
+        # not complete. The signer declines to build it and the verify step that
+        # follows would reject it in any case.
+        early_op, early_utxo = self.make_p2pk_utxo(3 * COIN)
+        early_unsigned = self.build_spend([early_op], [early_utxo])
+        early_unsigned.vin[0].scriptSig = b""
+        early = node.signrawtransactionwithkey(
+            early_unsigned.serialize().hex(), [self.privkey_wif],
+            [{"txid": f"{early_op.hash:064x}", "vout": early_op.n,
+              "scriptPubKey": early_utxo.scriptPubKey.hex(),
+              "amount": early_utxo.nValue / COIN}], "ALL|UNIFIED")
+        assert not early["complete"], early
+        self.log.info("  signing refuses ALL|UNIFIED before the fork is live")
+
         op_x, utxo_x = self.make_p2pk_utxo(3 * COIN)
         self.mine(1)
         assert_equal(node.getblockcount(), ACTIVATION_HEIGHT - 1)
@@ -757,6 +773,62 @@ class UnifiedSighashTest(BitcoinTestFramework):
         node.sendrawtransaction(signed["hex"])
         self.log.info("  signrawtransactionwithkey produced a valid fork signature")
 
+        self.log.info("The name printed for an opted-in hash type is one we accept back")
+        # decodepsbt renders this hash type as ALL|UNIFIED, so the RPC that signs
+        # has to take that spelling from a caller who read it there.
+        named_op, named_utxo = self.make_p2pk_utxo(3 * COIN)
+        self.mine(1)
+        unsigned_named = self.build_spend([named_op], [named_utxo])
+        unsigned_named.vin[0].scriptSig = b""
+        prevtxs_named = [{
+            "txid": f"{named_op.hash:064x}",
+            "vout": named_op.n,
+            "scriptPubKey": named_utxo.scriptPubKey.hex(),
+            "amount": named_utxo.nValue / COIN,
+        }]
+        named = node.signrawtransactionwithkey(unsigned_named.serialize().hex(), [priv_wif],
+                                               prevtxs_named, "ALL|UNIFIED")
+        assert named["complete"], named.get("errors")
+        # The byte that ends the signature is the hash type that was asked for.
+        # It is the first push of the scriptSig, the pubkey being the second.
+        named_sig = list(CScript(tx_from_hex(named["hex"]).vin[0].scriptSig))[0]
+        assert_equal(named_sig[-1], SIGHASH_ALL | SIGHASH_UNIFIED)
+        accepted_named = node.testmempoolaccept([named["hex"]])[0]
+        assert accepted_named["allowed"], accepted_named
+        node.sendrawtransaction(named["hex"])
+        self.log.info("  ALL|UNIFIED was accepted by name and signed correctly")
+
+        # ...and decoderawtransaction renders it. The decode is gated on the hash
+        # type being defined, which the opt-in byte is only where the fork's flag
+        # is set, so without setting it there the name is unreachable.
+        decoded = node.decoderawtransaction(named["hex"])
+        named_asm = decoded["vin"][0]["scriptSig"]["asm"]
+        assert "[ALL|UNIFIED]" in named_asm, named_asm
+        self.log.info("  and decoderawtransaction prints it back")
+
+        self.log.info("SINGLE with no matching output is skipped, opted in or not")
+        # A SIGHASH_SINGLE signature for an input with no output at its index
+        # commits to no outputs at all, so anyone can redirect it. The signer
+        # skips such an input. Setting the opt-in bit must not change that.
+        for named_type in ("SINGLE", "SINGLE|UNIFIED"):
+            op_1, utxo_1 = self.make_p2pk_utxo(3 * COIN)
+            op_2, utxo_2 = self.make_p2pk_utxo(3 * COIN)
+            self.mine(1)
+            two_in = self.build_spend([op_1, op_2], [utxo_1, utxo_2], n_outputs=1)
+            for txin in two_in.vin:
+                txin.scriptSig = b""
+            prevtxs_two = [{
+                "txid": f"{op.hash:064x}", "vout": op.n,
+                "scriptPubKey": utxo.scriptPubKey.hex(),
+                "amount": utxo.nValue / COIN,
+            } for op, utxo in ((op_1, utxo_1), (op_2, utxo_2))]
+            res = node.signrawtransactionwithkey(two_in.serialize().hex(), [priv_wif],
+                                                 prevtxs_two, named_type)
+            # Input 1 has no output at index 1, so it must be left unsigned.
+            assert not res["complete"], (named_type, res)
+            assert_equal(len(tx_from_hex(res["hex"]).vin[1].scriptSig), 0)
+            self.log.info(f"  {named_type} left the unmatched input unsigned")
+
         self.log.info("A partly signed multisig can be completed by a second signer")
         # combinerawtransaction has to recognise the opt-in signature already
         # present, or the second signer sees an empty input and the transaction
@@ -930,6 +1002,27 @@ class UnifiedSighashTest(BitcoinTestFramework):
             assert accepted["allowed"], accepted
             node.sendrawtransaction(signed_hex)
             self.log.info("  bitcoin-tx -unifiedsighash produced an accepted opt-in signature")
+
+            # The hash type can also be named outright, the same spelling the RPCs
+            # take and decodepsbt prints. The flag still says which message to sign,
+            # so both are given.
+            op_n, utxo_n = self.make_utxo(3 * COIN, key_to_p2wpkh_script(self.pubkey))
+            self.mine(1)
+            named_bt = self.build_witness_spend([op_n], [utxo_n])
+            named_hex = self.run_bitcoin_tx([
+                "-unifiedsighash", named_bt.serialize_without_witness().hex(),
+                f"set=privatekeys:[\"{self.privkey_wif}\"]",
+                f"set=prevtxs:[{{\"txid\":\"{op_n.hash:064x}\",\"vout\":{op_n.n},"
+                f"\"scriptPubKey\":\"{utxo_n.scriptPubKey.hex()}\","
+                f"\"amount\":{utxo_n.nValue / COIN:.8f}}}]",
+                "sign=ALL|UNIFIED",
+            ])
+            named_stack = tx_from_hex(named_hex).wit.vtxinwit[0].scriptWitness.stack
+            assert_equal(named_stack[0][-1], SIGHASH_ALL | SIGHASH_UNIFIED)
+            named_ok = node.testmempoolaccept([named_hex])[0]
+            assert named_ok["allowed"], named_ok
+            node.sendrawtransaction(named_hex)
+            self.log.info("  bitcoin-tx took sign=ALL|UNIFIED by name")
 
             # The same tool run again without the flag must not throw the
             # signature away. It reads an input under the rules it is told to

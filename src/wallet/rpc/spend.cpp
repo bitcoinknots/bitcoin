@@ -1012,7 +1012,8 @@ RPCHelpMan signrawtransactionwithwallet()
             "       \"SINGLE\"\n"
             "       \"ALL|ANYONECANPAY\"\n"
             "       \"NONE|ANYONECANPAY\"\n"
-            "       \"SINGLE|ANYONECANPAY\""},
+            "       \"SINGLE|ANYONECANPAY\"\n"
+            "       Append \"|UNIFIED\" for the unified signature hash, once the hardfork is active"},
                 },
                 RPCResult{
                     RPCResult::Type::OBJ, "", "",
@@ -1725,7 +1726,8 @@ RPCHelpMan walletprocesspsbt()
                     "       \"SINGLE\"\n"
                     "       \"ALL|ANYONECANPAY\"\n"
                     "       \"NONE|ANYONECANPAY\"\n"
-                    "       \"SINGLE|ANYONECANPAY\"",
+                    "       \"SINGLE|ANYONECANPAY\"\n"
+                    "       Append \"|UNIFIED\" for the unified signature hash, once the hardfork is active",
                                 RPCArgOptions{.also_positional = true}},
                             {"bip32derivs", RPCArg::Type::BOOL, RPCArg::Default{true}, "Include BIP 32 derivation paths for public keys if we know them", RPCArgOptions{.also_positional = true}},
                             {"finalize", RPCArg::Type::BOOL, RPCArg::Default{true}, "Also finalize inputs if possible", RPCArgOptions{.also_positional = true}},

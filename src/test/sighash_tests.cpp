@@ -5,6 +5,7 @@
 #include <common/system.h>
 #include <consensus/tx_check.h>
 #include <consensus/validation.h>
+#include <core_io.h>
 #include <hash.h>
 #include <key.h>
 #include <script/interpreter.h>
@@ -457,6 +458,24 @@ BOOST_AUTO_TEST_CASE(unified_sighash_needs_spent_outputs)
     bare.Init(tx, {});
     uint256 hash;
     BOOST_CHECK(!SignatureHashUnified(hash, script0, tx, 0, SIGHASH_ALL | SIGHASH_UNIFIED, SigVersion::BASE, bare));
+}
+
+BOOST_AUTO_TEST_CASE(unified_sighash_hash_type_names_round_trip)
+{
+    // Whatever a hash type renders as has to be something the signing RPCs
+    // accept, or a value read out of decodepsbt cannot be handed back to them.
+    for (const int base : {int{SIGHASH_ALL}, int{SIGHASH_NONE}, int{SIGHASH_SINGLE}}) {
+        for (const int acp : {0, int{SIGHASH_ANYONECANPAY}}) {
+            for (const int uni : {0, int{SIGHASH_UNIFIED}}) {
+                const int hash_type{base | acp | uni};
+                const std::string name{SighashToStr(static_cast<unsigned char>(hash_type))};
+                BOOST_CHECK_MESSAGE(!name.empty(), "no name for hash type " << hash_type);
+                const auto parsed{SighashFromStr(name)};
+                BOOST_CHECK_MESSAGE(parsed.has_value(), "\"" << name << "\" does not parse back");
+                if (parsed) BOOST_CHECK_EQUAL(*parsed, hash_type);
+            }
+        }
+    }
 }
 
 BOOST_AUTO_TEST_CASE(unified_sighash_refuses_to_sign_a_legacy_message_as_opted_in)

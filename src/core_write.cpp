@@ -135,7 +135,11 @@ std::string ScriptToAsmStr(const CScript& script, const bool fAttemptSighashDeco
                     // this won't decode correctly formatted public keys in Pubkey or Multisig scripts due to
                     // the restrictions on the pubkey formats (see IsCompressedOrUncompressedPubKey) being incongruous with the
                     // checks in CheckSignatureEncoding.
-                    if (CheckSignatureEncoding(vch, SCRIPT_VERIFY_STRICTENC, nullptr)) {
+                    // The opt-in bit is only a defined hash type where the fork's
+                    // flag is set, and this renders rather than validates, so it is
+                    // set unconditionally: without it an opted-in signature never
+                    // decodes and the names for those bytes are unreachable.
+                    if (CheckSignatureEncoding(vch, SCRIPT_VERIFY_STRICTENC | SCRIPT_VERIFY_UNIFIED_SIGHASH, nullptr)) {
                         const unsigned char chSigHashType = vch.back();
                         const auto it = mapSigHashTypes.find(chSigHashType);
                         if (it != mapSigHashTypes.end()) {
