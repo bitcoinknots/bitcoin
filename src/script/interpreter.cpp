@@ -215,7 +215,14 @@ bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned i
         // serror is set
         return false;
     } else if ((flags & SCRIPT_VERIFY_STRICTENC) != 0 && !IsDefinedHashtypeSignature(vchSig, flags)) {
-        return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
+        // A byte that would be defined once the fork is active says the spender
+        // opted in too early, not that the hash type is malformed. Kept apart so
+        // a caller can tell a signature that is merely early from one that is
+        // wrong, and retry the first rather than discard it.
+        const bool early{!vchSig.empty() && (vchSig.back() & SIGHASH_UNIFIED) &&
+                         SighashRulesFromFlags(flags) != SighashRules::UNIFIED &&
+                         IsDefinedHashtypeSignature(vchSig, flags | SCRIPT_VERIFY_UNIFIED_SIGHASH)};
+        return set_error(serror, early ? SCRIPT_ERR_SIG_HASHTYPE_TOO_EARLY : SCRIPT_ERR_SIG_HASHTYPE);
     }
     return true;
 }
@@ -1892,6 +1899,9 @@ bool GenericTransactionSignatureChecker<T>::CheckSchnorrSignature(Span<const uns
             return set_error(serror, SCRIPT_ERR_SCHNORR_SIG_HASHTYPE);
         }
     } else if (!SignatureHashSchnorr(sighash, execdata, *txTo, nIn, hashtype, sigversion, *this->txdata, m_mdb)) {
+        // Not reported as early, unlike the legacy path above. BIP341 refuses a
+        // hash type it does not define whatever this fork does, so the byte was
+        // already invalid here before the fork existed and stays so after it.
         return set_error(serror, SCRIPT_ERR_SCHNORR_SIG_HASHTYPE);
     }
     if (!VerifySchnorrSignature(sig, pubkey, sighash)) return set_error(serror, SCRIPT_ERR_SCHNORR_SIG);
