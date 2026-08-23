@@ -534,7 +534,7 @@ static void MutateTxDelOutput(CMutableTransaction& tx, const std::string& strOut
     tx.vout.erase(tx.vout.begin() + outIdx);
 }
 
-static const unsigned int N_SIGHASH_OPTS = 7;
+static const unsigned int N_SIGHASH_OPTS = 13;
 static const struct {
     const char *flagStr;
     int flags;
@@ -546,6 +546,16 @@ static const struct {
     {"ALL|ANYONECANPAY", SIGHASH_ALL|SIGHASH_ANYONECANPAY},
     {"NONE|ANYONECANPAY", SIGHASH_NONE|SIGHASH_ANYONECANPAY},
     {"SINGLE|ANYONECANPAY", SIGHASH_SINGLE|SIGHASH_ANYONECANPAY},
+    // The opt-in spellings, matching what SighashToStr prints and what the
+    // signing RPCs take. Naming one still needs -unifiedsighash: the name asks
+    // for the byte, the flag says which message to sign, and signing refuses
+    // rather than put the byte on a legacy message.
+    {"ALL|UNIFIED", SIGHASH_ALL|SIGHASH_UNIFIED},
+    {"ALL|ANYONECANPAY|UNIFIED", SIGHASH_ALL|SIGHASH_ANYONECANPAY|SIGHASH_UNIFIED},
+    {"NONE|UNIFIED", SIGHASH_NONE|SIGHASH_UNIFIED},
+    {"NONE|ANYONECANPAY|UNIFIED", SIGHASH_NONE|SIGHASH_ANYONECANPAY|SIGHASH_UNIFIED},
+    {"SINGLE|UNIFIED", SIGHASH_SINGLE|SIGHASH_UNIFIED},
+    {"SINGLE|ANYONECANPAY|UNIFIED", SIGHASH_SINGLE|SIGHASH_ANYONECANPAY|SIGHASH_UNIFIED},
 };
 
 static bool findSighashFlags(int& flags, const std::string& flagStr)

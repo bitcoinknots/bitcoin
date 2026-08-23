@@ -438,6 +438,13 @@ Everything with chain access decides on its own, from the rules of the block
 being built rather than the tip's: the wallet, `signrawtransactionwithkey`, the
 PSBT RPCs, `combinerawtransaction`, and the GUI.
 
+Wherever a hash type is named, the opted-in ones are spelled with `|UNIFIED`
+appended, as in `ALL|UNIFIED` or `SINGLE|ANYONECANPAY|UNIFIED`. The RPCs that
+take a hash type accept those spellings, `bitcoin-tx` takes them for `sign=`, and
+`decoderawtransaction` and `decodepsbt` print them, so a value read from one can
+be given to another. Naming one does not by itself choose the rules: signing
+refuses rather than put the byte on a legacy message.
+
 ## Implementation notes
 
 Verification is selected entirely by the script flags plus the hash type byte.
