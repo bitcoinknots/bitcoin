@@ -459,6 +459,40 @@ BOOST_AUTO_TEST_CASE(unified_sighash_needs_spent_outputs)
     BOOST_CHECK(!SignatureHashUnified(hash, script0, tx, 0, SIGHASH_ALL | SIGHASH_UNIFIED, SigVersion::BASE, bare));
 }
 
+BOOST_AUTO_TEST_CASE(unified_sighash_refuses_to_sign_a_legacy_message_as_opted_in)
+{
+    // The hash type byte is appended to the signature whatever it holds. Asking
+    // for the opt-in bit while the rules are legacy would sign the legacy
+    // message and label it as opted in, which verifies today and stops verifying
+    // at activation. Refuse rather than produce it.
+    FillableSigningProvider keystore;
+    const CKey key{GenerateRandomKey()};
+    BOOST_CHECK(keystore.AddKey(key));
+    const CScript spk{GetScriptForRawPubKey(key.GetPubKey())};
+
+    CMutableTransaction tx;
+    std::vector<CTxOut> spent;
+    BuildUnifiedTestTx(tx, spent, spk, spk);
+    const auto txdata{MakeUnifiedTxdata(tx, spent)};
+
+    // Ask the creator directly. ProduceSignature would refuse this for an
+    // unrelated reason, since a 0x21 signature fails the defined-hashtype check
+    // it verifies against, so it cannot tell whether the signer refused.
+    const CKeyID keyid{key.GetPubKey().GetID()};
+    std::vector<unsigned char> sig;
+    MutableTransactionSignatureCreator legacy_rules{tx, 0, spent[0].nValue, &txdata,
+                                                    SIGHASH_ALL | SIGHASH_UNIFIED};
+    BOOST_CHECK(!legacy_rules.CreateSig(keystore, sig, keyid, spk, SigVersion::BASE));
+    BOOST_CHECK(sig.empty());
+
+    // The same request under the fork's rules is what the bit is for.
+    MutableTransactionSignatureCreator unified_rules{tx, 0, spent[0].nValue, &txdata,
+                                                     SIGHASH_ALL | SIGHASH_UNIFIED};
+    unified_rules.SetSighashRules(SighashRules::UNIFIED);
+    BOOST_CHECK(unified_rules.CreateSig(keystore, sig, keyid, spk, SigVersion::BASE));
+    BOOST_CHECK_EQUAL(sig.back(), SIGHASH_ALL | SIGHASH_UNIFIED);
+}
+
 BOOST_AUTO_TEST_CASE(unified_sighash_sign_and_verify_roundtrip)
 {
     FillableSigningProvider keystore;

@@ -54,6 +54,13 @@ bool MutableTransactionSignatureCreator::CreateSig(const SigningProvider& provid
     // BASE/WITNESS_V0 signatures don't support explicit SIGHASH_DEFAULT, use SIGHASH_ALL instead.
     int hashtype = nHashType == SIGHASH_DEFAULT ? SIGHASH_ALL : nHashType;
 
+    // The hash type byte is appended to the signature whatever it holds, so a
+    // caller asking for this bit while the rules are legacy would get the legacy
+    // message signed under a byte claiming otherwise. That signature verifies
+    // today and stops verifying at activation, which is the one thing this fork
+    // takes away. Refuse rather than manufacture it.
+    if ((hashtype & SIGHASH_UNIFIED) && m_sighash_rules != SighashRules::UNIFIED) return false;
+
     uint256 hash;
     if (m_sighash_rules == SighashRules::UNIFIED) {
         if (!m_txdata) return false;
