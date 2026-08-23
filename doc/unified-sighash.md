@@ -81,12 +81,15 @@ One trigger covers every rule the fork carries, so there is no window where one
 is live and another is not. That deployment belongs to the proof of work change
 and is specified there, not here.
 
-Consensus asks whether the deployment is active *at* a block. Everything that
-has to decide in advance, the mempool, the block builder and the wallet, asks
-whether it is active *after* the current tip, which is the same question about
-the block being built. Both are the standard buried-deployment comparisons, and
-an implementation should call those helpers rather than open-code the
-arithmetic: a copy that drifts is a consensus split.
+Consensus asks whether the deployment is active *at* a block. The mempool and
+the block builder ask whether it is active *after* the current tip, which is the
+same question about the block being built. Both are the standard
+buried-deployment comparisons, and an implementation should call those helpers
+rather than open-code the arithmetic: a copy that drifts is a consensus split.
+
+Signing asks neither. It opts in wherever the deployment is scheduled, for the
+reason given under *Tooling*: a node whose blocks lag would answer the tip's
+question with a stale height and sign away its own replay protection quietly.
 
 Crossing the activation height invalidates something in either direction, so
 neither can be ignored. A byte that opts in reads as its low bits under the
@@ -423,20 +426,33 @@ the fork, which cannot be given confidently and cannot be changed once deployed.
 
 ## Tooling
 
-`bitcoin-tx` has no chain access, so it cannot work out whether the hardfork is
-active. It takes `-unifiedsighash` to sign this way, and the same flag is needed to
-recognise an existing signature of this kind when combining. Without it the tool
-produces legacy signatures, which stay valid but carry no replay protection.
+Signing opts in wherever the fork is scheduled, and does not ask whether the
+height has been reached. A node whose blocks are behind cannot tell, and reading
+its own tip is how a spender ends up holding a signature with no replay
+protection without being told. Signing early instead costs a transaction the
+network will not take yet, which is refused as too early rather than as
+malformed, so the caller can tell the two apart.
 
-`libbitcoinconsensus` is in the same position and takes
+`-walletoldsigs` signs the legacy message instead. Tests need it, since they run
+below the activation height, and a signer that has to interoperate with software
+which does not know the fork needs it too. It is the only way to produce a
+legacy signature once the fork is scheduled, so it is also the only way to give
+up replay protection, which is why it is not the default.
+
+On a chain where the fork is not scheduled at all there is no opt-in to make and
+signing is legacy throughout.
+
+Everything that signs uses that one rule: the wallet,
+`signrawtransactionwithkey`, the PSBT RPCs, `combinerawtransaction`, the GUI,
+and `bitcoin-tx`. The mempool and the block builder are separate and unchanged,
+since they reason about the block being built and so must read the chain.
+
+`libbitcoinconsensus` verifies rather than signs and has no chain of its own, so
+its caller says which rules apply with
 `bitcoinconsensus_SCRIPT_FLAGS_VERIFY_UNIFIED_SIGHASH`. It also needs the spent
 outputs whenever that flag is set, for the reason taproot already needs them
 there: the message commits to every spent amount and scriptPubKey, on inputs
 carrying no witness as well.
-
-Everything with chain access decides on its own, from the rules of the block
-being built rather than the tip's: the wallet, `signrawtransactionwithkey`, the
-PSBT RPCs, `combinerawtransaction`, and the GUI.
 
 Wherever a hash type is named, the opted-in ones are spelled with `|UNIFIED`
 appended, as in `ALL|UNIFIED` or `SINGLE|ANYONECANPAY|UNIFIED`. The RPCs that
@@ -501,10 +517,9 @@ the framework solves for itself therefore go through the two helpers at the top
 of `feature_unified_sighash.py` rather than calling `create_block` directly.
 Asking the node for a block template also requires naming the `blake2b` rule.
 
-The wallet still asks whether the fork applies to the next block before it
-signs, because the deployment is scheduled on no network yet. Once it has a
-height everywhere the wallet runs, that question and the plumbing that carries
-its answer from the GUI can go.
+Signing opts in wherever the deployment is scheduled, so on a network that has
+no height for it the wallet signs legacy throughout and nothing here applies
+until one is set.
 
 ## Interaction with PSBT
 

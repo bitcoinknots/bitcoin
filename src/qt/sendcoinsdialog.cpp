@@ -495,8 +495,7 @@ bool SendCoinsDialog::signWithExternalSigner(PartiallySignedTransaction& psbtx, 
     }
     // fillPSBT does not always properly finalize
     complete = FinalizeAndExtractPSBT(psbtx, mtx,
-                                      model->wallet().hardforkActiveForNextBlock()
-                                          ? SighashRules::UNIFIED : SighashRules::LEGACY);
+                                      SighashRulesForSigning(Params().GetConsensus()));
     return true;
 }
 

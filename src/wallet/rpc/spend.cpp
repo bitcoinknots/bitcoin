@@ -118,19 +118,32 @@ static UniValue FinishTransaction(const std::shared_ptr<CWallet> pwallet, const 
     }
 
     CMutableTransaction mtx;
-    // Finalizing decides whether the signatures present are enough, so it has
-    // to ask under the rules the next block will apply. Assuming the fork is
-    // active reports a transaction complete before activation whose opted-in
-    // signatures the network still rejects.
+    // Read under the same rules the signatures were made with, or a complete
+    // transaction is reported incomplete because its opted-in signatures are not
+    // recognised as signatures at all.
     complete = FinalizeAndExtractPSBT(psbtx, mtx,
-                                      pwallet->HardforkActiveForNextBlock()
-                                          ? SighashRules::UNIFIED : SighashRules::LEGACY);
+                                      SighashRulesForSigning(Params().GetConsensus()));
+
+    const bool psbt_opt_in{options.exists("psbt") && options["psbt"].get_bool()};
+    bool add_to_wallet{options.exists("add_to_wallet") ? options["add_to_wallet"].get_bool() : true};
+
+    // Committed before the warnings are written out, because a transaction the
+    // node would not take is reported here rather than only in the debug log.
+    std::string hex;
+    CTransactionRef tx;
+    if (complete) {
+        hex = EncodeHexTx(CTransaction(mtx));
+        tx = MakeTransactionRef(std::move(mtx));
+        if (add_to_wallet && !psbt_opt_in) {
+            bilingual_str broadcast_err;
+            pwallet->CommitTransaction(tx, {}, /*orderForm=*/{}, &broadcast_err);
+            if (!broadcast_err.empty()) warnings.emplace_back(broadcast_err);
+        }
+    }
 
     UniValue result(UniValue::VOBJ);
     PushWarnings(warnings, result);
 
-    const bool psbt_opt_in{options.exists("psbt") && options["psbt"].get_bool()};
-    bool add_to_wallet{options.exists("add_to_wallet") ? options["add_to_wallet"].get_bool() : true};
     if (psbt_opt_in || !complete || !add_to_wallet) {
         // Serialize the PSBT
         DataStream ssTx{};
@@ -139,12 +152,8 @@ static UniValue FinishTransaction(const std::shared_ptr<CWallet> pwallet, const 
     }
 
     if (complete) {
-        std::string hex{EncodeHexTx(CTransaction(mtx))};
-        CTransactionRef tx(MakeTransactionRef(std::move(mtx)));
         result.pushKV("txid", tx->GetHash().GetHex());
-        if (add_to_wallet && !psbt_opt_in) {
-            pwallet->CommitTransaction(tx, {}, /*orderForm=*/{});
-        } else {
+        if (!(add_to_wallet && !psbt_opt_in)) {
             result.pushKV("hex", hex);
         }
     }
@@ -1828,8 +1837,7 @@ RPCHelpMan walletprocesspsbt()
         CMutableTransaction mtx;
         // Returns true if complete, which we already think it is.
         CHECK_NONFATAL(FinalizeAndExtractPSBT(psbtx, mtx,
-                                              wallet.HardforkActiveForNextBlock()
-                                                  ? SighashRules::UNIFIED : SighashRules::LEGACY));
+                                              SighashRulesForSigning(Params().GetConsensus())));
         DataStream ssTx_final;
         ssTx_final << TX_WITH_WITNESS(mtx);
         result.pushKV("hex", HexStr(ssTx_final));

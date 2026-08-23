@@ -280,9 +280,6 @@ public:
     // Return whether the wallet contains a Taproot scriptPubKeyMan
     virtual bool taprootEnabled() = 0;
 
-    //! Whether the hardfork rules apply to the next block, and so which
-    //! signature hash this wallet's transactions are made and verified under.
-    virtual bool hardforkActiveForNextBlock() = 0;
 
     // Return whether wallet uses an external signer.
     virtual bool hasExternalSigner() = 0;

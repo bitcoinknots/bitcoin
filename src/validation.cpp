@@ -343,12 +343,6 @@ static bool HardforkActiveAfter(const CBlockIndex* pindexPrev, const ChainstateM
     return DeploymentActiveAfter(pindexPrev, chainman, Consensus::DEPLOYMENT_BLAKE2B);
 }
 
-bool HardforkActiveForNextBlock(const ChainstateManager& chainman)
-{
-    AssertLockHeld(cs_main);
-    return HardforkActiveAfter(chainman.ActiveChain().Tip(), chainman);
-}
-
 /** The hardfork script flags for the block that would be built on top of `tip`. */
 static unsigned int UnifiedSighashFlagForNextBlock(const CBlockIndex& tip, const ChainstateManager& chainman)
 {

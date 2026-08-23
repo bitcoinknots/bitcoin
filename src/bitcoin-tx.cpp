@@ -51,11 +51,8 @@ static void SetupBitcoinTxArgs(ArgsManager &argsman)
     argsman.AddArg("-create", "Create new, empty TX.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-json", "Select JSON output", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-txid", "Output only the hex-encoded transaction id of the resultant transaction.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
-    argsman.AddArg("-unifiedsighash", "Sign with the hardfork signature hash, which is opt-in per signature and gives replay protection. "
-                                 "This tool has no chain access and cannot tell whether the hardfork is active, so it has to be told. "
-                                 "Existing signatures of that kind are also only recognised when this is set (default: false)",
-                   ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     SetupChainParamsBaseOptions(argsman);
+    argsman.AddArg("-walletoldsigs", strprintf("Sign with the legacy signature hash rather than the hardfork one, which gives up replay protection (default: %u)", DEFAULT_WALLET_OLD_SIGS), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
 
     argsman.AddArg("delin=N", "Delete input N from TX", ArgsManager::ALLOW_ANY, OptionsCategory::COMMANDS);
     argsman.AddArg("delout=N", "Delete output N from TX", ArgsManager::ALLOW_ANY, OptionsCategory::COMMANDS);
@@ -547,9 +544,8 @@ static const struct {
     {"NONE|ANYONECANPAY", SIGHASH_NONE|SIGHASH_ANYONECANPAY},
     {"SINGLE|ANYONECANPAY", SIGHASH_SINGLE|SIGHASH_ANYONECANPAY},
     // The opt-in spellings, matching what SighashToStr prints and what the
-    // signing RPCs take. Naming one still needs -unifiedsighash: the name asks
-    // for the byte, the flag says which message to sign, and signing refuses
-    // rather than put the byte on a legacy message.
+    // signing RPCs take. The name asks for the byte; which message is signed is
+    // decided above, and signing refuses to put the byte on a legacy message.
     {"ALL|UNIFIED", SIGHASH_ALL|SIGHASH_UNIFIED},
     {"ALL|ANYONECANPAY|UNIFIED", SIGHASH_ALL|SIGHASH_ANYONECANPAY|SIGHASH_UNIFIED},
     {"NONE|UNIFIED", SIGHASH_NONE|SIGHASH_UNIFIED},
@@ -689,9 +685,9 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
 
     bool fHashSingle = ((nHashType & ~SIGHASH_ANYONECANPAY) == SIGHASH_SINGLE);
 
-    // This tool has no chain access, so it cannot work out whether the hardfork
-    // is active and must be told with -unifiedsighash.
-    const SighashRules sighash_rules{gArgs.GetBoolArg("-unifiedsighash", false) ? SighashRules::UNIFIED : SighashRules::LEGACY};
+    // The same rule the node signs by, so the two cannot disagree: opt in
+    // wherever the fork is scheduled, and take -walletoldsigs to say otherwise.
+    const SighashRules sighash_rules{SighashRulesForSigning(Params().GetConsensus())};
     // Built whenever every previous output is known, not only when signing for
     // the fork: reading an input that already carries an opt-in signature needs
     // the same commitments, and that happens under either rule set.
@@ -707,7 +703,7 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
         }
         have_spent_outputs = spent_outputs.size() == mergedTx.vin.size();
         if (sighash_rules == SighashRules::UNIFIED && !have_spent_outputs) {
-            throw std::runtime_error("-unifiedsighash needs the previous output of every input; supply them all");
+            throw std::runtime_error("the hardfork signature hash needs the previous output of every input; supply them all, or pass -walletoldsigs");
         }
         if (have_spent_outputs) {
             txdata.Init(CTransaction(mergedTx), std::move(spent_outputs), /*force=*/true);
@@ -730,7 +726,7 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
         // made under, and the spent outputs it commits to. What is not
         // recognised here is overwritten below, so read the input under both
         // rule sets and keep whichever finds something: a co-signer who did not
-        // pass -unifiedsighash would otherwise destroy the other party's work.
+        // pass -walletoldsigs would otherwise destroy the other party's work.
         SignatureData sigdata = DataFromTransaction(mergedTx, i, coin.out, sighash_rules, sighash_rules == SighashRules::UNIFIED && have_spent_outputs ? &txdata : nullptr);
         if (sighash_rules != SighashRules::UNIFIED && have_spent_outputs) {
             // Merged rather than replaced: one input can hold a legacy partial

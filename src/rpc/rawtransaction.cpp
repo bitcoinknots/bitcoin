@@ -18,6 +18,7 @@
 #include <node/transaction.h>
 #include <node/types.h>
 #include <policy/packages.h>
+#include <chainparams.h>
 #include <policy/policy.h>
 #include <policy/rbf.h>
 #include <primitives/transaction.h>
@@ -179,8 +180,8 @@ PartiallySignedTransaction ProcessPSBT(const std::string& psbt_string, const std
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, strprintf("TX decode failed %s", error));
     }
 
-    // The transaction is being built for the next block, so use its rules.
-    const SighashRules sighash_rules{WITH_LOCK(cs_main, return HardforkActiveForNextBlock(EnsureAnyChainman(context)))};
+    // Signing opts in wherever the fork is scheduled, without asking the chain.
+    const SighashRules sighash_rules{SighashRulesForSigning(Params().GetConsensus())};
 
     if (g_txindex) g_txindex->BlockUntilSyncedToCurrentChain();
     const NodeContext& node = EnsureAnyNodeContext(context);
@@ -713,7 +714,7 @@ static RPCHelpMan combinerawtransaction()
     // Recognising an opt-in signature needs the rules it was made under and the
     // spent outputs it commits to, or signatures already present in the inputs
     // being merged are invisible and the result silently loses them.
-    const SighashRules sighash_rules{WITH_LOCK(cs_main, return HardforkActiveForNextBlock(EnsureChainman(EnsureAnyNodeContext(request.context))))};
+    const SighashRules sighash_rules{SighashRulesForSigning(Params().GetConsensus())};
     PrecomputedTransactionData txdata;
     {
         std::vector<CTxOut> spent_outputs;
@@ -870,8 +871,8 @@ static RPCHelpMan signrawtransactionwithkey()
     ParsePrevouts(request.params[2], &keystore, coins);
 
     UniValue result(UniValue::VOBJ);
-    // The transaction is meant for the next block, so sign under its rules.
-    const SighashRules sighash_rules{WITH_LOCK(cs_main, return HardforkActiveForNextBlock(EnsureChainman(node)))};
+    // Signing opts in wherever the fork is scheduled, without asking the chain.
+    const SighashRules sighash_rules{SighashRulesForSigning(Params().GetConsensus())};
     SignTransaction(mtx, &keystore, coins, request.params[3], result, sighash_rules);
     return result;
 },
@@ -1603,12 +1604,10 @@ static RPCHelpMan finalizepsbt()
     bool extract = request.params[1].isNull() || (!request.params[1].isNull() && request.params[1].get_bool());
 
     CMutableTransaction mtx;
-    // Finalizing decides whether the signatures present are enough, so it has
-    // to ask under the rules the next block will apply. Assuming the fork is
-    // active reports a transaction complete before activation whose opted-in
-    // signatures the network still rejects.
-    const SighashRules sighash_rules{WITH_LOCK(cs_main, return HardforkActiveForNextBlock(EnsureAnyChainman(request.context)))
-                                     ? SighashRules::UNIFIED : SighashRules::LEGACY};
+    // Read under the same rules the signatures were made with, or a complete
+    // transaction is reported incomplete because its opted-in signatures are not
+    // recognised as signatures at all.
+    const SighashRules sighash_rules{SighashRulesForSigning(Params().GetConsensus())};
     bool complete = FinalizeAndExtractPSBT(psbtx, mtx, sighash_rules);
 
     UniValue result(UniValue::VOBJ);
@@ -1947,7 +1946,7 @@ static RPCHelpMan analyzepsbt()
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, strprintf("TX decode failed %s", error));
     }
 
-    const SighashRules sighash_rules{WITH_LOCK(cs_main, return HardforkActiveForNextBlock(EnsureAnyChainman(request.context)))};
+    const SighashRules sighash_rules{SighashRulesForSigning(Params().GetConsensus())};
     PSBTAnalysis psbta = AnalyzePSBT(psbtx, sighash_rules);
 
     UniValue result(UniValue::VOBJ);
@@ -2129,7 +2128,7 @@ RPCHelpMan descriptorprocesspsbt()
         PartiallySignedTransaction psbtx_copy = psbtx;
         // Finalization re-verifies the signatures, so it needs the same rules
         // they were produced under.
-        const SighashRules sighash_rules{WITH_LOCK(cs_main, return HardforkActiveForNextBlock(EnsureAnyChainman(request.context)))};
+        const SighashRules sighash_rules{SighashRulesForSigning(Params().GetConsensus())};
         CHECK_NONFATAL(FinalizeAndExtractPSBT(psbtx_copy, mtx, sighash_rules));
         DataStream ssTx_final;
         ssTx_final << TX_WITH_WITNESS(mtx);

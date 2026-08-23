@@ -7,6 +7,7 @@
 #include <interfaces/chain.h>
 #include <node/types.h>
 #include <policy/fees.h>
+#include <chainparams.h>
 #include <policy/policy.h>
 #include <util/moneystr.h>
 #include <util/rbf.h>
@@ -343,8 +344,7 @@ bool SignTransaction(CWallet& wallet, CMutableTransaction& mtx) {
         auto err{wallet.FillPSBT(psbtx, complete, SIGHASH_ALL, true /* sign */, false  /* bip32derivs */)};
         if (err) return false;
         complete = FinalizeAndExtractPSBT(psbtx, mtx,
-                                          wallet.HardforkActiveForNextBlock()
-                                              ? SighashRules::UNIFIED : SighashRules::LEGACY);
+                                          SighashRulesForSigning(Params().GetConsensus()));
         return complete;
     } else {
         return wallet.SignTransaction(mtx);

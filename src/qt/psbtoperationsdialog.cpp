@@ -51,8 +51,7 @@ namespace {
 //! The rules the wallet would sign under now, or legacy rules with no wallet.
 SighashRules SighashRulesForWallet(const WalletModel* model)
 {
-    return model && model->wallet().hardforkActiveForNextBlock() ? SighashRules::UNIFIED
-                                                                 : SighashRules::LEGACY;
+    return model ? SighashRulesForSigning(Params().GetConsensus()) : SighashRules::LEGACY;
 }
 } // namespace
 
