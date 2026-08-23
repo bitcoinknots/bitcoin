@@ -111,17 +111,10 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.nDAAHalfLife = 24 * 60 * 60;
         consensus.nAsertAnchorHeight = Consensus::MAINNET_ASERT_ANCHOR_HEIGHT;
-        // Set from -purityactivationheight; unset means hard fork never activates.
-        // Activation must be strictly after the ASERT anchor: GetNextASERTWorkRequired
-        // looks up GetAncestor(nAsertAnchorHeight) from the previous block.
-        if (opts.purity_activation_height) {
-            if (*opts.purity_activation_height <= consensus.nAsertAnchorHeight) {
-                throw std::runtime_error(strprintf(
-                    "-purityactivationheight height (%d) must be greater than ASERT anchor height %d",
-                    *opts.purity_activation_height, consensus.nAsertAnchorHeight));
-            }
-            consensus.nPurityActivationHeight = *opts.purity_activation_height;
-        }
+        consensus.nPurityActivationHeight = Consensus::MAINNET_PURITY_ACTIVATION_HEIGHT;
+        // First Purity consensus block. Consensus-pinned: a block at this
+        // height with any other hash is invalid regardless of -checkpoints.
+        consensus.hashPurityActivationBlock = uint256{"0000000000000000003ea74f4dafdda7ed4e02c4c1ccb9768e0ca4f9e1a35159"};
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.enforce_BIP94 = false;
         consensus.fPowNoRetargeting = false;
@@ -238,6 +231,7 @@ public:
                 {855000, uint256{"0000000000000000000233ea80aa10d38aa4486cd7033fffc2c4df556d0b9138"}},
                 {885248, uint256{"000000000000000000006e926737e6a349f7581525ad36e743dfe5f4bc3abbb7"}},
                 {908765, uint256{"00000000000000000001b64acb5fe4b40b84092159b6406a6244f46a37fa6c6b"}},
+                {961637, uint256{"0000000000000000003ea74f4dafdda7ed4e02c4c1ccb9768e0ca4f9e1a35159"}},
             }
         };
 

@@ -13,8 +13,6 @@
 #include <logging.h>
 #include <tinyformat.h>
 #include <util/chaintype.h>
-#include <util/fs.h>
-#include <util/readwritefile.h>
 #include <util/strencodings.h>
 #include <util/string.h>
 
@@ -26,103 +24,6 @@
 #include <vector>
 
 using util::SplitString;
-
-static const char* PURITY_ACTIVATION_HEIGHT_FILENAME = "purity_activation_height";
-
-/** Reject heights that cannot resolve the ASERT anchor as an ancestor. */
-static bool CheckPurityActivationHeight(int64_t height, std::string& error)
-{
-    if (height <= Consensus::MAINNET_ASERT_ANCHOR_HEIGHT || height >= std::numeric_limits<int>::max()) {
-        error = strprintf("-purityactivationheight height (%d) must be greater than ASERT anchor height %d and less than %d",
-                          height, Consensus::MAINNET_ASERT_ANCHOR_HEIGHT, std::numeric_limits<int>::max());
-        return false;
-    }
-    return true;
-}
-
-static bool ParsePurityActivationHeight(const std::string& value, int& height_out, std::string& error)
-{
-    int32_t height;
-    if (!ParseInt32(value, &height)) {
-        error = strprintf("Invalid -purityactivationheight height (%s)", value);
-        return false;
-    }
-    if (!CheckPurityActivationHeight(height, error)) {
-        return false;
-    }
-    height_out = height;
-    return true;
-}
-
-void ApplyPurityActivationHeightLock(ArgsManager& args)
-{
-    const fs::path lock_path{args.GetDataDirBase() / PURITY_ACTIVATION_HEIGHT_FILENAME};
-
-    if (fs::exists(lock_path)) {
-        const auto [ok, data] = ReadBinaryFile(lock_path, /*maxsize=*/64);
-        if (!ok) {
-            throw std::runtime_error(strprintf("Failed to read Purity activation height lock file %s", fs::PathToString(lock_path)));
-        }
-        // Trim trailing whitespace/newlines.
-        std::string text{data};
-        while (!text.empty() && (text.back() == '\n' || text.back() == '\r' || text.back() == ' ' || text.back() == '\t')) {
-            text.pop_back();
-        }
-        int locked_height;
-        std::string error;
-        if (!ParsePurityActivationHeight(text, locked_height, error)) {
-            throw std::runtime_error(strprintf("Invalid Purity activation height lock file %s: %s",
-                                              fs::PathToString(lock_path), error));
-        }
-        if (args.IsArgSet("-purityactivationheight")) {
-            const std::string cli_value{args.GetArg("-purityactivationheight", "")};
-            int cli_height;
-            std::string cli_error;
-            if (!ParsePurityActivationHeight(cli_value, cli_height, cli_error) || cli_height != locked_height) {
-                LogPrintf("Ignoring -purityactivationheight=%s; already locked at %d (%s)\n",
-                          cli_value, locked_height, fs::PathToString(lock_path));
-            } else {
-                LogPrintf("Using locked Purity activation height %d (%s)\n",
-                          locked_height, fs::PathToString(lock_path));
-            }
-        } else {
-            LogPrintf("Using locked Purity activation height %d (%s)\n",
-                      locked_height, fs::PathToString(lock_path));
-        }
-        args.ForceSetArg("-purityactivationheight", util::ToString(locked_height));
-        return;
-    }
-
-    if (args.IsArgSet("-purityactivationheight")) {
-        int height;
-        std::string error;
-        if (!ParsePurityActivationHeight(args.GetArg("-purityactivationheight", ""), height, error)) {
-            throw std::runtime_error(error);
-        }
-        if (!WriteBinaryFile(lock_path, strprintf("%d\n", height))) {
-            throw std::runtime_error(strprintf("Failed to write Purity activation height lock file %s", fs::PathToString(lock_path)));
-        }
-        LogPrintf("Locked Purity activation height to %d (%s)\n", height, fs::PathToString(lock_path));
-        return;
-    }
-
-    throw std::runtime_error(strprintf(
-        "Missing required -purityactivationheight on first mainnet run. "
-        "Set -purityactivationheight=<n> (must be > %d) to create %s",
-        Consensus::MAINNET_ASERT_ANCHOR_HEIGHT, fs::PathToString(lock_path)));
-}
-
-void ReadMainArgs(const ArgsManager& args, CChainParams::MainOptions& options)
-{
-    if (const auto height{args.GetIntArg("-purityactivationheight")}) {
-        std::string error;
-        if (!CheckPurityActivationHeight(*height, error)) {
-            throw std::runtime_error(error);
-        }
-        options.purity_activation_height = static_cast<int>(*height);
-        LogPrintf("Setting Purity activation height to %d\n", *options.purity_activation_height);
-    }
-}
 
 void ReadSigNetArgs(const ArgsManager& args, CChainParams::SigNetOptions& options)
 {
@@ -242,11 +143,8 @@ std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, c
     g_enable_rdts = true;
 
     switch (chain) {
-    case ChainType::MAIN: {
-        auto opts = CChainParams::MainOptions{};
-        ReadMainArgs(args, opts);
-        return CChainParams::Main(opts);
-    }
+    case ChainType::MAIN:
+        return CChainParams::Main({});
     case ChainType::TESTNET:
         return CChainParams::TestNet();
     case ChainType::TESTNET4:

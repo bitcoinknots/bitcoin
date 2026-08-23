@@ -194,9 +194,9 @@ unsigned int GetNextASERTWorkRequired(const CBlockIndex* pindexPrev, const CBloc
 {
     Assert(pindexPrev != nullptr);
     // Requires pindexPrev->nHeight >= nAsertAnchorHeight so the anchor exists as
-    // an ancestor. Mainnet enforces nPurityActivationHeight > nAsertAnchorHeight
-    // at startup; Assert (not assert) so a missing ancestor cannot become a
-    // nullptr dereference if NDEBUG is defined.
+    // an ancestor. Mainnet hardcodes nPurityActivationHeight > nAsertAnchorHeight;
+    // Assert (not assert) so a missing ancestor cannot become a nullptr
+    // dereference if NDEBUG is defined.
     const CBlockIndex* pindexAnchorBlock = pindexPrev->GetAncestor(params.nAsertAnchorHeight);
     Assert(pindexAnchorBlock != nullptr);
     Assert(pindexPrev->nHeight >= pindexAnchorBlock->nHeight);

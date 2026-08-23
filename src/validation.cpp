@@ -4665,6 +4665,14 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     if (!CheckDifficultyBits(block.nBits, GetNextWorkRequired(pindexPrev, &block, consensusParams), nHeight, consensusParams))
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-diffbits", "incorrect proof of work");
 
+    // The Purity activation block is pinned to a single hash by consensus.
+    // Unlike the checkpoint below, this cannot be disabled with -checkpoints=0.
+    if (!Consensus::PurityActivationBlockPermitted(nHeight, block.GetHash(), consensusParams)) {
+        LogPrintf("ERROR: %s: block %s at height %d is not the Purity activation block %s\n", __func__,
+                  block.GetHash().ToString(), nHeight, consensusParams.hashPurityActivationBlock.ToString());
+        return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-purity-activation-block");
+    }
+
     // Check against checkpoints
     if (chainman.m_options.checkpoints_enabled) {
         // Don't accept any forks from the main chain prior to last checkpoint.
@@ -5662,6 +5670,18 @@ bool ChainstateManager::LoadBlockIndex()
 
         for (CBlockIndex* pindex : vSortedByHeight) {
             if (m_interrupt) return false;
+            // A conflicting block at the Purity activation height can only be
+            // a leftover accepted before this software enforced the pin (new
+            // headers are rejected in ContextualCheckBlockHeader). Refuse to
+            // start so the user rebuilds the index instead of following a
+            // non-Purity chain.
+            if (!Consensus::PurityActivationBlockPermitted(pindex->nHeight, pindex->GetBlockHash(), GetConsensus())) {
+                LogError("Block index contains %s at height %d, which conflicts with the Purity activation block %s. "
+                         "This block was stored before upgrading; use -reindex to rebuild the block index.\n",
+                         pindex->GetBlockHash().ToString(), pindex->nHeight,
+                         GetConsensus().hashPurityActivationBlock.ToString());
+                return false;
+            }
             // If we have an assumeutxo-based chainstate, then the snapshot
             // block will be a candidate for the tip, but it may not be
             // VALID_TRANSACTIONS (eg if we haven't yet downloaded the block),
