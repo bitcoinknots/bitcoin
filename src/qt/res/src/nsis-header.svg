@@ -3,9 +3,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
 	 x="0px" y="0px" width="2.632in" height="1in"
 	 viewBox="-395 -8 1526 580">
-<!-- Designers: Kurtis Stirling, Blissmode, Skyler, and Steven Hay
-     License: MIT
--->
+<!-- Bitcoin Purity NSIS installer header. -->
 	<style type="text/css"><![CDATA[
 		text {
 			font-family: "OCR-Bitcoin";
@@ -14,9 +12,7 @@
 			text-anchor: left;
 		}
 	]]></style>
-	<g transform="scale(0.66) translate(-440, -80)">
-		<use xlink:href="bitcoinknots-logo.svg#logo" />
-	</g>
+	<image width="420" height="420" x="-200" y="40" xlink:href="bitcoin-purity-icon.png"/>
     <text x="320" y="236" style="letter-spacing: -0.14em">Bitcoin</text>
-    <text x="308.5" y="455" style="font-size: 240px; letter-spacing: -0.13em">Knots</text>
+    <text x="308.5" y="455" style="font-size: 240px; letter-spacing: -0.13em">Purity</text>
 </svg>

@@ -1,13 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg width="1in" height="1in" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<!-- Designers: Kurtis Stirling, Blissmode, Skyler, and Steven Hay
-     License: MIT
--->
-<g id="icon">
-	<circle cx="512" cy="512" r="495" fill="#F7931A" stroke="#D27A0F" stroke-width="34"/>
-	<g>
-		<use xlink:href="bitcoinknots-logo.svg#logo" />
-	</g>
-</g>
+<!-- Bitcoin Purity application icon. Source: brand mark from bitcoinpurity.org. -->
+<image width="1024" height="1024" xlink:href="bitcoin-purity-icon.png"/>
 </svg>

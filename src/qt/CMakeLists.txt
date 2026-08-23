@@ -99,7 +99,7 @@ foreach(size IN LISTS ICON_SPECS)
   add_custom_command(
     OUTPUT ${png}
     COMMAND "${RSVG_CONVERT}" -f png -d ${size} -p ${size} --output "${png}" "${CMAKE_CURRENT_SOURCE_DIR}/${bitcoin_svg}"
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${bitcoin_svg}"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${bitcoin_svg}" "${CMAKE_CURRENT_SOURCE_DIR}/res/src/bitcoin-purity-icon.png"
     COMMENT "Generating ${png} from ${bitcoin_svg}"
     VERBATIM
   )
@@ -150,14 +150,14 @@ add_custom_command(
 )
 add_custom_target(generate_ico DEPENDS "${bitcoin_ico}" "${testnet_ico}")
 
-set(logo_svg "res/src/bitcoinknots-logo.svg")
-set(png "${ICON_PATH}/bitcoinknots-logo.png")
+set(logo_png_src "res/src/bitcoin-purity-icon.png")
+set(png "${ICON_PATH}/bitcoinpurity-logo.png")
 set(size 960)
 add_custom_command(
   OUTPUT ${png}
-  COMMAND "${RSVG_CONVERT}" -f png -d ${size} -p ${size} --output "${png}" "${CMAKE_CURRENT_SOURCE_DIR}/${logo_svg}"
-  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${logo_svg}"
-  COMMENT "Generating ${png} from ${logo_svg}"
+  COMMAND "${IMAGEMAGICK_CONVERT}" "${CMAKE_CURRENT_SOURCE_DIR}/${logo_png_src}" -background none -filter Lanczos -resize ${size}x${size} "${png}"
+  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${logo_png_src}"
+  COMMENT "Generating ${png} from ${logo_png_src}"
   VERBATIM
 )
 
@@ -176,11 +176,17 @@ set(ABS_FONT_DIR ${CMAKE_CURRENT_BINARY_DIR}/res/fonts)
 add_custom_command(
   OUTPUT "${nsis_header_bmp}"
   COMMAND echo <fontconfig><dir>${ABS_FONT_DIR}</dir></fontconfig> > res/fonts/fonts.conf && FONTCONFIG_PATH=${ABS_FONT_DIR} ${RSVG_CONVERT} -f png -d 57 -p 57 ${CMAKE_CURRENT_SOURCE_DIR}/${nsis_header_input} | ${IMAGEMAGICK_CONVERT} - -background white -alpha remove BMP3:${nsis_header_bmp}
-  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${nsis_header_input}" "${FONT_PATH}"
+  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${nsis_header_input}" "${CMAKE_CURRENT_SOURCE_DIR}/res/src/bitcoin-purity-icon.png" "${FONT_PATH}"
   COMMENT "Generating ${nsis_header_bmp} from ${nsis_header_input}"
   VERBATIM
 )
 add_custom_target(generate_nsis_images DEPENDS "${nsis_wizard_bmp}" "${nsis_header_bmp}")
+
+# GUI qrc embeds these build-time rendered assets.
+add_custom_target(generate_app_icons DEPENDS
+  "${ICON_PATH}/bitcoin256.png"
+  "${ICON_PATH}/bitcoinpurity-logo.png"
+)
 
 configure_file(bitcoin_locale.qrc bitcoin_locale.qrc USE_SOURCE_PERMISSIONS COPYONLY)
 configure_file(bitcoin_rendered.qrc bitcoin_rendered.qrc USE_SOURCE_PERMISSIONS COPYONLY)
@@ -288,6 +294,7 @@ target_link_libraries(bitcoinqt
     $<$<PLATFORM_ID:Darwin>:-framework\ AppKit>
     $<$<CXX_COMPILER_ID:MSVC>:shlwapi>
 )
+add_dependencies(bitcoinqt generate_app_icons)
 
 if(ENABLE_WALLET)
   target_sources(bitcoinqt
@@ -407,6 +414,8 @@ add_executable(bitcoin-qt
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   add_dependencies(bitcoin-qt generate_ico)
+else()
+  add_dependencies(bitcoin-qt generate_icns)
 endif()
 
 if(WIN32)
