@@ -4,18 +4,31 @@ This document is the source of truth for the short-term hard fork. Code must
 match it. Long-term ideas belong in [roadmap.md](roadmap.md) and are **not**
 specified here as active rules.
 
-Activation height `nPurityActivationHeight` is set on mainnet via the
-`-purityactivationheight=<n>` option (or `purityactivationheight=<n>` in
-`bitcoin.conf`). The value must be **greater than** the ASERT anchor height
-**961632** (i.e. at least **961633**), so the first ASERT-adjusted block has
-the anchor as an ancestor. Values at or below the anchor are rejected at
-startup and are not locked. On **first use** a valid value is written to
-`<datadir>/purity_activation_height` and becomes permanent for that datadir;
-later attempts to set a different value are ignored. Mainnet startup now
-requires this value on first run (no implicit inactive mode). A provisional value such as
-**961636** (BIP110 enforcement-chain split at 961632 plus margin) may be used
-before the formal mainnet launch. Historical Bitcoin / Knots validation is
-unchanged before that height so IBD still works.
+Activation height `nPurityActivationHeight` is hardcoded on mainnet to
+**961637** (block hash
+`0000000000000000003ea74f4dafdda7ed4e02c4c1ccb9768e0ca4f9e1a35159`, the first
+Purity consensus block). It must be **greater than** the ASERT anchor height
+**961632** so the first ASERT-adjusted block has the anchor as an ancestor.
+Historical Bitcoin / Knots validation is unchanged before that height so IBD
+still works.
+
+The activation block hash is **consensus-pinned**
+(`hashPurityActivationBlock`): any header at height 961637 with a different
+hash is invalid. This is enforced unconditionally in header validation and is
+independent of the checkpoint at the same height (which `-checkpoints=0` can
+disable). On startup, a block index that already contains a conflicting block
+at 961637 (stored by other software before upgrading) is rejected and must be
+rebuilt with `-reindex`.
+
+Peers whose header chain announces a competing block at 961637 (typical
+Core/Knots tips) are **not** disconnected for that announcement. Their shared
+pre-activation headers are retained so IBD can download historical blocks from
+them in parallel with Purity peers; only post-activation history must come from
+the Purity chain.
+Automatic outbound peers proven to follow such a competing block are demoted to
+additional stale-consensus connections, subject to `-maxstaleoutbound`, so they
+cannot occupy or receive eviction protection for a Purity-compatible outbound
+slot.
 
 **Fork baseline:** the Knots/BIP110 *enforcement* chain that rejected
 non-signaling blocks at height 961632 — not the Core majority chain at the

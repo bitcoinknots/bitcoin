@@ -41,7 +41,7 @@ std::optional<ConfigError> InitConfig(ArgsManager& args, SettingsAbortFn setting
         }
 
         // Select base params first so GetDataDirNet() works, then ensure the
-        // datadir exists before locking mainnet purity activation height.
+        // datadir exists.
         const ChainType chain{args.GetChainType()};
         SelectBaseParams(chain);
 
@@ -63,10 +63,6 @@ std::optional<ConfigError> InitConfig(ArgsManager& args, SettingsAbortFn setting
         const auto net_path{args.GetDataDirNet()};
         if (!fs::exists(net_path)) {
             fs::create_directories(net_path / "wallets");
-        }
-
-        if (chain == ChainType::MAIN) {
-            ApplyPurityActivationHeightLock(args);
         }
 
         // Check for chain settings (Params() calls are only valid after this clause)

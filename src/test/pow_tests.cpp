@@ -250,7 +250,7 @@ static std::vector<CBlockIndex> MakeAsertChain(const Consensus::Params& params, 
 BOOST_AUTO_TEST_CASE(purity_asert_difficulty_is_a_floor)
 {
     Consensus::Params params = CreateChainParams(*m_node.args, ChainType::MAIN)->GetConsensus();
-    params.nPurityActivationHeight = 961636;
+    params.nPurityActivationHeight = Consensus::MAINNET_PURITY_ACTIVATION_HEIGHT;
     const int activation = params.nPurityActivationHeight;
 
     // On-schedule timestamps => ASERT target ≈ anchor target, leaving room both harder and easier.
@@ -306,7 +306,7 @@ BOOST_AUTO_TEST_CASE(purity_asert_difficulty_is_a_floor)
 BOOST_AUTO_TEST_CASE(purity_asert_accepts_legacy_daa_high_difficulty)
 {
     Consensus::Params params = CreateChainParams(*m_node.args, ChainType::MAIN)->GetConsensus();
-    params.nPurityActivationHeight = 961636;
+    params.nPurityActivationHeight = Consensus::MAINNET_PURITY_ACTIVATION_HEIGHT;
     const int activation = params.nPurityActivationHeight;
 
     // Current-mainnet-like compact, well below powLimit.
@@ -327,19 +327,10 @@ BOOST_AUTO_TEST_CASE(purity_asert_accepts_legacy_daa_high_difficulty)
 
 BOOST_AUTO_TEST_CASE(asert_at_purity_activation_uses_anchor)
 {
-    ArgsManager args;
-    args.ForceSetArg("-datadir", fs::PathToString(m_args.GetDataDirBase()));
-    args.ForceSetArg("-purityactivationheight", util::ToString(Consensus::MAINNET_ASERT_ANCHOR_HEIGHT + 1));
-    const auto chainParams = CreateChainParams(args, ChainType::MAIN);
-    const auto& params = chainParams->GetConsensus();
-
-    CBlockIndex pindexLast;
-    pindexLast.nHeight = Consensus::MAINNET_ASERT_ANCHOR_HEIGHT;
-    pindexLast.nTime = 1231006505;
-    pindexLast.nBits = 0x1d00ffff;
-
-    const unsigned int asert_nbits = GetNextASERTWorkRequired(&pindexLast, nullptr, params);
-    BOOST_CHECK_EQUAL(GetNextWorkRequired(&pindexLast, nullptr, params), asert_nbits);
+    Consensus::Params params = CreateChainParams(*m_node.args, ChainType::MAIN)->GetConsensus();
+    auto blocks = MakeAsertChain(params, Consensus::MAINNET_PURITY_ACTIVATION_HEIGHT - 1, 0x1a00ffff);
+    const unsigned int asert_nbits = GetNextASERTWorkRequired(&blocks.back(), nullptr, params);
+    BOOST_CHECK_EQUAL(GetNextWorkRequired(&blocks.back(), nullptr, params), asert_nbits);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

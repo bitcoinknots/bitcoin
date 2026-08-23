@@ -867,10 +867,11 @@ public:
     /** Whether this connection counts towards an automatic outbound target. */
     bool CountsTowardOutboundTarget() const { return !m_is_non_bip110_outbound; }
 
-    /** Whether this outbound peer did not advertise NODE_REDUCED_DATA (BIP-110).
+    /** Whether this outbound peer either did not advertise NODE_REDUCED_DATA
+     *  (BIP-110), or later proved it follows a non-Purity activation block.
      *  Such a peer is tolerated as an additional connection, like an addnode
      *  peer: it holds no automatic outbound semaphore slot and counts towards no
-     *  outbound target, so we keep looking for a BIP110 peer to fill it. */
+     *  outbound target, so we keep looking for a compatible peer to fill it. */
     std::atomic_bool m_is_non_bip110_outbound{false};
 
     /** Whether we should relay transactions to this peer. This only changes
@@ -1248,7 +1249,7 @@ public:
 
     void StartExtraBlockRelayPeers();
 
-    // Count the number of BIP110 full-relay peers we have (excludes non-BIP110 peers).
+    // Count full-relay peers that have not been demoted for stale consensus rules.
     int GetBIP110FullOutboundConnCount() const;
     // Return the number of outbound peers we have in excess of our target (eg,
     // if we previously called SetTryNewOutboundPeer(true), and have since set
@@ -1260,16 +1261,15 @@ public:
     // Count the number of block-relay-only peers we have over our limit.
     int GetExtraBlockRelayCount() const;
 
-    /** Demote an outbound peer that did not advertise NODE_REDUCED_DATA to an
-     *  additional connection: give up its automatic outbound semaphore slot (so
-     *  we keep looking for a BIP110 peer) and stop counting it as our outbound
+    /** Demote an outbound peer running stale consensus rules to an additional
+     *  connection: give up its automatic outbound semaphore slot (so we keep
+     *  looking for a compatible peer) and stop counting it as our outbound
      *  coverage of its network. A demoted peer draws on the inbound budget, so it
      *  is kept only while fewer than max_stale are already tolerated, its outbound
      *  target is not already filled (by BIP110 or stale peers alike), and the
      *  inbound budget has room; otherwise this sets fDisconnect and returns false
      *  without demoting. Does its own logging. Must not be called on an already-
-     *  demoted peer (Assert): the version handler guarantees this by rejecting
-     *  redundant VERSION messages. */
+     *  demoted peer (Assert). */
     bool DemoteToStaleOutbound(CNode& node, unsigned int max_stale) EXCLUSIVE_LOCKS_REQUIRED(!m_nodes_mutex);
 
     bool AddNode(const AddedNodeParams& add) EXCLUSIVE_LOCKS_REQUIRED(!m_added_nodes_mutex);

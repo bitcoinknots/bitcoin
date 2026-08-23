@@ -43,12 +43,6 @@ How to run Bitcoin Purity?
 
 See [doc/INSTALL.md](doc/INSTALL.md)
 
-At the first time you run Bitcoin Purity, you have to assign -purityactivationheight=<height> to activate the purity rules. This is a one-time operation.
-
-The purityactivationheight is the height of the block that the purity rules are activated. It is a consensus parameter. Please follow the official instruction and don't set it to arbitrary value.
-
-Once the purity rules are activated, you can run Bitcoin Purity without the -purityactivationheight parameter.
-
 License
 -------
 

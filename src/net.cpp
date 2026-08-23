@@ -1821,7 +1821,7 @@ void CConnman::CreateNodeFromAcceptedSocket(std::unique_ptr<Sock>&& sock,
     {
         LOCK(m_nodes_mutex);
         for (const CNode* pnode : m_nodes) {
-            // A demoted stale (non-BIP110) outbound peer gave up its outbound
+            // A demoted stale-consensus outbound peer gave up its outbound
             // slot, so it counts against the inbound limit here: it displaces an
             // inbound slot while connected, keeping the total within -maxconnections.
             if (pnode->IsInboundConn() || pnode->m_is_non_bip110_outbound) nInbound++;
@@ -2497,8 +2497,8 @@ void CConnman::StartExtraBlockRelayPeers()
     m_start_extra_block_relay_peers = true;
 }
 
-// Return the number of BIP110 outbound connections that are full relay (not blocks only).
-// Non-BIP110 outbound peers are excluded as they are "additional" and don't count toward limits.
+// Return the number of compatible outbound connections that are full relay (not blocks only).
+// Demoted stale-consensus peers are "additional" and don't count toward limits.
 int CConnman::GetBIP110FullOutboundConnCount() const
 {
     int nRelevant = 0;
@@ -2547,8 +2547,7 @@ int CConnman::GetExtraBlockRelayCount() const
 
 bool CConnman::DemoteToStaleOutbound(CNode& node, unsigned int max_stale)
 {
-    // The version handler rejects a redundant VERSION before the stale gate, so
-    // a peer is never demoted twice; assert that rather than guarding for it.
+    // Callers must not demote a peer twice.
     Assert(!node.m_is_non_bip110_outbound);
     // m_nodes_mutex guards grantOutbound and m_network_conn_counts, and lets us
     // count peers without racing the socket handler. The stale count is derived
@@ -2577,18 +2576,18 @@ bool CConnman::DemoteToStaleOutbound(CNode& node, unsigned int max_stale)
         if (pnode->m_conn_type == conn_type) ++same_target;
     }
     if (num_stale >= max_stale) {
-        LogDebug(BCLog::NET, "peer lacks NODE_REDUCED_DATA and already have %u non-BIP110 outbound peers (limit %u), %s\n",
+        LogDebug(BCLog::NET, "peer uses stale consensus rules and already have %u stale outbound peers (limit %u), %s\n",
                  num_stale, max_stale, node.DisconnectMsg(fLogIPs));
         node.fDisconnect = true;
         return false;
     }
     // Tolerating a stale peer is only worthwhile while it fills a gap in the
-    // outbound target. Once that target is met, by BIP110 peers, already
+    // outbound target. Once that target is met, by compatible peers, already
     // tolerated stale ones, or a mix, another stale peer buys us nothing.
     // same_target includes node, so compare with > and report the rest.
     const int max_same_target{node.IsFullOutboundConn() ? m_max_outbound_full_relay : m_max_outbound_block_relay};
     if (same_target > max_same_target) {
-        LogDebug(BCLog::NET, "peer lacks NODE_REDUCED_DATA and the outbound target is already full (%d/%d), %s\n",
+        LogDebug(BCLog::NET, "peer uses stale consensus rules and the outbound target is already full (%d/%d), %s\n",
                  same_target - 1, max_same_target, node.DisconnectMsg(fLogIPs));
         node.fDisconnect = true;
         return false;
@@ -2597,7 +2596,7 @@ bool CConnman::DemoteToStaleOutbound(CNode& node, unsigned int max_stale)
     // outbound target, so the peer must fit the inbound budget or a later
     // outbound connection would push us past -maxconnections.
     if (inbound_equiv >= m_max_inbound) {
-        LogDebug(BCLog::NET, "peer lacks NODE_REDUCED_DATA and no room within -maxconnections, %s\n",
+        LogDebug(BCLog::NET, "peer uses stale consensus rules and no room within -maxconnections, %s\n",
                  node.DisconnectMsg(fLogIPs));
         node.fDisconnect = true;
         return false;
@@ -2606,7 +2605,7 @@ bool CConnman::DemoteToStaleOutbound(CNode& node, unsigned int max_stale)
     node.grantOutbound.Release();
     if (node.IsManualOrFullOutboundConn()) --m_network_conn_counts[node.addr.GetNetwork()];
     ++num_stale;
-    LogDebug(BCLog::NET, "connected to non-BIP110 outbound peer (%u/%u), %s\n",
+    LogDebug(BCLog::NET, "connected to stale-consensus outbound peer (%u/%u), %s\n",
              num_stale, max_stale, node.ConnectionTypeAsString());
     return true;
 }

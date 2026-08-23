@@ -40,6 +40,8 @@ constexpr bool ValidDeployment(DeploymentPos dep) { return dep < MAX_VERSION_BIT
 
 /** Mainnet aserti3-1d anchor: BIP110 enforcement-chain block 961632. */
 inline constexpr int MAINNET_ASERT_ANCHOR_HEIGHT{961632};
+/** Mainnet Purity hard-fork activation block (first Purity consensus block). */
+inline constexpr int MAINNET_PURITY_ACTIVATION_HEIGHT{961637};
 
 /**
  * Struct for each individual consensus rule change using BIP9.
@@ -132,12 +134,18 @@ struct Params {
     int64_t nPowTargetTimespan;
     /**
      * Height at which Purity hard-fork rules (permanent RDTS + aserti3-1d) begin.
-     * Mainnet value comes from -purityactivationheight, locked into the datadir
-     * on first use. Unset => never activates. When set, must be greater than
-     * MAINNET_ASERT_ANCHOR_HEIGHT so GetNextASERTWorkRequired can resolve the
-     * anchor as an ancestor of the last pre-fork block.
+     * Mainnet uses MAINNET_PURITY_ACTIVATION_HEIGHT. Unset on other chains =>
+     * never activates. When set, must be greater than MAINNET_ASERT_ANCHOR_HEIGHT
+     * so GetNextASERTWorkRequired can resolve the anchor as an ancestor of the
+     * last pre-fork block.
      */
     int nPurityActivationHeight{std::numeric_limits<int>::max()};
+    /**
+     * Hash of the Purity activation block (the block at nPurityActivationHeight).
+     * When non-null, any block at that height with a different hash is invalid
+     * by consensus. Unlike checkpoints, this cannot be disabled at runtime.
+     */
+    uint256 hashPurityActivationBlock{};
     /** ASERT half-life in seconds (86400 = aserti3-1d). */
     int64_t nDAAHalfLife{24 * 60 * 60};
     /** ASERT anchor height (BIP110 enforcement-chain block 961632 on mainnet). */
@@ -176,6 +184,19 @@ struct Params {
         return std::numeric_limits<int>::max();
     }
 };
+
+/**
+ * Whether a block hash is permitted at the given height under the Purity
+ * activation-block pin. Only the block at nPurityActivationHeight is
+ * constrained, and only when hashPurityActivationBlock is set. This is a
+ * consensus rule, deliberately independent of -checkpoints.
+ */
+inline bool PurityActivationBlockPermitted(int height, const uint256& hash, const Params& params)
+{
+    return height != params.nPurityActivationHeight ||
+           params.hashPurityActivationBlock.IsNull() ||
+           hash == params.hashPurityActivationBlock;
+}
 
 } // namespace Consensus
 
