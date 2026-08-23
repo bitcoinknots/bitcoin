@@ -9,6 +9,7 @@
 #include <common/args.h>
 #include <net.h>
 #include <net_processing.h>
+#include <pow.h>
 #include <pubkey.h>
 #include <script/sign.h>
 #include <script/signingprovider.h>
@@ -17,6 +18,7 @@
 #include <test/util/random.h>
 #include <test/util/setup_common.h>
 #include <util/string.h>
+#include <util/strencodings.h>
 #include <util/time.h>
 #include <validation.h>
 
@@ -106,6 +108,106 @@ BOOST_AUTO_TEST_CASE(outbound_slow_chain_eviction)
     BOOST_CHECK(dummyNode1.fDisconnect == true);
 
     peerman.FinalizeNode(dummyNode1);
+}
+
+BOOST_FIXTURE_TEST_CASE(purity_incompatible_outbound_is_demoted, RegTestingSetup)
+{
+    LOCK(NetEventsInterface::g_msgproc_mutex);
+
+    ChainstateManager& chainman = *m_node.chainman;
+    auto connman = std::make_unique<ConnmanTestMsg>(0x1337, 0x1337, *m_node.addrman, *m_node.netgroupman, Params());
+    auto peerman = PeerManager::make(*connman, *m_node.addrman, nullptr, chainman, *m_node.mempool, *m_node.warnings, {});
+    CConnman::Options connman_opts;
+    connman_opts.m_max_automatic_connections = DEFAULT_MAX_PEER_CONNECTIONS;
+    connman->Init(connman_opts);
+    connman->SetMsgProc(peerman.get());
+    Consensus::Params& consensus{const_cast<Consensus::Params&>(chainman.GetConsensus())};
+    consensus.nAsertAnchorHeight = 1;
+    consensus.nPurityActivationHeight = 6;
+    consensus.nDAAHalfLife = 24 * 60 * 60;
+    consensus.powLimit = uint256{"00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
+    consensus.fPowAllowMinDifficultyBlocks = false;
+    consensus.hashPurityActivationBlock = uint256::ONE;
+
+    // Reuse two real proof-of-work-valid consecutive headers from the BIP110
+    // branch, mapped onto small test heights to exercise the activation split.
+    DataStream header_stream_636{ParseHex("1040072051a67f61dddfa3ce201b4ada733d71d247a8a0b705c7000000000000000000009b7b1a9639de9e0b51b213c4daf4874c2abc5593749ca8c6996fadca76b7549c5f65836a3d3502176e750f5f")};
+    DataStream header_stream_637{ParseHex("10200a20c0b91f36e50f8c4ecf3161ceb075227b2b8b1f69a2160200000000000000000067662c5e7a746eca3516ffdbbc58f8a47f198dabbe5022eb00fc3a3e535f9664909d886a3d35021721d3547a")};
+    CBlockHeader header_636;
+    CBlockHeader conflicting_637;
+    header_stream_636 >> header_636;
+    header_stream_637 >> conflicting_637;
+    BOOST_REQUIRE_EQUAL(header_636.GetHash().ToString(), "0000000000000000000216a2691f8b2b7b2275b0ce6131cf4e8c0fe5361fb9c0");
+    BOOST_REQUIRE_EQUAL(conflicting_637.GetHash().ToString(), "0000000000000000000121f7aa4329b9d040bde9eac2d49b5219e57742ccbc9d");
+    BOOST_REQUIRE_EQUAL(conflicting_637.hashPrevBlock, header_636.GetHash());
+
+    {
+        LOCK(cs_main);
+        CBlockIndex* prev{chainman.ActiveChain().Tip()};
+        for (int height = 1; height < consensus.nPurityActivationHeight - 1; ++height) {
+            const uint256 hash{height == consensus.nPurityActivationHeight - 2
+                                   ? header_636.hashPrevBlock
+                                   : m_rng.rand256()};
+            CBlockIndex* index{chainman.m_blockman.InsertBlockIndex(hash)};
+            index->nHeight = height;
+            index->pprev = prev;
+            index->nTime = header_636.nTime -
+                           (consensus.nPurityActivationHeight - 1 - height) * consensus.nPowTargetSpacing;
+            index->nBits = header_636.nBits;
+            index->nChainWork = prev->nChainWork + GetBlockProof(*index);
+            index->RaiseValidity(BLOCK_VALID_TREE);
+            index->BuildSkip();
+            prev = index;
+        }
+    }
+
+    auto* node = new CNode{/*id=*/0,
+                           /*sock=*/nullptr,
+                           CAddress(ip(0xa0b0c002), NODE_NONE),
+                           /*nKeyedNetGroupIn=*/0,
+                           /*nLocalHostNonceIn=*/0,
+                           CAddress(),
+                           /*addrNameIn=*/"",
+                           ConnectionType::OUTBOUND_FULL_RELAY,
+                           /*inbound_onion=*/false,
+                           /*network_key=*/0};
+    connman->AddTestNode(*node);
+    connman->Handshake(
+        *node,
+        /*successfully_connected=*/true,
+        /*remote_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA),
+        /*local_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA),
+        /*version=*/PROTOCOL_VERSION,
+        /*relay_txs=*/true);
+    BOOST_REQUIRE(!node->m_is_non_bip110_outbound);
+    BOOST_REQUIRE_EQUAL(connman->GetBIP110FullOutboundConnCount(), 1);
+
+    const std::atomic<bool> interrupt{false};
+    std::vector<CBlock> shared_headers{CBlock{header_636}};
+    DataStream shared_headers_stream;
+    shared_headers_stream << TX_WITH_WITNESS(shared_headers);
+    peerman->ProcessMessage(*node, NetMsgType::HEADERS, shared_headers_stream, /*time_received=*/0us, interrupt);
+
+    CNodeStateStats stats;
+    BOOST_REQUIRE(peerman->GetNodeStateStats(node->GetId(), stats));
+    BOOST_REQUIRE_EQUAL(stats.nSyncHeight, consensus.nPurityActivationHeight - 1);
+    BOOST_REQUIRE(stats.m_chain_sync_protected);
+
+    std::vector<CBlock> conflicting_headers{CBlock{conflicting_637}};
+    DataStream conflicting_headers_stream;
+    conflicting_headers_stream << TX_WITH_WITNESS(conflicting_headers);
+    peerman->ProcessMessage(*node, NetMsgType::HEADERS, conflicting_headers_stream, /*time_received=*/0us, interrupt);
+
+    BOOST_REQUIRE(peerman->GetNodeStateStats(node->GetId(), stats));
+    BOOST_CHECK_EQUAL(stats.nSyncHeight, consensus.nPurityActivationHeight - 1);
+    BOOST_CHECK(!stats.m_chain_sync_protected);
+    BOOST_CHECK(node->m_is_non_bip110_outbound);
+    BOOST_CHECK(!node->CountsTowardOutboundTarget());
+    BOOST_CHECK_EQUAL(connman->GetBIP110FullOutboundConnCount(), 0);
+    BOOST_CHECK(!node->fDisconnect);
+
+    peerman->FinalizeNode(*node);
+    connman->ClearTestNodes();
 }
 
 struct OutboundTest : TestingSetup {

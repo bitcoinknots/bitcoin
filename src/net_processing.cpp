@@ -1700,6 +1700,7 @@ bool PeerManagerImpl::GetNodeStateStats(NodeId nodeid, CNodeStateStats& stats) c
             return false;
         stats.nSyncHeight = state->pindexBestKnownBlock ? state->pindexBestKnownBlock->nHeight : -1;
         stats.nCommonHeight = state->pindexLastCommonBlock ? state->pindexLastCommonBlock->nHeight : -1;
+        stats.m_chain_sync_protected = state->m_chain_sync.m_protect;
         for (const QueuedBlock& queue : state->vBlocksInFlight) {
             if (queue.pindex)
                 stats.vHeightInFlight.push_back(queue.pindex->nHeight);
@@ -1830,6 +1831,20 @@ void PeerManagerImpl::MaybePunishNodeForBlock(NodeId nodeid, const BlockValidati
     // The node is providing invalid data:
     case BlockValidationResult::BLOCK_CONSENSUS:
     case BlockValidationResult::BLOCK_MUTATED:
+        // Competing chains at the Purity activation height are expected from
+        // peers already classified as stale, and inbound/manual peers do not
+        // occupy automatic outbound slots. A peer still counted as compatible
+        // must be disconnected so it cannot fill a Purity outbound target.
+        if (state.GetRejectReason() == "bad-purity-activation-block") {
+            bool tolerate_peer{false};
+            m_connman.ForNode(nodeid, [&tolerate_peer](CNode* node) {
+                tolerate_peer = node->m_is_non_bip110_outbound || !node->PunishInvalidBlocks();
+                return true;
+            });
+            if (tolerate_peer) break;
+            HandleDoSPunishment(m_connman, nodeid, 100, "Purity activation block");
+            return;
+        }
         if (!via_compact_block) {
             HandleDoSPunishment(m_connman, nodeid, 100, "block");
             return;
@@ -2852,7 +2867,7 @@ void PeerManagerImpl::UpdatePeerStateForReceivedHeaders(CNode& pfrom, Peer& peer
     // thus always subject to eviction under the bad/lagging chain logic.
     // See ChainSyncTimeoutState.
     // Stale peers are excluded, so they cannot take all the protect slots and
-    // leave the BIP110 peers we want to keep unprotected.
+    // leave compatible peers unprotected.
     if (!pfrom.fDisconnect && pfrom.IsFullOutboundConn() && pfrom.CountsTowardOutboundTarget() && nodestate->pindexBestKnownBlock != nullptr) {
         if (m_outbound_peers_with_protect_from_disconnect < MAX_OUTBOUND_PEERS_TO_PROTECT_FROM_DISCONNECT && nodestate->pindexBestKnownBlock->nChainWork >= m_chainman.ActiveChain().Tip()->nChainWork && !nodestate->m_chain_sync.m_protect) {
             LogDebug(BCLog::NET, "Protecting outbound peer=%d from eviction\n", pfrom.GetId());
@@ -2988,6 +3003,33 @@ void PeerManagerImpl::ProcessHeadersMessage(CNode& pfrom, Peer& peer,
     // Now process all the headers.
     BlockValidationState state;
     if (!m_chainman.ProcessNewBlockHeaders(headers, /*min_pow_checked=*/true, state, &pindexLast)) {
+        const bool purity_activation_mismatch{state.GetRejectReason() == "bad-purity-activation-block"};
+        if (purity_activation_mismatch &&
+            (pfrom.IsFullOutboundConn() || pfrom.IsBlockOnlyConn()) &&
+            !pfrom.m_is_non_bip110_outbound) {
+            // NODE_REDUCED_DATA proves BIP110 support, not membership in the
+            // Purity chain. Once an outbound peer announces a competing
+            // activation block, stop counting it as Purity connectivity and
+            // revoke any protection it earned from the shared prefix.
+            {
+                LOCK(cs_main);
+                CNodeState* nodestate{State(pfrom.GetId())};
+                if (nodestate && nodestate->m_chain_sync.m_protect) {
+                    nodestate->m_chain_sync.m_protect = false;
+                    --m_outbound_peers_with_protect_from_disconnect;
+                    assert(m_outbound_peers_with_protect_from_disconnect >= 0);
+                }
+            }
+            m_connman.DemoteToStaleOutbound(pfrom, m_opts.maxstaleoutbound);
+        }
+        // Headers before a mid-batch failure may already have been accepted.
+        // Credit the peer for that shared prefix so IBD can download historical
+        // blocks from non-Purity peers that diverge at the activation height.
+        if (pindexLast) {
+            UpdatePeerStateForReceivedHeaders(pfrom, peer, *pindexLast, /*received_new_header=*/false, /*may_have_more_headers=*/false);
+            LogDebug(BCLog::NET, "headers from peer=%d rejected after height %d (%s); retaining shared history for download\n",
+                     pfrom.GetId(), pindexLast->nHeight, state.ToString());
+        }
         if (state.IsInvalid()) {
             MaybePunishNodeForBlock(pfrom.GetId(), state, via_compact_block, "invalid header received");
             return;
@@ -5562,7 +5604,11 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
 
         if (!state.fSyncStarted && CanServeBlocks(*peer) && !m_chainman.m_blockman.LoadingBlocks()) {
             // Only actively request headers from a single peer, unless we're close to today.
-            if ((nSyncStarted == 0 && sync_blocks_and_headers_from_peer) || m_chainman.m_best_header->Time() > NodeClock::now() - 24h) {
+            // Also query stale-consensus outbound peers during IBD so we learn their
+            // shared pre-Purity chain tip for parallel block download below activation.
+            if ((nSyncStarted == 0 && sync_blocks_and_headers_from_peer) ||
+                m_chainman.m_best_header->Time() > NodeClock::now() - 24h ||
+                (pto->m_is_non_bip110_outbound && m_chainman.IsInitialBlockDownload() && sync_blocks_and_headers_from_peer)) {
                 const CBlockIndex* pindexStart = m_chainman.m_best_header;
                 /* If possible, start at the block preceding the currently
                    best known header.  This ensures that we always get a

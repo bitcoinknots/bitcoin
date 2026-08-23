@@ -4667,6 +4667,8 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
 
     // The Purity activation block is pinned to a single hash by consensus.
     // Unlike the checkpoint below, this cannot be disabled with -checkpoints=0.
+    // Non-Purity peers (Core/Knots) are expected to announce a different block
+    // here; reject it without treating them as malicious (see net_processing).
     if (!Consensus::PurityActivationBlockPermitted(nHeight, block.GetHash(), consensusParams)) {
         LogPrintf("ERROR: %s: block %s at height %d is not the Purity activation block %s\n", __func__,
                   block.GetHash().ToString(), nHeight, consensusParams.hashPurityActivationBlock.ToString());

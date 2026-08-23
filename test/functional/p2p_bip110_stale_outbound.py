@@ -86,7 +86,7 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
         self.log.info("A stale outbound peer is kept when we are below the connection budget")
         self.restart_node(0, extra_args=[f"-maxconnections={ROOMY}", "-maxstaleoutbound=2"])
 
-        with node.assert_debug_log(["connected to non-BIP110 outbound peer (1/2)"]):
+        with node.assert_debug_log(["connected to stale-consensus outbound peer (1/2)"]):
             peer = self.connect(node, 0, "outbound-full-relay", reduced_data=False)
             peer.sync_with_ping()
         assert_equal(self.outbound_count(node), 1)
@@ -164,7 +164,7 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
         self.restart_node(0, extra_args=[f"-maxconnections={ROOMY}", "-maxstaleoutbound=0"])
 
         # With no stale budget, a stale full-relay peer is dropped before marking.
-        with node.assert_debug_log(["peer lacks NODE_REDUCED_DATA and already have 0 non-BIP110 outbound peers"]):
+        with node.assert_debug_log(["peer uses stale consensus rules and already have 0 stale outbound peers"]):
             self.connect(node, 0, "outbound-full-relay", reduced_data=False,
                          wait_for_disconnect=True)
         self.wait_until(lambda: len(node.getpeerinfo()) == 0)
@@ -258,7 +258,7 @@ class BIP110StaleOutboundTest(BitcoinTestFramework):
         # The last one brings us to the clamped budget, so the per-target caps and
         # MAX_STALE_OUTBOUND_CONNECTIONS agree on the ceiling.
         with node.assert_debug_log(
-                [f"connected to non-BIP110 outbound peer ({MAX_STALE_OUTBOUND_CONNECTIONS}/"
+                [f"connected to stale-consensus outbound peer ({MAX_STALE_OUTBOUND_CONNECTIONS}/"
                  f"{MAX_STALE_OUTBOUND_CONNECTIONS})"]):
             peers.append(self.connect(node, idx, "block-relay-only", reduced_data=False))
             peers[-1].sync_with_ping()

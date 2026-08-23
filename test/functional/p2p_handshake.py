@@ -128,7 +128,7 @@ class P2PHandshakeTest(BitcoinTestFramework):
         peer2.sync_with_ping()
         assert len(node.getpeerinfo()) == 2
         # Third non-BIP110 peer should be rejected
-        with node.assert_debug_log(["peer lacks NODE_REDUCED_DATA and already have 2 non-BIP110 outbound peers"]):
+        with node.assert_debug_log(["peer uses stale consensus rules and already have 2 stale outbound peers"]):
             node.add_outbound_p2p_connection(
                 P2PInterface(), p2p_idx=2, wait_for_disconnect=True,
                 connection_type="outbound-full-relay", services=non_bip110_services,
