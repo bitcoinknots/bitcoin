@@ -4723,9 +4723,11 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     if (block.GetBlockTime() <= pindexPrev->GetMedianTimePast())
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "time-too-old", "block's timestamp is too early");
 
-    // Testnet4 and regtest only: Check timestamp against prev for difficulty-adjustment
-    // blocks to prevent timewarp attacks (see https://github.com/bitcoin/bitcoin/pull/15482).
-    if (consensusParams.enforce_BIP94) {
+    // Check timestamp against prev for difficulty-adjustment blocks to prevent
+    // timewarp attacks (see https://github.com/bitcoin/bitcoin/pull/15482).
+    // Enforced on testnet4 and regtest from genesis, and everywhere else from
+    // the BLAKE2b hardfork.
+    if (consensusParams.EnforceTimewarpRule(nHeight)) {
         // Check timestamp for the first block of each difficulty adjustment
         // interval, except the genesis block.
         if (nHeight % consensusParams.DifficultyAdjustmentInterval() == 0) {

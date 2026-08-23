@@ -195,6 +195,21 @@ struct Params {
     {
         return IsBlake2bHeight(height) && mtp_prev < RdtsExpiryTime;
     }
+
+    /**
+     * Whether BIP94's timewarp guard applies to a block at this height.
+     *
+     * Chains that already enforce BIP94 are unaffected. Everywhere else the
+     * rule starts at the BLAKE2b hardfork, so no block mined before it is
+     * retroactively invalidated. This deliberately does not touch the other
+     * half of enforce_BIP94, the retarget reading pindexFirst->nBits rather
+     * than pindexLast->nBits; on a chain with no min-difficulty exception
+     * those are the same value, but the flag stays the way to opt into it.
+     */
+    bool EnforceTimewarpRule(int height) const
+    {
+        return enforce_BIP94 || IsBlake2bHeight(height);
+    }
 };
 
 } // namespace Consensus
