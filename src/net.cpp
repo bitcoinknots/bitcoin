@@ -2898,6 +2898,7 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect, Spa
         const auto current_time{NodeClock::now()};
         int nTries = 0;
         const auto reachable_nets{g_reachable_nets.All()};
+        const bool prefer_blake2b{m_msgproc->ShouldPreferBlake2bPeers()};
 
         while (!interruptNet)
         {
@@ -2976,6 +2977,16 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect, Spa
             if (!fFeeler && !m_msgproc->HasAllDesirableServiceFlags(addr.nServices)) {
                 continue;
             } else if (fFeeler && !MayHaveUsefulAddressDB(addr.nServices)) {
+                continue;
+            }
+
+            // Past the fork, non-upgraded peers cannot serve BLAKE2b blocks, so
+            // hold out for a NODE_BLAKE2B candidate for the first tries; fall
+            // through afterwards so outbound is never starved. Non-HF peers are
+            // still kept as stale outbound (DemoteToStaleOutbound) for pre-fork
+            // block download.
+            if (!fFeeler && SkipForBlake2bPreference(addr.nServices, prefer_blake2b, nTries)) {
+                LogDebug(BCLog::NET, "Skipping outbound candidate %s: holding out for a NODE_BLAKE2B peer (try %d)\n", addr.ToStringAddrPort(), nTries);
                 continue;
             }
 

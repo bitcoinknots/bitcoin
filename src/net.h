@@ -1047,6 +1047,19 @@ private:
     std::unique_ptr<i2p::sam::Session> m_i2p_sam_session GUARDED_BY(m_sock_mutex);
 };
 
+/** Max addrman tries to hold out for a NODE_BLAKE2B peer before accepting any candidate. */
+static constexpr int MAX_BLAKE2B_BIAS_TRIES{80};
+
+/**
+ * Whether to skip an outbound candidate that lacks NODE_BLAKE2B to hold out for
+ * a hardfork-capable peer. Returns false once the bias window (tries > bias_tries)
+ * is exhausted, so outbound is never starved.
+ */
+inline bool SkipForBlake2bPreference(ServiceFlags candidate_services, bool prefer_blake2b, int tries, int bias_tries = MAX_BLAKE2B_BIAS_TRIES)
+{
+    return prefer_blake2b && tries <= bias_tries && !(candidate_services & NODE_BLAKE2B);
+}
+
 /**
  * Interface for message handling
  */
@@ -1067,6 +1080,13 @@ public:
      * for a peer to be "relevant".
      */
     virtual bool HasAllDesirableServiceFlags(ServiceFlags services) const = 0;
+
+    /**
+     * Whether outbound selection should prefer NODE_BLAKE2B peers, i.e. we are at
+     * or past the BLAKE2b fork height. Non-HF peers remain usable as stale
+     * outbound for pre-fork block download.
+     */
+    virtual bool ShouldPreferBlake2bPeers() const = 0;
 
     /**
     * Process protocol messages received from a given node

@@ -1590,4 +1590,24 @@ BOOST_AUTO_TEST_CASE(v2transport_test)
     }
 }
 
+BOOST_AUTO_TEST_CASE(blake2b_outbound_preference)
+{
+    const ServiceFlags hf{ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_BLAKE2B)};
+    const ServiceFlags non_hf{ServiceFlags(NODE_NETWORK | NODE_WITNESS)};
+
+    // Past the fork (prefer_blake2b=true): within the bias window, skip a
+    // candidate that does not advertise NODE_BLAKE2B, but keep one that does.
+    BOOST_CHECK(SkipForBlake2bPreference(non_hf, /*prefer_blake2b=*/true, /*tries=*/1, /*bias_tries=*/80));
+    BOOST_CHECK(!SkipForBlake2bPreference(hf, /*prefer_blake2b=*/true, /*tries=*/1, /*bias_tries=*/80));
+
+    // Not past the fork (prefer_blake2b=false): never skip, any peer is fine.
+    BOOST_CHECK(!SkipForBlake2bPreference(non_hf, /*prefer_blake2b=*/false, /*tries=*/1, /*bias_tries=*/80));
+    BOOST_CHECK(!SkipForBlake2bPreference(hf, /*prefer_blake2b=*/false, /*tries=*/1, /*bias_tries=*/80));
+
+    // Bias window exhausted: fall through and accept a non-HF peer (no starvation).
+    BOOST_CHECK(!SkipForBlake2bPreference(non_hf, /*prefer_blake2b=*/true, /*tries=*/81, /*bias_tries=*/80));
+    // Boundary: at exactly bias_tries we still hold out; one past we accept.
+    BOOST_CHECK(SkipForBlake2bPreference(non_hf, /*prefer_blake2b=*/true, /*tries=*/80, /*bias_tries=*/80));
+}
+
 BOOST_AUTO_TEST_SUITE_END()
