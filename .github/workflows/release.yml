@@ -1,0 +1,556 @@
+# Copyright (c) 2026 The Bitcoin Purity developers
+# Distributed under the MIT software license.
+
+name: Build Release
+
+on:
+  # Automatically build and publish when a version tag is pushed.
+  push:
+    tags:
+      - 'v*'
+
+  # Also allow manual test runs from the Actions page.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  # ============================================================
+  # Linux x86_64
+  # ============================================================
+  linux-x86_64:
+    name: Linux x86_64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            pkgconf \
+            python3 \
+            libevent-dev \
+            libboost-dev \
+            libsqlite3-dev \
+            libdb++-dev \
+            libminiupnpc-dev \
+            libzmq3-dev \
+            qtbase5-dev \
+            qttools5-dev \
+            qttools5-dev-tools \
+            qtwayland5 \
+            libqrencode-dev \
+            librsvg2-bin \
+            imagemagick
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+            -DBUILD_GUI=ON \
+            -DWITH_BDB=ON \
+            -DWARN_INCOMPATIBLE_BDB=OFF \
+            -DWITH_MINIUPNPC=ON \
+            -DWITH_ZMQ=ON \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_BENCH=OFF
+
+      - name: Build
+        run: |
+          cmake --build build \
+            --config ${BUILD_TYPE} \
+            -j "$(nproc)"
+
+      - name: Show binaries
+        run: |
+          find build/bin -maxdepth 2 -type f -print
+
+      - name: Prepare package
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME:-manual}"
+          PACKAGE="bitcoin-purity-${VERSION}-x86_64-linux-gnu"
+
+          mkdir -p "release/${PACKAGE}/bin"
+
+          find build/bin -maxdepth 1 -type f -executable \
+            -exec cp -v {} "release/${PACKAGE}/bin/" \;
+
+          cp -v README.md "release/${PACKAGE}/" 2>/dev/null || true
+          cp -v COPYING "release/${PACKAGE}/" 2>/dev/null || true
+
+          tar \
+            -C release \
+            -czf "${PACKAGE}.tar.gz" \
+            "${PACKAGE}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: bitcoin-purity-*.tar.gz
+          if-no-files-found: error
+
+
+  # ============================================================
+  # Linux ARM64
+  # Raspberry Pi 4 / 5 running 64-bit Linux
+  # ============================================================
+  linux-arm64:
+    name: Linux ARM64
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            pkgconf \
+            python3 \
+            libevent-dev \
+            libboost-dev \
+            libsqlite3-dev \
+            libdb++-dev \
+            libminiupnpc-dev \
+            libzmq3-dev \
+            qtbase5-dev \
+            qttools5-dev \
+            qttools5-dev-tools \
+            qtwayland5 \
+            libqrencode-dev \
+            librsvg2-bin \
+            imagemagick
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+            -DBUILD_GUI=ON \
+            -DWITH_BDB=ON \
+            -DWARN_INCOMPATIBLE_BDB=OFF \
+            -DWITH_MINIUPNPC=ON \
+            -DWITH_ZMQ=ON \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_BENCH=OFF
+
+      - name: Build
+        run: |
+          cmake --build build \
+            --config ${BUILD_TYPE} \
+            -j "$(nproc)"
+
+      - name: Show binaries
+        run: |
+          find build/bin -maxdepth 2 -type f -print
+
+      - name: Prepare package
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME:-manual}"
+          PACKAGE="bitcoin-purity-${VERSION}-aarch64-linux-gnu"
+
+          mkdir -p "release/${PACKAGE}/bin"
+
+          find build/bin -maxdepth 1 -type f -executable \
+            -exec cp -v {} "release/${PACKAGE}/bin/" \;
+
+          cp -v README.md "release/${PACKAGE}/" 2>/dev/null || true
+          cp -v COPYING "release/${PACKAGE}/" 2>/dev/null || true
+
+          tar \
+            -C release \
+            -czf "${PACKAGE}.tar.gz" \
+            "${PACKAGE}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64
+          path: bitcoin-purity-*.tar.gz
+          if-no-files-found: error
+
+
+  # ============================================================
+  # macOS Apple Silicon
+  # ============================================================
+  macos-arm64:
+    name: macOS Apple Silicon
+    runs-on: macos-14
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_15.0.app
+          clang --version
+
+      - name: Install dependencies
+        env:
+          HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
+        run: |
+          brew install --quiet python@3 || brew link --overwrite python@3
+          brew install --quiet \
+            coreutils \
+            ninja \
+            pkgconf \
+            gnu-getopt \
+            boost \
+            libevent \
+            miniupnpc \
+            zeromq \
+            qt@5 \
+            qrencode \
+            imagemagick \
+            libicns \
+            librsvg
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+            -DBUILD_GUI=ON \
+            -DWITH_BDB=OFF \
+            -DWITH_MINIUPNPC=ON \
+            -DWITH_ZMQ=ON \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_BENCH=OFF
+
+      - name: Build
+        run: |
+          cmake --build build \
+            --config ${BUILD_TYPE} \
+            -j "$(sysctl -n hw.logicalcpu)"
+
+      - name: Show binaries
+        run: |
+          find build/bin -maxdepth 2 -type f -print
+
+      - name: Prepare package
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME:-manual}"
+          PACKAGE="bitcoin-purity-${VERSION}-arm64-apple-darwin"
+
+          mkdir -p "release/${PACKAGE}/bin"
+
+          find build/bin -maxdepth 1 -type f -perm +111 \
+            -exec cp -v {} "release/${PACKAGE}/bin/" \;
+
+          cp -v README.md "release/${PACKAGE}/" 2>/dev/null || true
+          cp -v COPYING "release/${PACKAGE}/" 2>/dev/null || true
+
+          tar \
+            -C release \
+            -czf "${PACKAGE}.tar.gz" \
+            "${PACKAGE}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64
+          path: bitcoin-purity-*.tar.gz
+          if-no-files-found: error
+
+
+  # ============================================================
+  # macOS Intel x86_64
+  # ============================================================
+  macos-x86_64:
+    if: false
+    name: macOS Intel
+    runs-on: macos-13
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Show architecture
+        run: |
+          uname -a
+          uname -m
+          clang --version
+
+      - name: Install dependencies
+        env:
+          HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
+        run: |
+          brew install --quiet python@3 || brew link --overwrite python@3
+          brew install --quiet \
+            coreutils \
+            ninja \
+            pkgconf \
+            gnu-getopt \
+            boost \
+            libevent \
+            miniupnpc \
+            zeromq \
+            qt@5 \
+            qrencode \
+            imagemagick \
+            libicns \
+            librsvg
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+            -DBUILD_GUI=ON \
+            -DWITH_BDB=OFF \
+            -DWITH_MINIUPNPC=ON \
+            -DWITH_ZMQ=ON \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_BENCH=OFF
+
+      - name: Build
+        run: |
+          cmake --build build \
+            --config ${BUILD_TYPE} \
+            -j "$(sysctl -n hw.logicalcpu)"
+
+      - name: Show binaries
+        run: |
+          find build/bin -maxdepth 2 -type f -print
+
+      - name: Prepare package
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME:-manual}"
+          PACKAGE="bitcoin-purity-${VERSION}-x86_64-apple-darwin"
+
+          mkdir -p "release/${PACKAGE}/bin"
+
+          find build/bin -maxdepth 1 -type f -perm +111 \
+            -exec cp -v {} "release/${PACKAGE}/bin/" \;
+
+          cp -v README.md "release/${PACKAGE}/" 2>/dev/null || true
+          cp -v COPYING "release/${PACKAGE}/" 2>/dev/null || true
+
+          tar \
+            -C release \
+            -czf "${PACKAGE}.tar.gz" \
+            "${PACKAGE}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-x86_64
+          path: bitcoin-purity-*.tar.gz
+          if-no-files-found: error
+
+
+  # ============================================================
+  # Windows x64
+  # ============================================================
+  windows-x86_64:
+    name: Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 120
+
+    env:
+      PYTHONUTF8: 1
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Set up Visual Studio Developer Prompt
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $vswherePath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $installationPath = & $vswherePath -latest -property installationPath
+
+          $cmd = "`"$installationPath\Common7\Tools\VsDevCmd.bat`" -arch=x64 -no_logo && set"
+
+          cmd.exe /s /c $cmd | ForEach-Object {
+            if ($_ -match '^(.*?)=(.*)$') {
+              $name = $matches[1]
+              $value = $matches[2]
+
+              "$name=$value" | Out-File `
+                -FilePath $env:GITHUB_ENV `
+                -Encoding utf8 `
+                -Append
+            }
+          }
+          
+      - name: Configure vcpkg
+        shell: bash
+        run: |
+          echo "set(VCPKG_BUILD_TYPE release)" \
+            >> "${VCPKG_INSTALLATION_ROOT}/triplets/x64-windows.cmake"
+
+          echo "set(VCPKG_BUILD_TYPE release)" \
+            >> "${VCPKG_INSTALLATION_ROOT}/triplets/x64-windows-static.cmake"
+
+          # libevent compatibility with newer CMake.
+          sed -i \
+            '1s/^/set(ENV{CMAKE_POLICY_VERSION_MINIMUM} 3.5)\n/' \
+            "${VCPKG_INSTALLATION_ROOT}/scripts/ports.cmake"
+      
+      - name: Install rsvg-convert
+        shell: pwsh
+        run: |
+          choco install msys2 -y --no-progress
+
+          C:\tools\msys64\usr\bin\bash.exe -lc "
+            pacman -Sy --noconfirm &&
+            pacman -S --noconfirm mingw-w64-x86_64-librsvg
+          "
+
+          "C:\tools\msys64\mingw64\bin" | Out-File `
+            -FilePath $env:GITHUB_PATH `
+            -Encoding utf8 `
+            -Append
+      
+      - name: Verify rsvg-convert
+        shell: pwsh
+        run: |
+          rsvg-convert --version      
+      
+      - name: Configure
+        shell: pwsh
+        run: |
+          cmake -B build `
+            --preset vs2022-static `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake" `
+            -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=OFF `
+            -DBUILD_GUI=ON `
+            -DWITH_BDB=ON `
+            -DWARN_INCOMPATIBLE_BDB=OFF `
+            -DWITH_MINIUPNPC=ON `
+            -DWITH_ZMQ=ON `
+            -DBUILD_TESTS=OFF `
+            -DBUILD_BENCH=OFF
+
+      - name: Build
+        shell: pwsh
+        run: |
+          cmake --build build `
+            --config Release `
+            -j $env:NUMBER_OF_PROCESSORS
+
+      - name: Show binaries
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse build\bin
+
+      - name: Prepare package
+        shell: pwsh
+        run: |
+          $version = "${env:GITHUB_REF_NAME}"
+
+          if ([string]::IsNullOrWhiteSpace($version)) {
+              $version = "manual"
+          }
+
+          $package = "bitcoin-purity-$version-win64"
+          $target = "release\$package\bin"
+
+          New-Item `
+            -ItemType Directory `
+            -Force `
+            -Path $target | Out-Null
+
+          Get-ChildItem `
+            "build\bin\Release\*.exe" `
+            -ErrorAction Stop |
+            Copy-Item `
+              -Destination $target
+
+          if (Test-Path "README.md") {
+              Copy-Item "README.md" "release\$package\"
+          }
+
+          if (Test-Path "COPYING") {
+              Copy-Item "COPYING" "release\$package\"
+          }
+
+          Compress-Archive `
+            -Path "release\$package" `
+            -DestinationPath "$package.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: bitcoin-purity-*.zip
+          if-no-files-found: error
+
+
+  # ============================================================
+  # Create final GitHub Release
+  # ============================================================
+  release:
+    name: Publish GitHub Release
+
+    needs:
+      - linux-x86_64
+      - linux-arm64
+      - macos-arm64
+      - windows-x86_64
+
+    runs-on: ubuntu-24.04
+
+    # Manual workflow runs build artifacts only.
+    # Actual GitHub Release is created only for tags.
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: List release files
+        run: |
+          find release-artifacts \
+            -maxdepth 1 \
+            -type f \
+            -print
+
+      - name: Generate SHA256SUMS
+        working-directory: release-artifacts
+        run: |
+          sha256sum \
+            bitcoin-purity-*.tar.gz \
+            bitcoin-purity-*.zip \
+            > SHA256SUMS
+
+          cat SHA256SUMS
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            release-artifacts/bitcoin-purity-*.tar.gz \
+            release-artifacts/bitcoin-purity-*.zip \
+            release-artifacts/SHA256SUMS \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "Bitcoin Purity ${GITHUB_REF_NAME}" \
+            --generate-notes
