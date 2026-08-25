@@ -183,7 +183,6 @@ PartiallySignedTransaction ProcessPSBT(const std::string& psbt_string, const std
     }
 
     // Signing opts in wherever the fork is scheduled.
-    const SighashRules sighash_rules{SighashRulesForSigning(gArgs, Params().GetConsensus())};
 
     if (g_txindex) g_txindex->BlockUntilSyncedToCurrentChain();
     const NodeContext& node = EnsureAnyNodeContext(context);
@@ -269,7 +268,7 @@ PartiallySignedTransaction ProcessPSBT(const std::string& psbt_string, const std
         // Note that SignPSBTInput does a lot more than just constructing ECDSA signatures.
         // We only actually care about those if our signing provider doesn't hide private
         // information, as is the case with `descriptorprocesspsbt`
-    SignPSBTInput(provider, psbtx, /*index=*/i, &txdata, sighash_type, /*out_sigdata=*/nullptr, finalize, sighash_rules);
+        SignPSBTInput(provider, psbtx, /*index=*/i, &txdata, sighash_type, /*out_sigdata=*/nullptr, finalize);
     }
 
     // Update script/keypath information using descriptor data.
@@ -716,7 +715,6 @@ static RPCHelpMan combinerawtransaction()
     // Recognizing an opt-in signature needs the rules it was made under and the
     // spent outputs it commits to, or signatures already present in the inputs
     // being merged are invisible and the result silently loses them.
-    const SighashRules sighash_rules{SighashRulesForSigning(gArgs, Params().GetConsensus())};
     PrecomputedTransactionData txdata;
     {
         std::vector<CTxOut> spent_outputs;
@@ -757,7 +755,7 @@ static RPCHelpMan combinerawtransaction()
                     }
                     return true;
                 }()};
-                sigdata.MergeSignatureData(DataFromTransaction(txv, i, coin.out, sighash_rules,
+                sigdata.MergeSignatureData(DataFromTransaction(txv, i, coin.out,
                                                               shares_aggregates ? &txdata : nullptr));
             }
         }
@@ -808,7 +806,7 @@ static RPCHelpMan signrawtransactionwithkey()
             "       \"ALL|ANYONECANPAY\"\n"
             "       \"NONE|ANYONECANPAY\"\n"
             "       \"SINGLE|ANYONECANPAY\"\n"
-            "       Append \"|UNIFIED\" for the unified signature hash, once the hardfork is active\n"
+            "       Append \"|UNIFIED\" for the unified signature hash\n"
                     },
                 },
                 RPCResult{
@@ -874,8 +872,7 @@ static RPCHelpMan signrawtransactionwithkey()
 
     UniValue result(UniValue::VOBJ);
     // Signing opts in wherever the fork is scheduled.
-    const SighashRules sighash_rules{SighashRulesForSigning(gArgs, Params().GetConsensus())};
-    SignTransaction(mtx, &keystore, coins, request.params[3], result, sighash_rules);
+    SignTransaction(mtx, &keystore, coins, request.params[3], result);
     return result;
 },
     };
@@ -1601,8 +1598,7 @@ static RPCHelpMan finalizepsbt()
     // Read under the same rules the signatures were made with, or a complete
     // transaction is reported incomplete because its opted-in signatures are not
     // recognized as signatures at all.
-    const SighashRules sighash_rules{SighashRulesForSigning(gArgs, Params().GetConsensus())};
-    bool complete = FinalizeAndExtractPSBT(psbtx, mtx, sighash_rules);
+    bool complete = FinalizeAndExtractPSBT(psbtx, mtx);
 
     UniValue result(UniValue::VOBJ);
     DataStream ssTx{};
@@ -1940,8 +1936,7 @@ static RPCHelpMan analyzepsbt()
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, strprintf("TX decode failed %s", error));
     }
 
-    const SighashRules sighash_rules{SighashRulesForSigning(gArgs, Params().GetConsensus())};
-    PSBTAnalysis psbta = AnalyzePSBT(psbtx, sighash_rules);
+    PSBTAnalysis psbta = AnalyzePSBT(psbtx);
 
     UniValue result(UniValue::VOBJ);
     UniValue inputs_result(UniValue::VARR);
@@ -2023,7 +2018,7 @@ RPCHelpMan descriptorprocesspsbt()
             "       \"ALL|ANYONECANPAY\"\n"
             "       \"NONE|ANYONECANPAY\"\n"
                     "       \"SINGLE|ANYONECANPAY\"\n"
-                    "       Append \"|UNIFIED\" for the unified signature hash, once the hardfork is active",
+                    "       Append \"|UNIFIED\" for the unified signature hash",
                                 RPCArgOptions{.also_positional = true}},
                             {"bip32derivs", RPCArg::Type::BOOL, RPCArg::Default{true}, "Include BIP 32 derivation paths for public keys if we know them", RPCArgOptions{.also_positional = true}},
                             {"finalize", RPCArg::Type::BOOL, RPCArg::Default{true}, "Also finalize inputs if possible", RPCArgOptions{.also_positional = true}},
@@ -2122,8 +2117,7 @@ RPCHelpMan descriptorprocesspsbt()
         PartiallySignedTransaction psbtx_copy = psbtx;
         // Finalization re-verifies the signatures, so it needs the same rules
         // they were produced under.
-        const SighashRules sighash_rules{SighashRulesForSigning(gArgs, Params().GetConsensus())};
-        CHECK_NONFATAL(FinalizeAndExtractPSBT(psbtx_copy, mtx, sighash_rules));
+        CHECK_NONFATAL(FinalizeAndExtractPSBT(psbtx_copy, mtx));
         DataStream ssTx_final;
         ssTx_final << TX_WITH_WITNESS(mtx);
         result.pushKV("hex", HexStr(ssTx_final));

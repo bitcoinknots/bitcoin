@@ -247,11 +247,11 @@ public:
     virtual bool CanProvide(const CScript& script, SignatureData& sigdata) { return false; }
 
     /** Creates new signatures and adds them to the transaction. Returns whether all inputs were signed */
-    virtual bool SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum = nullptr, SighashRules sighash_rules = SighashRules::LEGACY) const { return false; }
+    virtual bool SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum = nullptr) const { return false; }
     /** Sign a message with the given script */
     virtual SigningResult SignMessage(const MessageSignatureFormat format, const std::string& message, const CTxDestination& address, std::string& str_sig) const { return SigningResult::SIGNING_FAILED; };
     /** Adds script and derivation path information to a PSBT, and optionally signs it. */
-    virtual std::optional<common::PSBTError> FillPSBT(PartiallySignedTransaction& psbt, const PrecomputedTransactionData& txdata, int sighash_type = SIGHASH_DEFAULT, bool sign = true, bool bip32derivs = false, int* n_signed = nullptr, bool finalize = true, SighashRules sighash_rules = SighashRules::LEGACY, std::vector<bilingual_str>* warnings = nullptr) const { return common::PSBTError::UNSUPPORTED; }
+    virtual std::optional<common::PSBTError> FillPSBT(PartiallySignedTransaction& psbt, const PrecomputedTransactionData& txdata, int sighash_type = SIGHASH_DEFAULT, bool sign = true, bool bip32derivs = false, int* n_signed = nullptr, bool finalize = true, std::vector<bilingual_str>* warnings = nullptr) const { return common::PSBTError::UNSUPPORTED; }
 
     virtual uint256 GetID() const { return uint256(); }
 
@@ -499,9 +499,9 @@ public:
 
     bool CanGetAddresses(bool internal = false) const override;
 
-    bool SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum = nullptr, SighashRules sighash_rules = SighashRules::LEGACY) const override;
+    bool SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum = nullptr) const override;
     SigningResult SignMessage(const MessageSignatureFormat format, const std::string& message, const CTxDestination& address, std::string& str_sig) const override;
-    std::optional<common::PSBTError> FillPSBT(PartiallySignedTransaction& psbt, const PrecomputedTransactionData& txdata, int sighash_type = SIGHASH_DEFAULT, bool sign = true, bool bip32derivs = false, int* n_signed = nullptr, bool finalize = true, SighashRules sighash_rules = SighashRules::LEGACY, std::vector<bilingual_str>* warnings = nullptr) const override;
+    std::optional<common::PSBTError> FillPSBT(PartiallySignedTransaction& psbt, const PrecomputedTransactionData& txdata, int sighash_type = SIGHASH_DEFAULT, bool sign = true, bool bip32derivs = false, int* n_signed = nullptr, bool finalize = true, std::vector<bilingual_str>* warnings = nullptr) const override;
 
     uint256 GetID() const override;
 
@@ -690,9 +690,9 @@ public:
     // Fetch the SigningProvider for the given pubkey and always include private keys. This should only be called by signing code.
     std::unique_ptr<FlatSigningProvider> GetSigningProvider(const CPubKey& pubkey) const;
 
-    bool SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum = nullptr, SighashRules sighash_rules = SighashRules::LEGACY) const override;
+    bool SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum = nullptr) const override;
     SigningResult SignMessage(const MessageSignatureFormat format, const std::string& message, const CTxDestination& address, std::string& str_sig) const override;
-    std::optional<common::PSBTError> FillPSBT(PartiallySignedTransaction& psbt, const PrecomputedTransactionData& txdata, int sighash_type = SIGHASH_DEFAULT, bool sign = true, bool bip32derivs = false, int* n_signed = nullptr, bool finalize = true, SighashRules sighash_rules = SighashRules::LEGACY, std::vector<bilingual_str>* warnings = nullptr) const override;
+    std::optional<common::PSBTError> FillPSBT(PartiallySignedTransaction& psbt, const PrecomputedTransactionData& txdata, int sighash_type = SIGHASH_DEFAULT, bool sign = true, bool bip32derivs = false, int* n_signed = nullptr, bool finalize = true, std::vector<bilingual_str>* warnings = nullptr) const override;
 
     uint256 GetID() const override;
 

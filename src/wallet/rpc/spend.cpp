@@ -124,8 +124,7 @@ static UniValue FinishTransaction(const std::shared_ptr<CWallet> pwallet, const 
     // Read under the same rules the signatures were made with, or a complete
     // transaction is reported incomplete because its opted-in signatures are not
     // recognized as signatures at all.
-    complete = FinalizeAndExtractPSBT(psbtx, mtx,
-                                      SighashRulesForSigning(gArgs, Params().GetConsensus()));
+    complete = FinalizeAndExtractPSBT(psbtx, mtx);
 
     const bool psbt_opt_in{options.exists("psbt") && options["psbt"].get_bool()};
     bool add_to_wallet{options.exists("add_to_wallet") ? options["add_to_wallet"].get_bool() : true};
@@ -1025,7 +1024,7 @@ RPCHelpMan signrawtransactionwithwallet()
             "       \"ALL|ANYONECANPAY\"\n"
             "       \"NONE|ANYONECANPAY\"\n"
             "       \"SINGLE|ANYONECANPAY\"\n"
-            "       Append \"|UNIFIED\" for the unified signature hash, once the hardfork is active"},
+            "       Append \"|UNIFIED\" for the unified signature hash"},
                 },
                 RPCResult{
                     RPCResult::Type::OBJ, "", "",
@@ -1739,7 +1738,7 @@ RPCHelpMan walletprocesspsbt()
                     "       \"ALL|ANYONECANPAY\"\n"
                     "       \"NONE|ANYONECANPAY\"\n"
                     "       \"SINGLE|ANYONECANPAY\"\n"
-                    "       Append \"|UNIFIED\" for the unified signature hash, once the hardfork is active",
+                    "       Append \"|UNIFIED\" for the unified signature hash",
                                 RPCArgOptions{.also_positional = true}},
                             {"bip32derivs", RPCArg::Type::BOOL, RPCArg::Default{true}, "Include BIP 32 derivation paths for public keys if we know them", RPCArgOptions{.also_positional = true}},
                             {"finalize", RPCArg::Type::BOOL, RPCArg::Default{true}, "Also finalize inputs if possible", RPCArgOptions{.also_positional = true}},
@@ -1839,8 +1838,7 @@ RPCHelpMan walletprocesspsbt()
     if (complete) {
         CMutableTransaction mtx;
         // Returns true if complete, which we already think it is.
-        CHECK_NONFATAL(FinalizeAndExtractPSBT(psbtx, mtx,
-                                              SighashRulesForSigning(gArgs, Params().GetConsensus())));
+        CHECK_NONFATAL(FinalizeAndExtractPSBT(psbtx, mtx));
         DataStream ssTx_final;
         ssTx_final << TX_WITH_WITNESS(mtx);
         result.pushKV("hex", HexStr(ssTx_final));

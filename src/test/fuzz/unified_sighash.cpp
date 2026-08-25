@@ -140,9 +140,9 @@ FUZZ_TARGET(unified_sighash)
         }
 
         // Missing context is refused rather than treated as absent.
-        ScriptExecutionData uninitialised;
+        ScriptExecutionData uninitialized;
         uint256 unused;
-        Assert(!SignatureHashUnified(unused, script_code, tx, in_pos, hash_type, sigversion, txdata, &uninitialised));
+        Assert(!SignatureHashUnified(unused, script_code, tx, in_pos, hash_type, sigversion, txdata, &uninitialized));
         Assert(!SignatureHashUnified(unused, script_code, tx, in_pos, hash_type, sigversion, txdata, nullptr));
     }
 

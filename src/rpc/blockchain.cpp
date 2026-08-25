@@ -9,6 +9,7 @@
 
 #include <blockfilter.h>
 #include <chain.h>
+#include <common/sighash_rules.h>
 #include <chainparams.h>
 #include <chainparamsbase.h>
 #include <clientversion.h>
@@ -736,6 +737,9 @@ static RPCHelpMan sweepprivkeys()
             const auto& utxo = input_txos[input_index];
             SignatureData sig_data;
             MutableTransactionSignatureCreator creator(tx, input_index, utxo.nValue, &txdata, SIGHASH_ALL);
+            // A swept key is the case replay protection matters most for: it is
+            // the one most likely already known to someone else.
+            creator.SetSighashRules(SighashRulesForSigning());
             if (!ProduceSignature(temp_keystore, creator, utxo.scriptPubKey, sig_data)) {
                 throw JSONRPCError(RPC_MISC_ERROR, "Failed to sign");
             }
@@ -1913,7 +1917,7 @@ RPCHelpMan getdeploymentinfo()
                 {RPCResult::Type::OBJ_DYN, "deployments", "", {
                     {RPCResult::Type::OBJ, "xxxx", "name of the deployment", RPCHelpForDeployment}
                 }},
-                {RPCResult::Type::OBJ, "hardfork", /*optional=*/true, "hardfork schedule, present only when one is configured", {
+                {RPCResult::Type::OBJ, "blake2b", /*optional=*/true, "hardfork schedule, present only when one is configured", {
                     {RPCResult::Type::NUM, "height", "the height the hardfork activates at"},
                     {RPCResult::Type::BOOL, "active", "whether the hardfork rules apply to the block after this one"},
                 }},
@@ -1956,7 +1960,7 @@ RPCHelpMan getdeploymentinfo()
                 // open-coded so this cannot drift from consensus.
                 hf.pushKV("active", DeploymentActiveAfter(blockindex, chainman,
                                                           Consensus::DEPLOYMENT_BLAKE2B));
-                deploymentinfo.pushKV("hardfork", std::move(hf));
+                deploymentinfo.pushKV("blake2b", std::move(hf));
             }
             return deploymentinfo;
         },

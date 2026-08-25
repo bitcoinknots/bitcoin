@@ -60,8 +60,7 @@ void PSBTOperationsDialog::openWithPSBT(PartiallySignedTransaction psbtx)
     m_transaction_data = psbtx;
 
     // Make sure all existing signatures are fully combined before checking for completeness.
-    const SighashRules sighash_rules{SighashRulesForSigning(gArgs, Params().GetConsensus())};
-    bool complete = FinalizePSBT(psbtx, sighash_rules);
+    bool complete = FinalizePSBT(psbtx);
     if (m_wallet_model) {
         size_t n_could_sign;
         const auto err{m_wallet_model->wallet().fillPSBT(SIGHASH_ALL, /*sign=*/false, /*bip32derivs=*/true, &n_could_sign, m_transaction_data, complete)};
@@ -115,7 +114,7 @@ void PSBTOperationsDialog::signTransaction()
 void PSBTOperationsDialog::broadcastTransaction()
 {
     CMutableTransaction mtx;
-    if (!FinalizeAndExtractPSBT(m_transaction_data, mtx, SighashRulesForSigning(gArgs, Params().GetConsensus()))) {
+    if (!FinalizeAndExtractPSBT(m_transaction_data, mtx)) {
         // This is never expected to fail unless we were given a malformed PSBT
         // (e.g. with an invalid signature.)
         showStatus(tr("Unknown error processing transaction."), StatusLevel::ERR);
@@ -200,7 +199,7 @@ QString PSBTOperationsDialog::renderTransaction(const PartiallySignedTransaction
         tx_description.append("<br>");
     }
 
-    PSBTAnalysis analysis = AnalyzePSBT(psbtx, SighashRulesForSigning(gArgs, Params().GetConsensus()));
+    PSBTAnalysis analysis = AnalyzePSBT(psbtx);
     tx_description.append(bullet_point);
     if (!*analysis.fee) {
         // This happens if the transaction is missing input UTXO information.
@@ -271,7 +270,7 @@ size_t PSBTOperationsDialog::couldSignInputs(const PartiallySignedTransaction &p
 }
 
 void PSBTOperationsDialog::showTransactionStatus(const PartiallySignedTransaction &psbtx) {
-    PSBTAnalysis analysis = AnalyzePSBT(psbtx, SighashRulesForSigning(gArgs, Params().GetConsensus()));
+    PSBTAnalysis analysis = AnalyzePSBT(psbtx);
     size_t n_could_sign = couldSignInputs(psbtx);
 
     switch (analysis.next) {

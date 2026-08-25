@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <common/sighash_rules.h>
 #include <psbt.h>
 
 #include <node/types.h>
@@ -295,7 +296,7 @@ bool PSBTInputSigned(const PSBTInput& input)
     return !input.final_script_sig.empty() || !input.final_script_witness.IsNull();
 }
 
-bool PSBTInputSignedAndVerified(const PartiallySignedTransaction psbt, unsigned int input_index, const PrecomputedTransactionData* txdata, SighashRules sighash_rules)
+bool PSBTInputSignedAndVerified(const PartiallySignedTransaction psbt, unsigned int input_index, const PrecomputedTransactionData* txdata)
 {
     CTxOut utxo;
     assert(input_index < psbt.inputs.size());
@@ -318,7 +319,7 @@ bool PSBTInputSignedAndVerified(const PartiallySignedTransaction psbt, unsigned 
     }
 
     if (txdata) {
-        const unsigned int flags{STANDARD_SCRIPT_VERIFY_FLAGS | (sighash_rules == SighashRules::UNIFIED ? uint32_t{SCRIPT_VERIFY_UNIFIED_SIGHASH} : uint32_t{0})};
+        const unsigned int flags{STANDARD_SCRIPT_VERIFY_FLAGS | (SighashRulesForVerifying() == SighashRules::UNIFIED ? uint32_t{SCRIPT_VERIFY_UNIFIED_SIGHASH} : uint32_t{0})};
         return VerifyScript(input.final_script_sig, utxo.scriptPubKey, &input.final_script_witness, flags, MutableTransactionSignatureChecker{&(*psbt.tx), input_index, utxo.nValue, *txdata, MissingDataBehavior::FAIL});
     } else {
         return VerifyScript(input.final_script_sig, utxo.scriptPubKey, &input.final_script_witness, STANDARD_SCRIPT_VERIFY_FLAGS, MutableTransactionSignatureChecker{&(*psbt.tx), input_index, utxo.nValue, MissingDataBehavior::FAIL});
@@ -373,12 +374,13 @@ PrecomputedTransactionData PrecomputePSBTData(const PartiallySignedTransaction& 
     return txdata;
 }
 
-bool SignPSBTInput(const SigningProvider& provider, PartiallySignedTransaction& psbt, int index, const PrecomputedTransactionData* txdata, int sighash,  SignatureData* out_sigdata, bool finalize, SighashRules sighash_rules)
+bool SignPSBTInput(const SigningProvider& provider, PartiallySignedTransaction& psbt, int index, const PrecomputedTransactionData* txdata, int sighash,  SignatureData* out_sigdata, bool finalize)
 {
+    const SighashRules sighash_rules{SighashRulesForSigning()};
     PSBTInput& input = psbt.inputs.at(index);
     const CMutableTransaction& tx = *psbt.tx;
 
-    if (PSBTInputSignedAndVerified(psbt, index, txdata, sighash_rules)) {
+    if (PSBTInputSignedAndVerified(psbt, index, txdata)) {
         return true;
     }
 
@@ -505,7 +507,7 @@ void RemoveUnnecessaryTransactions(PartiallySignedTransaction& psbtx, const int&
     }
 }
 
-bool FinalizePSBT(PartiallySignedTransaction& psbtx, SighashRules sighash_rules)
+bool FinalizePSBT(PartiallySignedTransaction& psbtx)
 {
     // Finalize input signatures -- in case we have partial signatures that add up to a complete
     //   signature, but have not combined them yet (e.g. because the combiner that created this
@@ -514,17 +516,17 @@ bool FinalizePSBT(PartiallySignedTransaction& psbtx, SighashRules sighash_rules)
     bool complete = true;
     const PrecomputedTransactionData txdata = PrecomputePSBTData(psbtx);
     for (unsigned int i = 0; i < psbtx.tx->vin.size(); ++i) {
-        complete &= SignPSBTInput(DUMMY_SIGNING_PROVIDER, psbtx, i, &txdata, SIGHASH_ALL, nullptr, true, sighash_rules);
+        complete &= SignPSBTInput(DUMMY_SIGNING_PROVIDER, psbtx, i, &txdata, SIGHASH_ALL, nullptr, true);
     }
 
     return complete;
 }
 
-bool FinalizeAndExtractPSBT(PartiallySignedTransaction& psbtx, CMutableTransaction& result, SighashRules sighash_rules)
+bool FinalizeAndExtractPSBT(PartiallySignedTransaction& psbtx, CMutableTransaction& result)
 {
     // It's not safe to extract a PSBT that isn't finalized, and there's no easy way to check
     //   whether a PSBT is finalized without finalizing it, so we just do this.
-    if (!FinalizePSBT(psbtx, sighash_rules)) {
+    if (!FinalizePSBT(psbtx)) {
         return false;
     }
 

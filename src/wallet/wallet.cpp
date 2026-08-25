@@ -2306,13 +2306,12 @@ bool CWallet::SignTransaction(CMutableTransaction& tx) const
 
 bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum) const
 {
-    const SighashRules sighash_rules{SighashRulesForSigning(gArgs, Params().GetConsensus())};
 
     // Try to sign with all ScriptPubKeyMans
     for (ScriptPubKeyMan* spk_man : GetAllScriptPubKeyMans()) {
         // spk_man->SignTransaction will return true if the transaction is complete,
         // so we can exit early and return true if that happens
-        if (spk_man->SignTransaction(tx, coins, sighash, input_errors, inputs_amount_sum, sighash_rules)) {
+        if (spk_man->SignTransaction(tx, coins, sighash, input_errors, inputs_amount_sum)) {
             return true;
         }
     }
@@ -2324,7 +2323,6 @@ bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint,
 std::optional<PSBTError> CWallet::FillPSBT(PartiallySignedTransaction& psbtx, bool& complete, int sighash_type, bool sign, bool bip32derivs, size_t * n_signed, bool finalize, std::vector<bilingual_str>* warnings) const
 {
     // Signing opts in wherever the fork is scheduled.
-    const SighashRules sighash_rules{SighashRulesForSigning(gArgs, Params().GetConsensus())};
     if (n_signed) {
         *n_signed = 0;
     }
@@ -2356,7 +2354,7 @@ std::optional<PSBTError> CWallet::FillPSBT(PartiallySignedTransaction& psbtx, bo
     // Fill in information from ScriptPubKeyMans
     for (ScriptPubKeyMan* spk_man : GetAllScriptPubKeyMans()) {
         int n_signed_this_spkm = 0;
-        const auto error{spk_man->FillPSBT(psbtx, txdata, sighash_type, sign, bip32derivs, &n_signed_this_spkm, finalize, sighash_rules, warnings)};
+        const auto error{spk_man->FillPSBT(psbtx, txdata, sighash_type, sign, bip32derivs, &n_signed_this_spkm, finalize, warnings)};
         if (error) {
             return error;
         }
@@ -2371,7 +2369,7 @@ std::optional<PSBTError> CWallet::FillPSBT(PartiallySignedTransaction& psbtx, bo
     // Complete if every input is now signed
     complete = true;
     for (size_t i = 0; i < psbtx.inputs.size(); ++i) {
-        complete &= PSBTInputSignedAndVerified(psbtx, i, &txdata, sighash_rules);
+        complete &= PSBTInputSignedAndVerified(psbtx, i, &txdata);
     }
 
     return {};

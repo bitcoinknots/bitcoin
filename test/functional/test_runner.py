@@ -95,7 +95,6 @@ BASE_SCRIPTS = [
     # vv Tests less than 5m vv
     'feature_fee_estimation.py',
     'feature_unified_sighash.py --descriptors',
-    'feature_unified_sighash_crossing.py',
     'rpc_combinerawtransaction_unified.py --descriptors',
     'feature_taproot.py',
     'feature_reduced_data_temporary_deployment.py',
