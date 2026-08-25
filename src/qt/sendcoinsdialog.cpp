@@ -4,6 +4,8 @@
 
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
+#include <common/args.h>
+#include <common/sighash_rules.h>
 #include <qt/sendcoinsdialog.h>
 #include <qt/forms/ui_sendcoinsdialog.h>
 
@@ -495,7 +497,7 @@ bool SendCoinsDialog::signWithExternalSigner(PartiallySignedTransaction& psbtx, 
     }
     // fillPSBT does not always properly finalize
     complete = FinalizeAndExtractPSBT(psbtx, mtx,
-                                      SighashRulesForSigning(Params().GetConsensus()));
+                                      SighashRulesForSigning(gArgs, Params().GetConsensus()));
     return true;
 }
 

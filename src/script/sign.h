@@ -116,7 +116,7 @@ bool ProduceSignature(const SigningProvider& provider, const BaseSignatureCreato
  *
  * sighash_rules must match the rules the existing signatures were made under, and
  * txdata must then be supplied: the hardfork signature hash commits to every
- * spent output, so recognising one of those signatures needs the whole
+ * spent output, so recognizing one of those signatures needs the whole
  * transaction's context, not just this input's. Without it an existing
  * signature is invisible and the input looks unsigned. */
 SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nIn, const CTxOut& txout, SighashRules sighash_rules, const PrecomputedTransactionData* txdata = nullptr);
@@ -128,9 +128,9 @@ bool IsSegWitOutput(const SigningProvider& provider, const CScript& script);
 /** Sign the CMutableTransaction */
 /** Sign a transaction.
  *
- * sighash_rules selects the hardfork signature hash; it must match the consensus
- * rules of the block the transaction is intended for, so callers derive it from
- * chain state rather than defaulting it. */
+ * sighash_rules selects the hardfork signature hash. Callers take it from
+ * SighashRulesForSigning rather than defaulting it, so that every signer in the
+ * process agrees about what it is producing. */
 bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* provider, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum, SighashRules sighash_rules);
 
 #endif // BITCOIN_SCRIPT_SIGN_H

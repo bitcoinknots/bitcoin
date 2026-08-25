@@ -9,7 +9,6 @@
 #include <consensus/amount.h>
 #include <consensus/consensus.h>
 #include <primitives/transaction.h>
-#include <deploymentstatus.h>
 #include <script/interpreter.h>
 #include <script/solver.h>
 
@@ -245,24 +244,5 @@ std::pair<CScript, unsigned int> GetScriptForTransactionInput(CScript prevScript
 std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsViewCache& view);
 
 int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte);
-
-/** Default for -walletoldsigs */
-static constexpr bool DEFAULT_WALLET_OLD_SIGS{false};
-
-/** Which signature hash rules this node signs under.
- *
- * The hardfork ships in this release, so signing opts in and does not consult
- * the chain: a node whose blocks are behind cannot tell whether the height has
- * passed, and guessing from its own tip is how a spender silently ends up with
- * a signature carrying no replay protection.
- *
- * Only where the fork is scheduled at all. A chain that never activates it has
- * no opt-in to make, and signing for one there would produce a transaction no
- * node on it accepts.
- *
- * -walletoldsigs signs the legacy message instead. It exists for tests, which
- * run before the activation height, and as an escape hatch for a signer that
- * has to interoperate with software that does not know the fork. */
-SighashRules SighashRulesForSigning(const Consensus::Params& params);
 
 #endif // BITCOIN_POLICY_POLICY_H

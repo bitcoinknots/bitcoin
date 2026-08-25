@@ -144,6 +144,7 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   common/bloom.cpp
   common/config.cpp
   common/init.cpp
+  common/sighash_rules.cpp
   common/interfaces.cpp
   common/messages.cpp
   common/netif.cpp

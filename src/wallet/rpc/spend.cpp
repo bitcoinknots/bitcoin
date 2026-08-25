@@ -2,6 +2,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <chainparams.h>
+#include <common/args.h>
+#include <common/sighash_rules.h>
 #include <common/messages.h>
 #include <consensus/validation.h>
 #include <core_io.h>
@@ -120,9 +123,9 @@ static UniValue FinishTransaction(const std::shared_ptr<CWallet> pwallet, const 
     CMutableTransaction mtx;
     // Read under the same rules the signatures were made with, or a complete
     // transaction is reported incomplete because its opted-in signatures are not
-    // recognised as signatures at all.
+    // recognized as signatures at all.
     complete = FinalizeAndExtractPSBT(psbtx, mtx,
-                                      SighashRulesForSigning(Params().GetConsensus()));
+                                      SighashRulesForSigning(gArgs, Params().GetConsensus()));
 
     const bool psbt_opt_in{options.exists("psbt") && options["psbt"].get_bool()};
     bool add_to_wallet{options.exists("add_to_wallet") ? options["add_to_wallet"].get_bool() : true};
@@ -1837,7 +1840,7 @@ RPCHelpMan walletprocesspsbt()
         CMutableTransaction mtx;
         // Returns true if complete, which we already think it is.
         CHECK_NONFATAL(FinalizeAndExtractPSBT(psbtx, mtx,
-                                              SighashRulesForSigning(Params().GetConsensus())));
+                                              SighashRulesForSigning(gArgs, Params().GetConsensus())));
         DataStream ssTx_final;
         ssTx_final << TX_WITH_WITNESS(mtx);
         result.pushKV("hex", HexStr(ssTx_final));

@@ -17,6 +17,7 @@
 #include <chainparamsbase.h>
 #include <clientversion.h>
 #include <common/args.h>
+#include <common/sighash_rules.h>
 #include <common/pcp.h>
 #include <common/system.h>
 #include <consensus/amount.h>
@@ -495,7 +496,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
                              kernel::DEFAULT_XOR_BLOCKSDIR),
                    ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-fastprune", "Use smaller block files and lower minimum prune height for testing purposes", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::DEBUG_TEST);
-    argsman.AddArg("-walletoldsigs", strprintf("Sign with the legacy signature hash rather than the hardfork one, which gives up replay protection (default: %u)", DEFAULT_WALLET_OLD_SIGS), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::DEBUG_TEST);
+    SetupSighashRulesArgs(argsman);
 #if HAVE_SYSTEM
     argsman.AddArg("-blocknotify=<cmd>", "Execute command when the best block changes (%s in cmd is replaced by block hash)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
 #endif

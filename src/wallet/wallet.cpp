@@ -3,6 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <common/sighash_rules.h>
 #include <wallet/wallet.h>
 
 #include <bitcoin-build-config.h> // IWYU pragma: keep
@@ -10,6 +11,7 @@
 #include <blockfilter.h>
 #include <chain.h>
 #include <coins.h>
+#include <chainparams.h>
 #include <common/args.h>
 #include <common/messages.h>
 #include <common/settings.h>
@@ -2304,7 +2306,7 @@ bool CWallet::SignTransaction(CMutableTransaction& tx) const
 
 bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum) const
 {
-    const SighashRules sighash_rules{SighashRulesForSigning(Params().GetConsensus())};
+    const SighashRules sighash_rules{SighashRulesForSigning(gArgs, Params().GetConsensus())};
 
     // Try to sign with all ScriptPubKeyMans
     for (ScriptPubKeyMan* spk_man : GetAllScriptPubKeyMans()) {
@@ -2321,8 +2323,8 @@ bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint,
 
 std::optional<PSBTError> CWallet::FillPSBT(PartiallySignedTransaction& psbtx, bool& complete, int sighash_type, bool sign, bool bip32derivs, size_t * n_signed, bool finalize, std::vector<bilingual_str>* warnings) const
 {
-    // Signing opts in wherever the fork is scheduled, without asking the chain.
-    const SighashRules sighash_rules{SighashRulesForSigning(Params().GetConsensus())};
+    // Signing opts in wherever the fork is scheduled.
+    const SighashRules sighash_rules{SighashRulesForSigning(gArgs, Params().GetConsensus())};
     if (n_signed) {
         *n_signed = 0;
     }
