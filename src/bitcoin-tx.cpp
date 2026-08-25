@@ -4,9 +4,11 @@
 
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
+#include <common/sighash_rules.h>
 #include <chainparamsbase.h>
 #include <clientversion.h>
 #include <coins.h>
+#include <chainparams.h>
 #include <common/args.h>
 #include <common/system.h>
 #include <compat/compat.h>
@@ -52,7 +54,7 @@ static void SetupBitcoinTxArgs(ArgsManager &argsman)
     argsman.AddArg("-json", "Select JSON output", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-txid", "Output only the hex-encoded transaction id of the resultant transaction.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     SetupChainParamsBaseOptions(argsman);
-    argsman.AddArg("-walletoldsigs", strprintf("Sign with the legacy signature hash rather than the hardfork one, which gives up replay protection (default: %u)", DEFAULT_WALLET_OLD_SIGS), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    SetupSighashRulesArgs(argsman);
 
     argsman.AddArg("delin=N", "Delete input N from TX", ArgsManager::ALLOW_ANY, OptionsCategory::COMMANDS);
     argsman.AddArg("delout=N", "Delete output N from TX", ArgsManager::ALLOW_ANY, OptionsCategory::COMMANDS);
@@ -545,7 +547,7 @@ static const struct {
     {"SINGLE|ANYONECANPAY", SIGHASH_SINGLE|SIGHASH_ANYONECANPAY},
     // The opt-in spellings, matching what SighashToStr prints and what the
     // signing RPCs take. The name asks for the byte; which message is signed is
-    // decided above, and signing refuses to put the byte on a legacy message.
+    // decided by the rules in force, not by the name.
     {"ALL|UNIFIED", SIGHASH_ALL|SIGHASH_UNIFIED},
     {"ALL|ANYONECANPAY|UNIFIED", SIGHASH_ALL|SIGHASH_ANYONECANPAY|SIGHASH_UNIFIED},
     {"NONE|UNIFIED", SIGHASH_NONE|SIGHASH_UNIFIED},
@@ -685,9 +687,19 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
 
     bool fHashSingle = ((nHashType & ~SIGHASH_ANYONECANPAY) == SIGHASH_SINGLE);
 
-    // The same rule the node signs by, so the two cannot disagree: opt in
-    // wherever the fork is scheduled, and take -walletoldsigs to say otherwise.
-    const SighashRules sighash_rules{SighashRulesForSigning(Params().GetConsensus())};
+    // The same rule the node signs by, minus the chain it has no way to read:
+    // with no height to compare against, the fork being scheduled is the whole
+    // answer. -walletoldsigs says otherwise, and this tool reads only the command
+    // line, so that flag has to be given here even when the node's config file
+    // already sets it.
+    const SighashRules sighash_rules{SighashRulesForSigning(gArgs, Params().GetConsensus())};
+    if ((nHashType & SIGHASH_UNIFIED) && sighash_rules != SighashRules::UNIFIED) {
+        // Asked for by name, so say why it cannot be given rather than fail as
+        // an unsolvable input further down.
+        throw std::runtime_error("UNIFIED was asked for, but this signs the legacy message: "
+                                 "either the fork is not scheduled on this network, or "
+                                 "-walletoldsigs is set");
+    }
     // Built whenever every previous output is known, not only when signing for
     // the fork: reading an input that already carries an opt-in signature needs
     // the same commitments, and that happens under either rule set.
@@ -722,9 +734,9 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
         const CScript& prevPubKey = coin.out.scriptPubKey;
         const CAmount& amount = coin.out.nValue;
 
-        // Recognising an existing opt-in signature needs the same rules it was
+        // Recognizing an existing opt-in signature needs the same rules it was
         // made under, and the spent outputs it commits to. What is not
-        // recognised here is overwritten below, so read the input under both
+        // recognized here is overwritten below, so read the input under both
         // rule sets and keep whichever finds something: a co-signer who did not
         // pass -walletoldsigs would otherwise destroy the other party's work.
         SignatureData sigdata = DataFromTransaction(mergedTx, i, coin.out, sighash_rules, sighash_rules == SighashRules::UNIFIED && have_spent_outputs ? &txdata : nullptr);
@@ -751,7 +763,7 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
         }
 
         // Without every previous output an opt-in signature cannot be read back,
-        // so an input carrying one would be replaced by whatever was recognised.
+        // so an input carrying one would be replaced by whatever was recognized.
         // Write only when that cannot lose anything: the result solves the input,
         // or every previous output was available to read it with, or there was
         // nothing there to begin with. Completeness is the test rather than a
