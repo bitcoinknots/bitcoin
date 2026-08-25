@@ -743,12 +743,11 @@ def UnifiedSignatureHash(script_code, txTo, inIdx, hashtype, spent_utxos, sigver
         if output_type not in (SIGHASH_ALL, SIGHASH_NONE, SIGHASH_SINGLE):
             return None
 
-    ss = bytes([script_type])
-    # Widths match the node: the hash type is one byte widened to four, and
-    # version and the code separator are unsigned there.
+    # Laid out as BIP341 lays out its message: epoch, then a one-byte hash type.
     if not 0 <= hashtype <= 0xFF:
         return None
-    ss += struct.pack("<I", hashtype)
+    ss = b"\x00"
+    ss += bytes([hashtype])
     ss += struct.pack("<I", txTo.version & 0xFFFFFFFF)
     ss += struct.pack("<I", txTo.nLockTime)
     # Five bytes, not four: the high one is reserved for a wider locktime.
@@ -760,12 +759,11 @@ def UnifiedSignatureHash(script_code, txTo, inIdx, hashtype, spent_utxos, sigver
         ss += sha256(b"".join(ser_string(u.scriptPubKey) for u in spent_utxos))
         ss += sha256(b"".join(struct.pack("<I", i.nSequence) for i in txTo.vin))
 
-    if output_type == SIGHASH_SINGLE:
-        if inIdx >= len(txTo.vout):
-            return None
-        ss += sha256(txTo.vout[inIdx].serialize())
-    elif output_type != SIGHASH_NONE:
+    if output_type not in (SIGHASH_NONE, SIGHASH_SINGLE):
         ss += sha256(b"".join(o.serialize() for o in txTo.vout))
+
+    # Where BIP341 writes its spend type.
+    ss += bytes([script_type])
 
     if anyonecanpay:
         ss += txTo.vin[inIdx].prevout.serialize()
@@ -781,10 +779,17 @@ def UnifiedSignatureHash(script_code, txTo, inIdx, hashtype, spent_utxos, sigver
         ss += bytes([1 if annex is not None else 0])
         if annex is not None:
             ss += sha256(ser_string(annex))
-        if script_type == UNIFIED_SCRIPT_TYPE_TAPSCRIPT:
-            ss += TaggedHash("TapLeaf", bytes([leaf_ver]) + ser_string(leaf_script))
-            ss += bytes([0])  # key version
-            ss += struct.pack("<I", codeseparator_pos & 0xFFFFFFFF)
+
+    # The single output, where BIP341 puts it.
+    if output_type == SIGHASH_SINGLE:
+        if inIdx >= len(txTo.vout):
+            return None
+        ss += sha256(txTo.vout[inIdx].serialize())
+
+    if script_type == UNIFIED_SCRIPT_TYPE_TAPSCRIPT:
+        ss += TaggedHash("TapLeaf", bytes([leaf_ver]) + ser_string(leaf_script))
+        ss += bytes([0])  # key version
+        ss += struct.pack("<I", codeseparator_pos & 0xFFFFFFFF)
 
     return TaggedHash("UnifiedSighash", ss)
 

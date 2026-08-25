@@ -168,51 +168,58 @@ The message is the concatenation below, and the signature hash is
 `SHA256( SHA256(tag) || SHA256(tag) || message )`.
 
 ```
-  1 byte    script type: 0 bare or P2SH, 1 segwit v0, 2 taproot key path,
-             3 tapscript
-  4 bytes   hash type, little endian
+  1 byte    epoch, 0
+  1 byte    hash type
   4 bytes   transaction version, little endian
   5 bytes   transaction locktime, little endian, zero-extended
 
   if ANYONECANPAY is not set:
- 32 bytes   sha_prevouts
- 32 bytes   sha_amounts
- 32 bytes   sha_scripts
- 32 bytes   sha_sequences
+    32 bytes  sha_prevouts
+    32 bytes  sha_amounts
+    32 bytes  sha_scripts
+    32 bytes  sha_sequences
 
-  if hash_type & 0x1f == SIGHASH_SINGLE:
- 32 bytes   SHA256( output at the same index as this input )
-             invalid if no output exists at that index
-  else if hash_type & 0x1f == SIGHASH_NONE:
-             nothing
-  otherwise:
- 32 bytes   sha_outputs
-             every value that is not SINGLE or NONE signs all outputs,
-             as the legacy algorithm does. Script types 2 and 3 accept
-             only SIGHASH_ALL, SIGHASH_NONE and SIGHASH_SINGLE, so the
-             fallthrough is reachable for script types 0 and 1 only.
+  if hash_type & 0x1f is neither SIGHASH_NONE nor SIGHASH_SINGLE:
+    32 bytes  sha_outputs
+              every value that is not SINGLE or NONE signs all outputs,
+              as the legacy algorithm does. Script types 2 and 3 accept
+              only SIGHASH_ALL, SIGHASH_NONE and SIGHASH_SINGLE, so the
+              fallthrough is reachable for script types 0 and 1 only.
+
+  1 byte    script type: 0 bare or P2SH, 1 segwit v0, 2 taproot key path,
+            3 tapscript
 
   if ANYONECANPAY is set:
- 36 bytes   this input's outpoint
-  variable  this input's spent output (value, then scriptPubKey)
-  4 bytes   this input's nSequence
+    36 bytes  this input's outpoint
+    variable  this input's spent output (value, then scriptPubKey)
+    4 bytes   this input's nSequence
   otherwise:
-  4 bytes   this input's index, little endian
-
-  then the tail for this script type.
+    4 bytes   this input's index, little endian
 
   for script types 0 and 1:
-  variable  scriptCode (compact-size length, then bytes)
+    variable  scriptCode (compact-size length, then bytes)
 
   for script types 2 and 3:
-  1 byte    1 if an annex is present, else 0
- 32 bytes   SHA256 of the annex (compact-size length, then bytes), if present
+    1 byte    1 if an annex is present, else 0
+    32 bytes  SHA256 of the annex (compact-size length, then bytes), if present
+
+  if hash_type & 0x1f == SIGHASH_SINGLE:
+    32 bytes  SHA256( output at the same index as this input )
+              invalid if no output exists at that index
 
   for script type 3 only:
- 32 bytes   tapleaf hash, as BIP341 defines it
-  1 byte    key version, 0
-  4 bytes   codeseparator position, little endian, 0xffffffff if none
+    32 bytes  tapleaf hash, as BIP341 defines it
+    1 byte    key version, 0
+    4 bytes   codeseparator position, little endian, 0xffffffff if none
 ```
+
+The fields are in BIP341's order, so the two messages can be read side by side:
+the epoch, then the hash type as one byte, the transaction data, the aggregates,
+the output commitment for the types that sign all outputs, then the byte that
+identifies the spend, the input data, and the per-type tail. BIP341 packs an
+annex bit into that byte and this has none to pack, so it carries the script
+type alone. The epoch is BIP341's, kept so a later revision has the same room to
+move that BIP341 left itself.
 
 The locktime occupies four bytes in a transaction but five here. Four run out
 on 2106-02-07, and a later hardfork that widened the field would otherwise have
@@ -251,6 +258,14 @@ that opted in:
 Under `ANYONECANPAY` the input's position is not committed to, so the input may
 still be moved into another transaction. Its own outpoint, spent output and
 sequence are committed to directly, since the aggregates are absent.
+
+`SIGHASH_SINGLE|ANYONECANPAY` therefore binds the input to the output at its own
+index without binding either to a position, so the pair can move together. The
+legacy algorithm binds the position for script type 0, though not by design: it
+serializes an output vector of length `nIn + 1` with the earlier entries nulled,
+and the length is what carries the index. BIP341 does not carry that over and
+neither does this. What the signer is promised is unchanged, since the commitment
+is to the output paired with their input rather than to where the pair sits.
 
 ### What an implementation needs
 
