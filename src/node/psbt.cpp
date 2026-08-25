@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <common/sighash_rules.h>
 #include <coins.h>
 #include <consensus/amount.h>
 #include <consensus/tx_verify.h>
@@ -14,7 +15,7 @@
 #include <numeric>
 
 namespace node {
-PSBTAnalysis AnalyzePSBT(PartiallySignedTransaction psbtx, SighashRules sighash_rules)
+PSBTAnalysis AnalyzePSBT(PartiallySignedTransaction psbtx)
 {
     // Go through each input and build status
     PSBTAnalysis result;
@@ -60,12 +61,12 @@ PSBTAnalysis AnalyzePSBT(PartiallySignedTransaction psbtx, SighashRules sighash_
         }
 
         // Check if it is final
-        if (!PSBTInputSignedAndVerified(psbtx, i, &txdata, sighash_rules)) {
+        if (!PSBTInputSignedAndVerified(psbtx, i, &txdata)) {
             input_analysis.is_final = false;
 
             // Figure out what is missing
             SignatureData outdata;
-            bool complete = SignPSBTInput(DUMMY_SIGNING_PROVIDER, psbtx, i, &txdata, 1, &outdata, /*finalize=*/true, sighash_rules);
+            bool complete = SignPSBTInput(DUMMY_SIGNING_PROVIDER, psbtx, i, &txdata, 1, &outdata, /*finalize=*/true);
 
             // Things are missing
             if (!complete) {
@@ -125,14 +126,14 @@ PSBTAnalysis AnalyzePSBT(PartiallySignedTransaction psbtx, SighashRules sighash_
             PSBTInput& input = psbtx.inputs[i];
             Coin newcoin;
 
-            // Recognise an input that is already signed before falling back to
+            // Recognize an input that is already signed before falling back to
             // dummy finalization, and do it with the real transaction data. The
             // dummy path has none, so it cannot verify a signature whose message
             // commits to every spent output, and it refuses the opt-in hash type
             // outright. Left to it, a finalized opted-in input fails here and the
             // size estimate is dropped from the result without any error.
-            const bool already_signed{PSBTInputSignedAndVerified(psbtx, i, &txdata, sighash_rules)};
-            if ((!already_signed && !SignPSBTInput(DUMMY_SIGNING_PROVIDER, psbtx, i, nullptr, 1, nullptr, /*finalize=*/true, sighash_rules)) || !psbtx.GetInputUTXO(newcoin.out, i)) {
+            const bool already_signed{PSBTInputSignedAndVerified(psbtx, i, &txdata)};
+            if ((!already_signed && !SignPSBTInput(DUMMY_SIGNING_PROVIDER, psbtx, i, nullptr, 1, nullptr, /*finalize=*/true)) || !psbtx.GetInputUTXO(newcoin.out, i)) {
                 success = false;
                 break;
             } else {

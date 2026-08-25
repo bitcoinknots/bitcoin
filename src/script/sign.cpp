@@ -3,6 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <common/sighash_rules.h>
 #include <script/sign.h>
 
 #include <consensus/amount.h>
@@ -603,9 +604,16 @@ bool ProduceSignature(const SigningProvider& provider, const BaseSignatureCreato
     sigdata.scriptSig = PushAll(result);
 
     // Test solution
-    // Completeness must be judged under the same rules the signatures were made
-    // for, and those rules travel in the script flags.
-    const unsigned int verify_flags{STANDARD_SCRIPT_VERIFY_FLAGS | ((creator.GetSighashRules() == SighashRules::UNIFIED) ? uint32_t{SCRIPT_VERIFY_UNIFIED_SIGHASH} : uint32_t{0})};
+    // Completeness asks whether the signatures now on this input solve it, which
+    // covers a co-signer's as well as any just made. Reading under the fork's
+    // rules accepts a legacy signature too, so the flag goes on if either the
+    // creator produced opted-in signatures or the chain would read them: by the
+    // creator's rule alone, -walletoldsigs could not finalize a co-signer's valid
+    // opted-in signature, and by the chain's alone, a caller that forced the
+    // fork's rules could not verify what it had just signed.
+    const bool read_opted_in{creator.GetSighashRules() == SighashRules::UNIFIED ||
+                             SighashRulesForVerifying() == SighashRules::UNIFIED};
+    const unsigned int verify_flags{STANDARD_SCRIPT_VERIFY_FLAGS | (read_opted_in ? uint32_t{SCRIPT_VERIFY_UNIFIED_SIGHASH} : uint32_t{0})};
     sigdata.complete = solved && VerifyScript(sigdata.scriptSig, fromPubKey, &sigdata.scriptWitness, verify_flags, creator.Checker());
     return sigdata.complete;
 }
@@ -619,7 +627,7 @@ private:
 public:
     SignatureExtractorChecker(SignatureData& sigdata, BaseSignatureChecker& checker) : DeferringSignatureChecker(checker), sigdata(sigdata) {}
 
-    bool CheckECDSASignature(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion, SighashRules sighash_rules = SighashRules::LEGACY) const override
+    bool CheckECDSASignature(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion, SighashRules sighash_rules) const override
     {
         if (m_checker.CheckECDSASignature(scriptSig, vchPubKey, scriptCode, sigversion, sighash_rules)) {
             CPubKey pubkey(vchPubKey);
@@ -644,8 +652,9 @@ struct Stacks
 }
 
 // Extracts signatures and scripts from incomplete scriptSigs. Please do not extend this, use PSBT instead
-SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nIn, const CTxOut& txout, SighashRules sighash_rules, const PrecomputedTransactionData* txdata)
+SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nIn, const CTxOut& txout, const PrecomputedTransactionData* txdata)
 {
+    const SighashRules sighash_rules{SighashRulesForVerifying()};
     SignatureData data;
     assert(tx.vin.size() > nIn);
     data.scriptSig = tx.vin[nIn].scriptSig;
@@ -739,8 +748,8 @@ class DummySignatureChecker final : public BaseSignatureChecker
 {
 public:
     DummySignatureChecker() = default;
-    bool CheckECDSASignature(const std::vector<unsigned char>& sig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion, SighashRules sighash_rules = SighashRules::LEGACY) const override { return sig.size() != 0; }
-    bool CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror, SighashRules sighash_rules = SighashRules::LEGACY) const override { return sig.size() != 0; }
+    bool CheckECDSASignature(const std::vector<unsigned char>& sig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion, SighashRules sighash_rules) const override { return sig.size() != 0; }
+    bool CheckSchnorrSignature(Span<const unsigned char> sig, Span<const unsigned char> pubkey, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror, SighashRules sighash_rules) const override { return sig.size() != 0; }
     bool CheckLockTime(const CScriptNum& nLockTime) const override { return true; }
     bool CheckSequence(const CScriptNum& nSequence) const override { return true; }
 };
@@ -814,6 +823,19 @@ bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* keystore, 
 {
     bool fHashSingle = ((nHashType & ~SIGHASH_ANYONECANPAY) == SIGHASH_SINGLE);
 
+    // Asked for by name, so say why it cannot be given. Without this the signer
+    // simply produces nothing and the input is reported with whatever script
+    // error the empty result happens to raise, which points nowhere near the
+    // actual conflict. bitcoin-tx refuses the same request the same way.
+    if ((nHashType & SIGHASH_UNIFIED) && sighash_rules != SighashRules::UNIFIED) {
+        for (unsigned int i = 0; i < mtx.vin.size(); ++i) {
+            input_errors[i] = _("UNIFIED was asked for, but this signs the legacy message: "
+                                "either the fork is not scheduled on this network, or "
+                                "-walletoldsigs is set");
+        }
+        return false;
+    }
+
     // Use CTransaction for the constant parts of the
     // transaction to avoid rehashing.
     const CTransaction txConst(mtx);
@@ -858,7 +880,11 @@ bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* keystore, 
             }
         }
 
-        SignatureData sigdata = DataFromTransaction(mtx, i, coin->second.out, sighash_rules, &txdata);
+        // Read under the verifying rule, not the signing one: an input can hold
+        // a co-signer's opt-in signature while this node signs legacy, and the
+        // write-back below replaces whatever this read could not see.
+        const bool input_had_data{!txin.scriptSig.empty() || !txin.scriptWitness.IsNull()};
+        SignatureData sigdata = DataFromTransaction(mtx, i, coin->second.out, &txdata);
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if (!fHashSingle || (i < mtx.vout.size())) {
             MutableTransactionSignatureCreator creator(mtx, i, amount, &txdata, nHashType);
@@ -870,7 +896,17 @@ bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* keystore, 
             }
         }
 
-        UpdateInput(txin, sigdata);
+        // Reading an opt-in signature back needs every spent output, so without
+        // them one already on this input is invisible here and the write would
+        // drop it. Write only where nothing can be lost: the input is solved, or
+        // it could be read with, or there was nothing on it to begin with.
+        if (sigdata.complete || txdata.m_spent_outputs_ready || !input_had_data) {
+            UpdateInput(txin, sigdata);
+        } else {
+            input_errors[i] = _("Input already carries signature data that cannot be "
+                                "read back without the previous output of every input");
+            continue;
+        }
 
         // The amount must be specified for a valid segwit signature. The unified
         // message commits to the amount of every input, not just witness ones, so
@@ -883,7 +919,7 @@ bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* keystore, 
         }
 
         ScriptError serror = SCRIPT_ERR_OK;
-        const unsigned int check_flags{STANDARD_SCRIPT_VERIFY_FLAGS | (sighash_rules == SighashRules::UNIFIED ? uint32_t{SCRIPT_VERIFY_UNIFIED_SIGHASH} : uint32_t{0})};
+        const unsigned int check_flags{STANDARD_SCRIPT_VERIFY_FLAGS | (SighashRulesForVerifying() == SighashRules::UNIFIED ? uint32_t{SCRIPT_VERIFY_UNIFIED_SIGHASH} : uint32_t{0})};
         if (!sigdata.complete && !VerifyScript(txin.scriptSig, prevPubKey, &txin.scriptWitness, check_flags, TransactionSignatureChecker(&txConst, i, amount, txdata, MissingDataBehavior::FAIL), &serror)) {
             if (serror == SCRIPT_ERR_INVALID_STACK_OPERATION) {
                 // Unable to sign input and verification failed (possible attempt to partially sign).

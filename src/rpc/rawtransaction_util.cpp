@@ -304,7 +304,7 @@ void ParsePrevouts(const UniValue& prevTxsUnival, FlatSigningProvider* keystore,
     }
 }
 
-void SignTransaction(CMutableTransaction& mtx, const SigningProvider* keystore, const std::map<COutPoint, Coin>& coins, const UniValue& hashType, UniValue& result, SighashRules sighash_rules)
+void SignTransaction(CMutableTransaction& mtx, const SigningProvider* keystore, const std::map<COutPoint, Coin>& coins, const UniValue& hashType, UniValue& result)
 {
     int nHashType = ParseSighashString(hashType);
 
@@ -312,7 +312,7 @@ void SignTransaction(CMutableTransaction& mtx, const SigningProvider* keystore, 
     std::map<int, bilingual_str> input_errors;
     std::optional<CAmount> inputs_amount_sum;
 
-    bool complete = SignTransaction(mtx, keystore, coins, nHashType, input_errors, &inputs_amount_sum, sighash_rules);
+    bool complete = SignTransaction(mtx, keystore, coins, nHashType, input_errors, &inputs_amount_sum);
     SignTransactionResultToJSON(mtx, complete, coins, input_errors, result, inputs_amount_sum);
 }
 

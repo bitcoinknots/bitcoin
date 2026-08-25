@@ -2,6 +2,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <common/args.h>
+#include <consensus/params.h>
+#include <common/sighash_rules.h>
 #include <common/system.h>
 #include <consensus/tx_check.h>
 #include <consensus/validation.h>
@@ -360,9 +363,7 @@ BOOST_AUTO_TEST_CASE(unified_sighash_activation_invalidates_a_legacy_opt_in_byte
     // byte already carries the opt-in bit is valid today: the legacy algorithm
     // reads 0x21 by its low bits and treats it as ALL. Once the rules are in
     // force that same byte means the signature opted in, so it is checked
-    // against the unified message and stops verifying. This is what the
-    // mempool has to evict when the chain crosses the activation height, in
-    // either direction.
+    // against the unified message and stops verifying.
     const CScript script0{CScript() << OP_1 << OP_CHECKSIG};
     const CScript script1{CScript() << OP_2 << OP_CHECKSIG};
     CMutableTransaction tx;
@@ -458,6 +459,34 @@ BOOST_AUTO_TEST_CASE(unified_sighash_needs_spent_outputs)
     bare.Init(tx, {});
     uint256 hash;
     BOOST_CHECK(!SignatureHashUnified(hash, script0, tx, 0, SIGHASH_ALL | SIGHASH_UNIFIED, SigVersion::BASE, bare));
+}
+
+BOOST_AUTO_TEST_CASE(unified_sighash_signing_rules_follow_the_schedule)
+{
+    // The one decision every signer in the process routes through. It reads the
+    // schedule and not the chain, so a node whose blocks lag cannot answer it
+    // differently from one that is caught up.
+    Consensus::Params unscheduled;
+    unscheduled.Blake2bHeight = std::numeric_limits<int>::max();
+    Consensus::Params scheduled;
+    scheduled.Blake2bHeight = 100;
+
+    ArgsManager plain;
+    SetupSighashRulesArgs(plain);
+
+    // Where the fork is not scheduled there is nothing to opt into.
+    BOOST_CHECK(SighashRulesForSigning(plain, unscheduled) == SighashRules::LEGACY);
+    // Where it is, every signature opts in, whatever the chain has reached. One
+    // made ahead of the height relays and waits for it.
+    BOOST_CHECK(SighashRulesForSigning(plain, scheduled) == SighashRules::UNIFIED);
+
+    ArgsManager old_sigs;
+    SetupSighashRulesArgs(old_sigs);
+    old_sigs.ForceSetArg("-walletoldsigs", "1");
+    // The escape hatch overrides it, and is the only way to give up replay
+    // protection wherever the fork is scheduled.
+    BOOST_CHECK(SighashRulesForSigning(old_sigs, scheduled) == SighashRules::LEGACY);
+    BOOST_CHECK(SighashRulesForSigning(old_sigs, unscheduled) == SighashRules::LEGACY);
 }
 
 BOOST_AUTO_TEST_CASE(unified_sighash_hash_type_names_round_trip)
@@ -1248,7 +1277,7 @@ BOOST_AUTO_TEST_CASE(unified_sighash_reads_hashtypes_as_legacy_does)
     }
 }
 
-/** Randomised check of exactly what the hardfork sighash commits to.
+/** Randomized check of exactly what the hardfork sighash commits to.
  *
  * Mutating anything inside the commitment must change the hash, and mutating
  * anything outside it must not. Getting either direction wrong is a consensus
@@ -1443,7 +1472,7 @@ BOOST_AUTO_TEST_CASE(unified_sighash_is_linear_in_input_count)
     BOOST_TEST_MESSAGE("inputs=" << N << " legacy=" << legacy_us << "us hf=" << unified_us
                        << "us ratio=" << (unified_us ? double(legacy_us) / double(unified_us) : 0.0));
 
-    // Sanity: they really are different messages, so nothing was optimised away.
+    // Sanity: they really are different messages, so nothing was optimized away.
     BOOST_CHECK_NE(acc_legacy, acc_hf);
     BOOST_CHECK_GT(legacy_us, 10 * std::max<int64_t>(unified_us, 1));
 }

@@ -496,8 +496,7 @@ bool SendCoinsDialog::signWithExternalSigner(PartiallySignedTransaction& psbtx, 
         return false;
     }
     // fillPSBT does not always properly finalize
-    complete = FinalizeAndExtractPSBT(psbtx, mtx,
-                                      SighashRulesForSigning(gArgs, Params().GetConsensus()));
+    complete = FinalizeAndExtractPSBT(psbtx, mtx);
     return true;
 }
 

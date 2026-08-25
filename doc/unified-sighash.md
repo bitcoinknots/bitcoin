@@ -81,26 +81,19 @@ One trigger covers every rule the fork carries, so there is no window where one
 is live and another is not. That deployment belongs to the proof of work change
 and is specified there, not here.
 
-Consensus asks whether the deployment is active *at* a block. The mempool and
-the block builder ask whether it is active *after* the current tip, which is the
-same question about the block being built. Both are the standard
-buried-deployment comparisons, and an implementation should call those helpers
-rather than open-code the arithmetic: a copy that drifts is a consensus split.
+Consensus asks whether the deployment is active *at* a block, the standard
+buried-deployment comparison. An implementation should call that helper rather
+than open-code the arithmetic: a copy that drifts is a consensus split.
 
-Signing asks neither. It opts in wherever the deployment is scheduled, for the
-reason given under *Tooling*: a node whose blocks lag would answer the tip's
-question with a stale height and sign away its own replay protection quietly.
+Nothing outside consensus asks. Signing and relay both opt in wherever the
+deployment is scheduled: the height is a question about a block, and neither a
+signature nor a mempool entry is in one yet. An entry therefore does not change
+meaning as the chain crosses the height, and nothing has to be reconciled in
+either direction.
 
-Crossing the activation height invalidates something in either direction, so
-neither can be ignored. A byte that opts in reads as its low bits under the
-legacy algorithm today, so a signature carrying one is valid before activation
-and not after; a signature made under the fork's rules is not valid before it.
-A mempool entry accepted under one answer can therefore be invalid under the
-other, whether the chain reached the height by a reorg or by ordinary forward
-progress, and the block assembler cannot skip an entry that has become invalid.
-An entry is dropped when its recorded state disagrees with the block being built
-*and* it carries a signature that opted in, since no other entry reads
-differently on the two sides; see *Implementation notes* below.
+A byte that opts in reads as its low bits under the legacy algorithm, so a
+signature carrying one is valid before activation and not after; a signature made
+under the fork's rules is not valid before it.
 
 ## Specification
 
@@ -134,10 +127,26 @@ without `SIGHASH_ANYONECANPAY`, carry the opt-in bit there.
 
 Opting in changes which message is signed and nothing else.
 
-Before activation, `SIGHASH_UNIFIED` is not a defined hash type. Under
-`SCRIPT_VERIFY_STRICTENC` such a signature is rejected outright, and without it
-the legacy message is computed and the signature does not verify. Opting in early
-is therefore neither relayable nor minable.
+Before activation the message is not the one consensus checks, so a block below
+the height cannot carry an opted-in signature: it is verified against the legacy
+message there and fails as a mandatory error.
+
+Relay is separate and deliberately not keyed to the height. A node whose blocks
+lag would otherwise refuse to pass on a transaction the rest of the network
+already accepts, so the mempool takes an opted-in signature wherever the fork is
+scheduled. On a chain that never schedules the fork the byte keeps the meaning it
+has always had, and such a signature is neither relayed nor mined there.
+
+At or past the height a scheduled fork is also an active one, so the two flags
+cannot disagree and an entry the mempool took is one the next block can carry.
+Below the height they do differ: the mempool holds what the next block cannot
+carry, and the block assembler does not skip such an entry, it fails on it. A
+node in that window therefore builds no template until the height, and any peer
+can put it there. Nothing detects, sweeps or skips, because the deployment is
+that a node reaches the height before it is asked for a template: keep producing
+under the current release until the fork height, and point block production at
+this one from the fork block. That is a property of the deployment and not of
+the code.
 
 ### Message
 
@@ -265,7 +274,7 @@ CVE-2020-14199.
 
 Taproot spends use the same algorithm as every other script type. BIP341's own
 digest is not involved once a signature opts in, and BIP341 itself is unchanged:
-a node without the fork computes BIP341 for the same byte, does not recognise the
+a node without the fork computes BIP341 for the same byte, does not recognize the
 hash type, and rejects the spend.
 
 The message is the one above, with the script type byte set to 2 for a key path
@@ -338,7 +347,7 @@ define. Neither is untouched on mainnet, so the exception under *Compatibility*
 below is unavoidable either way.
 
 `0x40` carries the same role on other chains, where it selects their digest. A
-signer that recognises that byte would compute their message rather than this
+signer that recognizes that byte would compute their message rather than this
 one, producing a signature that fails for a reason it cannot report. An undefined
 byte fails immediately, and fails legibly.
 
@@ -363,6 +372,13 @@ the mandatory flags, and the legacy message commits to the byte whatever it is.
 So a bare, P2SH or segwit v0 signature whose hash type already has this bit set
 is consensus-valid today, and after activation it is read under the new algorithm
 and stops verifying.
+
+Relay stops earlier than consensus does. The mempool reads the bit wherever the
+fork is scheduled rather than waiting for the height, so from the moment a
+network has a height for it such a signature is no longer relayed, while a block
+below that height still accepts it. Nothing that was minable becomes unminable
+before activation; what changes is that these stop propagating, which is the
+direction that helps, since after activation they cannot be spent at all.
 
 This costs almost nobody anything. Opting in is per signature, so the legacy
 algorithm keeps working exactly as it does today and a spender who never sets
@@ -426,26 +442,47 @@ the fork, which cannot be given confidently and cannot be changed once deployed.
 
 ## Tooling
 
-Signing opts in wherever the fork is scheduled, and does not ask whether the
-height has been reached. A node whose blocks are behind cannot tell, and reading
-its own tip is how a spender ends up holding a signature with no replay
-protection without being told. Signing early instead costs a transaction the
-network will not take yet, which is refused as too early rather than as
-malformed, so the caller can tell the two apart.
+Signing opts in wherever the fork is scheduled, and does not ask how far along
+the chain is. The height is a question about a block, and a signature is not in
+one yet; a node whose blocks lag would answer it from a stale tip and sign away
+its own replay protection without being told. Software carrying this rule is run
+for the fork, so being scheduled is the whole answer, and it holds for an offline
+signer, which has no chain to ask at all.
 
-`-walletoldsigs` signs the legacy message instead. Tests need it, since they run
-below the activation height, and a signer that has to interoperate with software
-which does not know the fork needs it too. It is the only way to produce a
-legacy signature once the fork is scheduled, so it is also the only way to give
-up replay protection, which is why it is not the default.
+Where the fork is not scheduled there is nothing to opt into, and such a
+signature is refused as too early rather than as malformed, so a caller can tell
+the two apart.
+
+`-walletoldsigs` signs the legacy message instead. A signer that has to
+interoperate with software which does not know the fork needs it, and so does a
+test that wants a legacy signature. It is the only way to produce one where the
+fork is scheduled, so it is also the only way to give up replay protection, which
+is why it is not the default.
 
 On a chain where the fork is not scheduled at all there is no opt-in to make and
 signing is legacy throughout.
 
-Everything that signs uses that one rule: the wallet,
+Everything that spends uses that one rule: the wallet,
 `signrawtransactionwithkey`, the PSBT RPCs, `combinerawtransaction`, the GUI,
-and `bitcoin-tx`. The mempool and the block builder are separate and unchanged,
-since they reason about the block being built and so must read the chain.
+and `bitcoin-tx`. The mempool follows the same rule, so what a node signs is
+what it will relay. Only consensus reads the height, because only a block has
+one.
+
+Message signing is the exception, and stays legacy. A message signature is
+verified against a hash type of exactly `SIGHASH_ALL`, so opting in would
+produce one this node's own verifier rejects.
+
+Reading is separate from signing, and is not narrowed by `-walletoldsigs`.
+Verifying under the fork's rules accepts a legacy signature too, since one that
+does not set the bit takes the legacy message either way, so a node told to sign
+the old message still recognizes a co-signer's opted-in signature rather than
+replacing it. What a node signs is its own choice; what it can read from someone
+else is not. One consequence for multisig: an input can carry a legacy signature
+from one party and an opted-in one from another, and both verify.
+
+A PSBT input's declared hash type moves to the type the signature actually used,
+but only for the call that produced it. Where two parties sign under different
+rules, the field ends up describing whichever signed last.
 
 `libbitcoinconsensus` verifies rather than signs and has no chain of its own, so
 its caller says which rules apply with
@@ -473,34 +510,14 @@ opted-in signatures valid that were not, and it makes others invalid that were,
 because a byte the legacy algorithm reads as an output type means "opted in"
 once the flag applies, and the message changes with it. The usual argument that
 anything accepted by policy is valid under consensus therefore does not hold,
-and the mempool must derive the flag from the rules of the block being built
-rather than from the tip.
+so the argument that anything accepted by policy is valid under consensus does
+not hold here.
 
-It follows that the mempool has to be reconciled whenever the chain crosses the
-height, in either direction. Handling only the reorg leaves an entry accepted
-before activation sitting in the pool afterwards, and block production stops on
-that node from the first block that enforces the fork.
-
-An entry has to be dropped when the answer recorded on it disagrees with the
-block about to be built, in either direction, *and* the transaction carries a
-signature that opted in. Whether it was accepted under the fork's rules is
-recorded on the entry rather than recomputed later: recomputing means trusting
-that the chain still says the same thing about a height it may have replaced.
-
-The second condition matters as much as the first. Only an opted-in signature
-reads differently on the two sides, so dropping on the recorded state alone
-empties every mempool on the network at the crossing block and discards
-payments already in flight for a rule that does not apply to them. Detecting it
-is a read of the input bytes, not a verification: a 65-byte Schnorr signature,
-or a DER signature followed by one hash type byte, with that bit set. Err
-towards dropping when a push cannot be ruled out as a signature.
-
-Both directions matter because the flag is a switch. Gaining the fork invalidates
-an entry whose legacy signature carries the opt-in bit, and losing it invalidates
-one that opted in. The chain reaches the height by ordinary forward progress as
-well as by reorg, and the forward path disconnects nothing, so an implementation
-that reconciles only on reorg leaves the first case in the pool and stops making
-blocks.
+The mempool answers it without reference to the height: the flag is on wherever
+the fork is scheduled. A node whose blocks lag would otherwise refuse to relay a
+transaction the rest of the network already accepts, and an entry that never
+changes meaning needs no reconciliation when the chain crosses the height in
+either direction.
 
 ### Relationship to the proof-of-work change
 
@@ -517,9 +534,9 @@ the framework solves for itself therefore go through the two helpers at the top
 of `feature_unified_sighash.py` rather than calling `create_block` directly.
 Asking the node for a block template also requires naming the `blake2b` rule.
 
-Signing opts in wherever the deployment is scheduled, so on a network that has
-no height for it the wallet signs legacy throughout and nothing here applies
-until one is set.
+Signing opts in wherever the deployment is scheduled, so on a network that has no
+height for it the wallet signs legacy throughout and nothing here applies until
+one is set.
 
 ## Interaction with PSBT
 

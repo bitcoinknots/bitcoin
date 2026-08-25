@@ -6,6 +6,7 @@
 #ifndef BITCOIN_SCRIPT_SIGN_H
 #define BITCOIN_SCRIPT_SIGN_H
 
+#include <common/sighash_rules.h>
 #include <attributes.h>
 #include <coins.h>
 #include <hash.h>
@@ -111,7 +112,6 @@ struct SignatureData {
 /** Produce a script signature using a generic signature creator. */
 bool ProduceSignature(const SigningProvider& provider, const BaseSignatureCreator& creator, const CScript& scriptPubKey, SignatureData& sigdata);
 
-/** Extract signature data from a transaction input, and insert it. */
 /** Extract signature data from a (partially) signed input.
  *
  * sighash_rules must match the rules the existing signatures were made under, and
@@ -119,18 +119,17 @@ bool ProduceSignature(const SigningProvider& provider, const BaseSignatureCreato
  * spent output, so recognizing one of those signatures needs the whole
  * transaction's context, not just this input's. Without it an existing
  * signature is invisible and the input looks unsigned. */
-SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nIn, const CTxOut& txout, SighashRules sighash_rules, const PrecomputedTransactionData* txdata = nullptr);
+SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nIn, const CTxOut& txout, const PrecomputedTransactionData* txdata = nullptr);
 void UpdateInput(CTxIn& input, const SignatureData& data);
 
 /** Check whether a scriptPubKey is known to be segwit. */
 bool IsSegWitOutput(const SigningProvider& provider, const CScript& script);
 
-/** Sign the CMutableTransaction */
 /** Sign a transaction.
  *
- * sighash_rules selects the hardfork signature hash. Callers take it from
- * SighashRulesForSigning rather than defaulting it, so that every signer in the
- * process agrees about what it is producing. */
-bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* provider, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum, SighashRules sighash_rules);
+ * sighash_rules defaults to the rule this node signs by. Message signing passes
+ * LEGACY instead: a message signature is verified against a hash type of exactly
+ * SIGHASH_ALL, so opting in would produce one this node's own verifier rejects. */
+bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* provider, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum, SighashRules sighash_rules = SighashRulesForSigning());
 
 #endif // BITCOIN_SCRIPT_SIGN_H

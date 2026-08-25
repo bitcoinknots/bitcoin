@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <chainparams.h>
 #include <node/psbt.h>
 #include <psbt.h>
 #include <pubkey.h>
@@ -21,7 +22,14 @@ using node::AnalyzePSBT;
 using node::PSBTAnalysis;
 using node::PSBTInputAnalysis;
 
-FUZZ_TARGET(psbt)
+void initialize_psbt()
+{
+    // Reading a signature back consults the chain parameters for the signature
+    // hash rules, which asserts if none have been selected.
+    SelectParams(ChainType::REGTEST);
+}
+
+FUZZ_TARGET(psbt, .init = initialize_psbt)
 {
     SeedRandomStateForTest(SeedRand::ZEROS);
     FuzzedDataProvider fuzzed_data_provider{buffer.data(), buffer.size()};
@@ -33,7 +41,7 @@ FUZZ_TARGET(psbt)
     }
     const PartiallySignedTransaction psbt = psbt_mut;
 
-    const PSBTAnalysis analysis = AnalyzePSBT(psbt, /*sighash_rules=*/SighashRules::LEGACY);
+    const PSBTAnalysis analysis = AnalyzePSBT(psbt);
     (void)PSBTRoleName(analysis.next);
     for (const PSBTInputAnalysis& input_analysis : analysis.inputs) {
         (void)PSBTRoleName(input_analysis.next);
@@ -66,11 +74,11 @@ FUZZ_TARGET(psbt)
     }
 
     psbt_mut = psbt;
-    (void)FinalizePSBT(psbt_mut, /*sighash_rules=*/SighashRules::LEGACY);
+    (void)FinalizePSBT(psbt_mut);
 
     psbt_mut = psbt;
     CMutableTransaction result;
-    if (FinalizeAndExtractPSBT(psbt_mut, result, /*sighash_rules=*/SighashRules::LEGACY)) {
+    if (FinalizeAndExtractPSBT(psbt_mut, result)) {
         const PartiallySignedTransaction psbt_from_tx{result};
     }
 

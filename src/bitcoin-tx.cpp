@@ -734,19 +734,12 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
         const CScript& prevPubKey = coin.out.scriptPubKey;
         const CAmount& amount = coin.out.nValue;
 
-        // Recognizing an existing opt-in signature needs the same rules it was
-        // made under, and the spent outputs it commits to. What is not
-        // recognized here is overwritten below, so read the input under both
-        // rule sets and keep whichever finds something: a co-signer who did not
-        // pass -walletoldsigs would otherwise destroy the other party's work.
-        SignatureData sigdata = DataFromTransaction(mergedTx, i, coin.out, sighash_rules, sighash_rules == SighashRules::UNIFIED && have_spent_outputs ? &txdata : nullptr);
-        if (sighash_rules != SighashRules::UNIFIED && have_spent_outputs) {
-            // Merged rather than replaced: one input can hold a legacy partial
-            // signature from one party and an opt-in one from another, and a
-            // read under a single rule set sees only one of them.
-            sigdata.MergeSignatureData(DataFromTransaction(mergedTx, i, coin.out,
-                                                           SighashRules::UNIFIED, &txdata));
-        }
+        // Recognizing an existing opt-in signature needs the spent outputs it
+        // commits to. What is not recognized here is overwritten below, so a
+        // co-signer who did not pass -walletoldsigs would otherwise have their
+        // work destroyed.
+        SignatureData sigdata = DataFromTransaction(mergedTx, i, coin.out,
+                                                    have_spent_outputs ? &txdata : nullptr);
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if (!fHashSingle || (i < mergedTx.vout.size())) {
             MutableTransactionSignatureCreator creator(mergedTx, i, amount, sighash_rules == SighashRules::UNIFIED ? &txdata : nullptr, nHashType);

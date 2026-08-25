@@ -21,6 +21,7 @@ independent Python implementation of the sighash:
     too, at the cost of SIGHASH_DEFAULT.
 """
 
+from io import BytesIO
 import os
 import subprocess
 from decimal import Decimal
@@ -32,6 +33,7 @@ from test_framework.descriptors import descsum_create
 from test_framework.wallet_util import bytes_to_wif
 from test_framework.messages import CTransaction, CTxIn, CTxOut, COutPoint, COIN, msg_tx, tx_from_hex
 from test_framework.p2p import P2PDataStore, P2PInterface
+from test_framework.psbt import PSBT, PSBT_IN_SIGHASH_TYPE
 from test_framework.messages import CTxInWitness
 from test_framework.script_util import (
     key_to_p2pkh_script,
@@ -93,6 +95,11 @@ class UnifiedSighashTest(BitcoinTestFramework):
             "-corepolicy=0",
         ]
         self.extra_args = [args, list(args)]
+
+    def hash_types_in_scriptsig(self, script_sig):
+        """Hash type bytes of every signature-shaped push in a scriptSig."""
+        return [bytes(item)[-1] for item in CScript(script_sig)
+                if isinstance(item, bytes) and 68 <= len(item) <= 73]
 
     def make_p2pk_utxo(self, value):
         """Fund a P2PKH output we control, and return (outpoint, txout).
@@ -250,6 +257,13 @@ class UnifiedSighashTest(BitcoinTestFramework):
             f"{why}: refused, but for the wrong reason: {reason}"
         return reason
 
+    def hash_type_of(self, raw_hex, index=0):
+        """The hash type byte of the first scriptSig signature in a raw transaction."""
+        tx = CTransaction()
+        tx.deserialize(BytesIO(bytes.fromhex(raw_hex)))
+        script_sig = tx.vin[index].scriptSig
+        return script_sig[script_sig[0]]
+
     def submit(self, tx):
         """Try to accept tx into the mempool; return None on success or the reject reason."""
         res = self.nodes[0].testmempoolaccept([tx.serialize().hex()])[0]
@@ -281,7 +295,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
         # The schedule must actually have reached consensus. Twice during
         # development the option parsed and was then silently dropped, leaving
         # a fork that could never activate while every other test still passed.
-        hf = node.getdeploymentinfo().get("hardfork")
+        hf = node.getdeploymentinfo().get("blake2b")
         assert hf is not None, "the hardfork schedule did not reach consensus params"
         assert_equal(hf["height"], ACTIVATION_HEIGHT)
         assert_equal(hf["active"], False)
@@ -299,8 +313,11 @@ class UnifiedSighashTest(BitcoinTestFramework):
         unified_tx = self.build_spend([op_a, op_b], [utxo_a, utxo_b])
         sign_input_unified(unified_tx, 0, utxo_a.scriptPubKey, self.privkey, [utxo_a, utxo_b])
         sign_input_unified(unified_tx, 1, utxo_b.scriptPubKey, self.privkey, [utxo_a, utxo_b])
-        reason = self.reject(unified_tx, "opting in must not be usable before activation")
-        self.log.info(f"  pre-activation rejection of opt-in signature: {reason}")
+        # Relay takes it: refusing would only stop a node whose blocks lag from
+        # passing on what the rest of the network accepts. A block below the
+        # height still cannot carry it, which is checked immediately below.
+        assert_equal(self.submit(unified_tx), None)
+        self.log.info("  before activation an opt-in signature relays")
 
         # The mempool refusing it is policy. A miner can skip the mempool, so
         # prove consensus refuses it too: a block below the activation height
@@ -321,18 +338,46 @@ class UnifiedSighashTest(BitcoinTestFramework):
         node.disconnect_p2ps()
         self.log.info("  a pre-activation block carrying one is rejected at consensus")
 
+        # The one narrow incompatibility, pinned on both sides. A legacy signature
+        # whose hash type already carries the bit is refused by relay as soon as
+        # the fork is scheduled, because the mempool reads the bit without waiting
+        # for the height. Consensus is unchanged and a block below the height
+        # still carries it, which is what makes this a relay change and not a
+        # rule change.
+        op_l, utxo_l = self.make_p2pk_utxo(3 * COIN)
+        self.mine(1)
+        legacy_bit = self.build_spend([op_l], [utxo_l])
+        sign_input_legacy(legacy_bit, 0, utxo_l.scriptPubKey, self.privkey,
+                          SIGHASH_ALL | SIGHASH_UNIFIED)
+        assert self.submit(legacy_bit) is not None, \
+            "a legacy signature carrying the bit must not relay once the fork is scheduled"
+        bit_peer = node.add_p2p_connection(P2PDataStore())
+        bit_tip = int(node.getbestblockhash(), 16)
+        bit_height = node.getblockcount() + 1
+        assert bit_height < ACTIVATION_HEIGHT
+        bit_block = self.build_block(bit_tip, create_coinbase(bit_height),
+                                     node.getblock(node.getbestblockhash())["time"] + 1,
+                                     bit_height)
+        bit_block.vtx.append(legacy_bit)
+        self.seal_block(bit_block)
+        bit_peer.send_blocks_and_test([bit_block], node, success=True)
+        assert_equal(node.getblockcount(), bit_height)
+        node.disconnect_p2ps()
+        self.log.info("  a legacy signature carrying the bit: not relayed, still mined")
+
         # Taproot opts in through the same bit. Kept until after activation so
         # both sides of the boundary are exercised on one output.
         self.op_tr, self.utxo_tr, self.info_tr = self.make_taproot_utxo(4 * COIN)
         self.mine(1)
         tr_tx = self.build_taproot_spend(self.op_tr, self.utxo_tr)
         self.sign_taproot_keypath(tr_tx, [self.utxo_tr], self.info_tr, SIGHASH_ALL | SIGHASH_UNIFIED)
-        reason = self.reject(tr_tx, "taproot opt-in must not be usable before activation")
-        self.log.info(f"  pre-activation rejection of opt-in taproot signature: {reason}")
+        assert_equal(self.submit(tr_tx), None)
+        self.log.info("  an opt-in taproot signature relays")
 
-        # Reserved for the reorg-eviction test far below: it must stay confirmed
-        # across a rollback, or the spend is dropped for missing inputs and the
-        # eviction path under test is never exercised.
+
+        # Reserved for the rollback test far below: it must stay confirmed across
+        # the rollback, or the spend is dropped for missing inputs and the path
+        # under test is never exercised.
         self.op_reserved, self.utxo_reserved = self.make_p2pk_utxo(3 * COIN)
         # Two more for the competing-branch test, which forks below this point
         # so both stay confirmed on either branch, plus a legacy-signed control
@@ -375,7 +420,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
         # implementation that starts one block early. The block at
         # ACTIVATION_HEIGHT - 1 is the last that must still refuse an opt-in
         # signature, so build exactly that block and require the refusal.
-        assert_equal(node.getdeploymentinfo()["hardfork"]["active"],
+        assert_equal(node.getdeploymentinfo()["blake2b"]["active"],
                      self.fork_active_for_next_block())
         assert not self.fork_active_for_next_block(), \
             "the block at ACTIVATION_HEIGHT - 1 must not enforce the fork"
@@ -396,10 +441,8 @@ class UnifiedSighashTest(BitcoinTestFramework):
         node.disconnect_p2ps()
         self.log.info("  the last pre-activation block still refuses an opt-in signature")
 
-        # Signing opts in wherever the fork is scheduled, without asking whether
-        # the height has been reached, so this produces a signature here. It is
-        # the mempool that refuses it, and it says why: too early rather than
-        # malformed, so a caller can tell it apart from a broken hash type.
+        # Naming the byte explicitly below the height: the rules are the fork's
+        # wherever it is scheduled, so this is an ordinary opted-in signature.
         early_op, early_utxo = self.make_p2pk_utxo(3 * COIN)
         early_unsigned = self.build_spend([early_op], [early_utxo])
         early_unsigned.vin[0].scriptSig = b""
@@ -409,10 +452,10 @@ class UnifiedSighashTest(BitcoinTestFramework):
               "scriptPubKey": early_utxo.scriptPubKey.hex(),
               "amount": early_utxo.nValue / COIN}], "ALL|UNIFIED")
         assert early["complete"], early.get("errors")
+        assert self.hash_type_of(early["hex"]) & SIGHASH_UNIFIED, early
         early_check = node.testmempoolaccept([early["hex"]])[0]
-        assert not early_check["allowed"], early_check
-        assert "not active yet" in early_check["reject-reason"], early_check
-        self.log.info("  before activation an opt-in signature is refused as too early")
+        assert early_check["allowed"], early_check
+        self.log.info("  signing names the opt-in byte wherever the fork is scheduled")
 
         op_x, utxo_x = self.make_p2pk_utxo(3 * COIN)
         self.mine(1)
@@ -421,9 +464,9 @@ class UnifiedSighashTest(BitcoinTestFramework):
         # The RPC answers the same question as fork_active_for_next_block: does the
         # block built on this one enforce the fork. Pin them together rather than
         # asserting a constant, so the two cannot drift apart unnoticed.
-        assert_equal(node.getdeploymentinfo()["hardfork"]["active"],
+        assert_equal(node.getdeploymentinfo()["blake2b"]["active"],
                      self.fork_active_for_next_block())
-        assert_equal(node.getdeploymentinfo()["hardfork"]["active"], True)
+        assert_equal(node.getdeploymentinfo()["blake2b"]["active"], True)
 
         self.log.info("Mempool at the activation boundary")
         # The next block is the first one that enforces the fork, so the
@@ -453,7 +496,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
             "the fork-signed transaction should have been mined"
         self.log.info("  block production continued across the boundary")
 
-        assert_equal(node.getdeploymentinfo()["hardfork"]["active"], True)
+        assert_equal(node.getdeploymentinfo()["blake2b"]["active"], True)
 
         self.log.info("From activation: opting in works, and legacy still works")
         op_c, utxo_c = self.make_p2pk_utxo(9 * COIN)
@@ -772,7 +815,11 @@ class UnifiedSighashTest(BitcoinTestFramework):
         }]
         signed = node.signrawtransactionwithkey(unsigned.serialize().hex(), [priv_wif], prevtxs)
         assert signed["complete"], signed.get("errors")
-        # The node's own signature is accepted under the fork rules.
+        # It opted in, rather than merely producing something the mempool takes: a
+        # legacy signature would be accepted here too, so acceptance alone would
+        # let this pass without the fork being exercised at all.
+        assert self.hash_type_of(signed["hex"]) & SIGHASH_UNIFIED, \
+            "the node signs for the fork wherever it is scheduled"
         accepted = node.testmempoolaccept([signed["hex"]])[0]
         assert accepted["allowed"], accepted
         node.sendrawtransaction(signed["hex"])
@@ -835,7 +882,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
             self.log.info(f"  {named_type} left the unmatched input unsigned")
 
         self.log.info("A partly signed multisig can be completed by a second signer")
-        # combinerawtransaction has to recognise the opt-in signature already
+        # combinerawtransaction has to recognize the opt-in signature already
         # present, or the second signer sees an empty input and the transaction
         # can never be completed.
         keyA, keyB = ECKey(), ECKey()
@@ -1098,7 +1145,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
         node.sendrawtransaction(final["hex"])
         self.log.info("  finalizepsbt verified the opt-in signature and extracted it")
 
-        self.log.info("analyzepsbt recognises an opt-in signature as a signature")
+        self.log.info("analyzepsbt recognizes an opt-in signature as a signature")
         # analyzepsbt verifies the signatures it finds. Verifying them under the
         # wrong rules does not fail loudly: it reports a fully signed input as
         # unsigned and lists signatures as missing that are not, which is how a
@@ -1319,93 +1366,40 @@ class UnifiedSighashTest(BitcoinTestFramework):
 
         self.log.info("Reorg back across the activation height")
         # A fork-signed transaction mined above the activation height, then the
-        # chain is rolled back below it. The transaction returns to the mempool
-        # but is no longer valid for the block that would be built next, so the
-        # node must not stall trying to mine it.
-        op_r, utxo_r = self.make_p2pk_utxo(3 * COIN)
-        self.mine(1)
+        # chain rolled back below it. Spends a utxo funded before the rollback
+        # point, or the entry would be dropped for missing inputs and the path
+        # under test never reached.
+        op_r, utxo_r = self.op_reserved, self.utxo_reserved
         reorg_tx = self.build_spend([op_r], [utxo_r])
         sign_input_unified(reorg_tx, 0, utxo_r.scriptPubKey, self.privkey, [utxo_r])
         reorg_txid = node.sendrawtransaction(reorg_tx.serialize().hex())
         reorg_block = self.mine(1)[0]
         assert reorg_txid in node.getblock(reorg_block)["tx"]
+        height_before_rollback = node.getblockcount()
 
         # Roll back to below the activation height: the next block would be
         # ACTIVATION_HEIGHT - 1, which does not enforce the fork.
         rollback_to = node.getblockhash(ACTIVATION_HEIGHT - 1)
         node.invalidateblock(rollback_to)
         assert_equal(node.getblockcount(), ACTIVATION_HEIGHT - 2)
-        assert reorg_txid not in node.getrawmempool(), \
-            "a fork-signed transaction must not survive a reorg below activation"
-        # Block production must not stall.
-        self.mine(1)
-        assert_equal(node.getblockcount(), ACTIVATION_HEIGHT - 1)
+
+        # The mempool takes an opt-in wherever the fork is scheduled, so the
+        # entry comes back rather than being re-checked against the next block's
+        # rules. Consensus still refuses it there, and the assembler does not
+        # skip such an entry, so no template can be built until the height is
+        # reached again. This is the window the deployment avoids by not asking
+        # a node below the height for a template.
+        assert reorg_txid in node.getrawmempool(), \
+            "the mempool is keyed on the fork being scheduled, not on the height"
+        assert_raises_rpc_error(-1, "TestBlockValidity failed", node.getblocktemplate,
+                                {"rules": ["segwit", "blake2b"]})
+
         node.reconsiderblock(rollback_to)
+        assert_equal(node.getblockcount(), height_before_rollback)
+        node.getblocktemplate({"rules": ["segwit", "blake2b"]})
         # The reorg invalidated the wallet's cached utxo set.
         self.wallet.rescan_utxos()
-        self.log.info("  reorg handled, block production continued")
-
-        self.log.info("An unconfirmed opt-in transaction is evicted by a reorg below activation")
-        # The previous case came back through the disconnect pool and failed
-        # re-acceptance. This one never reaches a block, so nothing re-validates
-        # it: only the reorg filter can drop it, and if it survives the block
-        # assembler will pick it up and block production stops.
-        op_u, utxo_u = self.op_reserved, self.utxo_reserved
-        unconf = self.build_spend([op_u], [utxo_u])
-        sign_input_unified(unconf, 0, utxo_u.scriptPubKey, self.privkey, [utxo_u])
-        unconf_txid = node.sendrawtransaction(unconf.serialize().hex())
-        assert unconf_txid in node.getrawmempool()
-        accepted_height = node.getblockcount()
-
-        # Two blocks exist at ACTIVATION_HEIGHT - 1 after the earlier reorg, so
-        # roll back past both to be sure the next block is below activation.
-        rollback2 = node.getblockhash(ACTIVATION_HEIGHT - 2)
-        node.invalidateblock(rollback2)
-        assert node.getblockcount() < accepted_height
-        assert not self.fork_active_for_next_block()
-        assert unconf_txid not in node.getrawmempool(), \
-            "an unconfirmed opt-in transaction must not survive a reorg below activation"
-        self.mine(1)
-        node.reconsiderblock(rollback2)
-        self.wallet.rescan_utxos()
-        self.log.info("  evicted, and block production continued")
-
-        self.log.info("An opt-in entry is evicted when a rollback drops below activation")
-        # The entry records whether the fork applied when it was accepted, and
-        # the filter compares that against the tip the node actually has. A
-        # rollback is the shape reachable here; a reorg onto a shorter chain
-        # with more work is the other, and the predicate reads the new tip
-        # either way rather than reasoning about relative heights.
-        assert self.fork_active_for_next_block()
-        roll_tx = self.build_spend([self.op_branch], [self.utxo_branch])
-        sign_input_unified(roll_tx, 0, self.utxo_branch.scriptPubKey, self.privkey,
-                           [self.utxo_branch])
-        roll_txid = node.sendrawtransaction(roll_tx.serialize().hex())
-        # Control: same shape, same funding depth, signed under the legacy rules.
-        # Its signature reads the same on both sides of the height, so the
-        # rollback must leave it alone. Asserted so that eviction cannot quietly
-        # widen back into every entry in the pool.
-        ctl_tx = self.build_spend([self.op_branch_ctl], [self.utxo_branch_ctl])
-        sign_input_legacy(ctl_tx, 0, self.utxo_branch_ctl.scriptPubKey, self.privkey)
-        ctl_txid = node.sendrawtransaction(ctl_tx.serialize().hex())
-        assert roll_txid in node.getrawmempool()
-        assert ctl_txid in node.getrawmempool()
-
-        roll_to = node.getblockhash(ACTIVATION_HEIGHT - 2)
-        node.invalidateblock(roll_to)
-        assert not self.fork_active_for_next_block()
-        mempool_after = node.getrawmempool()
-        assert roll_txid not in mempool_after, \
-            "an opt-in entry survived a rollback below activation"
-        assert ctl_txid in mempool_after, \
-            "a legacy entry that opted in nowhere must survive a rollback"
-        # The assembler throws rather than skipping an entry it cannot validate,
-        # so a surviving entry stops block production outright.
-        node.getblocktemplate({"rules": ["segwit"]})
-        node.reconsiderblock(roll_to)
-        assert self.fork_active_for_next_block()
-        self.wallet.rescan_utxos()
-        self.log.info("  evicted, and the template still builds")
+        self.log.info("  entry returns, no template below the height, both resume above it")
 
         self.log.info("A block containing a bad opt-in signature is rejected outright")
         # Fresh outputs: the earlier stale_tx spent inputs that good_tx has
@@ -1449,7 +1443,7 @@ class UnifiedSighashTest(BitcoinTestFramework):
         self.sync_blocks(timeout=120)
         assert_equal(self.nodes[1].getbestblockhash(), final_tip)
         assert_equal(self.nodes[1].getblockcount(), final_height)
-        assert_equal(self.nodes[1].getdeploymentinfo()["hardfork"]["active"], True)
+        assert_equal(self.nodes[1].getdeploymentinfo()["blake2b"]["active"], True)
         self.log.info("  reindex and a fresh peer both reach the same chain")
 
         self.log.info("An opt-in transaction relays to a peer and is accepted there")
@@ -1494,10 +1488,10 @@ class UnifiedSighashTest(BitcoinTestFramework):
         self.log.info("  refused without the amount, signs with it")
 
         self.log.info("-walletoldsigs signs the legacy message instead")
-        # The escape hatch. Signing opts in wherever the fork is scheduled, so a
-        # signer that has to interoperate with software which does not know the
-        # fork, and a test running before the activation height, need a way to
-        # ask for the old message. The bit is absent and the node takes it.
+        # The escape hatch. Every signature opts in wherever the fork is scheduled,
+        # so a signer that has to interoperate with software which does not know
+        # the fork needs a way to ask for the old message. The bit is absent and
+        # the node takes it.
         self.restart_node(0, extra_args=self.extra_args[0] + ["-walletoldsigs"])
         op_old, utxo_old = self.make_p2pk_utxo(3 * COIN)
         self.mine(1)
@@ -1515,6 +1509,85 @@ class UnifiedSighashTest(BitcoinTestFramework):
         accepted_old = node.testmempoolaccept([old_signed["hex"]])[0]
         assert accepted_old["allowed"], accepted_old
         self.log.info("  -walletoldsigs produced a legacy signature the node accepts")
+
+        self.log.info("A BIP322 message signature stays legacy")
+        # Message signing is not a spend. It is verified against a hash type of
+        # exactly SIGHASH_ALL, so opting in would produce a signature this node's
+        # own verifier rejects. A non-legacy address takes the BIP322 path.
+        self.restart_node(0, extra_args=self.extra_args[0])
+        self.nodes[0].createwallet(wallet_name="bip322")
+        w = self.nodes[0].get_wallet_rpc("bip322")
+        addr = w.getnewaddress(address_type="bech32")
+        sig = w.signmessage(addr, "unified sighash")
+        assert node.verifymessage(addr, sig, "unified sighash"), \
+            "a message signature must not opt in, or the node cannot verify it"
+        self.log.info("  signed and verified with the fork scheduled")
+
+        self.log.info("A co-signer's opt-in signature survives -walletoldsigs")
+        # Reading is keyed on the fork being scheduled, not on what this node
+        # signs, so a node told to sign legacy still recognizes the other
+        # party's opt-in signature instead of overwriting it.
+        key_b = ECKey()
+        key_b.generate()
+        redeem = CScript([OP_2, self.pubkey, key_b.get_pubkey().get_bytes(), OP_2, OP_CHECKMULTISIG])
+        ms_spk = script_to_p2sh_script(redeem)
+        ms_funding = self.wallet.send_to(from_node=self.nodes[0], scriptPubKey=ms_spk, amount=5 * COIN)
+        self.mine(1)
+        ms_tx = CTransaction()
+        ms_tx.vin = [CTxIn(COutPoint(int(ms_funding["txid"], 16), ms_funding["sent_vout"]))]
+        ms_tx.vout = [CTxOut(4 * COIN, key_to_p2pkh_script(self.pubkey))]
+        ms_prev = [{"txid": ms_funding["txid"], "vout": ms_funding["sent_vout"],
+                    "scriptPubKey": ms_spk.hex(), "redeemScript": redeem.hex(), "amount": 5}]
+
+        self.restart_node(0, extra_args=self.extra_args[0])
+        first = self.nodes[0].signrawtransactionwithkey(
+            ms_tx.serialize().hex(), [self.privkey_wif], ms_prev)
+        first_types = self.hash_types_in_scriptsig(tx_from_hex(first["hex"]).vin[0].scriptSig)
+        assert SIGHASH_ALL | SIGHASH_UNIFIED in first_types, first_types
+
+        self.restart_node(0, extra_args=self.extra_args[0] + ["-walletoldsigs"])
+        second = self.nodes[0].signrawtransactionwithkey(
+            first["hex"], [bytes_to_wif(key_b.get_bytes())], ms_prev)
+        second_types = self.hash_types_in_scriptsig(tx_from_hex(second["hex"]).vin[0].scriptSig)
+        assert SIGHASH_ALL | SIGHASH_UNIFIED in second_types, \
+            f"the co-signer's opt-in signature was dropped: {second_types}"
+        assert SIGHASH_ALL in second_types, f"this node's legacy signature is missing: {second_types}"
+        self.log.info("  both signatures kept, and the input verifies")
+
+        self.log.info("A PSBT that demands the opt-in is refused, not downgraded")
+        # Still on -walletoldsigs. A PSBT whose input declares the opt-in cannot be
+        # honoured by a node that will not produce one, and the request carrying a
+        # plain type must not turn that into a silent downgrade: the signature would
+        # be replayable while the PSBT went on advertising the protected type.
+        self.nodes[0].createwallet(wallet_name="psbt_mismatch")
+        psbt_wallet = self.nodes[0].get_wallet_rpc("psbt_mismatch")
+        self.generatetoaddress(self.nodes[0], COINBASE_MATURITY + 1,
+                               psbt_wallet.getnewaddress(), sync_fun=self.no_op)
+        plain = psbt_wallet.walletcreatefundedpsbt(
+            [], [{psbt_wallet.getnewaddress(): 1}], 0, {"feeRate": 0.0001})["psbt"]
+        # Declare the opt-in on the input without signing it, which is the state a
+        # co-signer leaves behind. The request is plain ALL, which differs from the
+        # declaration only by the opt-in bit: that is the case a wallet must refuse
+        # rather than quietly satisfy with a signature carrying no protection.
+        declaring = PSBT.from_base64(plain)
+        for psbt_in in declaring.i:
+            psbt_in.map[PSBT_IN_SIGHASH_TYPE] = (SIGHASH_ALL | SIGHASH_UNIFIED).to_bytes(4, "little")
+        assert_raises_rpc_error(-22, "Specified sighash value does not match",
+                                psbt_wallet.walletprocesspsbt, declaring.to_base64(), True, "ALL")
+        self.log.info("  a mismatched request fails rather than signing something else")
+
+        # Asking for the opt-in by name while the wallet will not produce one is
+        # answered by naming the conflict. Without that the signer returns nothing
+        # and the input carries whatever script error the empty result raised,
+        # which points nowhere near the cause.
+        named_raw = self.nodes[0].createrawtransaction(
+            [{"txid": f"{op_old.hash:064x}", "vout": op_old.n}],
+            [{self.wallet.get_address(): 2}])
+        refused = psbt_wallet.signrawtransactionwithwallet(named_raw, None, "ALL|UNIFIED")
+        assert not refused["complete"]
+        assert any("UNIFIED was asked for" in e.get("error", "") for e in refused["errors"]), \
+            refused["errors"]
+        self.log.info("  and naming UNIFIED under -walletoldsigs says why, not a script error")
 
 
 if __name__ == "__main__":

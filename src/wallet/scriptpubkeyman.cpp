@@ -40,9 +40,9 @@ namespace {
  *  an opted-in taproot signature names SIGHASH_ALL instead and the two mean the
  *  same thing here. Without the opt-in in play the comparison is unchanged, so
  *  ALL against NONE still fails, and so does DEFAULT against ALL. */
-bool SighashTypesAgree(int declared, int requested, SighashRules sighash_rules)
+bool SighashTypesAgree(int declared, int requested)
 {
-    if (sighash_rules != SighashRules::UNIFIED) return declared == requested;
+    if (SighashRulesForSigning() != SighashRules::UNIFIED) return declared == requested;
     if ((declared & SIGHASH_UNIFIED) == 0 && (requested & SIGHASH_UNIFIED) == 0) {
         return declared == requested;
     }
@@ -717,9 +717,9 @@ bool LegacyDataSPKM::CanProvide(const CScript& script, SignatureData& sigdata)
     }
 }
 
-bool LegacyScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum, SighashRules sighash_rules) const
+bool LegacyScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum) const
 {
-    return ::SignTransaction(tx, this, coins, sighash, input_errors, inputs_amount_sum, sighash_rules);
+    return ::SignTransaction(tx, this, coins, sighash, input_errors, inputs_amount_sum);
 }
 
 SigningResult LegacyScriptPubKeyMan::SignMessage(const MessageSignatureFormat format, const std::string& message, const CTxDestination& address, std::string& str_sig) const
@@ -745,7 +745,7 @@ SigningResult LegacyScriptPubKeyMan::SignMessage(const MessageSignatureFormat fo
     return SigningResult::SIGNING_FAILED;
 }
 
-std::optional<PSBTError> LegacyScriptPubKeyMan::FillPSBT(PartiallySignedTransaction& psbtx, const PrecomputedTransactionData& txdata, int sighash_type, bool sign, bool bip32derivs, int* n_signed, bool finalize, SighashRules sighash_rules, std::vector<bilingual_str>* warnings) const
+std::optional<PSBTError> LegacyScriptPubKeyMan::FillPSBT(PartiallySignedTransaction& psbtx, const PrecomputedTransactionData& txdata, int sighash_type, bool sign, bool bip32derivs, int* n_signed, bool finalize, std::vector<bilingual_str>* warnings) const
 {
     if (n_signed) {
         *n_signed = 0;
@@ -760,7 +760,7 @@ std::optional<PSBTError> LegacyScriptPubKeyMan::FillPSBT(PartiallySignedTransact
 
         // Get the Sighash type
         if (sign && input.sighash_type != std::nullopt &&
-            !SighashTypesAgree(*input.sighash_type, sighash_type, sighash_rules)) {
+            !SighashTypesAgree(*input.sighash_type, sighash_type)) {
             return PSBTError::SIGHASH_MISMATCH;
         }
 
@@ -773,7 +773,7 @@ std::optional<PSBTError> LegacyScriptPubKeyMan::FillPSBT(PartiallySignedTransact
             // There's no UTXO so we can just skip this now
             continue;
         }
-        SignPSBTInput(HidingSigningProvider(this, !sign, !bip32derivs), psbtx, i, &txdata, sighash_type, nullptr, finalize, sighash_rules);
+        SignPSBTInput(HidingSigningProvider(this, !sign, !bip32derivs), psbtx, i, &txdata, sighash_type, nullptr, finalize);
 
         bool signed_one = PSBTInputSigned(input);
         if (n_signed && (signed_one || !sign)) {
@@ -2660,7 +2660,7 @@ bool DescriptorScriptPubKeyMan::CanProvide(const CScript& script, SignatureData&
     return IsMine(script);
 }
 
-bool DescriptorScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum, SighashRules sighash_rules) const
+bool DescriptorScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum) const
 {
     std::unique_ptr<FlatSigningProvider> keys = std::make_unique<FlatSigningProvider>();
     for (const auto& coin_pair : coins) {
@@ -2671,7 +2671,7 @@ bool DescriptorScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const s
         keys->Merge(std::move(*coin_keys));
     }
 
-    return ::SignTransaction(tx, keys.get(), coins, sighash, input_errors, inputs_amount_sum, sighash_rules);
+    return ::SignTransaction(tx, keys.get(), coins, sighash, input_errors, inputs_amount_sum);
 }
 
 SigningResult DescriptorScriptPubKeyMan::SignMessage(const MessageSignatureFormat format, const std::string& message, const CTxDestination& address, std::string& str_sig) const
@@ -2702,7 +2702,7 @@ SigningResult DescriptorScriptPubKeyMan::SignMessage(const MessageSignatureForma
     return SigningResult::OK;
 }
 
-std::optional<PSBTError> DescriptorScriptPubKeyMan::FillPSBT(PartiallySignedTransaction& psbtx, const PrecomputedTransactionData& txdata, int sighash_type, bool sign, bool bip32derivs, int* n_signed, bool finalize, SighashRules sighash_rules, std::vector<bilingual_str>* warnings) const
+std::optional<PSBTError> DescriptorScriptPubKeyMan::FillPSBT(PartiallySignedTransaction& psbtx, const PrecomputedTransactionData& txdata, int sighash_type, bool sign, bool bip32derivs, int* n_signed, bool finalize, std::vector<bilingual_str>* warnings) const
 {
     if (n_signed) {
         *n_signed = 0;
@@ -2717,7 +2717,7 @@ std::optional<PSBTError> DescriptorScriptPubKeyMan::FillPSBT(PartiallySignedTran
 
         // Get the Sighash type
         if (sign && input.sighash_type != std::nullopt &&
-            !SighashTypesAgree(*input.sighash_type, sighash_type, sighash_rules)) {
+            !SighashTypesAgree(*input.sighash_type, sighash_type)) {
             return PSBTError::SIGHASH_MISMATCH;
         }
 
@@ -2778,7 +2778,7 @@ std::optional<PSBTError> DescriptorScriptPubKeyMan::FillPSBT(PartiallySignedTran
             }
         }
 
-        SignPSBTInput(HidingSigningProvider(keys.get(), /*hide_secret=*/!sign, /*hide_origin=*/!bip32derivs), psbtx, i, &txdata, sighash_type, nullptr, finalize, sighash_rules);
+        SignPSBTInput(HidingSigningProvider(keys.get(), /*hide_secret=*/!sign, /*hide_origin=*/!bip32derivs), psbtx, i, &txdata, sighash_type, nullptr, finalize);
 
         bool signed_one = PSBTInputSigned(input);
         if (n_signed && (signed_one || !sign)) {

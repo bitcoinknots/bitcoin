@@ -4,6 +4,7 @@
 
 #include <common/sighash_rules.h>
 
+#include <chainparams.h>
 #include <common/args.h>
 #include <consensus/params.h>
 #include <deploymentstatus.h>
@@ -22,4 +23,16 @@ SighashRules SighashRulesForSigning(const ArgsManager& args, const Consensus::Pa
     if (args.GetBoolArg("-walletoldsigs", DEFAULT_WALLET_OLD_SIGS)) return SighashRules::LEGACY;
     return DeploymentEnabled(params, Consensus::DEPLOYMENT_BLAKE2B) ? SighashRules::UNIFIED
                                                                     : SighashRules::LEGACY;
+}
+
+SighashRules SighashRulesForSigning()
+{
+    return SighashRulesForSigning(gArgs, Params().GetConsensus());
+}
+
+SighashRules SighashRulesForVerifying()
+{
+    return DeploymentEnabled(Params().GetConsensus(), Consensus::DEPLOYMENT_BLAKE2B)
+               ? SighashRules::UNIFIED
+               : SighashRules::LEGACY;
 }
