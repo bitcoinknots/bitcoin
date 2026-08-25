@@ -87,7 +87,7 @@ const std::map<unsigned char, std::string> mapSigHashTypes = {
     {static_cast<unsigned char>(SIGHASH_SINGLE|SIGHASH_ANYONECANPAY), std::string("SINGLE|ANYONECANPAY")},
     // The hardfork opt-in. Without these an opted-in signature renders as an
     // empty string wherever a hash type is shown, which is every PSBT the wallet
-    // produces once the fork is active.
+    // produces.
     {static_cast<unsigned char>(SIGHASH_ALL|SIGHASH_UNIFIED), std::string("ALL|UNIFIED")},
     {static_cast<unsigned char>(SIGHASH_ALL|SIGHASH_ANYONECANPAY|SIGHASH_UNIFIED), std::string("ALL|ANYONECANPAY|UNIFIED")},
     {static_cast<unsigned char>(SIGHASH_NONE|SIGHASH_UNIFIED), std::string("NONE|UNIFIED")},
