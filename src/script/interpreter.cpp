@@ -191,9 +191,9 @@ bool static IsDefinedHashtypeSignature(const valtype &vchSig, unsigned int flags
         return false;
     }
     unsigned char nHashType = vchSig[vchSig.size() - 1] & (~(SIGHASH_ANYONECANPAY));
-    // The opt-in bit is a defined hash type only once the fork is active. Before
-    // then it is an unknown byte and stays rejected, so opting in early is not
-    // relayable and cannot be mined.
+    // The opt-in bit is a defined hash type wherever the fork applies. The
+    // mempool sets that flag on any chain which schedules it, so this rejects
+    // only on one that does not, where the byte has never meant anything.
     if (SighashRulesFromFlags(flags) == SighashRules::UNIFIED) {
         nHashType &= ~SIGHASH_UNIFIED;
     }
@@ -215,10 +215,12 @@ bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned i
         // serror is set
         return false;
     } else if ((flags & SCRIPT_VERIFY_STRICTENC) != 0 && !IsDefinedHashtypeSignature(vchSig, flags)) {
-        // A byte that would be defined once the fork is active says the spender
-        // opted in too early, not that the hash type is malformed. Kept apart so
-        // a caller can tell a signature that is merely early from one that is
-        // wrong, and retry the first rather than discard it.
+        // A byte that would be defined where the fork applies says the spender
+        // opted in, not that the hash type is malformed. Kept apart so a caller
+        // can tell the two apart. Deliberately says "not active here" rather than
+        // "not yet": this is reached on a chain that has not scheduled the fork
+        // at all, where it never becomes active, since one that has schedules the
+        // flag on and accepts the byte.
         const bool early{!vchSig.empty() && (vchSig.back() & SIGHASH_UNIFIED) &&
                          SighashRulesFromFlags(flags) != SighashRules::UNIFIED &&
                          IsDefinedHashtypeSignature(vchSig, flags | SCRIPT_VERIFY_UNIFIED_SIGHASH)};

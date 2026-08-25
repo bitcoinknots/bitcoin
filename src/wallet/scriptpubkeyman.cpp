@@ -29,9 +29,9 @@ namespace {
 /** Whether a PSBT's declared hash type and the one this wallet will sign with
  *  mean the same signature.
  *
- *  `unified` is what the wallet is about to produce, taken from chain state
- *  rather than from the request, so the declared type may legitimately carry the
- *  opt-in bit when the request does not. Reconcile only in that direction: if
+ *  `unified` is what the wallet is about to produce, which does not come from
+ *  the request, so the declared type may legitimately carry the opt-in bit when
+ *  the request does not. Reconcile only in that direction: if
  *  the wallet is not opting in, a PSBT that demands the opt-in is a genuine
  *  disagreement and must still fail, or the wallet signs the legacy message
  *  while the PSBT continues to advertise the unified one.
@@ -49,14 +49,13 @@ bool SighashTypesAgree(int declared, int requested, SighashRules sighash_rules)
     // Only a hash type that really is SIGHASH_DEFAULT means ALL. Stripping the
     // opt-in bit off 0x20 leaves zero as well, and that is a different type
     // with a message of its own, so it must not be folded into ALL here.
-    const auto normalise = [](int type) {
+    const auto canonical = [](int type) {
         if (type == SIGHASH_DEFAULT) return int{SIGHASH_ALL};
         return type & ~SIGHASH_UNIFIED;
     };
-    return normalise(declared) == normalise(requested);
+    return canonical(declared) == canonical(requested);
 }
 } // namespace
-
 
 //! Value for the first BIP 32 hardened derivation. Can be used as a bit mask and as a value. See BIP 32 for more details.
 const uint32_t BIP32_HARDENED_KEY_LIMIT = 0x80000000;
@@ -272,7 +271,7 @@ SigningResult ScriptPubKeyMan::SignMessageBIP322(MessageSignatureFormat format, 
     // be changed to. This is a BIP322 message signature, not a spend: it is
     // verified against a hash type of exactly SIGHASH_ALL, so opting in would
     // produce a signature this node's own verifier rejects, and would not be
-    // recognised by other implementations either.
+    // recognized by other implementations either.
     std::map<int, bilingual_str> errors;
     if (!::SignTransaction(to_sign, keystore, coins, SIGHASH_ALL, errors,
                            /*inputs_amount_sum=*/nullptr, /*sighash_rules=*/SighashRules::LEGACY)) {

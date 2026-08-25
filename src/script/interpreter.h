@@ -168,8 +168,9 @@ enum : uint32_t {
     // makes others invalid that were: a byte like 0x21 reads as ALL under the
     // legacy algorithm today and means "opted in" once this applies, so the
     // message it is checked against changes. So the usual "policy is at least
-    // as strict as consensus" reasoning runs backwards, and the mempool must
-    // derive it from the block being built rather than from the tip.
+    // as strict as consensus" reasoning runs backwards. The mempool therefore
+    // sets it wherever the fork is scheduled rather than tracking the height, so
+    // that a lagging node relays what its peers relay.
     SCRIPT_VERIFY_UNIFIED_SIGHASH = (1U << 22),
 
     // Constants to point to the highest flag in use. Add new flags above this line.
@@ -186,8 +187,8 @@ static constexpr unsigned int REDUCED_DATA_MANDATORY_VERIFY_FLAGS{0
 
 /** Which signature hash rules a caller is asking for.
  *
- * Callers that reach chain state derive this from the rules of the block being
- * built; offline tools take it from the user. */
+ * Signers opt in wherever the fork is scheduled; verifiers take it from the
+ * script flags they were given. */
 enum class SighashRules {
     LEGACY,   //!< the algorithms in use before the hardfork
     UNIFIED,  //!< the hardfork algorithm, opted into per signature

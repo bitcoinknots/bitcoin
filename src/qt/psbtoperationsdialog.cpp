@@ -2,6 +2,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <chainparams.h>
+#include <common/args.h>
+#include <common/sighash_rules.h>
 #include <qt/psbtoperationsdialog.h>
 
 #include <common/messages.h>
@@ -47,14 +50,6 @@ PSBTOperationsDialog::PSBTOperationsDialog(
     m_ui->broadcastTransactionButton->setEnabled(false);
 }
 
-namespace {
-//! The rules the wallet would sign under now, or legacy rules with no wallet.
-SighashRules SighashRulesForWallet(const WalletModel* model)
-{
-    return model ? SighashRulesForSigning(Params().GetConsensus()) : SighashRules::LEGACY;
-}
-} // namespace
-
 PSBTOperationsDialog::~PSBTOperationsDialog()
 {
     delete m_ui;
@@ -65,7 +60,7 @@ void PSBTOperationsDialog::openWithPSBT(PartiallySignedTransaction psbtx)
     m_transaction_data = psbtx;
 
     // Make sure all existing signatures are fully combined before checking for completeness.
-    const SighashRules sighash_rules{SighashRulesForWallet(m_wallet_model)};
+    const SighashRules sighash_rules{SighashRulesForSigning(gArgs, Params().GetConsensus())};
     bool complete = FinalizePSBT(psbtx, sighash_rules);
     if (m_wallet_model) {
         size_t n_could_sign;
@@ -120,7 +115,7 @@ void PSBTOperationsDialog::signTransaction()
 void PSBTOperationsDialog::broadcastTransaction()
 {
     CMutableTransaction mtx;
-    if (!FinalizeAndExtractPSBT(m_transaction_data, mtx, SighashRulesForWallet(m_wallet_model))) {
+    if (!FinalizeAndExtractPSBT(m_transaction_data, mtx, SighashRulesForSigning(gArgs, Params().GetConsensus()))) {
         // This is never expected to fail unless we were given a malformed PSBT
         // (e.g. with an invalid signature.)
         showStatus(tr("Unknown error processing transaction."), StatusLevel::ERR);
@@ -205,7 +200,7 @@ QString PSBTOperationsDialog::renderTransaction(const PartiallySignedTransaction
         tx_description.append("<br>");
     }
 
-    PSBTAnalysis analysis = AnalyzePSBT(psbtx, SighashRulesForWallet(m_wallet_model));
+    PSBTAnalysis analysis = AnalyzePSBT(psbtx, SighashRulesForSigning(gArgs, Params().GetConsensus()));
     tx_description.append(bullet_point);
     if (!*analysis.fee) {
         // This happens if the transaction is missing input UTXO information.
@@ -276,7 +271,7 @@ size_t PSBTOperationsDialog::couldSignInputs(const PartiallySignedTransaction &p
 }
 
 void PSBTOperationsDialog::showTransactionStatus(const PartiallySignedTransaction &psbtx) {
-    PSBTAnalysis analysis = AnalyzePSBT(psbtx, SighashRulesForWallet(m_wallet_model));
+    PSBTAnalysis analysis = AnalyzePSBT(psbtx, SighashRulesForSigning(gArgs, Params().GetConsensus()));
     size_t n_could_sign = couldSignInputs(psbtx);
 
     switch (analysis.next) {
