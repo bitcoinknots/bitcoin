@@ -1641,6 +1641,12 @@ bool SignatureHashUnified(uint256& hash_out, const CScript& scriptCode, const T&
     // sign without it rather than sign over less.
     if (taproot && (execdata == nullptr || !execdata->m_annex_init)) return HandleMissingData(mdb);
 
+    // Needed for every script type, not just taproot, despite the name. The flag
+    // means the spent-amount and spent-script aggregates have been computed, and
+    // this message commits to both on every input: committing to every spent
+    // amount is what closes CVE-2020-14199, which is the reason a bare or segwit
+    // v0 input opts in at all. They live behind a taproot-named flag only
+    // because BIP341 is what introduced them.
     if (!(cache.m_bip341_taproot_ready && cache.m_spent_outputs_ready)) return HandleMissingData(mdb);
 
     // This message is only defined for signatures that opted in.
@@ -1673,8 +1679,15 @@ bool SignatureHashUnified(uint256& hash_out, const CScript& scriptCode, const T&
     case SigVersion::TAPSCRIPT: script_type = 3; break;
     default: assert(false);
     }
-    ss << script_type;
-    ss << nHashType;
+    // Laid out as BIP341 lays out its message, so the two can be read side by
+    // side. The epoch is BIP341's, kept so a later revision has the same room
+    // to move that BIP341 left itself.
+    static constexpr uint8_t EPOCH = 0;
+    ss << EPOCH;
+    // One byte, as BIP341 writes it and as the signature carries it: consensus
+    // reads the hash type from the last byte of the signature, so a wider field
+    // could hold a value no verifier would ever reconstruct.
+    ss << static_cast<uint8_t>(nHashType);
 
     // Transaction level data. The locktime is committed to as five bytes rather
     // than the four it occupies today: four run out on 2106-02-07, and a
@@ -1690,14 +1703,13 @@ bool SignatureHashUnified(uint256& hash_out, const CScript& scriptCode, const T&
         ss << cache.m_spent_scripts_single_hash;
         ss << cache.m_sequences_single_hash;
     }
-    if (output_type == SIGHASH_SINGLE) {
-        if (nIn >= txTo.vout.size()) return false;
-        HashWriter single_output{};
-        single_output << txTo.vout[nIn];
-        ss << single_output.GetSHA256();
-    } else if (output_type != SIGHASH_NONE) {
+    if (output_type != SIGHASH_NONE && output_type != SIGHASH_SINGLE) {
         ss << cache.m_outputs_single_hash;   // ALL, and every value that is not NONE or SINGLE
     }
+
+    // Where BIP341 writes its spend type. It has an annex bit to pack in there
+    // and we do not, so the byte is the script type alone.
+    ss << script_type;
 
     // Data about the input being signed. Under ANYONECANPAY the aggregate
     // hashes are absent, so this input's own prevout, spent output and sequence
@@ -1712,21 +1724,29 @@ bool SignatureHashUnified(uint256& hash_out, const CScript& scriptCode, const T&
         ss << static_cast<uint32_t>(nIn);
     }
 
-    // The tail is what each script type needs beyond the shared body.
     if (!taproot) {
         ss << scriptCode;
     } else {
         // The annex is committed to, or it would be malleable.
         ss << static_cast<uint8_t>(execdata->m_annex_present ? 1 : 0);
         if (execdata->m_annex_present) ss << execdata->m_annex_hash;
-        if (sigversion == SigVersion::TAPSCRIPT) {
-            // Without the leaf hash a signature for one script leaf would be
-            // valid for any other leaf under the same key.
-            if (!execdata->m_tapleaf_hash_init || !execdata->m_codeseparator_pos_init) return HandleMissingData(mdb);
-            ss << execdata->m_tapleaf_hash;
-            ss << static_cast<uint8_t>(0); // key version
-            ss << execdata->m_codeseparator_pos;
-        }
+    }
+
+    // The single output, where BIP341 puts it.
+    if (output_type == SIGHASH_SINGLE) {
+        if (nIn >= txTo.vout.size()) return false;
+        HashWriter single_output{};
+        single_output << txTo.vout[nIn];
+        ss << single_output.GetSHA256();
+    }
+
+    if (sigversion == SigVersion::TAPSCRIPT) {
+        // Without the leaf hash a signature for one script leaf would be
+        // valid for any other leaf under the same key.
+        if (!execdata->m_tapleaf_hash_init || !execdata->m_codeseparator_pos_init) return HandleMissingData(mdb);
+        ss << execdata->m_tapleaf_hash;
+        ss << static_cast<uint8_t>(0); // key version
+        ss << execdata->m_codeseparator_pos;
     }
 
     hash_out = ss.GetSHA256();
