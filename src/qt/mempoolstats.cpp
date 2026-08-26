@@ -243,7 +243,7 @@ void MempoolStats::drawChart()
     int bottom = ui->graphicsView->size().height()-GRAPH_PADDING_BOTTOM;
     qreal maxwidth = ui->graphicsView->size().width()-GRAPH_PADDING_LEFT-GRAPH_PADDING_RIGHT;
     qreal maxheightG = ui->graphicsView->size().height()-GRAPH_PADDING_TOP-GRAPH_PADDING_TOP_LABEL-LABEL_HEIGHT;
-    float paddingTopSizeFactor = 1.2;
+    float paddingTopSizeFactor = 1.2f;
     qreal step = maxwidth/(double)vSamples.size();
 
     // make sure we skip samples that would be drawn narrower then 1px
