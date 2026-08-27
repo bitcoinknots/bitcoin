@@ -43,6 +43,7 @@ from test_framework.script_util import (
 )
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
+    assert_approx,
     assert_equal,
     assert_greater_than_or_equal,
     assert_is_hex_string,
@@ -266,7 +267,8 @@ class SegWitTest(BitcoinTestFramework):
         tx1_hex = self.nodes[0].gettransaction(txid1)['hex']
         tx1 = tx_from_hex(tx1_hex)
 
-        # Check that wtxid is properly reported in mempool entry (txid1)
+        # Check that hash and wtxid are properly reported in mempool entry (txid1)
+        assert_equal(int(self.nodes[0].getmempoolentry(txid1)["hash"], 16), tx1.calc_sha256(True))
         assert_equal(int(self.nodes[0].getmempoolentry(txid1)["wtxid"], 16), tx1.calc_sha256(True))
 
         # Check that weight and vsize are properly reported in mempool entry (txid1)
@@ -282,7 +284,8 @@ class SegWitTest(BitcoinTestFramework):
         tx = tx_from_hex(tx2_hex)
         assert not tx.wit.is_null()
 
-        # Check that wtxid is properly reported in mempool entry (txid2)
+        # Check that hash and wtxid are properly reported in mempool entry (txid2)
+        assert_equal(int(self.nodes[0].getmempoolentry(txid2)["hash"], 16), tx.calc_sha256(True))
         assert_equal(int(self.nodes[0].getmempoolentry(txid2)["wtxid"], 16), tx.calc_sha256(True))
 
         # Check that weight and vsize are properly reported in mempool entry (txid2)
@@ -305,7 +308,8 @@ class SegWitTest(BitcoinTestFramework):
         assert txid2 in template_txids
         assert txid3 in template_txids
 
-        # Check that wtxid is properly reported in mempool entry (txid3)
+        # Check that hash and wtxid are properly reported in mempool entry (txid3)
+        assert_equal(int(self.nodes[0].getmempoolentry(txid3)["hash"], 16), tx.calc_sha256(True))
         assert_equal(int(self.nodes[0].getmempoolentry(txid3)["wtxid"], 16), tx.calc_sha256(True))
 
         # Check that weight and vsize are properly reported in mempool entry (txid3)
@@ -314,6 +318,32 @@ class SegWitTest(BitcoinTestFramework):
 
         # Mine a block to clear the gbt cache again.
         self.generate(self.nodes[0], 1)
+
+        self.log.info("Signing with all-segwit inputs reveals fee rate")
+        addr = self.nodes[0].getnewaddress(address_type='p2sh-segwit')
+        txid = self.nodes[0].sendtoaddress(addr, 1)
+        tx = self.nodes[0].getrawtransaction(txid, True)
+        n = -1
+        value = -1
+        for o in tx["vout"]:
+            if o["scriptPubKey"]["address"] == addr:
+                n = o["n"]
+                value = Decimal(o["value"])
+                break
+        assert n > -1 # failure means we could not find the address in the outputs despite sending to it
+        assert_equal(value, 1) # failure means we got an unexpected amount of coins, despite trying to send 1
+        fee = Decimal("0.00010000")
+        value_out = value - fee
+        self.generatetoaddress(self.nodes[0], 1, self.nodes[0].getnewaddress())
+        raw = self.nodes[0].createrawtransaction([{"txid" : txid, "vout" : n}], [{self.nodes[0].getnewaddress() : value_out}])
+        signed = self.nodes[0].signrawtransactionwithwallet(raw)
+        assert_equal(signed["complete"], True)
+        txsize = self.nodes[0].decoderawtransaction(signed['hex'])['vsize']
+        exp_feerate = 1000 * fee / Decimal(txsize)
+        assert_approx(signed["feerate"], exp_feerate, Decimal("0.00000010"))
+        # discrepancy = 100000000 * (exp_feerate - signed["feerate"])
+        # assert -10 < discrepancy < 10
+        assert_equal(Decimal(signed["fee"]), fee)
 
         if not self.options.descriptors:
             self.log.info("Verify behaviour of importaddress and listunspent")
@@ -372,14 +402,12 @@ class SegWitTest(BitcoinTestFramework):
                     [bare, p2sh, p2wsh, p2sh_p2wsh] = self.p2sh_address_to_script(v)
                     # p2sh multisig with compressed keys should always be spendable
                     spendable_anytime.extend([p2sh])
-                    # bare multisig can be watched and signed, but is not treated as ours
-                    solvable_after_importaddress.extend([bare])
                     # P2WSH and P2SH(P2WSH) multisig with compressed keys are spendable after direct importaddress
                     spendable_after_importaddress.extend([p2wsh, p2sh_p2wsh])
                 else:
                     [p2wpkh, p2sh_p2wpkh, p2pk, p2pkh, p2sh_p2pk, p2sh_p2pkh, p2wsh_p2pk, p2wsh_p2pkh, p2sh_p2wsh_p2pk, p2sh_p2wsh_p2pkh] = self.p2pkh_address_to_script(v)
                     # normal P2PKH and P2PK with compressed keys should always be spendable
-                    spendable_anytime.extend([p2pkh, p2pk])
+                    spendable_anytime.extend([p2pkh])
                     # P2SH_P2PK, P2SH_P2PKH with compressed keys are spendable after direct importaddress
                     spendable_after_importaddress.extend([p2sh_p2pk, p2sh_p2pkh, p2wsh_p2pk, p2wsh_p2pkh, p2sh_p2wsh_p2pk, p2sh_p2wsh_p2pkh])
                     # P2WPKH and P2SH_P2WPKH with compressed keys should always be spendable
@@ -391,14 +419,12 @@ class SegWitTest(BitcoinTestFramework):
                     [bare, p2sh, p2wsh, p2sh_p2wsh] = self.p2sh_address_to_script(v)
                     # p2sh multisig with uncompressed keys should always be spendable
                     spendable_anytime.extend([p2sh])
-                    # bare multisig can be watched and signed, but is not treated as ours
-                    solvable_after_importaddress.extend([bare])
                     # P2WSH and P2SH(P2WSH) multisig with uncompressed keys are never seen
                     unseen_anytime.extend([p2wsh, p2sh_p2wsh])
                 else:
                     [p2wpkh, p2sh_p2wpkh, p2pk, p2pkh, p2sh_p2pk, p2sh_p2pkh, p2wsh_p2pk, p2wsh_p2pkh, p2sh_p2wsh_p2pk, p2sh_p2wsh_p2pkh] = self.p2pkh_address_to_script(v)
                     # normal P2PKH and P2PK with uncompressed keys should always be spendable
-                    spendable_anytime.extend([p2pkh, p2pk])
+                    spendable_anytime.extend([p2pkh])
                     # P2SH_P2PK and P2SH_P2PKH are spendable after direct importaddress
                     spendable_after_importaddress.extend([p2sh_p2pk, p2sh_p2pkh])
                     # Witness output types with uncompressed keys are never seen
@@ -409,11 +435,11 @@ class SegWitTest(BitcoinTestFramework):
                 if v['isscript']:
                     # Multisig without private is not seen after addmultisigaddress, but seen after importaddress
                     [bare, p2sh, p2wsh, p2sh_p2wsh] = self.p2sh_address_to_script(v)
-                    solvable_after_importaddress.extend([bare, p2sh, p2wsh, p2sh_p2wsh])
+                    solvable_after_importaddress.extend([p2sh, p2wsh, p2sh_p2wsh])
                 else:
                     [p2wpkh, p2sh_p2wpkh, p2pk, p2pkh, p2sh_p2pk, p2sh_p2pkh, p2wsh_p2pk, p2wsh_p2pkh, p2sh_p2wsh_p2pk, p2sh_p2wsh_p2pkh] = self.p2pkh_address_to_script(v)
                     # normal P2PKH, P2PK, P2WPKH and P2SH_P2WPKH with compressed keys should always be seen
-                    solvable_anytime.extend([p2pkh, p2pk, p2wpkh, p2sh_p2wpkh])
+                    solvable_anytime.extend([p2pkh, p2wpkh, p2sh_p2wpkh])
                     # P2SH_P2PK, P2SH_P2PKH with compressed keys are seen after direct importaddress
                     solvable_after_importaddress.extend([p2sh_p2pk, p2sh_p2pkh, p2wsh_p2pk, p2wsh_p2pkh, p2sh_p2wsh_p2pk, p2sh_p2wsh_p2pkh])
 
@@ -422,13 +448,13 @@ class SegWitTest(BitcoinTestFramework):
                 if v['isscript']:
                     [bare, p2sh, p2wsh, p2sh_p2wsh] = self.p2sh_address_to_script(v)
                     # Base uncompressed multisig without private is not seen after addmultisigaddress, but seen after importaddress
-                    solvable_after_importaddress.extend([bare, p2sh])
+                    solvable_after_importaddress.extend([p2sh])
                     # P2WSH and P2SH(P2WSH) multisig with uncompressed keys are never seen
                     unseen_anytime.extend([p2wsh, p2sh_p2wsh])
                 else:
                     [p2wpkh, p2sh_p2wpkh, p2pk, p2pkh, p2sh_p2pk, p2sh_p2pkh, p2wsh_p2pk, p2wsh_p2pkh, p2sh_p2wsh_p2pk, p2sh_p2wsh_p2pkh] = self.p2pkh_address_to_script(v)
                     # normal P2PKH and P2PK with uncompressed keys should always be seen
-                    solvable_anytime.extend([p2pkh, p2pk])
+                    solvable_anytime.extend([p2pkh])
                     # P2SH_P2PK, P2SH_P2PKH with uncompressed keys are seen after direct importaddress
                     solvable_after_importaddress.extend([p2sh_p2pk, p2sh_p2pkh])
                     # Witness output types with uncompressed keys are never seen

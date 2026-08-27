@@ -55,6 +55,15 @@ bool CheckDiskSpace(const fs::path& dir, uint64_t additional_bytes = 0);
  */
 std::streampos GetFileSize(const char* path, std::streamsize max = std::numeric_limits<std::streamsize>::max());
 
+//! Return the original FILE* unchanged. On systems that support it,
+//! also advise the OS that the file will be accessed sequentially.
+FILE* AdviseSequential(FILE*);
+
+//! Close a file and return the result of fclose(). On systems that
+//! support it, advise the OS to remove the file contents from the page
+//! cache (which can help on memory-constrained systems).
+int CloseAndUncache(FILE*);
+
 /** Release all directory locks. This is used for unit testing only, at runtime
  * the global destructor will take care of the locks.
  */
@@ -75,6 +84,14 @@ std::string PermsToSymbolicString(fs::perms p);
  * @return Permissions as fs::perms
  */
 std::optional<fs::perms> InterpretPermString(const std::string& s);
+
+/** Check if a directory is writable by creating a temporary file on it.
+ *
+ * @param[in] dir_path Path of the directory to test
+ * @return true if a temporary file could be created and removed, false otherwise.
+ * @throw std::runtime_error if dir_path is not a directory.
+ */
+bool IsDirWritable(const fs::path& dir_path);
 
 #ifdef WIN32
 fs::path GetSpecialFolderPath(int nFolder, bool fCreate = true);

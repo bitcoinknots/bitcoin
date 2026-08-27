@@ -218,6 +218,47 @@ IsMineResult IsMineInner(const LegacyDataSPKM& keystore, const CScript& scriptPu
 
 } // namespace
 
+SigningResult ScriptPubKeyMan::SignMessageBIP322(MessageSignatureFormat format, const SigningProvider* keystore, const std::string& message, const CTxDestination& address, std::string& str_sig) const
+{
+    assert(format != MessageSignatureFormat::LEGACY);
+
+    MessageVerificationResult result; // unused
+    auto txs = BIP322Txs::Create(address, message, result);
+    assert(txs);
+
+    const CTransaction& to_spend = txs->m_to_spend;
+    CMutableTransaction to_sign(txs->m_to_sign);
+
+    // Create the "unspent output" map, consisting of the to_spend output
+    std::map<COutPoint, Coin> coins;
+    coins[to_sign.vin[0].prevout] = Coin(to_spend.vout[0], 1, false);
+
+    // Sign the transaction
+    std::map<int, bilingual_str> errors;
+    if (!::SignTransaction(to_sign, keystore, coins, SIGHASH_ALL, errors)) {
+        // TODO: this may be a multisig which successfully signed but needed additional signatures
+        return SigningResult::SIGNING_FAILED;
+    }
+
+    // We force the format to FULL, if this turned out to be a legacy format (p2pkh) signature
+    if (to_sign.vin[0].scriptSig.size() > 0 || to_sign.vin[0].scriptWitness.IsNull()) {
+        format = MessageSignatureFormat::FULL;
+    }
+
+    DataStream ds;
+    if (format == MessageSignatureFormat::SIMPLE) {
+        // Simple format output
+        ds << to_sign.vin[0].scriptWitness.stack;
+    } else {
+        // Full format output
+        ds << TX_WITH_WITNESS(to_sign);
+    }
+
+    str_sig = EncodeBase64(ds);
+
+    return SigningResult::OK;
+}
+
 isminetype LegacyDataSPKM::IsMine(const CScript& script) const
 {
     switch (IsMineInner(*this, script, IsMineSigVersion::TOP)) {
@@ -262,7 +303,7 @@ bool LegacyDataSPKM::CheckDecryptionKey(const CKeyingMaterial& master_key)
         }
         if (keyPass && keyFail)
         {
-            LogPrintf("The wallet is probably corrupted: Some keys decrypt but not all.\n");
+            LogWarning("The wallet is probably corrupted: Some keys decrypt but not all.");
             throw std::runtime_error("Error unlocking wallet: some keys decrypt but not all. Your wallet file may be corrupt.");
         }
         if (keyFail || !keyPass)
@@ -400,6 +441,23 @@ std::vector<WalletDestination> LegacyScriptPubKeyMan::MarkUnusedAddresses(const 
     }
 
     return result;
+}
+
+bool LegacyDataSPKM::IsKeyActive(const CScript& script) const
+{
+    LOCK(cs_KeyStore);
+
+    if (!IsMine(script)) return false; // Not in the keystore at all
+
+    for (const auto& key_id : GetAffectedKeys(script, *this)) {
+        const auto it = mapKeyMetadata.find(key_id);
+        if (it == mapKeyMetadata.end()) return false; // This key must be really old
+
+        if (!it->second.hd_seed_id.IsNull() && it->second.hd_seed_id == m_hd_chain.seed_id) return true;
+    }
+
+    // Imported or dumped for a new keypool
+    return false;
 }
 
 void LegacyScriptPubKeyMan::UpgradeKeyMetadata()
@@ -620,21 +678,31 @@ bool LegacyDataSPKM::CanProvide(const CScript& script, SignatureData& sigdata)
     }
 }
 
-bool LegacyScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors) const
+bool LegacyScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum) const
 {
-    return ::SignTransaction(tx, this, coins, sighash, input_errors);
+    return ::SignTransaction(tx, this, coins, sighash, input_errors, inputs_amount_sum);
 }
 
-SigningResult LegacyScriptPubKeyMan::SignMessage(const std::string& message, const PKHash& pkhash, std::string& str_sig) const
+SigningResult LegacyScriptPubKeyMan::SignMessage(const MessageSignatureFormat format, const std::string& message, const CTxDestination& address, std::string& str_sig) const
 {
+    if (format != MessageSignatureFormat::LEGACY) {
+        return SignMessageBIP322(format, this, message, address, str_sig);
+    }
+
+    const PKHash* pkhash = std::get_if<PKHash>(&address);
+    if (!pkhash) {
+        return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
+    }
+
     CKey key;
-    if (!GetKey(ToKeyID(pkhash), key)) {
+    if (!GetKey(ToKeyID(*pkhash), key)) {
         return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
     }
 
     if (MessageSign(key, message, str_sig)) {
         return SigningResult::OK;
     }
+
     return SigningResult::SIGNING_FAILED;
 }
 
@@ -1511,6 +1579,7 @@ void LegacyScriptPubKeyMan::LearnRelatedScripts(const CPubKey& key, OutputType t
 
 void LegacyScriptPubKeyMan::LearnAllRelatedScripts(const CPubKey& key)
 {
+    if (!g_implicit_segwit) return;
     // OutputType::P2SH_SEGWIT always adds all necessary scripts for all types.
     LearnRelatedScripts(key, OutputType::P2SH_SEGWIT);
 }
@@ -1818,9 +1887,29 @@ std::optional<MigrationData> LegacyDataSPKM::MigrateToDescriptor()
 
     WalletBatch batch(m_storage.GetDatabase());
     if (!batch.TxnBegin()) {
-        LogPrintf("Error generating descriptors for migration, cannot initialize db transaction\n");
+        LogWarning("Error generating descriptors for migration, cannot initialize db transaction");
         return std::nullopt;
     }
+
+    constexpr auto sanitycheck = [](const bool erased, const bool maybe_compressed_key, const CScript &spk, const LegacyDataSPKM& self, const DescriptorScriptPubKeyMan& desc_spk_man) {
+        assert(desc_spk_man.IsMine(spk) == ISMINE_SPENDABLE);
+        if (erased) {
+            assert(self.IsMine(spk) == ISMINE_SPENDABLE);
+            return;
+        }
+        if (maybe_compressed_key && !g_implicit_segwit) {
+            // combo() includes segwit
+            if (spk.IsPayToScriptHash()) return;
+            int witness_version;
+            std::vector<unsigned char> witness_program;
+            if (spk.IsWitnessProgram(witness_version, witness_program)) {
+                if (witness_version == 0 && witness_program.size() == 20) {
+                    return;
+                }
+            }
+        }
+        assert(erased);
+    };
 
     // keyids is now all non-HD keys. Each key will have its own combo descriptor
     for (const CKeyID& keyid : keyids) {
@@ -1859,8 +1948,7 @@ std::optional<MigrationData> LegacyDataSPKM::MigrateToDescriptor()
         // Remove the scriptPubKeys from our current set
         for (const CScript& spk : desc_spks) {
             size_t erased = spks.erase(spk);
-            assert(erased == 1);
-            assert(IsMine(spk) == ISMINE_SPENDABLE);
+            sanitycheck(erased, key.IsCompressed(), spk, *this, *desc_spk_man);
         }
 
         out.desc_spkms.push_back(std::move(desc_spk_man));
@@ -1905,8 +1993,7 @@ std::optional<MigrationData> LegacyDataSPKM::MigrateToDescriptor()
             // Remove the scriptPubKeys from our current set
             for (const CScript& spk : desc_spks) {
                 size_t erased = spks.erase(spk);
-                assert(erased == 1);
-                assert(IsMine(spk) == ISMINE_SPENDABLE);
+                sanitycheck(erased, /*maybe_compressed_key=*/true, spk, *this, *desc_spk_man);
             }
 
             out.desc_spkms.push_back(std::move(desc_spk_man));
@@ -2000,7 +2087,7 @@ std::optional<MigrationData> LegacyDataSPKM::MigrateToDescriptor()
 
     // Make sure that we have accounted for all scriptPubKeys
     if (!Assume(spks.empty())) {
-        LogPrintf("%s\n", STR_INTERNAL_BUG("Error: Some output scripts were not migrated.\n"));
+        LogError("%s", STR_INTERNAL_BUG("Error: Some output scripts were not migrated."));
         return std::nullopt;
     }
 
@@ -2054,7 +2141,7 @@ std::optional<MigrationData> LegacyDataSPKM::MigrateToDescriptor()
 
     // Finalize transaction
     if (!batch.TxnCommit()) {
-        LogPrintf("Error generating descriptors for migration, cannot commit db transaction\n");
+        LogWarning("Error generating descriptors for migration, cannot commit db transaction");
         return std::nullopt;
     }
 
@@ -2144,7 +2231,7 @@ bool DescriptorScriptPubKeyMan::CheckDecryptionKey(const CKeyingMaterial& master
             break;
     }
     if (keyPass && keyFail) {
-        LogPrintf("The wallet is probably corrupted: Some keys decrypt but not all.\n");
+        LogWarning("The wallet is probably corrupted: Some keys decrypt but not all.");
         throw std::runtime_error("Error unlocking wallet: some keys decrypt but not all. Your wallet file may be corrupt.");
     }
     if (keyFail || !keyPass) {
@@ -2533,7 +2620,7 @@ bool DescriptorScriptPubKeyMan::CanProvide(const CScript& script, SignatureData&
     return IsMine(script);
 }
 
-bool DescriptorScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors) const
+bool DescriptorScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum) const
 {
     std::unique_ptr<FlatSigningProvider> keys = std::make_unique<FlatSigningProvider>();
     for (const auto& coin_pair : coins) {
@@ -2544,24 +2631,34 @@ bool DescriptorScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const s
         keys->Merge(std::move(*coin_keys));
     }
 
-    return ::SignTransaction(tx, keys.get(), coins, sighash, input_errors);
+    return ::SignTransaction(tx, keys.get(), coins, sighash, input_errors, inputs_amount_sum);
 }
 
-SigningResult DescriptorScriptPubKeyMan::SignMessage(const std::string& message, const PKHash& pkhash, std::string& str_sig) const
+SigningResult DescriptorScriptPubKeyMan::SignMessage(const MessageSignatureFormat format, const std::string& message, const CTxDestination& address, std::string& str_sig) const
 {
-    std::unique_ptr<FlatSigningProvider> keys = GetSigningProvider(GetScriptForDestination(pkhash), true);
+    std::unique_ptr<FlatSigningProvider> keys = GetSigningProvider(GetScriptForDestination(address), true);
     if (!keys) {
         return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
     }
 
+    if (format != MessageSignatureFormat::LEGACY) {
+        return SignMessageBIP322(format, keys.get(), message, address, str_sig);
+    }
+
+    const PKHash* pkhash = std::get_if<PKHash>(&address);
+    if (!pkhash) {
+        return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
+    }
+
     CKey key;
-    if (!keys->GetKey(ToKeyID(pkhash), key)) {
+    if (!keys->GetKey(ToKeyID(*pkhash), key)) {
         return SigningResult::PRIVATE_KEY_NOT_AVAILABLE;
     }
 
     if (!MessageSign(key, message, str_sig)) {
         return SigningResult::SIGNING_FAILED;
     }
+
     return SigningResult::OK;
 }
 
@@ -2849,6 +2946,11 @@ bool DescriptorScriptPubKeyMan::CanUpdateToWalletDescriptor(const WalletDescript
     if (!HasWalletDescriptor(descriptor)) {
         error = "can only update matching descriptor";
         return false;
+    }
+
+    if (!descriptor.descriptor->IsRange()) {
+        // Skip range check for non-range descriptors
+        return true;
     }
 
     if (descriptor.range_start > m_wallet_descriptor.range_start ||

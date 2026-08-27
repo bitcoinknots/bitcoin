@@ -32,6 +32,7 @@ static RPCHelpMan validateaddress()
         "\nReturn information about the given bitcoin address.\n",
         {
             {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The bitcoin address to validate"},
+            {"address_type", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "DEPRECATED", RPCArgOptions{.hidden=true}},
         },
         RPCResult{
             RPCResult::Type::OBJ, "", "",
@@ -44,6 +45,7 @@ static RPCHelpMan validateaddress()
                 {RPCResult::Type::NUM, "witness_version", /*optional=*/true, "The version number of the witness program"},
                 {RPCResult::Type::STR_HEX, "witness_program", /*optional=*/true, "The hex value of the witness program"},
                 {RPCResult::Type::STR, "error", /*optional=*/true, "Error message, if any"},
+                {RPCResult::Type::NUM, "error_index", /*optional=*/true, "DEPRECATED. The index of the first likely error location, if known"},
                 {RPCResult::Type::ARR, "error_locations", /*optional=*/true, "Indices of likely error locations in address, if known (e.g. Bech32 errors)",
                     {
                         {RPCResult::Type::NUM, "index", "index of a potential error"},
@@ -59,6 +61,14 @@ static RPCHelpMan validateaddress()
             std::string error_msg;
             std::vector<int> error_locations;
             CTxDestination dest = DecodeDestination(request.params[0].get_str(), error_msg, &error_locations);
+
+            // Merely validate address_type is an actual address type, so we don't silently ignore potential future parameters
+            if (!request.params[1].isNull()) {
+                if (!ParseOutputType(request.params[1].get_str())) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Unknown address type '%s'", request.params[1].get_str()));
+                }
+            }
+
             const bool isValid = IsValidDestination(dest);
             CHECK_NONFATAL(isValid == error_msg.empty());
 
@@ -74,6 +84,9 @@ static RPCHelpMan validateaddress()
                 UniValue detail = DescribeAddress(dest);
                 ret.pushKVs(std::move(detail));
             } else {
+                if (!error_locations.empty()) {
+                    ret.pushKV("error_index", error_locations.at(0));
+                }
                 UniValue error_indices(UniValue::VARR);
                 for (int i : error_locations) error_indices.push_back(i);
                 ret.pushKV("error_locations", std::move(error_indices));
@@ -89,14 +102,20 @@ static RPCHelpMan createmultisig()
 {
     return RPCHelpMan{"createmultisig",
         "\nCreates a multi-signature address with n signature of m keys required.\n"
-        "It returns a json object with the address and redeemScript.\n",
+        "It returns a json object with the address and redeemScript.\n"
+        "Public keys can be sorted according to BIP67 during the request if required.\n",
         {
             {"nrequired", RPCArg::Type::NUM, RPCArg::Optional::NO, "The number of required signatures out of the n keys."},
             {"keys", RPCArg::Type::ARR, RPCArg::Optional::NO, "The hex-encoded public keys.",
                 {
                     {"key", RPCArg::Type::STR_HEX, RPCArg::Optional::OMITTED, "The hex-encoded public key"},
                 }},
-            {"address_type", RPCArg::Type::STR, RPCArg::Default{"legacy"}, "The address type to use. Options are \"legacy\", \"p2sh-segwit\", and \"bech32\"."},
+            {"options|address_type", {RPCArg::Type::OBJ_NAMED_PARAMS, RPCArg::Type::STR}, RPCArg::Optional::OMITTED, "",
+                {
+                    {"address_type", RPCArg::Type::STR, RPCArg::Default{"legacy"}, "The address type to use. Options are \"legacy\", \"p2sh-segwit\", and \"bech32\".", RPCArgOptions{.also_positional = true}},
+                    {"sort", RPCArg::Type::BOOL, RPCArg::Default{false}, "Whether to sort public keys according to BIP67."},
+                },
+                RPCArgOptions{.oneline_description="options"}},
         },
         RPCResult{
             RPCResult::Type::OBJ, "", "",
@@ -120,29 +139,55 @@ static RPCHelpMan createmultisig()
         {
             int required = request.params[0].getInt<int>();
 
+            bool sort = false;
+            OutputType output_type = OutputType::LEGACY;
+
+            if (request.params[2].isStr()) {
+                // backward compatibility
+                std::optional<OutputType> parsed = ParseOutputType(request.params[2].get_str());
+                if (!parsed) {
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("Unknown address type '%s'", request.params[2].get_str()));
+                }
+                output_type = parsed.value();
+            } else if (!request.params[2].isNull()) {
+                const UniValue& options = request.params[2].get_obj();
+                RPCTypeCheckObj(options,
+                    {
+                        {"address_type", UniValueType(UniValue::VSTR)},
+                        {"sort", UniValueType(UniValue::VBOOL)},
+                    },
+                    true, true);
+
+                if (options.exists("address_type")) {
+                    std::optional<OutputType> parsed = ParseOutputType(options["address_type"].get_str());
+                    if (!parsed) {
+                        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("Unknown address type '%s'", options["address_type"].get_str()));
+                    }
+                    output_type = parsed.value();
+                }
+
+                if (options.exists("sort")) {
+                    sort = options["sort"].get_bool();
+                }
+            }
+            if (output_type == OutputType::BECH32M) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "createmultisig cannot create bech32m multisig addresses");
+            }
+
             // Get the public keys
             const UniValue& keys = request.params[1].get_array();
             std::vector<CPubKey> pubkeys;
             pubkeys.reserve(keys.size());
             for (unsigned int i = 0; i < keys.size(); ++i) {
                 pubkeys.push_back(HexToPubKey(keys[i].get_str()));
-            }
-
-            // Get the output type
-            OutputType output_type = OutputType::LEGACY;
-            if (!request.params[2].isNull()) {
-                std::optional<OutputType> parsed = ParseOutputType(request.params[2].get_str());
-                if (!parsed) {
-                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("Unknown address type '%s'", request.params[2].get_str()));
-                } else if (parsed.value() == OutputType::BECH32M) {
-                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "createmultisig cannot create bech32m multisig addresses");
+                if (sort && !pubkeys.back().IsCompressed()) {
+                    throw std::runtime_error(strprintf("Compressed key required for BIP67: %s", keys[i].get_str()));
                 }
-                output_type = parsed.value();
             }
 
             FlatSigningProvider keystore;
             CScript inner;
-            const CTxDestination dest = AddAndGetMultisigDestination(required, pubkeys, output_type, keystore, inner);
+            const CTxDestination dest = AddAndGetMultisigDestination(required, pubkeys, output_type, keystore, inner, sort);
 
             // Make the descriptor
             std::unique_ptr<Descriptor> descriptor = InferDescriptor(GetScriptForDestination(dest), keystore);
@@ -273,6 +318,12 @@ static RPCHelpMan deriveaddresses()
         {
             {"descriptor", RPCArg::Type::STR, RPCArg::Optional::NO, "The descriptor."},
             {"range", RPCArg::Type::RANGE, RPCArg::Optional::OMITTED, "If a ranged descriptor is used, this specifies the end or the range (in [begin,end] notation) to derive."},
+            {"options", RPCArg::Type::OBJ_NAMED_PARAMS, RPCArg::Optional::OMITTED, "",
+                {
+                    {"require_checksum", RPCArg::Type::BOOL, RPCArg::Default{true}, "Require a checksum. If a checksum is provided it will be verified regardless of this parameter."},
+                },
+                RPCArgOptions{.oneline_description="options"}
+            },
         },
         {
             RPCResult{"for single derivation descriptors",
@@ -294,13 +345,29 @@ static RPCHelpMan deriveaddresses()
             },
         },
         RPCExamples{
-            "First three native segwit receive addresses\n" +
+            "First three native segwit receive addresses:\n" +
             HelpExampleCli("deriveaddresses", "\"" + EXAMPLE_DESCRIPTOR + "\" \"[0,2]\"") +
-            HelpExampleRpc("deriveaddresses", "\"" + EXAMPLE_DESCRIPTOR + "\", \"[0,2]\"")
+            HelpExampleRpc("deriveaddresses", "\"" + EXAMPLE_DESCRIPTOR + "\", \"[0,2]\"") +
+            "Derive the PKH address from a WIF, which has a built-in checksum:\n" +
+            HelpExampleCli("deriveaddresses", "\"pkh(cPsQTSmMZ8e3AEUWGjS73f5R364yJxH6RxcgnwbHjbKbFPUP2Dtu)\" null '{\"require_checksum\": false}'")
         },
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
         {
             const std::string desc_str = request.params[0].get_str();
+            bool require_checksum = true;
+
+            if (!request.params[2].isNull()) {
+                const UniValue& options = request.params[2];
+                RPCTypeCheckObj(options,
+                    {
+                        {"require_checksum", UniValueType(UniValue::VBOOL)},
+                    },
+                    true, true);
+
+                if (options.exists("require_checksum")) {
+                    require_checksum = options["require_checksum"].get_bool();
+                }
+            }
 
             int64_t range_begin = 0;
             int64_t range_end = 0;
@@ -311,16 +378,16 @@ static RPCHelpMan deriveaddresses()
 
             FlatSigningProvider key_provider;
             std::string error;
-            auto descs = Parse(desc_str, key_provider, error, /* require_checksum = */ true);
+            auto descs = Parse(desc_str, key_provider, error, require_checksum);
             if (descs.empty()) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, error);
             }
             auto& desc = descs.at(0);
-            if (!desc->IsRange() && request.params.size() > 1) {
+            if (!desc->IsRange() && !request.params[1].isNull()) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Range should not be specified for an un-ranged descriptor");
             }
 
-            if (desc->IsRange() && request.params.size() == 1) {
+            if (desc->IsRange() && request.params[1].isNull()) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Range must be specified for a ranged descriptor");
             }
 

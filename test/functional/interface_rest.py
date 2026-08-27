@@ -6,6 +6,7 @@
 
 from decimal import Decimal
 from enum import Enum
+from io import BytesIO
 import http.client
 import json
 import typing
@@ -15,6 +16,7 @@ import urllib.parse
 from test_framework.messages import (
     BLOCK_HEADER_SIZE,
     COIN,
+    deser_block_spent_outputs,
 )
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
@@ -49,6 +51,9 @@ def filter_output_indices_by_value(vouts, value):
             yield vout['n']
 
 class RESTTest (BitcoinTestFramework):
+    def add_options(self, parser):
+        self.add_wallet_options(parser)
+
     def set_test_params(self):
         self.num_nodes = 2
         self.extra_args = [["-rest", "-blockfilterindex=1"], []]
@@ -345,6 +350,9 @@ class RESTTest (BitcoinTestFramework):
         for obj in [json_obj, mempool_info]:
             obj.pop("unbroadcastcount")
         assert_equal(json_obj, mempool_info)
+        json_obj = self.test_rest_request("/mempool/info/with_fee_histogram")
+        mempool_info = self.nodes[0].getmempoolinfo(with_fee_histogram=True)
+        assert_equal(json_obj, mempool_info)
 
         # Check that there are our submitted transactions in the TX memory pool
         json_obj = self.test_rest_request("/mempool/contents")
@@ -424,6 +432,34 @@ class RESTTest (BitcoinTestFramework):
         assert_equal(self.test_rest_request(f"/headers/{bb_hash}", query_params={"count": 1}), self.test_rest_request(f"/headers/1/{bb_hash}"))
         assert_equal(self.test_rest_request(f"/blockfilterheaders/basic/{bb_hash}", query_params={"count": 1}), self.test_rest_request(f"/blockfilterheaders/basic/5/{bb_hash}"))
 
+        self.log.info("Test the /spenttxouts URI")
+
+        block_count = self.nodes[0].getblockcount()
+        for height in range(0, block_count + 1):
+            blockhash = self.nodes[0].getblockhash(height)
+            spent_bin = self.test_rest_request(f"/spenttxouts/{blockhash}", req_type=ReqType.BIN, ret_type=RetType.BYTES)
+            spent_hex = self.test_rest_request(f"/spenttxouts/{blockhash}", req_type=ReqType.HEX, ret_type=RetType.BYTES)
+            spent_json = self.test_rest_request(f"/spenttxouts/{blockhash}", req_type=ReqType.JSON, ret_type=RetType.JSON)
+
+            assert_equal(bytes.fromhex(spent_hex.decode()), spent_bin)
+
+            spent = deser_block_spent_outputs(BytesIO(spent_bin))
+            block = self.nodes[0].getblock(blockhash, 3)  # return prevout for each input
+            assert_equal(len(spent), len(block["tx"]))
+            assert_equal(len(spent_json), len(block["tx"]))
+
+            for i, tx in enumerate(block["tx"]):
+                prevouts = [txin["prevout"] for txin in tx["vin"] if "coinbase" not in txin]
+                # compare with `getblock` JSON output (coinbase tx has no prevouts)
+                actual = [(txout.scriptPubKey.hex(), Decimal(txout.nValue) / COIN) for txout in spent[i]]
+                expected = [(p["scriptPubKey"]["hex"], p["value"]) for p in prevouts]
+                assert_equal(expected, actual)
+                # also compare JSON format
+                actual = [(prevout["scriptPubKey"], prevout["value"]) for prevout in spent_json[i]]
+                expected = [(p["scriptPubKey"], p["value"]) for p in prevouts]
+                assert_equal(expected, actual)
+
+
         self.log.info("Test the /deploymentinfo URI")
 
         deployment_info = self.nodes[0].getdeploymentinfo()
@@ -439,6 +475,24 @@ class RESTTest (BitcoinTestFramework):
 
         resp = self.test_rest_request(f"/deploymentinfo/{INVALID_PARAM}", ret_type=RetType.OBJ, status=400)
         assert_equal(resp.read().decode('utf-8').rstrip(), f"Invalid hash: {INVALID_PARAM}")
+
+        if self.is_wallet_compiled():
+            self.import_deterministic_coinbase_privkeys()
+
+            # Random address so node1's balance doesn't increase
+            not_related_address = "2MxqoHEdNQTyYeX1mHcbrrpzgojbosTpCvJ"
+
+            # Prepare for Fee estimation
+            for i in range(18):
+                self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 0.1)
+                self.sync_all()
+                self.generatetoaddress(self.nodes[1], 1, not_related_address)
+            self.sync_all()
+
+            json_obj = self.test_rest_request("/fee/conservative/1")
+            assert_greater_than(float(json_obj["feerate"]), 0)
+            assert_greater_than(int(json_obj["blocks"]), 0)
+
 
 if __name__ == '__main__':
     RESTTest(__file__).main()

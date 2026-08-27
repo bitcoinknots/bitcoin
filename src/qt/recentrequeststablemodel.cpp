@@ -34,6 +34,7 @@ RecentRequestsTableModel::RecentRequestsTableModel(WalletModel *parent) :
     columns << tr("Date") << tr("Label") << tr("Message") << getAmountTitle();
 
     connect(walletModel->getOptionsModel(), &OptionsModel::displayUnitChanged, this, &RecentRequestsTableModel::updateDisplayUnit);
+    connect(walletModel->getOptionsModel(), &OptionsModel::fontForMoneyChanged, this, &RecentRequestsTableModel::updateFontForMoney);
 }
 
 RecentRequestsTableModel::~RecentRequestsTableModel() = default;
@@ -87,16 +88,39 @@ QVariant RecentRequestsTableModel::data(const QModelIndex &index, int role) cons
         case Amount:
             if (rec->recipient.amount == 0 && role == Qt::DisplayRole)
                 return tr("(no amount requested)");
+            else if (rec->recipient.amount == 0 && role == Qt::EditRole)
+                return "";
             else if (role == Qt::EditRole)
                 return BitcoinUnits::format(walletModel->getOptionsModel()->getDisplayUnit(), rec->recipient.amount, false, BitcoinUnits::SeparatorStyle::NEVER);
             else
                 return BitcoinUnits::format(walletModel->getOptionsModel()->getDisplayUnit(), rec->recipient.amount);
         }
     }
+    else if (role == Qt::FontRole) {
+        const RecentRequestEntry * const rec = &list[index.row()];
+        if (index.column() == Amount && rec->recipient.amount) {
+            const BitcoinUnit display_unit = walletModel->getOptionsModel()->getDisplayUnit();
+            return walletModel->getOptionsModel()->getFontForMoney(display_unit);
+        }
+    }
     else if (role == Qt::TextAlignmentRole)
     {
         if (index.column() == Amount)
             return (int)(Qt::AlignRight|Qt::AlignVCenter);
+    } else if (role == Qt::UserRole) {
+        const RecentRequestEntry* rec = &list[index.row()];
+        switch (index.column()) {
+        case Date:
+            return rec->date;
+        case Label:
+            return rec->recipient.label;
+        case Message:
+            return rec->recipient.message;
+        case Amount:
+            return QVariant(static_cast<qlonglong>(rec->recipient.amount));
+        default:
+            return QVariant();
+        }
     }
     return QVariant();
 }
@@ -212,15 +236,15 @@ void RecentRequestsTableModel::addNewRequest(RecentRequestEntry &recipient)
     endInsertRows();
 }
 
-void RecentRequestsTableModel::sort(int column, Qt::SortOrder order)
-{
-    std::sort(list.begin(), list.end(), RecentRequestEntryLessThan(column, order));
-    Q_EMIT dataChanged(index(0, 0, QModelIndex()), index(list.size() - 1, NUMBER_OF_COLUMNS - 1, QModelIndex()));
-}
-
 void RecentRequestsTableModel::updateDisplayUnit()
 {
     updateAmountColumnTitle();
+    updateFontForMoney();
+}
+
+void RecentRequestsTableModel::updateFontForMoney()
+{
+    Q_EMIT dataChanged(index(0, Amount), index(rowCount(QModelIndex()) - 1, Amount));
 }
 
 bool RecentRequestEntryLessThan::operator()(const RecentRequestEntry& left, const RecentRequestEntry& right) const

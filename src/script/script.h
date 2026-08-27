@@ -26,6 +26,7 @@
 
 // Maximum number of bytes pushable to the stack
 static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520;
+static const unsigned int MAX_SCRIPT_ELEMENT_SIZE_REDUCED = 256;
 
 // Maximum number of non-push operations per script
 static const int MAX_OPS_PER_SCRIPT = 201;
@@ -406,7 +407,8 @@ private:
  * Tests in October 2015 showed use of this reduced dbcache memory usage by 23%
  *  and made an initial sync 13% faster.
  */
-typedef prevector<28, unsigned char> CScriptBase;
+static constexpr unsigned int PREVECTOR_SIZE{36};
+using CScriptBase = prevector<PREVECTOR_SIZE, uint8_t>;
 
 bool GetScriptOp(CScriptBase::const_iterator& pc, CScriptBase::const_iterator end, opcodetype& opcodeRet, std::vector<unsigned char>* pvchRet);
 
@@ -572,6 +574,9 @@ public:
     {
         return (size() > 0 && *begin() == OP_RETURN) || (size() > MAX_SCRIPT_SIZE);
     }
+
+    size_t IsOLGA(size_t remaining_outputs) const;
+    std::pair<size_t, size_t> DatacarrierBytes(size_t remaining_outputs) const;
 
     void clear()
     {

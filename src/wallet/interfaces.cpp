@@ -8,6 +8,7 @@
 #include <consensus/amount.h>
 #include <interfaces/chain.h>
 #include <interfaces/handler.h>
+#include <key_io.h>
 #include <node/types.h>
 #include <policy/fees.h>
 #include <primitives/transaction.h>
@@ -21,6 +22,7 @@
 #include <util/ui_change_type.h>
 #include <wallet/coincontrol.h>
 #include <wallet/context.h>
+#include <wallet/dump.h>
 #include <wallet/feebumper.h>
 #include <wallet/fees.h>
 #include <wallet/types.h>
@@ -31,6 +33,7 @@
 #include <wallet/wallet.h>
 
 #include <memory>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -50,6 +53,16 @@ using interfaces::WalletTx;
 using interfaces::WalletTxOut;
 using interfaces::WalletTxStatus;
 using interfaces::WalletValueMap;
+
+std::set<CScript> AddressesToKeys(std::vector<std::string> addresses)
+{
+    std::set<CScript> keys;
+    for (const auto& address : addresses) {
+        CScript scriptPubKey = GetScriptForDestination(DecodeDestination(address));
+        keys.insert(scriptPubKey);
+    }
+    return keys;
+}
 
 namespace wallet {
 // All members of the classes in this namespace are intentionally public, as the
@@ -104,6 +117,7 @@ WalletTxStatus MakeWalletTxStatus(const CWallet& wallet, const CWalletTx& wtx)
     result.is_abandoned = wtx.isAbandoned();
     result.is_coinbase = wtx.IsCoinBase();
     result.is_in_main_chain = wtx.isConfirmed();
+    result.is_assumed = wallet.IsTxAssumed(wtx);
     return result;
 }
 
@@ -151,7 +165,18 @@ public:
         return m_wallet->ChangeWalletPassphrase(old_wallet_passphrase, new_wallet_passphrase);
     }
     void abortRescan() override { m_wallet->AbortRescan(); }
-    bool backupWallet(const std::string& filename) override { return m_wallet->BackupWallet(filename); }
+    bool canBackupToDbDump() override {
+        return (m_wallet->GetDatabase().Format() != "bdb");
+    }
+    bool backupWallet(const std::string& filename, const WalletBackupFormat format, bilingual_str& error) override {
+        switch (format) {
+            case WalletBackupFormat::DbDump:
+                return DumpWallet(m_wallet->GetDatabase(), error, filename);
+            case WalletBackupFormat::Raw:
+                return m_wallet->BackupWallet(filename);
+        }
+        return false;
+    }
     std::string getWalletName() override { return m_wallet->GetName(); }
     util::Result<CTxDestination> getNewDestination(const OutputType type, const std::string& label) override
     {
@@ -166,9 +191,9 @@ public:
         }
         return false;
     }
-    SigningResult signMessage(const std::string& message, const PKHash& pkhash, std::string& str_sig) override
+    SigningResult signMessage(const MessageSignatureFormat format, const std::string& message, const CTxDestination& address, std::string& str_sig) override
     {
-        return m_wallet->SignMessage(message, pkhash, str_sig);
+        return m_wallet->SignMessage(format, message, address, str_sig);
     }
     bool isSpendable(const CTxDestination& dest) override
     {
@@ -253,6 +278,23 @@ public:
     {
         LOCK(m_wallet->cs_wallet);
         return m_wallet->DisplayAddress(dest);
+    }
+    bool checkAddressForUsage(const std::vector<std::string>& addresses) const override
+    {
+        LOCK(m_wallet->cs_wallet);
+        return m_wallet->FindScriptPubKeyUsed(AddressesToKeys(addresses));
+    }
+    bool findAddressUsage(const std::vector<std::string>& addresses, std::function<void(const std::string&, const WalletTx&, uint32_t)> callback) const override
+    {
+        LOCK(m_wallet->cs_wallet);
+        return m_wallet->FindScriptPubKeyUsed(AddressesToKeys(addresses), [&callback, this](const CWalletTx& wtx, uint32_t output_index){
+            CTxDestination dest;
+            bool success = ExtractDestination(wtx.tx->vout[output_index].scriptPubKey, dest);
+            assert(success);  // It shouldn't be possible to end up here with anything unrecognised
+            std::string address = EncodeDestination(dest);
+            WalletTx interface_wtx = MakeWalletTx(*m_wallet, wtx);
+            callback(address, interface_wtx, output_index);
+        });
     }
     bool lockCoin(const COutPoint& output, const bool write_to_db) override
     {
@@ -574,13 +616,18 @@ public:
     }
     ~WalletLoaderImpl() override { UnloadWallets(m_context); }
 
+    //! HACK to workaround libc++ bugs (assigning from other locations such as sweepprivkeys breaks std::any_cast type checking); see also https://github.com/llvm/llvm-project/issues/55684
+    void assignContextHACK(std::any& a) override
+    {
+        a = &m_context;
+    }
     //! ChainClient methods
     void registerRpcs() override
     {
         for (const CRPCCommand& command : GetWalletRPCCommands()) {
             m_rpc_commands.emplace_back(command.category, command.name, [this, &command](const JSONRPCRequest& request, UniValue& result, bool last_handler) {
                 JSONRPCRequest wallet_request = request;
-                wallet_request.context = &m_context;
+                assignContextHACK(wallet_request.context);
                 return command.actor(wallet_request, result, last_handler);
             }, command.argNames, command.unique_id);
             m_rpc_handlers.emplace_back(m_context.chain->handleRpc(m_rpc_commands.back()));

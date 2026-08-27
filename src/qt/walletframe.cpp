@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <qt/pairingpage.h>
 #include <qt/walletframe.h>
 
 #include <node/interface_ui.h>
@@ -18,13 +19,14 @@
 #include <fstream>
 #include <string>
 
+#include <Qt>
 #include <QApplication>
 #include <QClipboard>
-#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QVBoxLayout>
+#include <QWidget>
 
 WalletFrame::WalletFrame(const PlatformStyle* _platformStyle, QWidget* parent)
     : QFrame(parent),
@@ -35,12 +37,22 @@ WalletFrame::WalletFrame(const PlatformStyle* _platformStyle, QWidget* parent)
     QHBoxLayout *walletFrameLayout = new QHBoxLayout(this);
     setContentsMargins(0,0,0,0);
     walletStack = new QStackedWidget(this);
+    m_global_stack = new QStackedWidget(this);
+    m_global_stack->addWidget(walletStack);
     walletFrameLayout->setContentsMargins(0,0,0,0);
-    walletFrameLayout->addWidget(walletStack);
+    walletFrameLayout->addWidget(m_global_stack);
 
     // hbox for no wallet
-    QGroupBox* no_wallet_group = new QGroupBox(walletStack);
+    QWidget* no_wallet_group = new QWidget(walletStack);
     QVBoxLayout* no_wallet_layout = new QVBoxLayout(no_wallet_group);
+
+    m_label_alerts = new QLabel(this);
+    m_label_alerts->setVisible(false);
+    m_label_alerts->setStyleSheet("QLabel { background-color: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0, stop:0 #F0D0A0, stop:1 #F8D488); color:#000000; }");
+    m_label_alerts->setWordWrap(true);
+    m_label_alerts->setMargin(3);
+    m_label_alerts->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    no_wallet_layout->addWidget(m_label_alerts, 0, Qt::AlignTop);
 
     QLabel *noWallet = new QLabel(tr("No wallet has been loaded.\nGo to File > Open Wallet to load a wallet.\n- OR -"));
     noWallet->setAlignment(Qt::AlignCenter);
@@ -53,6 +65,9 @@ WalletFrame::WalletFrame(const PlatformStyle* _platformStyle, QWidget* parent)
     no_wallet_group->setLayout(no_wallet_layout);
 
     walletStack->addWidget(no_wallet_group);
+
+    m_page_pairing = new PairingPage(this);
+    m_global_stack->addWidget(m_page_pairing);
 }
 
 WalletFrame::~WalletFrame() = default;
@@ -61,8 +76,15 @@ void WalletFrame::setClientModel(ClientModel *_clientModel)
 {
     this->clientModel = _clientModel;
 
+    m_page_pairing->setClientModel(_clientModel);
+
     for (auto i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i) {
         i.value()->setClientModel(_clientModel);
+    }
+
+    if (_clientModel) {
+        connect(_clientModel, &ClientModel::alertsChanged, this, &WalletFrame::updateAlerts);
+        updateAlerts(_clientModel->getStatusBarWarnings());
     }
 }
 
@@ -153,6 +175,12 @@ void WalletFrame::gotoOverviewPage()
     QMap<WalletModel*, WalletView*>::const_iterator i;
     for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
         i.value()->gotoOverviewPage();
+    m_global_stack->setCurrentWidget(walletStack);
+}
+
+void WalletFrame::gotoPairingPage()
+{
+    m_global_stack->setCurrentWidget(m_page_pairing);
 }
 
 void WalletFrame::gotoHistoryPage()
@@ -160,6 +188,7 @@ void WalletFrame::gotoHistoryPage()
     QMap<WalletModel*, WalletView*>::const_iterator i;
     for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
         i.value()->gotoHistoryPage();
+    m_global_stack->setCurrentWidget(walletStack);
 }
 
 void WalletFrame::gotoReceiveCoinsPage()
@@ -167,6 +196,7 @@ void WalletFrame::gotoReceiveCoinsPage()
     QMap<WalletModel*, WalletView*>::const_iterator i;
     for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
         i.value()->gotoReceiveCoinsPage();
+    m_global_stack->setCurrentWidget(walletStack);
 }
 
 void WalletFrame::gotoSendCoinsPage(QString addr)
@@ -174,6 +204,7 @@ void WalletFrame::gotoSendCoinsPage(QString addr)
     QMap<WalletModel*, WalletView*>::const_iterator i;
     for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
         i.value()->gotoSendCoinsPage(addr);
+    m_global_stack->setCurrentWidget(walletStack);
 }
 
 void WalletFrame::gotoSignMessageTab(QString addr)
@@ -232,7 +263,7 @@ void WalletFrame::gotoLoadPSBT(bool from_clipboard)
 
     auto dlg = new PSBTOperationsDialog(this, currentWalletModel(), clientModel);
     dlg->openWithPSBT(psbtx);
-    GUIUtil::ShowModalDialogAsynchronously(dlg);
+    GUIUtil::ShowModalDialogAsynchronously(dlg, Qt::NonModal);
 }
 
 void WalletFrame::encryptWallet()
@@ -280,6 +311,12 @@ void WalletFrame::usedReceivingAddresses()
 WalletView* WalletFrame::currentWalletView() const
 {
     return qobject_cast<WalletView*>(walletStack->currentWidget());
+}
+
+void WalletFrame::updateAlerts(const QString &warnings)
+{
+    m_label_alerts->setVisible(!warnings.isEmpty());
+    m_label_alerts->setText(warnings);
 }
 
 WalletModel* WalletFrame::currentWalletModel() const

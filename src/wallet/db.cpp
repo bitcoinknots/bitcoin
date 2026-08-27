@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <exception>
 #include <fstream>
+#include <set>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -22,17 +23,33 @@ bool operator<(Span<const std::byte> a, BytePrefix b) { return std::ranges::lexi
 
 std::vector<std::pair<fs::path, std::string>> ListDatabases(const fs::path& wallet_dir)
 {
+    const fs::path& data_dir = gArgs.GetDataDirNet();
+    const fs::path& blocks_dir = gArgs.GetBlocksDirPath();
+
+    // Here we place the top level dirs we want to skip in case walletdir is datadir or blocksdir
+    // Those directories are referenced in doc/files.md
+    const std::set<fs::path> ignore_paths = {
+                                        blocks_dir,
+                                        data_dir / "blktree",
+                                        data_dir / "blocks",
+                                        data_dir / "chainstate",
+                                        data_dir / "coins",
+                                        data_dir / "database",
+                                        data_dir / "indexes",
+                                        data_dir / "regtest",
+                                        data_dir / "signet",
+                                        data_dir / "testnet3"
+                                        };
+
     std::vector<std::pair<fs::path, std::string>> paths;
     std::error_code ec;
 
     for (auto it = fs::recursive_directory_iterator(wallet_dir, ec); it != fs::recursive_directory_iterator(); it.increment(ec)) {
-        if (ec) {
-            if (fs::is_directory(*it)) {
-                it.disable_recursion_pending();
-                LogPrintf("%s: %s %s -- skipping.\n", __func__, ec.message(), fs::PathToString(it->path()));
-            } else {
-                LogPrintf("%s: %s %s\n", __func__, ec.message(), fs::PathToString(it->path()));
-            }
+        assert(!ec); // Loop should exit on error.
+
+        // We don't want to iterate through those special node dirs
+        if (ignore_paths.count(it->path())) {
+            it.disable_recursion_pending();
             continue;
         }
 
@@ -65,9 +82,17 @@ std::vector<std::pair<fs::path, std::string>> ListDatabases(const fs::path& wall
                 }
             }
         } catch (const std::exception& e) {
-            LogPrintf("%s: Error scanning %s: %s\n", __func__, fs::PathToString(it->path()), e.what());
+            LogWarning("Error while scanning wallet dir item: %s [%s].", e.what(), fs::PathToString(it->path()));
             it.disable_recursion_pending();
         }
+    }
+    if (ec) {
+        // Loop could have exited with an error due to one of:
+        // * wallet_dir itself not being scannable.
+        // * increment() failure. (Observed on Windows native builds when
+        //   removing the ACL read permissions of a wallet directory after the
+        //   process started).
+        LogWarning("Error scanning directory entries under %s: %s", fs::PathToString(wallet_dir), ec.message());
     }
 
     return paths;
@@ -100,7 +125,7 @@ bool IsBDBFile(const fs::path& path)
     // This check also prevents opening lock files.
     std::error_code ec;
     auto size = fs::file_size(path, ec);
-    if (ec) LogPrintf("%s: %s %s\n", __func__, ec.message(), fs::PathToString(path));
+    if (ec) LogWarning("Error reading file_size: %s [%s]", ec.message(), fs::PathToString(path));
     if (size < 4096) return false;
 
     std::ifstream file{path, std::ios::binary};
@@ -124,7 +149,7 @@ bool IsSQLiteFile(const fs::path& path)
     // A SQLite Database file is at least 512 bytes.
     std::error_code ec;
     auto size = fs::file_size(path, ec);
-    if (ec) LogPrintf("%s: %s %s\n", __func__, ec.message(), fs::PathToString(path));
+    if (ec) LogWarning("Error reading file_size: %s [%s]", ec.message(), fs::PathToString(path));
     if (size < 512) return false;
 
     std::ifstream file{path, std::ios::binary};

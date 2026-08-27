@@ -6,6 +6,7 @@
 
 #include <chain.h>
 #include <clientversion.h>
+#include <codex32.h>
 #include <core_io.h>
 #include <hash.h>
 #include <interfaces/chain.h>
@@ -216,6 +217,8 @@ RPCHelpMan importprivkey()
     };
 }
 
+UniValue ProcessDescriptorImport(CWallet& wallet, const UniValue& data, const int64_t timestamp, const std::vector<CExtKey>& master_keys = {}) EXCLUSIVE_LOCKS_REQUIRED(wallet.cs_wallet);
+
 RPCHelpMan importaddress()
 {
     return RPCHelpMan{"importaddress",
@@ -229,7 +232,7 @@ RPCHelpMan importaddress()
             "\nNote: If you import a non-standard raw script in hex form, outputs sending to it will be treated\n"
             "as change, and not show up in many RPCs.\n"
             "Note: Use \"getwalletinfo\" to query the scanning progress.\n"
-            "Note: This command is only compatible with legacy wallets. Use \"importdescriptors\" for descriptor wallets.\n",
+            "Note: For descriptor wallets, this command will create new descriptor/s, and only works if the wallet has private keys disabled.\n",
                 {
                     {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The Bitcoin address (or hex-encoded script)"},
                     {"label", RPCArg::Type::STR, RPCArg::Default{""}, "An optional label"},
@@ -250,7 +253,18 @@ RPCHelpMan importaddress()
     std::shared_ptr<CWallet> const pwallet = GetWalletForJSONRPCRequest(request);
     if (!pwallet) return UniValue::VNULL;
 
+    // Use legacy spkm only if the wallet does not support descriptors.
+    bool use_legacy = !pwallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS);
+    if (use_legacy) {
+        // In case the wallet is blank
     EnsureLegacyScriptPubKeyMan(*pwallet, true);
+    } else {
+        // We don't allow mixing watch-only descriptors with spendable ones.
+        if (!pwallet->IsWalletFlagSet(WALLET_FLAG_DISABLE_PRIVATE_KEYS)) {
+            throw JSONRPCError(RPC_WALLET_ERROR, "Cannot import address in wallet with private keys enabled. "
+                                                 "Create wallet with no private keys to watch specific addresses/scripts");
+        }
+    }
 
     const std::string strLabel{LabelFromValue(request.params[1])};
 
@@ -276,23 +290,41 @@ RPCHelpMan importaddress()
     if (!request.params[3].isNull())
         fP2SH = request.params[3].get_bool();
 
+    // Import descriptor helper function
+    const auto& import_descriptor = [pwallet](const std::string& desc, const std::string label) EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet) {
+        UniValue data(UniValue::VType::VOBJ);
+        data.pushKV("desc", AddChecksum(desc));
+        if (!label.empty()) data.pushKV("label", label);
+        const UniValue& ret = ProcessDescriptorImport(*pwallet, data, /*timestamp=*/1);
+        if (ret.exists("error")) throw ret["error"];
+    };
+
     {
         LOCK(pwallet->cs_wallet);
 
-        CTxDestination dest = DecodeDestination(request.params[0].get_str());
+        const std::string& address = request.params[0].get_str();
+        CTxDestination dest = DecodeDestination(address);
         if (IsValidDestination(dest)) {
             if (fP2SH) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Cannot use the p2sh flag with an address - use a script instead");
             }
             if (OutputTypeFromDestination(dest) == OutputType::BECH32M) {
+                if (use_legacy)
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Bech32m addresses cannot be imported into legacy wallets");
             }
 
             pwallet->MarkDirty();
 
+            if (use_legacy) {
             pwallet->ImportScriptPubKeys(strLabel, {GetScriptForDestination(dest)}, /*have_solving_data=*/false, /*apply_label=*/true, /*timestamp=*/1);
+            } else {
+                import_descriptor("addr(" + address + ")", strLabel);
+            }
         } else if (IsHex(request.params[0].get_str())) {
-            std::vector<unsigned char> data(ParseHex(request.params[0].get_str()));
+            const std::string& hex = request.params[0].get_str();
+
+            if (use_legacy) {
+                std::vector<unsigned char> data(ParseHex(hex));
             CScript redeem_script(data.begin(), data.end());
 
             std::set<CScript> scripts = {redeem_script};
@@ -303,6 +335,14 @@ RPCHelpMan importaddress()
             }
 
             pwallet->ImportScriptPubKeys(strLabel, scripts, /*have_solving_data=*/false, /*apply_label=*/true, /*timestamp=*/1);
+            } else {
+                // P2SH Not allowed. Can't detect inner P2SH function from a raw hex.
+                if (fP2SH) throw JSONRPCError(RPC_WALLET_ERROR, "P2SH import feature disabled for descriptors' wallet. "
+                                                                "Use 'importdescriptors' to specify inner P2SH function");
+
+                // Import descriptors
+                import_descriptor("raw(" + hex + ")", strLabel);
+            }
         } else {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Bitcoin address or script");
         }
@@ -505,6 +545,8 @@ RPCHelpMan importwallet()
                 },
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
 {
+    EnsureNotWalletRestricted(request);
+
     std::shared_ptr<CWallet> const pwallet = GetWalletForJSONRPCRequest(request);
     if (!pwallet) return UniValue::VNULL;
 
@@ -679,6 +721,47 @@ RPCHelpMan dumpprivkey()
     };
 }
 
+RPCHelpMan dumpmasterprivkey()
+{
+    return RPCHelpMan{"dumpmasterprivkey",
+                "Reveals the current master private key.\n",
+                {},
+                RPCResult{
+                    RPCResult::Type::STR, "key", "The HD master private key"
+                },
+                RPCExamples{
+                    HelpExampleCli("dumpmasterprivkey", "")
+                },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
+    if (!wallet) return NullUniValue;
+    const CWallet* const pwallet = wallet.get();
+
+    LegacyScriptPubKeyMan& spk_man = EnsureLegacyScriptPubKeyMan(*wallet);
+
+    LOCK2(pwallet->cs_wallet, spk_man.cs_KeyStore);
+
+    EnsureWalletIsUnlocked(*pwallet);
+
+    CKeyID seed_id = spk_man.GetHDChain().seed_id;
+    if (!spk_man.IsHDEnabled()) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet is not a HD wallet.");
+    }
+    CKey seed;
+    if (spk_man.GetKey(seed_id, seed)) {
+        CExtKey masterKey;
+        masterKey.SetSeed(seed);
+
+        return EncodeExtKey(masterKey);
+    } else {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Unable to retrieve HD master private key");
+        return NullUniValue;
+    }
+},
+    };
+}
+
 
 RPCHelpMan dumpwallet()
 {
@@ -703,6 +786,8 @@ RPCHelpMan dumpwallet()
                 },
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
 {
+    EnsureNotWalletRestricted(request);
+
     const std::shared_ptr<const CWallet> pwallet = GetWalletForJSONRPCRequest(request);
     if (!pwallet) return UniValue::VNULL;
 
@@ -797,7 +882,13 @@ RPCHelpMan dumpwallet()
             } else {
                 file << "change=1";
             }
-            file << strprintf(" # addr=%s%s\n", strAddr, (metadata.has_key_origin ? " hdkeypath="+WriteHDKeypath(metadata.key_origin.path, /*apostrophe=*/true) : ""));
+            if (metadata.has_key_origin) {
+                file << " hdkeypath=" + WriteHDKeypath(metadata.key_origin.path, /*apostrophe=*/true);
+                if (!(metadata.hd_seed_id.IsNull() || (metadata.hdKeypath == "s" && metadata.hd_seed_id == keyid))) {
+                    file << " hdseedid=" + metadata.hd_seed_id.GetHex();
+                }
+            }
+            file << strprintf(" # addr=%s\n", strAddr);
         }
     }
     file << "\n";
@@ -1452,7 +1543,7 @@ RPCHelpMan importmulti()
     };
 }
 
-static UniValue ProcessDescriptorImport(CWallet& wallet, const UniValue& data, const int64_t timestamp) EXCLUSIVE_LOCKS_REQUIRED(wallet.cs_wallet)
+UniValue ProcessDescriptorImport(CWallet& wallet, const UniValue& data, const int64_t timestamp, const std::vector<CExtKey>& master_keys) EXCLUSIVE_LOCKS_REQUIRED(wallet.cs_wallet)
 {
     UniValue warnings(UniValue::VARR);
     UniValue result(UniValue::VOBJ);
@@ -1468,6 +1559,10 @@ static UniValue ProcessDescriptorImport(CWallet& wallet, const UniValue& data, c
 
         // Parse descriptor string
         FlatSigningProvider keys;
+        for (const auto& mk : master_keys) {
+            keys.AddMasterKey(mk);
+        }
+
         std::string error;
         auto parsed_descs = Parse(descriptor, keys, error, /* require_checksum = */ true);
         if (parsed_descs.empty()) {
@@ -1482,6 +1577,7 @@ static UniValue ProcessDescriptorImport(CWallet& wallet, const UniValue& data, c
         }
 
         // Range check
+        std::optional<bool> is_ranged;
         int64_t range_start = 0, range_end = 1, next_index = 0;
         if (!parsed_descs.at(0)->IsRange() && data.exists("range")) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Range should not be specified for an un-ranged descriptor");
@@ -1496,6 +1592,7 @@ static UniValue ProcessDescriptorImport(CWallet& wallet, const UniValue& data, c
                 range_end = wallet.m_keypool_size;
             }
             next_index = range_start;
+            is_ranged = true;
 
             if (data.exists("next_index")) {
                 next_index = data["next_index"].getInt<int64_t>();
@@ -1517,12 +1614,13 @@ static UniValue ProcessDescriptorImport(CWallet& wallet, const UniValue& data, c
         }
 
         // Ranged descriptors should not have a label
-        if (data.exists("range") && data.exists("label")) {
+        if (is_ranged.has_value() && is_ranged.value() && data.exists("label")) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Ranged descriptors should not have a label");
         }
 
+        bool desc_internal = internal.has_value() && internal.value();
         // Internal addresses should not have a label either
-        if (internal && data.exists("label")) {
+        if (desc_internal && data.exists("label")) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Internal addresses should not have a label");
         }
 
@@ -1538,7 +1636,6 @@ static UniValue ProcessDescriptorImport(CWallet& wallet, const UniValue& data, c
 
         for (size_t j = 0; j < parsed_descs.size(); ++j) {
             auto parsed_desc = std::move(parsed_descs[j]);
-            bool desc_internal = internal.has_value() && internal.value();
             if (parsed_descs.size() == 2) {
                 desc_internal = j == 1;
             } else if (parsed_descs.size() > 2) {
@@ -1642,6 +1739,15 @@ RPCHelpMan importdescriptors()
                             },
                         },
                         RPCArgOptions{.oneline_description="requests"}},
+                    {"seeds", RPCArg::Type::ARR, RPCArg::Default{UniValue::VARR}, "BIP32 master seeds for the above descriptors",
+                        {
+                            {"shares", RPCArg::Type::ARR, RPCArg::Optional::OMITTED, "a codex32 (BIP 93) encoded seed, or list of codex32-encoded shares",
+                                {
+                                    {"share 1", RPCArg::Type::STR, RPCArg::Optional::OMITTED, ""},
+                                },
+                            },
+                        },
+                        RPCArgOptions{.oneline_description="seeds"}},
                 },
                 RPCResult{
                     RPCResult::Type::ARR, "", "Response is an array with the same size as the input that has the execution result",
@@ -1694,6 +1800,48 @@ RPCHelpMan importdescriptors()
     int64_t now = 0;
     int64_t lowest_timestamp = 0;
     bool rescan = false;
+
+    // Parse codex32 strings
+    std::vector<CExtKey> master_keys;
+    if (main_request.params[1].isArray()) {
+        const auto& req_seeds = main_request.params[1].get_array();
+        master_keys.reserve(req_seeds.size());
+        for (size_t i = 0; i < req_seeds.size(); ++i) {
+            const auto& req_shares = req_seeds[i].get_array();
+            std::vector<codex32::Result> shares;
+            shares.reserve(req_shares.size());
+            for (size_t j = 0; j < req_shares.size(); ++j) {
+                if (!req_shares[j].isStr()) {
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "codex32 shares must be strings");
+                }
+                codex32::Result key_res{req_shares[j].get_str()};
+                if (!key_res.IsValid()) {
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid codex32 share: " + codex32::ErrorString(key_res.error()));
+                }
+                shares.push_back(key_res);
+            }
+
+            // Recover seed
+            std::vector<unsigned char> seed;
+            if (shares.size() == 1) {
+                if (shares[0].GetShareIndex() != 's') {
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid codex32: single share must be the S share");
+                }
+                seed = shares[0].GetPayload();
+            } else {
+                codex32::Result s{shares, 's'};
+                if (!s.IsValid()) {
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Failed to derive codex32 seed: " + codex32::ErrorString(s.error()));
+                }
+                seed = s.GetPayload();
+            }
+
+            CExtKey master_key;
+            master_key.SetSeed(Span{(std::byte*) seed.data(), seed.size()});
+            master_keys.push_back(master_key);
+        }
+    }
+
     UniValue response(UniValue::VARR);
     {
         LOCK(pwallet->cs_wallet);
@@ -1705,7 +1853,7 @@ RPCHelpMan importdescriptors()
         for (const UniValue& request : requests.getValues()) {
             // This throws an error if "timestamp" doesn't exist
             const int64_t timestamp = std::max(GetImportTimestamp(request, now), minimum_timestamp);
-            const UniValue result = ProcessDescriptorImport(*pwallet, request, timestamp);
+            const UniValue result = ProcessDescriptorImport(*pwallet, request, timestamp, master_keys);
             response.push_back(result);
 
             if (lowest_timestamp > timestamp ) {
@@ -1904,6 +2052,8 @@ RPCHelpMan backupwallet()
                 },
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
 {
+    EnsureNotWalletRestricted(request);
+
     const std::shared_ptr<const CWallet> pwallet = GetWalletForJSONRPCRequest(request);
     if (!pwallet) return UniValue::VNULL;
 
@@ -1954,6 +2104,7 @@ RPCHelpMan restorewallet()
         },
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
 {
+    EnsureNotWalletRestricted(request);
 
     WalletContext& context = EnsureWalletContext(request.context);
 

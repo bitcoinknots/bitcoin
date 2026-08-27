@@ -329,6 +329,12 @@ enum ServiceFlags : uint64_t {
     // NODE_P2P_V2 means the node supports BIP324 transport
     NODE_P2P_V2 = (1 << 11),
 
+    // NODE_UTREEXO means the node can provide utreexo inclusion proofs for new and otherwise available blocks
+    NODE_UTREEXO = (1 << 12),
+
+    // NODE_UTREEXO_ARCHIVE means the node can provide utreexo inclusion proofs for all historical blocks
+    NODE_UTREEXO_ARCHIVE = (1 << 13),
+
     // Bits 24-31 are reserved for temporary experiments. Just pick a bit that
     // isn't getting used, or one not being used much, and notify the
     // bitcoin-development mailing list. Remember that service bits are just
@@ -336,6 +342,12 @@ enum ServiceFlags : uint64_t {
     // collisions and other cases where nodes may be advertising a service they
     // do not actually support. Other service bits should be allocated via the
     // BIP process.
+
+    NODE_UTREEXO_TMP = (1 << 24),
+
+    NODE_REPLACE_BY_FEE = (1 << 26),
+
+    NODE_MALICIOUS = (1 << 29),
 };
 
 /**
@@ -351,7 +363,7 @@ std::vector<std::string> serviceFlagsToStr(uint64_t flags);
  * should be updated appropriately to filter for nodes with
  * desired service flags (compatible with our new flags).
  */
-constexpr ServiceFlags SeedsServiceFlags() { return ServiceFlags(NODE_NETWORK | NODE_WITNESS); }
+constexpr ServiceFlags SeedsServiceFlags() { return ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA); }
 
 /**
  * Checks if a peer with the given service flags may be capable of having a
@@ -484,9 +496,7 @@ enum GetDataMsg : uint32_t {
     MSG_CMPCT_BLOCK = 4,                              //!< Defined in BIP152
     MSG_WITNESS_BLOCK = MSG_BLOCK | MSG_WITNESS_FLAG, //!< Defined in BIP144
     MSG_WITNESS_TX = MSG_TX | MSG_WITNESS_FLAG,       //!< Defined in BIP144
-    // MSG_FILTERED_WITNESS_BLOCK is defined in BIP144 as reserved for future
-    // use and remains unused.
-    // MSG_FILTERED_WITNESS_BLOCK = MSG_FILTERED_BLOCK | MSG_WITNESS_FLAG,
+    MSG_FILTERED_WITNESS_BLOCK = MSG_FILTERED_BLOCK | MSG_WITNESS_FLAG,  //!< Defined in BIP144
 };
 
 /** inv message data */
@@ -510,6 +520,7 @@ public:
     bool IsMsgFilteredBlk() const { return type == MSG_FILTERED_BLOCK; }
     bool IsMsgCmpctBlk() const { return type == MSG_CMPCT_BLOCK; }
     bool IsMsgWitnessBlk() const { return type == MSG_WITNESS_BLOCK; }
+    bool IsMsgFilteredWitnessBlk() const { return type == MSG_FILTERED_WITNESS_BLOCK; }
 
     // Combined-message helper methods
     bool IsGenTxMsg() const
@@ -518,7 +529,7 @@ public:
     }
     bool IsGenBlkMsg() const
     {
-        return type == MSG_BLOCK || type == MSG_FILTERED_BLOCK || type == MSG_CMPCT_BLOCK || type == MSG_WITNESS_BLOCK;
+        return type == MSG_BLOCK || type == MSG_FILTERED_BLOCK || type == MSG_CMPCT_BLOCK || type == MSG_WITNESS_BLOCK || type == MSG_FILTERED_WITNESS_BLOCK;
     }
 
     uint32_t type;

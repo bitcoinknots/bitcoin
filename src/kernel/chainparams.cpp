@@ -3,6 +3,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <bitcoin-build-config.h> // IWYU pragma: keep
+
 #include <kernel/chainparams.h>
 
 #include <chainparamsseeds.h>
@@ -27,6 +29,10 @@
 #include <type_traits>
 
 using namespace util::hex_literals;
+
+RDTSConsentFlag g_rdts_consent{RDTS_CONSENT};
+bool g_enable_rdts{g_rdts_consent != RDTSConsentFlag::UNSUPPORTED_UNSAFE_NO_ENFORCEMENT};
+bool g_rdts_warning{false};
 
 // Workaround MSVC bug triggering C7595 when calling consteval constructors in
 // initializer lists.
@@ -117,8 +123,25 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = 1628640000; // August 11th, 2021
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 709632; // Approximately November 12th, 2021
 
-        consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000b1f3b93b65b16d035a82be84"};
-        consensus.defaultAssumeValid = uint256{"00000000000000000001b658dd1120e82e66d2790811f89ede9742ada3ed6d77"}; // 886157
+        // ReducedData Temporary Softfork (RDTS)
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].bit = 4;
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].nStartTime = 1764547200; // December 1st, 2025
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].min_activation_height = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].max_activation_height = 965664; // ~September 1st, 2026
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].active_duration = 52416; // ~1 year
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].threshold = 1109; // 55% of 2016
+
+        if (g_rdts_consent == RDTSConsentFlag::UNSUPPORTED_UNSAFE_NO_ENFORCEMENT && !g_enable_rdts) {
+            consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
+            consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+            consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].max_activation_height = std::numeric_limits<int>::max();
+            consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].active_duration = std::numeric_limits<int>::max();
+            consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].threshold = 0;
+        }
+
+        consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000dee8e2a309ad8a9820433c68"};
+        consensus.defaultAssumeValid = uint256{"00000000000000000000611fd22f2df7c8fbd0688745c3a6c3bb5109cc2a12cb"}; // 912683
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -131,7 +154,7 @@ public:
         pchMessageStart[3] = 0xd9;
         nDefaultPort = 8333;
         nPruneAfterHeight = 100000;
-        m_assumed_blockchain_size = 720;
+        m_assumed_blockchain_size = 810;
         m_assumed_chain_state_size = 14;
 
         genesis = CreateGenesisBlock(1231006505, 2083236893, 0x1d00ffff, 1, 50 * COIN);
@@ -146,6 +169,8 @@ public:
         // release ASAP to avoid it where possible.
         vSeeds.emplace_back("seed.bitcoin.sipa.be."); // Pieter Wuille, only supports x1, x5, x9, and xd
         vSeeds.emplace_back("dnsseed.bluematt.me."); // Matt Corallo, only supports x9
+        vSeeds.emplace_back("dnsseed.bitcoin.dashjr-list-of-p2p-nodes.us."); // Luke Dashjr, support BIP110 seeding (x8000009)
+        vSeeds.emplace_back("seed.bitcoin.haf.ovh."); // Léo Haf, support BIP110 seeding (x8000009)
         vSeeds.emplace_back("seed.bitcoin.jonasschnelli.ch."); // Jonas Schnelli, only supports x1, x5, x9, and xd
         vSeeds.emplace_back("seed.btc.petertodd.net."); // Peter Todd, only supports x1, x5, x9, and xd
         vSeeds.emplace_back("seed.bitcoin.sprovoost.nl."); // Sjors Provoost
@@ -181,6 +206,32 @@ public:
                 {250000, uint256{"000000000000003887df1f29024b06fc2200b55f8af8f35453d7be294df2d214"}},
                 {279000, uint256{"0000000000000001ae8c72a0b0c301f67e3afca10e819efa9041e458e9bd7e40"}},
                 {295000, uint256{"00000000000000004d9b4ef50f0f9d686fd69db2e03af35a100370c64632a983"}},
+                {393216, uint256{"00000000000000000390df7d2bdc06b9fcb260b39e3fb15b4bc9f62572553924"}},
+                {421888, uint256{"000000000000000004b232ad9492d0729d7f9d6737399ffcdaac1c8160db5ef6"}},
+                {438784, uint256{"0000000000000000040d6ef667d7a52caf93d8e0d1e40fd7155c787b42667179"}},
+                {451840, uint256{"0000000000000000029103c8ade7786e7379623465c72d71d84624eb9c159bea"}},
+                {469766, uint256{"000000000000000000130b2bd812c6a7ae9c02a74fc111806b1dd11e8975da45"}},
+                {481824, uint256{"0000000000000000001c8018d9cb3b742ef25114f27563e3fc4a1902167f9893"}},
+                {514048, uint256{"00000000000000000022fe630be397a62c58972bb81f0a2d1ae8c968511a4659"}},
+                {553472, uint256{"0000000000000000000e06b6698a4f65ab9915f24b23ca2f9d1abf30cc3e9173"}},
+                {571392, uint256{"00000000000000000019c18b43077775fc299a6646ab0e9dbbd5770bf6ca392d"}},
+                {596000, uint256{"0000000000000000000706f93dc673ca366c810f317e7cfe8d951c0107b65223"}},
+                {601723, uint256{"000000000000000000009837f74796532b21d8ccf7def3dcfcb45aa92cd86b9e"}},
+                {617056, uint256{"0000000000000000000ca51b293fb2be2fbaf1acc76dcbbbff7e4d7796380b9e"}},
+                {632549, uint256{"00000000000000000001bae1b2b73ec3fde475c1ed7fdd382c2c49860ec19920"}},
+                {643700, uint256{"00000000000000000002959e9b44507120453344794df09bd1276eb325ed7110"}},
+                {667811, uint256{"00000000000000000007888a9d01313d69d6335df46ea33e875ee6832670c596"}},
+                {688888, uint256{"0000000000000000000e1e3bd783ce0de7b0cdabf2034723595dbcd5a28cf831"}},
+                {704256, uint256{"0000000000000000000465f5acfcd603337994261a4d67a647cb49866c98b538"}},
+                {714000, uint256{"0000000000000000000184f9b9da75c3ab764438f4f3ecd766637648a3a44d0d"}},
+                {737232, uint256{"0000000000000000000709881cc8d33f84815fe8ea1baad9889042146b4d3042"}},
+                {803584, uint256{"000000000000000000003d97a46dbbb4cca4b3e23c39c446df75cfe726163bb5"}},
+                {832080, uint256{"00000000000000000003349bda23ed5efc98145c10620c247ec93896ac249e22"}},
+                {843264, uint256{"0000000000000000000101209b4ab3570862dc3fac8633eb62938a541c55a2ff"}},
+                {846679, uint256{"000000000000000000032b91acdaaf16f8c40d46afeb835c3ac604860f905d56"}},
+                {855000, uint256{"0000000000000000000233ea80aa10d38aa4486cd7033fffc2c4df556d0b9138"}},
+                {885248, uint256{"000000000000000000006e926737e6a349f7581525ad36e743dfe5f4bc3abbb7"}},
+                {908765, uint256{"00000000000000000001b64acb5fe4b40b84092159b6406a6244f46a37fa6c6b"}},
             }
         };
 
@@ -196,14 +247,20 @@ public:
                 .hash_serialized = AssumeutxoHash{uint256{"dbd190983eaf433ef7c15f78a278ae42c00ef52e0fd2a54953782175fbadcea9"}},
                 .m_chain_tx_count = 1145604538,
                 .blockhash = consteval_ctor(uint256{"000000000000000000010b17283c3c400507969a9c2afd1dcf2082ec5cca2880"}),
+            },
+            {
+                .height = 910'000,
+                .hash_serialized = AssumeutxoHash{uint256{"4daf8a17b4902498c5787966a2b51c613acdab5df5db73f196fa59a4da2f1568"}},
+                .m_chain_tx_count = 1226586151,
+                .blockhash = consteval_ctor(uint256{"0000000000000000000108970acb9522ffd516eae17acddcb1bd16469194a821"}),
             }
         };
 
         chainTxData = ChainTxData{
-            // Data from RPC: getchaintxstats 4096 00000000000000000001b658dd1120e82e66d2790811f89ede9742ada3ed6d77
-            .nTime    = 1741017141,
-            .tx_count = 1161875261,
-            .dTxRate  = 4.620728156243148,
+            // Data from RPC: getchaintxstats 4096 00000000000000000000611fd22f2df7c8fbd0688745c3a6c3bb5109cc2a12cb
+            .nTime    = 1756722903,
+            .tx_count = 1235299397,
+            .dTxRate  = 6.721086701157182,  // held back due to present abnormal tx rate
         };
     }
 };
@@ -245,6 +302,14 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = 1619222400; // April 24th, 2021
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = 1628640000; // August 11th, 2021
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
+
+        // ReducedData Temporary Softfork (RDTS)
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].bit = 4;
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].nStartTime = 1764547200; // December 1st, 2025
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].min_activation_height = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].active_duration = 52416; // ~1 year
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].threshold = 1109; // 55% of 2016
 
         consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000015f5e0c9f13455b0eb17"};
         consensus.defaultAssumeValid = uint256{"00000000000003fc7967410ba2d0a8a8d50daedc318d43e8baf1a9782c236a57"}; // 3974606
@@ -344,6 +409,14 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
+
+        // ReducedData Temporary Softfork (RDTS)
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].bit = 4;
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].nStartTime = 1764547200; // December 1st, 2025
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].min_activation_height = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].active_duration = 52416; // ~1 year
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].threshold = 1109; // 55% of 2016
 
         consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000001d6dce8651b6094e4c1"};
         consensus.defaultAssumeValid = uint256{"0000000000003ed4f08dbdf6f7d6b271a6bcffce25675cb40aa9fa43179a89f3"}; // 72600
@@ -464,7 +537,7 @@ public:
         consensus.CSVHeight = 1;
         consensus.SegwitHeight = 1;
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
-        consensus.nPowTargetSpacing = 10 * 60;
+        consensus.nPowTargetSpacing = options.pow_target_spacing;
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.enforce_BIP94 = false;
         consensus.fPowNoRetargeting = false;
@@ -482,6 +555,11 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
+
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].bit = 4;
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].min_activation_height = 0;
 
         // message start is defined as the first 4 bytes of the sha256d of the block script
         HashWriter h{};
@@ -558,6 +636,11 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
 
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].bit = 4;
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].min_activation_height = 0;
+
         consensus.nMinimumChainWork = uint256{};
         consensus.defaultAssumeValid = uint256{};
 
@@ -572,6 +655,9 @@ public:
 
         for (const auto& [dep, height] : opts.activation_heights) {
             switch (dep) {
+            case Consensus::BuriedDeployment::DEPLOYMENT_BLAKE2B:
+                consensus.Blake2bHeight = int{height};
+                break;
             case Consensus::BuriedDeployment::DEPLOYMENT_SEGWIT:
                 consensus.SegwitHeight = int{height};
                 break;
@@ -594,6 +680,13 @@ public:
             consensus.vDeployments[deployment_pos].nStartTime = version_bits_params.start_time;
             consensus.vDeployments[deployment_pos].nTimeout = version_bits_params.timeout;
             consensus.vDeployments[deployment_pos].min_activation_height = version_bits_params.min_activation_height;
+            consensus.vDeployments[deployment_pos].max_activation_height = version_bits_params.max_activation_height;
+            consensus.vDeployments[deployment_pos].active_duration = version_bits_params.active_duration;
+            // Validated here rather than in src/chainparams.cpp because nMinerConfirmationWindow is not yet available at parse time
+            if (version_bits_params.active_duration != std::numeric_limits<int>::max() && version_bits_params.active_duration % consensus.nMinerConfirmationWindow != 0) {
+                throw std::runtime_error(strprintf("active_duration (%d) must be a multiple of nMinerConfirmationWindow (%d)", version_bits_params.active_duration, consensus.nMinerConfirmationWindow));
+            }
+            consensus.vDeployments[deployment_pos].threshold = version_bits_params.threshold;
         }
 
         genesis = CreateGenesisBlock(1296688602, 2, 0x207fffff, 1, 50 * COIN);

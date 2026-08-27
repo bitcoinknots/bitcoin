@@ -4,6 +4,7 @@
 
 add_library(bitcoin_crypto STATIC EXCLUDE_FROM_ALL
   aes.cpp
+  blake2b.cpp
   chacha20.cpp
   chacha20poly1305.cpp
   hex_base.cpp
@@ -56,5 +57,16 @@ if(HAVE_ARM_SHANI)
   target_sources(bitcoin_crypto PRIVATE sha256_arm_shani.cpp)
   set_property(SOURCE sha256_arm_shani.cpp PROPERTY
     COMPILE_OPTIONS ${ARM_SHANI_CXXFLAGS}
+  )
+endif()
+
+if(ENABLE_POWER8)
+  target_compile_definitions(bitcoin_crypto PRIVATE
+    ENABLE_POWER8
+    $<IF:$<STREQUAL:${CMAKE_CXX_BYTE_ORDER},BIG_ENDIAN>,WORDS_BIGENDIAN,>
+  )
+  target_sources(bitcoin_crypto PRIVATE sha256_power8.cpp)
+  set_property(SOURCE sha256_power8.cpp PROPERTY
+    COMPILE_OPTIONS ${POWER8_CXXFLAGS}
   )
 endif()

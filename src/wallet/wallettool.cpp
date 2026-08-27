@@ -7,6 +7,8 @@
 #include <wallet/wallettool.h>
 
 #include <common/args.h>
+#include <tinyformat.h>
+#include <univalue.h>
 #include <util/fs.h>
 #include <util/translation.h>
 #include <wallet/dump.h>
@@ -14,7 +16,15 @@
 #include <wallet/wallet.h>
 #include <wallet/walletutil.h>
 
+#include <cassert>
+#include <fstream>
+#include <string>
+
 namespace wallet {
+
+UniValue ProcessDescriptorImport(CWallet& wallet, const UniValue& data, const int64_t timestamp, const std::vector<CExtKey>& master_keys = {})
+    EXCLUSIVE_LOCKS_REQUIRED(wallet.cs_wallet);
+
 namespace WalletTool {
 
 // The standard wallet deleter function blocks on the validation interface
@@ -34,6 +44,10 @@ static void WalletCreate(CWallet* wallet_instance, uint64_t wallet_creation_flag
     wallet_instance->SetMinVersion(FEATURE_LATEST);
     wallet_instance->InitWalletFlags(wallet_creation_flags);
 
+    if (wallet_instance->IsWalletFlagSet(WALLET_FLAG_BLANK_WALLET)) {
+        return;
+    }
+
     if (!wallet_instance->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS)) {
         auto spk_man = wallet_instance->GetOrCreateLegacyScriptPubKeyMan();
         spk_man->SetupGeneration(false);
@@ -45,7 +59,7 @@ static void WalletCreate(CWallet* wallet_instance, uint64_t wallet_creation_flag
     wallet_instance->TopUpKeyPool();
 }
 
-static std::shared_ptr<CWallet> MakeWallet(const std::string& name, const fs::path& path, DatabaseOptions options)
+static std::shared_ptr<CWallet> MakeWallet(const std::string& name, const fs::path& path, DatabaseOptions options, CWallet::do_init_used_flag do_init_used_flag_val = CWallet::do_init_used_flag::Init)
 {
     DatabaseStatus status;
     bilingual_str error;
@@ -59,7 +73,7 @@ static std::shared_ptr<CWallet> MakeWallet(const std::string& name, const fs::pa
     std::shared_ptr<CWallet> wallet_instance{new CWallet(/*chain=*/nullptr, name, std::move(database)), WalletToolReleaseWallet};
     DBErrors load_wallet_ret;
     try {
-        load_wallet_ret = wallet_instance->LoadWallet();
+        load_wallet_ret = wallet_instance->LoadWallet(do_init_used_flag_val);
     } catch (const std::runtime_error&) {
         tfm::format(std::cerr, "Error loading %s. Is wallet being used by another process?\n", name);
         return nullptr;
@@ -110,14 +124,40 @@ static void WalletShowInfo(CWallet* wallet_instance)
     tfm::format(std::cout, "Address Book: %zu\n", wallet_instance->m_address_book.size());
 }
 
+static bool ReadAndParseColdcardFile(const fs::path& path, UniValue& decriptors)
+{
+    std::ifstream file;
+    file.open(path);
+    if (!file.is_open()) {
+        tfm::format(std::cerr, "%s. Please check permissions.\n", fs::PathToString(path));
+        return false;
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.substr(0, 22) == "importdescriptors \'[{\"") break;
+    }
+
+    file.close();
+
+    decriptors.clear();
+    if (!decriptors.read(line.substr(19, line.size() - 20))) {
+        tfm::format(std::cerr, "Unable to parse %s\n", fs::PathToString(path));
+        return false;
+    }
+
+    assert(decriptors.isArray());
+    return true;
+}
+
 bool ExecuteWalletToolFunc(const ArgsManager& args, const std::string& command)
 {
     if (args.IsArgSet("-format") && command != "createfromdump") {
         tfm::format(std::cerr, "The -format option can only be used with the \"createfromdump\" command.\n");
         return false;
     }
-    if (args.IsArgSet("-dumpfile") && command != "dump" && command != "createfromdump") {
-        tfm::format(std::cerr, "The -dumpfile option can only be used with the \"dump\" and \"createfromdump\" commands.\n");
+    if (args.IsArgSet("-dumpfile") && command != "dump" && command != "createfromdump" && command != "importfromcoldcard") {
+        tfm::format(std::cerr, "The -dumpfile option can only be used with the \"dump\", \"createfromdump\" and \"importfromcoldcard\" commands.\n");
         return false;
     }
     if (args.IsArgSet("-descriptors") && command != "create") {
@@ -165,7 +205,8 @@ bool ExecuteWalletToolFunc(const ArgsManager& args, const std::string& command)
         DatabaseOptions options;
         ReadDatabaseArgs(args, options);
         options.require_existing = true;
-        const std::shared_ptr<CWallet> wallet_instance = MakeWallet(name, path, options);
+        // NOTE: We need to skip initialisation of the m_used flag, or else the address book count might be wrong
+        const std::shared_ptr<CWallet> wallet_instance = MakeWallet(name, path, options, CWallet::do_init_used_flag::Skip);
         if (!wallet_instance) return false;
         WalletShowInfo(wallet_instance.get());
         wallet_instance->Close();
@@ -191,6 +232,14 @@ bool ExecuteWalletToolFunc(const ArgsManager& args, const std::string& command)
         DatabaseOptions options;
         ReadDatabaseArgs(args, options);
         options.require_existing = true;
+
+        // Get the dumpfile
+        std::string dump_filename = args.GetArg("-dumpfile", "");
+        if (dump_filename.empty()) {
+            tfm::format(std::cerr, "No dump file provided. To use dump, -dumpfile=<filename> must be provided.\n");
+            return false;
+        }
+
         DatabaseStatus status;
 
         if (args.GetBoolArg("-withinternalbdb", false) && IsBDBFile(BDBDataFile(path))) {
@@ -204,24 +253,67 @@ bool ExecuteWalletToolFunc(const ArgsManager& args, const std::string& command)
             return false;
         }
 
-        bool ret = DumpWallet(args, *database, error);
+        if (database->Format().starts_with("bdb")) {
+            tfm::format(std::cerr, "dump: WARNING: BDB-backed wallets have a wallet id that is not currently dumped.\n");
+        }
+
+        bool ret = DumpWallet(*database, error, dump_filename);
         if (!ret && !error.empty()) {
             tfm::format(std::cerr, "%s\n", error.original);
             return ret;
         }
-        tfm::format(std::cout, "The dumpfile may contain private keys. To ensure the safety of your Bitcoin, do not share the dumpfile.\n");
+        tfm::format(std::cerr, "The dumpfile may contain private keys. To ensure the safety of your Bitcoin, do not share the dumpfile.\n");
         return ret;
     } else if (command == "createfromdump") {
         bilingual_str error;
         std::vector<bilingual_str> warnings;
         bool ret = CreateFromDump(args, name, path, error, warnings);
         for (const auto& warning : warnings) {
-            tfm::format(std::cout, "%s\n", warning.original);
+            tfm::format(std::cerr, "%s\n", warning.original);
         }
         if (!ret && !error.empty()) {
             tfm::format(std::cerr, "%s\n", error.original);
         }
         return ret;
+    } else if (command == "importfromcoldcard") {
+        tfm::format(std::cerr, "WARNING: The \"importfromcoldcard\" command is experimental and will likely be removed or changed incompatibly in a future version.\n");
+
+        std::string filename = gArgs.GetArg("-dumpfile", "");
+        if (filename.empty()) {
+            tfm::format(std::cerr, "To use importfromcoldcard, -dumpfile=<filename> must be provided.\n");
+            return false;
+        }
+
+        const fs::path import_file_path{fs::absolute(fs::PathFromString(filename))};
+        if (!fs::exists(import_file_path)) {
+            tfm::format(std::cerr, "File %s does not exist.\n", fs::PathToString(import_file_path));
+            return false;
+        }
+
+        UniValue descriptors;
+        if (!ReadAndParseColdcardFile(import_file_path, descriptors)) {
+            return false;
+        }
+
+        DatabaseOptions options;
+        options.require_create = true;
+        options.create_flags |= WALLET_FLAG_DESCRIPTORS;
+        options.create_flags |= WALLET_FLAG_DISABLE_PRIVATE_KEYS;
+        options.create_flags |= WALLET_FLAG_BLANK_WALLET;
+        options.require_format = DatabaseFormat::SQLITE;
+        std::shared_ptr<CWallet> wallet_instance = MakeWallet(name, path, options);
+        if (!wallet_instance) {
+            return false;
+        }
+
+        LOCK(wallet_instance->cs_wallet);
+        for (const UniValue& descriptor : descriptors.getValues()) {
+            const UniValue result = ProcessDescriptorImport(*wallet_instance, descriptor, 0);
+            tfm::format(std::cerr, "%s\n", result.write(2));
+        }
+
+        WalletShowInfo(wallet_instance.get());
+        wallet_instance->Close();
     } else {
         tfm::format(std::cerr, "Invalid command: %s\n", command);
         return false;

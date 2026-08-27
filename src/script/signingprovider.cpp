@@ -9,6 +9,8 @@
 
 #include <logging.h>
 
+bool g_implicit_segwit = true;
+
 const SigningProvider& DUMMY_SIGNING_PROVIDER = SigningProvider();
 
 template<typename M, typename K, typename V>
@@ -82,6 +84,16 @@ bool FlatSigningProvider::GetTaprootBuilder(const XOnlyPubKey& output_key, Tapro
     return LookupHelper(tr_trees, output_key, builder);
 }
 
+void FlatSigningProvider::AddMasterKey(const CExtKey& key)
+{
+    CPubKey pubkey = key.Neuter().pubkey;
+    const auto id = pubkey.GetID();
+    KeyOriginInfo origin;
+    std::copy(key.vchFingerprint, key.vchFingerprint + sizeof(key.vchFingerprint), origin.fingerprint);
+    origins[id] = std::make_pair(pubkey, origin);
+    keys[id] = key.key;
+}
+
 FlatSigningProvider& FlatSigningProvider::Merge(FlatSigningProvider&& b)
 {
     scripts.merge(b.scripts);
@@ -107,7 +119,7 @@ void FillableSigningProvider::ImplicitlyLearnRelatedKeyScripts(const CPubKey& pu
     // "Implicitly" refers to fact that scripts are derived automatically from
     // existing keys, and are present in memory, even without being explicitly
     // loaded (e.g. from a file).
-    if (pubkey.IsCompressed()) {
+    if (pubkey.IsCompressed() && g_implicit_segwit) {
         CScript script = GetScriptForDestination(WitnessV0KeyHash(key_id));
         // This does not use AddCScript, as it may be overridden.
         CScriptID id(script);
@@ -353,7 +365,7 @@ void TaprootBuilder::Insert(TaprootBuilder::NodeInfo&& node, int depth)
         // as what Insert() performs on the m_branch variable. Instead of
         // storing a NodeInfo object, just remember whether or not there is one
         // at that depth.
-        if (depth < 0 || (size_t)depth > TAPROOT_CONTROL_MAX_NODE_COUNT) return false;
+        if (depth < 0 || (size_t)depth > TAPROOT_CONTROL_MAX_NODE_COUNT_REDUCED) return false;
         if ((size_t)depth + 1 < branch.size()) return false;
         while (branch.size() > (size_t)depth && branch[depth]) {
             branch.pop_back();
@@ -466,7 +478,7 @@ std::optional<std::vector<std::tuple<int, std::vector<unsigned char>, int>>> Inf
             // Skip script records with nonsensical leaf version.
             if (leaf_ver < 0 || leaf_ver >= 0x100 || leaf_ver & 1) continue;
             // Skip script records with invalid control block sizes.
-            if (control.size() < TAPROOT_CONTROL_BASE_SIZE || control.size() > TAPROOT_CONTROL_MAX_SIZE ||
+            if (control.size() < TAPROOT_CONTROL_BASE_SIZE || control.size() > TAPROOT_CONTROL_MAX_SIZE_REDUCED ||
                 ((control.size() - TAPROOT_CONTROL_BASE_SIZE) % TAPROOT_CONTROL_NODE_SIZE) != 0) continue;
             // Skip script records that don't match the control block.
             if ((control[0] & TAPROOT_LEAF_MASK) != leaf_ver) continue;

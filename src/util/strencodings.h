@@ -33,6 +33,7 @@ enum SafeChars
     SAFE_CHARS_UA_COMMENT, //!< BIP-0014 subset
     SAFE_CHARS_FILENAME, //!< Chars allowed in filenames
     SAFE_CHARS_URI, //!< Chars allowed in URIs (RFC 3986)
+    SAFE_CHARS_PRINTABLE, //!< The full set of printable chars
 };
 
 /**
@@ -59,7 +60,7 @@ enum class ByteUnit : uint64_t {
 * @param[in] rule   The set of safe chars to choose (default: least restrictive)
 * @return           A new string without unsafe chars
 */
-std::string SanitizeString(std::string_view str, int rule = SAFE_CHARS_DEFAULT);
+std::string SanitizeString(std::string_view str, int rule = SAFE_CHARS_DEFAULT, bool escape = false);
 /** Parse the hex string into bytes (uint8_t or std::byte). Ignores whitespace. Returns nullopt on invalid input. */
 template <typename Byte = std::byte>
 std::optional<std::vector<Byte>> TryParseHex(std::string_view str);
@@ -163,8 +164,8 @@ constexpr bool IsDigit(char c)
  * @param[in] c     character to test
  * @return          true if the argument is a whitespace character; otherwise false
  */
-constexpr inline bool IsSpace(char c) noexcept {
-    return c == ' ' || c == '\f' || c == '\n' || c == '\r' || c == '\t' || c == '\v';
+constexpr inline bool IsSpace(const char c) noexcept {
+    return c <= ' ' && (c == ' ' || (c >= '\t' && c <= '\r'));
 }
 
 /**

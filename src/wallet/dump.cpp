@@ -21,15 +21,8 @@ namespace wallet {
 static const std::string DUMP_MAGIC = "BITCOIN_CORE_WALLET_DUMP";
 uint32_t DUMP_VERSION = 1;
 
-bool DumpWallet(const ArgsManager& args, WalletDatabase& db, bilingual_str& error)
+bool DumpWallet(WalletDatabase& db, bilingual_str& error, const std::string& dump_filename)
 {
-    // Get the dumpfile
-    std::string dump_filename = args.GetArg("-dumpfile", "");
-    if (dump_filename.empty()) {
-        error = _("No dump file provided. To use dump, -dumpfile=<filename> must be provided.");
-        return false;
-    }
-
     fs::path path = fs::PathFromString(dump_filename);
     path = fs::absolute(path);
     if (fs::exists(path)) {
@@ -180,6 +173,9 @@ bool CreateFromDump(const ArgsManager& args, const std::string& name, const fs::
     if (file_format.empty()) {
         error = _("No wallet file format provided. To use createfromdump, -format=<format> must be provided.");
         return false;
+    }
+    if (file_format.starts_with("bdb") || format_value.starts_with("bdb")) {
+        warnings.push_back(_("Warning: BDB-backed wallets have a wallet id that is not currently restored."));
     }
     DatabaseFormat data_format;
     if (file_format == "bdb") {

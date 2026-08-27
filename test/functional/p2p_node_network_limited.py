@@ -11,6 +11,7 @@ and that it responds to getdata requests for blocks correctly:
 from test_framework.messages import (
     CInv,
     MSG_BLOCK,
+    NODE_REDUCED_DATA,
     NODE_NETWORK_LIMITED,
     NODE_P2P_V2,
     NODE_WITNESS,
@@ -46,7 +47,11 @@ class NodeNetworkLimitedTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 3
-        self.extra_args = [['-prune=550'], [], []]
+        self.extra_args = [
+            ['-prune=550', '-peerbloomfilters=0'],
+            [],
+            [],
+        ]
 
     def disconnect_all(self):
         self.disconnect_nodes(0, 1)
@@ -118,7 +123,7 @@ class NodeNetworkLimitedTest(BitcoinTestFramework):
     def run_test(self):
         node = self.nodes[0].add_p2p_connection(P2PIgnoreInv())
 
-        expected_services = NODE_WITNESS | NODE_NETWORK_LIMITED
+        expected_services = NODE_WITNESS | NODE_NETWORK_LIMITED | NODE_REDUCED_DATA
         if self.options.v2transport:
             expected_services |= NODE_P2P_V2
 

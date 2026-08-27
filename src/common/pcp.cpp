@@ -15,6 +15,9 @@
 #include <util/readwritefile.h>
 #include <util/sock.h>
 #include <util/strencodings.h>
+#include <util/threadinterrupt.h>
+
+bool g_pcp_warn_for_unauthorized{false};
 
 namespace {
 
@@ -80,6 +83,8 @@ constexpr size_t NATPMP_MAP_RESPONSE_LIFETIME_OFS = 12;
 constexpr uint8_t NATPMP_RESULT_SUCCESS = 0;
 //! Result code representing unsupported version.
 constexpr uint8_t NATPMP_RESULT_UNSUPP_VERSION = 1;
+//! Result code representing not authorized (router doesn't support port mapping).
+constexpr uint8_t NATPMP_RESULT_NOT_AUTHORIZED = 2;
 //! Result code representing lack of resources.
 constexpr uint8_t NATPMP_RESULT_NO_RESOURCES = 4;
 
@@ -143,6 +148,8 @@ constexpr size_t PCP_MAP_EXTERNAL_IP_OFS = 20;
 
 //! Result code representing success (RFC6887 7.4), shared with NAT-PMP.
 constexpr uint8_t PCP_RESULT_SUCCESS = NATPMP_RESULT_SUCCESS;
+//! Result code representing not authorized (RFC6887 7.4), shared with NAT-PMP.
+constexpr uint8_t PCP_RESULT_NOT_AUTHORIZED = NATPMP_RESULT_NOT_AUTHORIZED;
 //! Result code representing lack of resources (RFC6887 7.4).
 constexpr uint8_t PCP_RESULT_NO_RESOURCES = 8;
 
@@ -217,7 +224,8 @@ CNetAddr PCPUnwrapAddress(Span<const uint8_t> wrapped_addr)
 //! PCP or NAT-PMP send-receive loop.
 std::optional<std::vector<uint8_t>> PCPSendRecv(Sock &sock, const std::string &protocol, Span<const uint8_t> request, int num_tries,
         std::chrono::milliseconds timeout_per_try,
-        std::function<bool(Span<const uint8_t>)> check_packet)
+        std::function<bool(Span<const uint8_t>)> check_packet,
+        CThreadInterrupt& interrupt)
 {
     using namespace std::chrono;
     // UDP is a potentially lossy protocol, so we try to send again a few times.
@@ -230,7 +238,7 @@ std::optional<std::vector<uint8_t>> PCPSendRecv(Sock &sock, const std::string &p
         }
         // Dispatch packet to gateway.
         if (sock.Send(request.data(), request.size(), 0) != static_cast<ssize_t>(request.size())) {
-            LogPrintLevel(BCLog::NET, BCLog::Level::Warning, "%s: Could not send request: %s\n", protocol, NetworkErrorString(WSAGetLastError()));
+            LogPrintLevel(BCLog::NET, BCLog::Level::Debug, "%s: Could not send request: %s\n", protocol, NetworkErrorString(WSAGetLastError()));
             return std::nullopt; // Network-level error, probably no use retrying.
         }
 
@@ -238,6 +246,7 @@ std::optional<std::vector<uint8_t>> PCPSendRecv(Sock &sock, const std::string &p
         auto cur_time = time_point_cast<milliseconds>(MockableSteadyClock::now());
         auto deadline = cur_time + timeout_per_try;
         while ((cur_time = time_point_cast<milliseconds>(MockableSteadyClock::now())) < deadline) {
+            if (interrupt) return std::nullopt;
             Sock::Event occurred = 0;
             if (!sock.Wait(deadline - cur_time, Sock::RECV, &occurred)) {
                 LogPrintLevel(BCLog::NET, BCLog::Level::Warning, "%s: Could not wait on socket: %s\n", protocol, NetworkErrorString(WSAGetLastError()));
@@ -251,7 +260,7 @@ std::optional<std::vector<uint8_t>> PCPSendRecv(Sock &sock, const std::string &p
             // Receive response.
             recvsz = sock.Recv(response, sizeof(response), MSG_DONTWAIT);
             if (recvsz < 0) {
-                LogPrintLevel(BCLog::NET, BCLog::Level::Warning, "%s: Could not receive response: %s\n", protocol, NetworkErrorString(WSAGetLastError()));
+                LogPrintLevel(BCLog::NET, BCLog::Level::Debug, "%s: Could not receive response: %s\n", protocol, NetworkErrorString(WSAGetLastError()));
                 return std::nullopt; // Network-level error, probably no use retrying.
             }
             LogPrintLevel(BCLog::NET, BCLog::Level::Debug, "%s: Received response of %d bytes: %s\n", protocol, recvsz, HexStr(Span(response, recvsz)));
@@ -271,7 +280,7 @@ std::optional<std::vector<uint8_t>> PCPSendRecv(Sock &sock, const std::string &p
 
 }
 
-std::variant<MappingResult, MappingError> NATPMPRequestPortMap(const CNetAddr &gateway, uint16_t port, uint32_t lifetime, int num_tries, std::chrono::milliseconds timeout_per_try)
+std::variant<MappingResult, MappingError> NATPMPRequestPortMap(const CNetAddr &gateway, uint16_t port, uint32_t lifetime, CThreadInterrupt& interrupt, int num_tries, std::chrono::milliseconds timeout_per_try)
 {
     struct sockaddr_storage dest_addr;
     socklen_t dest_addrlen = sizeof(struct sockaddr_storage);
@@ -319,7 +328,8 @@ std::variant<MappingResult, MappingError> NATPMPRequestPortMap(const CNetAddr &g
                 return false; // Wasn't response to what we expected, try receiving next packet.
             }
             return true;
-        });
+        },
+        interrupt);
 
     struct in_addr external_addr;
     if (recv_res) {
@@ -361,13 +371,26 @@ std::variant<MappingResult, MappingError> NATPMPRequestPortMap(const CNetAddr &g
                 return false; // Wasn't response to what we expected, try receiving next packet.
             }
             return true;
-        });
+        },
+        interrupt);
 
     if (recv_res) {
         const std::span<uint8_t> response = *recv_res;
 
         Assume(response.size() >= NATPMP_MAP_RESPONSE_SIZE);
         uint16_t result_code = ReadBE16(response.data() + NATPMP_RESPONSE_HDR_RESULT_OFS);
+        static bool already_warned_for_unauthorized{false};
+        if (result_code == NATPMP_RESULT_NOT_AUTHORIZED) {
+            if (already_warned_for_unauthorized && !g_pcp_warn_for_unauthorized) {
+                // NOT_AUTHORIZED is expected on many routers that don't support port mapping.
+                LogDebug(BCLog::NET, "natpmp: Port mapping failed with result %s\n", NATPMPResultString(result_code));
+                return MappingError::PROTOCOL_ERROR;
+            } else {
+                already_warned_for_unauthorized = true;
+            }
+        } else {
+            already_warned_for_unauthorized = false;
+        }
         if (result_code != NATPMP_RESULT_SUCCESS) {
             LogPrintLevel(BCLog::NET, BCLog::Level::Warning, "natpmp: Port mapping failed with result %s\n", NATPMPResultString(result_code));
             if (result_code == NATPMP_RESULT_NO_RESOURCES) {
@@ -384,7 +407,7 @@ std::variant<MappingResult, MappingError> NATPMPRequestPortMap(const CNetAddr &g
     }
 }
 
-std::variant<MappingResult, MappingError> PCPRequestPortMap(const PCPMappingNonce &nonce, const CNetAddr &gateway, const CNetAddr &bind, uint16_t port, uint32_t lifetime, int num_tries, std::chrono::milliseconds timeout_per_try)
+std::variant<MappingResult, MappingError> PCPRequestPortMap(const PCPMappingNonce &nonce, const CNetAddr &gateway, const CNetAddr &bind, uint16_t port, uint32_t lifetime, CThreadInterrupt& interrupt, int num_tries, std::chrono::milliseconds timeout_per_try)
 {
     struct sockaddr_storage dest_addr, bind_addr;
     socklen_t dest_addrlen = sizeof(struct sockaddr_storage), bind_addrlen = sizeof(struct sockaddr_storage);
@@ -484,7 +507,8 @@ std::variant<MappingResult, MappingError> PCPRequestPortMap(const PCPMappingNonc
                 return false; // Wasn't response to what we expected, try receiving next packet.
             }
             return true;
-        });
+        },
+        interrupt);
 
     if (!recv_res) {
         return MappingError::NETWORK_ERROR;
@@ -501,6 +525,18 @@ std::variant<MappingResult, MappingError> PCPRequestPortMap(const PCPMappingNonc
     uint32_t lifetime_ret = ReadBE32(response.data() + PCP_HDR_LIFETIME_OFS);
     uint16_t external_port = ReadBE16(response.data() + PCP_HDR_SIZE + PCP_MAP_EXTERNAL_PORT_OFS);
     CNetAddr external_addr{PCPUnwrapAddress(response.subspan(PCP_HDR_SIZE + PCP_MAP_EXTERNAL_IP_OFS, ADDR_IPV6_SIZE))};
+    static bool already_warned_for_unauthorized{false};
+    if (result_code == PCP_RESULT_NOT_AUTHORIZED) {
+        if (already_warned_for_unauthorized && !g_pcp_warn_for_unauthorized) {
+            // NOT_AUTHORIZED is expected on many routers that don't support port mapping.
+            LogDebug(BCLog::NET, "pcp: Mapping failed with result %s\n", PCPResultString(result_code));
+            return MappingError::PROTOCOL_ERROR;
+        } else {
+            already_warned_for_unauthorized = true;
+        }
+    } else {
+        already_warned_for_unauthorized = false;
+    }
     if (result_code != PCP_RESULT_SUCCESS) {
         LogPrintLevel(BCLog::NET, BCLog::Level::Warning, "pcp: Mapping failed with result %s\n", PCPResultString(result_code));
         if (result_code == PCP_RESULT_NO_RESOURCES) {

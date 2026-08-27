@@ -24,6 +24,17 @@
 #include <utility>
 #include <vector>
 
+enum class RDTSConsentFlag {
+    RUNTIME_CHECK,
+    IMPLICIT,
+    RUNTIME_WARN,
+    UNSUPPORTED_UNSAFE_NO_ENFORCEMENT,
+};
+
+extern RDTSConsentFlag g_rdts_consent;
+extern bool g_enable_rdts;
+extern bool g_rdts_warning;
+
 typedef std::map<int, uint256> MapCheckpoints;
 
 struct CCheckpointData {
@@ -32,6 +43,12 @@ struct CCheckpointData {
     int GetHeight() const {
         const auto& final_checkpoint = mapCheckpoints.rbegin();
         return final_checkpoint->first /* height */;
+    }
+
+    bool CheckBlock(int height, const uint256& hash) const {
+        const auto i = mapCheckpoints.find(height);
+        if (i == mapCheckpoints.end()) return true;
+        return hash == i->second;
     }
 };
 
@@ -137,6 +154,7 @@ public:
     struct SigNetOptions {
         std::optional<std::vector<uint8_t>> challenge{};
         std::optional<std::vector<std::string>> seeds{};
+        int64_t pow_target_spacing{10 * 60};
     };
 
     /**
@@ -146,6 +164,9 @@ public:
         int64_t start_time;
         int64_t timeout;
         int min_activation_height;
+        int max_activation_height{std::numeric_limits<int>::max()};
+        int active_duration{std::numeric_limits<int>::max()};
+        int threshold{0};  // 0 means use global nRuleChangeActivationThreshold
     };
 
     /**

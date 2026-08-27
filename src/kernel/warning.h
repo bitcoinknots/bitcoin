@@ -7,8 +7,12 @@
 
 namespace kernel {
 enum class Warning {
+    RULES_NOT_CONSENTED,
     UNKNOWN_NEW_RULES_ACTIVATED,
     LARGE_WORK_INVALID_CHAIN,
+    UNKNOWN_NEW_RULES_SIGNAL_VBITS,
+    UNKNOWN_NEW_RULES_SIGNAL_INTVER,
+    SOFTWARE_EXPIRY,
 };
 } // namespace kernel
 #endif // BITCOIN_KERNEL_WARNING_H

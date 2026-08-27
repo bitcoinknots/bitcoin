@@ -5,9 +5,12 @@
 """Test fee estimation code."""
 from copy import deepcopy
 from decimal import Decimal, ROUND_DOWN
+import http.client
+import json
 import os
 import random
 import time
+import urllib.parse
 
 from test_framework.messages import (
     COIN,
@@ -24,6 +27,7 @@ from test_framework.wallet import MiniWallet
 
 MAX_FILE_AGE = 60
 SECONDS_PER_HOUR = 60 * 60
+target_success_threshold = 0.8
 
 def small_txpuzzle_randfee(
     wallet, from_node, conflist, unconflist, amount, min_fee, fee_increment, batch_reqs
@@ -71,6 +75,22 @@ def small_txpuzzle_randfee(
     return (tx.get_vsize(), fee)
 
 
+def rest_getfee(url, mode, target, status=200):
+    rest_uri = '/rest/fee/%s/%s.json' % (mode, target)
+
+    url = urllib.parse.urlparse(url)
+    conn = http.client.HTTPConnection(url.hostname, url.port)
+    conn.request('GET', rest_uri)
+    resp = conn.getresponse()
+    data = resp.read()
+
+    assert_equal(resp.status, status)
+
+    if status == 200:
+        return json.loads(data.decode('utf-8'), parse_float=Decimal)
+    else:
+        return data
+
 def check_raw_estimates(node, fees_seen):
     """Call estimaterawfee and verify that the estimates meet certain invariants."""
 
@@ -96,6 +116,8 @@ def check_smart_estimates(node, fees_seen):
     feerate_ceiling = max(max(fees_seen), float(mempoolMinFee), float(minRelaytxFee))
     last_feerate = feerate_ceiling
     for i, e in enumerate(all_smart_estimates):  # estimate is for i+1
+        assert_equal(e, rest_getfee(node.url, 'unset', i+1))
+
         feerate = float(e["feerate"])
         assert_greater_than(feerate, 0)
         assert_greater_than_or_equal(feerate, float(mempoolMinFee))
@@ -136,6 +158,22 @@ def check_fee_estimates_btw_modes(node, expected_conservative, expected_economic
     assert_equal(fee_est_conservative, expected_conservative)
     assert_equal(fee_est_economical, expected_economical)
     assert_equal(fee_est_default, expected_economical)
+    assert_equal(fee_est_conservative, rest_getfee(node.url, 'conservative', 1)['feerate'])
+    assert_equal(fee_est_economical, rest_getfee(node.url, 'economical', 1)['feerate'])
+    assert_equal(fee_est_default, rest_getfee(node.url, 'unset', 1)['feerate'])
+
+
+def get_feerate_into_mempool(node, kB):
+    mempool_entries = list(node.getrawmempool(verbose=True).values())
+    for entry in mempool_entries:
+        entry['feerate_BTC/vB'] = entry['fees']['modified'] / entry['vsize']
+    mempool_entries.sort(key=lambda entry: entry['feerate_BTC/vB'], reverse=True)
+    bytes_remaining = kB * 1000
+    for entry in mempool_entries:
+        bytes_remaining -= entry['vsize']
+        if bytes_remaining <= 0:
+            return satoshi_round(entry['feerate_BTC/vB'] * 1000, rounding=ROUND_DOWN)
+    raise AssertionError('Entire mempool is smaller than %s kB' % (kB,))
 
 
 class EstimateFeeTest(BitcoinTestFramework):
@@ -144,8 +182,8 @@ class EstimateFeeTest(BitcoinTestFramework):
         # whitelist peers to speed up tx relay / mempool sync
         self.noban_tx_relay = True
         self.extra_args = [
-            [],
-            ["-blockmaxweight=72000"],
+            ['-rest'],
+            ["-blockmaxweight=72000", "-rest"],
             ["-blockmaxweight=36000"],
         ]
 
@@ -238,9 +276,70 @@ class EstimateFeeTest(BitcoinTestFramework):
         self.log.info("Final estimates after emptying mempools")
         check_estimates(self.nodes[1], self.fees_per_kb)
 
+    def test_feerate_dustrelayfee_common(self, node, multiplier, dust_mode, desc, expected_base):
+        dust_parameter = f"-dustdynamic={dust_mode}".replace('=3*', '=')
+        self.log.info(f"Test dust limit setting {dust_parameter} (fee estimation for {desc})")
+        self.restart_node(0, extra_args=[dust_parameter, '-dustrelayfee=0'])
+        assert_equal(node.getmempoolinfo()['dustdynamic'], dust_mode)
+        expected_dustrelayfee = satoshi_round(expected_base() * multiplier, rounding=ROUND_DOWN)
+        with node.busy_wait_for_debug_log([b'Updating dust feerate']):
+            mempool_info = node.getmempoolinfo()
+            assert mempool_info['dustrelayfee'] != expected_dustrelayfee
+            assert mempool_info['dustrelayfeefloor'] <= expected_dustrelayfee
+            node.mockscheduler(SECONDS_PER_HOUR)
+        mempool_info = node.getmempoolinfo()
+        assert_equal(mempool_info['dustrelayfee'], expected_dustrelayfee)
+        assert mempool_info['dustrelayfee'] > mempool_info['dustrelayfeefloor']
+
+    def test_feerate_dustrelayfee_target(self, node, multiplier, dustfee_target):
+        dust_mode = f"{multiplier}*target:{dustfee_target}"
+        self.test_feerate_dustrelayfee_common(node, multiplier, dust_mode, f'{dustfee_target} blocks', lambda: node.estimaterawfee(dustfee_target, target_success_threshold)['long']['feerate'])
+
+    def test_feerate_dustrelayfee_mempool(self, node, multiplier, dustfee_kB):
+        dust_mode = f"{multiplier}*mempool:{dustfee_kB}"
+        self.test_feerate_dustrelayfee_common(node, multiplier, dust_mode, f'{dustfee_kB} kB into mempool', lambda: get_feerate_into_mempool(node, dustfee_kB))
+
+    def test_feerate_dustrelayfee(self):
+        node = self.nodes[0]
+
+        # test dustdynamic=target:<blocks>
+        for dustfee_target in (2, 8, 1008):
+            for multiplier in (Decimal('0.5'), 1, 3, Decimal('3.3'), 10, Decimal('10.001')):
+                self.test_feerate_dustrelayfee_target(node, multiplier, dustfee_target)
+
+        # Fill mempool up
+        mempool_size = 0
+        batch_sendtx_reqs = []
+        min_fee = Decimal("0.00001")
+        while mempool_size < 52000:
+            (tx_bytes, fee) = small_txpuzzle_randfee(
+                self.wallet,
+                self.nodes[0],
+                self.confutxo,
+                self.memutxo,
+                Decimal("0.005"),
+                min_fee,
+                min_fee,
+                batch_sendtx_reqs,
+            )
+            mempool_size += tx_bytes
+        node.batch(batch_sendtx_reqs)
+
+        # test dustdynamic=mempool:<kB>
+        for dustfee_kB in (1, 10, 50):
+            for multiplier in (Decimal('0.5'), 1, 3, Decimal('3.3'), 10, Decimal('10.001')):
+                self.test_feerate_dustrelayfee_mempool(node, multiplier, dustfee_kB)
+
+        # Restore nodes to a normal state, wiping the mempool
+        self.stop_node(0)
+        (self.nodes[0].chain_path / 'mempool.dat').unlink()
+        self.start_node(0)
+        self.connect_nodes(1, 0)
+        self.connect_nodes(0, 2)
+
     def test_estimates_with_highminrelaytxfee(self):
         high_val = 3 * self.nodes[1].estimatesmartfee(2)["feerate"]
-        self.restart_node(1, extra_args=[f"-minrelaytxfee={high_val}"])
+        self.restart_node(1, extra_args=[f"-minrelaytxfee={high_val}", '-rest'])
         check_smart_estimates(self.nodes[1], self.fees_per_kb)
         self.restart_node(1)
 
@@ -452,6 +551,8 @@ class EstimateFeeTest(BitcoinTestFramework):
         self.log.info("Test fee_estimates.dat is flushed periodically")
         self.test_estimate_dat_is_flushed_periodically()
 
+        self.test_feerate_dustrelayfee()
+
         # check that estimatesmartfee feerate is greater than or equal to maximum of mempoolminfee and minrelaytxfee
         self.log.info(
             "Test fee rate estimation after restarting node with high minrelaytxfee"
@@ -478,6 +579,13 @@ class EstimateFeeTest(BitcoinTestFramework):
         assert_raises_rpc_error(
             -32603, "Fee estimation disabled", self.nodes[0].estimatesmartfee, 2
         )
+
+        self.log.info("Bad REST requests")
+        assert rest_getfee(self.nodes[1].url, 'foobar', 2, 400).startswith(b'<MODE> must be one of <unset|economical|conservative>')
+        assert rest_getfee(self.nodes[1].url, 'conservative', -1, 400).startswith(b'Unable to parse confirmation target to int')
+        assert rest_getfee(self.nodes[1].url, 'conservative', 'abc', 400).startswith(b'Unable to parse confirmation target to int')
+        assert rest_getfee(self.nodes[1].url, 'conservative', 2**65, 400).startswith(b'Unable to parse confirmation target to int')
+        assert rest_getfee(self.nodes[1].url, 'conservative', 0, 400).startswith(b'Invalid confirmation target, must be in between ')
 
 
 if __name__ == "__main__":

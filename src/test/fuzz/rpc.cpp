@@ -85,6 +85,7 @@ const std::vector<std::string> RPC_COMMANDS_NOT_SAFE_FOR_FUZZING{
     "importwallet", // avoid reading from disk
     "loadtxoutset",   // avoid reading from disk
     "loadwallet",   // avoid reading from disk
+    "savefeeestimates",      // disabled as a precautionary measure: may take a file path argument in the future
     "savemempool",           // disabled as a precautionary measure: may take a file path argument in the future
     "setban",                // avoid DNS lookups
     "stop",                  // avoid shutdown state
@@ -111,6 +112,7 @@ const std::vector<std::string> RPC_COMMANDS_SAFE_FOR_FUZZING{
     "estimaterawfee",
     "estimatesmartfee",
     "finalizepsbt",
+    "format",
     "generate",
     "generateblock",
     "getaddednodeinfo",
@@ -123,6 +125,8 @@ const std::vector<std::string> RPC_COMMANDS_SAFE_FOR_FUZZING{
     "getblockfrompeer", // when no peers are connected, no p2p message is sent
     "getblockhash",
     "getblockheader",
+    "getblockfileinfo",
+    "getblocklocations",
     "getblockstats",
     "getblocktemplate",
     "getchaintips",
@@ -133,11 +137,13 @@ const std::vector<std::string> RPC_COMMANDS_SAFE_FOR_FUZZING{
     "getdescriptoractivity",
     "getdescriptorinfo",
     "getdifficulty",
+    "getgeneralinfo",
     "getindexinfo",
     "getmemoryinfo",
     "getmempoolancestors",
     "getmempooldescendants",
     "getmempoolentry",
+    "getmempoolstats",
     "getmempoolinfo",
     "getmininginfo",
     "getnettotals",
@@ -151,6 +157,7 @@ const std::vector<std::string> RPC_COMMANDS_SAFE_FOR_FUZZING{
     "getrawmempool",
     "getrawtransaction",
     "getrpcinfo",
+    "getrpcwhitelist",
     "gettxout",
     "gettxoutsetinfo",
     "gettxspendingprevout",
@@ -158,7 +165,10 @@ const std::vector<std::string> RPC_COMMANDS_SAFE_FOR_FUZZING{
     "invalidateblock",
     "joinpsbts",
     "listbanned",
+    "listmempooltransactions",
+    "listprunelocks",
     "logging",
+    "maxmempool",
     "mockscheduler",
     "ping",
     "preciousblock",
@@ -167,15 +177,19 @@ const std::vector<std::string> RPC_COMMANDS_SAFE_FOR_FUZZING{
     "reconsiderblock",
     "scanblocks",
     "scantxoutset",
+    "scriptthreadsinfo",
     "sendmsgtopeer", // when no peers are connected, no p2p message is sent
     "sendrawtransaction",
     "setmocktime",
     "setnetworkactive",
+    "setprunelock",
+    "setscriptthreadsenabled",
     "signmessagewithprivkey",
     "signrawtransactionwithkey",
     "submitblock",
     "submitheader",
     "submitpackage",
+    "sweepprivkeys",
     "syncwithvalidationinterfacequeue",
     "testmempoolaccept",
     "uptime",

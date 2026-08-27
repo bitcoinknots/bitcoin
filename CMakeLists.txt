@@ -96,7 +96,10 @@ include(CMakeDependentOption)
 # When adding a new option, end the <help_text> with a full stop for consistency.
 option(BUILD_DAEMON "Build bitcoind executable." ON)
 option(BUILD_GUI "Build bitcoin-qt executable." OFF)
+set(WITH_QT_VERSION "5" CACHE STRING "Choose 5 or 6.")
+set_property(CACHE WITH_QT_VERSION PROPERTY STRINGS "5" "6")
 option(BUILD_CLI "Build bitcoin-cli executable." ON)
+option(BUILD_BITCOINCONSENSUS_LIB "Build libbitcoinconsensus library." OFF)
 
 option(BUILD_TESTS "Build test_bitcoin executable." ON)
 option(BUILD_TX "Build bitcoin-tx executable." ${BUILD_TESTS})
@@ -104,6 +107,55 @@ option(BUILD_UTIL "Build bitcoin-util executable." ${BUILD_TESTS})
 
 option(BUILD_UTIL_CHAINSTATE "Build experimental bitcoin-chainstate executable." OFF)
 option(BUILD_KERNEL_LIB "Build experimental bitcoinkernel library." ${BUILD_UTIL_CHAINSTATE})
+
+option(WITH_SYSTEM_LEVELDB "Build with system LevelDB instead of embedded fork." OFF)
+mark_as_advanced(WITH_SYSTEM_LEVELDB)
+if(WITH_SYSTEM_LEVELDB)
+  find_package(LevelDB MODULE REQUIRED)
+else()
+  set(EMBEDDED_LEVELDB TRUE)
+endif()  # WITH_SYSTEM_LEVELDB
+
+option(WITH_SYSTEM_LIBSECP256K1 "Build with system libsecp256k1 instead of embedded copy." OFF)
+mark_as_advanced(WITH_SYSTEM_LIBSECP256K1)
+if(WITH_SYSTEM_LIBSECP256K1)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(libsecp256k1 REQUIRED IMPORTED_TARGET libsecp256k1)
+  add_library(secp256k1 ALIAS PkgConfig::libsecp256k1)
+
+  if(NOT (libsecp256k1_HAS_SECP256K1_ELLSWIFT_CREATE AND libsecp256k1_HAS_SECP256K1_XONLY_PUBKEY_PARSE AND libsecp256k1_HAS_SECP256K1_ECDSA_RECOVER AND libsecp256k1_HAS_SECP256K1_SCHNORRSIG_VERIFY))
+    include(CheckSymbolExists)
+    include(CMakePushCheckState)
+    cmake_push_check_state(RESET)
+    string(APPEND CMAKE_REQUIRED_FLAGS " ${libsecp256k1_CFLAGS_OTHER}")
+    list(APPEND CMAKE_REQUIRED_INCLUDES ${libsecp256k1_INCLUDE_DIRS})
+    list(APPEND CMAKE_REQUIRED_LINK_OPTIONS ${libsecp256k1_LDFLAGS})
+    list(APPEND CMAKE_REQUIRED_LIBRARIES ${libsecp256k1_LIBRARIES})
+    unset(missing_modules)
+    macro(check_secp256k1_module module symbol)
+      string(TOUPPER "${symbol}" VAR)
+      set(VAR "libsecp256k1_HAS_${VAR}")
+      unset(${VAR})
+      check_symbol_exists("${symbol}" "secp256k1_${module}.h" ${VAR})
+      if(NOT ${VAR})
+        list(APPEND missing_modules "${module}")
+      endif()
+    endmacro()
+    message(CHECK_START "Checking for required libsecp256k1 modules")
+    list(APPEND CMAKE_MESSAGE_INDENT "  ")
+    check_secp256k1_module(ellswift secp256k1_ellswift_create)
+    check_secp256k1_module(extrakeys secp256k1_xonly_pubkey_parse)
+    check_secp256k1_module(recovery secp256k1_ecdsa_recover)
+    check_secp256k1_module(schnorrsig secp256k1_schnorrsig_verify)
+    list(POP_BACK CMAKE_MESSAGE_INDENT)
+    if(missing_modules)
+      list(JOIN missing_modules ", " missing_modules)
+      message(FATAL_ERROR "System-installed libsecp256k1 lacks these required modules: ${missing_modules}.")
+    endif()
+    message(CHECK_PASS "all were found")
+    cmake_pop_check_state()
+  endif()
+endif()  # WITH_SYSTEM_LIBSECP256K1
 
 option(ENABLE_WALLET "Enable wallet." ON)
 option(WITH_SQLITE "Enable SQLite wallet support." ${ENABLE_WALLET})
@@ -126,7 +178,7 @@ if(WITH_BDB)
                     "BDB (legacy) wallets opened by this build will not be portable!"
     )
     if(WARN_INCOMPATIBLE_BDB)
-      message(WARNING "If this is intended, pass \"-DWARN_INCOMPATIBLE_BDB=OFF\".\n"
+      message(FATAL_ERROR "If this is intended, pass \"-DWARN_INCOMPATIBLE_BDB=OFF\".\n"
                       "Passing \"-DWITH_BDB=OFF\" will suppress this warning."
       )
     endif()
@@ -139,6 +191,11 @@ option(REDUCE_EXPORTS "Attempt to reduce exported symbols in the resulting execu
 option(WERROR "Treat compiler warnings as errors." OFF)
 option(WITH_CCACHE "Attempt to use ccache for compiling." ON)
 
+option(WITH_MINIUPNPC "Enable UPnP." OFF)
+if(WITH_MINIUPNPC)
+  find_package(MiniUPnPc MODULE REQUIRED)
+endif()
+
 option(WITH_ZMQ "Enable ZMQ notifications." OFF)
 if(WITH_ZMQ)
   find_package(ZeroMQ 4.0.0 MODULE REQUIRED)
@@ -149,7 +206,9 @@ if(WITH_USDT)
   find_package(USDT MODULE REQUIRED)
 endif()
 
-cmake_dependent_option(ENABLE_EXTERNAL_SIGNER "Enable external signer support." ON "NOT WIN32" OFF)
+option(ENABLE_EXTERNAL_SIGNER "Enable external signer support." ON)
+
+option(ENABLE_TOR_SUBPROCESS "Enable support for executing a dedicated Tor node." ON)
 
 cmake_dependent_option(WITH_QRENCODE "Enable QR code support." ON "BUILD_GUI" OFF)
 if(WITH_QRENCODE)
@@ -159,7 +218,9 @@ endif()
 
 cmake_dependent_option(WITH_DBUS "Enable DBus support." ON "NOT CMAKE_SYSTEM_NAME MATCHES \"(Windows|Darwin)\" AND BUILD_GUI" OFF)
 
-option(WITH_MULTIPROCESS "Build multiprocess bitcoin-node and bitcoin-gui executables in addition to monolithic bitcoind and bitcoin-qt executables. Requires libmultiprocess library. Experimental." OFF)
+cmake_dependent_option(WITH_TASKBAR_PROGRESS "Enable GUI taskbar progress." ON "CMAKE_SYSTEM_NAME STREQUAL \"Windows\" AND BUILD_GUI" OFF)
+
+set(WITH_MULTIPROCESS OFF)
 if(WITH_MULTIPROCESS)
   find_package(Libmultiprocess REQUIRED COMPONENTS Lib)
   find_package(LibmultiprocessNative REQUIRED COMPONENTS Bin
@@ -177,12 +238,22 @@ if(BUILD_GUI)
     list(APPEND qt_components DBus)
     set(USE_DBUS TRUE)
   endif()
+  if(WITH_TASKBAR_PROGRESS)
+    list(APPEND qt_components WinExtras)
+    set(BITCOIN_QT_WIN_TASKBAR TRUE)
+  endif()
   if(BUILD_GUI_TESTS)
     list(APPEND qt_components Test)
   endif()
+  if("${WITH_QT_VERSION}" STREQUAL "6")
+    find_package(Qt 6.2 MODULE REQUIRED
+      COMPONENTS ${qt_components}
+    )
+  else()  # ! Qt 6
   find_package(Qt 5.11.3 MODULE REQUIRED
     COMPONENTS ${qt_components}
   )
+  endif()  # Qt 6
   unset(qt_components)
 endif()
 
@@ -222,6 +293,7 @@ if(BUILD_FOR_FUZZING)
   message(WARNING "BUILD_FOR_FUZZING=ON will disable all other targets and force BUILD_FUZZ_BINARY=ON.")
   set(BUILD_DAEMON OFF)
   set(BUILD_CLI OFF)
+  set(BUILD_BITCOINCONSENSUS_LIB OFF)
   set(BUILD_TX OFF)
   set(BUILD_UTIL OFF)
   set(BUILD_UTIL_CHAINSTATE OFF)
@@ -229,6 +301,7 @@ if(BUILD_FOR_FUZZING)
   set(BUILD_WALLET_TOOL OFF)
   set(BUILD_GUI OFF)
   set(ENABLE_EXTERNAL_SIGNER OFF)
+  set(WITH_MINIUPNPC OFF)
   set(WITH_ZMQ OFF)
   set(BUILD_TESTS OFF)
   set(BUILD_GUI_TESTS OFF)
@@ -240,8 +313,48 @@ if(BUILD_FOR_FUZZING)
   )
 endif()
 
+set(RDTS_CONSENT "UNSET" CACHE STRING "RDTS (BIP110) consent behaviour.")
+set(RDTS_CONSENT_OPTIONS "RUNTIME_CHECK" "RUNTIME_WARN" "IMPLICIT")
+set_property(CACHE RDTS_CONSENT PROPERTY STRINGS "UNSET" ${RDTS_CONSENT_OPTIONS})
+list(APPEND RDTS_CONSENT_OPTIONS "UNSUPPORTED_UNSAFE_NO_ENFORCEMENT")
+if(RDTS_CONSENT MATCHES "^(1|ON|YES|TRUE|Y)$")
+  set(RDTS_CONSENT "IMPLICIT")
+endif()
+if(BUILD_DAEMON OR BUILD_GUI OR BUILD_KERNEL_LIB)
+  if(NOT RDTS_CONSENT IN_LIST RDTS_CONSENT_OPTIONS)
+    message(FATAL_ERROR
+      "RDTS_CONSENT is not set.\n"
+      "This version of Bitcoin Knots applies the BIP110 (RDTS) network upgrade, which fixes critical vulnerabilities in long-standing network design. To avoid applying this upgrade by accident, please choose whether to accept it now, or defer explicit confirmation until runtime.\n"
+      "Important: Because this upgrade already has broad community support, reverting to an older software version does not reject it. Running outdated software after any network upgrade only leaves your node vulnerable to displaying fake or fraudulent transactions. To effectively reject this upgrade, you need to run alternative software designed to split away from the upgraded network.\n"
+      "To accept this upgrade now, add to your CMake options:\n"
+      "  -D RDTS_CONSENT=IMPLICIT\n"
+      "Or to defer explicit confirmation until runtime (via GUI prompt or consensusrules=rdts config setting):\n"
+      "  -D RDTS_CONSENT=RUNTIME_CHECK    (causes bitcoind to exit if absent)\n"
+      "  -D RDTS_CONSENT=RUNTIME_WARN     (causes bitcoind to warn hourly if absent)\n"
+      "For more information, see: https://bitcoinknots.org/learn/2026-rdts"
+    )
+  endif()
+else()
+  # Nothing else enforces consensus rules, but RDTSConsentFlags::UNSET doesn't actually exist so would break the build
+  set(RDTS_CONSENT "IMPLICIT")
+endif()
+if(RDTS_CONSENT STREQUAL "UNSUPPORTED_UNSAFE_NO_ENFORCEMENT")
+  list(APPEND configure_warnings
+    "RDTS_CONSENT=UNSUPPORTED_UNSAFE_NO_ENFORCEMENT is NOT a supported option. Use at your own risk!
+Note that this will NOT make your node reject RDTS\; it will merely be insecure after RDTS activates."
+  )
+endif()
+
+# The external_lib_interface interface library aims to encapsulate build flags, which
+# are specific to non-internal libraries.
+# It is intended to be a usage requirement for non-internal library
+# targets.
+add_library(external_lib_interface INTERFACE)
+
 include(TryAppendCXXFlags)
 include(TryAppendLinkerFlag)
+
+try_append_linker_flag("-Wl,--no-undefined" TARGET external_lib_interface)
 
 # Redefine/adjust per-configuration flags.
 target_compile_definitions(core_interface_debug INTERFACE
@@ -314,6 +427,13 @@ if(WIN32)
     # As a best effort, target Windows 8.
     try_append_linker_flag("-Wl,--major-subsystem-version,6" TARGET core_interface)
     try_append_linker_flag("-Wl,--minor-subsystem-version,2" TARGET core_interface)
+
+    find_library(MINGWTHRD_LIBRARY mingwthrd)
+    if (MINGWTHRD_LIBRARY)
+      target_link_libraries(core_interface INTERFACE
+        ${MINGWTHRD_LIBRARY}
+      )
+    endif()
   endif()
 
   # Workaround producing large object files, which cannot be handled by the assembler.
@@ -409,7 +529,11 @@ if(BUILD_DAEMON OR BUILD_GUI OR BUILD_CLI OR BUILD_TESTS OR BUILD_BENCH OR BUILD
   find_package(Libevent 2.1.8 MODULE REQUIRED)
 endif()
 
+include(cmake/iopriority.cmake)
+
 include(cmake/introspection.cmake)
+
+include(cmake/mempressure.cmake)
 
 include(cmake/ccache.cmake)
 
@@ -447,7 +571,7 @@ else()
   try_append_cxx_flags("-Woverloaded-virtual" TARGET warn_interface SKIP_LINK)
   try_append_cxx_flags("-Wsuggest-override" TARGET warn_interface SKIP_LINK)
   try_append_cxx_flags("-Wimplicit-fallthrough" TARGET warn_interface SKIP_LINK)
-  try_append_cxx_flags("-Wunreachable-code" TARGET warn_interface SKIP_LINK)
+  try_append_cxx_flags("-Wunreachable-code-loop-increment" TARGET warn_interface SKIP_LINK)
   try_append_cxx_flags("-Wdocumentation" TARGET warn_interface SKIP_LINK)
   try_append_cxx_flags("-Wself-assign" TARGET warn_interface SKIP_LINK)
   try_append_cxx_flags("-Wbidi-chars=any" TARGET warn_interface SKIP_LINK)
@@ -566,6 +690,10 @@ if(WERROR)
   unset(werror_flag)
 endif()
 
+if(BUILD_BITCOINCONSENSUS_LIB)
+  set(HAVE_CONSENSUS_LIB TRUE)
+endif()
+
 # Prefer Unix-style package components over frameworks on macOS.
 # This improves compatibility with Python version managers.
 set(Python3_FIND_FRAMEWORK LAST CACHE STRING "")
@@ -573,7 +701,11 @@ set(Python3_FIND_FRAMEWORK LAST CACHE STRING "")
 # improves compatibility with Python version managers that use shims.
 set(Python3_FIND_UNVERSIONED_NAMES FIRST CACHE STRING "")
 mark_as_advanced(Python3_FIND_FRAMEWORK Python3_FIND_UNVERSIONED_NAMES)
+if(BUILD_GUI)
+  find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
+else()
 find_package(Python3 3.10 COMPONENTS Interpreter)
+endif()
 if(Python3_EXECUTABLE)
   set(PYTHON_COMMAND ${Python3_EXECUTABLE})
 else()
@@ -614,7 +746,6 @@ endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "NetBSD")
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 else()
-  set(CMAKE_SKIP_BUILD_RPATH TRUE)
   set(CMAKE_SKIP_INSTALL_RPATH TRUE)
 endif()
 add_subdirectory(test)
@@ -640,15 +771,23 @@ if(BUILD_DAEMON AND WITH_MULTIPROCESS)
 else()
   set(bitcoin_daemon_status OFF)
 endif()
-message("  bitcoin-node (multiprocess) ......... ${bitcoin_daemon_status}")
-message("  bitcoin-qt (GUI) .................... ${BUILD_GUI}")
+if(BUILD_GUI)
+  if("${WITH_QT_VERSION}" STREQUAL "6")
+    set(bitcoin_qt_status "ON (Qt 6)")
+  else()
+    set(bitcoin_qt_status "ON (Qt 5)")
+  endif()
+else()
+  set(bitcoin_qt_status "OFF")
+endif()
+message("  bitcoin-qt (GUI) .................... ${bitcoin_qt_status}")
 if(BUILD_GUI AND WITH_MULTIPROCESS)
   set(bitcoin_gui_status ON)
 else()
   set(bitcoin_gui_status OFF)
 endif()
-message("  bitcoin-gui (GUI, multiprocess) ..... ${bitcoin_gui_status}")
 message("  bitcoin-cli ......................... ${BUILD_CLI}")
+message("  libbitcoinconsensus ................. ${BUILD_BITCOINCONSENSUS_LIB}")
 message("  bitcoin-tx .......................... ${BUILD_TX}")
 message("  bitcoin-util ........................ ${BUILD_UTIL}")
 message("  bitcoin-wallet ...................... ${BUILD_WALLET_TOOL}")
@@ -661,10 +800,13 @@ if(ENABLE_WALLET)
   message("   - legacy wallets (Berkeley DB) ..... ${WITH_BDB}")
 endif()
 message("  external signer ..................... ${ENABLE_EXTERNAL_SIGNER}")
+message("  tor subprocess ...................... ${ENABLE_TOR_SUBPROCESS}")
+message("  port mapping using UPnP ............. ${WITH_MINIUPNPC}")
 message("  ZeroMQ .............................. ${WITH_ZMQ}")
 message("  USDT tracing ........................ ${WITH_USDT}")
 message("  QR code (GUI) ....................... ${WITH_QRENCODE}")
 message("  DBus (GUI) .......................... ${WITH_DBUS}")
+message("  RDTS consent ........................ ${RDTS_CONSENT}")
 message("Tests:")
 message("  test_bitcoin ........................ ${BUILD_TESTS}")
 message("  test_bitcoin-qt ..................... ${BUILD_GUI_TESTS}")

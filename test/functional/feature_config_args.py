@@ -131,7 +131,7 @@ class ConfArgsTest(BitcoinTestFramework):
         with open(inc_conf_file_path, 'w', encoding='utf-8') as conf:
             conf.write('reindex=1\n')
 
-        with self.nodes[0].assert_debug_log(expected_msgs=['Warning: reindex=1 is set in the configuration file, which will significantly slow down startup. Consider removing or commenting out this option for better performance, unless there is currently a condition which makes rebuilding the indexes necessary']):
+        with self.nodes[0].assert_debug_log(expected_msgs=["[warning] reindex=1 is set in the configuration file, which will significantly slow down startup. Consider removing or commenting out this option for better performance, unless there is currently a condition which makes rebuilding the indexes necessary"]):
             self.start_node(0)
         self.stop_node(0)
 
@@ -146,9 +146,6 @@ class ConfArgsTest(BitcoinTestFramework):
 
         main_conf_file_path = self.nodes[0].datadir_path / "bitcoin_main.conf"
         util.write_config(main_conf_file_path, n=0, chain='', extra_config=f'includeconf={inc_conf_file_path}\n')
-        with open(inc_conf_file_path, 'w', encoding='utf-8') as conf:
-            conf.write('acceptnonstdtxn=1\n')
-        self.nodes[0].assert_start_raises_init_error(extra_args=[f"-conf={main_conf_file_path}", "-allowignoredconf"], expected_msg='Error: acceptnonstdtxn is not currently supported for main chain')
 
         with open(inc_conf_file_path, 'w', encoding='utf-8') as conf:
             conf.write('nono\n')
@@ -231,7 +228,7 @@ class ConfArgsTest(BitcoinTestFramework):
                 )
 
     def test_log_buffer(self):
-        with self.nodes[0].assert_debug_log(expected_msgs=['Warning: parsed potentially confusing double-negative -listen=0\n']):
+        with self.nodes[0].assert_debug_log(expected_msgs=["[warning] Parsed potentially confusing double-negative -listen=0\n"]):
             self.start_node(0, extra_args=['-nolisten=0'])
         self.stop_node(0)
 
@@ -257,7 +254,6 @@ class ConfArgsTest(BitcoinTestFramework):
             self.start_node(0, extra_args=[
                 '-addnode=some.node',
                 '-rpcauth=alice:f7efda5c189b999524f151318c0c86$d5b51b3beffbc0',
-                '-rpcbind=127.1.1.1',
                 '-rpcbind=127.0.0.1',
                 "-rpcallowip=127.0.0.1",
                 '-rpcpassword=',
@@ -506,7 +502,6 @@ class ConfArgsTest(BitcoinTestFramework):
         self.test_invalid_command_line_options()
         self.test_ignored_conf()
         self.test_ignored_default_conf()
-        self.test_acceptstalefeeestimates_arg_support()
         self.test_testnet3_deprecation_msg()
 
         # Remove the -datadir argument so it doesn't override the config file

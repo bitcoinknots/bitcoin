@@ -45,6 +45,7 @@ FUZZ_TARGET(wallet_bdb_parser, .init = initialize_wallet_bdb_parser)
     {
         AutoFile outfile{fsbridge::fopen(wallet_path, "wb")};
         outfile << Span{buffer};
+        assert(outfile.fclose() == 0);
     }
 
     const DatabaseOptions options{};
@@ -63,7 +64,7 @@ FUZZ_TARGET(wallet_bdb_parser, .init = initialize_wallet_bdb_parser)
 #endif
     auto db{MakeBerkeleyRODatabase(wallet_path, options, status, error)};
     if (db) {
-        assert(DumpWallet(g_setup->m_args, *db, error));
+        assert(DumpWallet(*db, error, fs::PathToString(bdb_ro_dumpfile)));
     } else {
 #ifdef USE_BDB_NON_MSVC
         bdb_ro_err = true;
@@ -124,7 +125,7 @@ FUZZ_TARGET(wallet_bdb_parser, .init = initialize_wallet_bdb_parser)
             return;
         }
         assert(!bdb_ro_err);
-        assert(DumpWallet(g_setup->m_args, *db, error));
+        assert(DumpWallet(*db, error, fs::PathToString(bdb_dumpfile)));
     } catch (const std::runtime_error& e) {
         if (bdb_ro_err) return;
         throw e;

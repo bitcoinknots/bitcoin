@@ -42,6 +42,9 @@ class ChainstateManager;
 namespace Consensus {
 struct Params;
 }
+namespace node {
+struct PruneLockInfo;
+};
 namespace util {
 class SignalInterrupt;
 } // namespace util
@@ -52,15 +55,18 @@ class BlockTreeDB : public CDBWrapper
 {
 public:
     using CDBWrapper::CDBWrapper;
-    bool WriteBatchSync(const std::vector<std::pair<int, const CBlockFileInfo*>>& fileInfo, int nLastFile, const std::vector<const CBlockIndex*>& blockinfo);
+    bool WriteBatchSync(const std::vector<std::pair<int, const CBlockFileInfo*>>& fileInfo, int nLastFile, const std::vector<const CBlockIndex*>& blockinfo, const std::unordered_map<std::string, node::PruneLockInfo>& prune_locks);
     bool ReadBlockFileInfo(int nFile, CBlockFileInfo& info);
     bool ReadLastBlockFile(int& nFile);
     bool WriteReindexing(bool fReindexing);
     void ReadReindexing(bool& fReindexing);
+    bool WritePruneLock(const std::string& name, const node::PruneLockInfo&);
+    bool DeletePruneLock(const std::string& name);
     bool WriteFlag(const std::string& name, bool fValue);
     bool ReadFlag(const std::string& name, bool& fValue);
     bool LoadBlockIndexGuts(const Consensus::Params& consensusParams, std::function<CBlockIndex*(const uint256&)> insertBlockIndex, const util::SignalInterrupt& interrupt)
         EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
+    bool LoadPruneLocks(std::unordered_map<std::string, node::PruneLockInfo>& prune_locks, const util::SignalInterrupt& interrupt);
 };
 } // namespace kernel
 
@@ -75,10 +81,10 @@ static const unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
 static const unsigned int MAX_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
 
 /** Size of header written by WriteBlock before a serialized CBlock (8 bytes) */
-static constexpr size_t BLOCK_SERIALIZATION_HEADER_SIZE{std::tuple_size_v<MessageStartChars> + sizeof(unsigned int)};
+static constexpr uint32_t BLOCK_SERIALIZATION_HEADER_SIZE{std::tuple_size_v<MessageStartChars> + sizeof(unsigned int)};
 
 /** Total overhead when writing undo data: header (8 bytes) plus checksum (32 bytes) */
-static constexpr size_t UNDO_DATA_DISK_OVERHEAD{BLOCK_SERIALIZATION_HEADER_SIZE + uint256::size()};
+static constexpr uint32_t UNDO_DATA_DISK_OVERHEAD{BLOCK_SERIALIZATION_HEADER_SIZE + uint256::size()};
 
 // Because validation code takes pointers to the map's CBlockIndex objects, if
 // we ever switch to another associative container, we need to either use a
@@ -96,7 +102,17 @@ struct CBlockIndexHeightOnlyComparator {
 };
 
 struct PruneLockInfo {
-    int height_first{std::numeric_limits<int>::max()}; //! Height of earliest block that should be kept and not pruned
+    std::string desc; //! Arbitrary human-readable description of the lock purpose
+    uint64_t height_first{std::numeric_limits<uint64_t>::max()}; //! Height of earliest block that should be kept and not pruned
+    uint64_t height_last{std::numeric_limits<uint64_t>::max()}; //! Height of latest block that should be kept and not pruned
+    bool temporary{true};
+
+    SERIALIZE_METHODS(PruneLockInfo, obj)
+    {
+        READWRITE(obj.desc);
+        READWRITE(VARINT(obj.height_first));
+        READWRITE(VARINT(obj.height_last));
+    }
 };
 
 enum BlockfileType {
@@ -172,6 +188,8 @@ private:
 
     AutoFile OpenUndoFile(const FlatFilePos& pos, bool fReadOnly = false) const;
 
+    bool DoPruneLocksForbidPruning(const CBlockFileInfo& block_file_info) EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
+
     /* Calculate the block/rev files to delete based on height specified by user with RPC command pruneblockchain */
     void FindFilesToPruneManual(
         std::set<int>& setFilesToPrune,
@@ -235,7 +253,7 @@ private:
 
     const bool m_prune_mode;
 
-    const std::vector<std::byte> m_xor_key;
+    const Obfuscation m_xor_key;
 
     /** Dirty block index entries. */
     std::set<CBlockIndex*> m_dirty_blockindex;
@@ -243,14 +261,17 @@ private:
     /** Dirty block file entries. */
     std::set<int> m_dirty_fileinfo;
 
+public:
     /**
      * Map from external index name to oldest block that must not be pruned.
      *
-     * @note Internally, only blocks at height (height_first - PRUNE_LOCK_BUFFER - 1) and
-     * below will be pruned, but callers should avoid assuming any particular buffer size.
+     * @note Internally, only blocks before height (height_first - PRUNE_LOCK_BUFFER - 1) and
+     * after height (height_last + PRUNE_LOCK_BUFFER) will be pruned, but callers should
+     * avoid assuming any particular buffer size.
      */
     std::unordered_map<std::string, PruneLockInfo> m_prune_locks GUARDED_BY(::cs_main);
 
+private:
     BlockfileType BlockfileTypeForHeight(int height);
 
     const kernel::BlockManagerOpts m_opts;
@@ -350,6 +371,7 @@ public:
 
     /** Attempt to stay below this number of bytes of block files. */
     [[nodiscard]] uint64_t GetPruneTarget() const { return m_opts.prune_target; }
+    [[nodiscard]] uint64_t GetPruneTargetForChainstate(const Chainstate& chain, ChainstateManager& chainman) const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     static constexpr auto PRUNE_TARGET_MANUAL{std::numeric_limits<uint64_t>::max()};
 
     [[nodiscard]] bool LoadingBlocks() const { return m_importing || !m_blockfiles_indexed; }
@@ -399,11 +421,13 @@ public:
     //! Check whether the block associated with this index entry is pruned or not.
     bool IsBlockPruned(const CBlockIndex& block) const EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
 
+    bool PruneLockExists(const std::string& name) const SHARED_LOCKS_REQUIRED(::cs_main);
     //! Create or update a prune lock identified by its name
-    void UpdatePruneLock(const std::string& name, const PruneLockInfo& lock_info) EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
+    bool UpdatePruneLock(const std::string& name, const PruneLockInfo& lock_info, bool sync=false) EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
+    bool DeletePruneLock(const std::string& name) EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
 
     /** Open a block file (blk?????.dat) */
-    AutoFile OpenBlockFile(const FlatFilePos& pos, bool fReadOnly = false) const;
+    AutoFile OpenBlockFile(const FlatFilePos& pos, bool fReadOnly) const;
 
     /** Translation to a filesystem path */
     fs::path GetBlockPosFilename(const FlatFilePos& pos) const;
@@ -414,9 +438,9 @@ public:
     void UnlinkPrunedFiles(const std::set<int>& setFilesToPrune) const;
 
     /** Functions for disk access for blocks */
-    bool ReadBlock(CBlock& block, const FlatFilePos& pos) const;
-    bool ReadBlock(CBlock& block, const CBlockIndex& index) const;
-    bool ReadRawBlock(std::vector<uint8_t>& block, const FlatFilePos& pos) const;
+    bool ReadBlock(CBlock& block, const FlatFilePos& pos, const std::optional<uint256>& expected_hash = {}, bool lowprio = false) const;
+    bool ReadBlock(CBlock& block, const CBlockIndex& index, bool lowprio = false) const;
+    bool ReadRawBlock(std::vector<uint8_t>& block, const FlatFilePos& pos, bool lowprio = false) const;
 
     bool ReadBlockUndo(CBlockUndo& blockundo, const CBlockIndex& index) const;
 

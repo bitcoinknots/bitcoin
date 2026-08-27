@@ -6,8 +6,10 @@
 #ifndef BITCOIN_UTIL_TIME_H
 #define BITCOIN_UTIL_TIME_H
 
+#include <atomic>
 #include <chrono> // IWYU pragma: export
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -73,6 +75,12 @@ constexpr auto Ticks(Dur2 d)
 {
     return std::chrono::duration_cast<Dur1>(d).count();
 }
+
+template <typename Duration>
+constexpr int64_t TicksSeconds(Duration d)
+{
+    return int64_t{Ticks<std::chrono::seconds>(d)};
+}
 template <typename Duration, typename Timepoint>
 constexpr auto TicksSinceEpoch(Timepoint t)
 {
@@ -132,6 +140,7 @@ T GetTime()
  */
 std::string FormatISO8601DateTime(int64_t nTime);
 std::string FormatISO8601Date(int64_t nTime);
+std::string FormatISO8601Time(int64_t nTime);
 std::optional<int64_t> ParseISO8601DateTime(std::string_view str);
 
 /**
@@ -143,5 +152,47 @@ struct timeval MillisToTimeval(int64_t nTimeout);
  * Convert milliseconds to a struct timeval for e.g. select.
  */
 struct timeval MillisToTimeval(std::chrono::milliseconds ms);
+
+/**
+ * Retrieve the CPU time (user + system) spent by the current thread.
+ */
+std::chrono::nanoseconds ThreadCpuTime();
+
+/**
+ * Measure CPU time spent by the current thread.
+ * A clock is started when a CpuTimer is created. When the object is destroyed
+ * the elapsed CPU time is calculated and a callback function is invoked,
+ * providing it the elapsed CPU time.
+ */
+class CpuTimer
+{
+public:
+    using FinishedCB = std::function<void(std::chrono::nanoseconds)>;
+
+    /**
+     * Construct a timer.
+     * @param[in] finished_cb A callback to invoke when this object is destroyed.
+     */
+    CpuTimer(const FinishedCB& finished_cb)
+        : m_start{ThreadCpuTime()},
+          m_finished_cb{finished_cb}
+    {
+    }
+
+    ~CpuTimer()
+    {
+        m_finished_cb(ThreadCpuTime() - m_start);
+    }
+
+private:
+    const std::chrono::nanoseconds m_start;
+    FinishedCB m_finished_cb;
+};
+
+/**
+ * Add `b` nanoseconds to a nanoseconds atomic.
+ * @return The value of `a` immediately after the operation.
+ */
+std::chrono::nanoseconds operator+=(std::atomic<std::chrono::nanoseconds>& a, std::chrono::nanoseconds b);
 
 #endif // BITCOIN_UTIL_TIME_H
