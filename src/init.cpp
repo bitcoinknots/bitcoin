@@ -36,7 +36,6 @@
 #include <interfaces/mining.h>
 #include <interfaces/node.h>
 #include <kernel/caches.h>
-#include <kernel/chainparams.h>
 #include <kernel/context.h>
 #include <kernel/warning.h>
 #include <key.h>
@@ -696,8 +695,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-uaspoof=<ua>", strprintf("Replace entire user agent string with custom identifier (should be formatted '%s' as specified in BIP 14)", BIP14_EXAMPLE_UA), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::CONNECTION);
 
     SetupChainParamsBaseOptions(argsman);
-    argsman.AddArg("-consensusrules=<rules>", strprintf("Enforce the specified consensus rules (default: none). Must be %s to use this software.", CONSENSUSRULES_REQUIRED), ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
-    argsman.AddArg("-rdts_consent_flag=<n>", strprintf("Test RDTS consent flag <n> (default: %u)", static_cast<int64_t>(g_rdts_consent)), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::DEBUG_TEST);
+    argsman.AddArg("-consensusrules=<rules>", "Enforce the specified consensus rules (default: none).", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
 
     argsman.AddArg("-acceptnonstddatacarrier",
                    strprintf("Relay and mine non-OP_RETURN datacarrier injection (default: %u)",
@@ -1579,80 +1577,12 @@ static ChainstateLoadResult InitAndLoadChainstate(
 
 bool UserProtocolRulesCheck()
 {
-    const auto rules_requested{gArgs.GetArgs(CONSENSUSRULES_CONFIG_NAME)};
-    for (const auto& rulesok : rules_requested) {
-        if (rulesok == CONSENSUSRULES_REQUIRED) continue;
-        return InitError(strprintf(_("Unknown rule specified in -%s: %s"), CONSENSUSRULES_CONFIG_NAME, rulesok));
+    for (const auto& rule : gArgs.GetArgs(CONSENSUSRULES_CONFIG_NAME)) {
+        // Accepted and ignored: configurations written while RDTS consent was required still carry it
+        if (rule == "rdts") continue;
+        return InitError(strprintf(_("Unknown rule specified in -%s: %s"), CONSENSUSRULES_CONFIG_NAME, rule));
     }
     return true;
-}
-
-bool UserProtocolRulesConsent()
-{
-    if (g_rdts_consent == RDTSConsentFlag::IMPLICIT) {
-        LogPrintf("User already consented to '%s' consensus rules (at installation)\n", CONSENSUSRULES_REQUIRED);
-        return true;
-    }
-    for (const auto& rulesok : gArgs.GetArgs(CONSENSUSRULES_CONFIG_NAME)) {
-        if (rulesok == CONSENSUSRULES_REQUIRED) {
-            LogPrintf("User already consented to '%s' consensus rules (in config)\n", CONSENSUSRULES_REQUIRED);
-            return true;
-        }
-    }
-
-    bilingual_str msg = strprintf(_(
-        "BIP110/RDTS Network Upgrade\n"
-        "\n"
-        "This version of %s applies the BIP110 (RDTS) network upgrade, "
-        "which fixes critical vulnerabilities in long-standing network design. "
-        "However, you are in control of your own software, and this application asks for explicit confirmation.\n"
-        "\n"
-        "Important: "
-        "Because this upgrade already has broad community support, "
-        "reverting to an older software version does not reject it. "
-        "Running outdated software after any network upgrade only leaves your node vulnerable to displaying fake or fraudulent transactions. "
-        "To effectively reject this upgrade, you need to run alternative software designed to split away from the upgraded network.\n"
-        "\n"
-        "For more information, see: %s"
-    ),
-        CLIENT_NAME,
-        "https://bitcoinknots.org/learn/2026-rdts");
-    const bilingual_str msg_manual_suffix = strprintf(_(
-        "To confirm this upgrade, add to your %s file: %s"
-    ),
-        gArgs.GetPathArg("-conf", BITCOIN_CONF_FILENAME).utf8string(),
-        CONSENSUSRULES_CONFIG_NAME + "=" + CONSENSUSRULES_REQUIRED);
-    const bilingual_str msg_manual = msg + Untranslated("\n\n") + msg_manual_suffix;
-
-    if (!gArgs.GetSettingsPath()) {
-        msg = msg_manual;
-    }
-
-    const bool consent = uiInterface.ThreadSafeQuestion(
-        _("Attention:") + Untranslated(" ") + msg,
-        msg_manual.original
-        , "Attention", CClientUIInterface::MSG_WARNING | CClientUIInterface::BTN_ABORT);
-
-    if (consent) {
-        if (gArgs.GetSettingsPath()) {
-            // Write to settings.json so we don't ask anymore
-            LogPrintf("User interactively consented to '%s' consensus rules (%s)\n", CONSENSUSRULES_REQUIRED, "remembering for next time");
-            gArgs.LockSettings([&](common::Settings& settings) {
-                auto& setting = settings.rw_settings[CONSENSUSRULES_CONFIG_NAME];
-                if (setting.isArray()) {
-                    // Normally, it doesn't make sense to support multiple rulesets, but if the user has done so already, don't lose the current set
-                    setting.push_back(CONSENSUSRULES_REQUIRED);
-                } else {
-                    setting = CONSENSUSRULES_REQUIRED;
-                }
-            });
-            gArgs.WriteSettingsFile();
-        } else {
-            LogPrintf("User interactively consented to '%s' consensus rules (%s)\n", CONSENSUSRULES_REQUIRED, "settings disabled, so can't save");
-        }
-    }
-
-    return consent;
 }
 
 bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
@@ -1731,32 +1661,6 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
 
     if (!UserProtocolRulesCheck()) {
         return false;
-    }
-
-    if (!(chainparams.IsTestChain() || UserProtocolRulesConsent())) {
-        if (g_rdts_consent == RDTSConsentFlag::RUNTIME_CHECK) {
-            return InitError(_("User has not consented to supported protocol rules. Exiting"));
-        } else if (g_rdts_consent == RDTSConsentFlag::UNSUPPORTED_UNSAFE_NO_ENFORCEMENT) {
-            LogError("User has not consented to supported protocol rules. This node will NOT enforce them. Warning every hour.");
-            g_local_services = ServiceFlags(g_local_services & ~NODE_REDUCED_DATA);
-            scheduler.scheduleEvery([]{
-                LogError("RDTS is not enabled. This node is therefore vulnerable to displaying fake or fraudulent transactions.\n");
-                LogError("For more information, see: %s\n", "https://bitcoinknots.org/learn/2026-rdts");
-                LogError("To enable RDTS enforcement and disable this warning, add to %s: %s\n",
-                    gArgs.GetPathArg("-conf", BITCOIN_CONF_FILENAME).utf8string(),
-                    CONSENSUSRULES_CONFIG_NAME + "=" + CONSENSUSRULES_REQUIRED);
-            }, std::chrono::hours{1});
-        } else {
-            LogError("User has not consented to supported protocol rules. This node will STILL enforce them. Warning every hour.");
-            g_rdts_warning = true;
-            scheduler.scheduleEvery([]{
-                LogError("This software applies the BIP110/RDTS network upgrade, which fixes critical vulnerabilities, but explicit user confirmation has not been configured.\n");
-                LogError("For more information, see: %s\n", "https://bitcoinknots.org/learn/2026-rdts");
-                LogError("To confirm this upgrade and dismiss this warning, add to your %s file: %s\n",
-                    gArgs.GetPathArg("-conf", BITCOIN_CONF_FILENAME).utf8string(),
-                    CONSENSUSRULES_CONFIG_NAME + "=" + CONSENSUSRULES_REQUIRED);
-            }, std::chrono::hours{1});
-        }
     }
 
     if (interfaces::Ipc* ipc = node.init->ipc()) {

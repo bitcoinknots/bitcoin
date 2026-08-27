@@ -9,10 +9,8 @@
 
 #include <arith_uint256.h>
 #include <chain.h>
-#include <chainparamsbase.h>
 #include <checkqueue.h>
 #include <clientversion.h>
-#include <common/args.h>
 #include <consensus/amount.h>
 #include <consensus/consensus.h>
 #include <consensus/merkle.h>
@@ -6794,31 +6792,6 @@ ChainstateManager::ChainstateManager(const util::SignalInterrupt& interrupt, Opt
       m_blockman{interrupt, std::move(blockman_options)},
       m_validation_cache{m_options.script_execution_cache_bytes, m_options.signature_cache_bytes}
 {
-    if (GetParams().IsTestChain()
-        ? (!g_enable_rdts)
-        : GetConsensus().vDeployments[Consensus::DEPLOYMENT_REDUCED_DATA].nStartTime == Consensus::BIP9Deployment::NEVER_ACTIVE) {
-        m_options.notifications.warningSet(kernel::Warning::RULES_NOT_CONSENTED,
-            strprintf(_("Warning: RDTS is not enabled. This node is therefore vulnerable to displaying fake or fraudulent transactions. To enable RDTS enforcement and disable this warning, add %s to your %s file."),
-                CONSENSUSRULES_CONFIG_NAME + "=" + CONSENSUSRULES_REQUIRED,
-#ifdef BUILDING_FOR_LIBBITCOINKERNEL
-                "bitcoin.conf"
-#else
-                gArgs.GetPathArg("-conf", BITCOIN_CONF_FILENAME).utf8string()
-#endif
-            )
-        );
-    } else if (g_rdts_warning) {
-        m_options.notifications.warningSet(kernel::Warning::RULES_NOT_CONSENTED,
-            strprintf(_("Warning: This software applies the BIP110/RDTS network upgrade, but explicit confirmation has not been configured. To confirm this upgrade and dismiss this warning, add %s to your %s file."),
-                CONSENSUSRULES_CONFIG_NAME + "=" + CONSENSUSRULES_REQUIRED,
-#ifdef BUILDING_FOR_LIBBITCOINKERNEL
-                "bitcoin.conf"
-#else
-                gArgs.GetPathArg("-conf", BITCOIN_CONF_FILENAME).utf8string()
-#endif
-            )
-        );
-    }
 }
 
 ChainstateManager::~ChainstateManager()
