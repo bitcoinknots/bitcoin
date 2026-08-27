@@ -2,11 +2,14 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <common/args.h>
+#include <common/sighash_rules.h>
 #include <common/system.h>
 #include <consensus/validation.h>
 #include <interfaces/chain.h>
 #include <node/types.h>
 #include <policy/fees.h>
+#include <chainparams.h>
 #include <policy/policy.h>
 #include <util/moneystr.h>
 #include <util/rbf.h>
@@ -372,7 +375,11 @@ Result CommitTransaction(CWallet& wallet, const uint256& txid, CMutableTransacti
     mapValue_t mapValue = oldWtx.mapValue;
     mapValue["replaces_txid"] = oldWtx.GetHash().ToString();
 
-    wallet.CommitTransaction(tx, std::move(mapValue), oldWtx.vOrderForm);
+    bilingual_str broadcast_err;
+    wallet.CommitTransaction(tx, std::move(mapValue), oldWtx.vOrderForm, &broadcast_err);
+    // bumpfee already reports this vector, so a replacement the node would not
+    // take is said out loud rather than left to the debug log.
+    if (!broadcast_err.empty()) errors.push_back(broadcast_err);
 
     // mark the original tx as bumped
     bumped_txid = tx->GetHash();

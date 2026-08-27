@@ -136,6 +136,7 @@ target_json_data_sources(test_bitcoin
   data/key_io_invalid.json
   data/key_io_valid.json
   data/script_tests.json
+  data/unified_sighash.json
   data/sighash.json
   data/tx_invalid.json
   data/tx_valid.json

@@ -9,6 +9,7 @@
 
 #include <blockfilter.h>
 #include <chain.h>
+#include <common/sighash_rules.h>
 #include <chainparams.h>
 #include <chainparamsbase.h>
 #include <clientversion.h>
@@ -615,7 +616,7 @@ static RPCHelpMan sweepprivkeys()
     // Parse options
     std::set<CScript> needles;
     wallet::CCoinControl coin_control;
-    FillableSigningProvider temp_keystore;
+    FlatSigningProvider temp_keystore;
     CMutableTransaction tx;
     std::string label;
     CAmount total_in = 0;
@@ -631,7 +632,8 @@ static RPCHelpMan sweepprivkeys()
                 CPubKey pubkey = key.GetPubKey();
                 CHECK_NONFATAL(key.VerifyPubKey(pubkey));
 
-                temp_keystore.AddKey(key);
+                temp_keystore.keys[pubkey.GetID()] = key;
+                temp_keystore.pubkeys[pubkey.GetID()] = pubkey;
                 CKeyID address = pubkey.GetID();
                 CScript script = GetScriptForDestination(PKHash(address));
                 if (!script.empty()) {
@@ -640,6 +642,25 @@ static RPCHelpMan sweepprivkeys()
                 script = GetScriptForRawPubKey(pubkey);
                 if (!script.empty()) {
                     needles.insert(script);
+                }
+                if (pubkey.IsCompressed()) {
+                    CScript p2wpkh_script = GetScriptForDestination(WitnessV0KeyHash(pubkey));
+                    if (!p2wpkh_script.empty()) {
+                        needles.insert(p2wpkh_script);
+                    }
+                    script = GetScriptForDestination(ScriptHash(p2wpkh_script));
+                    if (!script.empty()) {
+                        needles.insert(script);
+                        temp_keystore.scripts[CScriptID(p2wpkh_script)] = p2wpkh_script;
+                    }
+                    auto tap_tweak = XOnlyPubKey(pubkey).CreateTapTweak(nullptr);
+                    if (tap_tweak) {
+                        WitnessV1Taproot output_key{tap_tweak->first};
+                        needles.insert(GetScriptForDestination(output_key));
+                        TaprootBuilder builder;
+                        builder.Finalize(XOnlyPubKey(pubkey));
+                        temp_keystore.tr_trees[output_key] = builder;
+                    }
                 }
             }
         } else if (optname == "label") {
@@ -710,10 +731,15 @@ static RPCHelpMan sweepprivkeys()
         if (IsDust(tx.vout[0], pwallet->chain().relayDustFee())) {
             throw JSONRPCError(RPC_VERIFY_REJECTED, "Swept value would be dust");
         }
+        PrecomputedTransactionData txdata;
+        txdata.Init(tx, std::vector<CTxOut>(input_txos.begin(), input_txos.end()), true);
         for (size_t input_index = 0; input_index < tx.vin.size(); ++input_index) {
             const auto& utxo = input_txos[input_index];
             SignatureData sig_data;
-            MutableTransactionSignatureCreator creator(tx, input_index, utxo.nValue, SIGHASH_ALL);
+            MutableTransactionSignatureCreator creator(tx, input_index, utxo.nValue, &txdata, SIGHASH_ALL);
+            // A swept key is the case replay protection matters most for: it is
+            // the one most likely already known to someone else.
+            creator.SetSighashRules(SighashRulesForSigning());
             if (!ProduceSignature(temp_keystore, creator, utxo.scriptPubKey, sig_data)) {
                 throw JSONRPCError(RPC_MISC_ERROR, "Failed to sign");
             }
@@ -1891,6 +1917,10 @@ RPCHelpMan getdeploymentinfo()
                 {RPCResult::Type::OBJ_DYN, "deployments", "", {
                     {RPCResult::Type::OBJ, "xxxx", "name of the deployment", RPCHelpForDeployment}
                 }},
+                {RPCResult::Type::OBJ, "blake2b", /*optional=*/true, "hardfork schedule, present only when one is configured", {
+                    {RPCResult::Type::NUM, "height", "the height the hardfork activates at"},
+                    {RPCResult::Type::BOOL, "active", "whether the hardfork rules apply to the block after this one"},
+                }},
             }
         },
         RPCExamples{ HelpExampleCli("getdeploymentinfo", "") + HelpExampleRpc("getdeploymentinfo", "") },
@@ -1915,6 +1945,23 @@ RPCHelpMan getdeploymentinfo()
             deploymentinfo.pushKV("hash", blockindex->GetBlockHash().ToString());
             deploymentinfo.pushKV("height", blockindex->nHeight);
             deploymentinfo.pushKV("deployments", DeploymentInfo(blockindex, chainman));
+
+            // Reported at the top level rather than among the deployments so
+            // an operator can see whether the fork is scheduled and whether it
+            // has taken effect, instead of inferring that from rejected
+            // transactions. Every rule the fork carries activates together, at
+            // the deployment the proof-of-work change uses.
+            const Consensus::Params& consensus{chainman.GetConsensus()};
+            if (consensus.Blake2bHeight != std::numeric_limits<int>::max()) {
+                UniValue hf(UniValue::VOBJ);
+                hf.pushKV("height", consensus.Blake2bHeight);
+                // The block after this one is built on it, so ask whether the
+                // deployment is active after it. Delegated rather than
+                // open-coded so this cannot drift from consensus.
+                hf.pushKV("active", DeploymentActiveAfter(blockindex, chainman,
+                                                          Consensus::DEPLOYMENT_BLAKE2B));
+                deploymentinfo.pushKV("blake2b", std::move(hf));
+            }
             return deploymentinfo;
         },
     };

@@ -3,6 +3,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <common/args.h>
+#include <common/sighash_rules.h>
 #include <base58.h>
 #include <chain.h>
 #include <coins.h>
@@ -18,6 +20,7 @@
 #include <node/transaction.h>
 #include <node/types.h>
 #include <policy/packages.h>
+#include <chainparams.h>
 #include <policy/policy.h>
 #include <policy/rbf.h>
 #include <primitives/transaction.h>
@@ -178,6 +181,8 @@ PartiallySignedTransaction ProcessPSBT(const std::string& psbt_string, const std
     if (!DecodeBase64PSBT(psbtx, psbt_string, error)) {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, strprintf("TX decode failed %s", error));
     }
+
+    // Signing opts in wherever the fork is scheduled.
 
     if (g_txindex) g_txindex->BlockUntilSyncedToCurrentChain();
     const NodeContext& node = EnsureAnyNodeContext(context);
@@ -706,6 +711,24 @@ static RPCHelpMan combinerawtransaction()
     // Use CTransaction for the constant parts of the
     // transaction to avoid rehashing.
     const CTransaction txConst(mergedTx);
+
+    // Recognizing an opt-in signature needs the rules it was made under and the
+    // spent outputs it commits to, or signatures already present in the inputs
+    // being merged are invisible and the result silently loses them.
+    PrecomputedTransactionData txdata;
+    {
+        std::vector<CTxOut> spent_outputs;
+        spent_outputs.reserve(mergedTx.vin.size());
+        for (const CTxIn& txin : mergedTx.vin) {
+            const Coin& coin = view.AccessCoin(txin.prevout);
+            if (coin.IsSpent()) break;
+            spent_outputs.emplace_back(coin.out);
+        }
+        if (spent_outputs.size() == mergedTx.vin.size()) {
+            txdata.Init(txConst, std::move(spent_outputs), /*force=*/true);
+        }
+    }
+
     // Sign what we can:
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn& txin = mergedTx.vin[i];
@@ -718,7 +741,22 @@ static RPCHelpMan combinerawtransaction()
         // ... and merge in other signatures:
         for (const CMutableTransaction& txv : txVariants) {
             if (txv.vin.size() > i) {
-                sigdata.MergeSignatureData(DataFromTransaction(txv, i, coin.out));
+                // The precomputed data covers the prevouts, the sequences and
+                // the outputs, so a variant agreeing on those is described by it
+                // whatever its scriptSigs hold. Comparing txids instead would
+                // exclude every legacy multisig variant, because a partial
+                // signature lives in the scriptSig and so changes the txid.
+                const bool shares_aggregates{[&] {
+                    if (txv.vin.size() != txConst.vin.size()) return false;
+                    if (txv.vout != txConst.vout) return false;
+                    for (size_t k = 0; k < txv.vin.size(); ++k) {
+                        if (txv.vin[k].prevout != txConst.vin[k].prevout) return false;
+                        if (txv.vin[k].nSequence != txConst.vin[k].nSequence) return false;
+                    }
+                    return true;
+                }()};
+                sigdata.MergeSignatureData(DataFromTransaction(txv, i, coin.out,
+                                                              shares_aggregates ? &txdata : nullptr));
             }
         }
         ProduceSignature(DUMMY_SIGNING_PROVIDER, MutableTransactionSignatureCreator(mergedTx, i, coin.out.nValue, 1), coin.out.scriptPubKey, sigdata);
@@ -768,6 +806,7 @@ static RPCHelpMan signrawtransactionwithkey()
             "       \"ALL|ANYONECANPAY\"\n"
             "       \"NONE|ANYONECANPAY\"\n"
             "       \"SINGLE|ANYONECANPAY\"\n"
+            "       Append \"|UNIFIED\" for the unified signature hash\n"
                     },
                 },
                 RPCResult{
@@ -832,6 +871,7 @@ static RPCHelpMan signrawtransactionwithkey()
     ParsePrevouts(request.params[2], &keystore, coins);
 
     UniValue result(UniValue::VOBJ);
+    // Signing opts in wherever the fork is scheduled.
     SignTransaction(mtx, &keystore, coins, request.params[3], result);
     return result;
 },
@@ -1555,6 +1595,9 @@ static RPCHelpMan finalizepsbt()
     bool extract = request.params[1].isNull() || (!request.params[1].isNull() && request.params[1].get_bool());
 
     CMutableTransaction mtx;
+    // Read under the same rules the signatures were made with, or a complete
+    // transaction is reported incomplete because its opted-in signatures are not
+    // recognized as signatures at all.
     bool complete = FinalizeAndExtractPSBT(psbtx, mtx);
 
     UniValue result(UniValue::VOBJ);
@@ -1974,7 +2017,8 @@ RPCHelpMan descriptorprocesspsbt()
             "       \"SINGLE\"\n"
             "       \"ALL|ANYONECANPAY\"\n"
             "       \"NONE|ANYONECANPAY\"\n"
-                    "       \"SINGLE|ANYONECANPAY\"",
+                    "       \"SINGLE|ANYONECANPAY\"\n"
+                    "       Append \"|UNIFIED\" for the unified signature hash",
                                 RPCArgOptions{.also_positional = true}},
                             {"bip32derivs", RPCArg::Type::BOOL, RPCArg::Default{true}, "Include BIP 32 derivation paths for public keys if we know them", RPCArgOptions{.also_positional = true}},
                             {"finalize", RPCArg::Type::BOOL, RPCArg::Default{true}, "Also finalize inputs if possible", RPCArgOptions{.also_positional = true}},
@@ -2071,6 +2115,8 @@ RPCHelpMan descriptorprocesspsbt()
     if (complete) {
         CMutableTransaction mtx;
         PartiallySignedTransaction psbtx_copy = psbtx;
+        // Finalization re-verifies the signatures, so it needs the same rules
+        // they were produced under.
         CHECK_NONFATAL(FinalizeAndExtractPSBT(psbtx_copy, mtx));
         DataStream ssTx_final;
         ssTx_final << TX_WITH_WITNESS(mtx);

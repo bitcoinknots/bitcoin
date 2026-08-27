@@ -664,6 +664,7 @@ public:
     OutputType TransactionChangeType(const std::optional<OutputType>& change_type, const std::vector<CRecipient>& vecSend) const;
 
     /** Fetch the inputs and sign with SIGHASH_ALL. */
+
     bool SignTransaction(CMutableTransaction& tx) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     /** Sign the tx given the input coins and sighash. */
     bool SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum = nullptr) const;
@@ -690,7 +691,8 @@ public:
                   bool sign = true,
                   bool bip32derivs = true,
                   size_t* n_signed = nullptr,
-                  bool finalize = true) const;
+                  bool finalize = true,
+                  std::vector<bilingual_str>* warnings = nullptr) const;
 
     /**
      * Submit the transaction to the node's mempool and then relay to peers.
@@ -701,7 +703,13 @@ public:
      * @param[in] mapValue key-values to be set on the transaction.
      * @param[in] orderForm BIP 70 / BIP 21 order form details to be set on the transaction.
      */
-    void CommitTransaction(CTransactionRef tx, mapValue_t mapValue, std::vector<std::pair<std::string, std::string>> orderForm);
+    /** Adds a transaction to the wallet and broadcasts it.
+     *
+     * The transaction is kept and retried later when it cannot be broadcast now,
+     * so `broadcast_err` is how a caller learns that happened. Without it the
+     * only trace is the debug log, and an RPC reports a send that did not leave
+     * the node as though it had. */
+    void CommitTransaction(CTransactionRef tx, mapValue_t mapValue, std::vector<std::pair<std::string, std::string>> orderForm, bilingual_str* broadcast_err = nullptr);
 
     /** Pass this transaction to node for mempool insertion and relay to peers if flag set to true */
     bool SubmitTxMemoryPoolAndRelay(CWalletTx& wtx, std::string& err_string, bool relay) const

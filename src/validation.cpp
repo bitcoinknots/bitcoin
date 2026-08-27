@@ -268,6 +268,26 @@ bool CheckSequenceLocksAtTip(CBlockIndex* tip,
 // Returns the script flags which should be checked for a given block
 static unsigned int GetBlockScriptFlags(const CBlockIndex& block_index, const ChainstateManager& chainman);
 
+/** Whether the hardfork rules will apply to a block built on `pindexPrev`.
+ *
+ * A height is known before the block exists, so a caller can reach the same
+ * answer consensus will. */
+/** The hardfork script flag the mempool verifies under.
+ *
+ * Not keyed to the height. An opted-in signature is the same signature at every
+ * height, and refusing it below the activation one only stops a node whose
+ * blocks lag from relaying what the chain it is catching up to already accepts.
+ * Consensus still decides whether a block may carry one, which is where the
+ * height belongs.
+ *
+ * Where the fork is not scheduled there is nothing to accept, so the flag stays
+ * off and the byte keeps the meaning it has always had on that chain. */
+static unsigned int UnifiedSighashMempoolFlag(const ChainstateManager& chainman)
+{
+    return DeploymentEnabled(chainman, Consensus::DEPLOYMENT_BLAKE2B)
+               ? uint32_t{SCRIPT_VERIFY_UNIFIED_SIGHASH} : uint32_t{0};
+}
+
 /** Compute accurate total signature operation cost of a transaction.
  *  Not consensus-critical, since legacy sigops counting is always used in the protocol.
  */
@@ -1509,7 +1529,11 @@ bool MemPoolAccept::PolicyScriptChecks(const ATMPArgs& args, Workspace& ws)
     const CTransaction& tx = *ws.m_ptx;
     TxValidationState& state = ws.m_state;
 
-    const unsigned int scriptVerifyFlags = PolicyScriptVerifyFlags(args.m_ignore_rejects);
+    // ConsensusScriptChecks shares ws.m_precomputed_txdata with this call, and
+    // what that precomputes depends on SCRIPT_VERIFY_UNIFIED_SIGHASH, so both take
+    // that flag from the same place.
+    const unsigned int scriptVerifyFlags = PolicyScriptVerifyFlags(args.m_ignore_rejects) |
+        UnifiedSighashMempoolFlag(m_active_chainstate.m_chainman);
 
     // Check input scripts and signatures.
     // This is done last to help prevent CPU exhaustion denial-of-service attacks.
@@ -1548,7 +1572,13 @@ bool MemPoolAccept::ConsensusScriptChecks(const ATMPArgs& args, Workspace& ws)
     // There is a similar check in CreateNewBlock() to prevent creating
     // invalid blocks (using TestBlockValidity), however allowing such
     // transactions into the mempool can be exploited as a DoS attack.
-    unsigned int currentBlockScriptVerifyFlags{GetBlockScriptFlags(*m_active_chainstate.m_chain.Tip(), m_active_chainstate.m_chainman)};
+    // GetBlockScriptFlags answers whether the fork applied to the tip. That is
+    // the consensus question and the wrong one here, since the next block is one
+    // higher and may be the one that activates. Drop that bit and take the next
+    // block's rules instead, matching PolicyScriptChecks so the two agree and
+    // the shared precomputed data is built once.
+    unsigned int currentBlockScriptVerifyFlags{GetBlockScriptFlags(*m_active_chainstate.m_chain.Tip(), m_active_chainstate.m_chainman) & ~uint32_t{SCRIPT_VERIFY_UNIFIED_SIGHASH}};
+    currentBlockScriptVerifyFlags |= UnifiedSighashMempoolFlag(m_active_chainstate.m_chainman);
     if (!CheckInputsFromMempoolAndCache(tx, state, m_view, m_pool, currentBlockScriptVerifyFlags,
                                         ws.m_precomputed_txdata, m_active_chainstate.CoinsTip(), GetValidationCache())) {
         LogError("BUG! PLEASE REPORT THIS! CheckInputScripts failed against latest-block but not STANDARD flags %s, %s", hash.ToString(), state.ToString());
@@ -2475,7 +2505,10 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
             assert(!coin.IsSpent());
             spent_outputs.emplace_back(coin.out);
         }
-        txdata.Init(tx, std::move(spent_outputs));
+        // The hardfork sighash needs the BIP341 commitments for every input,
+        // including on transactions carrying no witness at all, so force the
+        // precomputation rather than inferring it from the inputs.
+        txdata.Init(tx, std::move(spent_outputs), /*force=*/!!(flags & SCRIPT_VERIFY_UNIFIED_SIGHASH));
     }
     assert(txdata.m_spent_outputs.size() == tx.vin.size());
     assert(flags_per_input.empty() || flags_per_input.size() == tx.vin.size());
@@ -2693,6 +2726,10 @@ static unsigned int GetBlockScriptFlags(const CBlockIndex& block_index, const Ch
     // Enforce BIP147 NULLDUMMY (activated simultaneously with segwit)
     if (DeploymentActiveAt(block_index, chainman, Consensus::DEPLOYMENT_SEGWIT)) {
         flags |= SCRIPT_VERIFY_NULLDUMMY;
+    }
+
+    if (DeploymentActiveAt(block_index, chainman, Consensus::DEPLOYMENT_BLAKE2B)) {
+        flags |= SCRIPT_VERIFY_UNIFIED_SIGHASH;
     }
 
     if (DeploymentActiveAt(block_index, chainman, Consensus::DEPLOYMENT_REDUCED_DATA)) {
