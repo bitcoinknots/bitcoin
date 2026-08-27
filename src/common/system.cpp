@@ -13,17 +13,23 @@
 
 #ifndef WIN32
 #include <sys/stat.h>
+#include <unistd.h>
 #else
 #include <compat/compat.h>
 #include <codecvt>
+#include <windows.h>
 #endif
 
 #ifdef HAVE_MALLOPT_ARENA_MAX
 #include <malloc.h>
 #endif
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <locale>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <thread>

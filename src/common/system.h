@@ -9,7 +9,6 @@
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 #include <util/time.h>
 
-#include <chrono>
 #include <cstdint>
 #include <string>
 

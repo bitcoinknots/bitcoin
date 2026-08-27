@@ -2947,8 +2947,8 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
     // in multiple threads). Preallocate the vector size so a new allocation
     // doesn't invalidate pointers into the vector, and keep txsdata in scope
     // for as long as `control`.
-    CCheckQueueControl<CScriptCheck> control(fScriptChecks && parallel_script_checks ? &m_chainman.GetCheckQueue() : nullptr);
     std::vector<PrecomputedTransactionData> txsdata(block.vtx.size());
+    CCheckQueueControl<CScriptCheck> control(fScriptChecks && parallel_script_checks ? &m_chainman.GetCheckQueue() : nullptr);
 
     // For BIP9 deployments, get the activation height dynamically. When RDTS is
     // inactive the start height is 0, so no input is treated as pre-activation and
@@ -4953,8 +4953,8 @@ bool ChainstateManager::ProcessNewBlockHeaders(std::span<const CBlockHeader> hea
             const CBlockIndex& last_accepted{**ppindex};
             int64_t blocks_left{(NodeClock::now() - last_accepted.Time()) / GetConsensus().PowTargetSpacing()};
             blocks_left = std::max<int64_t>(0, blocks_left);
-            const double progress{100.0 * last_accepted.nHeight / (last_accepted.nHeight + blocks_left)};
-            LogInfo("Synchronizing blockheaders, height: %d (~%.2f%%)\n", last_accepted.nHeight, progress);
+            const int progress = last_accepted.nHeight ? static_cast<int>(1000LL * last_accepted.nHeight / (last_accepted.nHeight + blocks_left)) : 0;
+            LogInfo("Synchronizing blockheaders, height: %d (~%d.%d%%)\n", last_accepted.nHeight, progress / 10, progress % 10);
         }
     }
     return true;
@@ -4980,8 +4980,8 @@ void ChainstateManager::ReportHeadersPresync(const arith_uint256& work, int64_t 
     if (initial_download) {
         int64_t blocks_left{(NodeClock::now() - NodeSeconds{std::chrono::seconds{timestamp}}) / GetConsensus().PowTargetSpacing()};
         blocks_left = std::max<int64_t>(0, blocks_left);
-        const double progress{100.0 * height / (height + blocks_left)};
-        LogInfo("Pre-synchronizing blockheaders, height: %d (~%.2f%%)\n", height, progress);
+        const int progress = height ? static_cast<int>(1000LL * height / (height + blocks_left)) : 0;
+        LogInfo("Pre-synchronizing blockheaders, height: %d (~%d.%d%%)\n", height, progress / 10, progress % 10);
     }
 }
 
@@ -5224,9 +5224,9 @@ bool Chainstate::LoadChainTip()
     auto target = tip;
     while (target) {
         const bool is_candidate{setBlockIndexCandidates.contains(target)};
-        if (is_candidate) setBlockIndexCandidates.erase(tip);
+        if (is_candidate) setBlockIndexCandidates.erase(target);
         target->nSequenceId = SEQ_ID_BEST_CHAIN_FROM_DISK;
-        if (is_candidate) setBlockIndexCandidates.insert(tip);
+        if (is_candidate) setBlockIndexCandidates.insert(target);
         target = target->pprev;
     }
     PruneBlockIndexCandidates();
@@ -5511,6 +5511,128 @@ bool Chainstate::NeedsRedownload() const
     }
 
     return false;
+}
+
+std::vector<CBlockIndex*> Chainstate::FindRdtsSignalingViolations() const
+{
+    AssertLockHeld(cs_main);
+
+    std::vector<CBlockIndex*> violators;
+
+    const Consensus::Params& params{m_chainman.GetConsensus()};
+    // RDTS is the only Knots deployment that sets a mandatory-signaling
+    // deadline; this is deliberately scoped to it. A future deployment with
+    // max_activation_height set would need its own handling.
+    const Consensus::DeploymentPos dep{Consensus::DEPLOYMENT_REDUCED_DATA};
+    const auto& deployment{params.vDeployments[dep]};
+
+    // Only a configured mandatory-signaling deadline can be violated. A
+    // non-enforcing node leaves max_activation_height at its INT_MAX default,
+    // so it is naturally excluded here.
+    if (deployment.max_activation_height >= std::numeric_limits<int>::max()) return violators;
+
+    // A block must signal only within [max_activation_height - 2P, max_activation_height - P).
+    const int period{static_cast<int>(params.nMinerConfirmationWindow)};
+    const int window_begin{deployment.max_activation_height - (2 * period)};
+    const int window_end{deployment.max_activation_height - period};
+
+    // One pass over the whole block index (not just the active chain, so a
+    // violator on a side branch is corrected too). The cheap height comparison
+    // gates the more expensive versionbits State() lookup. Within the window a
+    // block was required to signal iff the deployment is STARTED for its branch,
+    // the same condition ConnectBlock/ContextualCheckBlockHeaderVolatile applies.
+    // The verdict is re-derived from the stored header, so it does not change as
+    // other blocks are invalidated and one scan suffices.
+    for (auto& [_, index] : m_blockman.m_block_index) {
+        if (index.nStatus & BLOCK_FAILED_MASK) continue;             // already handled
+        if (index.nHeight < window_begin || index.nHeight >= window_end) continue;
+        if (m_chainman.m_versionbitscache.State(index.pprev, params, dep) != ThresholdState::STARTED) continue;
+        const bool signals_top{(index.nVersion & VERSIONBITS_TOP_MASK) == VERSIONBITS_TOP_BITS};
+        const bool signals_bit{(index.nVersion & (uint32_t{1} << deployment.bit)) != 0};
+        if (signals_top && signals_bit) continue;                    // signaled correctly
+        violators.push_back(&index);
+    }
+
+    return violators;
+}
+
+bool Chainstate::CorrectRdtsInvalidBlocks(bilingual_str& error)
+{
+    AssertLockNotHeld(m_chainstate_mutex);
+    AssertLockNotHeld(::cs_main);
+
+    std::vector<CBlockIndex*> violators;
+    {
+        LOCK(cs_main);
+        violators = FindRdtsSignalingViolations();
+    }
+
+    // Invalidate lowest height first: doing so also fails a violator's descendants,
+    // so a higher violator on the same branch is skipped below. This calls
+    // InvalidateBlock only for the topmost violator of each branch, off the single
+    // scan above. Marks persist to the block index, so this is a no-op on every
+    // subsequent startup.
+    std::sort(violators.begin(), violators.end(),
+              [](const CBlockIndex* a, const CBlockIndex* b) { return a->nHeight < b->nHeight; });
+
+    bool invalidated{false};
+    for (CBlockIndex* target : violators) {
+        // m_interrupt here is the shutdown signal, so an interrupt means shutdown:
+        // return success and let the caller's shutdown check exit; any uncorrected
+        // violators are re-scanned on the next start.
+        if (m_chainman.m_interrupt) return true;
+
+        bool needs_reindex{false};
+        {
+            LOCK(cs_main);
+            if (target->nStatus & BLOCK_FAILED_MASK) continue;  // already failed as a descendant
+            // Correcting an active-chain violator disconnects every block from the
+            // tip down to and including it. If any of those has been pruned we
+            // cannot rewind, and a partial rewind would strand good blocks that can
+            // be neither reconnected nor re-downloaded. Refuse to start instead, as
+            // BIP148 did for the analogous case. (Pruning drops a block's data and
+            // undo together, so IsBlockPruned covers both.) Only the active-chain
+            // disconnect needs local data; the reconnect side is safe because
+            // FindMostWorkChain skips candidate chains with missing data.
+            if (m_chain.Contains(target)) {
+                for (const CBlockIndex* b{m_chain.Tip()}; b != target->pprev; b = b->pprev) {
+                    if (m_blockman.IsBlockPruned(*b)) {
+                        needs_reindex = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (needs_reindex) {
+            LogError("RDTS: cannot correct inherited invalid block %s at height %d: required block "
+                     "data has been pruned\n", target->GetBlockHash().ToString(), target->nHeight);
+            error = _("A block that violates the BIP110/RDTS mandatory-signaling rule was inherited from a client that was not enforcing it, and correcting it needs block data that has been pruned");
+            return false;
+        }
+
+        LogPrintf("RDTS: block %s at height %d violates mandatory signaling and was "
+                  "inherited from a non-enforcing client; marking it invalid\n",
+                  target->GetBlockHash().ToString(), target->nHeight);
+
+        BlockValidationState state;
+        if (!InvalidateBlock(state, target) || !state.IsValid()) {
+            LogError("RDTS: failed to invalidate %s: %s\n", target->GetBlockHash().ToString(), state.ToString());
+            error = _("Failed to correct a block that violates the BIP110/RDTS mandatory-signaling rule");
+            return false;
+        }
+        invalidated = true;
+    }
+
+    // Reconnect to the best remaining valid chain once, after all invalidations.
+    if (invalidated) {
+        BlockValidationState state;
+        if (!ActivateBestChain(state) || !state.IsValid()) {
+            LogError("RDTS: failed to activate best chain after correction: %s\n", state.ToString());
+            error = _("Failed to correct a block that violates the BIP110/RDTS mandatory-signaling rule");
+            return false;
+        }
+    }
+    return true;
 }
 
 void Chainstate::ClearBlockIndexCandidates()

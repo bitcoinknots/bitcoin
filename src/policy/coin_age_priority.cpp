@@ -105,14 +105,18 @@ void CTxMemPool::UpdateDependentPriorities(const CTransaction &tx, unsigned int 
 double
 CTxMemPoolEntry::GetPriority(unsigned int currentHeight) const
 {
-    // This will only return accurate results when currentHeight >= the heights
-    // at which all the in-chain inputs of the tx were included in blocks.
-    // Typical usage of GetPriority with chainActive.Height() will ensure this.
-    int heightDiff = currentHeight - cachedHeight;
+    // This will only return accurate results when the difference between
+    // cachedHeight and currentHeight does not cross any blocks where the
+    // inputs of the tx are included.
+    // Typical usage of GetPriority with chainActive.Height() will ensure this,
+    // but it's possible that a reorg leaves unaffected mempool entries with a
+    // higher cachedHeight if and only if the below math is safe.
+    int heightDiff = int(currentHeight) - int(cachedHeight);
     double deltaPriority = ((double)heightDiff*inChainInputValue)/nModSize;
     double dResult = cachedPriority + deltaPriority;
-    if (dResult < 0) // This should only happen if it was called with an invalid height
+    if (dResult < 0) {  // Small floating point rounding can potentially add up
         dResult = 0;
+    }
     return dResult;
 }
 

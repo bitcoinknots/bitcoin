@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -567,7 +568,7 @@ std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsV
     for (const CTxIn& txin : tx.vin) {
         const CTxOut &utxo = view.AccessCoin(txin.prevout).out;
         auto[script, consensus_weight_per_byte] = GetScriptForTransactionInput(utxo.scriptPubKey, txin);
-        const auto dcb = script.DatacarrierBytes(0);
+        const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness);
         ret.first += dcb.first;
         ret.second += dcb.second;
     }
@@ -583,7 +584,7 @@ std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsV
 
 int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte)
 {
-    int32_t mod_weight{0};
+    int64_t mod_weight{0};
 
     // Add in any extra weight for data bytes
     if (weight_per_data_byte > 1) {
@@ -591,18 +592,18 @@ int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& vi
             const CTxOut &utxo = view.AccessCoin(txin.prevout).out;
             auto[script, consensus_weight_per_byte] = GetScriptForTransactionInput(utxo.scriptPubKey, txin);
             if (weight_per_data_byte > consensus_weight_per_byte) {
-                const auto dcb = script.DatacarrierBytes(0);
-                mod_weight += (dcb.first + dcb.second) * (weight_per_data_byte - consensus_weight_per_byte);
+                const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness);
+                mod_weight += int64_t(dcb.first + dcb.second) * (weight_per_data_byte - consensus_weight_per_byte);
             }
         }
         if (weight_per_data_byte > WITNESS_SCALE_FACTOR) {
             for (size_t i{tx.vout.size()}; i; ) {
                 const CTxOut& txout = tx.vout[--i];
                 const auto dcb = txout.scriptPubKey.DatacarrierBytes(tx.vout.size() - i);
-                mod_weight += (dcb.first + dcb.second) * (weight_per_data_byte - WITNESS_SCALE_FACTOR);
+                mod_weight += int64_t(dcb.first + dcb.second) * (weight_per_data_byte - WITNESS_SCALE_FACTOR);
             }
         }
     }
 
-    return mod_weight;
+    return int32_t(std::min(mod_weight, int64_t{std::numeric_limits<int32_t>::max()}));
 }

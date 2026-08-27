@@ -29,6 +29,8 @@
 #include <sys/sysctl.h>
 #endif
 
+#include <type_traits>
+
 namespace {
 
 // Linux and FreeBSD 14.0+. For FreeBSD 13.2 the code can be compiled but
@@ -93,11 +95,8 @@ std::optional<CNetAddr> QueryDefaultGatewayImpl(sa_family_t family)
         return std::nullopt;
     }
 
-#if defined(__FreeBSD_version) && __FreeBSD_version >= 1500029
-    using recv_result_t = size_t;
-#else
-    using recv_result_t = int64_t;
-#endif
+    using recv_result_t = std::conditional_t<std::is_signed_v<decltype(NLMSG_HDRLEN)>, int64_t, decltype(NLMSG_HDRLEN)>;
+
     for (nlmsghdr* hdr = (nlmsghdr*)response; NLMSG_OK(hdr, static_cast<recv_result_t>(recv_result)); hdr = NLMSG_NEXT(hdr, recv_result)) {
         rtmsg* r = (rtmsg*)NLMSG_DATA(hdr);
         int remaining_len = RTM_PAYLOAD(hdr);

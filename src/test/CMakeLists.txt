@@ -26,6 +26,7 @@ add_executable(test_bitcoin
   blockmanager_tests.cpp
   bloom_tests.cpp
   bswap_tests.cpp
+  caches_tests.cpp
   chainstate_write_tests.cpp
   checkqueue_tests.cpp
   cluster_linearize_tests.cpp
@@ -69,6 +70,7 @@ add_executable(test_bitcoin
   orphanage_tests.cpp
   pcp_tests.cpp
   peerman_tests.cpp
+  psbt_tests.cpp
   pmt_tests.cpp
   policy_fee_tests.cpp
   policyestimator_tests.cpp
@@ -100,6 +102,7 @@ add_executable(test_bitcoin
   span_tests.cpp
   streams_tests.cpp
   sync_tests.cpp
+  system_ram_tests.cpp
   system_tests.cpp
   timeoffsets_tests.cpp
   torcontrol_tests.cpp

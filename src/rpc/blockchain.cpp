@@ -912,7 +912,9 @@ static CBlockUndo GetUndoChecked(BlockManager& blockman, const CBlockIndex& bloc
     return blockUndo;
 }
 
-const RPCResult getblock_vin{
+const RPCResult& GetBlockVin()
+{
+    static const RPCResult getblock_vin{
     RPCResult::Type::ARR, "vin", "",
     {
         {RPCResult::Type::OBJ, "", "",
@@ -935,6 +937,8 @@ const RPCResult getblock_vin{
         }},
     }
 };
+    return getblock_vin;
+}
 
 static RPCHelpMan getblock()
 {
@@ -985,7 +989,7 @@ static RPCHelpMan getblock()
                         {RPCResult::Type::OBJ, "", "",
                         {
                             {RPCResult::Type::ELISION, "", "The transactions in the format of the getrawtransaction RPC. Different from verbosity = 1 \"tx\" result"},
-                            {RPCResult::Type::NUM, "fee", "The transaction fee in " + CURRENCY_UNIT + ", omitted if block undo data is not available"},
+                            {RPCResult::Type::NUM, "fee", /*optional=*/true, "The transaction fee in " + CURRENCY_UNIT + ", omitted if block undo data is not available"},
                         }},
                     }},
                 }},
@@ -997,7 +1001,7 @@ static RPCHelpMan getblock()
                     {
                         {RPCResult::Type::OBJ, "", "",
                         {
-                            getblock_vin,
+                            GetBlockVin(),
                         }},
                     }},
                 }},

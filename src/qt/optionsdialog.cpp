@@ -21,6 +21,7 @@
 #include <interfaces/node.h>
 #include <netbase.h>
 #include <node/caches.h>
+#include <node/dbcache.h>
 #include <node/chainstatemanager_args.h>
 #include <node/mempool_args.h> // for ParseDustDynamicOpt
 #include <outputtype.h>
@@ -248,9 +249,11 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     ui->verticalLayout->setStretchFactor(ui->tabWidget, 1);
 
     /* Main elements init */
-    ui->databaseCache->setRange(MIN_DB_CACHE >> 20, std::numeric_limits<int>::max());
+    ui->databaseCache->setRange(MIN_DBCACHE_BYTES / 1_MiB, std::numeric_limits<int>::max());
     ui->threadsScriptVerif->setMinimum(-GetNumCores());
     ui->threadsScriptVerif->setMaximum(MAX_SCRIPTCHECK_THREADS);
+    ui->threadsWarning->setVisible(false);
+    ui->threadsWarning->setStyleSheet("QLabel { color: red; }");
     ui->pruneWarning->setVisible(false);
     ui->pruneWarning->setStyleSheet("QLabel { color: red; }");
 
@@ -820,6 +823,10 @@ void OptionsDialog::setModel(OptionsModel *_model)
     connect(ui->databaseCache, qOverload<int>(&QSpinBox::valueChanged), this, &OptionsDialog::showRestartWarning);
     connect(ui->externalSignerPath, &QLineEdit::textChanged, [this]{ showRestartWarning(); });
     connect(ui->threadsScriptVerif, qOverload<int>(&QSpinBox::valueChanged), this, &OptionsDialog::showRestartWarning);
+    connect(ui->threadsScriptVerif, qOverload<int>(&QSpinBox::valueChanged), this, [this](int value) {
+        ui->threadsWarning->setVisible(value > GetNumCores());
+    });
+    ui->threadsWarning->setVisible(ui->threadsScriptVerif->value() > GetNumCores());
     /* Wallet */
     connect(ui->spendZeroConfChange, &QCheckBox::clicked, this, &OptionsDialog::showRestartWarning);
     /* Network */

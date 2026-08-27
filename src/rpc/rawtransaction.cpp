@@ -878,7 +878,9 @@ static RPCHelpMan signrawtransactionwithkey()
     };
 }
 
-const RPCResult decodepsbt_inputs{
+const RPCResult& DecodePSBTInputs()
+{
+    static const RPCResult decodepsbt_inputs{
     RPCResult::Type::ARR, "inputs", "",
     {
         {RPCResult::Type::OBJ, "", "",
@@ -1004,8 +1006,12 @@ const RPCResult decodepsbt_inputs{
         }},
     }
 };
+    return decodepsbt_inputs;
+}
 
-const RPCResult decodepsbt_outputs{
+const RPCResult& DecodePSBTOutputs()
+{
+    static const RPCResult decodepsbt_outputs{
     RPCResult::Type::ARR, "outputs", "",
     {
         {RPCResult::Type::OBJ, "", "",
@@ -1071,6 +1077,8 @@ const RPCResult decodepsbt_outputs{
         }},
     }
 };
+    return decodepsbt_outputs;
+}
 
 static RPCHelpMan decodepsbt()
 {
@@ -1111,8 +1119,8 @@ static RPCHelpMan decodepsbt()
                         {
                              {RPCResult::Type::STR_HEX, "key", "(key-value pair) An unknown key-value pair"},
                         }},
-                        decodepsbt_inputs,
-                        decodepsbt_outputs,
+                        DecodePSBTInputs(),
+                        DecodePSBTOutputs(),
                         {RPCResult::Type::STR_AMOUNT, "fee", /*optional=*/true, "The transaction fee paid if all UTXOs slots in the PSBT have been filled."},
                     }
                 },

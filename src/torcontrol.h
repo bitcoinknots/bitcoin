@@ -30,6 +30,9 @@ extern const std::string DEFAULT_TOR_CONTROL;
 extern const std::string DEFAULT_TOR_EXECUTE;
 static const bool DEFAULT_LISTEN_ONION = true;
 
+/** Tor control reply code. Ref: https://spec.torproject.org/control-spec/replies.html */
+constexpr int TOR_REPLY_SYNTAX_ERROR{512}; //!< Syntax error in command argument
+
 void StartTorControl(CService onion_service_target);
 void InterruptTorControl();
 void StopTorControl();
@@ -151,7 +154,7 @@ public:
     /** Callback for GETINFO net/listeners/socks result */
     void get_socks_cb(TorControlConnection& conn, const TorControlReply& reply);
     /** Callback for ADD_ONION result */
-    void add_onion_cb(TorControlConnection& conn, const TorControlReply& reply);
+    void add_onion_cb(TorControlConnection& conn, const TorControlReply& reply, bool pow_was_enabled);
     /** Callback for AUTHENTICATE result */
     void auth_cb(TorControlConnection& conn, const TorControlReply& reply);
     /** Callback for AUTHCHALLENGE result */

@@ -239,7 +239,6 @@ if(BUILD_GUI)
     set(USE_DBUS TRUE)
   endif()
   if(WITH_TASKBAR_PROGRESS)
-    list(APPEND qt_components WinExtras)
     set(BITCOIN_QT_WIN_TASKBAR TRUE)
   endif()
   if(BUILD_GUI_TESTS)
@@ -322,7 +321,10 @@ add_library(external_lib_interface INTERFACE)
 include(TryAppendCXXFlags)
 include(TryAppendLinkerFlag)
 
+# Sanitizers require leaving undefined symbols in the library
+if(NOT SANITIZERS)
 try_append_linker_flag("-Wl,--no-undefined" TARGET external_lib_interface)
+endif()
 
 # Redefine/adjust per-configuration flags.
 target_compile_definitions(core_interface_debug INTERFACE

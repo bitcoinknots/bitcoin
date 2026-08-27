@@ -782,7 +782,8 @@ void BlockManager::CleanupBlockRevFiles() const
 CBlockFileInfo* BlockManager::GetBlockFileInfo(size_t n)
 {
     LOCK(cs_LastBlockFile);
-    if (n > m_blockfile_info.size()-1) return nullptr;
+
+    if (n >= m_blockfile_info.size()) return nullptr;
     return &m_blockfile_info.at(n);
 }
 

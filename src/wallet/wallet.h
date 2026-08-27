@@ -313,7 +313,6 @@ private:
 
     std::atomic<bool> fAbortRescan{false};
     std::atomic<bool> fScanningWallet{false}; // controlled by WalletRescanReserver
-    std::atomic<bool> m_attaching_chain{false};
     std::atomic<bool> m_scanning_with_passphrase{false};
     std::atomic<SteadyClock::time_point> m_scanning_start{SteadyClock::time_point{}};
     std::atomic<double> m_scanning_progress{0};
@@ -381,7 +380,7 @@ private:
 
     void SyncMetaData(std::pair<TxSpends::iterator, TxSpends::iterator>) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
-    void SyncTransaction(const CTransactionRef& tx, const SyncTxState& state, bool update_tx = true, bool rescanning_old_block = false) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    bool SyncTransaction(const CTransactionRef& tx, const SyncTxState& state, bool update_tx = true, bool rescanning_old_block = false) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
     /** WalletFlags set on this wallet. */
     std::atomic<uint64_t> m_wallet_flags{0};
@@ -454,6 +453,9 @@ private:
     static bool AttachChain(const std::shared_ptr<CWallet>& wallet, interfaces::Chain& chain, const bool rescan_required, bilingual_str& error, std::vector<bilingual_str>& warnings);
 
     static NodeClock::time_point GetDefaultNextResend();
+
+    // Update last block processed in memory only
+    void SetLastBlockProcessedInMem(int block_height, uint256 block_hash) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
 public:
     /**
@@ -824,7 +826,6 @@ public:
     /** should probably be renamed to IsRelevantToMe */
     bool IsFromMe(const CTransaction& tx) const;
     CAmount GetDebit(const CTransaction& tx, const isminefilter& filter) const;
-    void chainStateFlushed(ChainstateRole role, const CBlockLocator& loc) override;
 
     enum class do_init_used_flag { Init, Skip };
     DBErrors LoadWallet(const do_init_used_flag do_init_used_flag_val = do_init_used_flag::Init);
@@ -1029,13 +1030,10 @@ public:
         assert(m_last_block_processed_height >= 0);
         return m_last_block_processed;
     }
-    /** Set last block processed height, currently only use in unit test */
-    void SetLastBlockProcessed(int block_height, uint256 block_hash) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet)
-    {
-        AssertLockHeld(cs_wallet);
-        m_last_block_processed_height = block_height;
-        m_last_block_processed = block_hash;
-    };
+    /** Set last block processed height, and write to database */
+    void SetLastBlockProcessed(int block_height, uint256 block_hash) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    /** Write the current best block to database */
+    void WriteBestBlock() const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     /** Height of background validation. Returns -1 if there is no background validation. */
     int GetBackgroundValidationHeight() const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet)
     {
@@ -1115,6 +1113,9 @@ public:
     //! Find the private key for the given key id from the wallet's descriptors, if available
     //! Returns nullopt when no descriptor has the key or if the wallet is locked.
     std::optional<CKey> GetKey(const CKeyID& keyid) const;
+
+    //! Disconnect chain notifications and wait for all notifications to be processed
+    void DisconnectChainNotifications();
 };
 
 /**

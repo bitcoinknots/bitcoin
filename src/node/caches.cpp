@@ -5,9 +5,13 @@
 #include <node/caches.h>
 
 #include <common/args.h>
+#include <common/system_ram.h>
 #include <index/txindex.h>
 #include <kernel/caches.h>
 #include <logging.h>
+#include <node/dbcache.h>
+#include <node/interface_ui.h>
+#include <tinyformat.h>
 #include <util/byte_units.h>
 
 #include <algorithm>
@@ -19,20 +23,21 @@
 static constexpr size_t MAX_TX_INDEX_CACHE{1024_MiB};
 //! Max memory allocated to all block filter index caches combined in bytes.
 static constexpr size_t MAX_FILTER_INDEX_CACHE{1024_MiB};
-//! Maximum dbcache size on 32-bit systems.
-static constexpr size_t MAX_32BIT_DBCACHE{1024_MiB};
 
 namespace node {
-CacheSizes CalculateCacheSizes(const ArgsManager& args, size_t n_indexes)
+size_t CalculateDbCacheBytes(const ArgsManager& args)
 {
-    // Convert -dbcache from MiB units to bytes. The total cache is floored by MIN_DB_CACHE and capped by max size_t value.
-    size_t total_cache{DEFAULT_DB_CACHE};
-    if (std::optional<int64_t> db_cache = args.GetIntArg("-dbcache")) {
+    if (auto db_cache{args.GetIntArg("-dbcache")}) {
         if (*db_cache < 0) db_cache = 0;
         uint64_t db_cache_bytes = SaturatingLeftShift<uint64_t>(*db_cache, 20);
-        constexpr auto max_db_cache{sizeof(void*) == 4 ? MAX_32BIT_DBCACHE : std::numeric_limits<size_t>::max()};
-        total_cache = std::max<size_t>(MIN_DB_CACHE, std::min<uint64_t>(db_cache_bytes, max_db_cache));
+        return std::max<size_t>(MIN_DBCACHE_BYTES, std::min(db_cache_bytes, MAX_DBCACHE_BYTES));
     }
+    return GetDefaultDBCache();
+}
+
+CacheSizes CalculateCacheSizes(const ArgsManager& args, size_t n_indexes)
+{
+    size_t total_cache{CalculateDbCacheBytes(args)};
 
     IndexCacheSizes index_sizes;
     index_sizes.tx_index = std::min(total_cache / 8, args.GetBoolArg("-txindex", DEFAULT_TXINDEX) ? MAX_TX_INDEX_CACHE : 0);
@@ -43,5 +48,24 @@ CacheSizes CalculateCacheSizes(const ArgsManager& args, size_t n_indexes)
         total_cache -= index_sizes.filter_index * n_indexes;
     }
     return {index_sizes, kernel::CacheSizes{total_cache}};
+}
+
+void LogOversizedDbCache(const ArgsManager& args) noexcept
+{
+    if (const auto total_ram{TryGetTotalRam()}) {
+        const size_t db_cache{CalculateDbCacheBytes(args)};
+        if (ShouldWarnOversizedDbCache(db_cache, *total_ram)) {
+            InitWarning(bilingual_str{tfm::format(_("A %s MiB dbcache may be too large for a system with only %s MiB of memory."),
+                        db_cache / 1_MiB, *total_ram / 1_MiB)});
+        }
+    }
+}
+
+void LogAutoDbCacheSettings() noexcept
+{
+    LogInfo("Automatically selected -dbcache=%s MiB based on %s system memory of %s MiB.",
+            GetDefaultDBCache(GetTotalRam()) / 1_MiB,
+            TryGetTotalRam() ? "detected" : "assumed",
+            GetTotalRam() / 1_MiB);
 }
 } // namespace node

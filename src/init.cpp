@@ -36,6 +36,7 @@
 #include <interfaces/ipc.h>
 #include <interfaces/mining.h>
 #include <interfaces/node.h>
+#include <ipc/exception.h>
 #include <kernel/caches.h>
 #include <kernel/context.h>
 #include <kernel/warning.h>
@@ -50,6 +51,7 @@
 #include <node/blockmanager_args.h>
 #include <node/blockstorage.h>
 #include <node/caches.h>
+#include <node/dbcache.h>
 #include <node/chainstate.h>
 #include <node/chainstatemanager_args.h>
 #include <node/context.h>
@@ -314,6 +316,14 @@ void Shutdown(NodeContext& node)
     for (const auto& client : node.chain_clients) {
         client->flush();
     }
+    for (auto& client : node.chain_clients) {
+        try {
+            client->stop();
+        } catch (const ipc::Exception& e) {
+            LogDebug(BCLog::IPC, "Chain client did not disconnect cleanly: %s", e.what());
+            client.reset();
+        }
+    }
     StopMapPort();
 
     // Because these depend on each-other, we make sure that neither can be
@@ -385,9 +395,6 @@ void Shutdown(NodeContext& node)
                 chainstate->ResetCoinsViews();
             }
         }
-    }
-    for (const auto& client : node.chain_clients) {
-        client->stop();
     }
 
 #ifdef ENABLE_ZMQ
@@ -511,7 +518,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-corepolicy", strprintf("Use Bitcoin Core policy defaults (default: %u)", DEFAULT_COREPOLICY), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-datadir=<dir>", "Specify data directory", ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION, OptionsCategory::OPTIONS);
     argsman.AddArg("-dbbatchsize", strprintf("Maximum database write batch size in bytes (default: %u)", nDefaultDbBatchSize), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::OPTIONS);
-    argsman.AddArg("-dbcache=<n>", strprintf("Maximum database cache size <n> MiB (minimum %d, default: %d). Make sure you have enough RAM. In addition, unused memory allocated to the mempool is shared with this cache (see -maxmempool).", MIN_DB_CACHE >> 20, DEFAULT_DB_CACHE >> 20), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-dbcache=<n>", strprintf("Maximum database cache size <n> MiB (minimum %s, default is platform dependent, between %s and %s). Make sure you have enough RAM. In addition, unused memory allocated to the mempool is shared with this cache (see -maxmempool).", MIN_DBCACHE_BYTES / 1_MiB, MIN_DEFAULT_DBCACHE / 1_MiB, MAX_DEFAULT_DBCACHE / 1_MiB), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-dbfilesize",
                    strprintf("Target size of files within databases, in MiB (%u to %u, default: %u).",
                              1, 1024,
@@ -535,7 +542,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
                    ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-pid=<file>", strprintf("Specify pid file. Relative paths will be prefixed by a net-specific datadir location. (default: %s)", BITCOIN_PID_FILENAME), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-prune=<n>", strprintf("Reduce storage requirements by enabling pruning (deleting) of old blocks. This allows the pruneblockchain RPC to be called to delete specific blocks and enables automatic pruning of old blocks if a target size in MiB is provided. This mode is incompatible with -txindex. "
-            "Warning: Reverting this setting requires re-downloading the entire blockchain. "
+            "Warning: Reverting this setting requires re-downloading the entire blockchain. Wallets and indexes should be loaded at startup and kept active while pruning is enabled so they stay synchronized before old block data is deleted; wallets or indexes that fall behind pruned data may require a reindex. "
             "(default: 0 = disable pruning blocks, 1 = allow manual pruning via RPC, >=%u = automatically prune block files to stay under the specified target size in MiB)", MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-pruneduringinit=<n>", "Temporarily adjusts the -prune setting until initial sync completes."
         " Ignored if pruning is disabled."
@@ -1480,7 +1487,7 @@ static ChainstateLoadResult InitAndLoadChainstate(
     LogPrintf("* Using %.1f MiB for in-memory UTXO set (plus up to %.1f MiB of unused mempool space)\n", cache_sizes.coins * (1.0 / 1024 / 1024), mempool_opts.max_size_bytes * (1.0 / 1024 / 1024));
 
     if (gArgs.IsArgSet("-lowmem")) {
-        g_low_memory_threshold = gArgs.GetIntArg("-lowmem", 0 /* not used */) * 1024 * 1024;
+        g_low_memory_threshold = std::max(int64_t{0}, gArgs.GetIntArg("-lowmem", 0 /* not used */)) * 1024 * 1024;
     }
     if (g_low_memory_threshold > 0) {
         LogPrintf("* Flushing caches if available system memory drops below %s MiB\n", g_low_memory_threshold / 1024 / 1024);
@@ -1986,6 +1993,11 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     // ********************************************************* Step 7: load block chain
 
     // cache size calculations
+    if (args.GetIntArg("-dbcache")) {
+        node::LogOversizedDbCache(args);
+    } else {
+        node::LogAutoDbCacheSettings();
+    }
     const auto [index_cache_sizes, kernel_cache_sizes] = CalculateCacheSizes(args, g_enabled_filter_types.size());
 
     LogInfo("Cache configuration:");
@@ -2012,6 +2024,34 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         do_reindex_chainstate,
         kernel_cache_sizes,
         args);
+
+    // A data directory advanced by a client that was not enforcing BIP110/RDTS
+    // can contain blocks that violate RDTS mandatory signaling. Normal startup
+    // does not re-validate inherited history, so correct such state now: mark
+    // the offending blocks invalid and reorganize to the best valid chain. If
+    // the data needed to rewind has been pruned, report it as a load failure so
+    // the reindex prompt below offers recovery, rather than running on (or
+    // partially rewinding) an invalid chain.
+    //
+    // Skip this on any reindex: -reindex and -reindex-chainstate re-connect blocks
+    // through ConnectBlock, which re-enforces the rule and rejects violators during
+    // the rebuild, so the correction is redundant. It is also unsafe there: a
+    // chainstate reindex returns here with the active chain not yet built, and
+    // correcting against an empty chain would fail an internal consistency check.
+    //
+    // The block index is shared, so the invalid marks apply to any background
+    // (assumeutxo) chainstate too; only the active chainstate is reorganized here.
+    // Safe while every snapshot base stays below the RDTS window (as today); a
+    // future snapshot base above the window would need re-review.
+    if (status == ChainstateLoadStatus::SUCCESS && !ShutdownRequested(node) &&
+            !do_reindex && !do_reindex_chainstate) {
+        bilingual_str rdts_error;
+        if (!node.chainman->ActiveChainstate().CorrectRdtsInvalidBlocks(rdts_error)) {
+            status = ChainstateLoadStatus::FAILURE;
+            error = rdts_error;
+        }
+    }
+
     if (status == ChainstateLoadStatus::FAILURE && !do_reindex && !ShutdownRequested(node)) {
         // If reindex=auto, directly start the reindex
         bool fAutoReindex = (args.GetArg("-reindex", "0") == "auto");
@@ -2021,7 +2061,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
             do_retry = HasTestOption(args, "reindex_after_failure_noninteractive_yes") ||
             uiInterface.ThreadSafeQuestion(
             error + Untranslated(".\n\n") + _("Do you want to rebuild the databases now?"),
-            error.original + ".\nPlease restart with -reindex or -reindex-chainstate to recover.",
+            error.original + (args.GetIntArg("-prune", 0) ? ".\nPlease restart with -reindex to recover." : ".\nPlease restart with -reindex or -reindex-chainstate to recover."),
             "", CClientUIInterface::MSG_ERROR | CClientUIInterface::BTN_ABORT);
         } else {
             LogPrintf("Automatically running a reindex.\n");
@@ -2470,6 +2510,8 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         banman->DumpBanlist();
     }, DUMP_BANS_INTERVAL);
 
+    banman->SetScheduler(scheduler);
+
     if (node.peerman) node.peerman->StartScheduledTasks(scheduler);
 
 #if HAVE_SYSTEM
@@ -2492,7 +2534,7 @@ bool StartIndexBackgroundSync(NodeContext& node)
     // starting from that point up to the current tip.
     // indexes_start_block='nullptr' means "start from height 0".
     std::optional<const CBlockIndex*> indexes_start_block;
-    std::string older_index_name;
+    BaseIndex* older_index{nullptr};
     ChainstateManager& chainman = *Assert(node.chainman);
     const Chainstate& chainstate = WITH_LOCK(::cs_main, return chainman.GetChainstateForIndexing());
     const CChain& index_chain = chainstate.m_chain;
@@ -2510,7 +2552,7 @@ bool StartIndexBackgroundSync(NodeContext& node)
 
         if (!indexes_start_block || !pindex || pindex->nHeight < indexes_start_block.value()->nHeight) {
             indexes_start_block = pindex;
-            older_index_name = summary.name;
+            older_index = index;
             if (!pindex) break; // Starting from genesis so no need to look for earlier block.
         }
     };
@@ -2521,7 +2563,9 @@ bool StartIndexBackgroundSync(NodeContext& node)
         const CBlockIndex* start_block = *indexes_start_block;
         if (!start_block) start_block = chainman.ActiveChain().Genesis();
         if (!chainman.m_blockman.CheckBlockDataAvailability(*index_chain.Tip(), *Assert(start_block))) {
-            return InitError(Untranslated(strprintf("%s best block of the index goes beyond pruned data. Please disable the index or reindex (which will download the whole blockchain again)", older_index_name)));
+            return InitError(strprintf(
+                _("Index \"%s\" needs block data that has been pruned.\nRestart with -reindex to rebuild (re-downloading the entire blockchain), or %s to disable."),
+                older_index->GetName(), older_index->GetDisableAction()));
         }
     }
 

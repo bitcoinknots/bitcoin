@@ -347,6 +347,9 @@ enum ServiceFlags : uint64_t {
 
     NODE_REPLACE_BY_FEE = (1 << 26),
 
+    // NODE_REDUCED_DATA means the node enforces ReducedData rules as applicable
+    NODE_REDUCED_DATA = (1 << 27),
+
     NODE_MALICIOUS = (1 << 29),
 };
 

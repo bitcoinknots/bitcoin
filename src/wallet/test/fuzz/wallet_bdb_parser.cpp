@@ -40,6 +40,7 @@ void initialize_wallet_bdb_parser()
 
 FUZZ_TARGET(wallet_bdb_parser, .init = initialize_wallet_bdb_parser)
 {
+    SeedRandomStateForTest(SeedRand::ZEROS);  // for IsDirWritable
     const auto wallet_path = g_setup->m_args.GetDataDirNet() / "fuzzed_wallet.dat";
 
     {
@@ -90,6 +91,8 @@ FUZZ_TARGET(wallet_bdb_parser, .init = initialize_wallet_bdb_parser)
             error.original == "Internal record position not in page" ||
             error.original == "LSNs are not reset, this database is not completely flushed. Please reopen then close the database with a version that has BDB support" ||
             error.original == "Records page has odd number of records" ||
+            error.original == "BTree page has an unexpected level" ||
+            error.original == "BTree Leaf page is not at level 1" ||
             error.original == "Bad overflow record page type") {
             // Do nothing
         } else if (error.original == "Subdatabase last page is greater than database last page" ||

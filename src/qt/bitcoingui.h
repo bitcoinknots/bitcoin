@@ -55,8 +55,9 @@ class QComboBox;
 class QDateTime;
 class QProgressBar;
 class QProgressDialog;
-class QWinTaskbarButton;
 QT_END_NAMESPACE
+
+class WinTaskbarProgress;
 
 namespace GUIUtil {
 class ClickableLabel;
@@ -144,6 +145,7 @@ private:
     QAction* usedReceivingAddressesAction = nullptr;
     QAction* signMessageAction = nullptr;
     QAction* verifyMessageAction = nullptr;
+    QAction* sweepPrivKeyAction = nullptr;
     QAction* m_load_psbt_action = nullptr;
     QAction* m_load_psbt_clipboard_action = nullptr;
     QAction* aboutAction = nullptr;
@@ -180,7 +182,7 @@ private:
     RPCConsole* rpcConsole = nullptr;
     HelpMessageDialog* helpMessageDialog = nullptr;
 #ifdef BITCOIN_QT_WIN_TASKBAR
-    QWinTaskbarButton* m_taskbar_button = nullptr;
+    WinTaskbarProgress* m_taskbar_progress = nullptr;
 #endif
     ModalOverlay* modalOverlay = nullptr;
     MempoolStats* mempoolStats = nullptr;
@@ -303,6 +305,8 @@ public Q_SLOTS:
     void gotoVerifyMessageTab(QString addr = "");
     /** Load Partially Signed Bitcoin Transaction from file or clipboard */
     void gotoLoadPSBT(bool from_clipboard = false);
+
+    void gotoSweepPrivKeyDialog();
     /** Enable history action when privacy is changed */
     void enableHistoryAction(bool privacy);
 

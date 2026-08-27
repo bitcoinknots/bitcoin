@@ -419,8 +419,14 @@ CoinsResult AvailableCoins(const CWallet& wallet,
 
             std::unique_ptr<SigningProvider> provider = wallet.GetSolvingProvider(output.scriptPubKey);
 
-            if (segwit_inputs_only && !IsSegWitOutput(*provider, wtx.tx->vout[i].scriptPubKey)) {
-                continue;
+            if (segwit_inputs_only) {
+                if (provider) {
+                    if (!IsSegWitOutput(*provider, output.scriptPubKey)) continue;
+                } else {
+                    int witness_ver;
+                    std::vector<unsigned char> witness_prog;
+                    if (!output.scriptPubKey.IsWitnessProgram(witness_ver, witness_prog)) continue;
+                }
             }
 
             int input_bytes = CalculateMaximumSignedInputSize(output, COutPoint(), provider.get(), can_grind_r, coinControl);
@@ -763,7 +769,7 @@ util::Result<SelectionResult> ChooseSelectionResult(interfaces::Chain& chain, co
         }
         std::optional<CAmount> combined_bump_fee = chain.calculateCombinedBumpFee(outpoints, coin_selection_params.m_effective_feerate);
         if (!combined_bump_fee.has_value()) {
-            return util::Error{_("Failed to calculate bump fees, because unconfirmed UTXOs depend on enormous cluster of unconfirmed transactions.")};
+            return util::Error{_("Failed to calculate bump fees, because unconfirmed UTXOs depend on an enormous cluster of unconfirmed transactions.")};
         }
         CAmount bump_fee_overestimate = summed_bump_fees - combined_bump_fee.value();
         if (bump_fee_overestimate) {
@@ -893,7 +899,7 @@ util::Result<SelectionResult> AutomaticCoinSelection(const CWallet& wallet, Coin
             if (group.m_ancestors >= max_ancestors || group.m_descendants >= max_descendants) total_unconf_long_chain += group.GetSelectionAmount();
         }
 
-        if (CAmount total_amount = available_coins.GetTotalAmount() - total_discarded < value_to_select) {
+        if (CAmount total_amount = available_coins.GetTotalAmount() - total_discarded; total_amount < value_to_select) {
             // Special case, too-long-mempool cluster.
             if (total_amount + total_unconf_long_chain > value_to_select) {
                 return util::Error{_("Unconfirmed UTXOs are available, but spending them creates a chain of transactions that will be rejected by the mempool")};

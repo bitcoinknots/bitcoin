@@ -1253,7 +1253,7 @@ static RPCHelpMan bumpfee_helper(std::string method_name)
 
     if ((!options.exists("require_replacable")) || options["require_replacable"].get_bool()) {
         const auto wtx = pwallet->GetWalletTx(hash);
-        if (!SignalsOptInRBF(*wtx->tx)) {
+        if (wtx && !SignalsOptInRBF(*wtx->tx)) {
             throw JSONRPCError(RPC_WALLET_ERROR, "Transaction is not BIP 125 replaceable");
         }
     }
@@ -1417,7 +1417,7 @@ RPCHelpMan send()
         "Send 0.3 BTC with a fee rate of 25 " + CURRENCY_ATOM + "/vB using named arguments\n"
         + HelpExampleCli("-named send", "outputs='{\"" + EXAMPLE_ADDRESS[0] + "\": 0.3}' fee_rate=25\n") +
         "Create a transaction that should confirm the next block, with a specific input, and return result without adding to wallet or broadcasting to the network\n"
-        + HelpExampleCli("send", "'{\"" + EXAMPLE_ADDRESS[0] + "\": 0.1}' 1 economical '{\"add_to_wallet\": false, \"inputs\": [{\"txid\":\"a08e6907dbbd3d809776dbfc5d82e371b764ed838b5655e72f463568df1aadf0\", \"vout\":1}]}'")
+        + HelpExampleCli("send", "'{\"" + EXAMPLE_ADDRESS[0] + "\": 0.1}' 1 economical null '{\"add_to_wallet\": false, \"inputs\": [{\"txid\":\"a08e6907dbbd3d809776dbfc5d82e371b764ed838b5655e72f463568df1aadf0\", \"vout\":1}]}'")
         },
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
         {

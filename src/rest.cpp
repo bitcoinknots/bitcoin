@@ -784,6 +784,9 @@ static bool rest_mempool_transactions(const std::any& context, HTTPRequest* req,
         }
 
         const auto sequence_start{ToIntegral<uint64_t>(raw_sequence_start)};
+        if (!sequence_start) {
+            return RESTERR(req, HTTP_BAD_REQUEST, "Parse error");
+        }
         str_json = MempoolTxsToJSON(*mempool, verbose, sequence_start.value()).write() + "\n";
 
         req->WriteHeader("Content-Type", "application/json");
