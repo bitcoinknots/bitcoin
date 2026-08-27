@@ -6,10 +6,15 @@
 #ifndef BITCOIN_STREAMS_H
 #define BITCOIN_STREAMS_H
 
+#include <logging.h>
 #include <serialize.h>
 #include <span.h>
 #include <support/allocators/zeroafterfree.h>
+#include <util/check.h>
+#include <util/fs_helpers.h>
+#include <util/obfuscation.h>
 #include <util/overflow.h>
+#include <util/syserror.h>
 
 #include <algorithm>
 #include <assert.h>
@@ -23,27 +28,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-
-namespace util {
-inline void Xor(Span<std::byte> write, Span<const std::byte> key, size_t key_offset = 0)
-{
-    if (key.size() == 0) {
-        return;
-    }
-    key_offset %= key.size();
-
-    for (size_t i = 0, j = key_offset; i != write.size(); i++) {
-        write[i] ^= key[j++];
-
-        // This potentially acts on very many bytes of data, so it's
-        // important that we calculate `j`, i.e. the `key` index in this
-        // way instead of doing a %, which would effectively be a division
-        // for each byte Xor'd -- much slower than need be.
-        if (j == key.size())
-            j = 0;
-    }
-}
-} // namespace util
 
 /* Minimal stream for overwriting and/or appending to an existing byte vector
  *
@@ -273,9 +257,9 @@ public:
      *
      * @param[in] key    The key used to XOR the data in this stream.
      */
-    void Xor(const std::vector<unsigned char>& key)
+    void Xor(const Obfuscation& key)
     {
-        util::Xor(MakeWritableByteSpan(*this), MakeByteSpan(key));
+        key(*this);
     }
 
     /** Compute total memory usage of this object (own memory + any dynamic memory). */
@@ -386,19 +370,42 @@ public:
  *
  * Will automatically close the file when it goes out of scope if not null.
  * If you're returning the file pointer, return file.release().
- * If you need to close the file early, use file.fclose() instead of fclose(file).
+ * If you need to close the file early, use autofile.fclose() instead of fclose(underlying_FILE).
+ *
+ * @note If the file has been written to, then the caller must close it
+ * explicitly with the `fclose()` method, check if it returns an error and treat
+ * such an error as if the `write()` method failed. The OS's `fclose(3)` may
+ * fail to flush to disk data that has been previously written, rendering the
+ * file corrupt.
  */
 class AutoFile
 {
 protected:
     std::FILE* m_file;
-    std::vector<std::byte> m_xor;
+    Obfuscation m_obfuscation;
     std::optional<int64_t> m_position;
+    bool m_was_written{false};
 
 public:
-    explicit AutoFile(std::FILE* file, std::vector<std::byte> data_xor={});
+    explicit AutoFile(std::FILE* file, const Obfuscation& obfuscation = {});
 
-    ~AutoFile() { fclose(); }
+    ~AutoFile()
+    {
+        if (m_was_written) {
+            // Callers that wrote to the file must have closed it explicitly
+            // with the fclose() method and checked that the close succeeded.
+            // This is because here in the destructor we have no way to signal
+            // errors from fclose() which, after write, could mean the file is
+            // corrupted and must be handled properly at the call site.
+            // Destructors in C++ cannot signal an error to the callers because
+            // they do not return a value and are not allowed to throw exceptions.
+            Assume(IsNull());
+        }
+
+        if (fclose() != 0) {
+            LogError("Failed to close file: %s", SysErrorString(errno));
+        }
+    }
 
     // Disallow copies
     AutoFile(const AutoFile&) = delete;
@@ -428,7 +435,7 @@ public:
     bool IsNull() const { return m_file == nullptr; }
 
     /** Continue with a different XOR key */
-    void SetXor(std::vector<std::byte> data_xor) { m_xor = data_xor; }
+    void SetXor(const Obfuscation& obfuscation) { m_obfuscation = obfuscation; }
 
     /** Implementation detail, only used internally. */
     std::size_t detail_fread(Span<std::byte> dst);
@@ -442,8 +449,18 @@ public:
     /** Wrapper around FileCommit(). */
     bool Commit();
 
+    void SetIdlePriority();
+
     /** Wrapper around TruncateFile(). */
     bool Truncate(unsigned size);
+
+    void AdviseSequential()
+    {
+        ::AdviseSequential(m_file);
+    }
+
+    //! Write a mutable buffer more efficiently than write(), obfuscating the buffer in-place.
+    void write_buffer(std::span<std::byte> src);
 
     //
     // Stream subset
@@ -466,6 +483,8 @@ public:
         return *this;
     }
 };
+
+using DataBuffer = std::vector<std::byte>;
 
 /** Wrapper around an AutoFile& that implements a ring buffer to
  *  deserialize from. It guarantees the ability to rewind a given number of bytes.
@@ -523,11 +542,22 @@ private:
     }
 
 public:
-    BufferedFile(AutoFile& file, uint64_t nBufSize, uint64_t nRewindIn)
+    BufferedFile(AutoFile& file LIFETIMEBOUND, uint64_t nBufSize, uint64_t nRewindIn)
         : m_src{file}, nReadLimit{std::numeric_limits<uint64_t>::max()}, nRewind{nRewindIn}, vchBuf(nBufSize, std::byte{0})
     {
         if (nRewindIn >= nBufSize)
             throw std::ios_base::failure("Rewind limit must be less than buffer size");
+        m_src.AdviseSequential();
+    }
+
+    ~BufferedFile() { fclose(); }
+
+    int fclose()
+    {
+        if (auto rel{m_src.release()}) {
+            return CloseAndUncache(rel);
+        }
+        return m_src.fclose();
     }
 
     //! check whether we're at the end of the source file
@@ -611,6 +641,89 @@ public:
             buf_offset += inc;
             if (buf_offset >= vchBuf.size()) buf_offset = 0;
         }
+    }
+};
+
+/**
+ * Wrapper that buffers reads from an underlying stream.
+ * Requires underlying stream to support read() and detail_fread() calls
+ * to support fixed-size and variable-sized reads, respectively.
+ */
+template <typename S>
+class BufferedReader
+{
+    S& m_src;
+    DataBuffer m_buf;
+    size_t m_buf_pos;
+
+public:
+    //! Requires stream ownership to prevent leaving the stream at an unexpected position after buffered reads.
+    explicit BufferedReader(S&& stream LIFETIMEBOUND, size_t size = 1 << 16)
+        requires std::is_rvalue_reference_v<S&&>
+        : m_src{stream}, m_buf(size), m_buf_pos{size} {}
+
+    void read(Span<std::byte> dst)
+    {
+        if (const auto available{std::min(dst.size(), m_buf.size() - m_buf_pos)}) {
+            std::copy_n(m_buf.begin() + m_buf_pos, available, dst.begin());
+            m_buf_pos += available;
+            dst = dst.subspan(available);
+        }
+        if (dst.size()) {
+            assert(m_buf_pos == m_buf.size());
+            m_src.read(dst);
+
+            m_buf_pos = 0;
+            m_buf.resize(m_src.detail_fread(m_buf));
+        }
+    }
+
+    template <typename T>
+    BufferedReader& operator>>(T&& obj)
+    {
+        Unserialize(*this, obj);
+        return *this;
+    }
+};
+
+/**
+ * Wrapper that buffers writes to an underlying stream.
+ * Requires underlying stream to support write_buffer() method
+ * for efficient buffer flushing and obfuscation.
+ */
+template <typename S>
+class BufferedWriter
+{
+    S& m_dst;
+    DataBuffer m_buf;
+    size_t m_buf_pos{0};
+
+public:
+    explicit BufferedWriter(S& stream LIFETIMEBOUND, size_t size = 1 << 16) : m_dst{stream}, m_buf(size) {}
+
+    ~BufferedWriter() { flush(); }
+
+    void flush()
+    {
+        if (m_buf_pos) m_dst.write_buffer(std::span{m_buf}.first(m_buf_pos));
+        m_buf_pos = 0;
+    }
+
+    void write(std::span<const std::byte> src)
+    {
+        while (const auto available{std::min(src.size(), m_buf.size() - m_buf_pos)}) {
+            std::copy_n(src.begin(), available, m_buf.begin() + m_buf_pos);
+            m_buf_pos += available;
+            if (m_buf_pos == m_buf.size()) flush();
+            src = src.subspan(available);
+        }
+    }
+
+    template <typename T>
+    BufferedWriter& operator<<(const T& obj)
+    {
+        Serialize(*this, obj);
+        return *this;
     }
 };
 

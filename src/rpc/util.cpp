@@ -256,7 +256,7 @@ CPubKey AddrToPubKey(const FillableSigningProvider& keystore, const std::string&
 }
 
 // Creates a multisig address from a given list of public keys, number of signatures required, and the address type
-CTxDestination AddAndGetMultisigDestination(const int required, const std::vector<CPubKey>& pubkeys, OutputType type, FlatSigningProvider& keystore, CScript& script_out)
+CTxDestination AddAndGetMultisigDestination(const int required, const std::vector<CPubKey>& pubkeys, OutputType type, FlatSigningProvider& keystore, CScript& script_out, bool sort)
 {
     // Gather public keys
     if (required < 1) {
@@ -269,7 +269,7 @@ CTxDestination AddAndGetMultisigDestination(const int required, const std::vecto
         throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Number of keys involved in the multisignature address creation > %d\nReduce the number", MAX_PUBKEYS_PER_MULTISIG));
     }
 
-    script_out = GetScriptForMultisig(required, pubkeys);
+    script_out = GetScriptForMultisig(required, pubkeys, sort);
 
     // Check if any keys are uncompressed. If so, the type is legacy
     for (const CPubKey& pk : pubkeys) {
@@ -666,7 +666,11 @@ UniValue RPCHelpMan::HandleRequest(const JSONRPCRequest& request) const
      * the user is asking for help information, and throw help when appropriate.
      */
     if (request.mode == JSONRPCRequest::GET_HELP || !IsValidNumArgs(request.params.size())) {
-        throw std::runtime_error(ToString());
+        std::string help_format = "default";
+        if (request.strMethod == "format") {
+            help_format = request.params[1].get_str();
+        }
+        throw std::runtime_error(ToString(help_format));
     }
     UniValue arg_mismatch{UniValue::VOBJ};
     for (size_t i{0}; i < m_args.size(); ++i) {
@@ -784,7 +788,7 @@ std::vector<std::pair<std::string, bool>> RPCHelpMan::GetArgNames() const
 size_t RPCHelpMan::GetParamIndex(std::string_view key) const
 {
     auto it{std::find_if(
-        m_args.begin(), m_args.end(), [&key](const auto& arg) { return arg.GetName() == key;}
+        m_args.begin(), m_args.end(), [&key](const auto& arg) { return arg.GetFirstName() == key;}
     )};
 
     CHECK_NONFATAL(it != m_args.end());  // TODO: ideally this is checked at compile time
@@ -853,6 +857,34 @@ std::string RPCHelpMan::ToString() const
     return ret;
 }
 
+std::string RPCHelpMan::ToStringArgsCli() const
+{
+    std::string res;
+    for (const auto& arg : m_args) {
+        const bool is_file = ToLower(arg.m_description).find("file") != std::string::npos;
+        res += arg.m_names + ":" + (is_file ? "file" : arg.ToTypeString()) + ",";
+    }
+
+    if (res.size() > 0) {
+        res.pop_back();
+    }
+
+    return res;
+}
+
+std::string RPCHelpMan::ToString(const std::string& format) const
+{
+    if (format == "default") {
+        return this->ToString();
+    }
+
+    if (format == "args_cli") {
+        return this->ToStringArgsCli();
+    }
+
+    throw std::runtime_error("unrecogonized help format");
+}
+
 UniValue RPCHelpMan::GetArgMap() const
 {
     UniValue arr{UniValue::VARR};
@@ -870,9 +902,15 @@ UniValue RPCHelpMan::GetArgMap() const
     for (int i{0}; i < int(m_args.size()); ++i) {
         const auto& arg = m_args.at(i);
         std::vector<std::string> arg_names = SplitString(arg.m_names, '|');
+        RPCArg::Type argtype = arg.m_type;
+        size_t arg_num = 0;
         for (const auto& arg_name : arg_names) {
-            push_back_arg_info(m_name, i, arg_name, arg.m_type);
-            if (arg.m_type == RPCArg::Type::OBJ_NAMED_PARAMS) {
+            if (!arg.m_type_per_name.empty()) {
+                argtype = arg.m_type_per_name.at(arg_num++);
+            }
+
+            push_back_arg_info(m_name, i, arg_name, argtype);
+            if (argtype == RPCArg::Type::OBJ_NAMED_PARAMS) {
                 for (const auto& inner : arg.m_inner) {
                     std::vector<std::string> inner_names = SplitString(inner.m_names, '|');
                     for (const std::string& inner_name : inner_names) {
@@ -923,13 +961,15 @@ UniValue RPCArg::MatchesType(const UniValue& request) const
 {
     if (m_opts.skip_type_check) return true;
     if (IsOptional() && request.isNull()) return true;
-    const auto exp_type{ExpectedType(m_type)};
-    if (!exp_type) return true; // nothing to check
+    for (auto type : m_type_per_name.empty() ? std::vector<RPCArg::Type>{m_type} : m_type_per_name) {
+        const auto exp_type{ExpectedType(type)};
+        if (!exp_type) return true; // nothing to check
 
-    if (*exp_type != request.getType()) {
-        return strprintf("JSON value of type %s is not of expected type %s", uvTypeName(request.getType()), uvTypeName(*exp_type));
+        if (*exp_type == request.getType()) {
+            return true;
+        }
     }
-    return true;
+    return strprintf("JSON value of type %s is not of expected type %s", uvTypeName(request.getType()), uvTypeName(*ExpectedType(m_type)));
 }
 
 std::string RPCArg::GetFirstName() const
@@ -952,6 +992,32 @@ bool RPCArg::IsOptional() const
     }
 }
 
+std::string RPCArg::ToTypeString() const
+{
+    switch (m_type) {
+    case Type::STR_HEX:
+    case Type::STR:
+        return "string";
+    case Type::NUM:
+        return "numeric";
+    case Type::AMOUNT:
+        return "numeric or string";
+    case Type::RANGE:
+        return "numeric or array";
+    case Type::BOOL:
+        return "boolean";
+    case Type::OBJ:
+    case Type::OBJ_NAMED_PARAMS:
+    case Type::OBJ_USER_KEYS:
+        return "json object";
+    case Type::ARR:
+        return"json array";
+    } // no default case, so the compiler can warn about missing cases
+
+    //gcc and msvc might complain we don't return anything even if we handle all cases
+    throw std::runtime_error("unknown argument type");
+}
+
 std::string RPCArg::ToDescriptionString(bool is_named_arg) const
 {
     std::string ret;
@@ -959,39 +1025,7 @@ std::string RPCArg::ToDescriptionString(bool is_named_arg) const
     if (m_opts.type_str.size() != 0) {
         ret += m_opts.type_str.at(1);
     } else {
-        switch (m_type) {
-        case Type::STR_HEX:
-        case Type::STR: {
-            ret += "string";
-            break;
-        }
-        case Type::NUM: {
-            ret += "numeric";
-            break;
-        }
-        case Type::AMOUNT: {
-            ret += "numeric or string";
-            break;
-        }
-        case Type::RANGE: {
-            ret += "numeric or array";
-            break;
-        }
-        case Type::BOOL: {
-            ret += "boolean";
-            break;
-        }
-        case Type::OBJ:
-        case Type::OBJ_NAMED_PARAMS:
-        case Type::OBJ_USER_KEYS: {
-            ret += "json object";
-            break;
-        }
-        case Type::ARR: {
-            ret += "json array";
-            break;
-        }
-        } // no default case, so the compiler can warn about missing cases
+        ret += this->ToTypeString();
     }
     if (m_fallback.index() == 1) {
         ret += ", optional, default=" + std::get<RPCArg::DefaultHint>(m_fallback);
@@ -1387,6 +1421,23 @@ std::vector<CScript> EvalDescriptorStringOrObject(const UniValue& scanobject, Fl
     return ret;
 }
 
+std::vector<CTransactionRef> ParseTransactionVector(const UniValue txns_param)
+{
+    std::vector<CTransactionRef> txns;
+    const UniValue& raw_transactions = txns_param.get_array();
+    txns.reserve(raw_transactions.size());
+
+    for (const auto& rawtx : raw_transactions.getValues()) {
+        CMutableTransaction mtx;
+        if (!DecodeHexTx(mtx, rawtx.get_str())) {
+            throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
+                               "TX decode failed: " + rawtx.get_str() + " Make sure the prev tx has at least one input.");
+        }
+        txns.emplace_back(MakeTransactionRef(std::move(mtx)));
+    }
+    return txns;
+}
+
 /** Convert a vector of bilingual strings to a UniValue::VARR containing their original untranslated values. */
 [[nodiscard]] static UniValue BilingualStringsToUniValue(const std::vector<bilingual_str>& bilingual_strings)
 {
@@ -1408,6 +1459,22 @@ void PushWarnings(const std::vector<bilingual_str>& warnings, UniValue& obj)
 {
     if (warnings.empty()) return;
     obj.pushKV("warnings", BilingualStringsToUniValue(warnings));
+}
+
+bool GetWalletRestrictionFromJSONRPCRequest(const JSONRPCRequest& request, std::string& out_wallet_allowed)
+{
+    if (request.m_wallet_restriction.empty()) return false;
+    out_wallet_allowed = request.m_wallet_restriction;
+    return true;
+}
+
+void EnsureNotWalletRestricted(const JSONRPCRequest& request)
+{
+    std::string authorized_wallet_name;
+    const bool have_wallet_restriction = GetWalletRestrictionFromJSONRPCRequest(request, authorized_wallet_name);
+    if (have_wallet_restriction) {
+        throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Method not available for wallet-restricted RPC users");
+    }
 }
 
 std::vector<RPCResult> ScriptPubKeyDoc() {

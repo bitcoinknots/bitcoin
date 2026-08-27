@@ -10,6 +10,7 @@
 #include <primitives/transaction.h> // For CTransactionRef
 #include <util/result.h>
 
+#include <any>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -34,6 +35,7 @@ struct CBlockLocator;
 struct FeeCalculation;
 namespace node {
 struct NodeContext;
+struct PruneLockInfo;
 } // namespace node
 
 namespace interfaces {
@@ -141,6 +143,10 @@ public:
     //! Check that the block is available on disk (i.e. has not been
     //! pruned), and contains transactions.
     virtual bool haveBlockOnDisk(int height) = 0;
+
+    virtual bool pruneLockExists(const std::string& name) const = 0;
+    virtual bool updatePruneLock(const std::string& name, const node::PruneLockInfo& lock_info, bool sync=false) = 0;
+    virtual bool deletePruneLock(const std::string& name) = 0;
 
     //! Get locator for the current chain tip.
     virtual CBlockLocator getTipLocator() = 0;
@@ -310,6 +316,9 @@ public:
     //! Send init error.
     virtual void initError(const bilingual_str& message) = 0;
 
+    //! Ask init question.
+    virtual bool initQuestion(const bilingual_str& message, const bilingual_str& non_interactive_message, const bilingual_str& caption, unsigned int style) = 0;
+
     //! Send progress indicator.
     virtual void showProgress(const std::string& title, int progress, bool resume_possible) = 0;
 
@@ -394,6 +403,8 @@ class ChainClient
 {
 public:
     virtual ~ChainClient() = default;
+
+    virtual void assignContextHACK(std::any&) {};
 
     //! Register rpcs.
     virtual void registerRpcs() = 0;

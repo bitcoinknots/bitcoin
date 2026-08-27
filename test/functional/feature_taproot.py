@@ -80,6 +80,7 @@ from test_framework.script import (
     SIGHASH_ANYONECANPAY,
     SegwitV0SignatureMsg,
     TaggedHash,
+    TAPROOT_CONTROL_MAX_NODE_COUNT_REDUCED,
     TaprootSignatureMsg,
     is_op_success,
     taproot_construct,
@@ -766,7 +767,7 @@ def spenders_taproot_active():
         scripts = [
             ("pk_codesep", CScript(random_checksig_style(pubs[1]) + bytes([OP_CODESEPARATOR]))),  # codesep after checksig
             ("codesep_pk", CScript(bytes([OP_CODESEPARATOR]) + random_checksig_style(pubs[1]))),  # codesep before checksig
-            ("branched_codesep", CScript([random.randbytes(random.randrange(2, 511)), OP_DROP, OP_IF, OP_CODESEPARATOR, pubs[0], OP_ELSE, OP_CODESEPARATOR, pubs[1], OP_ENDIF, OP_CHECKSIG])),  # branch dependent codesep
+            ("branched_codesep", CScript([random.randbytes(random.randrange(2, 75)), OP_DROP, OP_IF, OP_CODESEPARATOR, pubs[0], OP_ELSE, OP_CODESEPARATOR, pubs[1], OP_ENDIF, OP_CHECKSIG])),  # branch dependent codesep
             # Note that the first data push in the "branched_codesep" script has the purpose of
             # randomizing the sighash, both by varying script size and content. In order to
             # avoid MINIMALDATA script verification errors caused by not-minimal-encoded data
@@ -776,6 +777,7 @@ def spenders_taproot_active():
         tap = taproot_construct(pubs[0], scripts)
         add_spender(spenders, "sighash/pk_codesep", tap=tap, leaf="pk_codesep", key=secs[1], **common, **SINGLE_SIG, **SIGHASH_BITFLIP, **ERR_SIG_SCHNORR)
         add_spender(spenders, "sighash/codesep_pk", tap=tap, leaf="codesep_pk", key=secs[1], codeseppos=0, **common, **SINGLE_SIG, **SIGHASH_BITFLIP, **ERR_SIG_SCHNORR)
+        common['standard'] = False
         add_spender(spenders, "sighash/branched_codesep/left", tap=tap, leaf="branched_codesep", key=secs[0], codeseppos=3, **common, inputs=[getter("sign"), b'\x01'], **SIGHASH_BITFLIP, **ERR_SIG_SCHNORR)
         add_spender(spenders, "sighash/branched_codesep/right", tap=tap, leaf="branched_codesep", key=secs[1], codeseppos=6, **common, inputs=[getter("sign"), b''], **SIGHASH_BITFLIP, **ERR_SIG_SCHNORR)
 
@@ -891,6 +893,8 @@ def spenders_taproot_active():
         scripts = [scripts, random.choice(PARTNER_MERKLE_FN)]
     tap = taproot_construct(pubs[0], scripts)
     # Test that spends with a depth of 128 work, but 129 doesn't (even with a tree with weird Merkle branches in it).
+    assert 'standard' not in SINGLE_SIG
+    SINGLE_SIG['standard'] = False
     add_spender(spenders, "spendpath/merklelimit", tap=tap, leaf="128deep", **SINGLE_SIG, key=secs[0], failure={"leaf": "129deep"}, **ERR_CONTROLBLOCK_SIZE)
     # Test that flipping the negation bit invalidates spends.
     add_spender(spenders, "spendpath/negflag", tap=tap, leaf="128deep", **SINGLE_SIG, key=secs[0], failure={"negflag": lambda ctx: 1 - default_negflag(ctx)}, **ERR_WITNESS_PROGRAM_MISMATCH)
@@ -904,6 +908,7 @@ def spenders_taproot_active():
     add_spender(spenders, "spendpath/padlongcontrol", tap=tap, leaf="128deep", **SINGLE_SIG, key=secs[0], failure={"controlblock": lambda ctx: default_controlblock(ctx) + random.randbytes(random.randrange(1, 32))}, **ERR_CONTROLBLOCK_SIZE)
     # Test that truncating the control block invalidates it.
     add_spender(spenders, "spendpath/trunclongcontrol", tap=tap, leaf="128deep", **SINGLE_SIG, key=secs[0], failure={"controlblock": lambda ctx: default_merklebranch(ctx)[0:random.randrange(1, 32)]}, **ERR_CONTROLBLOCK_SIZE)
+    del SINGLE_SIG['standard']
 
     scripts = [("s", CScript([pubs[0], OP_CHECKSIG]))]
     tap = taproot_construct(pubs[1], scripts)
@@ -1022,7 +1027,7 @@ def spenders_taproot_active():
         ("t36", CScript([])),
     ]
     # Add many dummies to test huge trees
-    for j in range(100000):
+    for j in range(min(100000, 2**TAPROOT_CONTROL_MAX_NODE_COUNT_REDUCED - len(scripts))):
         scripts.append((None, CScript([OP_RETURN, random.randrange(100000)])))
     random.shuffle(scripts)
     tap = taproot_construct(pubs[0], scripts)
@@ -1039,10 +1044,13 @@ def spenders_taproot_active():
     add_spender(spenders, "tapscript/disabled_checkmultisig", leaf="t1", **common, **SINGLE_SIG, failure={"leaf": "t3"}, **ERR_TAPSCRIPT_CHECKMULTISIG)
     add_spender(spenders, "tapscript/disabled_checkmultisigverify", leaf="t2", **common, **SINGLE_SIG, failure={"leaf": "t4"}, **ERR_TAPSCRIPT_CHECKMULTISIG)
     # Test that OP_IF and OP_NOTIF do not accept non-0x01 as truth value (the MINIMALIF rule is consensus in Tapscript)
+    assert 'standard' not in common
+    common['standard'] = False
     add_spender(spenders, "tapscript/minimalif", leaf="t5", **common, inputs=[getter("sign"), b'\x01'], failure={"inputs": [getter("sign"), b'\x02']}, **ERR_MINIMALIF)
     add_spender(spenders, "tapscript/minimalnotif", leaf="t6", **common, inputs=[getter("sign"), b'\x01'], failure={"inputs": [getter("sign"), b'\x03']}, **ERR_MINIMALIF)
     add_spender(spenders, "tapscript/minimalif", leaf="t5", **common, inputs=[getter("sign"), b'\x01'], failure={"inputs": [getter("sign"), b'\x0001']}, **ERR_MINIMALIF)
     add_spender(spenders, "tapscript/minimalnotif", leaf="t6", **common, inputs=[getter("sign"), b'\x01'], failure={"inputs": [getter("sign"), b'\x0100']}, **ERR_MINIMALIF)
+    del common['standard']
     # Test that 1-byte public keys (which are unknown) are acceptable but nonstandard with unrelated signatures, but 0-byte public keys are not valid.
     add_spender(spenders, "tapscript/unkpk/checksig", leaf="t16", standard=False, **common, **SINGLE_SIG, failure={"leaf": "t7"}, **ERR_UNKNOWN_PUBKEY)
     add_spender(spenders, "tapscript/unkpk/checksigadd", leaf="t17", standard=False, **common, **SINGLE_SIG, failure={"leaf": "t10"}, **ERR_UNKNOWN_PUBKEY)
@@ -1072,7 +1080,7 @@ def spenders_taproot_active():
     # Test that an input stack size of 1000 elements is permitted, but 1001 isn't.
     add_spender(spenders, "tapscript/1000inputs", leaf="t23", **common, inputs=[getter("sign")] + [b'' for _ in range(999)], failure={"leaf": "t24", "inputs": [getter("sign")] + [b'' for _ in range(1000)]}, **ERR_STACK_SIZE)
     # Test that pushing a MAX_SCRIPT_ELEMENT_SIZE byte stack element is valid, but one longer is not.
-    add_spender(spenders, "tapscript/pushmaxlimit", leaf="t25", **common, **SINGLE_SIG, failure={"leaf": "t26"}, **ERR_PUSH_LIMIT)
+    add_spender(spenders, "tapscript/pushmaxlimit", standard=False, leaf="t25", **common, **SINGLE_SIG, failure={"leaf": "t26"}, **ERR_PUSH_LIMIT)
     # Test that 999-of-999 multisig works (but 1000-of-1000 triggers stack size limits)
     add_spender(spenders, "tapscript/bigmulti", leaf="t33", **common, inputs=big_spend_inputs, num=999, failure={"leaf": "t34", "num": 1000}, **ERR_STACK_SIZE)
     # Test that the CLEANSTACK rule is consensus critical in tapscript
@@ -1131,11 +1139,13 @@ def spenders_taproot_active():
                     dummylen = 0
                     while not predict_sigops_ratio(n, dummylen):
                         dummylen += 1
-                    scripts = [("s", fn(n, pubkey)[0])]
+                    script = fn(n, pubkey)[0]
+                    scripts = [("s", script)]
                     for _ in range(merkledepth):
                         scripts = [scripts, random.choice(PARTNER_MERKLE_FN)]
                     tap = taproot_construct(pubs[0], scripts)
-                    standard = annex is None and dummylen <= 80 and len(pubkey) == 32
+                    has_conditional = any(op in (OP_IF, OP_NOTIF) for op, _, _ in script.raw_iter())
+                    standard = annex is None and dummylen <= 80 and len(pubkey) == 32 and not has_conditional and merkledepth <= TAPROOT_CONTROL_MAX_NODE_COUNT_REDUCED
                     add_spender(spenders, "tapscript/sigopsratio_%i" % fn_num, tap=tap, leaf="s", annex=annex, hashtype=hashtype, key=secs[1], inputs=[getter("sign"), random.randbytes(dummylen)], standard=standard, failure={"inputs": [getter("sign"), random.randbytes(dummylen - 1)]}, **ERR_SIGOPS_RATIO)
 
     # Future leaf versions
@@ -1377,6 +1387,7 @@ class TaprootTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
+        self.extra_args = [["-datacarrierfullcount"]]
 
     def block_submit(self, node, txs, msg, err_msg, cb_pubkey=None, fees=0, sigops_weight=0, witness=False, accept=False):
 

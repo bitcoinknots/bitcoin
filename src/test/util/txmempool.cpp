@@ -23,6 +23,7 @@ CTxMemPool::Options MemPoolOptionsForTest(const NodeContext& node)
         // Default to always checking mempool regardless of
         // chainparams.DefaultConsistencyChecks for tests
         .check_ratio = 1,
+        .truc_policy = TRUCPolicy::Enforce,
         .signals = node.validation_signals.get(),
     };
     const auto result{ApplyArgsManOptions(*node.args, ::Params(), mempool_opts)};
@@ -37,7 +38,7 @@ CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CMutableTransaction& tx) co
 
 CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransactionRef& tx) const
 {
-    return CTxMemPoolEntry{tx, nFee, TicksSinceEpoch<std::chrono::seconds>(time), nHeight, m_sequence, spendsCoinbase, sigOpCost, lp};
+    return CTxMemPoolEntry{tx, nFee, TicksSinceEpoch<std::chrono::seconds>(time), nHeight, m_sequence, COIN_AGE_CACHE_ZERO, spendsCoinbase, /*extra_weight=*/0, sigOpCost, lp};
 }
 
 std::optional<std::string> CheckPackageMempoolAcceptResult(const Package& txns,
@@ -211,10 +212,15 @@ void CheckMempoolTRUCInvariants(const CTxMemPool& tx_pool)
 
 void AddToMempool(CTxMemPool& tx_pool, const CTxMemPoolEntry& entry)
 {
+    const auto entry_coin_age_cache = entry.GetInternalCoinAgeCache();
     LOCK2(cs_main, tx_pool.cs);
     auto changeset = tx_pool.GetChangeSet();
     changeset->StageAddition(entry.GetSharedTx(), entry.GetFee(),
             entry.GetTime().count(), entry.GetHeight(), entry.GetSequence(),
-            entry.GetSpendsCoinbase(), entry.GetSigOpCost(), entry.GetLockPoints());
+            entry_coin_age_cache,
+            /*spends_coinbase=*/ entry.GetSpendsCoinbase(),
+            /*extra_weight=*/ entry.GetExtraWeight(),
+            /*sigops_cost=*/ entry.GetSigOpCost(),
+            /*lp=*/ entry.GetLockPoints());
     changeset->Apply();
 }

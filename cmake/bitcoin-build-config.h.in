@@ -29,6 +29,8 @@
 /* Copyright year */
 #define COPYRIGHT_YEAR @COPYRIGHT_YEAR@
 
+#cmakedefine ENABLE_POWER8 1
+
 /* Define this symbol to build code that uses ARMv8 SHA-NI intrinsics */
 #cmakedefine ENABLE_ARM_SHANI 1
 
@@ -38,12 +40,17 @@
 /* Define if external signer support is enabled */
 #cmakedefine ENABLE_EXTERNAL_SIGNER 1
 
+#cmakedefine ENABLE_TOR_SUBPROCESS 1
+
 /* Define this symbol to build code that uses SSE4.1 intrinsics */
 #cmakedefine ENABLE_SSE41 1
 
 /* Define to 1 to enable tracepoints for Userspace, Statically Defined Tracing
    */
 #cmakedefine ENABLE_TRACING 1
+
+/* Define this symbol if the consensus lib has been built */
+#cmakedefine HAVE_CONSENSUS_LIB 1
 
 /* Define to 1 to enable wallet functions. */
 #cmakedefine ENABLE_WALLET 1
@@ -93,11 +100,25 @@
 /* Define this symbol if you have posix_fallocate */
 #cmakedefine HAVE_POSIX_FALLOCATE 1
 
+#cmakedefine01 HAVE_IOPOLICY
+
+#cmakedefine01 HAVE_IOPRIO_SYSCALL
+
+#cmakedefine01 HAVE_WINDOWS_IOPRIO
+
 /* Define this symbol if platform supports unix domain sockets */
 #cmakedefine HAVE_SOCKADDR_UN 1
 
+/* Define to 1 if close_range works with just unistd.h included. */
+#cmakedefine01 HAVE_CLOSE_RANGE_GENERIC
+
+/* Define to 1 if close_range works only with Linux-specific includes. */
+#cmakedefine01 HAVE_CLOSE_RANGE_LINUX
+
 /* Define this symbol to build code that uses getauxval */
 #cmakedefine HAVE_STRONG_GETAUXVAL 1
+
+#cmakedefine HAVE_LINUX_SYSINFO 1
 
 /* Define this symbol if the BSD sysctl() is available */
 #cmakedefine HAVE_SYSCTL 1
@@ -141,10 +162,18 @@
 /* Define if dbus support should be compiled in */
 #cmakedefine USE_DBUS 1
 
+/* Define if QWinTaskbarProgress support should be compiled in */
+#cmakedefine BITCOIN_QT_WIN_TASKBAR 1
+
 /* Define if QR support should be compiled in */
 #cmakedefine USE_QRCODE 1
 
 /* Define if sqlite support should be compiled in */
 #cmakedefine USE_SQLITE 1
+
+/* Define if building embedded LevelDB */
+#cmakedefine EMBEDDED_LEVELDB 1
+
+#define RDTS_CONSENT RDTSConsentFlag::@RDTS_CONSENT@
 
 #endif //BITCOIN_CONFIG_H

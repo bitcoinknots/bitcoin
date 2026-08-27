@@ -9,6 +9,7 @@
 #include <any>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include <univalue.h>
 #include <util/fs.h>
@@ -24,7 +25,7 @@ UniValue JSONRPCReplyObj(UniValue result, UniValue error, std::optional<UniValue
 UniValue JSONRPCError(int code, const std::string& message);
 
 /** Generate a new RPC authentication cookie and write it to disk */
-bool GenerateAuthCookie(std::string* cookie_out, std::optional<fs::perms> cookie_perms=std::nullopt);
+bool GenerateAuthCookie(std::string* cookie_out, const std::pair<std::optional<fs::perms>, bool>& cookie_perms);
 /** Read the RPC authentication cookie from disk */
 bool GetAuthCookie(std::string *cookie_out);
 /** Delete RPC authentication cookie from disk */
@@ -41,6 +42,7 @@ public:
     enum Mode { EXECUTE, GET_HELP, GET_ARGS } mode = EXECUTE;
     std::string URI;
     std::string authUser;
+    std::string m_wallet_restriction{"-"};
     std::string peerAddr;
     std::any context;
     JSONRPCVersion m_json_version = JSONRPCVersion::V1_LEGACY;

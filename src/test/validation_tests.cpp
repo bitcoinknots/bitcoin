@@ -45,6 +45,25 @@ static void TestBlockSubsidyHalvings(int nSubsidyHalvingInterval)
     TestBlockSubsidyHalvings(consensusParams);
 }
 
+BOOST_AUTO_TEST_CASE(checkpoint_sanity)
+{
+    const auto chainParams = CreateChainParams(*m_node.args, ChainType::MAIN);
+    const auto& checkpoints = chainParams->Checkpoints();
+
+    uint256 p11111 = uint256{"0000000069e244f73d78e8fd29ba2fd2ed618bd6fa2ee92559f542fdb26e7c1d"};
+    uint256 p134444 = uint256{"00000000000005b12ffd4cd315cd34ffd4a594f430ac814c91184a0d42d2b0fe"};
+    BOOST_CHECK(checkpoints.CheckBlock(11111, p11111));
+    BOOST_CHECK(checkpoints.CheckBlock(134444, p134444));
+
+    // Wrong hashes at checkpoints should fail:
+    BOOST_CHECK(!checkpoints.CheckBlock(11111, p134444));
+    BOOST_CHECK(!checkpoints.CheckBlock(134444, p11111));
+
+    // ... but any hash not at a checkpoint should succeed:
+    BOOST_CHECK(checkpoints.CheckBlock(11111+1, p134444));
+    BOOST_CHECK(checkpoints.CheckBlock(134444+1, p11111));
+}
+
 BOOST_AUTO_TEST_CASE(block_subsidy_test)
 {
     const auto chainParams = CreateChainParams(*m_node.args, ChainType::MAIN);
@@ -64,6 +83,25 @@ BOOST_AUTO_TEST_CASE(subsidy_limit_test)
         BOOST_CHECK(MoneyRange(nSum));
     }
     BOOST_CHECK_EQUAL(nSum, CAmount{2099999997690000});
+}
+
+BOOST_AUTO_TEST_CASE(block_header_hidden_v2_fields)
+{
+    Consensus::Params params{};
+    const auto check_hidden_field = [&](const CBlock& block) {
+        BlockValidationState state;
+        BOOST_CHECK(!CheckBlock(block, state, params, /*fCheckPOW=*/false, /*fCheckMerkleRoot=*/false));
+        BOOST_CHECK(state.GetResult() == BlockValidationResult::BLOCK_MUTATED);
+        BOOST_CHECK_EQUAL(state.GetRejectReason(), "error-headerv1-with-v2-fields");
+    };
+
+    CBlock hidden_txcount;
+    hidden_txcount.m_txcount = 1;
+    check_hidden_field(hidden_txcount);
+
+    CBlock hidden_mm_rhs;
+    hidden_mm_rhs.m_mm_rhs = uint256::ONE;
+    check_hidden_field(hidden_mm_rhs);
 }
 
 BOOST_AUTO_TEST_CASE(signet_parse_tests)

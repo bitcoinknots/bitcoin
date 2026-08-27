@@ -77,6 +77,29 @@ def assert_equal(thing1, thing2, *args):
         raise AssertionError("not(%s)" % " == ".join(str(arg) for arg in (thing1, thing2) + args))
 
 
+def assert_equal_without_usage(actual, expected):
+    """
+    Assert that testmempoolaccept results match expected values, ignoring the 'usage' field.
+    This helper is for tests that were written before the 'usage' field was added.
+    """
+    if isinstance(actual, list) and isinstance(expected, list):
+        assert_equal(len(actual), len(expected))
+        for act, exp in zip(actual, expected):
+            assert_equal_without_usage(act, exp)
+    elif isinstance(actual, dict) and isinstance(expected, dict):
+        # Check that all expected keys match
+        for key in expected:
+            assert key in actual, f"Expected key '{key}' not in actual result"
+            if key != 'usage':  # Skip usage comparison
+                assert_equal(actual[key], expected[key])
+        # Verify usage exists and is positive if transaction was validated
+        if 'usage' in actual:
+            assert isinstance(actual['usage'], int), "usage should be an integer"
+            assert actual['usage'] > 0, "usage should be positive"
+    else:
+        assert_equal(actual, expected)
+
+
 def assert_greater_than(thing1, thing2):
     if thing1 <= thing2:
         raise AssertionError("%s <= %s" % (str(thing1), str(thing2)))
@@ -217,6 +240,18 @@ def assert_array_result(object_array, to_match, expected, should_not_find=False)
         raise AssertionError("No objects matched %s" % (str(to_match)))
     if num_matched > 0 and should_not_find:
         raise AssertionError("Objects were found %s" % (str(to_match)))
+
+def assert_scale(number, expected_scale=8):
+    """Assert number has expected scale, e.g. fractional digits; number of
+    digits after the decimal. The default of 8 corresponds to a Bitcoin amount."""
+    number = str(number)
+    mantissa = number.split('.')[-1].upper()
+    if mantissa[:3] == '0E-':
+        assert_equal(mantissa, '0E-{}'.format(expected_scale))  # zeros in exponent notation
+    elif mantissa == number:
+        assert_equal(0, expected_scale)  # no mantissa, ergo, expected scale must be 0
+    else:
+        assert_equal(len(mantissa), expected_scale)
 
 
 # Utility functions
@@ -453,6 +488,7 @@ def write_config(config_path, *, n, chain, extra_config="", disable_autoconnect=
         # in tests.
         f.write("peertimeout=999999999\n")
         f.write("printtoconsole=0\n")
+        f.write("upnp=0\n")
         f.write("natpmp=0\n")
         f.write("shrinkdebugfile=0\n")
         f.write("deprecatedrpc=create_bdb\n")  # Required to run the tests
@@ -558,7 +594,8 @@ def check_node_connections(*, node, num_in, num_out):
 def gen_return_txouts():
     from .messages import CTxOut
     from .script import CScript, OP_RETURN
-    txouts = [CTxOut(nValue=0, scriptPubKey=CScript([OP_RETURN, b'\x01'*67437]))]
+    txouts = [CTxOut(nValue=0, scriptPubKey=CScript([OP_RETURN, b'\x01'*80]))] * 733
+    txouts.append(CTxOut(nValue=0, scriptPubKey=CScript([OP_RETURN, b'\x01'*9])))
     assert_equal(sum([len(txout.serialize()) for txout in txouts]), 67456)
     return txouts
 
@@ -599,3 +636,13 @@ def find_vout_for_address(node, txid, addr):
         if addr == tx["vout"][i]["scriptPubKey"]["address"]:
             return i
     raise RuntimeError("Vout not found for address: txid=%s, addr=%s" % (txid, addr))
+
+def is_dir_writable(dir_path: pathlib.Path) -> bool:
+    """Return True if we can create a file in the directory, False otherwise"""
+    try:
+        tmp = dir_path / f".tmp_{random.randrange(1 << 32)}"
+        tmp.touch()
+        tmp.unlink()
+        return True
+    except OSError:
+        return False

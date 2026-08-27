@@ -32,9 +32,11 @@ void initialize_miner()
 {
     static const auto testing_setup = MakeNoLogFileContext<const TestingSetup>();
     g_setup = testing_setup.get();
+    MineBlock(g_setup->m_node, {.coinbase_output_script = CScript() << OP_FALSE});
     for (uint32_t i = 0; i < uint32_t{100}; ++i) {
         g_available_coins.emplace_back(Txid::FromUint256(uint256::ZERO), i);
     }
+    g_setup->m_node.args->ForceSetArg("-blockprioritysize", "0");
 }
 
 // Test that the MiniMiner can run with various outpoints and feerates.
@@ -187,7 +189,7 @@ FUZZ_TARGET(mini_miner_selection, .init = initialize_miner)
     miner_options.test_block_validity = false;
     miner_options.coinbase_output_script = CScript() << OP_0;
 
-    node::BlockAssembler miner{g_setup->m_node.chainman->ActiveChainstate(), &pool, miner_options};
+    node::BlockAssembler miner{g_setup->m_node.chainman->ActiveChainstate(), &pool, miner_options, g_setup->m_node};
     node::MiniMiner mini_miner{pool, outpoints};
     assert(mini_miner.IsReadyToCalculate());
 

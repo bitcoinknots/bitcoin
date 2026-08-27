@@ -15,9 +15,14 @@
 
 #include <QByteArray>
 #include <QCompleter>
+#include <QMimeData>
+#include <QTextDocumentFragment>
+#include <QTextEdit>
 #include <QThread>
 #include <QWidget>
 
+class GuiNetWatch;
+class PairingPage;
 class PlatformStyle;
 class RPCExecutor;
 class RPCTimerInterface;
@@ -32,7 +37,10 @@ namespace Ui {
 }
 
 QT_BEGIN_NAMESPACE
+class QColor;
+class QEvent;
 class QDateTime;
+class QLabel;
 class QMenu;
 class QItemSelection;
 QT_END_NAMESPACE
@@ -43,6 +51,10 @@ class RPCConsole: public QWidget
     Q_OBJECT
 
 public:
+    struct ThemeColors {
+        QColor warning;
+        QColor userinput;
+    };
     explicit RPCConsole(interfaces::Node& node, const PlatformStyle *platformStyle, QWidget *parent);
     ~RPCConsole();
 
@@ -52,6 +64,7 @@ public:
     }
 
     void setClientModel(ClientModel *model = nullptr, int bestblock_height = 0, int64_t bestblock_date = 0, double verification_progress = 0.0);
+    void addPairingTab();
 
 #ifdef ENABLE_WALLET
     void addWallet(WalletModel* const walletModel);
@@ -70,13 +83,16 @@ public:
         INFO,
         CONSOLE,
         GRAPH,
-        PEERS
+        PEERS,
+        PAIRING,
     };
 
-    std::vector<TabTypes> tabs() const { return {TabTypes::INFO, TabTypes::CONSOLE, TabTypes::GRAPH, TabTypes::PEERS}; }
+    std::vector<TabTypes> tabs() const;
 
     QString tabTitle(TabTypes tab_type) const;
     QKeySequence tabShortcut(TabTypes tab_type) const;
+
+    QLabel *m_label_softwareexpiry;
 
 protected:
     virtual bool eventFilter(QObject* obj, QEvent *event) override;
@@ -103,6 +119,8 @@ private Q_SLOTS:
     void showOrHideBanTableIfRequired();
     /** clear the selected node */
     void clearSelectedNode();
+    /** reset all fields in UI detailed information to N/A */
+    void resetDetailWidget();
     /** show detailed information on ui about selected node */
     void updateDetailWidget();
 
@@ -142,14 +160,16 @@ public Q_SLOTS:
 private:
     struct TranslatedStrings {
         const QString yes{tr("Yes")}, no{tr("No")}, to{tr("To")}, from{tr("From")},
-            ban_for{tr("Ban for")}, na{tr("N/A")}, unknown{tr("Unknown")};
+            ban_for{tr("Ban for")}, na{tr("N/A")}, unknown{tr("Unknown")}, no_permissions{tr("None")};
     } const ts;
 
     void startExecutor();
     void setTrafficGraphRange(int mins);
+    void WriteCommandHistory();
 
     enum ColumnWidths
     {
+        DIRECTION_COLUMN_WIDTH = 32,
         ADDRESS_COLUMN_WIDTH = 200,
         SUBVERSION_COLUMN_WIDTH = 150,
         PING_COLUMN_WIDTH = 80,
@@ -161,6 +181,9 @@ private:
     interfaces::Node& m_node;
     Ui::RPCConsole* const ui;
     ClientModel *clientModel = nullptr;
+    std::map<TabTypes, QWidget*> m_tabs;
+    PairingPage *m_tab_pairing{nullptr};
+    GuiNetWatch *netwatch = nullptr;
     QStringList history;
     int historyPtr = 0;
     QString cmdBeforeBrowsing;
@@ -177,6 +200,10 @@ private:
     bool m_is_executing{false};
     QByteArray m_peer_widget_header_state;
     QByteArray m_banlist_widget_header_state;
+    bool m_alternating_row_colors{false};
+
+    // Theme Colors
+    const ThemeColors *m_theme_colors;
 
     /** Update UI with latest network info from model. */
     void updateNetworkState();
@@ -188,9 +215,27 @@ private:
     }
 
     void updateWindowTitle();
+    void updateThemeColors();
+    void updateConsoleStyleSheet();
 
 private Q_SLOTS:
     void updateAlerts(const QString& warnings);
+};
+
+/**
+ * A version of QTextEdit that only populates plaintext mime data from a
+ * selection, this avoids some bad behavior in QT's HTML->Markdown conversion.
+ */
+class PlainCopyTextEdit : public QTextEdit {
+    Q_OBJECT
+public:
+    using QTextEdit::QTextEdit;
+protected:
+    QMimeData* createMimeDataFromSelection() const override {
+        auto md = new QMimeData();
+        md->setText(textCursor().selection().toPlainText());
+        return md;
+    }
 };
 
 #endif // BITCOIN_QT_RPCCONSOLE_H

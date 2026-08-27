@@ -7,6 +7,7 @@
 #define BITCOIN_NET_PROCESSING_H
 
 #include <net.h>
+#include <threadsafety.h>
 #include <txorphanage.h>
 #include <validationinterface.h>
 
@@ -25,9 +26,11 @@ class Warnings;
 static constexpr bool DEFAULT_TXRECONCILIATION_ENABLE{false};
 /** Default for -maxorphantx, maximum number of orphan transactions kept in memory */
 static const uint32_t DEFAULT_MAX_ORPHAN_TRANSACTIONS{100};
+static constexpr size_t BLOCK_RECONSTRUCTION_EXTRA_TXN_PER_TXN_SIZE_LIMIT{100000};
+static const size_t DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN_SIZE{10000000};
 /** Default number of non-mempool transactions to keep around for block reconstruction. Includes
     orphan, replaced, and rejected transactions. */
-static const uint32_t DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN{100};
+static const uint32_t DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN{32768};
 static const bool DEFAULT_PEERBLOOMFILTERS = false;
 static const bool DEFAULT_PEERBLOCKFILTERS = false;
 /** Maximum number of outstanding CMPCTBLOCK requests for the same block. */
@@ -35,6 +38,14 @@ static const unsigned int MAX_CMPCTBLOCKS_INFLIGHT_PER_BLOCK = 3;
 /** Number of headers sent in one getheaders result. We rely on the assumption that if a peer sends
  *  less than this number, we reached its tip. Changing this value is a protocol upgrade. */
 static const unsigned int MAX_HEADERS_RESULTS = 2000;
+/** Maximum number of tolerated automatic outbound peers lacking NODE_REDUCED_DATA
+ *  (BIP-110). Only full-relay and block-relay outbound connections are demoted,
+ *  so this is their combined count: a stale peer can occupy no other slot. These
+ *  are additional to the outbound target but count within -maxconnections, each
+ *  displacing an inbound slot while connected. */
+static constexpr int MAX_STALE_OUTBOUND_CONNECTIONS{MAX_OUTBOUND_FULL_RELAY_CONNECTIONS + MAX_BLOCK_RELAY_ONLY_CONNECTIONS};
+/** -maxstaleoutbound default */
+static constexpr int DEFAULT_MAXSTALEOUTBOUND{8};
 
 struct CNodeStateStats {
     int nSyncHeight = -1;
@@ -50,6 +61,8 @@ struct CNodeStateStats {
     ServiceFlags their_services;
     int64_t presync_height{-1};
     std::chrono::seconds time_offset{0};
+    NodeSeconds m_last_block_announcement;
+    int m_misbehavior_score{0};
 };
 
 struct PeerManagerInfo {
@@ -70,6 +83,7 @@ public:
         //! Number of non-mempool transactions to keep around for block reconstruction. Includes
         //! orphan, replaced, and rejected transactions.
         uint32_t max_extra_txs{DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN};
+        size_t max_extra_txs_size{DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN_SIZE};
         //! Whether all P2P messages are captured to disk
         bool capture_messages{false};
         //! Whether or not the internal RNG behaves deterministically (this is
@@ -78,6 +92,7 @@ public:
         //! Number of headers sent in one getheaders message result (this is
         //! a test-only option).
         uint32_t max_headers_result{MAX_HEADERS_RESULTS};
+        unsigned int maxstaleoutbound{DEFAULT_MAXSTALEOUTBOUND};
     };
 
     static std::unique_ptr<PeerManager> make(CConnman& connman, AddrMan& addrman,
@@ -86,19 +101,21 @@ public:
     virtual ~PeerManager() = default;
 
     /**
-     * Attempt to manually fetch block from a given peer. We must already have the header.
+     * Attempt to manually fetch block from a given peer.
      *
      * @param[in]  peer_id      The peer id
      * @param[in]  block_index  The blockindex
      * @returns std::nullopt if a request was successfully made, otherwise an error message
      */
-    virtual std::optional<std::string> FetchBlock(NodeId peer_id, const CBlockIndex& block_index) = 0;
+    std::optional<std::string> FetchBlock(NodeId peer_id, const CBlockIndex& block_index);
+    virtual std::optional<std::string> FetchBlock(NodeId peer_id, const uint256& hash, const CBlockIndex* block_index) = 0;
 
     /** Begin running background tasks, should only be called once */
     virtual void StartScheduledTasks(CScheduler& scheduler) = 0;
 
     /** Get statistics from node state */
     virtual bool GetNodeStateStats(NodeId nodeid, CNodeStateStats& stats) const = 0;
+    virtual void LimitOrphanTxSize(uint32_t nMaxOrphans) = 0;
 
     virtual std::vector<TxOrphanage::OrphanTxBase> GetOrphanTransactions() = 0;
 
@@ -152,6 +169,9 @@ public:
      * we do not have a confirmed set of service flags.
     */
     virtual ServiceFlags GetDesirableServiceFlags(ServiceFlags services) const = 0;
+
+    /** Get number of peers from which we're downloading blocks */
+    virtual int GetNumberOfPeersWithValidatedDownloads() const EXCLUSIVE_LOCKS_REQUIRED(::cs_main) = 0;
 };
 
 #endif // BITCOIN_NET_PROCESSING_H

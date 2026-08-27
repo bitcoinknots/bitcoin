@@ -40,6 +40,7 @@ from test_framework.blocktools import (
     target_str,
 )
 from test_framework.messages import (
+    CBlock,
     CBlockHeader,
     COIN,
     from_hex,
@@ -229,6 +230,7 @@ class BlockchainTest(BitcoinTestFramework):
                     'since': 144,
                     'statistics': {
                         'period': 144,
+                        'period_start': 144,
                         'threshold': 108,
                         'elapsed': height - 143,
                         'count': height - 143,
@@ -578,7 +580,8 @@ class BlockchainTest(BitcoinTestFramework):
         node.reconsiderblock(rollback_hash)
         # The chain has probably already been restored by the time reconsiderblock returns,
         # but poll anyway.
-        self.wait_until(lambda: node.waitfornewblock(timeout=100)['hash'] == current_hash)
+        self.wait_until(lambda: node.waitfornewblock(current_tip=rollback_header['previousblockhash'])['hash'] == current_hash)
+
         assert_raises_rpc_error(-1, "Negative timeout", node.waitfornewblock, -1)
 
     def _test_waitforblockheight(self):
@@ -630,8 +633,9 @@ class BlockchainTest(BitcoinTestFramework):
         blockhash = self.generate(node, 1)[0]
 
         def assert_hexblock_hashes(verbosity):
-            block = node.getblock(blockhash, verbosity)
-            assert_equal(blockhash, hash256(bytes.fromhex(block[:160]))[::-1].hex())
+            block = from_hex(CBlock(), node.getblock(blockhash, verbosity))
+            block.rehash()
+            assert_equal(blockhash, block.hash)
 
         def assert_fee_not_in_block(hash, verbosity):
             block = node.getblock(hash, verbosity)

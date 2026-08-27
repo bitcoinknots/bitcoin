@@ -11,6 +11,7 @@
 #include <common/system.h>
 #include <compat/compat.h>
 #include <compat/stdin.h>
+#include <consensus/amount.h>
 #include <policy/feerate.h>
 #include <rpc/client.h>
 #include <rpc/mining.h>
@@ -82,6 +83,7 @@ static void SetupCliArgs(ArgsManager& argsman)
 
     argsman.AddArg("-version", "Print version and exit", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-conf=<file>", strprintf("Specify configuration file. Relative paths will be prefixed by datadir location. (default: %s)", BITCOIN_CONF_FILENAME), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-confrw=<file>", strprintf("Specify read/write configuration file. Relative paths will be prefixed by the network-specific datadir location. (default: %s)", BITCOIN_RW_CONF_FILENAME), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-datadir=<dir>", "Specify data directory", ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION, OptionsCategory::OPTIONS);
     argsman.AddArg("-generate",
                    strprintf("Generate blocks, equivalent to RPC getnewaddress followed by RPC generatetoaddress. Optional positional integer "
@@ -90,7 +92,7 @@ static void SetupCliArgs(ArgsManager& argsman)
                              DEFAULT_NBLOCKS, DEFAULT_MAX_TRIES),
                    ArgsManager::ALLOW_ANY, OptionsCategory::CLI_COMMANDS);
     argsman.AddArg("-addrinfo", "Get the number of addresses known to the node, per network and total, after filtering for quality and recency. The total number of addresses known to the node may be higher.", ArgsManager::ALLOW_ANY, OptionsCategory::CLI_COMMANDS);
-    argsman.AddArg("-getinfo", "Get general information from the remote server. Note that unlike server-side RPC calls, the output of -getinfo is the result of multiple non-atomic requests. Some entries in the output may represent results from different states (e.g. wallet balance may be as of a different block from the chain state reported)", ArgsManager::ALLOW_ANY, OptionsCategory::CLI_COMMANDS);
+    argsman.AddArg("-getinfo", "Get general information from the remote server, including the total balance and the balances of each loaded wallet when in multiwallet mode. Note that -getinfo is the combined result of several RPCs (getnetworkinfo, getblockchaininfo, getwalletinfo, getbalances, and in multiwallet mode, listwallets), each with potentially different state.", ArgsManager::ALLOW_ANY, OptionsCategory::CLI_COMMANDS);
     argsman.AddArg("-netinfo", strprintf("Get network peer connection information from the remote server. An optional argument from 0 to %d can be passed for different peers listings (default: 0). If a non-zero value is passed, an additional \"outonly\" (or \"o\") argument can be passed to see outbound peers only. Pass \"help\" (or \"h\") for detailed help documentation.", NETINFO_MAX_LEVEL), ArgsManager::ALLOW_ANY, OptionsCategory::CLI_COMMANDS);
 
     SetupChainParamsBaseOptions(argsman);
@@ -185,13 +187,6 @@ static int AppInitRPC(int argc, char* argv[])
     }
     if (!gArgs.ReadConfigFiles(error, true)) {
         tfm::format(std::cerr, "Error reading configuration file: %s\n", error);
-        return EXIT_FAILURE;
-    }
-    // Check for chain settings (BaseParams() calls are only valid after this clause)
-    try {
-        SelectBaseParams(gArgs.GetChainType());
-    } catch (const std::exception& e) {
-        tfm::format(std::cerr, "Error: %s\n", e.what());
         return EXIT_FAILURE;
     }
     return CONTINUE_EXECUTION;
@@ -432,6 +427,7 @@ private:
         int64_t last_send;
         int64_t last_trxn;
         int id;
+        int cpu_load;
         int mapped_as;
         int version;
         bool is_addr_relay_enabled;
@@ -477,7 +473,30 @@ private:
         std::string str;
         for (size_t i = 0; i < services.size(); ++i) {
             const std::string s{services[i].get_str()};
-            str += s == "NETWORK_LIMITED" ? 'l' : s == "P2P_V2" ? '2' : ToLower(s[0]);
+            if (s == "NETWORK_LIMITED") {
+                str += 'l';
+            } else if (s == "P2P_V2") {
+                str += '2';
+            } else if (s == "UTREEXO") {
+                str += 't';
+            } else if (s == "UTREEXO_ARCHIVE") {
+                str += 'T';
+            } else if (s == "UTREEXO_TMP?") {
+                str += 'y';
+            } else {
+                str += ToLower(s[0]);
+            }
+        }
+        return str;
+    }
+    static std::string ServicesList(const UniValue& services)
+    {
+        std::string str{services.size() ? services[0].get_str() : ""};
+        for (size_t i{1}; i < services.size(); ++i) {
+            str += ", " + services[i].get_str();
+        }
+        for (auto& c: str) {
+            c = (c == '_' ? ' ' : ToLower(c));
         }
         return str;
     }
@@ -552,6 +571,7 @@ public:
                 const int64_t last_trxn{peer["last_transaction"].getInt<int64_t>()};
                 const double min_ping{peer["minping"].isNull() ? -1 : peer["minping"].get_real()};
                 const double ping{peer["pingtime"].isNull() ? -1 : peer["pingtime"].get_real()};
+                const int cpu_load{peer["cpu_load"].isNull() ? -1 : static_cast<int>(round(peer["cpu_load"].get_real()))};
                 const std::string addr{peer["addr"].get_str()};
                 const std::string age{conn_time == 0 ? "" : ToString((time_now - conn_time) / 60)};
                 const std::string services{FormatServices(peer["servicesnames"])};
@@ -560,7 +580,30 @@ public:
                 const bool is_addr_relay_enabled{peer["addr_relay_enabled"].isNull() ? false : peer["addr_relay_enabled"].get_bool()};
                 const bool is_bip152_hb_from{peer["bip152_hb_from"].get_bool()};
                 const bool is_bip152_hb_to{peer["bip152_hb_to"].get_bool()};
-                m_peers.push_back({addr, sub_version, conn_type, NETWORK_SHORT_NAMES[network_id], age, services, transport, min_ping, ping, addr_processed, addr_rate_limited, last_blck, last_recv, last_send, last_trxn, peer_id, mapped_as, version, is_addr_relay_enabled, is_bip152_hb_from, is_bip152_hb_to, is_outbound, is_tx_relay});
+                m_peers.push_back(Peer{.addr = addr,
+                                       .sub_version = sub_version,
+                                       .conn_type = conn_type,
+                                       .network = NETWORK_SHORT_NAMES[network_id],
+                                       .age = age,
+                                       .services = services,
+                                       .transport_protocol_type = transport,
+                                       .min_ping = min_ping,
+                                       .ping = ping,
+                                       .addr_processed = addr_processed,
+                                       .addr_rate_limited = addr_rate_limited,
+                                       .last_blck = last_blck,
+                                       .last_recv = last_recv,
+                                       .last_send = last_send,
+                                       .last_trxn = last_trxn,
+                                       .id = peer_id,
+                                       .cpu_load = cpu_load,
+                                       .mapped_as = mapped_as,
+                                       .version = version,
+                                       .is_addr_relay_enabled = is_addr_relay_enabled,
+                                       .is_bip152_hb_from = is_bip152_hb_from,
+                                       .is_bip152_hb_to = is_bip152_hb_to,
+                                       .is_outbound = is_outbound,
+                                       .is_tx_relay = is_tx_relay});
                 m_max_addr_length = std::max(addr.length() + 1, m_max_addr_length);
                 m_max_addr_processed_length = std::max(ToString(addr_processed).length(), m_max_addr_processed_length);
                 m_max_addr_rate_limited_length = std::max(ToString(addr_rate_limited).length(), m_max_addr_rate_limited_length);
@@ -572,12 +615,13 @@ public:
         }
 
         // Generate report header.
-        std::string result{strprintf("%s client %s%s - server %i%s\n\n", CLIENT_NAME, FormatFullVersion(), ChainToString(), networkinfo["protocolversion"].getInt<int>(), networkinfo["subversion"].get_str())};
+        const std::string services{DetailsRequested() ? strprintf(" - services %s", FormatServices(networkinfo["localservicesnames"])) : ""};
+        std::string result{strprintf("%s client %s%s - server %i%s%s\n\n", CLIENT_NAME, FormatFullVersion(), ChainToString(), networkinfo["protocolversion"].getInt<int>(), networkinfo["subversion"].get_str(), services)};
 
         // Report detailed peer connections list sorted by direction and minimum ping time.
         if (DetailsRequested() && !m_peers.empty()) {
             std::sort(m_peers.begin(), m_peers.end());
-            result += strprintf("<->   type   net %*s  v  mping   ping send recv  txn  blk  hb %*s%*s%*s ",
+            result += strprintf("<->   type   net %*s  v  mping   ping send recv  txn  blk  hb %*s%*s cpu%*s ",
                                 m_max_services_length, "serv",
                                 m_max_addr_processed_length, "addrp",
                                 m_max_addr_rate_limited_length, "addrl",
@@ -587,7 +631,7 @@ public:
             for (const Peer& peer : m_peers) {
                 std::string version{ToString(peer.version) + peer.sub_version};
                 result += strprintf(
-                    "%3s %6s %5s %*s %2s%7s%7s%5s%5s%5s%5s  %2s %*s%*s%*s%*i %*s %-*s%s\n",
+                    "%3s %6s %5s %*s %2s%7s%7s%5s%5s%5s%5s  %2s %*s%*s%4s%*s%*i %*s %-*s%s\n",
                     peer.is_outbound ? "out" : "in",
                     ConnectionTypeForNetinfo(peer.conn_type),
                     peer.network,
@@ -605,6 +649,7 @@ public:
                     peer.addr_processed ? ToString(peer.addr_processed) : peer.is_addr_relay_enabled ? "" : ".",
                     m_max_addr_rate_limited_length, // variable spacing
                     peer.addr_rate_limited ? ToString(peer.addr_rate_limited) : "",
+                    peer.cpu_load > 0 ? ToString(round(peer.cpu_load)) : "",
                     m_max_age_length, // variable spacing
                     peer.age,
                     m_is_asmap_on ? 7 : 0, // variable spacing
@@ -615,7 +660,7 @@ public:
                     IsAddressSelected() ? peer.addr : "",
                     IsVersionSelected() && version != "0" ? version : "");
             }
-            result += strprintf("                %*s         ms     ms  sec  sec  min  min                %*s\n\n", m_max_services_length, "", m_max_age_length, "min");
+            result += strprintf("                %*s         ms     ms  sec  sec  min  min                   ‰%*s\n\n", m_max_services_length, "", m_max_age_length, "min");
         }
 
         // Report peer connection totals by type.
@@ -654,6 +699,9 @@ public:
         }
 
         // Report local addresses, ports, and scores.
+        if (!DetailsRequested()) {
+            result += strprintf("\n\nLocal services: %s", ServicesList(networkinfo["localservicesnames"]));
+        }
         result += "\n\nLocal addresses";
         const std::vector<UniValue>& local_addrs{networkinfo["localaddresses"].getValues()};
         if (local_addrs.empty()) {
@@ -713,6 +761,11 @@ public:
         "           \"c\" - COMPACT_FILTERS: peer can handle basic block filter requests (see BIPs 157 and 158)\n"
         "           \"l\" - NETWORK_LIMITED: peer limited to serving only the last 288 blocks (~2 days)\n"
         "           \"2\" - P2P_V2: peer supports version 2 P2P transport protocol, as defined in BIP 324\n"
+        "           \"t\" - UTREEXO peer can handle Utreexo proof requests for blocks it serves\n"
+        "           \"T\" - UTREEXO_ARCHIVE peer can handle Utreexo proof requests for all  historical blocks\n"
+        "           \"y\" - UTREEXO_TMP? peer can handle Utreexo proof requests\n"
+        "           \"r\" - REPLACE_BY_FEE? peer supports replacement of transactions without BIP 125 signalling\n"
+        "           \"m\" - MALICIOUS? peer openly seeks to aid in bypassing network policy/spam filters (OR to sabotage nodes that seek to)\n"
         "           \"u\" - UNKNOWN: unrecognized bit flag\n"
         "  v        Version of transport protocol used for the connection\n"
         "  mping    Minimum observed ping time, in milliseconds (ms)\n"
@@ -728,6 +781,7 @@ public:
         "  addrp    Total number of addresses processed, excluding those dropped due to rate limiting\n"
         "           \".\" - we do not relay addresses to this peer (getpeerinfo \"addr_relay_enabled\" is false)\n"
         "  addrl    Total number of addresses dropped due to rate limiting\n"
+        "  cpu      CPU time processing messages to/from peer, per milles (‰) of age, rounded to nearest integer, if non-zero\n"
         "  age      Duration of connection to the peer, in minutes\n"
         "  asmap    Mapped AS (Autonomous System) number at the end of the BGP route to the peer, used for diversifying\n"
         "           peer selection (only displayed if the -asmap config option is set)\n"
@@ -1012,9 +1066,29 @@ static void ParseError(const UniValue& error, std::string& strPrint, int& nRet)
     nRet = abs(error["code"].getInt<int>());
 }
 
+static CAmount AmountFromValue(const UniValue& value)
+{
+    CAmount amount{0};
+    if (!ParseFixedPoint(value.getValStr(), 8, &amount))
+        throw std::runtime_error("Invalid amount");
+    if (!MoneyRange(amount))
+        throw std::runtime_error("Amount out of range");
+    return amount;
+}
+
+static UniValue ValueFromAmount(const CAmount& amount)
+{
+    bool sign{amount < 0};
+    int64_t n_abs{sign ? -amount : amount};
+    int64_t quotient{n_abs / COIN};
+    int64_t remainder{n_abs % COIN};
+    return UniValue(UniValue::VNUM, strprintf("%s%d.%08d", sign ? "-" : "", quotient, remainder));
+}
+
 /**
- * GetWalletBalances calls listwallets; if more than one wallet is loaded, it then
- * fetches mine.trusted balances for each loaded wallet and pushes them to `result`.
+ * GetWalletBalances calls listwallets; if more than one wallet is loaded, it
+ * then fetches mine.trusted balances for each loaded wallet and pushes all the
+ * balances, followed by the total balance, to `result`.
  *
  * @param result  Reference to UniValue object the wallet names and balances are pushed to.
  */
@@ -1027,13 +1101,17 @@ static void GetWalletBalances(UniValue& result)
     if (wallets.size() <= 1) return;
 
     UniValue balances(UniValue::VOBJ);
+    CAmount total_balance{0};
     for (const UniValue& wallet : wallets.getValues()) {
         const std::string& wallet_name = wallet.get_str();
         const UniValue getbalances = ConnectAndCallRPC(&rh, "getbalances", /* args=*/{}, wallet_name);
+        if (!getbalances.find_value("error").isNull()) continue;
         const UniValue& balance = getbalances.find_value("result")["mine"]["trusted"];
+        total_balance += AmountFromValue(balance);
         balances.pushKV(wallet_name, balance);
     }
     result.pushKV("balances", std::move(balances));
+    result.pushKV("total_balance", ValueFromAmount(total_balance));
 }
 
 /**
@@ -1176,6 +1254,7 @@ static void ParseGetInfoResult(UniValue& result)
                                        wallet.empty() ? "\"\"" : wallet);
         }
         result_string += "\n";
+        result_string += strprintf("%sTotal balance:%s %s\n\n", CYAN, RESET, result["total_balance"].getValStr());
     }
 
     const std::string warnings{result["warnings"].getValStr()};
@@ -1267,7 +1346,7 @@ static int CommandLineRPC(int argc, char *argv[])
         gArgs.CheckMultipleCLIArgs();
         std::unique_ptr<BaseRequestHandler> rh;
         std::string method;
-        if (gArgs.IsArgSet("-getinfo")) {
+        if (gArgs.GetBoolArg("-getinfo", false)) {
             rh.reset(new GetinfoRequestHandler());
         } else if (gArgs.GetBoolArg("-netinfo", false)) {
             if (!args.empty() && (args.at(0) == "h" || args.at(0) == "help")) {

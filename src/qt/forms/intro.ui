@@ -223,7 +223,7 @@
    <item>
     <widget class="QLabel" name="lblExplanation3">
      <property name="text">
-      <string>If you have chosen to limit block chain storage (pruning), the historical data must still be downloaded and processed, but will be deleted afterward to keep your disk usage low.</string>
+      <string>If you choose to limit block chain storage (pruning), the historical data must still be downloaded and processed, but will be deleted afterward to keep your disk usage low.</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>
@@ -243,16 +243,16 @@
       </widget>
      </item>
      <item>
-      <widget class="QSpinBox" name="pruneGB">
+      <widget class="QSpinBox" name="pruneMiB">
        <property name="suffix">
-        <string> GB</string>
+        <string> MiB</string>
        </property>
       </widget>
      </item>
      <item>
       <widget class="QLabel" name="lblPruneSuffix">
        <property name="buddy">
-        <cstring>pruneGB</cstring>
+        <cstring>pruneMiB</cstring>
        </property>
       </widget>
      </item>
@@ -270,6 +270,64 @@
       </spacer>
      </item>
     </layout>
+   </item>
+   <item>
+    <widget class="QWidget" name="groupAssumeValid">
+     <layout class="QVBoxLayout">
+      <item>
+       <widget class="QLabel" name="lblExplanationAssumeValid">
+        <property name="text">
+         <string>The initial synchronisation process can go faster if you skip verification of older transactions. This does, however, require trusting that the &quot;assumed valid&quot; blockchain below is in fact valid. Uncheck this if you want to fully validate the entire blockchain history.</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="layoutAssumeValid">
+        <item>
+         <widget class="QCheckBox" name="assumevalid">
+          <property name="toolTip">
+           <string>Reverting this setting will slow down initial synchronisation due to validating old transactions</string>
+          </property>
+          <property name="text">
+           <string>Skip validation of the transactions until after block:</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer>
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="layoutAssumeValidBlock">
+        <item>
+         <spacer>
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="assumevalidBlock">
+          <property name="maxLength">
+           <number>64</number>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
    </item>
    <item>
     <spacer name="verticalSpacer">

@@ -40,7 +40,7 @@ void AddLoggingArgs(ArgsManager& argsman)
     argsman.AddArg("-loglevelalways", strprintf("Always prepend a category and level (default: %u)", DEFAULT_LOGLEVELALWAYS), ArgsManager::ALLOW_ANY, OptionsCategory::DEBUG_TEST);
     argsman.AddArg("-logratelimit", strprintf("Apply rate limiting to unconditional logging to mitigate disk-filling attacks (default: %u)", BCLog::DEFAULT_LOGRATELIMIT), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::DEBUG_TEST);
     argsman.AddArg("-printtoconsole", "Send trace/debug info to console (default: 1 when no -daemon. To disable logging to file, set -nodebuglogfile)", ArgsManager::ALLOW_ANY, OptionsCategory::DEBUG_TEST);
-    argsman.AddArg("-shrinkdebugfile", "Shrink debug.log file on client startup (default: 1 when no -debug)", ArgsManager::ALLOW_ANY, OptionsCategory::DEBUG_TEST);
+    argsman.AddArg("-shrinkdebugfile", "Shrink debug log file on client startup (default: 1 when no -debug)", ArgsManager::ALLOW_ANY, OptionsCategory::DEBUG_TEST);
 }
 
 void SetLoggingOptions(const ArgsManager& args)
@@ -133,6 +133,15 @@ bool StartLogging(const ArgsManager& args)
     } else {
         // Not categorizing as "Warning" because it's the default behavior
         LogPrintf("Config file: %s (not found, skipping)\n", fs::PathToString(config_file_path));
+    }
+
+    fs::path rwconfig_file_path = args.GetRWConfigFilePath();
+    if (fs::exists(rwconfig_file_path)) {
+        LogPrintf("R/W Config file: %s\n", fs::PathToString(rwconfig_file_path));
+    } else if (gArgs.IsArgSet("-confrw")) {
+        InitWarning(strprintf(_("The specified R/W config file %s does not exist"), fs::PathToString(rwconfig_file_path)));
+    } else {
+        LogPrintf("R/W Config file: %s (not found, skipping)\n", fs::PathToString(rwconfig_file_path));
     }
 
     // Log the config arguments to debug.log

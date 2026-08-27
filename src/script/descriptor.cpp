@@ -149,8 +149,6 @@ std::string DescriptorChecksum(const Span<const char>& span)
     return ret;
 }
 
-std::string AddChecksum(const std::string& str) { return str + "#" + DescriptorChecksum(str); }
-
 ////////////////////////////////////////////////////////////////////////////
 // Internal representation                                                //
 ////////////////////////////////////////////////////////////////////////////
@@ -843,8 +841,11 @@ class PKDescriptor final : public DescriptorImpl
 private:
     const bool m_xonly;
 protected:
-    std::vector<CScript> MakeScripts(const std::vector<CPubKey>& keys, Span<const CScript>, FlatSigningProvider&) const override
+    std::vector<CScript> MakeScripts(const std::vector<CPubKey>& keys, Span<const CScript>, FlatSigningProvider& out) const override
     {
+        CKeyID id = keys[0].GetID();
+        out.pubkeys.emplace(id, keys[0]);
+
         if (m_xonly) {
             CScript script = CScript() << ToByteVector(XOnlyPubKey(keys[0])) << OP_CHECKSIG;
             return Vector(std::move(script));
@@ -1966,8 +1967,8 @@ std::vector<std::unique_ptr<DescriptorImpl>> ParseScript(uint32_t& key_exp_index
                 // First process all open braces.
                 while (Const("{", expr)) {
                     branches.push_back(false); // new left branch
-                    if (branches.size() > TAPROOT_CONTROL_MAX_NODE_COUNT) {
-                        error = strprintf("tr() supports at most %i nesting levels", TAPROOT_CONTROL_MAX_NODE_COUNT);
+                    if (branches.size() > TAPROOT_CONTROL_MAX_NODE_COUNT_REDUCED) {
+                        error = strprintf("tr() supports at most %i nesting levels", TAPROOT_CONTROL_MAX_NODE_COUNT_REDUCED);
                         return {};
                     }
                 }
@@ -2379,6 +2380,8 @@ std::string GetDescriptorChecksum(const std::string& descriptor)
     if (!CheckChecksum(sp, false, error, &ret)) return "";
     return ret;
 }
+
+std::string AddChecksum(const std::string& str) { return str + "#" + DescriptorChecksum(str); }
 
 std::unique_ptr<Descriptor> InferDescriptor(const CScript& script, const SigningProvider& provider)
 {

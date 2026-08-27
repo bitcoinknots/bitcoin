@@ -33,7 +33,9 @@ bool operator==(const CBlockFileInfo& a, const CBlockFileInfo& b)
 CBlockHeader ConsumeBlockHeader(FuzzedDataProvider& provider)
 {
     CBlockHeader header;
-    header.nVersion = provider.ConsumeIntegral<decltype(header.nVersion)>();
+    // Clear nVersion's high bit: it's the m_header_v2 wire flag, and setting it
+    // without m_header_v2 makes the v2 header round-trip underflow.
+    header.nVersion = provider.ConsumeIntegral<decltype(header.nVersion)>() & 0x7fffffff;
     header.hashPrevBlock = g_block_hash;
     header.hashMerkleRoot = g_block_hash;
     header.nTime = provider.ConsumeIntegral<decltype(header.nTime)>();
@@ -89,7 +91,8 @@ FUZZ_TARGET(block_index, .init = init_block_index)
     }
 
     // Store these files and blocks in the block index. It should not fail.
-    assert(block_index.WriteBatchSync(files_info, files_count - 1, blocks_info));
+    const std::unordered_map<std::string, node::PruneLockInfo> prune_locks;
+    assert(block_index.WriteBatchSync(files_info, files_count - 1, blocks_info, prune_locks));
 
     // We should be able to read every block file info we stored. Its value should correspond to
     // what we stored above.

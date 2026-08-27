@@ -31,6 +31,7 @@
 #include <util/check.h>
 #include <util/sock.h>
 #include <util/threadinterrupt.h>
+#include <util/time.h>
 
 #include <atomic>
 #include <condition_variable>
@@ -96,6 +97,9 @@ static constexpr bool DEFAULT_V2_TRANSPORT{true};
 
 typedef int64_t NodeId;
 
+/** Get the score of a local address. */
+int GetnScore(const CService& addr);
+
 struct AddedNodeParams {
     std::string m_added_node;
     bool m_use_v2transport;
@@ -148,7 +152,7 @@ enum
     LOCAL_NONE,   // unknown
     LOCAL_IF,     // address a local interface listens on
     LOCAL_BIND,   // address explicit bound to
-    LOCAL_MAPPED, // address reported by PCP
+    LOCAL_MAPPED, // address reported by UPnP or PCP
     LOCAL_MANUAL, // address explicitly specified (-externalip=)
 
     LOCAL_MAX
@@ -220,6 +224,10 @@ public:
     TransportProtocolType m_transport_type;
     /** BIP324 session id string in hex, if any. */
     std::string m_session_id;
+    /** whether this peer forced its connection by evicting another */
+    bool m_forced_inbound;
+    /** CPU time spent processing messages to/from the peer. */
+    std::chrono::nanoseconds m_cpu_time;
 };
 
 
@@ -664,6 +672,8 @@ struct CNodeOptions
     NetPermissionFlags permission_flags = NetPermissionFlags::None;
     std::unique_ptr<i2p::sam::Session> i2p_sam_session = nullptr;
     bool prefer_evict = false;
+    // True if ForceInbound connection required evicting a peer
+    bool forced_inbound{false};
     size_t recv_flood_size{DEFAULT_MAXRECEIVEBUFFER * 1000};
     bool use_v2transport = false;
 };
@@ -721,6 +731,7 @@ public:
      */
     std::string cleanSubVer GUARDED_BY(m_subver_mutex){};
     const bool m_prefer_evict{false}; // This peer is preferred for eviction.
+    const bool m_forced_inbound{false}; // This peer forced an inbound connection
     bool HasPermission(NetPermissionFlags permission) const {
         return NetPermissions::HasFlag(m_permission_flags, permission);
     }
@@ -735,6 +746,10 @@ public:
     const uint64_t nKeyedNetGroup;
     std::atomic_bool fPauseRecv{false};
     std::atomic_bool fPauseSend{false};
+
+    /** Network key used to prevent fingerprinting our node across networks.
+     *  Influenced by the network and the bind address (+ bind port for inbounds) */
+    const uint64_t m_network_key;
 
     const ConnectionType m_conn_type;
 
@@ -850,6 +865,15 @@ public:
     /** Whether this peer provides all services that we want. Used for eviction decisions */
     std::atomic_bool m_has_all_wanted_services{false};
 
+    /** Whether this connection counts towards an automatic outbound target. */
+    bool CountsTowardOutboundTarget() const { return !m_is_non_bip110_outbound; }
+
+    /** Whether this outbound peer did not advertise NODE_REDUCED_DATA (BIP-110).
+     *  Such a peer is tolerated as an additional connection, like an addnode
+     *  peer: it holds no automatic outbound semaphore slot and counts towards no
+     *  outbound target, so we keep looking for a BIP110 peer to fill it. */
+    std::atomic_bool m_is_non_bip110_outbound{false};
+
     /** Whether we should relay transactions to this peer. This only changes
      * from false to true. It will never change back to false. */
     std::atomic_bool m_relays_txs{false};
@@ -887,6 +911,7 @@ public:
           const std::string& addrNameIn,
           ConnectionType conn_type_in,
           bool inbound_onion,
+          uint64_t network_key,
           CNodeOptions&& node_opts = {});
     CNode(const CNode&) = delete;
     CNode& operator=(const CNode&) = delete;
@@ -945,6 +970,25 @@ public:
 
     void CopyStats(CNodeStats& stats) EXCLUSIVE_LOCKS_REQUIRED(!m_subver_mutex, !m_addr_local_mutex, !cs_vSend, !cs_vRecv);
 
+    bool PunishInvalidBlocks() const
+    {
+        if (HasPermission(NetPermissionFlags::NoBan)) {
+            return false;
+        }
+        switch (m_conn_type) {
+            case ConnectionType::INBOUND:
+            case ConnectionType::MANUAL:
+            case ConnectionType::FEELER:
+                return false;
+            case ConnectionType::OUTBOUND_FULL_RELAY:
+            case ConnectionType::BLOCK_RELAY:
+            case ConnectionType::ADDR_FETCH:
+                return true;
+        } // no default case, so the compiler can warn about missing cases
+
+        assert(false);
+    }
+
     std::string ConnectionTypeAsString() const { return ::ConnectionTypeAsString(m_conn_type); }
 
     /**
@@ -968,6 +1012,9 @@ public:
         m_last_ping_time = ping_time;
         m_min_ping_time = std::min(m_min_ping_time.load(), ping_time);
     }
+
+    /** CPU time spent processing messages to/from the peer. */
+    std::atomic<std::chrono::nanoseconds> m_cpu_time;
 
 private:
     const NodeId id;
@@ -1069,6 +1116,7 @@ public:
         std::vector<NetWhitebindPermissions> vWhiteBinds;
         std::vector<CService> vBinds;
         std::vector<CService> onion_binds;
+        bool listenonion{false};
         /// True if the user did not specify -bind= or -whitebind= and thus
         /// we should bind on `0.0.0.0` (IPv4) and `::` (IPv6).
         bool bind_on_any;
@@ -1078,6 +1126,8 @@ public:
         bool m_i2p_accept_incoming;
         bool whitelist_forcerelay = DEFAULT_WHITELISTFORCERELAY;
         bool whitelist_relay = DEFAULT_WHITELISTRELAY;
+        bool m_capture_messages = false;
+        bool disable_v1conn_clearnet = false;
     };
 
     void Init(const Options& connOptions) EXCLUSIVE_LOCKS_REQUIRED(!m_added_nodes_mutex, !m_total_bytes_sent_mutex)
@@ -1112,10 +1162,17 @@ public:
                 m_added_node_params.push_back({added_node, use_v2transport});
             }
         }
+        m_normal_binds = connOptions.vBinds;
         m_onion_binds = connOptions.onion_binds;
+        m_listenonion = connOptions.listenonion;
         whitelist_forcerelay = connOptions.whitelist_forcerelay;
         whitelist_relay = connOptions.whitelist_relay;
+        m_capture_messages = connOptions.m_capture_messages;
+        disable_v1conn_clearnet = connOptions.disable_v1conn_clearnet;
     }
+
+    // test only
+    void SetCaptureMessages(bool cap) { m_capture_messages = cap; }
 
     CConnman(uint64_t seed0, uint64_t seed1, AddrMan& addrman, const NetGroupManager& netgroupman,
              const CChainParams& params, bool network_active = true);
@@ -1125,9 +1182,10 @@ public:
     bool Start(CScheduler& scheduler, const Options& options) EXCLUSIVE_LOCKS_REQUIRED(!m_total_bytes_sent_mutex, !m_added_nodes_mutex, !m_addr_fetches_mutex, !mutexMsgProc);
 
     void StopThreads();
-    void StopNodes();
-    void Stop()
+    void StopNodes() EXCLUSIVE_LOCKS_REQUIRED(!m_reconnections_mutex);
+    void Stop() EXCLUSIVE_LOCKS_REQUIRED(!m_reconnections_mutex)
     {
+        AssertLockNotHeld(m_reconnections_mutex);
         StopThreads();
         StopNodes();
     };
@@ -1191,8 +1249,8 @@ public:
 
     void StartExtraBlockRelayPeers();
 
-    // Count the number of full-relay peer we have.
-    int GetFullOutboundConnCount() const;
+    // Count the number of BIP110 full-relay peers we have (excludes non-BIP110 peers).
+    int GetBIP110FullOutboundConnCount() const;
     // Return the number of outbound peers we have in excess of our target (eg,
     // if we previously called SetTryNewOutboundPeer(true), and have since set
     // to false, we may have extra peers that we wish to disconnect). This may
@@ -1202,6 +1260,18 @@ public:
     int GetExtraFullOutboundCount() const;
     // Count the number of block-relay-only peers we have over our limit.
     int GetExtraBlockRelayCount() const;
+
+    /** Demote an outbound peer that did not advertise NODE_REDUCED_DATA to an
+     *  additional connection: give up its automatic outbound semaphore slot (so
+     *  we keep looking for a BIP110 peer) and stop counting it as our outbound
+     *  coverage of its network. A demoted peer draws on the inbound budget, so it
+     *  is kept only while fewer than max_stale are already tolerated, its outbound
+     *  target is not already filled (by BIP110 or stale peers alike), and the
+     *  inbound budget has room; otherwise this sets fDisconnect and returns false
+     *  without demoting. Does its own logging. Must not be called on an already-
+     *  demoted peer (Assert): the version handler guarantees this by rejecting
+     *  redundant VERSION messages. */
+    bool DemoteToStaleOutbound(CNode& node, unsigned int max_stale) EXCLUSIVE_LOCKS_REQUIRED(!m_nodes_mutex);
 
     bool AddNode(const AddedNodeParams& add) EXCLUSIVE_LOCKS_REQUIRED(!m_added_nodes_mutex);
     bool RemoveAddedNode(const std::string& node) EXCLUSIVE_LOCKS_REQUIRED(!m_added_nodes_mutex);
@@ -1245,6 +1315,8 @@ public:
     void AddLocalServices(ServiceFlags services) { m_local_services = ServiceFlags(m_local_services | services); };
     void RemoveLocalServices(ServiceFlags services) { m_local_services = ServiceFlags(m_local_services & ~services); }
 
+    //! set the max outbound target in bytes
+    void SetMaxOutboundTarget(uint64_t limit) EXCLUSIVE_LOCKS_REQUIRED(!m_total_bytes_sent_mutex);
     uint64_t GetMaxOutboundTarget() const EXCLUSIVE_LOCKS_REQUIRED(!m_total_bytes_sent_mutex);
     std::chrono::seconds GetMaxOutboundTimeframe() const;
 
@@ -1268,9 +1340,12 @@ public:
     void WakeMessageHandler() EXCLUSIVE_LOCKS_REQUIRED(!mutexMsgProc);
 
     /** Return true if we should disconnect the peer for failing an inactivity check. */
-    bool ShouldRunInactivityChecks(const CNode& node, std::chrono::seconds now) const;
+    bool ShouldRunInactivityChecks(const CNode& node, std::chrono::microseconds now) const;
 
     bool MultipleManualOrFullOutboundConns(Network net) const EXCLUSIVE_LOCKS_REQUIRED(m_nodes_mutex);
+
+    /* Returns true if outbound v1 connections need to be disabled on IPV4/IPV6 network. */
+    bool DisableV1OnClearnet(Network net) const;
 
 private:
     struct ListenSocket {
@@ -1318,7 +1393,7 @@ private:
     void DisconnectNodes() EXCLUSIVE_LOCKS_REQUIRED(!m_reconnections_mutex, !m_nodes_mutex);
     void NotifyNumConnectionsChanged();
     /** Return true if the peer is inactive and should be disconnected. */
-    bool InactivityCheck(const CNode& node) const;
+    bool InactivityCheck(const CNode& node, std::chrono::microseconds now) const;
 
     /**
      * Generate a collection of sockets to check for IO readiness.
@@ -1362,7 +1437,14 @@ private:
      */
     bool AlreadyConnectedToAddress(const CAddress& addr);
 
-    bool AttemptToEvictConnection();
+    /**
+     * Attempt to disconnect a connected peer.
+     * Used to make room for new inbound connections, returns true if successful.
+     * @param[in] force     Try to evict a random inbound ban-able peer if
+     *                      all connections are otherwise protected.
+     */
+    bool AttemptToEvictConnection(bool force);
+
     CNode* ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure, ConnectionType conn_type, bool use_v2transport) EXCLUSIVE_LOCKS_REQUIRED(!m_unused_i2p_sessions_mutex);
     void AddWhitelistPermissionFlags(NetPermissionFlags& flags, std::optional<CNetAddr> addr, const std::vector<NetWhitelistPermissions>& ranges) const;
 
@@ -1573,11 +1655,14 @@ private:
      */
     std::atomic_bool m_start_extra_block_relay_peers{false};
 
+    std::vector<CService> m_normal_binds;
+
     /**
      * A vector of -bind=<address>:<port>=onion arguments each of which is
      * an address and port that are designated for incoming Tor connections.
      */
     std::vector<CService> m_onion_binds;
+    bool m_listenonion;
 
     /**
      * flag for adding 'forcerelay' permission to whitelisted inbound
@@ -1590,6 +1675,18 @@ private:
      * and manual peers with default permissions.
      */
     bool whitelist_relay;
+
+    /**
+     * flag for whether messages are captured
+     */
+    bool m_capture_messages{false};
+
+    /**
+     * option for disabling outbound v1 connections on IPV4 and IPV6.
+     * outbound connections on IPV4/IPV6 need to be v2 connections.
+     * outbound connections on Tor/I2P/CJDNS can be v1 or v2 connections.
+     */
+    bool disable_v1conn_clearnet;
 
     /**
      * Mutex protecting m_i2p_sam_sessions.

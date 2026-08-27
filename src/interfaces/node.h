@@ -21,11 +21,13 @@
 #include <stdint.h>
 #include <string>
 #include <tuple>
+#include <variant>
 #include <vector>
 
 class BanMan;
 class CFeeRate;
 class CNodeStats;
+class CTxMemPool;
 class Coin;
 class RPCTimerInterface;
 class UniValue;
@@ -121,7 +123,7 @@ public:
     virtual void resetSettings() = 0;
 
     //! Map port.
-    virtual void mapPort(bool enable) = 0;
+    virtual void mapPort(bool use_upnp, bool use_pcp) = 0;
 
     //! Get proxy.
     virtual bool getProxy(Network net, Proxy& proxy_info) = 0;
@@ -156,6 +158,8 @@ public:
 
     //! Get total bytes sent.
     virtual int64_t getTotalBytesSent() = 0;
+
+    virtual CTxMemPool& mempool() = 0;
 
     //! Get mempool size.
     virtual size_t getMempoolSize() = 0;
@@ -215,7 +219,7 @@ public:
     virtual std::optional<Coin> getUnspentOutput(const COutPoint& output) = 0;
 
     //! Broadcast transaction.
-    virtual node::TransactionError broadcastTransaction(CTransactionRef tx, CAmount max_tx_fee, std::string& err_string) = 0;
+    virtual node::TransactionError broadcastTransaction(CTransactionRef tx, const std::variant<CAmount, CFeeRate>& max_tx_fee, std::string& err_string) = 0;
 
     //! Get wallet loader.
     virtual WalletLoader& walletLoader() = 0;
@@ -251,6 +255,10 @@ public:
     //! Register handler for network active messages.
     using NotifyNetworkActiveChangedFn = std::function<void(bool network_active)>;
     virtual std::unique_ptr<Handler> handleNotifyNetworkActiveChanged(NotifyNetworkActiveChangedFn fn) = 0;
+
+    //! Register handler for network local changed messages.
+    using NotifyNetworkLocalChangedFn = std::function<void()>;
+    virtual std::unique_ptr<Handler> handleNotifyNetworkLocalChanged(NotifyNetworkLocalChangedFn fn) = 0;
 
     //! Register handler for notify alert messages.
     using NotifyAlertChangedFn = std::function<void()>;

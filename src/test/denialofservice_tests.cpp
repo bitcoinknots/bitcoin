@@ -20,6 +20,7 @@
 #include <util/time.h>
 #include <validation.h>
 
+#include <algorithm>
 #include <array>
 #include <stdint.h>
 
@@ -62,13 +63,14 @@ BOOST_AUTO_TEST_CASE(outbound_slow_chain_eviction)
                      CAddress(),
                      /*addrNameIn=*/"",
                      ConnectionType::OUTBOUND_FULL_RELAY,
-                     /*inbound_onion=*/false};
+                     /*inbound_onion=*/false,
+                     /*network_key=*/0};
 
     connman.Handshake(
         /*node=*/dummyNode1,
         /*successfully_connected=*/true,
-        /*remote_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS),
-        /*local_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS),
+        /*remote_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA),
+        /*local_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA),
         /*version=*/PROTOCOL_VERSION,
         /*relay_txs=*/true);
 
@@ -128,7 +130,8 @@ void AddRandomOutboundPeer(NodeId& id, std::vector<CNode*>& vNodes, PeerManager&
                                   CAddress(),
                                   /*addrNameIn=*/"",
                                   connType,
-                                  /*inbound_onion=*/false});
+                                  /*inbound_onion=*/false,
+                                  /*network_key=*/0});
     CNode &node = *vNodes.back();
     node.SetCommonVersion(PROTOCOL_VERSION);
 
@@ -296,6 +299,196 @@ BOOST_FIXTURE_TEST_CASE(block_relay_only_eviction, OutboundTest)
     connman->ClearTestNodes();
 }
 
+//! BIP-110: peers that don't advertise NODE_REDUCED_DATA are tolerated as
+//! *additional* connections, so they must never count towards the automatic
+//! outbound targets. Otherwise ThreadOpenConnections opens replacements for them
+//! (it skips them) while the eviction logic disconnects good peers to compensate
+//! (it used to count them), churning the outbound peer set.
+BOOST_FIXTURE_TEST_CASE(stale_outbound_peers_are_additional, OutboundTest)
+{
+    NodeId id{0};
+    auto connman = std::make_unique<ConnmanTestMsg>(0x1337, 0x1337, *m_node.addrman, *m_node.netgroupman, Params());
+    auto peerLogic = PeerManager::make(*connman, *m_node.addrman, nullptr, *m_node.chainman, *m_node.mempool, *m_node.warnings, {});
+
+    CConnman::Options options;
+    options.m_max_automatic_connections = DEFAULT_MAX_PEER_CONNECTIONS;
+    connman->Init(options);
+
+    const auto time_init{GetTime<std::chrono::seconds>()};
+    SetMockTime(time_init);
+    std::vector<CNode*> vNodes;
+
+    // This test exercises target/eviction accounting, not the -maxstaleoutbound
+    // limit, so demote with a generous budget that never trips it.
+    auto demote = [&](CNode& n) { return connman->DemoteToStaleOutbound(n, 1000); };
+
+    // A stale peer is only tolerated while its outbound target still has room, so
+    // they arrive first here, as during a rollout where BIP110 peers are scarce.
+    const size_t first_stale{vNodes.size()};
+    const int kStaleFullRelay{3};
+    for (int i = 0; i < kStaleFullRelay; ++i) {
+        AddRandomOutboundPeer(id, vNodes, *peerLogic, *connman, ConnectionType::OUTBOUND_FULL_RELAY);
+        BOOST_CHECK(demote(*vNodes.back()));
+    }
+    AddRandomOutboundPeer(id, vNodes, *peerLogic, *connman, ConnectionType::BLOCK_RELAY);
+    BOOST_CHECK(demote(*vNodes.back()));
+    // None of them count towards the targets they are filling in for.
+    BOOST_CHECK_EQUAL(connman->GetBIP110FullOutboundConnCount(), 0);
+    BOOST_CHECK_EQUAL(connman->GetExtraFullOutboundCount(), 0);
+    BOOST_CHECK_EQUAL(connman->GetExtraBlockRelayCount(), 0);
+
+    // BIP110 peers then arrive and fill both targets. They are not gated, so the
+    // stale peers we already tolerate end up on top of a full target.
+    const size_t first_good{vNodes.size()};
+    for (int i = 0; i < MAX_OUTBOUND_FULL_RELAY_CONNECTIONS; ++i) {
+        AddRandomOutboundPeer(id, vNodes, *peerLogic, *connman, ConnectionType::OUTBOUND_FULL_RELAY);
+    }
+    for (int i = 0; i < MAX_BLOCK_RELAY_ONLY_CONNECTIONS; ++i) {
+        AddRandomOutboundPeer(id, vNodes, *peerLogic, *connman, ConnectionType::BLOCK_RELAY);
+    }
+    BOOST_CHECK_EQUAL(connman->GetBIP110FullOutboundConnCount(), MAX_OUTBOUND_FULL_RELAY_CONNECTIONS);
+    BOOST_CHECK_EQUAL(connman->GetExtraFullOutboundCount(), 0);
+    BOOST_CHECK_EQUAL(connman->GetExtraBlockRelayCount(), 0);
+
+    // With the target now full, a further stale peer buys us nothing: it is
+    // refused and the caller disconnects it rather than growing the peer set.
+    AddRandomOutboundPeer(id, vNodes, *peerLogic, *connman, ConnectionType::OUTBOUND_FULL_RELAY);
+    BOOST_CHECK(!demote(*vNodes.back()));
+    BOOST_CHECK(vNodes.back()->CountsTowardOutboundTarget()); // not demoted
+    BOOST_CHECK(vNodes.back()->fDisconnect);
+    vNodes.back()->fDisconnect = false; // keep it out of the way below
+    vNodes.pop_back();
+
+    // ...and nothing gets evicted to make room for the ones we do tolerate.
+    SetMockTime(time_init + 3 * std::chrono::seconds{m_node.chainman->GetConsensus().nPowTargetSpacing} + 1s);
+    peerLogic->CheckForStaleTipAndEvictPeers();
+    for (const CNode* node : vNodes) {
+        BOOST_CHECK(node->fDisconnect == false);
+    }
+
+    // A tolerated stale peer must not mask a genuinely extra good peer. Give the
+    // BIP110 peers filling the target a recent block announcement so they are not
+    // the natural eviction candidates, and leave the extra peer worse than them
+    // but still better than a stale peer, which has never announced at all. If
+    // the full-relay candidate scan failed to skip stale peers it would pick one
+    // of those instead, culling a peer we deliberately chose to tolerate.
+    for (size_t i = first_good; i < vNodes.size(); ++i) {
+        peerLogic->UpdateLastBlockAnnounceTime(vNodes[i]->GetId(), GetTime());
+        vNodes[i]->m_last_block_time = GetTime<std::chrono::seconds>();
+    }
+    SetMockTime(time_init);
+    AddRandomOutboundPeer(id, vNodes, *peerLogic, *connman, ConnectionType::OUTBOUND_FULL_RELAY);
+    CNode& extra_full_relay{*vNodes.back()};
+    peerLogic->UpdateLastBlockAnnounceTime(extra_full_relay.GetId(), GetTime() - 1000);
+    AddRandomOutboundPeer(id, vNodes, *peerLogic, *connman, ConnectionType::BLOCK_RELAY);
+    CNode& extra_block_relay{*vNodes.back()};
+    // The stale peers are still ignored, so exactly one of each type is extra.
+    BOOST_CHECK_EQUAL(connman->GetExtraFullOutboundCount(), 1);
+    BOOST_CHECK_EQUAL(connman->GetExtraBlockRelayCount(), 1);
+
+    SetMockTime(time_init + 3 * std::chrono::seconds{m_node.chainman->GetConsensus().nPowTargetSpacing} + 1s);
+    peerLogic->CheckForStaleTipAndEvictPeers();
+    BOOST_CHECK(extra_full_relay.fDisconnect == true);
+    BOOST_CHECK(extra_block_relay.fDisconnect == true);
+    for (size_t i = first_stale; i < first_good; ++i) {
+        BOOST_CHECK(vNodes[i]->m_is_non_bip110_outbound);
+        BOOST_CHECK(vNodes[i]->fDisconnect == false);
+    }
+    for (size_t i = first_good; i < vNodes.size() - 2; ++i) {
+        BOOST_CHECK(vNodes[i]->fDisconnect == false);
+    }
+    extra_full_relay.fDisconnect = false;
+    extra_block_relay.fDisconnect = false;
+
+    // Dropping the stale peers must not underflow the counts.
+    for (size_t i = first_stale; i < first_good; ++i) {
+        vNodes[i]->fDisconnect = true;
+    }
+    BOOST_CHECK_EQUAL(connman->GetExtraFullOutboundCount(), 1);
+    BOOST_CHECK_EQUAL(connman->GetExtraBlockRelayCount(), 1);
+
+    for (const CNode* node : vNodes) {
+        peerLogic->FinalizeNode(*node);
+    }
+    connman->ClearTestNodes();
+}
+
+//! BIP-110: a stale peer is not our outbound coverage of its network either, so
+//! it cannot strip the "only peer on this network" eviction protection from a
+//! BIP110 peer sharing that network.
+BOOST_FIXTURE_TEST_CASE(stale_outbound_is_not_network_coverage, OutboundTest)
+{
+    NodeId id{0};
+    auto connman = std::make_unique<ConnmanTestMsg>(0x1337, 0x1337, *m_node.addrman, *m_node.netgroupman, Params());
+    auto peerLogic = PeerManager::make(*connman, *m_node.addrman, nullptr, *m_node.chainman, *m_node.mempool, *m_node.warnings, {});
+
+    CConnman::Options options;
+    options.m_max_automatic_connections = DEFAULT_MAX_PEER_CONNECTIONS;
+    connman->Init(options);
+    std::vector<CNode*> vNodes;
+
+    AddRandomOutboundPeer(id, vNodes, *peerLogic, *connman, ConnectionType::OUTBOUND_FULL_RELAY, /*onion_peer=*/true);
+    AddRandomOutboundPeer(id, vNodes, *peerLogic, *connman, ConnectionType::OUTBOUND_FULL_RELAY, /*onion_peer=*/true);
+    BOOST_CHECK(connman->MultipleManualOrFullOutboundConnsLocked(NET_ONION));
+    BOOST_CHECK(connman->DemoteToStaleOutbound(*vNodes.back(), /*max_stale=*/1000));
+    BOOST_CHECK(!connman->MultipleManualOrFullOutboundConnsLocked(NET_ONION));
+
+    for (const CNode* node : vNodes) {
+        peerLogic->FinalizeNode(*node);
+    }
+    connman->ClearTestNodes();
+}
+
+//! BIP-110: a demoted stale outbound peer draws on the inbound budget. It is
+//! refused (so the caller disconnects it) when either -maxstaleoutbound are
+//! already tolerated or the inbound budget is full; the latter keeps a later
+//! outbound connection from pushing us past -maxconnections.
+BOOST_FIXTURE_TEST_CASE(stale_outbound_respects_maxconnections, OutboundTest)
+{
+    NodeId id{0};
+    auto connman = std::make_unique<ConnmanTestMsg>(0x1337, 0x1337, *m_node.addrman, *m_node.netgroupman, Params());
+    auto peerLogic = PeerManager::make(*connman, *m_node.addrman, nullptr, *m_node.chainman, *m_node.mempool, *m_node.warnings, {});
+
+    CConnman::Options options;
+    options.m_max_automatic_connections = 20;
+    connman->Init(options);
+    std::vector<CNode*> vNodes;
+
+    // The inbound budget is -maxconnections minus the reserved outbound slots.
+    const int max_inbound = options.m_max_automatic_connections
+        - (MAX_OUTBOUND_FULL_RELAY_CONNECTIONS + MAX_BLOCK_RELAY_ONLY_CONNECTIONS + MAX_FEELER_CONNECTIONS);
+    BOOST_REQUIRE(max_inbound > 1);
+
+    // -maxstaleoutbound caps how many we tolerate, independent of inbound room.
+    AddRandomOutboundPeer(id, vNodes, *peerLogic, *connman, ConnectionType::OUTBOUND_FULL_RELAY);
+    BOOST_CHECK(connman->DemoteToStaleOutbound(*vNodes.back(), /*max_stale=*/1));
+    BOOST_CHECK(!vNodes.back()->CountsTowardOutboundTarget());
+    AddRandomOutboundPeer(id, vNodes, *peerLogic, *connman, ConnectionType::OUTBOUND_FULL_RELAY);
+    BOOST_CHECK(!connman->DemoteToStaleOutbound(*vNodes.back(), /*max_stale=*/1)); // at limit
+    BOOST_CHECK(vNodes.back()->CountsTowardOutboundTarget()); // not demoted
+
+    // Fill the inbound budget: the one demoted stale peer already occupies a slot.
+    for (int i = 1; i < max_inbound; ++i) {
+        AddRandomOutboundPeer(id, vNodes, *peerLogic, *connman, ConnectionType::INBOUND);
+    }
+
+    // With the inbound budget full, a further stale outbound peer has no room: it
+    // is refused (rather than evicting an inbound peer) and keeps counting as
+    // outbound. The -maxstaleoutbound limit is generous here, so this is the
+    // inbound-room path, not the limit path.
+    AddRandomOutboundPeer(id, vNodes, *peerLogic, *connman, ConnectionType::OUTBOUND_FULL_RELAY);
+    BOOST_CHECK(!connman->DemoteToStaleOutbound(*vNodes.back(), /*max_stale=*/1000));
+    BOOST_CHECK(vNodes.back()->CountsTowardOutboundTarget()); // not demoted
+    BOOST_CHECK(std::none_of(vNodes.begin(), vNodes.end(), [](const CNode* n) {
+        return n->IsInboundConn() && n->fDisconnect;
+    }));
+
+    for (const CNode* node : vNodes) {
+        peerLogic->FinalizeNode(*node);
+    }
+    connman->ClearTestNodes();
+}
+
 BOOST_AUTO_TEST_CASE(peer_discouragement)
 {
     LOCK(NetEventsInterface::g_msgproc_mutex);
@@ -327,7 +520,8 @@ BOOST_AUTO_TEST_CASE(peer_discouragement)
                          CAddress(),
                          /*addrNameIn=*/"",
                          ConnectionType::INBOUND,
-                         /*inbound_onion=*/false};
+                         /*inbound_onion=*/false,
+                         /*network_key=*/1};
     nodes[0]->SetCommonVersion(PROTOCOL_VERSION);
     peerLogic->InitializeNode(*nodes[0], NODE_NETWORK);
     nodes[0]->fSuccessfullyConnected = true;
@@ -347,7 +541,8 @@ BOOST_AUTO_TEST_CASE(peer_discouragement)
                          CAddress(),
                          /*addrNameIn=*/"",
                          ConnectionType::INBOUND,
-                         /*inbound_onion=*/false};
+                         /*inbound_onion=*/false,
+                         /*network_key=*/1};
     nodes[1]->SetCommonVersion(PROTOCOL_VERSION);
     peerLogic->InitializeNode(*nodes[1], NODE_NETWORK);
     nodes[1]->fSuccessfullyConnected = true;
@@ -377,7 +572,8 @@ BOOST_AUTO_TEST_CASE(peer_discouragement)
                          CAddress(),
                          /*addrNameIn=*/"",
                          ConnectionType::OUTBOUND_FULL_RELAY,
-                         /*inbound_onion=*/false};
+                         /*inbound_onion=*/false,
+                         /*network_key=*/2};
     nodes[2]->SetCommonVersion(PROTOCOL_VERSION);
     peerLogic->InitializeNode(*nodes[2], NODE_NETWORK);
     nodes[2]->fSuccessfullyConnected = true;
@@ -419,7 +615,8 @@ BOOST_AUTO_TEST_CASE(DoS_bantime)
                     CAddress(),
                     /*addrNameIn=*/"",
                     ConnectionType::INBOUND,
-                    /*inbound_onion=*/false};
+                    /*inbound_onion=*/false,
+                    /*network_key=*/1};
     dummyNode.SetCommonVersion(PROTOCOL_VERSION);
     peerLogic->InitializeNode(dummyNode, NODE_NETWORK);
     dummyNode.fSuccessfullyConnected = true;

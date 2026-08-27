@@ -48,6 +48,11 @@ struct WalletContext;
 using isminefilter = std::underlying_type<isminetype>::type;
 } // namespace wallet
 
+enum class WalletBackupFormat {
+    Raw,   // Literal db copy
+    DbDump,  // DumpWallet plaintext low-level db dump
+};
+
 namespace interfaces {
 
 class Handler;
@@ -89,8 +94,10 @@ public:
     //! Abort a rescan.
     virtual void abortRescan() = 0;
 
+    virtual bool canBackupToDbDump() = 0;
+
     //! Back up wallet.
-    virtual bool backupWallet(const std::string& filename) = 0;
+    virtual bool backupWallet(const std::string& filename, const WalletBackupFormat format, bilingual_str& error) = 0;
 
     //! Get wallet name.
     virtual std::string getWalletName() = 0;
@@ -102,7 +109,7 @@ public:
     virtual bool getPubKey(const CScript& script, const CKeyID& address, CPubKey& pub_key) = 0;
 
     //! Sign message
-    virtual SigningResult signMessage(const std::string& message, const PKHash& pkhash, std::string& str_sig) = 0;
+    virtual SigningResult signMessage(const MessageSignatureFormat format, const std::string& message, const CTxDestination& address, std::string& str_sig) = 0;
 
     //! Return whether wallet has private key.
     virtual bool isSpendable(const CTxDestination& dest) = 0;
@@ -133,6 +140,9 @@ public:
 
     //! Display address on external signer
     virtual util::Result<void> displayAddress(const CTxDestination& dest) = 0;
+
+    virtual bool checkAddressForUsage(const std::vector<std::string>& addresses) const = 0;
+    virtual bool findAddressUsage(const std::vector<std::string>& addresses, std::function<void(const std::string&, const WalletTx&, uint32_t)> callback) const = 0;
 
     //! Lock coin.
     virtual bool lockCoin(const COutPoint& output, const bool write_to_db) = 0;
@@ -426,6 +436,8 @@ struct WalletTxStatus
     bool is_abandoned;
     bool is_coinbase;
     bool is_in_main_chain;
+    // The block containing this transaction is assumed valid
+    bool is_assumed;
 };
 
 //! Wallet transaction output.

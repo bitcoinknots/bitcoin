@@ -10,6 +10,7 @@
 #include <blockfilter.h>
 #include <chain.h>
 #include <chainparams.h>
+#include <common/messages.h>
 #include <core_io.h>
 #include <flatfile.h>
 #include <httpserver.h>
@@ -27,12 +28,15 @@
 #include <streams.h>
 #include <sync.h>
 #include <txmempool.h>
+#include <undo.h>
 #include <util/any.h>
 #include <util/check.h>
 #include <util/strencodings.h>
 #include <validation.h>
+#include <policy/fees.h>
 
 #include <any>
+#include <optional>
 #include <vector>
 
 #include <univalue.h>
@@ -275,6 +279,113 @@ static bool rest_headers(const std::any& context,
         req->WriteReply(HTTP_OK, strJSON);
         return true;
     }
+    default: {
+        return RESTERR(req, HTTP_NOT_FOUND, "output format not found (available: " + AvailableDataFormatsString() + ")");
+    }
+    }
+}
+
+/**
+ * Serialize spent outputs as a list of per-transaction CTxOut lists using binary format.
+ */
+static void SerializeBlockUndo(DataStream& stream, const CBlockUndo& block_undo)
+{
+    WriteCompactSize(stream, block_undo.vtxundo.size() + 1);
+    WriteCompactSize(stream, 0); // block_undo.vtxundo doesn't contain coinbase tx
+    for (const CTxUndo& tx_undo : block_undo.vtxundo) {
+        WriteCompactSize(stream, tx_undo.vprevout.size());
+        for (const Coin& coin : tx_undo.vprevout) {
+            coin.out.Serialize(stream);
+        }
+    }
+}
+
+/**
+ * Serialize spent outputs as a list of per-transaction CTxOut lists using JSON format.
+ */
+static void BlockUndoToJSON(const CBlockUndo& block_undo, UniValue& result)
+{
+    result.push_back({UniValue::VARR}); // block_undo.vtxundo doesn't contain coinbase tx
+    for (const CTxUndo& tx_undo : block_undo.vtxundo) {
+        UniValue tx_prevouts(UniValue::VARR);
+        for (const Coin& coin : tx_undo.vprevout) {
+            UniValue prevout(UniValue::VOBJ);
+            prevout.pushKV("value", ValueFromAmount(coin.out.nValue));
+
+            UniValue script_pub_key(UniValue::VOBJ);
+            ScriptToUniv(coin.out.scriptPubKey, /*out=*/script_pub_key, /*include_hex=*/true, /*include_address=*/true);
+            prevout.pushKV("scriptPubKey", std::move(script_pub_key));
+
+            tx_prevouts.push_back(std::move(prevout));
+        }
+        result.push_back(std::move(tx_prevouts));
+    }
+}
+
+static bool rest_spent_txouts(const std::any& context, HTTPRequest* req, const std::string& strURIPart)
+{
+    if (!CheckWarmup(req)) {
+        return false;
+    }
+    std::string param;
+    const RESTResponseFormat rf = ParseDataFormat(param, strURIPart);
+    std::vector<std::string> path = SplitString(param, '/');
+
+    std::string hashStr;
+    if (path.size() == 1) {
+        // path with query parameter: /rest/spenttxouts/<hash>
+        hashStr = path[0];
+    } else {
+        return RESTERR(req, HTTP_BAD_REQUEST, "Invalid URI format. Expected /rest/spenttxouts/<hash>.<ext>");
+    }
+
+    auto hash{uint256::FromHex(hashStr)};
+    if (!hash) {
+        return RESTERR(req, HTTP_BAD_REQUEST, "Invalid hash: " + hashStr);
+    }
+
+    ChainstateManager* chainman = GetChainman(context, req);
+    if (!chainman) {
+        return false;
+    }
+
+    const CBlockIndex* pblockindex = WITH_LOCK(cs_main, return chainman->m_blockman.LookupBlockIndex(*hash));
+    if (!pblockindex) {
+        return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
+    }
+
+    CBlockUndo block_undo;
+    if (pblockindex->nHeight > 0 && !chainman->m_blockman.ReadBlockUndo(block_undo, *pblockindex)) {
+        return RESTERR(req, HTTP_NOT_FOUND, hashStr + " undo not available");
+    }
+
+    switch (rf) {
+    case RESTResponseFormat::BINARY: {
+        DataStream ssSpentResponse{};
+        SerializeBlockUndo(ssSpentResponse, block_undo);
+        req->WriteHeader("Content-Type", "application/octet-stream");
+        req->WriteReply(HTTP_OK, ssSpentResponse);
+        return true;
+    }
+
+    case RESTResponseFormat::HEX: {
+        DataStream ssSpentResponse{};
+        SerializeBlockUndo(ssSpentResponse, block_undo);
+        const std::string strHex{HexStr(ssSpentResponse) + "\n"};
+        req->WriteHeader("Content-Type", "text/plain");
+        req->WriteReply(HTTP_OK, strHex);
+        return true;
+    }
+
+    case RESTResponseFormat::JSON: {
+        UniValue result(UniValue::VARR);
+        BlockUndoToJSON(block_undo, result);
+        std::string strJSON = result.write() + "\n";
+        req->WriteHeader("Content-Type", "application/json");
+        req->WriteReply(HTTP_OK, strJSON);
+        return true;
+    }
+
     default: {
         return RESTERR(req, HTTP_NOT_FOUND, "output format not found (available: " + AvailableDataFormatsString() + ")");
     }
@@ -646,7 +757,7 @@ static bool rest_deploymentinfo(const std::any& context, HTTPRequest* req, const
 
 }
 
-static bool rest_mempool(const std::any& context, HTTPRequest* req, const std::string& str_uri_part)
+static bool rest_mempool_transactions(const std::any& context, HTTPRequest* req, const std::string& str_uri_part)
 {
     if (!CheckWarmup(req))
         return false;
@@ -654,7 +765,46 @@ static bool rest_mempool(const std::any& context, HTTPRequest* req, const std::s
     std::string param;
     const RESTResponseFormat rf = ParseDataFormat(param, str_uri_part);
     if (param != "contents" && param != "info") {
-        return RESTERR(req, HTTP_BAD_REQUEST, "Invalid URI format. Expected /rest/mempool/<info|contents>.json");
+        return RESTERR(req, HTTP_BAD_REQUEST, "Invalid URI format. Expected /rest/mempool/transactions/<info|contents>.json");
+    }
+
+    const CTxMemPool* mempool = GetMemPool(context, req);
+    if (!mempool) return false;
+
+    switch (rf) {
+    case RESTResponseFormat::JSON: {
+        std::string str_json;
+        std::string raw_sequence_start;
+        const bool verbose = param == "contents";
+
+        try {
+            raw_sequence_start = req->GetQueryParameter("sequence_start").value_or("0");
+        } catch (const std::runtime_error& e) {
+            return RESTERR(req, HTTP_BAD_REQUEST, e.what());
+        }
+
+        const auto sequence_start{ToIntegral<uint64_t>(raw_sequence_start)};
+        str_json = MempoolTxsToJSON(*mempool, verbose, sequence_start.value()).write() + "\n";
+
+        req->WriteHeader("Content-Type", "application/json");
+        req->WriteReply(HTTP_OK, str_json);
+        return true;
+    }
+    default: {
+        return RESTERR(req, HTTP_NOT_FOUND, "output format not found (available: json)");
+    }
+    }
+}
+
+static bool rest_mempool(const std::any& context, HTTPRequest* req, const std::string& str_uri_part)
+{
+    if (!CheckWarmup(req))
+        return false;
+
+    std::string param;
+    const RESTResponseFormat rf = ParseDataFormat(param, str_uri_part);
+    if (param != "contents" && param != "info" && param != "info/with_fee_histogram") {
+        return RESTERR(req, HTTP_BAD_REQUEST, "Invalid URI format. Expected /rest/mempool/<info|info/with_fee_histogram|contents>.json");
     }
 
     const CTxMemPool* mempool = GetMemPool(context, req);
@@ -687,9 +837,14 @@ static bool rest_mempool(const std::any& context, HTTPRequest* req, const std::s
             if (verbose && mempool_sequence) {
                 return RESTERR(req, HTTP_BAD_REQUEST, "Verbose results cannot contain mempool sequence values. (hint: set \"verbose=false\")");
             }
-            str_json = MempoolToJSON(*mempool, verbose, mempool_sequence).write() + "\n";
+            ChainstateManager* maybe_chainman = GetChainman(context, req);
+            if (!maybe_chainman) return false;
+            ChainstateManager& chainman = *maybe_chainman;
+            str_json = MempoolToJSON(chainman, *mempool, verbose, mempool_sequence).write() + "\n";
+        } else if (param == "info/with_fee_histogram") {
+            str_json = MempoolInfoToJSON(*mempool, MempoolInfoToJSON_const_histogram_floors).write() + "\n";
         } else {
-            str_json = MempoolInfoToJSON(*mempool).write() + "\n";
+            str_json = MempoolInfoToJSON(*mempool, std::nullopt).write() + "\n";
         }
 
         req->WriteHeader("Content-Type", "application/json");
@@ -1005,6 +1160,76 @@ static bool rest_blockhash_by_height(const std::any& context, HTTPRequest* req,
     }
 }
 
+static bool rest_getfee(const std::any& context, HTTPRequest* req, const std::string& strURIPart) {
+    if (!CheckWarmup(req)) {
+        return false;
+    }
+
+    const NodeContext* const node = GetNodeContext(context, req);
+    if (!node) return false;
+    const CBlockPolicyEstimator* const fee_estimator = node->fee_estimator.get();
+    if (!fee_estimator) return false;
+
+    std::string param;
+    const RESTResponseFormat rf = ParseDataFormat(param, strURIPart);
+    switch (rf) {
+    case RESTResponseFormat::JSON: {
+        std::vector<std::string> path = SplitString(param, '/');
+        path.erase(path.begin());
+        // check url scheme is correct
+        if (path.size() != 2) {
+            return RESTERR(req, HTTP_BAD_REQUEST, "Path must be /rest/fee/<MODE>/<TARGET>.json");
+        }
+        // check estimation mode is valid
+        const auto modestr = ToUpper(path[0]);
+        FeeEstimateMode mode;
+        if (!common::FeeModeFromString(modestr, mode)){
+            return RESTERR(req, HTTP_BAD_REQUEST, "<MODE> must be one of <unset|economical|conservative>");
+        }
+
+        // type conversions for estimateSmartFee
+        bool conservative = mode == FeeEstimateMode::CONSERVATIVE;
+        const auto parsed_conf_target{ToIntegral<unsigned int>(path[1])};
+        if (!parsed_conf_target.has_value()) {
+            return RESTERR(req, HTTP_BAD_REQUEST, strprintf("Unable to parse confirmation target to int"));
+        }
+        auto conf_target{*parsed_conf_target};
+        unsigned int max_target = fee_estimator->HighestTargetTracked(FeeEstimateHorizon::LONG_HALFLIFE);
+        if (conf_target < 1 || conf_target > max_target) {
+            return RESTERR(req, HTTP_BAD_REQUEST, strprintf("Invalid confirmation target, must be in between %u - %u", 1, max_target));
+        }
+
+        // perform fee estimation
+        FeeCalculation feeCalc;
+        CFeeRate estimatedfee = fee_estimator->estimateSmartFee(conf_target, &feeCalc, conservative);
+
+        // create json for replying
+        UniValue feejson(UniValue::VOBJ);
+        if (estimatedfee != CFeeRate(0)) {
+            const CTxMemPool* mempool = GetMemPool(context, req);
+            if (mempool) {
+                CFeeRate min_mempool_feerate{mempool->GetMinFee()};
+                CFeeRate min_relay_feerate{mempool->m_opts.min_relay_feerate};
+                estimatedfee = std::max({estimatedfee, min_mempool_feerate, min_relay_feerate});
+            }
+            feejson.pushKV("feerate", ValueFromAmount(estimatedfee.GetFeePerK()));
+        } else {
+            return RESTERR(req, HTTP_SERVICE_UNAVAILABLE, "Insufficient data or no feerate found");
+        }
+        feejson.pushKV("blocks", feeCalc.returnedTarget);
+
+        // reply
+        std::string strJSON = feejson.write() + "\n";
+        req->WriteHeader("Content-Type", "application/json");
+        req->WriteReply(HTTP_OK, strJSON);
+        return true;
+    }
+    default: {
+        return RESTERR(req, HTTP_NOT_FOUND, "output format not found (available: json)");
+    }
+    }
+}
+
 static const struct {
     const char* prefix;
     bool (*handler)(const std::any& context, HTTPRequest* req, const std::string& strReq);
@@ -1016,11 +1241,14 @@ static const struct {
       {"/rest/blockfilterheaders/", rest_filter_header},
       {"/rest/chaininfo", rest_chaininfo},
       {"/rest/mempool/", rest_mempool},
+      {"/rest/mempool/transactions", rest_mempool_transactions},
       {"/rest/headers/", rest_headers},
       {"/rest/getutxos", rest_getutxos},
+      {"/rest/spenttxouts/", rest_spent_txouts},
       {"/rest/deploymentinfo/", rest_deploymentinfo},
       {"/rest/deploymentinfo", rest_deploymentinfo},
       {"/rest/blockhashbyheight/", rest_blockhash_by_height},
+      {"/rest/fee", rest_getfee},
 };
 
 void StartREST(const std::any& context)

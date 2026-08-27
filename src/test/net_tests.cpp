@@ -67,7 +67,8 @@ BOOST_AUTO_TEST_CASE(cnode_simple_test)
                                                             CAddress(),
                                                             pszDest,
                                                             ConnectionType::OUTBOUND_FULL_RELAY,
-                                                            /*inbound_onion=*/false);
+                                                            /*inbound_onion=*/false,
+                                                            /*network_key=*/0);
     BOOST_CHECK(pnode1->IsFullOutboundConn() == true);
     BOOST_CHECK(pnode1->IsManualConn() == false);
     BOOST_CHECK(pnode1->IsBlockOnlyConn() == false);
@@ -85,7 +86,8 @@ BOOST_AUTO_TEST_CASE(cnode_simple_test)
                                                             CAddress(),
                                                             pszDest,
                                                             ConnectionType::INBOUND,
-                                                            /*inbound_onion=*/false);
+                                                            /*inbound_onion=*/false,
+                                                            /*network_key=*/1);
     BOOST_CHECK(pnode2->IsFullOutboundConn() == false);
     BOOST_CHECK(pnode2->IsManualConn() == false);
     BOOST_CHECK(pnode2->IsBlockOnlyConn() == false);
@@ -103,7 +105,8 @@ BOOST_AUTO_TEST_CASE(cnode_simple_test)
                                                             CAddress(),
                                                             pszDest,
                                                             ConnectionType::OUTBOUND_FULL_RELAY,
-                                                            /*inbound_onion=*/false);
+                                                            /*inbound_onion=*/false,
+                                                            /*network_key=*/2);
     BOOST_CHECK(pnode3->IsFullOutboundConn() == true);
     BOOST_CHECK(pnode3->IsManualConn() == false);
     BOOST_CHECK(pnode3->IsBlockOnlyConn() == false);
@@ -121,7 +124,8 @@ BOOST_AUTO_TEST_CASE(cnode_simple_test)
                                                             CAddress(),
                                                             pszDest,
                                                             ConnectionType::INBOUND,
-                                                            /*inbound_onion=*/true);
+                                                            /*inbound_onion=*/true,
+                                                            /*network_key=*/3);
     BOOST_CHECK(pnode4->IsFullOutboundConn() == false);
     BOOST_CHECK(pnode4->IsManualConn() == false);
     BOOST_CHECK(pnode4->IsBlockOnlyConn() == false);
@@ -613,7 +617,8 @@ BOOST_AUTO_TEST_CASE(ipv4_peer_with_ipv6_addrMe_test)
                                                            CAddress{},
                                                            /*pszDest=*/std::string{},
                                                            ConnectionType::OUTBOUND_FULL_RELAY,
-                                                           /*inbound_onion=*/false);
+                                                           /*inbound_onion=*/false,
+                                                           /*network_key=*/0);
     pnode->fSuccessfullyConnected.store(true);
 
     // the peer claims to be reaching us via IPv6
@@ -667,7 +672,8 @@ BOOST_AUTO_TEST_CASE(get_local_addr_for_peer_port)
                    /*addrBindIn=*/CService{},
                    /*addrNameIn=*/std::string{},
                    /*conn_type_in=*/ConnectionType::OUTBOUND_FULL_RELAY,
-                   /*inbound_onion=*/false};
+                   /*inbound_onion=*/false,
+                   /*network_key=*/0};
     peer_out.fSuccessfullyConnected = true;
     peer_out.SetAddrLocal(peer_us);
 
@@ -688,7 +694,8 @@ BOOST_AUTO_TEST_CASE(get_local_addr_for_peer_port)
                   /*addrBindIn=*/CService{},
                   /*addrNameIn=*/std::string{},
                   /*conn_type_in=*/ConnectionType::INBOUND,
-                  /*inbound_onion=*/false};
+                  /*inbound_onion=*/false,
+                  /*network_key=*/1};
     peer_in.fSuccessfullyConnected = true;
     peer_in.SetAddrLocal(peer_us);
 
@@ -792,6 +799,36 @@ BOOST_AUTO_TEST_CASE(LocalAddress_BasicLifecycle)
     BOOST_CHECK(!IsLocal(addr));
 }
 
+BOOST_AUTO_TEST_CASE(LocalAddress_nScore_Overflow)
+{
+    g_reachable_nets.Add(NET_IPV4);
+    CService addr{UtilBuildAddress(0x002, 0x001, 0x001, 0x001), 1000}; // 2.1.1.1:1000
+
+    // SeenLocal increments when nScore is below max
+    const int initial_score = 1000;
+    BOOST_REQUIRE(AddLocal(addr, initial_score));
+    BOOST_REQUIRE(IsLocal(addr));
+    BOOST_CHECK_EQUAL(GetnScore(addr), initial_score);
+
+    // SeenLocal increments the score
+    BOOST_CHECK(SeenLocal(addr));
+    BOOST_CHECK_EQUAL(GetnScore(addr), initial_score + 1);
+
+    // SeenLocal saturates at max
+    RemoveLocal(addr);
+    BOOST_REQUIRE(AddLocal(addr, std::numeric_limits<int>::max()));
+    BOOST_CHECK_EQUAL(GetnScore(addr), std::numeric_limits<int>::max());
+
+    // a couple increments should saturate
+    for (int i = 0; i < 2; ++i) {
+        BOOST_CHECK(SeenLocal(addr));
+        BOOST_CHECK_EQUAL(GetnScore(addr), std::numeric_limits<int>::max());
+    }
+
+    RemoveLocal(addr);
+    BOOST_CHECK(!IsLocal(addr));
+}
+
 BOOST_AUTO_TEST_CASE(initial_advertise_from_version_message)
 {
     LOCK(NetEventsInterface::g_msgproc_mutex);
@@ -807,7 +844,7 @@ BOOST_AUTO_TEST_CASE(initial_advertise_from_version_message)
     // Pretend that we bound to this port.
     const uint16_t bind_port = 20001;
     m_node.args->ForceSetArg("-bind", strprintf("3.4.5.6:%u", bind_port));
-    m_node.args->ForceSetArg("-capturemessages", "1");
+    m_node.connman->SetCaptureMessages(true);
 
     // Our address:port as seen from the peer - 2.3.4.5:20002 (different from the above).
     in_addr peer_us_addr;
@@ -825,9 +862,10 @@ BOOST_AUTO_TEST_CASE(initial_advertise_from_version_message)
                /*addrBindIn=*/CService{},
                /*addrNameIn=*/std::string{},
                /*conn_type_in=*/ConnectionType::OUTBOUND_FULL_RELAY,
-               /*inbound_onion=*/false};
+               /*inbound_onion=*/false,
+               /*network_key=*/2};
 
-    const uint64_t services{NODE_NETWORK | NODE_WITNESS};
+    const uint64_t services{NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA};
     const int64_t time{0};
 
     // Force ChainstateManager::IsInitialBlockDownload() to return false.
@@ -835,7 +873,7 @@ BOOST_AUTO_TEST_CASE(initial_advertise_from_version_message)
     auto& chainman = static_cast<TestChainstateManager&>(*m_node.chainman);
     chainman.JumpOutOfIbd();
 
-    m_node.peerman->InitializeNode(peer, NODE_NETWORK);
+    m_node.peerman->InitializeNode(peer, ServiceFlags(NODE_NETWORK | NODE_REDUCED_DATA));
 
     std::atomic<bool> interrupt_dummy{false};
     std::chrono::microseconds time_received_dummy{0};
@@ -884,7 +922,7 @@ BOOST_AUTO_TEST_CASE(initial_advertise_from_version_message)
 
     CaptureMessage = CaptureMessageOrig;
     chainman.ResetIbd();
-    m_node.args->ForceSetArg("-capturemessages", "0");
+    m_node.connman->SetCaptureMessages(false);
     m_node.args->ForceSetArg("-bind", "");
 }
 
@@ -900,7 +938,8 @@ BOOST_AUTO_TEST_CASE(advertise_local_address)
                                        CAddress{},
                                        /*pszDest=*/std::string{},
                                        ConnectionType::OUTBOUND_FULL_RELAY,
-                                       /*inbound_onion=*/false);
+                                       /*inbound_onion=*/false,
+                                       /*network_key=*/0);
     };
     g_reachable_nets.Add(NET_CJDNS);
 

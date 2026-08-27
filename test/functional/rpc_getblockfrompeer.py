@@ -8,6 +8,7 @@ from test_framework.authproxy import JSONRPCException
 from test_framework.messages import (
     CBlock,
     from_hex,
+    msg_block,
     msg_headers,
     NODE_WITNESS,
 )
@@ -70,8 +71,8 @@ class GetBlockFromPeerTest(BitcoinTestFramework):
         assert_raises_rpc_error(-3, "JSON value of type number is not of expected type string", self.nodes[0].getblockfrompeer, 1234, peer_0_peer_1_id)
         assert_raises_rpc_error(-3, "JSON value of type string is not of expected type number", self.nodes[0].getblockfrompeer, short_tip, "0")
 
-        self.log.info("We must already have the header")
-        assert_raises_rpc_error(-1, "Block header missing", self.nodes[0].getblockfrompeer, "00" * 32, 0)
+        self.log.info("We can request blocks for which we do not have the header")
+        self.nodes[0].getblockfrompeer("11" * 32, 0)
 
         self.log.info("Non-existent peer generates error")
         for peer_id in [-1, peer_0_peer_1_id + 1]:
@@ -84,6 +85,14 @@ class GetBlockFromPeerTest(BitcoinTestFramework):
         presegwit_peer_id = peers[1]["id"]
         assert_raises_rpc_error(-1, "Pre-SegWit peer", self.nodes[0].getblockfrompeer, short_tip, presegwit_peer_id)
 
+        self.log.info("Fetching from same peer twice generates error")
+        self.nodes[0].add_p2p_connection(P2PInterface())
+        peers = self.nodes[0].getpeerinfo()
+        assert_equal(len(peers), 3)
+        slow_peer_id = peers[2]["id"]
+        assert_equal(self.nodes[0].getblockfrompeer(short_tip, slow_peer_id), {})
+        assert_raises_rpc_error(-1, "Already requested from this peer", self.nodes[0].getblockfrompeer, short_tip, slow_peer_id)
+
         self.log.info("Successful fetch")
         result = self.nodes[0].getblockfrompeer(short_tip, peer_0_peer_1_id)
         self.wait_until(lambda: self.check_for_block(node=0, hash=short_tip), timeout=1)
@@ -92,10 +101,34 @@ class GetBlockFromPeerTest(BitcoinTestFramework):
         self.log.info("Don't fetch blocks we already have")
         assert_raises_rpc_error(-1, "Block already downloaded", self.nodes[0].getblockfrompeer, short_tip, peer_0_peer_1_id)
 
-        self.log.info("Don't fetch blocks while the node has not synced past it yet")
+        self.log.info("Non-existent peer generates error, even if we already have the block")
+        assert_raises_rpc_error(-1, "Block already downloaded", self.nodes[0].getblockfrompeer, short_tip, peer_0_peer_1_id + 1)
+
+        self.log.info("Do fetch blocks even if the node has not seen the header yet")
         # For this test we need node 1 in prune mode and as a side effect this also disconnects
         # the nodes which is also necessary for the rest of the test.
         self.restart_node(1, ["-prune=550"])
+
+        # Generate a block on the disconnected node that the pruning node is not connected to
+        blockhash = self.generate(self.nodes[0], 1, sync_fun=self.no_op)[0]
+        block_hex = self.nodes[0].getblock(blockhash=blockhash, verbosity=0)
+        block = from_hex(CBlock(), block_hex)
+
+        # Connect a P2PInterface to the pruning node
+        p2p_i = P2PInterface()
+        node1_interface = self.nodes[1].add_p2p_connection(p2p_i)
+
+        node1_peers = self.nodes[1].getpeerinfo()
+        assert_equal(len(node1_peers), 1)
+        node1_interface_id = node1_peers[0]["id"]
+        assert_equal(self.nodes[1].getblockfrompeer(blockhash, node1_interface_id), {})
+        block.calc_sha256()
+        p2p_i.wait_for_getdata([block.sha256])
+        p2p_i.send_and_ping(msg_block(block))
+        assert_equal(block_hex, self.nodes[1].getblock(blockhash, 0))
+        self.nodes[1].disconnectnode(nodeid=node1_interface_id)
+
+        self.log.info("Do fetch blocks even if the node has not synced past it yet")
 
         # Generate a block on the disconnected node that the pruning node is not connected to
         blockhash = self.generate(self.nodes[0], 1, sync_fun=self.no_op)[0]
@@ -108,13 +141,13 @@ class GetBlockFromPeerTest(BitcoinTestFramework):
         node1_interface.send_and_ping(msg_headers([block]))
 
         # Get the peer id of the P2PInterface from the pruning node
+        node1_interface = self.nodes[1].add_p2p_connection(P2PInterface())
         node1_peers = self.nodes[1].getpeerinfo()
-        assert_equal(len(node1_peers), 1)
-        node1_interface_id = node1_peers[0]["id"]
+        assert_equal(len(node1_peers), 2)
+        node1_interface_id = node1_peers[1]["id"]
 
-        # Trying to fetch this block from the P2PInterface should not be possible
-        error_msg = "In prune mode, only blocks that the node has already synced previously can be fetched from a peer"
-        assert_raises_rpc_error(-1, error_msg, self.nodes[1].getblockfrompeer, blockhash, node1_interface_id)
+        # Trying to fetch this block from the P2PInterface should be possible
+        assert_equal(self.nodes[1].getblockfrompeer(blockhash, node1_interface_id), {})
 
         self.log.info("Connect pruned node")
         self.connect_nodes(0, 2)
@@ -124,10 +157,21 @@ class GetBlockFromPeerTest(BitcoinTestFramework):
         # We need to generate more blocks to be able to prune
         self.generate(self.nodes[0], 400, sync_fun=self.no_op)
         self.sync_blocks([self.nodes[0], pruned_node])
-        pruneheight = pruned_node.pruneblockchain(300)
-        assert_equal(pruneheight, 248)
+
+        # The goal now will be to mimic the automatic pruning process and verify what happens when we fetch an historic
+        # block at any point of time.
+        #
+        # Starting with three blocks files. The pruning process will prune them one by one. And, at the second pruning
+        # event, the test will fetch the past block. Which will be stored at the latest block file. Which can only be
+        # pruned when the latest block file is full (in this case, the third one), and a new one is created.
+
+        # First prune event, prune first block file
+        highest_pruned_block_num = pruned_node.getblockfileinfo(0)["highest_block"]
+        pruneheight = pruned_node.pruneblockchain(highest_pruned_block_num + 1)
+        assert_equal(pruneheight, highest_pruned_block_num)
         # Ensure the block is actually pruned
-        pruned_block = self.nodes[0].getblockhash(2)
+        fetch_block_num = 2
+        pruned_block = self.nodes[0].getblockhash(fetch_block_num)
         assert_raises_rpc_error(-1, "Block not available (pruned data)", pruned_node.getblock, pruned_block)
 
         self.log.info("Fetch pruned block")
@@ -138,18 +182,29 @@ class GetBlockFromPeerTest(BitcoinTestFramework):
         self.wait_until(lambda: self.check_for_block(node=2, hash=pruned_block), timeout=1)
         assert_equal(result, {})
 
+        # Validate that the re-fetched block was stored at the last, current, block file
+        assert_equal(fetch_block_num, pruned_node.getblockfileinfo(2)["lowest_block"])
+
         self.log.info("Fetched block persists after next pruning event")
         self.generate(self.nodes[0], 250, sync_fun=self.no_op)
         self.sync_blocks([self.nodes[0], pruned_node])
-        pruneheight += 251
-        assert_equal(pruned_node.pruneblockchain(700), pruneheight)
+
+        # Second prune event, prune second block file
+        highest_pruned_block_num = pruned_node.getblockfileinfo(1)["highest_block"]
+        pruneheight = pruned_node.pruneblockchain(highest_pruned_block_num + 1)
+        assert_equal(pruneheight, highest_pruned_block_num)
+        # As the re-fetched block is in the third file, and we just pruned the second one, 'getblock' must work.
         assert_equal(pruned_node.getblock(pruned_block)["hash"], "36c56c5b5ebbaf90d76b0d1a074dcb32d42abab75b7ec6fa0ffd9b4fbce8f0f7")
 
-        self.log.info("Fetched block can be pruned again when prune height exceeds the height of the tip at the time when the block was fetched")
+        self.log.info("Re-fetched block can be pruned again when a new block file is created")
         self.generate(self.nodes[0], 250, sync_fun=self.no_op)
         self.sync_blocks([self.nodes[0], pruned_node])
-        pruneheight += 250
-        assert_equal(pruned_node.pruneblockchain(1000), pruneheight)
+
+        # Third prune event, prune third block file
+        highest_pruned_block_num = pruned_node.getblockfileinfo(2)["highest_block"]
+        pruneheight = pruned_node.pruneblockchain(highest_pruned_block_num + 1)
+        assert_equal(pruneheight, highest_pruned_block_num)
+        # and check that the re-fetched block file is now pruned
         assert_raises_rpc_error(-1, "Block not available (pruned data)", pruned_node.getblock, pruned_block)
 
 

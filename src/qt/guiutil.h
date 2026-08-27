@@ -13,6 +13,7 @@
 
 #include <QApplication>
 #include <QEvent>
+#include <QFont>
 #include <QHeaderView>
 #include <QItemDelegate>
 #include <QLabel>
@@ -22,6 +23,7 @@
 #include <QProgressBar>
 #include <QString>
 #include <QTableView>
+#include <Qt>
 
 #include <cassert>
 #include <chrono>
@@ -46,6 +48,7 @@ class QFont;
 class QKeySequence;
 class QLineEdit;
 class QMenu;
+class QColor;
 class QPoint;
 class QProgressDialog;
 class QUrl;
@@ -60,11 +63,15 @@ namespace GUIUtil
     constexpr auto dialog_flags = Qt::WindowTitleHint | Qt::WindowSystemMenuHint | Qt::WindowCloseButtonHint;
 
     // Create human-readable string from date
+    QString dateStr(const QDate &datetime);
+    QString dateStr(qint64 nTime);
     QString dateTimeStr(const QDateTime &datetime);
     QString dateTimeStr(qint64 nTime);
 
     // Return a monospace font
     QFont fixedPitchFont(bool use_embedded_font = false);
+
+    QString fontToCss(const QFont& font);
 
     // Set up widget for address
     void setupAddressWidget(QValidatedLineEdit *widget, QWidget *parent);
@@ -213,6 +220,45 @@ namespace GUIUtil
         bool eventFilter(QObject* watched, QEvent* event) override;
     };
 
+    /**
+     * Makes a QTableView last column feel as if it was being resized from its left border.
+     * Also makes sure the column widths are never larger than the table's viewport.
+     * In Qt, all columns are resizable from the right, but it's not intuitive resizing the last column from the right.
+     * Usually our second to last columns behave as if stretched, and when on stretch mode, columns aren't resizable
+     * interactively or programmatically.
+     *
+     * This helper object takes care of this issue.
+     *
+     */
+    class TableViewLastColumnResizingFixer: public QObject
+    {
+        Q_OBJECT
+
+        public:
+            TableViewLastColumnResizingFixer(QTableView* table, int lastColMinimumWidth, int allColsMinimumWidth, QObject *parent);
+            void stretchColumnWidth(int column);
+
+        private:
+            QTableView* tableView;
+            int lastColumnMinimumWidth;
+            int allColumnsMinimumWidth;
+            int lastColumnIndex;
+            int columnCount;
+            int secondToLastColumnIndex;
+
+            void adjustTableColumnsWidth();
+            int getAvailableWidthForColumn(int column);
+            int getColumnsWidth();
+            void connectViewHeadersSignals();
+            void disconnectViewHeadersSignals();
+            void setViewHeaderResizeMode(int logicalIndex, QHeaderView::ResizeMode resizeMode);
+            void resizeColumn(int nColumnIndex, int width);
+
+        private Q_SLOTS:
+            void on_sectionResized(int logicalIndex, int oldSize, int newSize);
+            void on_geometriesChanged();
+    };
+
     bool GetStartOnSystemStartup();
     bool SetStartOnSystemStartup(bool fAutoStart);
 
@@ -246,6 +292,10 @@ namespace GUIUtil
     QString formatNiceTimeOffset(qint64 secs);
 
     QString formatBytes(uint64_t bytes);
+    QString formatBytesps(float bytes);
+
+    /** Check if a background color indicates dark mode */
+    bool isDarkMode(const QColor& color);
 
     qreal calculateIdealFontSize(int width, const QString& text, QFont font, qreal minPointSize = 4, qreal startPointSize = 14);
 
@@ -374,6 +424,7 @@ namespace GUIUtil
      * Replaces a plain text link with an HTML tagged one.
      */
     QString MakeHtmlLink(const QString& source, const QString& link);
+    QString MakeHtmlLink(const QString& source);
 
     void PrintSlotException(
         const std::exception* exception,
@@ -425,7 +476,7 @@ namespace GUIUtil
     /**
      * Shows a QDialog instance asynchronously, and deletes it on close.
      */
-    void ShowModalDialogAsynchronously(QDialog* dialog);
+    void ShowModalDialogAsynchronously(QDialog* dialog, Qt::WindowModality modality=Qt::ApplicationModal);
 
     inline bool IsEscapeOrBack(int key)
     {

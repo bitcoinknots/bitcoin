@@ -37,6 +37,7 @@
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QClipboard>
+#include <QColor>
 #include <QDateTime>
 #include <QDesktopServices>
 #include <QDialog>
@@ -71,6 +72,7 @@
 
 #include <cassert>
 #include <chrono>
+#include <cmath>
 #include <exception>
 #include <fstream>
 #include <string>
@@ -87,9 +89,19 @@ using namespace std::chrono_literals;
 
 namespace GUIUtil {
 
+QString dateStr(const QDate &date)
+{
+    return QLocale::system().toString(date, QLocale::ShortFormat);
+}
+
+QString dateStr(qint64 nTime)
+{
+    return dateStr(QDateTime::fromSecsSinceEpoch(nTime).date());
+}
+
 QString dateTimeStr(const QDateTime &date)
 {
-    return QLocale::system().toString(date.date(), QLocale::ShortFormat) + QString(" ") + date.toString("hh:mm");
+    return dateStr(date.date()) + QString(" ") + date.toString("hh:mm");
 }
 
 QString dateTimeStr(qint64 nTime)
@@ -100,9 +112,75 @@ QString dateTimeStr(qint64 nTime)
 QFont fixedPitchFont(bool use_embedded_font)
 {
     if (use_embedded_font) {
-        return {"Roboto Mono"};
+        // If we don't specify a size, various contexts will initialize it differently
+        return {"Embedded variant of Roboto Mono", QFont().pointSize()};
     }
     return QFontDatabase::systemFont(QFontDatabase::FixedFont);
+}
+
+static void escapeForCssString(QString& s)
+{
+    for (qsizetype i{s.size()}; i; ) {
+        switch (s.at(--i).unicode()) {
+            case '\\': case '\"':
+                s.insert(i, '\\');
+        }
+    }
+}
+
+QString fontToCss(const QFont& font)
+{
+    QString css;
+    auto families = font.families();
+    if (families.isEmpty()) {
+        auto family = font.family();
+        if (!family.isEmpty()) families.append(family);
+    }
+    if (!families.isEmpty()) {
+        css += "font-family:";
+        for (auto& family : families) {
+            escapeForCssString(family);
+            css += "\"" + family + "\", ";
+        }
+        css.chop(2);
+        css += ";";
+    }
+    if (const auto point_size{font.pointSize()}; point_size != -1) {
+        css += "font-size:" + QString::number(point_size) + "pt;";
+    } else if (const auto pixel_size{font.pixelSize()}; pixel_size != -1) {
+        css += "font-size:" + QString::number(pixel_size) + "px;";
+    }
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+    css += "font-weight:" + QString::number((int)font.weight()) + ";";
+#else
+    css += "font-weight:" + QString::number(font.weight() * 8) + ";";
+#endif
+    switch (font.style()) {
+    default:
+        css += "font-style:normal;";
+        break;
+    case QFont::StyleItalic:
+        css += "font-style:italic;";
+        break;
+    case QFont::StyleOblique:
+        css += "font-style:oblique;";
+        break;
+    }
+    css += "text-decoration:";
+    if (font.underline()) {
+        css += " underline";
+    }
+    if (font.overline()) {
+        css += " overline";
+    }
+    if (font.strikeOut()) {
+        css += " line-through";
+    }
+    if (!(font.underline() || font.overline() || font.strikeOut())) {
+        css += "none";
+    }
+    css += ";";
+    return css;
 }
 
 // Return a pre-generated dummy bech32m address (P2TR) with invalid checksum.
@@ -146,6 +224,39 @@ void AddButtonShortcut(QAbstractButton* button, const QKeySequence& shortcut)
     QObject::connect(new QShortcut(shortcut, button), &QShortcut::activated, [button]() { button->animateClick(); });
 }
 
+qint64 URIParseAmount(std::string amount_str, bool * const ok)
+{
+    bool is_hex = false;
+    if (amount_str[0] == 'x' || amount_str[0] == 'X') {
+        is_hex = true;
+        amount_str = amount_str.substr(1);
+    }
+    size_t exponent_sep_pos = amount_str.find_first_of("Xx", 1);
+    int exponent;
+    if (exponent_sep_pos != std::string::npos) {
+        exponent = QString::fromStdString(amount_str.substr(exponent_sep_pos + 1)).toInt(ok, is_hex ? 0x10 : 10);
+        if (!*ok) return -1;
+    } else {
+        exponent = is_hex ? 4 : 8;
+        exponent_sep_pos = amount_str.size();
+    }
+    size_t fractional_sep_pos = amount_str.find('.');
+    size_t fractional_digits = 0;
+    if (fractional_sep_pos == std::string::npos)
+        fractional_sep_pos = exponent_sep_pos;
+    else
+        fractional_digits = (exponent_sep_pos - fractional_sep_pos) - 1;
+    exponent -= fractional_digits;
+    amount_str = amount_str.substr(0, fractional_sep_pos) + (fractional_digits ? amount_str.substr(fractional_sep_pos + 1, fractional_digits) : "");
+    if (exponent > 0) {
+        amount_str.append(exponent, '0');
+    } else if (exponent < 0) {
+        // Sub-satoshi amount? Truncate
+        amount_str = amount_str.substr(0, amount_str.size() + exponent);
+    }
+    return QString::fromStdString(amount_str).toLongLong(ok, is_hex ? 0x10 : 10);
+}
+
 bool parseBitcoinURI(const QUrl &uri, SendCoinsRecipient *out)
 {
     // return if URI is not valid or is no bitcoin: URI
@@ -185,9 +296,9 @@ bool parseBitcoinURI(const QUrl &uri, SendCoinsRecipient *out)
         {
             if(!i->second.isEmpty())
             {
-                if (!BitcoinUnits::parse(BitcoinUnit::BTC, i->second, &rv.amount)) {
-                    return false;
-                }
+                bool ok;
+                rv.amount = URIParseAmount((i->second).toStdString(), &ok);
+                if (!ok) return false;
             }
             fShouldReturnFalse = false;
         }
@@ -405,17 +516,22 @@ bool isObscured(QWidget *w)
 
 void bringToFront(QWidget* w)
 {
+#ifdef Q_OS_MACOS
+    ForceActivation();
+#endif
+
     if (w) {
+#if (QT_VERSION < QT_VERSION_CHECK(6, 3, 2))
         if (QGuiApplication::platformName() == "wayland") {
+            // Workaround for bug fixed in https://codereview.qt-project.org/c/qt/qtwayland/+/421125
             auto flags = w->windowFlags();
             w->setWindowFlags(flags|Qt::WindowStaysOnTopHint);
             w->show();
             w->setWindowFlags(flags);
             w->show();
-        } else {
-#ifdef Q_OS_MACOS
-            ForceActivation();
+        } else
 #endif
+        {
             // activateWindow() (sometimes) helps with keyboard focus on Windows
             if (w->isMinimized()) {
                 w->showNormal();
@@ -435,7 +551,7 @@ void handleCloseWindowShortcut(QWidget* w)
 
 void openDebugLogfile()
 {
-    fs::path pathDebug = gArgs.GetDataDirNet() / "debug.log";
+    fs::path pathDebug = LogInstance().m_file_path;
 
     /* Open debug.log with the associated application */
     if (fs::exists(pathDebug))
@@ -511,6 +627,120 @@ bool LabelOutOfFocusEventFilter::eventFilter(QObject* watched, QEvent* event)
     }
 
     return QObject::eventFilter(watched, event);
+}
+
+void TableViewLastColumnResizingFixer::connectViewHeadersSignals()
+{
+    connect(tableView->horizontalHeader(), &QHeaderView::sectionResized, this, &TableViewLastColumnResizingFixer::on_sectionResized);
+    connect(tableView->horizontalHeader(), &QHeaderView::geometriesChanged, this, &TableViewLastColumnResizingFixer::on_geometriesChanged);
+}
+
+// We need to disconnect these while handling the resize events, otherwise we can enter infinite loops.
+void TableViewLastColumnResizingFixer::disconnectViewHeadersSignals()
+{
+    disconnect(tableView->horizontalHeader(), &QHeaderView::sectionResized, this, &TableViewLastColumnResizingFixer::on_sectionResized);
+    disconnect(tableView->horizontalHeader(), &QHeaderView::geometriesChanged, this, &TableViewLastColumnResizingFixer::on_geometriesChanged);
+}
+
+// Setup the resize mode, handles compatibility for Qt5 and below as the method signatures changed.
+// Refactored here for readability.
+void TableViewLastColumnResizingFixer::setViewHeaderResizeMode(int logicalIndex, QHeaderView::ResizeMode resizeMode)
+{
+    tableView->horizontalHeader()->setSectionResizeMode(logicalIndex, resizeMode);
+}
+
+void TableViewLastColumnResizingFixer::resizeColumn(int nColumnIndex, int width)
+{
+    tableView->setColumnWidth(nColumnIndex, width);
+    tableView->horizontalHeader()->resizeSection(nColumnIndex, width);
+}
+
+int TableViewLastColumnResizingFixer::getColumnsWidth()
+{
+    int nColumnsWidthSum = 0;
+    for (int i = 0; i < columnCount; i++)
+    {
+        nColumnsWidthSum += tableView->horizontalHeader()->sectionSize(i);
+    }
+    return nColumnsWidthSum;
+}
+
+int TableViewLastColumnResizingFixer::getAvailableWidthForColumn(int column)
+{
+    int nResult = lastColumnMinimumWidth;
+    int nTableWidth = tableView->horizontalHeader()->width();
+
+    if (nTableWidth > 0)
+    {
+        int nOtherColsWidth = getColumnsWidth() - tableView->horizontalHeader()->sectionSize(column);
+        nResult = std::max(nResult, nTableWidth - nOtherColsWidth);
+    }
+
+    return nResult;
+}
+
+// Make sure we don't make the columns wider than the table's viewport width.
+void TableViewLastColumnResizingFixer::adjustTableColumnsWidth()
+{
+    disconnectViewHeadersSignals();
+    resizeColumn(lastColumnIndex, getAvailableWidthForColumn(lastColumnIndex));
+    connectViewHeadersSignals();
+
+    int nTableWidth = tableView->horizontalHeader()->width();
+    int nColsWidth = getColumnsWidth();
+    if (nColsWidth > nTableWidth)
+    {
+        resizeColumn(secondToLastColumnIndex,getAvailableWidthForColumn(secondToLastColumnIndex));
+    }
+}
+
+// Make column use all the space available, useful during window resizing.
+void TableViewLastColumnResizingFixer::stretchColumnWidth(int column)
+{
+    disconnectViewHeadersSignals();
+    resizeColumn(column, getAvailableWidthForColumn(column));
+    connectViewHeadersSignals();
+}
+
+// When a section is resized this is a slot-proxy for ajustAmountColumnWidth().
+void TableViewLastColumnResizingFixer::on_sectionResized(int logicalIndex, int oldSize, int newSize)
+{
+    adjustTableColumnsWidth();
+    int remainingWidth = getAvailableWidthForColumn(logicalIndex);
+    if (newSize > remainingWidth)
+    {
+       resizeColumn(logicalIndex, remainingWidth);
+    }
+}
+
+// When the table's geometry is ready, we manually perform the stretch of the "Message" column,
+// as the "Stretch" resize mode does not allow for interactive resizing.
+void TableViewLastColumnResizingFixer::on_geometriesChanged()
+{
+    if ((getColumnsWidth() - this->tableView->horizontalHeader()->width()) != 0)
+    {
+        disconnectViewHeadersSignals();
+        resizeColumn(secondToLastColumnIndex, getAvailableWidthForColumn(secondToLastColumnIndex));
+        connectViewHeadersSignals();
+    }
+}
+
+/**
+ * Initializes all internal variables and prepares the
+ * the resize modes of the last 2 columns of the table and
+ */
+TableViewLastColumnResizingFixer::TableViewLastColumnResizingFixer(QTableView* table, int lastColMinimumWidth, int allColsMinimumWidth, QObject *parent) :
+    QObject(parent),
+    tableView(table),
+    lastColumnMinimumWidth(lastColMinimumWidth),
+    allColumnsMinimumWidth(allColsMinimumWidth)
+{
+    columnCount = tableView->horizontalHeader()->count();
+    lastColumnIndex = columnCount - 1;
+    secondToLastColumnIndex = columnCount - 2;
+    tableView->horizontalHeader()->setMinimumSectionSize(allColumnsMinimumWidth);
+    setViewHeaderResizeMode(secondToLastColumnIndex, QHeaderView::Interactive);
+    setViewHeaderResizeMode(lastColumnIndex, QHeaderView::Interactive);
 }
 
 #ifdef WIN32
@@ -626,8 +856,14 @@ bool GetStartOnSystemStartup()
 
 bool SetStartOnSystemStartup(bool fAutoStart)
 {
-    if (!fAutoStart)
-        fs::remove(GetAutostartFilePath());
+    if (!fAutoStart) {
+        try {
+            fs::remove(GetAutostartFilePath());
+        } catch(const fs::filesystem_error& e) {
+            LogPrintf("Failed to remove autostart file: %s\n", e.what());
+            return false;
+        }
+    }
     else
     {
         char pszExePath[MAX_PATH+1];
@@ -637,7 +873,12 @@ bool SetStartOnSystemStartup(bool fAutoStart)
         }
         pszExePath[r] = '\0';
 
-        fs::create_directories(GetAutostartDir());
+        try {
+            fs::create_directories(GetAutostartDir());
+        } catch(const fs::filesystem_error& e) {
+            LogPrintf("Failed to create autostart directory: %s\n", e.what());
+            return false;
+        }
 
         std::ofstream optionFile{GetAutostartFilePath(), std::ios_base::out | std::ios_base::trunc};
         if (!optionFile.good())
@@ -833,6 +1074,52 @@ QString formatBytes(uint64_t bytes)
     return QObject::tr("%1 GB").arg(bytes / 1'000'000'000);
 }
 
+QString formatBytesps(float val)
+{
+    if (val < 10)
+        //: "Bytes per second"
+        return QObject::tr("%1 B/s").arg(0.01 * int(val * 100 + 0.5));
+    if (val < 100)
+        //: "Bytes per second"
+        return QObject::tr("%1 B/s").arg(0.1 * int(val * 10 + 0.5));
+    if (val < 1'000)
+        //: "Bytes per second"
+        return QObject::tr("%1 B/s").arg(int(val + 0.5));
+    if (val < 10'000)
+        //: "Kilobytes per second"
+        return QObject::tr("%1 kB/s").arg(0.01 * int(val / 10 + 0.5));
+    if (val < 100'000)
+        //: "Kilobytes per second"
+        return QObject::tr("%1 kB/s").arg(0.1 * int(val / 100 + 0.5));
+    if (val < 1'000'000)
+        //: "Kilobytes per second"
+        return QObject::tr("%1 kB/s").arg(int(val / 1'000 + 0.5));
+    if (val < 10'000'000)
+        //: "Megabytes per second"
+        return QObject::tr("%1 MB/s").arg(0.01 * int(val / 10'000 + 0.5));
+    if (val < 100'000'000)
+        //: "Megabytes per second"
+        return QObject::tr("%1 MB/s").arg(0.1 * int(val / 100'000 + 0.5));
+    if (val < 10'000'000'000)
+        //: "Megabytes per second"
+        return QObject::tr("%1 MB/s").arg(long(val / 1'000'000 + 0.5));
+
+    //: "Gigabytes per second"
+    return QObject::tr("%1 GB/s").arg(long(val / 1'000'000'000 + 0.5));
+}
+
+static double ColourLuminosity(const QColor& c)
+{
+    const auto Lr = std::pow(c.redF(),   2.2) * .2126;
+    const auto Lg = std::pow(c.greenF(), 2.2) * .7152;
+    const auto Lb = std::pow(c.blueF(),  2.2) * .0722;
+    return Lr + Lg + Lb;
+}
+
+bool isDarkMode(const QColor& color) {
+    return ColourLuminosity(color) < .36;
+}
+
 qreal calculateIdealFontSize(int width, const QString& text, QFont font, qreal minPointSize, qreal font_size) {
     while(font_size >= minPointSize) {
         font.setPointSizeF(font_size);
@@ -990,6 +1277,12 @@ QString MakeHtmlLink(const QString& source, const QString& link)
         QLatin1String("<a href=\"") + link + QLatin1String("\">") + link + QLatin1String("</a>"));
 }
 
+QString MakeHtmlLink(const QString& source)
+{
+    static const QRegularExpression uri(QStringLiteral(R"#(([\s>]|^)((https)://([\w./-]+))(?=\.?[\s<]|\.?$))#"), QRegularExpression::InvertedGreedinessOption);
+    return QString(source).replace(uri, QStringLiteral(R"#(\1<a href="\2">\3&#x2060;:&#x2060;/&#x2060;/&#x2060;\4</a>)#"));
+}
+
 void PrintSlotException(
     const std::exception* exception,
     const QObject* sender,
@@ -1001,15 +1294,18 @@ void PrintSlotException(
     PrintExceptionContinue(exception, description);
 }
 
-void ShowModalDialogAsynchronously(QDialog* dialog)
+void ShowModalDialogAsynchronously(QDialog* dialog, const Qt::WindowModality modality)
 {
     dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setWindowModality(Qt::ApplicationModal);
+    dialog->setWindowModality(modality);
     dialog->show();
 }
 
 QString WalletDisplayName(const QString& name)
 {
+    if (name.endsWith(".dat")) {
+        return name.chopped(4);
+    }
     return name.isEmpty() ? "[" + QObject::tr("default wallet") + "]" : name;
 }
 

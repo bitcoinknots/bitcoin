@@ -4,6 +4,8 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test RPC commands for signing messages with private key."""
 
+import base64
+
 from test_framework.descriptors import (
     descsum_create,
 )
@@ -22,7 +24,7 @@ class SignMessagesWithPrivTest(BitcoinTestFramework):
     def addresses_from_privkey(self, priv_key):
         '''Return addresses for a given WIF private key in legacy (P2PKH),
            nested segwit (P2SH-P2WPKH) and native segwit (P2WPKH) formats.'''
-        descriptors = f'pkh({priv_key})', f'sh(wpkh({priv_key}))', f'wpkh({priv_key})'
+        descriptors = f'pkh({priv_key})', f'sh(wpkh({priv_key}))', f'wpkh({priv_key})', f'wsh(pk({priv_key}))', f'tr({priv_key})'
         return [self.nodes[0].deriveaddresses(descsum_create(desc))[0] for desc in descriptors]
 
     def run_test(self):
@@ -39,9 +41,43 @@ class SignMessagesWithPrivTest(BitcoinTestFramework):
         assert_equal(addresses[0], 'mpLQjfK79b7CCV4VMJWEWAj5Mpx8Up5zxB')
         assert self.nodes[0].verifymessage(addresses[0], signature, message)
 
-        self.log.info('test that verifying with non-P2PKH addresses throws error')
-        for non_p2pkh_address in addresses[1:]:
-            assert_raises_rpc_error(-3, "Address does not refer to key", self.nodes[0].verifymessage, non_p2pkh_address, signature, message)
+        self.log.info('test that verifying with non-P2PKH addresses succeeds')
+        bin_sig = bytearray(base64.b64decode(signature))
+        for non_p2pkh_address in addresses[1:3]:
+            assert self.nodes[0].verifymessage(non_p2pkh_address, signature, message)
+            bin_sig[0] += 4
+            bip137_signature = base64.b64encode(bin_sig).decode('ascii')
+            assert self.nodes[0].verifymessage(non_p2pkh_address, bip137_signature, message)
+
+        self.log.info('test that verifying with p2wsh address throws error')
+        assert_raises_rpc_error(-3, "Address does not refer to key", self.nodes[0].verifymessage, addresses[3], signature, message)
+
+        self.log.info('test that verifying with p2tr address throws error')
+        assert_raises_rpc_error(-3, "Address does not refer to key", self.nodes[0].verifymessage, addresses[4], signature, message)
+
+        self.log.info('test that verifying Electrum p2sh-segwit succeeds')
+        signature = 'IFBRc4WU3K2c75KG7kcn/x9Ov6y75xrk05t9Zi7kwEIJNU0dMFMgRdeeKYo8JC4L83ckPavuaI+GUuvYZdwkGsM='
+        assert self.nodes[0].verifymessage('2MzoTgQ7YuReUaXaW2iciHoewDGdmagMVuy', signature, message)
+
+        self.log.info('test that verifying Electrum p2wpkh succeeds')
+        signature = 'IBR+8bubsBxBFFE3CO6pggzNSRyg/23HRMNXyWUIIEXmTe3P0apzd5izyR/d80nVRE883I58gijFKIevBLtcPRI='
+        assert self.nodes[0].verifymessage('bcrt1qa0mscp9epevt07rscyjsre5fdlxjp3tlcchs4x', signature, message)
+
+        self.log.info('test that verifying Sparrow p2wpkh ("Electrum") succeeds')
+        signature = 'H036ky29d5FwS0K46di8ssfP+UbVEghDoexR2GGv+WX+WQHVnTWiUTOSjazS3+aIx92qsnE0m/WK2uflxI47BhQ='
+        assert self.nodes[0].verifymessage('bcrt1q00cc7f4m04f5mjdcm9g6c5y2a3wnvfvflljety', signature, message)
+
+        self.log.info('test that verifying Sparrow p2wpkh ("BIP137/Trezor") succeeds')
+        signature = 'J036ky29d5FwS0K46di8ssfP+UbVEghDoexR2GGv+WX+WQHVnTWiUTOSjazS3+aIx92qsnE0m/WK2uflxI47BhQ='
+        assert self.nodes[0].verifymessage('bcrt1q00cc7f4m04f5mjdcm9g6c5y2a3wnvfvflljety', signature, message)
+
+        self.log.info('test that verifying Sparrow p2wpkh ("BIP322 Simple") succeeds')
+        signature = 'AkcwRAIgCu7IrN3jCvBdp5myPZHCKiOW5o3EToYG2xgPbjiw6JsCIFwaZMcYQj9FmWcNtZk3qTp2UDBm77cbFmxQ3WVnVxrCASEDonFDI6fuQ05yUfeQIsOs599XHZnpaTxaqD13g4sXYRY='
+        assert self.nodes[0].verifymessage('bcrt1q00cc7f4m04f5mjdcm9g6c5y2a3wnvfvflljety', signature, message)
+
+        self.log.info('test that verifying Sparrow p2tr ("BIP322 Simple") succeeds')
+        signature = 'AUFdYU3dZCSmTxWnl5ja/Jo096VAaKtdaYs8b4ikF2iuQ2fiy7YSFHBWcD40a1oBKTVWUrXqOC0pXoDjTFKqM/ObAQ=='
+        assert self.nodes[0].verifymessage('bcrt1p5t6gmtfkd4q8jfgz40auxqgtll895n85amlgvgsz0jwxvfw9qltss6wfve', signature, message)
 
         self.log.info('test parameter validity and error codes')
         # signmessagewithprivkey has two required parameters

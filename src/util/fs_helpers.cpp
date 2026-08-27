@@ -8,6 +8,7 @@
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
 #include <logging.h>
+#include <random.h>
 #include <sync.h>
 #include <util/fs.h>
 #include <util/syserror.h>
@@ -108,28 +109,28 @@ std::streampos GetFileSize(const char* path, std::streamsize max)
 bool FileCommit(FILE* file)
 {
     if (fflush(file) != 0) { // harmless if redundantly called
-        LogPrintf("fflush failed: %s\n", SysErrorString(errno));
+        LogError("fflush failed: %s", SysErrorString(errno));
         return false;
     }
 #ifdef WIN32
     HANDLE hFile = (HANDLE)_get_osfhandle(_fileno(file));
     if (FlushFileBuffers(hFile) == 0) {
-        LogPrintf("FlushFileBuffers failed: %s\n", Win32ErrorString(GetLastError()));
+        LogError("FlushFileBuffers failed: %s", Win32ErrorString(GetLastError()));
         return false;
     }
 #elif defined(__APPLE__) && defined(F_FULLFSYNC)
     if (fcntl(fileno(file), F_FULLFSYNC, 0) == -1) { // Manpage says "value other than -1" is returned on success
-        LogPrintf("fcntl F_FULLFSYNC failed: %s\n", SysErrorString(errno));
+        LogError("fcntl F_FULLFSYNC failed: %s", SysErrorString(errno));
         return false;
     }
 #elif HAVE_FDATASYNC
     if (fdatasync(fileno(file)) != 0 && errno != EINVAL) { // Ignore EINVAL for filesystems that don't support sync
-        LogPrintf("fdatasync failed: %s\n", SysErrorString(errno));
+        LogError("fdatasync failed: %s", SysErrorString(errno));
         return false;
     }
 #else
     if (fsync(fileno(file)) != 0 && errno != EINVAL) {
-        LogPrintf("fsync failed: %s\n", SysErrorString(errno));
+        LogError("fsync failed: %s", SysErrorString(errno));
         return false;
     }
 #endif
@@ -191,11 +192,14 @@ void AllocateFileRange(FILE* file, unsigned int offset, unsigned int length)
     HANDLE hFile = (HANDLE)_get_osfhandle(_fileno(file));
     LARGE_INTEGER nFileSize;
     int64_t nEndPos = (int64_t)offset + length;
-    nFileSize.u.LowPart = nEndPos & 0xFFFFFFFF;
-    nFileSize.u.HighPart = nEndPos >> 32;
-    SetFilePointerEx(hFile, nFileSize, 0, FILE_BEGIN);
-    SetEndOfFile(hFile);
-#elif defined(__APPLE__)
+    if (GetFileSizeEx(hFile, &nFileSize) && (int64_t{nFileSize.u.HighPart} << 32 | nFileSize.u.LowPart) <= nEndPos) {
+        nFileSize.u.LowPart = nEndPos & 0xFFFFFFFF;
+        nFileSize.u.HighPart = nEndPos >> 32;
+        if (SetFilePointerEx(hFile, nFileSize, 0, FILE_BEGIN)) {
+            SetEndOfFile(hFile);
+        }
+    }
+#elif 0
     // OSX specific version
     // NOTE: Contrary to other OS versions, the OSX version assumes that
     // NOTE: offset is the size of the file.
@@ -213,23 +217,79 @@ void AllocateFileRange(FILE* file, unsigned int offset, unsigned int length)
 #else
 #if defined(HAVE_POSIX_FALLOCATE)
     // Version using posix_fallocate
-    off_t nEndPos = (off_t)offset + length;
-    if (0 == posix_fallocate(fileno(file), 0, nEndPos)) return;
+    if (0 == posix_fallocate(fileno(file), offset, length)) return;
 #endif
     // Fallback version
     // TODO: just write one byte per block
-    static const char buf[65536] = {};
+    uint8_t buf[65536];
     if (fseek(file, offset, SEEK_SET)) {
         return;
     }
+    clearerr(file);
     while (length > 0) {
         unsigned int now = 65536;
         if (length < now)
             now = length;
+        const size_t rlen = fread(buf, 1, now, file);
+        if (rlen < now) {
+            if (ferror(file)) {
+                // Don't clobber anything, just give up
+                clearerr(file);
+                return;
+            }
+            memset(&buf[rlen], 0, now - rlen);
+            if (0 != fseek(file, -rlen, SEEK_CUR)) {
+                return;
+            }
+        }
         fwrite(buf, 1, now, file); // allowed to fail; this function is advisory anyway
         length -= now;
     }
 #endif
+}
+
+FILE* AdviseSequential(FILE *file) {
+#ifdef _POSIX_C_SOURCE
+# if _POSIX_C_SOURCE >= 200112L
+    // Since this whole thing is advisory anyway, we can ignore any errors
+    // encountered up to and including the posix_fadvise call. However, we must
+    // rewind the file to the appropriate position if we've changed the seek
+    // offset.
+    if (file == nullptr) {
+        return nullptr;
+    }
+    const int fd = fileno(file);
+    if (fd == -1) {
+        return file;
+    }
+    const off_t start = lseek(fd, 0, SEEK_CUR);
+    if (start == -1) {
+        return file;
+    }
+    posix_fadvise(fd, start, 0, POSIX_FADV_WILLNEED);
+    posix_fadvise(fd, start, 0, POSIX_FADV_SEQUENTIAL);
+# endif
+#endif
+    return file;
+}
+
+int CloseAndUncache(FILE *file) {
+#ifdef _POSIX_C_SOURCE
+# if _POSIX_C_SOURCE >= 200112L
+    // Ignore any errors up to and including the posix_fadvise call since it's
+    // advisory.
+    if (file != nullptr) {
+        const int fd = fileno(file);
+        if (fd != -1) {
+            const off_t end = lseek(fd, 0, SEEK_END);
+            if (end != (off_t)-1) {
+                posix_fadvise(fd, 0, end, POSIX_FADV_DONTNEED);
+            }
+        }
+    }
+# endif
+#endif
+    return std::fclose(file);
 }
 
 #ifdef WIN32
@@ -241,7 +301,7 @@ fs::path GetSpecialFolderPath(int nFolder, bool fCreate)
         return fs::path(pszPath);
     }
 
-    LogPrintf("SHGetSpecialFolderPathW() failed, could not obtain requested path.\n");
+    LogError("SHGetSpecialFolderPathW() failed, could not obtain requested path.");
     return fs::path("");
 }
 #endif
@@ -275,23 +335,55 @@ std::string PermsToSymbolicString(fs::perms p)
 {
     std::string perm_str(9, '-');
 
-    auto set_perm = [&](size_t pos, fs::perms required_perm, char letter) {
+    auto set_perm = [&](size_t pos, fs::perms required_perm, char letter, char else_letter = '\0') {
         if ((p & required_perm) != fs::perms::none) {
             perm_str[pos] = letter;
+        } else if (else_letter) {
+            perm_str[pos] = else_letter;
         }
     };
 
     set_perm(0, fs::perms::owner_read,   'r');
     set_perm(1, fs::perms::owner_write,  'w');
-    set_perm(2, fs::perms::owner_exec,   'x');
+    if ((p & fs::perms::owner_exec) != fs::perms::none) {
+        set_perm(2, fs::perms::set_uid,  's', 'x');
+    } else {
+        set_perm(2, fs::perms::set_uid,  'S');
+    }
+
     set_perm(3, fs::perms::group_read,   'r');
     set_perm(4, fs::perms::group_write,  'w');
-    set_perm(5, fs::perms::group_exec,   'x');
+    if ((p & fs::perms::group_exec) != fs::perms::none) {
+        set_perm(5, fs::perms::set_gid,  's', 'x');
+    } else {
+        set_perm(5, fs::perms::set_gid,  'S');
+    }
+
     set_perm(6, fs::perms::others_read,  'r');
     set_perm(7, fs::perms::others_write, 'w');
-    set_perm(8, fs::perms::others_exec,  'x');
+    if ((p & fs::perms::others_exec)  != fs::perms::none) {
+        set_perm(8, fs::perms::sticky_bit, 't', 'x');
+    } else {
+        set_perm(8, fs::perms::sticky_bit, 'T');
+    }
 
     return perm_str;
+}
+
+static std::optional<unsigned> StringToOctal(const std::string& str)
+{
+    unsigned ret = 0;
+    for (char c : str) {
+        if (c < '0' || c > '7') return std::nullopt;
+        ret = (ret << 3) | (c - '0');
+    }
+    return ret;
+}
+
+static auto ConvertPermsToOctal(const std::string& str) noexcept -> std::optional<unsigned>
+{
+    if ((str.length() == 3) || (str.length() == 4)) return StringToOctal(str);
+    return std::nullopt;
 }
 
 std::optional<fs::perms> InterpretPermString(const std::string& s)
@@ -305,7 +397,25 @@ std::optional<fs::perms> InterpretPermString(const std::string& s)
         return fs::perms::owner_read | fs::perms::owner_write |
                fs::perms::group_read |
                fs::perms::others_read;
+    } else if (auto octal_perms = ConvertPermsToOctal(s)) {
+        return static_cast<fs::perms>(*octal_perms);
     } else {
         return std::nullopt;
     }
+}
+
+bool IsDirWritable(const fs::path& dir_path)
+{
+    // Attempt to create a tmp file in the directory
+    if (!fs::is_directory(dir_path)) throw std::runtime_error(strprintf("Path %s is not a directory", fs::PathToString(dir_path)));
+    FastRandomContext rng;
+    const auto tmp = dir_path / fs::PathFromString(strprintf(".tmp_%d", rng.rand64()));
+
+    if (const auto created{fsbridge::fopen(tmp, "wbx")}) {
+        std::fclose(created);
+        std::error_code ec;
+        fs::remove(tmp, ec); // clean up, ignore errors
+        return true;
+    }
+    return false;
 }

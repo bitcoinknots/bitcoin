@@ -6,6 +6,8 @@
 #include <common/signmessage.h> // For MessageSign(), MessageVerify(), MESSAGE_MAGIC
 #include <hash.h> // For Hash()
 #include <key.h>  // For CKey
+#include <key_io.h> // EncodeDestination
+#include <outputtype.h> // For BIP-322 tests
 #include <script/parsing.h>
 #include <span.h>
 #include <sync.h>
@@ -594,6 +596,15 @@ BOOST_AUTO_TEST_CASE(util_time_GetTime)
     BOOST_CHECK(steady_0 + 1ms <= std::chrono::steady_clock::now());
     BOOST_CHECK(ms_0 < GetTime<std::chrono::milliseconds>());
     BOOST_CHECK(us_0 < GetTime<std::chrono::microseconds>());
+}
+
+BOOST_AUTO_TEST_CASE(util_ticksseconds)
+{
+    BOOST_CHECK_EQUAL(TicksSeconds(0s), 0);
+    BOOST_CHECK_EQUAL(TicksSeconds(1s), 1);
+    BOOST_CHECK_EQUAL(TicksSeconds(999ms), 0);
+    BOOST_CHECK_EQUAL(TicksSeconds(1000ms), 1);
+    BOOST_CHECK_EQUAL(TicksSeconds(1500ms), 1);
 }
 
 BOOST_AUTO_TEST_CASE(test_IsDigit)
@@ -1668,6 +1679,38 @@ BOOST_AUTO_TEST_CASE(message_sign)
         "Sign with a valid private key");
 
     BOOST_CHECK_EQUAL(expected_signature, generated_signature);
+
+    // BIP-322 tests
+    // (no signing done here, as we need a wallet to do so)
+
+    auto pubkey = privkey.GetPubKey();
+    MessageVerificationResult mvr{MessageVerificationResult::OK};
+
+    // LEGACY pubkey type
+    auto dest_legacy = GetDestinationForKey(pubkey, OutputType::LEGACY);
+    BOOST_CHECK_EQUAL("15CRxFdyRpGZLW9w8HnHvVduizdL5jKNbs", EncodeDestination(dest_legacy));
+    auto txs_legacy = BIP322Txs::Create(dest_legacy, message, mvr);
+    if (!txs_legacy || mvr != MessageVerificationResult::OK) {
+        BOOST_FAIL("Failed to create BIP-322 txs for legacy address");
+    }
+
+    // P2SH_SEGWIT pubkey type
+    auto dest_p2sh_segwit = GetDestinationForKey(pubkey, OutputType::P2SH_SEGWIT);
+    BOOST_CHECK_EQUAL("35uijJkf4rcCnGzEZsn12YJenTHToDKpr2", EncodeDestination(dest_p2sh_segwit));
+    auto txs_p2sh_segwit = BIP322Txs::Create(dest_p2sh_segwit, message, mvr);
+    if (!txs_p2sh_segwit || mvr != MessageVerificationResult::OK) {
+        BOOST_FAIL("Failed to create BIP-322 txs for p2sh-segwit address");
+    }
+
+    // BECH32
+    auto dest_bech32 = GetDestinationForKey(pubkey, OutputType::BECH32);
+    BOOST_CHECK_EQUAL("bc1q9cy7s7nmzah0m6mt2ftmu6x723esjxqkkl4wsw", EncodeDestination(dest_bech32));
+    auto txs_bech32 = BIP322Txs::Create(dest_bech32, message, mvr);
+    if (!txs_bech32 || mvr != MessageVerificationResult::OK) {
+        BOOST_FAIL("Failed to create BIP-322 txs for bech32 address");
+    }
+
+    // TODO: BECH32M
 }
 
 BOOST_AUTO_TEST_CASE(message_verify)
@@ -1675,16 +1718,16 @@ BOOST_AUTO_TEST_CASE(message_verify)
     BOOST_CHECK_EQUAL(
         MessageVerify(
             "invalid address",
-            "signature should be irrelevant",
+            "AA==",
             "message too"),
         MessageVerificationResult::ERR_INVALID_ADDRESS);
 
     BOOST_CHECK_EQUAL(
         MessageVerify(
             "3B5fQsEXEaV8v6U3ejYc8XaKXAkyQj2MjV",
-            "signature should be irrelevant",
+            "AA==",
             "message too"),
-        MessageVerificationResult::ERR_ADDRESS_NO_KEY);
+        MessageVerificationResult::ERR_INVALID /* ERR_ADDRESS_NO_KEY */);
 
     BOOST_CHECK_EQUAL(
         MessageVerify(
@@ -1698,7 +1741,7 @@ BOOST_AUTO_TEST_CASE(message_verify)
             "1KqbBpLy5FARmTPD4VZnDDpYjkUvkr82Pm",
             "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
             "message should be irrelevant"),
-        MessageVerificationResult::ERR_PUBKEY_NOT_RECOVERED);
+        MessageVerificationResult::ERR_INVALID /* ERR_PUBKEY_NOT_RECOVERED */);
 
     BOOST_CHECK_EQUAL(
         MessageVerify(
@@ -1720,6 +1763,124 @@ BOOST_AUTO_TEST_CASE(message_verify)
             "IIcaIENoYW5jZWxsb3Igb24gYnJpbmsgb2Ygc2Vjb25kIGJhaWxvdXQgZm9yIGJhbmtzIAaHRtbCeDZINyavx14=",
             "Trust me"),
         MessageVerificationResult::OK);
+
+    // BIP-322 tests
+
+    // privkey: L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k
+
+    BOOST_CHECK_EQUAL(
+        MessageVerify(
+            "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+            "AkcwRAIgM2gBAQqvZX15ZiysmKmQpDrG83avLIT492QBzLnQIxYCIBaTpOaD20qRlEylyxFSeEA2ba9YOixpX8z46TSDtS40ASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHI=",
+            ""),
+        MessageVerificationResult::OK);
+
+    BOOST_CHECK_EQUAL(
+        MessageVerify(
+            "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+            "AkcwRAIgZRfIY3p7/DoVTty6YZbWS71bc5Vct9p9Fia83eRmw2QCICK/ENGfwLtptFluMGs2KsqoNSk89pO7F29zJLUx9a/sASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHI=",
+            "Hello World"),
+        MessageVerificationResult::OK);
+
+    // BIP322 signature created using buidl-python library with same parameters as test on line 2596
+    BOOST_CHECK_EQUAL(
+        MessageVerify(
+            "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+         "AkgwRQIhAOzyynlqt93lOKJr+wmmxIens//zPzl9tqIOua93wO6MAiBi5n5EyAcPScOjf1lAqIUIQtr3zKNeavYabHyR8eGhowEhAsfxIAMZZEKUPYWI4BruhAQjzFT8FSFSajuFwrDL1Yhy",
+            "Hello World"),
+        MessageVerificationResult::OK);
+
+    // 2-of-3 p2sh multisig BIP322 signature (created with the buidl-python library)
+    // Keys are defined as (HDRootWIF, bip322_path)
+    // Key1 (L4DksdGZ4KQJfcLHD5Dv25fu8Rxyv7hHi2RjZR4TYzr8c6h9VNrp, m/45'/0/0/1)
+    // Key2 (KzSRqnCVwjzY8id2X5oHEJWXkSHwKUYaAXusjwgkES8BuQPJnPNu, m/45'/0/0/3)
+    // Key3 (L1zt9Rw7HrU7jaguMbVzhiX8ffuVkmMis5wLHddXYuHWYf8u8uRj, m/45'/0/0/6)
+    // BIP322 includes signs from Key2 and Key3
+    BOOST_CHECK_EQUAL(
+        MessageVerify(
+            "3LnYoUkFrhyYP3V7rq3mhpwALz1XbCY9Uq",
+         "AAAAAAHNcfHaNfl8f/+ZC2gTr8aF+0KgppYjKM94egaNm/u1ZAAAAAD8AEcwRAIhAJ6hdj61vLDP+aFa30qUZQmrbBfE0kiOObYvt5nqPSxsAh9IrOKFwflfPRUcQ/5e0REkdFHVP2GGdUsMgDet+sNlAUcwRAIgH3eW/VyFDoXvCasd8qxgwj5NDVo0weXvM6qyGXLCR5YCIEwjbEV6fS6RWP6QsKOcMwvlGr1/SgdCC6pW4eH87/YgAUxpUiECKJfGy28imLcuAeNBLHCNv3NRP5jnJwFDNRXCYNY/vJ4hAv1RQtaZs7+vKqQeWl2rb/jd/gMxkEjUnjZdDGPDZkMLIQL65cH2X5O7LujjTLDL2l8Pxy0Y2UUR99u1qCfjdz7dklOuAAAAAAEAAAAAAAAAAAFqAAAAAA==",
+            "This will be a p2sh 2-of-3 multisig BIP 322 signed message"),
+        MessageVerificationResult::OK);
+
+    // 3-of-3 p2wsh multisig BIP322 signature (created with the buidl-python library)
+    // Keys are defined as (HDRootWIF, bip322_path)
+    // Key1 (L4DksdGZ4KQJfcLHD5Dv25fu8Rxyv7hHi2RjZR4TYzr8c6h9VNrp, m/45'/0/0/6)
+    // Key2 (KzSRqnCVwjzY8id2X5oHEJWXkSHwKUYaAXusjwgkES8BuQPJnPNu, m/45'/0/0/9)
+    // Key3 (L1zt9Rw7HrU7jaguMbVzhiX8ffuVkmMis5wLHddXYuHWYf8u8uRj, m/45'/0/0/11)
+    BOOST_CHECK_EQUAL(
+        MessageVerify(
+            "bc1qlqtuzpmazp2xmcutlwv0qvggdvem8vahkc333usey4gskug8nutsz53msw",    "BQBIMEUCIQDQoXvGKLH58exuujBOta+7+GN7vi0lKwiQxzBpuNuXuAIgIE0XYQlFDOfxbegGYYzlf+tqegleAKE6SXYIa1U+uCcBRzBEAiATegywVl6GWrG9jJuPpNwtgHKyVYCX2yfuSSDRFATAaQIgTLlU6reLQsSIrQSF21z3PtUO2yAUseUWGZqRUIE7VKoBSDBFAiEAgxtpidsU0Z4u/+5RB9cyeQtoCW5NcreLJmWXZ8kXCZMCIBR1sXoEinhZE4CF9P9STGIcMvCuZjY6F5F0XTVLj9SjAWlTIQP3dyWvTZjUENWJowMWBsQrrXCUs20Gu5YF79CG5Ga0XSEDwqI5GVBOuFkFzQOGH5eTExSAj2Z/LDV/hbcvAPQdlJMhA17FuuJd+4wGuj+ZbVxEsFapTKAOwyhfw9qpch52JKxbU64=",
+            "This will be a p2wsh 3-of-3 multisig BIP 322 signed message"),
+        MessageVerificationResult::OK);
+
+    // Single key p2tr BIP322 signature (created with the buidl-python library)
+    // PrivateKeyWIF L3VFeEujGtevx9w18HD1fhRbCH67Az2dpCymeRE1SoPK6XQtaN2k
+    BOOST_CHECK_EQUAL(
+        MessageVerify(
+            "bc1ppv609nr0vr25u07u95waq5lucwfm6tde4nydujnu8npg4q75mr5sxq8lt3",
+            "AUHd69PrJQEv+oKTfZ8l+WROBHuy9HKrbFCJu7U1iK2iiEy1vMU5EfMtjc+VSHM7aU0SDbak5IUZRVno2P5mjSafAQ==",
+            "Hello World"),
+        MessageVerificationResult::OK);
+
+    // Same p2tr BIP322 signature as above (created with the buidl-python library)
+    // Signature should not verify against the message
+    BOOST_CHECK_EQUAL(
+        MessageVerify(
+            "bc1ppv609nr0vr25u07u95waq5lucwfm6tde4nydujnu8npg4q75mr5sxq8lt3",
+            "AUHd69PrJQEv+oKTfZ8l+WROBHuy9HKrbFCJu7U1iK2iiEy1vMU5EfMtjc+VSHM7aU0SDbak5IUZRVno2P5mjSafAQ==",
+            "Hello World - This should fail"),
+        MessageVerificationResult::ERR_INVALID);
+
+    // wrong address
+
+    BOOST_CHECK_EQUAL(
+        MessageVerify(
+            "bc1qkecg9ly2xwxqgdy9egpuy87qc9x26smpts562s",
+            "AkcwRAIgM2gBAQqvZX15ZiysmKmQpDrG83avLIT492QBzLnQIxYCIBaTpOaD20qRlEylyxFSeEA2ba9YOixpX8z46TSDtS40ASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHI=",
+            ""),
+        MessageVerificationResult::ERR_INVALID);
+
+    BOOST_CHECK_EQUAL(
+        MessageVerify(
+            "bc1qkecg9ly2xwxqgdy9egpuy87qc9x26smpts562s",
+            "AkcwRAIgZRfIY3p7/DoVTty6YZbWS71bc5Vct9p9Fia83eRmw2QCICK/ENGfwLtptFluMGs2KsqoNSk89pO7F29zJLUx9a/sASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHI=",
+            "Hello World"),
+        MessageVerificationResult::ERR_INVALID);
+
+    // wrong signature / message (signatures swapped)
+
+    BOOST_CHECK_EQUAL(
+        MessageVerify(
+            "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+            "AkcwRAIgZRfIY3p7/DoVTty6YZbWS71bc5Vct9p9Fia83eRmw2QCICK/ENGfwLtptFluMGs2KsqoNSk89pO7F29zJLUx9a/sASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHI=",
+            ""),
+        MessageVerificationResult::ERR_INVALID);
+
+    BOOST_CHECK_EQUAL(
+        MessageVerify(
+            "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+            "AkcwRAIgM2gBAQqvZX15ZiysmKmQpDrG83avLIT492QBzLnQIxYCIBaTpOaD20qRlEylyxFSeEA2ba9YOixpX8z46TSDtS40ASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHI=",
+            "Hello World"),
+        MessageVerificationResult::ERR_INVALID);
+
+    // invalid address
+
+    BOOST_CHECK_EQUAL(
+        MessageVerify(
+            "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx1l",
+            "AkcwRAIgM2gBAQqvZX15ZiysmKmQpDrG83avLIT492QBzLnQIxYCIBaTpOaD20qRlEylyxFSeEA2ba9YOixpX8z46TSDtS40ASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHI=",
+            ""),
+        MessageVerificationResult::ERR_INVALID_ADDRESS);
+
+    // malformed signature
+
+    BOOST_CHECK_EQUAL(
+        MessageVerify(
+            "bc1q9vza2e8x573nczrlzms0wvx3gsqjx7vavgkx0l",
+            "AkcwRAIgClVQ8S9yX1h8YThlGElD9lOrQbOwbFDjkYb0ebfiq+oCIDHgb/X9WNalNNtqTXb465ufbv9JuLxcJf8qi7DP6yOXASECx/EgAxlkQpQ9hYjgGu6EBCPMVPwVIVJqO4XCsMvViHI",
+            ""),
+        MessageVerificationResult::ERR_MALFORMED_SIGNATURE);
 }
 
 BOOST_AUTO_TEST_CASE(message_hash)
@@ -1733,10 +1894,20 @@ BOOST_AUTO_TEST_CASE(message_hash)
 
     const uint256 signature_hash = Hash(unsigned_tx);
     const uint256 message_hash1 = Hash(prefixed_message);
-    const uint256 message_hash2 = MessageHash(unsigned_tx);
+    const uint256 message_hash2 = MessageHash(unsigned_tx, MessageSignatureFormat::LEGACY);
 
     BOOST_CHECK_EQUAL(message_hash1, message_hash2);
     BOOST_CHECK_NE(message_hash1, signature_hash);
+
+    // BIP-322 tests
+
+    const uint256 signature_hash_0x = MessageHash("", MessageSignatureFormat::FULL);
+    const uint256 signature_hash_Hello_World = MessageHash("Hello World", MessageSignatureFormat::FULL);
+
+    std::vector<unsigned char> vec(signature_hash_0x.begin(), signature_hash_0x.end());
+    BOOST_CHECK_EQUAL("c90c269c4f8fcbe6880f72a721ddfbf1914268a794cbb21cfafee13770ae19f1", HexStr(vec));
+    vec = std::vector<unsigned char>(signature_hash_Hello_World.begin(), signature_hash_Hello_World.end());
+    BOOST_CHECK_EQUAL("f0eb03b1a75ac6d9847f55c624a99169b5dccba2a31f5b23bea77ba270de0a7a", HexStr(vec));
 }
 
 BOOST_AUTO_TEST_CASE(remove_prefix)
@@ -1964,6 +2135,213 @@ BOOST_AUTO_TEST_CASE(mib_string_literal_test)
     BOOST_CHECK_EQUAL(1_MiB, 1024 * 1024);
     const auto max_mib{std::numeric_limits<size_t>::max() >> 20};
     BOOST_CHECK_EXCEPTION(operator""_MiB(static_cast<unsigned long long>(max_mib) + 1), std::overflow_error, HasReason("MiB value too large for size_t byte conversion"));
+}
+
+BOOST_AUTO_TEST_CASE(is_space_byte_range_test)
+{
+    std::vector expected(256, false);
+    for (auto c : std::string_view(" \f\n\r\t\v")) expected[c] = true;
+
+    for (auto i{0U}; i < expected.size(); ++i) {
+        auto c = static_cast<char>(i);
+        BOOST_CHECK_MESSAGE(IsSpace(c) == expected[i], "IsSpace test failed for char value: " << i);
+    }
+}
+
+static std::string CheckModifyRWConfigFile(std::map<std::string, std::string>& settings_to_change, const std::string& current_config_file)
+{
+    std::istringstream stream_in(current_config_file);
+    std::ostringstream stream_out;
+    try {
+        ModifyRWConfigStream(stream_in, stream_out, settings_to_change);
+    } catch (...) {
+        settings_to_change.clear();
+        throw;
+    }
+    settings_to_change.clear();
+    return stream_out.str();
+}
+
+BOOST_AUTO_TEST_CASE(test_ModifyRWConfigFile)
+{
+    std::map<std::string, std::string> cs;
+
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b"), "a=b");
+
+    cs["a"] = "c";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b"), "a=c");
+    BOOST_CHECK(cs.empty());
+
+    // Multi-char name/value
+    cs["ab"] = "cd";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "ab=bc"), "ab=cd");
+
+    // Preserved final newline
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\n"), "a=b\n");
+    cs["a"] = "c";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\n"), "a=c\n");
+
+    // Preserved final tab
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\t"), "a=b\t");
+    cs["a"] = "c";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\t"), "a=c\t");
+
+    // Preserved final space
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b "), "a=b ");
+    cs["a"] = "c";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b "), "a=c ");
+
+    // Preserved final crnl
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\r\n"), "a=b\r\n");
+    cs["a"] = "c";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\r\n"), "a=c\r\n");
+
+    // Empty file
+    cs["a"] = "c";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, ""), "a=c\n");
+
+    // Ignore k=v in comment
+    cs["a"] = "c";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "#a=b"), "#a=b\na=c\n");
+
+    // Preserved comment
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\t# c"), "a=b\t# c");
+
+    // Commented out commented value
+    cs["a"] = "c";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\t# c"), "a=c\n#a=b\t# c");
+
+    // Preserved whitespace before name
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, " \t \ta=b"), " \t \ta=b");
+    cs["a"] = "c";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, " \t \ta=b"), " \t \ta=c");
+
+    // Preserved whitespace after name
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a \t \t=b"), "a \t \t=b");
+    cs["a"] = "c";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a \t \t=b"), "a \t \t=c");
+
+    // Preserved whitespace before value
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a= \t \tb"), "a= \t \tb");
+    cs["a"] = "c";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a= \t \tb"), "a= \t \tc");
+
+    // Modifying value between others
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\nab=bc\nd=e"), "a=b\nab=bc\nd=e");
+    cs["ab"] = "x";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\nab=bc\nd=e"), "a=b\nab=x\nd=e");
+
+    // Blank key/value
+    cs["ab"] = "";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\nab=bc\nd=e"), "a=b\nab=\nd=e");
+    cs[""] = "x";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\nab=bc\nd=e"), "a=b\nab=bc\nd=e\n=x\n");
+
+    // Blank line in source
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\n\nab=bc\n\nd=e"), "a=b\n\nab=bc\n\nd=e");
+    cs["ab"] = "x";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\n\nab=bc\n\nd=e"), "a=b\n\nab=x\n\nd=e");
+
+    // Duplicate keys in the source
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\nab=bc\nf=x\nab=zx\nd=e"), "a=b\nab=bc\nf=x\nab=zx\nd=e");
+    cs["ab"] = "x";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\nab=bc\nf=x\nab=zx\nd=e"), "a=b\nab=x\nf=x\nab=zx\nd=e");
+
+    // Comment out entire file if invalid input line
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\nab=bc\nGARBAGE\nd=e"), "[INVALID]\n# Error parsing line 3: GARBAGE\n#a=b\n#ab=bc\n#GARBAGE\n#d=e");
+    cs["ab"] = "x";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\nab=bc\nGARBAGE\nd=e"), "ab=x\n[INVALID]\n# Error parsing line 3: GARBAGE\n#a=b\n#ab=bc\n#GARBAGE\n#d=e");
+    cs["ab"] = "x";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\nab=bc\nGARBAGE\nd=e\n"), "ab=x\n[INVALID]\n# Error parsing line 3: GARBAGE\n#a=b\n#ab=bc\n#GARBAGE\n#d=e\n");
+
+    // Whitespace inside values
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\nab=b\t \t c\nd=e"), "a=b\nab=b\t \t c\nd=e");
+    cs["ab"] = "x \t \tx";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\nab=b\t \t c\nd=e"), "a=b\nab=x \t \tx\nd=e");
+
+    // Newline inside name/value
+    cs["a"] = "x\nx";
+    BOOST_REQUIRE_THROW(CheckModifyRWConfigFile(cs, ""), std::invalid_argument);
+    cs["a"] = "x\rx";
+    BOOST_REQUIRE_THROW(CheckModifyRWConfigFile(cs, ""), std::invalid_argument);
+    cs["a\nb"] = "x";
+    BOOST_REQUIRE_THROW(CheckModifyRWConfigFile(cs, ""), std::invalid_argument);
+    cs["a\rb"] = "x";
+    BOOST_REQUIRE_THROW(CheckModifyRWConfigFile(cs, ""), std::invalid_argument);
+
+    // Whitespace leading/trailing name/value
+    cs["a"] = " x";
+    BOOST_REQUIRE_THROW(CheckModifyRWConfigFile(cs, ""), std::invalid_argument);
+    cs["a"] = "\tx";
+    BOOST_REQUIRE_THROW(CheckModifyRWConfigFile(cs, ""), std::invalid_argument);
+    cs[" a"] = "x";
+    BOOST_REQUIRE_THROW(CheckModifyRWConfigFile(cs, ""), std::invalid_argument);
+    cs["\ta"] = "x";
+    BOOST_REQUIRE_THROW(CheckModifyRWConfigFile(cs, ""), std::invalid_argument);
+    cs["a"] = "x ";
+    BOOST_REQUIRE_THROW(CheckModifyRWConfigFile(cs, ""), std::invalid_argument);
+    cs["a"] = "x\t";
+    BOOST_REQUIRE_THROW(CheckModifyRWConfigFile(cs, ""), std::invalid_argument);
+    cs["a "] = "x";
+    BOOST_REQUIRE_THROW(CheckModifyRWConfigFile(cs, ""), std::invalid_argument);
+    cs["a\t"] = "x";
+    BOOST_REQUIRE_THROW(CheckModifyRWConfigFile(cs, ""), std::invalid_argument);
+
+    // Ignore groups
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\n[group]\nab=bc\nd=e"), "a=b\n[group]\nab=bc\nd=e");
+    cs["ab"] = "x";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\n[group]\nab=bc\nd=e"), "a=b\nab=x\n[group]\nab=bc\nd=e");
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\n\t [group] \t#c\nab=bc\nd=e"), "a=b\n\t [group] \t#c\nab=bc\nd=e");
+    cs["ab"] = "x";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\n\t [group] \t#c\nab=bc\nd=e"), "a=b\nab=x\n\t [group] \t#c\nab=bc\nd=e");
+
+    // Comment out entire file if invalid input line, even after a group
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\n[group]\nab=bc\nGARBAGE\nd=e"), "[INVALID]\n# Error parsing line 4: GARBAGE\n#a=b\n#[group]\n#ab=bc\n#GARBAGE\n#d=e");
+    cs["ab"] = "x";
+    BOOST_CHECK_EQUAL(CheckModifyRWConfigFile(cs, "a=b\n[group]\nab=bc\nGARBAGE\nd=e"), "ab=x\n[INVALID]\n# Error parsing line 4: GARBAGE\n#a=b\n#[group]\n#ab=bc\n#GARBAGE\n#d=e");
+}
+
+BOOST_AUTO_TEST_CASE(ceil_div_test)
+{
+    // Return type is effectively the wider of the two types.
+    BOOST_CHECK((std::is_same_v<decltype(CeilDiv(uint32_t{0}, uint32_t{1})), uint32_t>));
+    BOOST_CHECK((std::is_same_v<decltype(CeilDiv(uint32_t{0}, uint64_t{1})), uint64_t>));
+    BOOST_CHECK((std::is_same_v<decltype(CeilDiv(uint64_t{0}, uint32_t{1})), uint64_t>));
+    BOOST_CHECK((std::is_same_v<decltype(CeilDiv(size_t{0}, uint32_t{1})), size_t>));
+    BOOST_CHECK((std::is_same_v<decltype(CeilDiv(uint32_t{0}, size_t{1})), size_t>));
+    BOOST_CHECK((std::is_same_v<decltype(CeilDiv(size_t{0}, size_t{1})), size_t>));
+    BOOST_CHECK((std::is_same_v<decltype(CeilDiv(size_t{0}, uint64_t{1})), uint64_t>));
+    BOOST_CHECK((std::is_same_v<decltype(CeilDiv(uint64_t{0}, size_t{1})), uint64_t>));
+
+    // Basic ceiling division: exact divisions and rounding up.
+    BOOST_CHECK_EQUAL(CeilDiv(0ULL, 1ULL), 0ULL);
+    BOOST_CHECK_EQUAL(CeilDiv(1ULL, 1ULL), 1ULL);
+    BOOST_CHECK_EQUAL(CeilDiv(2ULL, 2ULL), 1ULL);
+    BOOST_CHECK_EQUAL(CeilDiv(3ULL, 2ULL), 2ULL);
+    BOOST_CHECK_EQUAL(CeilDiv(5ULL, 3ULL), 2ULL);
+
+    // Works with size_t.
+    BOOST_CHECK_EQUAL(CeilDiv(size_t{0}, size_t{1}), size_t{0});
+    BOOST_CHECK_EQUAL(CeilDiv(size_t{3}, size_t{2}), size_t{2});
+
+    // Works with uint32_t.
+    BOOST_CHECK_EQUAL(CeilDiv(0U, 1U), 0U);
+    BOOST_CHECK_EQUAL(CeilDiv(3U, 2U), 2U);
+
+    // CeilDiv avoids overflow at max values.
+    constexpr uint64_t max_u64{std::numeric_limits<uint64_t>::max()};
+    BOOST_CHECK_EQUAL(CeilDiv(max_u64, 2ULL), (max_u64 / 2) + 1);
+
+    // Mixed types: size_t dividend with uint32_t divisor.
+    constexpr size_t max_u32_as_size{std::numeric_limits<uint32_t>::max()};
+    BOOST_CHECK_EQUAL(CeilDiv(max_u32_as_size, uint32_t{2}), (max_u32_as_size / 2) + 1);
+}
+
+BOOST_AUTO_TEST_CASE(ceil_div_zero_divisor_test)
+{
+    test_only_CheckFailuresAreExceptionsNotAborts check_failures;
+    BOOST_CHECK_THROW((void)CeilDiv(1ULL, 0ULL), NonFatalCheckError);
+    BOOST_CHECK_THROW((void)CeilDiv(size_t{1}, size_t{0}), NonFatalCheckError);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

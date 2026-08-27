@@ -63,12 +63,12 @@
           </widget>
          </item>
          <item>
-          <widget class="QSpinBox" name="pruneSize"/>
+          <widget class="QSpinBox" name="pruneSizeMiB"/>
          </item>
          <item>
           <widget class="QLabel" name="pruneSizeUnitLabel">
            <property name="text">
-            <string>GB</string>
+            <string>MiB</string>
            </property>
            <property name="textFormat">
             <enum>Qt::PlainText</enum>
@@ -108,7 +108,7 @@
             <string extracomment="Tooltip text for Options window setting that sets the size of the database cache. Explains the corresponding effects of increasing/decreasing this value.">Maximum database cache size. Make sure you have enough RAM. A larger cache can contribute to faster sync, after which the benefit is less pronounced for most use cases. Lowering the cache size will reduce memory usage. Unused mempool memory is shared for this cache.</string>
            </property>
            <property name="text">
-            <string>Size of &amp;database cache</string>
+            <string>S&amp;ize of database cache</string>
            </property>
            <property name="textFormat">
             <enum>Qt::PlainText</enum>
@@ -227,6 +227,27 @@
         </widget>
        </item>
        <item>
+        <layout class="QHBoxLayout">
+         <item>
+          <widget class="QLabel">
+           <property name="text">
+            <string>Address type:</string>
+           </property>
+           <property name="buddy">
+            <cstring>addressType</cstring>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QValueComboBox" name="addressType">
+           <property name="toolTip">
+            <string>Choose the default address type to select when receiving coins.</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
         <widget class="QGroupBox" name="groupBox">
          <property name="title">
           <string>Expert</string>
@@ -238,7 +259,7 @@
              <string>Whether to show coin control features or not.</string>
             </property>
             <property name="text">
-             <string>Enable coin &amp;control features</string>
+             <string>Enable co&amp;in control features</string>
             </property>
            </widget>
           </item>
@@ -316,12 +337,61 @@
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_Network">
        <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_Network_Port">
+         <item>
+          <widget class="QLabel" name="networkPortLabel">
+           <property name="text">
+            <string>Network &amp;port</string>
+           </property>
+           <property name="textFormat">
+            <enum>Qt::PlainText</enum>
+           </property>
+           <property name="buddy">
+            <cstring>networkPort</cstring>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="networkPort">
+           <property name="minimumSize">
+            <size>
+             <width>55</width>
+             <height>0</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>55</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>Network port (e.g. 8333)</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer_Network_Port">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
         <widget class="QCheckBox" name="mapPortNatpmp">
          <property name="toolTip">
           <string>Automatically open the Bitcoin client port on the router. This only works when your router supports PCP or NAT-PMP and it is enabled. The external port could be random.</string>
          </property>
          <property name="text">
-          <string>Map port using PCP or NA&amp;T-PMP</string>
+          <string>Automatically configure router(s) that support PCP or NA&amp;T-PMP</string>
          </property>
         </widget>
        </item>
@@ -341,7 +411,7 @@
           <string>Connect to the Bitcoin network through a SOCKS5 proxy.</string>
          </property>
          <property name="text">
-          <string>&amp;Connect through SOCKS5 proxy (default proxy):</string>
+          <string>Connect through &amp;SOCKS5 proxy (default proxy):</string>
          </property>
         </widget>
        </item>
@@ -614,6 +684,66 @@
         </layout>
        </item>
        <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_maxuploadtarget">
+         <item>
+          <widget class="QCheckBox" name="maxuploadtargetCheckbox">
+           <property name="text">
+            <string>Try to keep upload traffic under</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="maxuploadtarget"/>
+         </item>
+         <item>
+          <widget class="QLabel" name="maxuploadtargetUnitLabel">
+           <property name="text">
+            <string>MiB per day</string>
+           </property>
+           <property name="textFormat">
+            <enum>Qt::PlainText</enum>
+           </property>
+           <property name="buddy">
+            <cstring>maxuploadtargetCheckbox</cstring>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer_maxuploadtarget">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="peerbloomfilters">
+         <property name="toolTip">
+          <string>Support filtering of blocks and transaction with bloom filters</string>
+         </property>
+         <property name="text">
+          <string>Provide search services for light clients</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="peerblockfilters">
+         <property name="toolTip">
+          <string>Generate compact block filters and allow peers to download them</string>
+         </property>
+         <property name="text">
+          <string>Provide compact block filters for light clients</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <spacer name="verticalSpacer_Network">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
@@ -652,7 +782,7 @@
           <string>Show only a tray icon after minimizing the window.</string>
          </property>
          <property name="text">
-          <string>&amp;Minimize to the tray instead of the taskbar</string>
+          <string>Minimize to the &amp;tray instead of the taskbar</string>
          </property>
         </widget>
        </item>
@@ -735,6 +865,16 @@
         </layout>
        </item>
        <item>
+        <widget class="QCheckBox" name="displayAddresses">
+         <property name="toolTip">
+          <string>Whether to show Bitcoin addresses in the transaction list or not.</string>
+         </property>
+         <property name="text">
+          <string>&amp;Display addresses in transaction list</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <layout class="QHBoxLayout" name="horizontalLayout_3_Display">
          <item>
           <widget class="QLabel" name="thirdPartyTxUrlsLabel">
@@ -742,7 +882,7 @@
             <string>Third-party URLs (e.g. a block explorer) that appear in the transactions tab as context menu items. %s in the URL is replaced by transaction hash. Multiple URLs are separated by vertical bar |.</string>
            </property>
            <property name="text">
-            <string>&amp;Third-party transaction URLs</string>
+            <string>&amp;Third-party transaction URLs:</string>
            </property>
            <property name="buddy">
             <cstring>thirdPartyTxUrls</cstring>
@@ -766,7 +906,7 @@
          <item>
           <widget class="QLabel" name="moneyFontLabel">
            <property name="text">
-            <string>Font in the Overview tab: </string>
+            <string>Font for amounts: </string>
            </property>
            <property name="buddy">
             <cstring>moneyFont</cstring>
@@ -785,6 +925,41 @@
           </widget>
          </item>
         </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_qrFont">
+         <item>
+          <widget class="QLabel" name="qrFontLabel">
+           <property name="text">
+            <string>Font in QR Codes: </string>
+           </property>
+           <property name="buddy">
+            <cstring>qrFont</cstring>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="qrFont"/>
+         </item>
+         <item>
+          <widget class="QLabel" name="qrFont_preview">
+           <property name="text">
+            <string notr="true">1NS17iag9jJgT…
+bc1p2q3rvn3gp…</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="peersTabAlternatingRowColors">
+         <property name="toolTip">
+          <string>Alternate the row colors for the &quot;Peers&quot; and &quot;Banned peers&quot; tables in the Peers tab.</string>
+         </property>
+         <property name="text">
+          <string>Alternate row colors in the Peers tab</string>
+         </property>
+        </widget>
        </item>
        <item>
         <spacer name="verticalSpacer_Display">

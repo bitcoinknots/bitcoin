@@ -31,6 +31,7 @@
 #include <util/fs.h>
 #include <util/hasher.h>
 #include <util/result.h>
+#include <util/time.h>
 #include <util/translation.h>
 #include <versionbits.h>
 
@@ -64,6 +65,8 @@ namespace util {
 class SignalInterrupt;
 } // namespace util
 
+/** Default for using fee filter */
+static const bool DEFAULT_FEEFILTER = true;
 /** Block files containing a block-height within MIN_BLOCKS_TO_KEEP of ActiveChain().Tip() will not be pruned. */
 static const unsigned int MIN_BLOCKS_TO_KEEP = 288;
 static const signed int DEFAULT_CHECKBLOCKS = 6;
@@ -87,6 +90,13 @@ enum class SynchronizationState {
     INIT_DOWNLOAD,
     POST_INIT
 };
+
+enum SpkReuseModes {
+    SRM_ALLOW,
+    SRM_REJECT,
+};
+
+extern SpkReuseModes SpkReuseMode;
 
 /** Documentation for argument 'checklevel'. */
 extern const std::vector<std::string> CHECKLEVEL_DOC;
@@ -249,6 +259,11 @@ struct PackageMempoolAcceptResult
         : m_tx_results{ {wtxid, result} } {}
 };
 
+static const std::string rejectmsg_lowfee_mempool = "mempool min fee not met";
+static const std::string rejectmsg_lowfee_relay = "min relay fee not met";
+static const std::string rejectmsg_mempoolfull = "mempool full";
+static const std::string rejectmsg_zero_mempool_entry_seq = "zero mempool entry sequence";
+
 /**
  * Try to add a transaction to the mempool. This is an internal function and is exposed only for testing.
  * Client code should use ChainstateManager::ProcessTransaction()
@@ -257,15 +272,24 @@ struct PackageMempoolAcceptResult
  * @param[in]  tx                 The transaction to submit for mempool acceptance.
  * @param[in]  accept_time        The timestamp for adding the transaction to the mempool.
  *                                It is also used to determine when the entry expires.
- * @param[in]  bypass_limits      When true, don't enforce mempool fee and capacity limits,
- *                                and set entry_sequence to zero.
+ * @param[in]  ignore_rejects     Set of reject reasons to ignore and bypass, if possible.
  * @param[in]  test_accept        When true, run validation checks but don't submit to mempool.
  *
  * @returns a MempoolAcceptResult indicating whether the transaction was accepted/rejected with reason.
  */
 MempoolAcceptResult AcceptToMemoryPool(Chainstate& active_chainstate, const CTransactionRef& tx,
-                                       int64_t accept_time, bool bypass_limits, bool test_accept)
-    EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+                                       int64_t accept_time, const ignore_rejects_type& ignore_rejects, bool test_accept) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+
+static inline MempoolAcceptResult AcceptToMemoryPool(Chainstate& active_chainstate, const CTransactionRef& tx, int64_t accept_time, bool bypass_limits, bool test_accept) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
+    static const ignore_rejects_type ignore_rejects_legacy{
+        rejectmsg_lowfee_mempool,
+        rejectmsg_lowfee_relay,
+        rejectmsg_mempoolfull,
+        rejectmsg_zero_mempool_entry_seq,
+        "truc",
+    };
+    return AcceptToMemoryPool(active_chainstate, tx, accept_time, (bypass_limits ? ignore_rejects_legacy : empty_ignore_rejects), test_accept);
+}
 
 /**
 * Validate (and maybe submit) a package to the mempool. See doc/policy/packages.md for full details
@@ -278,7 +302,7 @@ MempoolAcceptResult AcceptToMemoryPool(Chainstate& active_chainstate, const CTra
 * possible for the package to be partially submitted.
 */
 PackageMempoolAcceptResult ProcessNewPackage(Chainstate& active_chainstate, CTxMemPool& pool,
-                                                   const Package& txns, bool test_accept, const std::optional<CFeeRate>& client_maxfeerate)
+                                                   const Package& txns, bool test_accept, const std::optional<CFeeRate>& client_maxfeerate, const ignore_rejects_type& ignore_rejects=empty_ignore_rejects)
                                                    EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
 /* Mempool validation helper functions */
@@ -322,6 +346,8 @@ std::optional<LockPoints> CalculateLockPointsAtTip(
  */
 bool CheckSequenceLocksAtTip(CBlockIndex* tip,
                              const LockPoints& lock_points);
+
+void LimitMempoolSize(CTxMemPool&, CCoinsViewCache&);
 
 /**
  * Closure representing one script verification
@@ -379,6 +405,8 @@ public:
 };
 
 /** Functions for validating blocks and updating the block tree */
+
+extern std::vector<unsigned char> blake2b_headline;
 
 /** Context-independent validity checks */
 bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
@@ -802,8 +830,7 @@ private:
     void UpdateTip(const CBlockIndex* pindexNew)
         EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
 
-    SteadyClock::time_point m_last_write{};
-    SteadyClock::time_point m_last_flush{};
+    NodeClock::time_point m_next_write{NodeClock::time_point::max()};
 
     /**
      * In case of an invalid snapshot, rename the coins leveldb directory so
@@ -1021,8 +1048,10 @@ public:
      * Every received block is assigned a unique and increasing identifier, so we
      * know which one to give priority in case of a fork.
      */
-    /** Blocks loaded from disk are assigned id 0, so start the counter at 1. */
-    int32_t nBlockSequenceId GUARDED_BY(::cs_main) = 1;
+    /** Blocks loaded from disk are assigned id SEQ_ID_INIT_FROM_DISK{1}
+     * (SEQ_ID_BEST_CHAIN_FROM_DISK{0} if they belong to the best chain loaded from disk),
+     * so start the counter after that. **/
+    int32_t nBlockSequenceId GUARDED_BY(::cs_main) = SEQ_ID_INIT_FROM_DISK + 1;
     /** Decreasing counter (used by subsequent preciousblock calls). */
     int32_t nBlockReverseSequenceId = -1;
     /** chainwork for the last block that preciousblock has been applied to. */
@@ -1033,7 +1062,7 @@ public:
     void ResetBlockSequenceCounters() EXCLUSIVE_LOCKS_REQUIRED(::cs_main)
     {
         AssertLockHeld(::cs_main);
-        nBlockSequenceId = 1;
+        nBlockSequenceId = SEQ_ID_INIT_FROM_DISK + 1;
         nBlockReverseSequenceId = -1;
     }
 
@@ -1121,6 +1150,19 @@ public:
     const CBlockIndex* GetBackgroundSyncTip() const EXCLUSIVE_LOCKS_REQUIRED(GetMutex()) {
         return BackgroundSyncInProgress() ? m_ibd_chainstate->m_chain.Tip() : nullptr;
     }
+
+    /**
+     * Update and possibly latch the IBD status.
+     *
+     * If block loading has finished and the current chain tip has enough work
+     * and is recent, set `m_cached_is_ibd` to false. This function never sets
+     * the flag back to true.
+     *
+     * This should be called after operations that may affect IBD exit
+     * conditions (e.g. after updating the active chain tip, or after
+     * `ImportBlocks()` finishes).
+     */
+    bool UpdateIBDStatus() EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
     node::BlockMap& BlockIndex() EXCLUSIVE_LOCKS_REQUIRED(::cs_main)
     {
@@ -1250,7 +1292,7 @@ public:
      * @param[in]  tx              The transaction to submit for mempool acceptance.
      * @param[in]  test_accept     When true, run validation checks but don't submit to mempool.
      */
-    [[nodiscard]] MempoolAcceptResult ProcessTransaction(const CTransactionRef& tx, bool test_accept=false)
+    [[nodiscard]] MempoolAcceptResult ProcessTransaction(const CTransactionRef& tx, bool test_accept=false, const ignore_rejects_type& ignore_rejects=empty_ignore_rejects)
         EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
     //! Load the block tree and coins database from disk, initializing state if we're running with -reindex
@@ -1321,6 +1363,8 @@ public:
     //! best header is no longer valid / guaranteed to be the most-work
     //! header in our block-index not known to be invalid, recalculate it.
     void RecalculateBestHeader() EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
+
+    bool m_script_check_queue_enabled{true};
 
     CCheckQueue<CScriptCheck>& GetCheckQueue() { return m_script_check_queue; }
 
