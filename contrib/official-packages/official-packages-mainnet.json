@@ -1,0 +1,24 @@
+{
+  "packages": [
+    {
+      "id": "mainnet-961814-prune-10gb",
+      "snapshot_height": 961814,
+      "base_blockhash": "00000000000000040440db37ab428b029ee5dda57d192088c13046d124eeb80b",
+      "prune_mib": 10000,
+      "download_uri": "https://04a6824622e38c7874b5ed208ebaf56a.r2.cloudflarestorage.com/purity-pruned-node/BitcoinPruity961814.zip?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=8a2d485dbe7b364d8d24a1b7caaef999%2F20260828%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260828T051928Z&X-Amz-Expires=604800&X-Amz-SignedHeaders=host&x-id=GetObject&X-Amz-Signature=5260d6e83fffc2a185fa9a10a7c481bf54e8a349f52cb2e66f6240be12f2dd9f",
+      "archive_sha256": "4b9ebf59002eda73aff911803642c0223bb792660c48f76826780836182e21f1",
+      "archive_size_bytes": 30390803377,
+      "extracted_size_bytes": 34182117528
+    },
+    {
+      "id": "mainnet-910000-full",
+      "snapshot_height": 910000,
+      "base_blockhash": "0000000000000000000108970acb9522ffd516eae17acddcb1bd16469194a821",
+      "prune_mib": 0,
+      "download_uri": "https://bitcoinpurity.org/downloads/mainnet/mainnet-910000-full.zip",
+      "archive_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+      "archive_size_bytes": 214748364800,
+      "extracted_size_bytes": 536870912000
+    }
+  ]
+}

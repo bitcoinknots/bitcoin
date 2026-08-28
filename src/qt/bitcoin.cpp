@@ -26,6 +26,7 @@
 #include <qt/guiutil.h>
 #include <qt/initexecutor.h>
 #include <qt/intro.h>
+#include <qt/packagedownloader.h>
 #include <qt/networkstyle.h>
 #include <qt/optionsmodel.h>
 #include <qt/platformstyle.h>
@@ -611,6 +612,19 @@ int GuiMain(int argc, char* argv[])
     // Gracefully exit if the user cancels
     if (!Intro::showIfNeeded(intro)) return EXIT_SUCCESS;
 
+    while (intro && intro->syncMode() == IntroSyncMode::OFFICIAL_PACKAGE) {
+        const auto package = intro->selectedPackage();
+        if (!package) break;
+
+        if (PackageDownloader::runBlocking(*package, intro->getDataDirectory())) {
+            break;
+        }
+
+        if (!intro->retryAfterPackageDownloadFailure()) {
+            return EXIT_SUCCESS;
+        }
+    }
+
     /// 6-7. Parse bitcoin.conf, determine network, switch to network specific
     /// options, and create datadir and settings.json.
     // - Do not call gArgs.GetDataDirNet() before this step finishes
@@ -698,7 +712,9 @@ int GuiMain(int argc, char* argv[])
     if (intro) {
         // Store intro dialog settings other than datadir (network specific)
         app.InitPruneSetting(intro->getPruneMiB());
-        gArgs.ForceSetArg("-assumevalid", intro->getAssumeValid().toStdString());
+        if (intro->syncMode() == IntroSyncMode::P2P_FULL) {
+            gArgs.ForceSetArg("-assumevalid", intro->getAssumeValid().toStdString());
+        }
     }
 
     try
@@ -710,8 +726,17 @@ int GuiMain(int argc, char* argv[])
         if (app.baseInitialize()) {
             if (intro) {
                 // Store intro dialog settings other than datadir (network specific)
-                common::SettingsValue intro_assumevalid = intro->getAssumeValid().toStdString();
-                app.node().context()->chain->overwriteRwSetting("assumevalid", intro_assumevalid);
+                const common::SettingsValue sync_mode{
+                    intro->syncMode() == IntroSyncMode::OFFICIAL_PACKAGE ? "official-package" : "p2p"};
+                app.node().context()->chain->overwriteRwSetting("sync-mode", sync_mode);
+                if (intro->syncMode() == IntroSyncMode::OFFICIAL_PACKAGE) {
+                    if (const auto package = intro->selectedPackage()) {
+                        app.node().context()->chain->overwriteRwSetting("official-package-id", package->id);
+                    }
+                } else {
+                    common::SettingsValue intro_assumevalid = intro->getAssumeValid().toStdString();
+                    app.node().context()->chain->overwriteRwSetting("assumevalid", intro_assumevalid);
+                }
                 // We can release the Intro widget now
                 intro.reset();
             }
