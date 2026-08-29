@@ -93,6 +93,31 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         options.rdts_expiry_time = expiry;
     }
 
+    if (const auto arg{args.GetArg("-rdtslegacysignalingheight", "")}; !arg.empty()) {
+        // The window ends at the BLAKE2b fork height, as on mainnet.
+        const auto fork{options.activation_heights.find(Consensus::BuriedDeployment::DEPLOYMENT_BLAKE2B)};
+        if (fork == options.activation_heights.end()) {
+            throw std::runtime_error("-rdtslegacysignalingheight requires -testactivationheight=blake2b@<height> (the window ends at the hardfork).");
+        }
+        int32_t height;
+        // Genesis can never be a violator, so the window starts at 1 at the earliest.
+        if (!ParseInt32(arg, &height) || height < 1 || height >= fork->second) {
+            throw std::runtime_error(strprintf("Invalid height (%s) for -rdtslegacysignalingheight=<height>: must be at least 1 and below the blake2b activation height (%d).", arg, fork->second));
+        }
+        options.rdts_legacy_signaling_height = height;
+    }
+
+    if (const auto arg{args.GetArg("-rdtslegacysignalingend", "")}; !arg.empty()) {
+        if (!options.rdts_legacy_signaling_height) {
+            throw std::runtime_error("-rdtslegacysignalingend requires -rdtslegacysignalingheight=<height>.");
+        }
+        int32_t end;
+        if (!ParseInt32(arg, &end) || end <= *options.rdts_legacy_signaling_height) {
+            throw std::runtime_error(strprintf("Invalid height (%s) for -rdtslegacysignalingend=<height>: must be above -rdtslegacysignalingheight (%d).", arg, *options.rdts_legacy_signaling_height));
+        }
+        options.rdts_legacy_signaling_end = end;
+    }
+
     for (const std::string& strDeployment : args.GetArgs("-vbparams")) {
         std::vector<std::string> vDeploymentParams = SplitString(strDeployment, ':');
         if (vDeploymentParams.size() < 3 || 7 < vDeploymentParams.size()) {

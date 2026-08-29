@@ -123,6 +123,14 @@ public:
         // via versionbits; the stall at 961633 prevented it from ever
         // reaching ACTIVE, and that deployment has been removed.)
         consensus.RdtsExpiryTime = 1819756800; // September 1st, 2027 00:00 UTC
+        // The versionbits deployment required signaling in [961632, 963648)
+        // (its max_activation_height 965664 minus two periods, then one).
+        // Keep that as a height rule, cut short by Blake2bHeight: the
+        // signaling branch and the non-signaling one have equal work per
+        // block, so without it the hardfork's parent would be whichever a
+        // node saw first.
+        consensus.RdtsLegacySignalingHeight = 961632;
+        consensus.RdtsLegacySignalingEnd = 963648;
 
         consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000dee8e2a309ad8a9820433c68"};
         consensus.defaultAssumeValid = uint256{"00000000000000000000611fd22f2df7c8fbd0688745c3a6c3bb5109cc2a12cb"}; // 912683
@@ -649,6 +657,12 @@ public:
         // default, so regtest behaviour is unchanged.
         if (opts.rdts_expiry_time) {
             consensus.RdtsExpiryTime = *opts.rdts_expiry_time;
+        }
+        if (opts.rdts_legacy_signaling_height) {
+            consensus.RdtsLegacySignalingHeight = *opts.rdts_legacy_signaling_height;
+        }
+        if (opts.rdts_legacy_signaling_end) {
+            consensus.RdtsLegacySignalingEnd = *opts.rdts_legacy_signaling_end;
         }
 
         for (const auto& [deployment_pos, version_bits_params] : opts.version_bits_parameters) {

@@ -4768,6 +4768,13 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     return true;
 }
 
+/** Whether a v1 header carries the legacy RDTS versionbits signal. */
+static bool SignalsLegacyRdts(int32_t version)
+{
+    return (version & VERSIONBITS_TOP_MASK) == VERSIONBITS_TOP_BITS &&
+           (version & (int32_t{1} << Consensus::Params::RDTS_LEGACY_SIGNALING_BIT)) != 0;
+}
+
 /** Context-dependent validity checks, but rechecked in ConnectBlock().
  *  Note that -reindex-chainstate skips the validation that happens here!
  */
@@ -4783,6 +4790,13 @@ static bool ContextualCheckBlockHeaderVolatile(const CBlockHeader& block, BlockV
     } else {
         if (consensusParams.IsBlake2bHeight(height)) {
             return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-version-blake2b", "New blocks require BLAKE2b PoW");
+        }
+        // The versionbits RDTS deployment of earlier releases required this
+        // signal from RdtsLegacySignalingHeight; keeping it up to the fork
+        // pins the hardfork onto the chain those releases followed.
+        if (consensusParams.RdtsLegacySignalingRequired(height) && !SignalsLegacyRdts(block.nVersion)) {
+            return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-version-reduced_data",
+                                 strprintf("Block must signal for reduced_data from height %d until the BLAKE2b hardfork", consensusParams.RdtsLegacySignalingHeight));
         }
     }
 
@@ -5619,9 +5633,17 @@ std::vector<CBlockIndex*> ChainstateManager::FindInheritedInvalidBlocks()
     // change as other blocks are invalidated and one scan suffices.
     // Checkpoints are deliberately not consulted: separation is performed by
     // the PoW change, and checkpoints are optional (-checkpoints=0).
+    // A stored v1 block in the legacy RDTS signaling window that does not
+    // signal is the analog of bad-version-reduced_data: such a branch was
+    // inherited from a client that did not require the signal (Core, or a
+    // Knots release before the versionbits deployment), and truncating it at
+    // the first non-signaling block leaves the signaling branch, which the
+    // hardfork builds on, as the best valid chain.
     for (auto& [_, index] : m_blockman.m_block_index) {
         if (index.nStatus & BLOCK_FAILED_MASK) continue;             // already handled
-        if (params.IsBlake2bHeight(index.nHeight) && !index.m_header_v2) {
+        if (index.m_header_v2) continue;
+        if (params.IsBlake2bHeight(index.nHeight) ||
+                (params.RdtsLegacySignalingRequired(index.nHeight) && !SignalsLegacyRdts(index.nVersion))) {
             violators.push_back(&index);
         }
     }
@@ -5736,10 +5758,12 @@ bool Chainstate::CorrectRdtsInvalidBlocks(bilingual_str& error)
             return false;
         }
 
-        LogPrintf("RDTS: block %s at height %d is invalid under the BLAKE2b "
-                  "hardfork and was inherited from a non-enforcing client; "
-                  "marking it invalid%s\n",
+        LogPrintf("RDTS: block %s at height %d %s and was inherited from a "
+                  "client that was not enforcing that rule; marking it invalid%s\n",
                   target->GetBlockHash().ToString(), target->nHeight,
+                  m_chainman.GetConsensus().IsBlake2bHeight(target->nHeight)
+                      ? "is SHA256d at or above the BLAKE2b fork height"
+                      : "does not carry the RDTS signal required in the legacy signaling window",
                   rewind ? strprintf(" and rewinding the active chain by %d block(s)", rewind) : "");
 
         BlockValidationState state;

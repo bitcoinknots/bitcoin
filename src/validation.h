@@ -1036,7 +1036,9 @@ public:
     const CChainParams& GetParams() const { return m_options.chainparams; }
 
     /** All not-yet-invalid blocks in the index that are SHA256d at or above
-     *  the BLAKE2b fork height (the index-side analog of bad-version-blake2b).
+     *  the BLAKE2b fork height (the index-side analog of bad-version-blake2b),
+     *  or SHA256d without the legacy RDTS signal inside the signaling window
+     *  (the analog of bad-version-reduced_data).
      *  The verdict is header-derived and independent of other blocks'
      *  validity, so a single scan is sufficient. Lives on the manager because
      *  it needs only the block index. @sa Chainstate::CorrectRdtsInvalidBlocks */

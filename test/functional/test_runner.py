@@ -157,6 +157,7 @@ BASE_SCRIPTS = [
     'feature_csv_activation.py',
     'feature_reduced_data_utxo_height.py',
     'feature_rdts_migration.py',
+    'feature_rdts_legacy_signaling.py',
     'p2p_sendheaders.py',
     'feature_config_args.py',
     'wallet_listtransactions.py --legacy-wallet',

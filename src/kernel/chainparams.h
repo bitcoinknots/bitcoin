@@ -170,6 +170,13 @@ public:
         //! height until the parent block's median-time-past reaches this
         //! value (see -rdtsexpiry). Requires a blake2b activation height.
         std::optional<int64_t> rdts_expiry_time{};
+        //! If set, v1 blocks from this height up to the blake2b activation
+        //! height must signal the legacy RDTS bit (see
+        //! -rdtslegacysignalingheight). Requires a blake2b activation height.
+        std::optional<int> rdts_legacy_signaling_height{};
+        //! If set, the legacy signaling window ends here instead of at the
+        //! blake2b activation height (see -rdtslegacysignalingend).
+        std::optional<int> rdts_legacy_signaling_end{};
     };
 
     static std::unique_ptr<const CChainParams> RegTest(const RegTestOptions& options);

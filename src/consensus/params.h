@@ -122,6 +122,25 @@ struct Params {
      * behaviour is unchanged on chains that do not set it.
      */
     int64_t RdtsExpiryTime{std::numeric_limits<int64_t>::min()};
+    /**
+     * First height from which the versionbits RDTS deployment shipped in
+     * Knots 29.3/29.4 required every block to signal (its
+     * max_activation_height minus two periods). Blocks from here up to
+     * Blake2bHeight must still carry that bit, so the chain those releases
+     * followed is the one the hardfork builds on, rather than an equal-work
+     * non-signaling branch. Unset on chains without that history.
+     */
+    int RdtsLegacySignalingHeight{std::numeric_limits<int>::max()};
+    /** Height at which that deployment's own window ended (max_activation_height
+     *  minus one period). The rule never extends past what those releases
+     *  enforced; the hardfork ends it earlier when Blake2bHeight is lower. */
+    int RdtsLegacySignalingEnd{std::numeric_limits<int>::max()};
+    /** Version bit the legacy RDTS deployment used. */
+    static constexpr int RDTS_LEGACY_SIGNALING_BIT{4};
+    bool RdtsLegacySignalingRequired(int height) const
+    {
+        return height >= RdtsLegacySignalingHeight && height < RdtsLegacySignalingEnd && !IsBlake2bHeight(height);
+    }
     /** Don't warn about unknown BIP 9 activations below this height.
      * This prevents us from warning about the CSV and segwit activations. */
     int MinBIP9WarningHeight;
