@@ -219,6 +219,8 @@ add_library(bitcoinqt STATIC EXCLUDE_FROM_ALL
   initexecutor.h
   intro.cpp
   intro.h
+  packagedownloader.cpp
+  packagedownloader.h
   $<$<PLATFORM_ID:Darwin>:macdockiconhandler.h>
   $<$<PLATFORM_ID:Darwin>:macdockiconhandler.mm>
   $<$<PLATFORM_ID:Darwin>:macnotificationhandler.h>
@@ -289,6 +291,7 @@ target_link_libraries(bitcoinqt
     bitcoin_cli
     leveldb
     Boost::headers
+    "Qt${WITH_QT_VERSION}::Network"
     $<TARGET_NAME_IF_EXISTS:MiniUPnPc::MiniUPnPc>
     $<TARGET_NAME_IF_EXISTS:QRencode::QRencode>
     $<$<PLATFORM_ID:Darwin>:-framework\ AppKit>

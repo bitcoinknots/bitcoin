@@ -1301,10 +1301,10 @@ The migration process will create a backup of the wallet before migrating. This 
       <group restype="x-gettext-plurals">
         <context-group purpose="location"><context context-type="linenumber">306</context></context-group>
         <trans-unit id="_msg288[0]">
-          <source xml:space="preserve">(%n GB needed for full chain)</source>
+          <source xml:space="preserve">(%n GB needed)</source>
         </trans-unit>
         <trans-unit id="_msg288[1]">
-          <source xml:space="preserve">(%n GB needed for full chain)</source>
+          <source xml:space="preserve">(%n GB needed)</source>
         </trans-unit>
       </group>
       <trans-unit id="_msg289">
@@ -1345,6 +1345,128 @@ The migration process will create a backup of the wallet before migrating. This 
         <source xml:space="preserve">Error</source>
         <context-group purpose="location"><context context-type="linenumber">280</context></context-group>
       </trans-unit>
+      <trans-unit id="_msg1249">
+        <source xml:space="preserve">Choose initial sync method</source>
+        <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1250">
+        <source xml:space="preserve">Choose storage options</source>
+        <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1251">
+        <source xml:space="preserve">Start from an official data package</source>
+        <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1251a">
+        <source xml:space="preserve"><b>Trustless, but slow.</b><br/>Requires downloading approximately %1 GB from peers and verifying every block. This can take from several days to several weeks depending on your hardware and connection.</source>
+        <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1251b">
+        <source xml:space="preserve"><b>Fast start, but requires trust.</b><br/>Download a pre-built data directory archive from %1. Choose a storage option on the next page. The node still downloads recent blocks from the network to reach the current tip.</source>
+        <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1251c">
+        <source xml:space="preserve">Start</source>
+        <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1251d">
+        <source xml:space="preserve">Quit</source>
+        <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1252">
+        <source xml:space="preserve">Not enough disk space. At least %1 GB is required.</source>
+        <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1253">
+        <source xml:space="preserve">Please select an official data package.</source>
+        <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1254">
+        <source xml:space="preserve">%1 will download an official data package and extract it into this directory.</source>
+        <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1255">
+        <source xml:space="preserve">Approximately %1 GB of data will be stored in this directory after extraction.</source>
+        <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
+      </trans-unit>
+    </group>
+  </body></file>
+  <file original="../packagedownloader.cpp" datatype="cpp" source-language="en"><body>
+    <group restype="x-trolltech-linguist-context" resname="PackageDownloadDialog">
+      <trans-unit id="_msg1256">
+        <source xml:space="preserve">Downloading official data package</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1257">
+        <source xml:space="preserve">Preparing download…</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1258">
+        <source xml:space="preserve">Verifying download…</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1259">
+        <source xml:space="preserve">Extracting data package…</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1260">
+        <source xml:space="preserve">Official data package installed successfully.</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1260a">
+        <source xml:space="preserve">Delete downloaded archive?</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1260b">
+        <source xml:space="preserve">The official data package was installed successfully.
+
+Delete %1 (%2) to free disk space?</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1260c">
+        <source xml:space="preserve">%1 GB</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1260d">
+        <source xml:space="preserve">%1 MB</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1260e">
+        <source xml:space="preserve">%p%</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1260f">
+        <source xml:space="preserve">%1 of %2 downloaded</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1260g">
+        <source xml:space="preserve">%1 remaining at %2/s</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1260h">
+        <source xml:space="preserve">Estimating time remaining…</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1260i">
+        <source xml:space="preserve">Finishing download…</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1260j">
+        <source xml:space="preserve">Downloading %1 using %2 parallel connections…</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1260k">
+        <source xml:space="preserve">Downloading %1…</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1261">
+        <source xml:space="preserve">Downloaded file failed hash verification.</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1262">
+        <source xml:space="preserve">Failed to install the official data package. You can try again or choose to sync from the network instead.</source>
+        <context-group purpose="location"><context context-type="sourcefile">../packagedownloader.cpp</context></context-group>
+      </trans-unit>
     </group>
   </body></file>
   <file original="../utilitydialog.cpp" datatype="cpp" source-language="en"><body>
@@ -1370,54 +1492,6 @@ The migration process will create a backup of the wallet before migrating. This 
       <trans-unit id="_msg301">
         <source xml:space="preserve">Do not shut down the computer until this window disappears.</source>
         <context-group purpose="location"><context context-type="linenumber">148</context></context-group>
-      </trans-unit>
-    </group>
-  </body></file>
-  <file original="../forms/intro.ui" datatype="x-trolltech-designer-ui" source-language="en"><body>
-    <group restype="x-trolltech-linguist-context" resname="Intro">
-      <trans-unit id="_msg302">
-        <source xml:space="preserve">Welcome</source>
-        <context-group purpose="location"><context context-type="linenumber">14</context></context-group>
-      </trans-unit>
-      <trans-unit id="_msg303">
-        <source xml:space="preserve">Welcome to %1.</source>
-        <context-group purpose="location"><context context-type="linenumber">23</context></context-group>
-      </trans-unit>
-      <trans-unit id="_msg304">
-        <source xml:space="preserve">As this is the first time the program is launched, you can choose where %1 will store its data.</source>
-        <context-group purpose="location"><context context-type="linenumber">49</context></context-group>
-      </trans-unit>
-      <trans-unit id="_msg305">
-        <source xml:space="preserve">Limit block chain storage to</source>
-        <context-group purpose="location"><context context-type="linenumber">238</context></context-group>
-      </trans-unit>
-      <trans-unit id="_msg306">
-        <source xml:space="preserve">Reverting this setting requires re-downloading the entire blockchain. It is faster to download the full chain first and prune it later. Disables some advanced features.</source>
-        <context-group purpose="location"><context context-type="linenumber">241</context></context-group>
-      </trans-unit>
-      <trans-unit id="_msg307">
-        <source xml:space="preserve"> GB</source>
-        <context-group purpose="location"><context context-type="linenumber">248</context></context-group>
-      </trans-unit>
-      <trans-unit id="_msg308">
-        <source xml:space="preserve">This initial synchronisation is very demanding, and may expose hardware problems with your computer that had previously gone unnoticed. Each time you run %1, it will continue downloading where it left off.</source>
-        <context-group purpose="location"><context context-type="linenumber">216</context></context-group>
-      </trans-unit>
-      <trans-unit id="_msg309">
-        <source xml:space="preserve">When you click OK, %1 will begin to download and process the full %4 block chain (%2 GB) starting with the earliest transactions in %3 when %4 initially launched.</source>
-        <context-group purpose="location"><context context-type="linenumber">206</context></context-group>
-      </trans-unit>
-      <trans-unit id="_msg310">
-        <source xml:space="preserve">If you have chosen to limit block chain storage (pruning), the historical data must still be downloaded and processed, but will be deleted afterward to keep your disk usage low.</source>
-        <context-group purpose="location"><context context-type="linenumber">226</context></context-group>
-      </trans-unit>
-      <trans-unit id="_msg311">
-        <source xml:space="preserve">Use the default data directory</source>
-        <context-group purpose="location"><context context-type="linenumber">66</context></context-group>
-      </trans-unit>
-      <trans-unit id="_msg312">
-        <source xml:space="preserve">Use a custom data directory:</source>
-        <context-group purpose="location"><context context-type="linenumber">73</context></context-group>
       </trans-unit>
     </group>
   </body></file>
