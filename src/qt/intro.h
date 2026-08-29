@@ -85,6 +85,7 @@ private:
     uint64_t m_bytes_available{0};
     int64_t m_prune_target_mib;
     std::vector<OfficialDataPackage> m_official_packages;
+    QString m_official_packages_load_error;
     IntroDataDirPage* m_data_dir_page;
     IntroSyncModePage* m_sync_mode_page;
     IntroStoragePage* m_storage_page;

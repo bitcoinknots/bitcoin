@@ -6,6 +6,7 @@
 
 #include <chainparams.h>
 #include <chainparamsbase.h>
+#include <clientversion.h>
 #include <qt/intro.h>
 #include <kernel/official_packages.h>
 #include <util/chaintype.h>
@@ -18,6 +19,7 @@
 #include <common/args.h>
 #include <common/settings.h>
 #include <interfaces/node.h>
+#include <logging.h>
 #include <node/interface_ui.h>
 #include <util/fs_helpers.h>
 #include <util/translation.h>
@@ -26,6 +28,7 @@
 
 #include <QButtonGroup>
 #include <QCheckBox>
+#include <QCoreApplication>
 #include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QFormLayout>
@@ -35,6 +38,13 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
+#include <QApplication>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QEventLoop>
+#include <QTimer>
+#include <QUrl>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QSettings>
@@ -44,6 +54,54 @@
 
 #include <cmath>
 #include <cstdlib>
+
+namespace {
+
+static constexpr int OFFICIAL_PACKAGES_FETCH_TIMEOUT_MS{30'000};
+
+std::optional<std::string> FetchOfficialPackagesJson(const QUrl& url, QString& error_out)
+{
+    QNetworkAccessManager manager;
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::UserAgentHeader,
+        QStringLiteral("%1/%2").arg(CLIENT_NAME, QString::fromStdString(FormatFullVersion())));
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+    QNetworkReply* reply = manager.get(request);
+
+    QEventLoop loop;
+    QTimer timeout;
+    timeout.setSingleShot(true);
+    timeout.setInterval(OFFICIAL_PACKAGES_FETCH_TIMEOUT_MS);
+    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    QObject::connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
+    timeout.start();
+    loop.exec();
+
+    if (!reply->isFinished()) {
+        error_out = QStringLiteral("Timed out loading the official package list.");
+        reply->abort();
+        reply->deleteLater();
+        QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        return std::nullopt;
+    }
+    if (reply->error() != QNetworkReply::NoError) {
+        error_out = reply->errorString();
+        reply->deleteLater();
+        QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        return std::nullopt;
+    }
+
+    const std::string contents = reply->readAll().toStdString();
+    reply->deleteLater();
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+    if (contents.empty()) {
+        error_out = QStringLiteral("The official package list was empty.");
+        return std::nullopt;
+    }
+    return contents;
+}
+
+} // namespace
 
 class FreespaceChecker : public QObject
 {
@@ -104,6 +162,8 @@ public:
     explicit IntroSyncModePage(Intro* wizard, int64_t blockchain_size_gb);
 
     IntroSyncMode syncMode() const;
+
+    void initializePage() override;
 
 private:
     Intro* m_wizard;
@@ -342,9 +402,10 @@ IntroSyncModePage::IntroSyncModePage(Intro* wizard, int64_t blockchain_size_gb)
     layout->addWidget(m_p2p_full);
 
     auto* p2p_detail = new QLabel(
-        Intro::tr("Requires downloading approximately %1 GB of block data from peers and verifying every block. This can take from several hours to multiple days depending on your hardware and connection.")
+        Intro::tr("<b>Trustless, but slow.</b><br/>Requires downloading approximately %1 GB from peers and verifying every block. This can take from several days to several weeks depending on your hardware and connection.")
             .arg(blockchain_size_gb),
         this);
+    p2p_detail->setTextFormat(Qt::RichText);
     p2p_detail->setWordWrap(true);
     p2p_detail->setIndent(20);
     layout->addWidget(p2p_detail);
@@ -355,17 +416,15 @@ IntroSyncModePage::IntroSyncModePage(Intro* wizard, int64_t blockchain_size_gb)
     layout->addWidget(m_official_package);
 
     auto* package_detail = new QLabel(
-        Intro::tr("Download a pre-built data directory archive from %1. This is much faster than syncing from scratch, but you must choose one of the available storage options on the next page. The node will still download recent blocks from the network to reach the current tip.")
+        Intro::tr("<b>Fast start, but requires trust.</b><br/>Download a pre-built data directory archive from %1. Choose a storage option on the next page. The node still downloads recent blocks from the network to reach the current tip.")
             .arg(QStringLiteral("bitcoinpurity.org")),
         this);
+    package_detail->setTextFormat(Qt::RichText);
     package_detail->setWordWrap(true);
     package_detail->setIndent(20);
     layout->addWidget(package_detail);
 
-    if (m_wizard->officialPackages().empty()) {
-        m_official_package->setEnabled(false);
-        m_official_package->setToolTip(Intro::tr("No official data packages are configured. Edit contrib/official-packages/official-packages-<network>.json in the source tree, or pass -officialpackages=<file>."));
-    }
+    m_official_package->setEnabled(false);
 
     connect(m_p2p_full, &QRadioButton::toggled, m_wizard, &Intro::onSyncModeChanged);
     connect(m_official_package, &QRadioButton::toggled, m_wizard, &Intro::onSyncModeChanged);
@@ -374,6 +433,15 @@ IntroSyncModePage::IntroSyncModePage(Intro* wizard, int64_t blockchain_size_gb)
 IntroSyncMode IntroSyncModePage::syncMode() const
 {
     return m_official_package->isChecked() ? IntroSyncMode::OFFICIAL_PACKAGE : IntroSyncMode::P2P_FULL;
+}
+
+void IntroSyncModePage::initializePage()
+{
+    m_official_package->setEnabled(false);
+    m_official_package->setToolTip(Intro::tr("Loading official package list…"));
+    QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+    m_wizard->reloadOfficialPackages();
+    m_wizard->updateOfficialPackageAvailability();
 }
 
 IntroStoragePage::IntroStoragePage(Intro* wizard)
@@ -483,7 +551,7 @@ void IntroStoragePage::refreshForSyncMode(IntroSyncMode mode)
         setSubTitle(Intro::tr("Choose how much blockchain data to keep on disk."));
         m_stack->setCurrentWidget(m_p2p_page);
         m_p2p_explanation->setText(
-            Intro::tr("When you click Finish, %1 will begin to download and process the full %4 block chain (%2 GB) starting with the earliest transactions in %3 when %4 initially launched.")
+            Intro::tr("When you click Start, %1 will begin to download and process the full %4 block chain (%2 GB) starting with the earliest transactions in %3 when %4 initially launched.")
                 .arg(CLIENT_NAME)
                 .arg(m_wizard->m_blockchain_size_gb)
                 .arg(2009)
@@ -558,7 +626,7 @@ Intro::Intro(QWidget *parent, int64_t blockchain_size_gb, int64_t chain_state_si
     m_blockchain_size_gb(blockchain_size_gb),
     m_chain_state_size_gb(chain_state_size_gb),
     m_prune_target_mib{GetPruneTargetMiB()},
-    m_official_packages{LoadOfficialDataPackages(gArgs, Params().GetChainType())},
+    m_official_packages{},
     m_data_dir_page(new IntroDataDirPage(this, blockchain_size_gb, chain_state_size_gb)),
     m_sync_mode_page(new IntroSyncModePage(this, blockchain_size_gb)),
     m_storage_page(new IntroStoragePage(this))
@@ -567,6 +635,15 @@ Intro::Intro(QWidget *parent, int64_t blockchain_size_gb, int64_t chain_state_si
     setWindowIcon(QIcon(QStringLiteral(":icons/bitcoin")));
     setWizardStyle(QWizard::ModernStyle);
     setOption(QWizard::IndependentPages, false);
+    setOption(QWizard::NoCancelButton, true);
+    setOption(QWizard::HaveCustomButton1, true);
+    setButtonText(QWizard::FinishButton, Intro::tr("Start"));
+    setButtonText(QWizard::CustomButton1, Intro::tr("Quit"));
+    connect(this, &QWizard::customButtonClicked, this, [this](int which) {
+        if (which == QWizard::CustomButton1) {
+            reject();
+        }
+    });
 
     addPage(m_data_dir_page);
     addPage(m_sync_mode_page);
@@ -680,7 +757,47 @@ std::optional<OfficialDataPackage> Intro::selectedPackage() const
 
 void Intro::reloadOfficialPackages()
 {
-    m_official_packages = LoadOfficialDataPackages(gArgs, Params().GetChainType());
+    const ChainType chain = Params().GetChainType();
+    m_official_packages_load_error.clear();
+
+    if (gArgs.IsArgSet("-officialpackages")) {
+        m_official_packages = LoadOfficialDataPackages(gArgs, chain);
+        if (m_official_packages.empty()) {
+            m_official_packages_load_error = tr("Could not read the file specified by -officialpackages.");
+        }
+        return;
+    }
+
+    if (FindDatadirOfficialPackagesConfigPath(gArgs, chain)) {
+        m_official_packages = LoadOfficialDataPackages(gArgs, chain);
+        if (m_official_packages.empty()) {
+            m_official_packages_load_error = tr("Could not read the official package list from the data directory.");
+        }
+        return;
+    }
+
+    const auto url = GetDefaultOfficialPackagesUrl(chain);
+    if (!url) {
+        m_official_packages.clear();
+        m_official_packages_load_error = tr("Official data packages are not available on this network.");
+        return;
+    }
+
+    QString fetch_error;
+    const auto contents = FetchOfficialPackagesJson(QUrl(QString::fromStdString(*url)), fetch_error);
+    if (!contents) {
+        LogPrintf("Failed to fetch official packages from %s: %s\n", *url, fetch_error.toStdString());
+        m_official_packages.clear();
+        m_official_packages_load_error = fetch_error.isEmpty()
+            ? tr("Could not load the official package list from downloads.bitcoinpurity.org.")
+            : fetch_error;
+        return;
+    }
+
+    m_official_packages = ParseOfficialDataPackagesFromJson(*contents, *url);
+    if (m_official_packages.empty()) {
+        m_official_packages_load_error = tr("The official package list from downloads.bitcoinpurity.org contained no valid packages.");
+    }
 }
 
 void Intro::updateOfficialPackageAvailability()
@@ -690,8 +807,14 @@ void Intro::updateOfficialPackageAvailability()
     if (have_packages) {
         m_sync_mode_page->m_official_package->setToolTip(QString{});
     } else {
-        m_sync_mode_page->m_official_package->setToolTip(
-            tr("No official data packages are configured. Edit contrib/official-packages/official-packages-<network>.json in the source tree, or pass -officialpackages=<file>."));
+        QString tooltip = m_official_packages_load_error;
+        if (tooltip.isEmpty()) {
+            tooltip = tr("Could not load the official package list from downloads.bitcoinpurity.org. Check your network connection, or pass -officialpackages=<file> to use a local JSON file.");
+        } else if (!gArgs.IsArgSet("-officialpackages") && !FindDatadirOfficialPackagesConfigPath(gArgs, Params().GetChainType())) {
+            tooltip += QLatin1Char(' ');
+            tooltip += tr("You can also pass -officialpackages=<file> to use a local JSON file.");
+        }
+        m_sync_mode_page->m_official_package->setToolTip(tooltip);
         if (m_sync_mode_page->syncMode() == IntroSyncMode::OFFICIAL_PACKAGE) {
             m_sync_mode_page->m_p2p_full->setChecked(true);
         }
@@ -710,8 +833,6 @@ bool Intro::validateCurrentPage()
     if (currentId() == 0) {
         gArgs.SoftSetArg("-datadir", fs::PathToString(GUIUtil::QStringToPath(getDataDirectory())));
         gArgs.ClearPathCache();
-        reloadOfficialPackages();
-        updateOfficialPackageAvailability();
         return true;
     }
     if (currentId() == 2) {

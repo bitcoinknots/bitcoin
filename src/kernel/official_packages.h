@@ -30,11 +30,18 @@ struct OfficialDataPackage {
     uint64_t extracted_size_bytes;
 };
 
-/** Default config file name pattern: official-packages-<chain>.json shipped with the client. */
-fs::path GetOfficialPackagesConfigPath(const ArgsManager& args, ChainType chain);
+/** Default remote JSON URL for the chain, when no local override is configured. */
+std::optional<std::string> GetDefaultOfficialPackagesUrl(ChainType chain);
 
-/** Load package definitions from the configured JSON file. Returns empty on missing/invalid file. */
+/** Optional per-node override in the datadir (official-packages-<chain>.json). */
+std::optional<fs::path> FindDatadirOfficialPackagesConfigPath(const ArgsManager& args, ChainType chain);
+
+/** Load package definitions from a local JSON file (-officialpackages or datadir override). */
 std::vector<OfficialDataPackage> LoadOfficialDataPackages(const ArgsManager& args, ChainType chain);
+
+/** Parse package definitions from JSON text (remote manifest or local file contents). */
+std::vector<OfficialDataPackage> ParseOfficialDataPackagesFromJson(
+    const std::string& json_contents, const std::string& source_label);
 
 std::optional<OfficialDataPackage> FindOfficialDataPackage(
     const std::vector<OfficialDataPackage>& packages, const std::string& id);

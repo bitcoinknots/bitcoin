@@ -4,8 +4,6 @@
 
 include(AddWindowsResources)
 
-set(OFFICIAL_PACKAGES_DIR "${PROJECT_SOURCE_DIR}/contrib/official-packages")
-
 configure_file(${PROJECT_SOURCE_DIR}/cmake/bitcoin-build-config.h.in bitcoin-build-config.h USE_SOURCE_PERMISSIONS @ONLY)
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 

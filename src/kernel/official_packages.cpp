@@ -4,8 +4,6 @@
 
 #include <kernel/official_packages.h>
 
-#include <bitcoin-build-config.h> // IWYU pragma: keep
-
 #include <common/args.h>
 #include <logging.h>
 #include <util/strencodings.h>
@@ -101,24 +99,6 @@ std::optional<OfficialDataPackage> ParsePackage(const UniValue& entry)
     return package;
 }
 
-std::optional<UniValue> ReadJsonFile(const fs::path& path)
-{
-    std::ifstream file{path, std::ios::binary};
-    if (!file) return std::nullopt;
-    const std::string contents((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-    UniValue json;
-    if (!json.read(contents)) {
-        LogPrintf("Official packages config: failed to parse JSON in %s\n", fs::PathToString(path));
-        return std::nullopt;
-    }
-    return json;
-}
-
-fs::path BundledOfficialPackagesDir()
-{
-    return fs::PathFromString(OFFICIAL_PACKAGES_DIR);
-}
-
 std::vector<std::string> OfficialPackagesConfigFilenames(ChainType chain)
 {
     std::vector<std::string> names;
@@ -147,10 +127,6 @@ std::optional<fs::path> ResolveExplicitOfficialPackagesPath(const ArgsManager& a
     if (fs::exists(arg_path)) {
         return fs::absolute(arg_path);
     }
-    const fs::path bundled_path = BundledOfficialPackagesDir() / arg_path;
-    if (fs::exists(bundled_path)) {
-        return bundled_path;
-    }
     const fs::path datadir_path = AbsPathForConfigVal(args, arg_path, /*net_specific=*/false);
     if (fs::exists(datadir_path)) {
         return datadir_path;
@@ -158,58 +134,90 @@ std::optional<fs::path> ResolveExplicitOfficialPackagesPath(const ArgsManager& a
     return datadir_path;
 }
 
-} // namespace
-
-fs::path GetOfficialPackagesConfigPath(const ArgsManager& args, ChainType chain)
+std::optional<fs::path> FindDatadirOfficialPackagesPath(const ArgsManager& args, ChainType chain)
 {
-    if (args.IsArgSet("-officialpackages")) {
-        return ResolveExplicitOfficialPackagesPath(args).value_or(
-            AbsPathForConfigVal(args, fs::PathFromString(args.GetArg("-officialpackages", "")), /*net_specific=*/false));
-    }
-
-    const auto filenames = OfficialPackagesConfigFilenames(chain);
-    for (const auto& filename : filenames) {
+    for (const auto& filename : OfficialPackagesConfigFilenames(chain)) {
         const fs::path datadir_path = AbsPathForConfigVal(args, fs::PathFromString(filename), /*net_specific=*/false);
         if (fs::exists(datadir_path)) return datadir_path;
     }
-
-    for (const auto& filename : filenames) {
-        const fs::path bundled_path = BundledOfficialPackagesDir() / fs::PathFromString(filename);
-        if (fs::exists(bundled_path)) return bundled_path;
-    }
-
-    return BundledOfficialPackagesDir() / fs::PathFromString(filenames.front());
+    return std::nullopt;
 }
 
-std::vector<OfficialDataPackage> LoadOfficialDataPackages(const ArgsManager& args, ChainType chain)
+} // namespace
+
+std::optional<std::string> GetDefaultOfficialPackagesUrl(ChainType chain)
+{
+    switch (chain) {
+    case ChainType::MAIN:
+        return "https://downloads.bitcoinpurity.org/official-packages-mainnet.json";
+    case ChainType::TESTNET:
+        return "https://downloads.bitcoinpurity.org/official-packages-testnet.json";
+    default:
+        return std::nullopt;
+    }
+}
+
+std::optional<fs::path> FindDatadirOfficialPackagesConfigPath(const ArgsManager& args, ChainType chain)
+{
+    return FindDatadirOfficialPackagesPath(args, chain);
+}
+
+std::vector<OfficialDataPackage> ParseOfficialDataPackagesFromJson(
+    const std::string& json_contents, const std::string& source_label)
 {
     std::vector<OfficialDataPackage> packages;
-    const fs::path config_path = GetOfficialPackagesConfigPath(args, chain);
-    if (!fs::exists(config_path)) {
-        LogPrintf("Official packages config not found: %s\n", fs::PathToString(config_path));
+    UniValue json;
+    if (!json.read(json_contents)) {
+        LogPrintf("Official packages config: failed to parse JSON from %s\n", source_label);
+        return packages;
+    }
+    if (!json.isObject()) {
+        LogPrintf("Official packages config: expected JSON object from %s\n", source_label);
         return packages;
     }
 
-    const auto json = ReadJsonFile(config_path);
-    if (!json || !json->isObject()) return packages;
-
-    const UniValue& list = json->exists("packages") ? json->find_value("packages") : *json;
+    const UniValue& list = json.exists("packages") ? json.find_value("packages") : json;
     if (!list.isArray()) {
-        LogPrintf("Official packages config: expected \"packages\" array in %s\n", fs::PathToString(config_path));
+        LogPrintf("Official packages config: expected \"packages\" array from %s\n", source_label);
         return packages;
     }
 
     for (size_t i = 0; i < list.size(); ++i) {
         const auto package = ParsePackage(list[i]);
         if (!package) {
-            LogPrintf("Official packages config: skipping invalid entry at index %u in %s\n", i, fs::PathToString(config_path));
+            LogPrintf("Official packages config: skipping invalid entry at index %u from %s\n", i, source_label);
             continue;
         }
         packages.push_back(*package);
     }
 
-    LogPrintf("Loaded %u official data package(s) from %s\n", packages.size(), fs::PathToString(config_path));
+    LogPrintf("Loaded %u official data package(s) from %s\n", packages.size(), source_label);
     return packages;
+}
+
+std::vector<OfficialDataPackage> LoadOfficialDataPackages(const ArgsManager& args, ChainType chain)
+{
+    std::optional<fs::path> config_path;
+    if (args.IsArgSet("-officialpackages")) {
+        config_path = ResolveExplicitOfficialPackagesPath(args);
+    } else {
+        config_path = FindDatadirOfficialPackagesPath(args, chain);
+    }
+
+    if (!config_path) {
+        LogPrintf("Official packages local config not found\n");
+        return {};
+    }
+
+    if (!fs::exists(*config_path)) {
+        LogPrintf("Official packages config not found: %s\n", fs::PathToString(*config_path));
+        return {};
+    }
+
+    std::ifstream file{*config_path, std::ios::binary};
+    if (!file) return {};
+    const std::string contents((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    return ParseOfficialDataPackagesFromJson(contents, fs::PathToString(*config_path));
 }
 
 std::optional<OfficialDataPackage> FindOfficialDataPackage(

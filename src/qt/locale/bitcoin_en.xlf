@@ -1357,6 +1357,22 @@ The migration process will create a backup of the wallet before migrating. This 
         <source xml:space="preserve">Start from an official data package</source>
         <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
       </trans-unit>
+      <trans-unit id="_msg1251a">
+        <source xml:space="preserve"><b>Trustless, but slow.</b><br/>Requires downloading approximately %1 GB from peers and verifying every block. This can take from several days to several weeks depending on your hardware and connection.</source>
+        <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1251b">
+        <source xml:space="preserve"><b>Fast start, but requires trust.</b><br/>Download a pre-built data directory archive from %1. Choose a storage option on the next page. The node still downloads recent blocks from the network to reach the current tip.</source>
+        <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1251c">
+        <source xml:space="preserve">Start</source>
+        <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
+      </trans-unit>
+      <trans-unit id="_msg1251d">
+        <source xml:space="preserve">Quit</source>
+        <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
+      </trans-unit>
       <trans-unit id="_msg1252">
         <source xml:space="preserve">Not enough disk space. At least %1 GB is required.</source>
         <context-group purpose="location"><context context-type="sourcefile">../intro.cpp</context></context-group>
