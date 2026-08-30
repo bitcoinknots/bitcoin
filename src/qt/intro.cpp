@@ -251,6 +251,26 @@ QString FormatBytes(quint64 bytes)
     static constexpr quint64 MB_BYTES = 1024ULL * 1024;
     return Intro::tr("%1 MB").arg(bytes / MB_BYTES);
 }
+
+/** Apply a GUI-chosen datadir to gArgs before InitConfig.
+ *
+ * SoftSetArg cannot update a value already SoftSet earlier in the intro flow, so a custom
+ * path chosen in the wizard would be ignored and the node would keep using the default
+ * datadir. ForceSetArg (or clearing a temporary default SoftSet) makes the user's choice
+ * take effect. Never SoftSet/ForceSet the OS default path permanently: that would block a
+ * -datadir override from bitcoin.conf in the default data directory.
+ */
+void ApplyIntroDataDir(const QString& dataDir)
+{
+    if (dataDir != GUIUtil::getDefaultDataDirectory()) {
+        gArgs.ForceSetArg("-datadir", fs::PathToString(GUIUtil::QStringToPath(dataDir)));
+    } else {
+        gArgs.LockSettings([](common::Settings& settings) {
+            settings.forced_settings.erase("datadir");
+        });
+    }
+    gArgs.ClearPathCache();
+}
 } // namespace
 
 FreespaceChecker::FreespaceChecker(Intro *_intro)
@@ -831,8 +851,11 @@ void Intro::onSyncModeChanged()
 bool Intro::validateCurrentPage()
 {
     if (currentId() == 0) {
-        gArgs.SoftSetArg("-datadir", fs::PathToString(GUIUtil::QStringToPath(getDataDirectory())));
-        gArgs.ClearPathCache();
+        // Page 0 is skipped when -datadir was given on the command line. Otherwise apply
+        // the path immediately so later wizard steps (e.g. official package lookup) see it.
+        if (!m_skip_data_dir_page) {
+            ApplyIntroDataDir(getDataDirectory());
+        }
         return true;
     }
     if (currentId() == 2) {
@@ -883,14 +906,18 @@ bool Intro::showIfNeeded(std::unique_ptr<Intro>& intro)
         NeedsSyncSetup(datadir_path);
 
     if (!need_intro) {
-        if (!datadir_from_cli && dataDir != GUIUtil::getDefaultDataDirectory()) {
-            gArgs.SoftSetArg("-datadir", fs::PathToString(datadir_path));
+        if (!datadir_from_cli) {
+            ApplyIntroDataDir(dataDir);
         }
         return true;
     }
 
-    gArgs.SoftSetArg("-datadir", fs::PathToString(datadir_path));
-    gArgs.ClearPathCache();
+    // Apply the known path so GetDataDir* works during the wizard (official package files
+    // under the datadir). SoftSetArg of the default path is intentionally avoided here —
+    // see ApplyIntroDataDir.
+    if (!datadir_from_cli) {
+        ApplyIntroDataDir(dataDir);
+    }
 
     intro = std::make_unique<Intro>(nullptr, Params().AssumedBlockchainSize(), Params().AssumedChainStateSize());
     intro->setDataDirectory(dataDir);
@@ -917,8 +944,12 @@ bool Intro::showIfNeeded(std::unique_ptr<Intro>& intro)
     settings.setValue("strDataDir", dataDir);
     settings.setValue("fReset", false);
 
-    if (!datadir_from_cli && dataDir != GUIUtil::getDefaultDataDirectory()) {
-        gArgs.SoftSetArg("-datadir", fs::PathToString(GUIUtil::QStringToPath(dataDir)));
+    /* Only override -datadir if different from the default, to make it possible to
+     * override -datadir in the bitcoin.conf file in the default data directory
+     * (to be consistent with bitcoind behavior). Use ForceSetArg rather than SoftSetArg
+     * because the wizard may already have SoftSet/ForceSet a prior path. */
+    if (!datadir_from_cli) {
+        ApplyIntroDataDir(dataDir);
     }
     return true;
 }
