@@ -50,6 +50,7 @@
 #include <algorithm>
 #include <atomic>
 #include <future>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <ranges>
@@ -970,6 +971,14 @@ private:
     int64_t ApproximateBestBlockDepth() const;
 
     /**
+     * Non-Purity (stale-consensus) automatic outbound peers can serve the shared
+     * pre-activation prefix. Once our tip is at nPurityActivationHeight-1 or
+     * beyond, only Purity peers can advance the chain, so we stop connecting to
+     * them. Unset activation height means this chain never forks.
+     */
+    bool NeedStaleOutboundPeers() const;
+
+    /**
      * To prevent fingerprinting attacks, only send blocks/headers outside of
      * the active chain if they are no more than a month older (both in time,
      * and in best equivalent proof of work) than the best header chain we know
@@ -1302,6 +1311,13 @@ bool PeerManagerImpl::TipMayBeStale()
 int64_t PeerManagerImpl::ApproximateBestBlockDepth() const
 {
     return (GetTime<std::chrono::seconds>() - m_best_block_time.load()).count() / m_chainparams.GetConsensus().nPowTargetSpacing;
+}
+
+bool PeerManagerImpl::NeedStaleOutboundPeers() const
+{
+    const int activation{m_chainparams.GetConsensus().nPurityActivationHeight};
+    if (activation == std::numeric_limits<int>::max()) return true;
+    return m_best_height.load() < activation - 1;
 }
 
 bool PeerManagerImpl::CanDirectFetch()
@@ -1657,13 +1673,20 @@ bool PeerManagerImpl::HasAllDesirableServiceFlags(ServiceFlags services) const
 
 ServiceFlags PeerManagerImpl::GetDesirableServiceFlags(ServiceFlags services) const
 {
+    ServiceFlags flags{NODE_NETWORK | NODE_WITNESS};
     if (services & NODE_NETWORK_LIMITED) {
         // Limited peers are desirable when we are close to the tip.
         if (ApproximateBestBlockDepth() < NODE_NETWORK_LIMITED_ALLOW_CONN_BLOCKS) {
-            return ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS);
+            flags = ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS);
         }
     }
-    return ServiceFlags(NODE_NETWORK | NODE_WITNESS);
+    // Once the pre-Purity prefix is on disk, require NODE_REDUCED_DATA so we
+    // do not open automatic outbound connections to Core peers that cannot
+    // serve the Purity activation block or anything after it.
+    if (!NeedStaleOutboundPeers()) {
+        flags = ServiceFlags(flags | NODE_REDUCED_DATA);
+    }
+    return flags;
 }
 
 PeerRef PeerManagerImpl::GetPeerRef(NodeId id) const
@@ -3020,7 +3043,10 @@ void PeerManagerImpl::ProcessHeadersMessage(CNode& pfrom, Peer& peer,
                     assert(m_outbound_peers_with_protect_from_disconnect >= 0);
                 }
             }
-            m_connman.DemoteToStaleOutbound(pfrom, m_opts.maxstaleoutbound);
+            // Keep it only while the shared prefix is still useful for IBD.
+            if (NeedStaleOutboundPeers()) {
+                m_connman.DemoteToStaleOutbound(pfrom, m_opts.maxstaleoutbound);
+            }
         }
         // Headers before a mid-batch failure may already have been accepted.
         // Credit the peer for that shared prefix so IBD can download historical
@@ -3583,10 +3609,17 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         // the ReducedData rules, demoting each to an additional connection. Only
         // the persistent outbound target types are gated; ADDR_FETCH (eg
         // -seednode) and FEELER are transient and count towards no target, so
-        // spending the budget on them would only break bootstrapping.
+        // spending the budget on them would only break bootstrapping. Once the
+        // pre-Purity prefix is synced, GetDesirableServiceFlags already requires
+        // NODE_REDUCED_DATA, so this path is only reached while IBD still needs
+        // historical blocks from non-Purity peers.
         if ((pfrom.IsFullOutboundConn() || pfrom.IsBlockOnlyConn()) && !(nServices & NODE_REDUCED_DATA)) {
-            // Keep it as an additional connection, see CNode::m_is_non_bip110_outbound.
-            if (!m_connman.DemoteToStaleOutbound(pfrom, m_opts.maxstaleoutbound)) {
+            if (!NeedStaleOutboundPeers() || !m_connman.DemoteToStaleOutbound(pfrom, m_opts.maxstaleoutbound)) {
+                if (!NeedStaleOutboundPeers()) {
+                    LogDebug(BCLog::NET, "peer does not offer NODE_REDUCED_DATA and chain tip is at or past the pre-Purity prefix, %s\n",
+                             pfrom.DisconnectMsg(fLogIPs));
+                    pfrom.fDisconnect = true;
+                }
                 return;
             }
         }
@@ -5554,6 +5587,14 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
     if (!pto->fSuccessfullyConnected || pto->fDisconnect)
         return true;
 
+    // Drop stale-consensus outbound peers once they can no longer help IBD.
+    if (pto->m_is_non_bip110_outbound && !NeedStaleOutboundPeers()) {
+        LogDebug(BCLog::NET, "disconnecting stale-consensus outbound peer, chain tip is at or past the pre-Purity prefix, %s\n",
+                 pto->DisconnectMsg(fLogIPs));
+        pto->fDisconnect = true;
+        return true;
+    }
+
     const auto current_time{GetTime<std::chrono::microseconds>()};
 
     if (pto->IsAddrFetchConn() && current_time - pto->m_connected > 10 * AVG_ADDRESS_BROADCAST_INTERVAL) {
@@ -5608,7 +5649,7 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
             // shared pre-Purity chain tip for parallel block download below activation.
             if ((nSyncStarted == 0 && sync_blocks_and_headers_from_peer) ||
                 m_chainman.m_best_header->Time() > NodeClock::now() - 24h ||
-                (pto->m_is_non_bip110_outbound && m_chainman.IsInitialBlockDownload() && sync_blocks_and_headers_from_peer)) {
+                (pto->m_is_non_bip110_outbound && NeedStaleOutboundPeers() && m_chainman.IsInitialBlockDownload() && sync_blocks_and_headers_from_peer)) {
                 const CBlockIndex* pindexStart = m_chainman.m_best_header;
                 /* If possible, start at the block preceding the currently
                    best known header.  This ensures that we always get a

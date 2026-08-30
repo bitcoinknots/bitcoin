@@ -28,7 +28,10 @@ the Purity chain.
 Automatic outbound peers proven to follow such a competing block are demoted to
 additional stale-consensus connections, subject to `-maxstaleoutbound`, so they
 cannot occupy or receive eviction protection for a Purity-compatible outbound
-slot.
+slot. Once the active tip is at `nPurityActivationHeight-1` or higher, those
+peers are no longer useful: the node stops opening automatic outbound
+connections to them (requiring `NODE_REDUCED_DATA`) and disconnects any already
+tolerated stale outbound peers.
 
 **Fork baseline:** the Knots/BIP110 *enforcement* chain that rejected
 non-signaling blocks at height 961632 — not the Core majority chain at the

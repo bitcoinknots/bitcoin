@@ -3,9 +3,12 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include <chainparams.h>
+#include <chrono>
+#include <limits>
 #include <node/miner.h>
 #include <net_processing.h>
 #include <pow.h>
+#include <protocol.h>
 #include <test/util/setup_common.h>
 #include <validation.h>
 
@@ -72,6 +75,28 @@ BOOST_AUTO_TEST_CASE(connections_desirable_service_flags)
     // Lastly, verify the stale tip checks can disallow limited peers connections after not receiving blocks for a prolonged period.
     SetMockTime(GetTime<std::chrono::seconds>() + std::chrono::seconds{consensus.nPowTargetSpacing * NODE_NETWORK_LIMITED_ALLOW_CONN_BLOCKS + 1});
     BOOST_CHECK(peerman->GetDesirableServiceFlags(peer_flags) == ServiceFlags(NODE_NETWORK | NODE_WITNESS));
+}
+
+BOOST_AUTO_TEST_CASE(connections_desirable_service_flags_require_purity_after_prefix)
+{
+    std::unique_ptr<PeerManager> peerman = PeerManager::make(*m_node.connman, *m_node.addrman, nullptr, *m_node.chainman, *m_node.mempool, *m_node.warnings, {});
+    Consensus::Params& consensus{const_cast<Consensus::Params&>(m_node.chainman->GetParams().GetConsensus())};
+    consensus.nPurityActivationHeight = 100;
+    const ServiceFlags full{NODE_NETWORK | NODE_WITNESS};
+    const ServiceFlags purity{NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA};
+
+    BOOST_CHECK(peerman->GetDesirableServiceFlags(full) == full);
+
+    peerman->SetBestBlock(/*height=*/consensus.nPurityActivationHeight - 2, std::chrono::seconds{0});
+    BOOST_CHECK(peerman->GetDesirableServiceFlags(full) == full);
+
+    peerman->SetBestBlock(/*height=*/consensus.nPurityActivationHeight - 1, std::chrono::seconds{0});
+    BOOST_CHECK(peerman->GetDesirableServiceFlags(full) == purity);
+
+    peerman->SetBestBlock(/*height=*/consensus.nPurityActivationHeight, std::chrono::seconds{0});
+    BOOST_CHECK(peerman->GetDesirableServiceFlags(full) == purity);
+    BOOST_CHECK(peerman->GetDesirableServiceFlags(ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS)) ==
+                ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
