@@ -1,10 +1,11 @@
 # Running a node and mining across the BLAKE2b proof-of-work change
 
-Status: draft, written against pull request #359 at `fee27ccfe9` and the
-release candidate `v29.4.1.knots20260508rc2`, on 2026-08-26. The two
-differ in places and this says where. "Measured" means observed on
-testnet4, or on a regtest node built from those sources, on that date.
-Re-check anything you rely on against the release you actually run.
+Status: draft, written against pull request #359 at `fee27ccfe9` and
+`v29.4.1.knots20260508rc2` on 2026-08-26; updated on 2026-08-31 for
+`v29.4.1.knots20260508rc4` and the mainnet activation. "Measured" means
+observed on testnet4, mainnet, or a regtest node built from those
+sources, on the date given. Re-check anything you rely on against the
+release you actually run.
 
 This is for people who operate a node or a miner. It does not argue for
 or against the change; the specification is the code and the discussion
@@ -49,37 +50,29 @@ and so must every block after it. A version 2 header below the height
 is rejected (`bad-version-sha256d`); a version 1 header at or above it
 is rejected (`bad-version-blake2b`).
 
-| Network | `Blake2bHeight` | State on 2026-08-26 |
+| Network | `Blake2bHeight` | State on 2026-08-31 |
 |---|---|---|
-| mainnet | not set in #359 or rc2; "set at release cut" | pending |
-| testnet4 | 149537 in rc2; not set in #359 | live since 2026-08-22, tip 171617 |
+| mainnet | 961640 in rc4 | live since 2026-08-30 06:14 UTC |
+| testnet4 | 150308 in rc4 (149537 in rc2, 150027 in rc3; each cut re-forked it) | live since 2026-08-30 |
 | regtest | `-testactivationheight=blake2b@N` | for testing |
 
-Do not estimate the activation from wall-clock time. Track the height
-with `bitcoin-cli getblockcount`. On the Knots mainnet chain the blocks
-are far apart at the moment (the tip was 961638 on 2026-08-23 and still
-on 2026-08-26), and testnet timestamps run ahead of real time.
-
-From the activation height, SHA-256 hardware is useless on this chain.
-Below it, it is the only hardware that can mine. If you have SHA-256
-hashrate and want the chain to reach the height, point it at a Knots
-node until then.
+Both networks are past their heights. Mainnet's fork block is 961640
+(`0000000000000050c1e5f69672f459293be14f46e5a494e7a8c8541396f18eeb`),
+and rc4 ships checkpoints at 961632 and 961639 against the transition
+being replayed differently. From the activation height, SHA-256
+hardware is useless on this chain; blocks it mines there are invalid.
 
 ### The first BLAKE2b difficulty
 
-In #359 as it stands, the first BLAKE2b block's target is the last
-SHA-256 target made easier by a factor of 2^`Blake2bTargetShift` (20
-by default, 7 for testnet4 in rc2), capped at the minimum difficulty. On testnet4 the
-chain was already at difficulty 1, so the clamp applied, the first block
-was mined on a CPU, and difficulty then climbed to 1,048,576 in 32 hours
-at the 4x-per-period cap (measured). On mainnet the same rule, applied
-to the SHA-256 difficulty in force at the fork, gives a hard start; the
-right value is being argued on #359 and is not settled. Expect the
-first retarget period to run long if less BLAKE2b hashrate turns up
-than the rule assumes, and plan for slow blocks rather than assuming
-ten minutes.
+The first BLAKE2b block's target is the last SHA-256 target made
+easier by a factor of 2^`Blake2bTargetShift` (22 for mainnet in rc4,
+20 by default), capped at the minimum difficulty. On mainnet that put
+block 961640 at difficulty 3.0e7, and enough hashrate turned up that
+the first day ran a few minutes per block (measured 2026-08-30). The
+first retarget, at 963648, moves difficulty toward ten-minute pacing;
+until then the pace follows whatever hashrate is pointed at the chain.
 
-## Before the fork: upgrading a node
+## Upgrading a node
 
 ### Verify what you download
 
@@ -95,40 +88,36 @@ keys, and that is expected.
 
 ### `blake2b_headline`
 
-Every node, mining or not, refuses to start without a
+The block at exactly `Blake2bHeight`, and only that block, must contain
+a news headline in its coinbase scriptSig, checked by every node as a
+plain substring search against its own configuration (`bad-headline`).
+Mainnet's fork block was mined on 2026-08-30 carrying
+`8-30 NYPost Deride And Conquer`, so the requirement is behind the
+chain: miners no longer put the headline anywhere.
+
+What remains is node configuration. rc4 refuses to start without a
 `blake2b_headline` setting:
 
     Error: This version requires blake2b_headline set manually
 
-The option is registered as a debug option, so it is hidden from
-`bitcoind -help`; it appears under `-help-debug`, with the description
-"Specify consensus-critical proof-of-time news headline - MUST BE SET
-TO EXACT CORRECT STRING".
+and uses the value to validate the fork block, which still matters for
+initial sync and reindex. Set it to the exact string above, unquoted.
+A mismatched value makes the node reject the real block 961640 and
+treat the peer that sent it as having sent a corrupt block (100
+misbehavior points, the disconnect threshold); an empty value matches
+anything and silently disables the check.
 
-It is consensus, and it is checked by every node. The block at exactly
-`Blake2bHeight` must contain the headline bytes somewhere in its
-coinbase scriptSig, and each node checks the block it receives against
-the string in its own configuration (`bad-headline`). A node configured
-with a different string rejects the real activation block, treats the
-peer that sent it as having sent a corrupt block (100 misbehavior
-points, the disconnect threshold), and follows nothing from then on.
-The check is a plain substring search, so an empty value matches
-anything and silently disables the rule; the current code still accepts
-an empty value. Set the exact string, set it on every node, and do not
-set it empty.
+#385, open at the time of writing, hardcodes the headline in the
+mainnet chain parameters, adds a checkpoint for block 961640, and
+reduces the option to a regtest-only debug setting, so a build that
+includes it needs no headline configuration and ignores a leftover
+bitcoin.conf line.
 
-Miners have one more constraint: the headline is added to the coinbase
-after the height push, and the coinbase scriptSig is limited to 100
-bytes, so a headline longer than about 93 bytes makes the activation block
-unmineable; there is no separate check that warns about it.
-
-The current release, v29.4.0, does not know the option. On its command
-line it is fatal (`Error parsing command line arguments: Invalid
-parameter -blake2b_headline=...`). In `bitcoin.conf` it is a warning
-(`Ignoring unknown configuration value blake2b_headline`) and the node
-runs. So the line can go into `bitcoin.conf` before the upgrade
-(measured). All of this describes the release candidate; the final
-release may hardcode the string.
+The current stable release, v29.4.0, does not know the option. On its
+command line it is fatal (`Error parsing command line arguments:
+Invalid parameter -blake2b_headline=...`). In `bitcoin.conf` it is a
+warning (`Ignoring unknown configuration value blake2b_headline`) and
+the node runs, so the line can go in before the upgrade (measured).
 
 ### Upgrading in place
 
@@ -205,9 +194,8 @@ only view of a version 2 header is the raw hex
 settled in #363. `getblockhash <height>` needs the block itself, not only the
 header, so during initial sync use a hash you already have.
 
-`getdeploymentinfo` on rc2 reports the schedule at the top level under
-`hardfork`, with `height` and `active`; the #357 branch names it
-`blake2b`. #359 by itself does not report the deployment in any RPC.
+`getdeploymentinfo` on rc4 reports the deployment as `blake2b`, with
+`height` and `active`. #359 by itself does not report it in any RPC.
 
 Chain work keeps the same scale across the fork, so `chainwork` in
 `getblockchaininfo` barely moves after the height and `getnetworkhashps`
@@ -235,9 +223,10 @@ continuation instead. Either way it never accepts the BLAKE2b chain.
 ### The stack
 
 The node and the mining gateway both need the fork. The gateway with
-BLAKE2b support is `justinfilip/datum_gateway`; the DATUM Gateway
-release used for SHA-256 mining does not have it. Build the fork
-separately and keep it separate from a production gateway.
+BLAKE2b support is `innerhat-dev/datum_gateway` (named
+`justinfilip/datum_gateway` until a 2026-08-29 account rename); the
+DATUM Gateway release used for SHA-256 mining does not have it. Build
+the fork separately and keep it separate from a production gateway.
 
 ### What `getblocktemplate` does
 
@@ -255,10 +244,11 @@ nothing. Two further things a template consumer must handle:
   is emitted as an unsigned number above 2147483648 (for example
   `2684354560`). Code that parses it into a signed 32-bit integer
   overflows.
-- For the template at exactly the activation height, `coinbaseaux`
-  carries `blake2b_headline` as hex. Put those bytes in the coinbase
-  scriptSig; the block is invalid without them. The key is absent from
-  every other template.
+- For the template at exactly the activation height — long past on
+  mainnet and testnet4 — `coinbaseaux` carries `blake2b_headline` as
+  hex, and the block is invalid without those bytes in its coinbase
+  scriptSig. The key is absent from every other template, and #385
+  removes it.
 
 The template does not supply the header's height, transaction count,
 flags, extranonce or nonce fields. The pool or gateway builds those.
@@ -277,16 +267,16 @@ field, so leave it off unless that fix is in your build.
 
 ### Hardware
 
-BLAKE2b and BLAKE2b-sia miners over Sia-style Stratum. Since activation
-testnet4 has been mined by roughly 50 to 70 TH/s from at least 18
-distinct coinbase tags (measured 2026-08-24). Its difficulty at activation was 1, low enough for a CPU to mine the
-first block with `generatetoaddress`; that will not be the case on
-mainnet.
+BLAKE2b and BLAKE2b-sia miners over Sia-style Stratum. On mainnet's
+first day the chain ran a few minutes per block at the fork-block
+difficulty, roughly 600 TH/s, from dozens of distinct coinbase tags
+(measured 2026-08-30).
 
-Sia-firmware behavior against a real gateway (merkle branch handling,
-extranonce split, difficulty encoding, submit parameter order) had not
-been verified on hardware at the time of writing. Try it on testnet4
-first.
+Sia-firmware ASICs confirmed end to end, with share and block counts,
+are tracked in paulscode's compatibility matrix:
+https://github.com/paulscode/datum-blake2b-startos#compatibility-matrix
+(Goldshell HS-Box, SC5 Pro and SC Box II, Antminer A3, Innosilicon S11
+as of 2026-08-29). Try yours on testnet4 first.
 
 ## Transactions, wallets and replay
 
@@ -325,21 +315,24 @@ Anything that only talks to a node over RPC is fine.
 
 ## Rehearsing on testnet4
 
-testnet4 has run the fork since block 149537 on 2026-08-22. A rehearsal
-node fits alongside a production node with its own data directory and
-the testnet4 ports (P2P 48333, RPC 48332 by default); the gateway needs
+testnet4 has run the fork since 2026-08-22, currently from block
+150308 (each release candidate re-forked it; under rc4 a node from an
+older candidate rewinds on its own at startup). A rehearsal node fits
+alongside a production node with its own data directory and the
+testnet4 ports (P2P 48333, RPC 48332 by default); the gateway needs
 its own stratum and API ports too. Give the node a fork peer or the
 #375 seed, sync, and watch `getblockheader` flip to `header_version: 2`
-at 149537. That exercise found most of what is in this document.
+at 150308. That exercise found most of what is in this document.
 
-## Open items on 2026-08-26
+## Open items on 2026-08-31
 
 | Where | What | Matters for |
 |---|---|---|
-| #359 | the change itself; mainnet height unset; headline mechanism | everything |
+| #359 | the change itself; shipped in rc4, not yet merged | everything |
+| #385 | hardcoded headline and fork-block checkpoint; retires `blake2b_headline` | node config |
 | #358 | activation tied to RDTS; startup warning if scheduled past RDTS expiry | startup |
 | #368 | `NODE_BLAKE2B` service bit and seed filter | peering |
 | #375 | testnet4 seed answering the fork filter | testnet4 peering |
 | #363 | version 2 header fields in RPC output | monitoring |
 | #357 | opt-in signature hash, replay protection | wallets |
-| #359 thread | first BLAKE2b difficulty and expected block times | mining |
+| #359 thread | first-retarget behavior at 963648 | mining |
