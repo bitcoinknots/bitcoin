@@ -1,3 +1,6 @@
+# Private keys
+*.pem
+
 # Build subdirectories.
 /*build*
 !/build-aux

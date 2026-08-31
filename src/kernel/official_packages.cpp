@@ -30,7 +30,7 @@ constexpr int MIN_PRUNE_MIB{550};
 //! Compressed secp256k1 public key used to verify remote package manifests.
 //! Generate and rotate with contrib/official-packages/sign-manifest.py.
 constexpr const char* OFFICIAL_PACKAGES_SIGNING_PUBKEY_HEX =
-    "03f6b05102371a6364cc5bc45d2be52a8a7d2ec4ba2c293bbeb050b0922122d6e1";
+    "02f7b5f924d626f3b2378d9bcaf81c944800deb1172fb13a212428c05e4cc9509a";
 
 std::optional<CPubKey> EmbeddedSigningPubKey()
 {

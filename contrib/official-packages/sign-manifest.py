@@ -55,6 +55,11 @@ def generate_keypair(path: Path) -> None:
 
 
 def show_pubkey(path: Path) -> str:
+    if not path.is_file():
+        raise SystemExit(
+            f"error: private key not found: {path}\n"
+            f"Generate one first with: {sys.argv[0]} --generate-keypair"
+        )
     text = run_openssl(["ec", "-in", str(path), "-text", "-noout"]).decode("utf-8")
     pub_lines = []
     in_pub = False
@@ -79,11 +84,29 @@ def show_pubkey(path: Path) -> str:
 
 
 def sign_manifest(path: Path, key_path: Path) -> None:
-    manifest = json.loads(path.read_text(encoding="utf-8"))
+    if not path.is_file():
+        raise SystemExit(
+            f"error: manifest file not found: {path}\n"
+            "Pass the path to the manifest JSON you want to sign, e.g.\n"
+            f"  {sys.argv[0]} --sign /path/to/official-packages-mainnet.json --key {key_path}"
+        )
+    if not key_path.is_file():
+        raise SystemExit(
+            f"error: private key not found: {key_path}\n"
+            f"Generate one first with: {sys.argv[0]} --generate-keypair"
+        )
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise SystemExit(f"error: {path} is not valid JSON: {e}")
+    if not isinstance(manifest, dict):
+        raise SystemExit(f"error: {path} must contain a top-level JSON object")
     if "signature" in manifest:
         manifest = {key: value for key, value in manifest.items() if key != "signature"}
-    payload = digest(manifest)
-    signature = run_openssl(["dgst", "-sha256", "-sign", str(key_path)], input_bytes=payload)
+    # pkeyutl signs the provided digest directly; `dgst -sign` would hash the
+    # input again, which does not match CPubKey::Verify() on the client.
+    signature = run_openssl(
+        ["pkeyutl", "-sign", "-inkey", str(key_path)], input_bytes=digest(manifest))
     manifest["signature"] = base64.b64encode(signature).decode("ascii")
     path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(f"Signed {path}")

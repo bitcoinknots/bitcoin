@@ -92,6 +92,35 @@ BOOST_AUTO_TEST_CASE(manifest_signature_roundtrip)
     BOOST_CHECK(!VerifyOfficialPackagesManifestSignature(unsigned_json, pubkey));
 }
 
+// Cross-implementation vector: manifest signed with
+// contrib/official-packages/sign-manifest.py (openssl pkeyutl over the
+// canonical single-SHA256 digest) must verify with CPubKey::Verify().
+BOOST_AUTO_TEST_CASE(manifest_signature_python_tool_vector)
+{
+    const std::string signed_json = R"({
+  "packages": [
+    {
+      "id": "mainnet-910000-prune-2gb",
+      "snapshot_height": 910000,
+      "base_blockhash": "0000000000000000000108970acb9522ffd516eae17acddcb1bd16469194a821",
+      "prune_mib": 1907,
+      "download_uri": "https://downloads.bitcoinpurity.org/mainnet/mainnet-910000-prune-2gb.zip",
+      "archive_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    }
+  ],
+  "signature": "MEQCIG+kvW+rrCkdKQ/0G3UePl9IHnOiaZeDTvsoa2jqxwMNAiAUtHGgE01pso95PeBdABvF4T/BioDbpb27UjIqrn3mRg=="
+})";
+
+    const CPubKey pubkey{ParseHex("0234b9bee991cfee1181eb994606ef744517c73365840870e44f4889c65bc09a39")};
+    BOOST_REQUIRE(pubkey.IsFullyValid());
+    BOOST_CHECK(VerifyOfficialPackagesManifestSignature(signed_json, pubkey));
+
+    // Any change to the signed payload must invalidate the signature.
+    std::string tampered = signed_json;
+    tampered.replace(tampered.find("prune_mib\": 1907"), 16, "prune_mib\": 1908");
+    BOOST_CHECK(!VerifyOfficialPackagesManifestSignature(tampered, pubkey));
+}
+
 BOOST_AUTO_TEST_CASE(parse_remote_manifest_requires_signature)
 {
     const std::string unsigned_json = R"({
