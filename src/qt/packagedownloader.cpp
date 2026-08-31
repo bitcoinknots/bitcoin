@@ -8,7 +8,8 @@
 
 #include <qt/guiutil.h>
 
-#include <crypto/sha256.h>
+#include <chainparams.h>
+#include <common/args.h>
 #include <crypto/sha256.h>
 #include <util/fs.h>
 #include <util/fs_helpers.h>
@@ -126,26 +127,35 @@ bool ValidateExtractedPackage(const fs::path& datadir, const OfficialDataPackage
         return false;
     }
 
+    const auto chainparams = CreateChainParams(gArgs, gArgs.GetChainType());
+    if (!chainparams || !IsOfficialSnapshotTrusted(*chainparams, package.snapshot_height, package.base_blockhash)) {
+        error = QObject::tr("Package snapshot does not match a trusted chain checkpoint.");
+        return false;
+    }
+
     const auto manifest = ReadPackageManifest(datadir);
-    if (manifest && manifest->isObject()) {
-        const std::string id = manifest->exists("id") ? manifest->find_value("id").get_str() : "";
-        if (!id.empty() && id != package.id) {
-            error = QObject::tr("Package manifest id does not match the selected package.");
+    if (!manifest || !manifest->isObject()) {
+        error = QObject::tr("Extracted data is missing a valid package manifest.");
+        return false;
+    }
+
+    const std::string id = manifest->exists("id") ? manifest->find_value("id").get_str() : "";
+    if (!id.empty() && id != package.id) {
+        error = QObject::tr("Package manifest id does not match the selected package.");
+        return false;
+    }
+    if (manifest->exists("base_blockhash")) {
+        const auto hash = uint256::FromUserHex(manifest->find_value("base_blockhash").get_str());
+        if (!hash || *hash != package.base_blockhash) {
+            error = QObject::tr("Package base block hash does not match the expected value.");
             return false;
         }
-        if (manifest->exists("base_blockhash")) {
-            const auto hash = uint256::FromUserHex(manifest->find_value("base_blockhash").get_str());
-            if (!hash || *hash != package.base_blockhash) {
-                error = QObject::tr("Package base block hash does not match the expected value.");
-                return false;
-            }
-        }
-        if (manifest->exists("snapshot_height")) {
-            const int height = manifest->find_value("snapshot_height").getInt<int>();
-            if (height != package.snapshot_height) {
-                error = QObject::tr("Package snapshot height does not match the expected value.");
-                return false;
-            }
+    }
+    if (manifest->exists("snapshot_height")) {
+        const int height = manifest->find_value("snapshot_height").getInt<int>();
+        if (height != package.snapshot_height) {
+            error = QObject::tr("Package snapshot height does not match the expected value.");
+            return false;
         }
     }
     return true;
@@ -173,6 +183,53 @@ std::string ArchiveFilenameFromUri(const std::string& uri, const std::string& pa
 bool ShouldSkipZipEntryPath(std::string_view entry)
 {
     return entry.starts_with("__MACOSX/") || entry.starts_with("._") || entry.find("/._") != std::string_view::npos;
+}
+
+bool ValidateZipEntryPaths(const std::vector<std::string>& entries, QString& error)
+{
+    for (const std::string& entry : entries) {
+        if (ShouldSkipZipEntryPath(entry)) continue;
+        if (!IsZipArchiveEntryPathSafe(entry)) {
+            error = QObject::tr("Archive contains an unsafe path and cannot be extracted.");
+            return false;
+        }
+    }
+    return true;
+}
+
+bool AllExtractedPathsContained(const fs::path& root, QString& error)
+{
+    std::error_code ec;
+    const fs::path canonical_root = fs::weakly_canonical(root, ec);
+    if (ec) {
+        error = QObject::tr("Failed to verify extracted package paths.");
+        return false;
+    }
+
+    for (auto it = fs::recursive_directory_iterator(root, ec); !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
+        const fs::path canonical_entry = fs::weakly_canonical(it->path(), ec);
+        if (ec) {
+            error = QObject::tr("Failed to verify extracted package paths.");
+            return false;
+        }
+        auto mismatch = std::mismatch(canonical_root.begin(), canonical_root.end(), canonical_entry.begin(), canonical_entry.end());
+        if (mismatch.first != canonical_root.end()) {
+            error = QObject::tr("Archive extraction escaped the destination directory.");
+            return false;
+        }
+    }
+    return true;
+}
+
+OfficialPackageTrustPolicy PackageDownloadTrustPolicy()
+{
+    if (gArgs.IsArgSet("-officialpackages")) {
+        return OfficialPackageTrustPolicy::LOCAL;
+    }
+    if (FindDatadirOfficialPackagesConfigPath(gArgs, gArgs.GetChainType())) {
+        return OfficialPackageTrustPolicy::LOCAL;
+    }
+    return OfficialPackageTrustPolicy::STRICT;
 }
 
 std::optional<std::vector<std::string>> ListZipEntryNames(const fs::path& archive_path, QString& error)
@@ -384,6 +441,10 @@ bool ExtractArchive(const fs::path& archive_path, const fs::path& datadir, QStri
         return false;
     }
 
+    if (!ValidateZipEntryPaths(*entries, error)) {
+        return false;
+    }
+
     const auto strip_components = DetectZipStripComponents(*entries);
     if (!strip_components) {
         error = QObject::tr("Could not determine the layout of the archive.");
@@ -394,6 +455,9 @@ bool ExtractArchive(const fs::path& archive_path, const fs::path& datadir, QStri
 
     if (ExtractArchiveWithStrip(archive_path, datadir, *strip_components, error, pump)) {
         fs::remove_all(datadir / "__MACOSX");
+        if (!AllExtractedPathsContained(datadir, error)) {
+            return false;
+        }
         if (IsPackageDataRoot(datadir)) {
             return true;
         }
@@ -412,7 +476,10 @@ bool ExtractArchive(const fs::path& archive_path, const fs::path& datadir, QStri
         return false;
     }
 
-    return HoistWrappedExtractRoot(datadir, error);
+    if (!HoistWrappedExtractRoot(datadir, error)) {
+        return false;
+    }
+    return AllExtractedPathsContained(datadir, error);
 }
 
 std::optional<uint64_t> ParseContentRangeTotal(const QByteArray& header)
@@ -517,6 +584,11 @@ public:
         m_progress_timer = new QTimer(this);
         m_progress_timer->setInterval(250);
         connect(m_progress_timer, &QTimer::timeout, this, &PackageDownloadDialog::updateProgress);
+
+        if (!IsOfficialDownloadUriAllowed(m_package.download_uri, PackageDownloadTrustPolicy())) {
+            fail(tr("The selected package download URL is not allowed."));
+            return;
+        }
 
         preparePaths();
         probeDownload();

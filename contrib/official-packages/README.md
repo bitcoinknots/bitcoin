@@ -31,6 +31,14 @@ bitcoin-qt -officialpackages=/path/to/official-packages-mainnet.json
 
 ### JSON format
 
+Remote manifests fetched from `downloads.bitcoinpurity.org` must include a
+top-level detached ECDSA signature verified against the public key embedded in
+`src/kernel/official_packages.cpp`. Sign local manifests for upload with:
+
+```bash
+contrib/official-packages/sign-manifest.py --sign official-packages-mainnet.json --key manifest-sign.pem
+```
+
 ```json
 {
   "packages": [
@@ -58,6 +66,21 @@ bitcoin-qt -officialpackages=/path/to/official-packages-mainnet.json
 | `archive_sha256` | SHA256 of the compressed archive (required, non-zero) |
 | `archive_size_bytes` | Estimated download size (for UI disk-space hints) |
 | `extracted_size_bytes` | Estimated size after extraction (for UI disk-space hints) |
+| `signature` | Required for remote manifests: base64 ECDSA signature over SHA-256 of the JSON object with this field removed |
+
+## Security
+
+Remote package lists and archives are validated as follows:
+
+1. The manifest must carry a valid detached ECDSA signature (STRICT policy).
+2. Each `download_uri` must use HTTPS and point at `downloads.bitcoinpurity.org`.
+3. Each package `snapshot_height` / `base_blockhash` pair must match a built-in
+   assumeutxo entry or consensus checkpoint for the active chain.
+4. Zip archives are scanned for path traversal (`..`, absolute paths) before
+   extraction, and extracted files must remain inside the destination datadir.
+
+Local manifests loaded via `-officialpackages` or a datadir override skip
+signature and download-host checks so developers can test offline.
 
 ## Package contents
 

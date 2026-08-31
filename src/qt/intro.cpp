@@ -814,7 +814,8 @@ void Intro::reloadOfficialPackages()
         return;
     }
 
-    m_official_packages = ParseOfficialDataPackagesFromJson(*contents, *url);
+    m_official_packages = ParseOfficialDataPackagesFromJson(
+        *contents, *url, OfficialPackageTrustPolicy::STRICT);
     if (m_official_packages.empty()) {
         m_official_packages_load_error = tr("The official package list from downloads.bitcoinpurity.org contained no valid packages.");
     }

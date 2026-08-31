@@ -14,6 +14,21 @@
 #include <vector>
 
 class ArgsManager;
+class CChainParams;
+class CPubKey;
+
+/**
+ * Trust policy for official package manifests and download URIs.
+ *
+ * STRICT applies to manifests fetched from downloads.bitcoinpurity.org and
+ * requires a valid detached signature plus HTTPS download URIs on an allowlist.
+ * LOCAL applies to user-provided manifests (-officialpackages or datadir file)
+ * and skips signature and URI host checks so developers can test offline.
+ */
+enum class OfficialPackageTrustPolicy {
+    STRICT,
+    LOCAL,
+};
 
 /**
  * Official pre-built datadir archive offered for fast initial sync.
@@ -41,9 +56,31 @@ std::vector<OfficialDataPackage> LoadOfficialDataPackages(const ArgsManager& arg
 
 /** Parse package definitions from JSON text (remote manifest or local file contents). */
 std::vector<OfficialDataPackage> ParseOfficialDataPackagesFromJson(
-    const std::string& json_contents, const std::string& source_label);
+    const std::string& json_contents,
+    const std::string& source_label,
+    OfficialPackageTrustPolicy trust_policy = OfficialPackageTrustPolicy::LOCAL);
 
 std::optional<OfficialDataPackage> FindOfficialDataPackage(
     const std::vector<OfficialDataPackage>& packages, const std::string& id);
+
+/** Whether a download URI satisfies the trust policy (HTTPS + host allowlist for STRICT). */
+bool IsOfficialDownloadUriAllowed(const std::string& uri, OfficialPackageTrustPolicy trust_policy);
+
+/**
+ * Whether snapshot_height/base_blockhash match a built-in assumeutxo entry or
+ * consensus checkpoint for this chain.
+ */
+bool IsOfficialSnapshotTrusted(
+    const CChainParams& params, int snapshot_height, const uint256& base_blockhash);
+
+/** SHA-256 digest of a manifest with any top-level signature field removed. */
+uint256 OfficialPackagesManifestDigest(const std::string& json_contents);
+
+/** Verify a detached ECDSA signature over OfficialPackagesManifestDigest(). */
+bool VerifyOfficialPackagesManifestSignature(
+    const std::string& json_contents, const CPubKey& signing_pubkey);
+
+/** Whether a zip archive entry path is safe to extract (no zip-slip). */
+bool IsZipArchiveEntryPathSafe(std::string_view entry_path);
 
 #endif // BITCOIN_KERNEL_OFFICIAL_PACKAGES_H
