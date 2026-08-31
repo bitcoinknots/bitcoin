@@ -60,8 +60,7 @@
 #define COINBASE_TYPE_YUGE 4 // 16KB max (ePIC, bitaxe)
 #define COINBASE_TYPE_ANTMAIN2 5 // 2.25KB max (S21, +?)
 
-// Submitblock json rpc command max size is max block size * 2 for ascii plus some breathing room
-#define MAX_SUBMITBLOCK_SIZE 8500000
+// MAX_SUBMITBLOCK_SIZE is defined in datum_blocktemplates.h (included above via datum_sockets.h).
 
 /////////////////////////////////
 // Stratum job types

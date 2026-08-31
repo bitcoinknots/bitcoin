@@ -2357,14 +2357,14 @@ void stratum_calculate_merkle_branches(T_DATUM_STRATUM_JOB *s) {
 	unsigned char (*next_level)[32];
 	
 	// scratch RAM
-	static unsigned char templist[16384][32];
+	static unsigned char templist[MAX_BLOCK_TXN_SLOTS][32];
 	
 	// dev sanity check for thread concurrency
 	static int safety_check;
 	int marker = ++safety_check;
 	
-	if (s->block_template->txn_count > 16383) {
-		DLOG_FATAL("BUG: stratum_calculate_merkle_branches does not support templates with more than 16383 transactions! %d transactions in template.",(int)s->block_template->txn_count);
+	if (s->block_template->txn_count > MAX_BLOCK_TXN_COUNT) {
+		DLOG_FATAL("BUG: stratum_calculate_merkle_branches does not support templates with more than %d transactions! %d transactions in template.", MAX_BLOCK_TXN_COUNT, (int)s->block_template->txn_count);
 		panic_from_thread(__LINE__);
 		return;
 	}
@@ -2579,16 +2579,61 @@ void update_stratum_job(T_DATUM_TEMPLATE_DATA *block_template, bool new_block, i
 	return;
 }
 
+static char *submitblock_buffer_end(char *buf)
+{
+	return buf + MAX_SUBMITBLOCK_SIZE - 1;
+}
+
+static bool submitblock_have_room(char *ptr, char *end, size_t need, const char *step)
+{
+	if (need > (size_t)(end - ptr)) {
+		DLOG_FATAL("submitblock buffer overflow at %s (need %zu bytes, have %zu, max block %u bytes)",
+			step, need, (size_t)(end - ptr), MAX_BLOCK_SIZE_BYTES);
+		return false;
+	}
+	return true;
+}
+
+static bool submitblock_payload_fits(size_t coinbase_txn_size, T_DATUM_STRATUM_JOB *job, bool empty_work)
+{
+	size_t txn_hex_bytes = 0;
+	size_t estimated;
+	size_t i;
+
+	if (empty_work || !job || !job->block_template) {
+		estimated = 160 + 18 + (coinbase_txn_size * 2) + 64;
+	} else {
+		for (i = 0; i < job->block_template->txn_count; i++) {
+			txn_hex_bytes += (size_t)job->block_template->txns[i].size * 2U;
+		}
+		estimated = 160 + 18 + (coinbase_txn_size * 2) + txn_hex_bytes + 64;
+	}
+
+	if (estimated > MAX_SUBMITBLOCK_SIZE - 1) {
+		DLOG_FATAL("submitblock payload too large (estimated %zu bytes, buffer %u, max block %u bytes)",
+			estimated, MAX_SUBMITBLOCK_SIZE, MAX_BLOCK_SIZE_BYTES);
+		return false;
+	}
+	return true;
+}
+
 int assembleBlockAndSubmit(uint8_t *block_header, uint8_t *coinbase_txn, size_t coinbase_txn_size, T_DATUM_STRATUM_JOB *job, T_DATUM_STRATUM_THREADPOOL_DATA *sdata, const char *block_hash_hex, bool empty_work) {
 	// TODO: Also submit directly to bitcoin P2P
 	char *submitblock_req = NULL;
 	char *ptr = NULL;
+	char *end = NULL;
 	size_t i;
 	json_t *r;
 	CURL *tcurl;
 	int ret = 0;
 	bool free_submitblock_req = false;
 	char *s = NULL;
+	int prefix_len;
+	int varint_len;
+
+	if (!submitblock_payload_fits(coinbase_txn_size, job, empty_work)) {
+		return 0;
+	}
 	
 	// each thread has a chunk of RAM dedicated to prepping block submissions. use it.
 	submitblock_req = sdata->submitblock_req;
@@ -2596,7 +2641,7 @@ int assembleBlockAndSubmit(uint8_t *block_header, uint8_t *coinbase_txn, size_t 
 	if (!submitblock_req) {
 		// This should NEVER happen and likely indicates something is terribly wrong with the state of things... but we'll try our best to salvage this block.
 		DLOG_ERROR("For some reason no pointer available for submitting the block we just found! Attempting to allocate new memory for this, but we're probably in for a bad time...");
-		submitblock_req = malloc(8500000); // worst case
+		submitblock_req = malloc(MAX_SUBMITBLOCK_SIZE);
 		if (!submitblock_req) {
 			// this would be really bad
 			DLOG_FATAL("Could not allocate RAM for submitblock! This is REALLY bad.");
@@ -2608,34 +2653,59 @@ int assembleBlockAndSubmit(uint8_t *block_header, uint8_t *coinbase_txn, size_t 
 		DLOG_ERROR("We were able to allocate a new block of RAM for submitting this block. But look into this issue. May be a hardware or OS problem!");
 		free_submitblock_req = true;
 	}
-	
+
+	end = submitblock_buffer_end(submitblock_req);
 	ptr = submitblock_req;
-	ptr += sprintf(ptr, "{\"jsonrpc\":\"1.0\",\"id\":\"%llu\",\"method\":\"submitblock\",\"params\":[\"",(unsigned long long)time(NULL));
-	for(i=0;i<80;i++) {
+	prefix_len = snprintf(ptr, (size_t)(end - ptr) + 1,
+		"{\"jsonrpc\":\"1.0\",\"id\":\"%llu\",\"method\":\"submitblock\",\"params\":[\"",
+		(unsigned long long)time(NULL));
+	if (prefix_len < 0 || !submitblock_have_room(ptr, end, (size_t)prefix_len, "json prefix")) {
+		goto submitblock_cleanup;
+	}
+	ptr += prefix_len;
+
+	if (!submitblock_have_room(ptr, end, 160, "block header")) {
+		goto submitblock_cleanup;
+	}
+	for (i = 0; i < 80; i++) {
 		ptr += sprintf(ptr, "%2.2x", block_header[i]);
 	}
 	
 	// txn count
 	if (!empty_work) {
-		ptr += append_bitcoin_varint_hex(job->block_template->txn_count + 1, ptr);
+		varint_len = append_bitcoin_varint_hex(job->block_template->txn_count + 1, ptr);
 	} else {
-		ptr += append_bitcoin_varint_hex(1, ptr);
+		varint_len = append_bitcoin_varint_hex(1, ptr);
 	}
+	if (varint_len <= 0 || !submitblock_have_room(ptr, end, (size_t)varint_len, "txn count varint")) {
+		goto submitblock_cleanup;
+	}
+	ptr += varint_len;
 	
 	// copy coinbase txn
-	for(i=0;i<coinbase_txn_size;i++) {
+	if (!submitblock_have_room(ptr, end, coinbase_txn_size * 2, "coinbase")) {
+		goto submitblock_cleanup;
+	}
+	for (i = 0; i < coinbase_txn_size; i++) {
 		ptr += sprintf(ptr, "%2.2x", coinbase_txn[i]);
 	}
 	
 	if (!empty_work) {
 		// copy all of the block transaction data to the buffer
-		for(i=0;i<job->block_template->txn_count;i++) {
-			memcpy(ptr, job->block_template->txns[i].txn_data_hex, job->block_template->txns[i].size*2);
-			ptr += job->block_template->txns[i].size*2;
+		for (i = 0; i < job->block_template->txn_count; i++) {
+			const size_t txn_hex_len = (size_t)job->block_template->txns[i].size * 2U;
+			if (!submitblock_have_room(ptr, end, txn_hex_len, "block transactions")) {
+				goto submitblock_cleanup;
+			}
+			memcpy(ptr, job->block_template->txns[i].txn_data_hex, txn_hex_len);
+			ptr += txn_hex_len;
 		}
 	}
 	
 	// close the submitblock
+	if (!submitblock_have_room(ptr, end, 3, "json suffix")) {
+		goto submitblock_cleanup;
+	}
 	*ptr = '"'; ptr++;
 	*ptr = ']'; ptr++;
 	*ptr = '}'; ptr++;
@@ -2704,6 +2774,7 @@ int assembleBlockAndSubmit(uint8_t *block_header, uint8_t *coinbase_txn, size_t 
 	}
 	
 	// cleanup
+submitblock_cleanup:
 	if (free_submitblock_req) {
 		// let's not free until our thread is done with it
 		usleep(10000);

@@ -59,6 +59,21 @@
 
 #define MAX_BLOCK_SIZE_BYTES 4000000
 
+// Stratum merkle-branch logic supports at most 16383 non-coinbase transactions.
+#define MAX_BLOCK_TXN_COUNT 16383
+#define MAX_BLOCK_TXN_SLOTS 16384
+
+// submitblock JSON payload ~= serialized block in hex (2x raw bytes) + JSON wrapper.
+#define SUBMITBLOCK_JSON_BREATHING_ROOM 500000U
+#define MAX_SUBMITBLOCK_SIZE ((MAX_BLOCK_SIZE_BYTES * 2U) + SUBMITBLOCK_JSON_BREATHING_ROOM)
+
+_Static_assert(MAX_BLOCK_TXN_COUNT < MAX_BLOCK_TXN_SLOTS,
+	"MAX_BLOCK_TXN_COUNT must fit in template txn slot array");
+_Static_assert(MAX_BLOCK_TXN_COUNT <= UINT16_MAX,
+	"MAX_BLOCK_TXN_COUNT exceeds T_DATUM_TEMPLATE_TXN.index_raw range");
+_Static_assert(MAX_SUBMITBLOCK_SIZE >= (MAX_BLOCK_SIZE_BYTES * 2U) + SUBMITBLOCK_JSON_BREATHING_ROOM,
+	"MAX_SUBMITBLOCK_SIZE must track MAX_BLOCK_SIZE_BYTES");
+
 // Assumption notes
 
 // max possible transactions = 16394-ish .. close enough to say 16384, since we're just not going to be idiots

@@ -102,7 +102,7 @@ int datum_template_init(void) {
 	
 	// TODO: Be smarter about dependent RAM data and size
 	// we're storing both binary and ascii hex versions of all txns for both processing and submitblock speedups
-	j = (sizeof(T_DATUM_TEMPLATE_TXN)*16384) + (MAX_BLOCK_SIZE_BYTES*3) + 2000000;
+	j = (sizeof(T_DATUM_TEMPLATE_TXN) * MAX_BLOCK_TXN_SLOTS) + (MAX_BLOCK_SIZE_BYTES * 3) + 2000000;
 	temp = calloc(j, MAX_TEMPLATES_IN_MEMORY);
 	if (!temp) {
 		DLOG_FATAL("ERROR: Could not allocate RAM for in-memory template data. :( (2)");
@@ -271,9 +271,9 @@ T_DATUM_TEMPLATE_DATA *datum_gbt_parser(json_t *gbt) {
 	tdata->txn_count = json_array_size(tx_array);
 	tdata->txn_data_offset = sizeof(T_DATUM_TEMPLATE_TXN)*tdata->txn_count;
 	if (tdata->txn_count > 0) {
-		if (tdata->txn_count > 16383) {
-			DLOG_WARN("DATUM Gateway does not support blocks with more than 16383 transactions! %d txns in template. Truncating template to 16383 transactions.", (int)tdata->txn_count);
-			tdata->txn_count = 16383;
+		if (tdata->txn_count > MAX_BLOCK_TXN_COUNT) {
+			DLOG_WARN("DATUM Gateway does not support blocks with more than %d transactions! %d txns in template. Truncating template to %d transactions.", MAX_BLOCK_TXN_COUNT, (int)tdata->txn_count, MAX_BLOCK_TXN_COUNT);
+			tdata->txn_count = MAX_BLOCK_TXN_COUNT;
 		}
 		for(i=0;i<tdata->txn_count;i++) {
 			json_t *tx = json_array_get(tx_array, i);
