@@ -22,6 +22,29 @@ env:
   REPO_USE_WARP_RUNNERS: 'bitcoin/bitcoin' # Use warp runners for this repo, instead of falling back to the slow GHA runners
 
 jobs:
+  datum-stage1:
+    name: 'DATUM ON/OFF build and functional test'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake python3 libevent-dev libboost-dev libcurl4-openssl-dev libjansson-dev libsodium-dev
+      - name: Build with DATUM enabled
+        run: |
+          cmake -S . -B build-datum-on -DBUILD_DATUM=ON -DBUILD_TESTS=OFF -DBUILD_GUI=OFF -DENABLE_WALLET=OFF -DWITH_ZMQ=OFF -DWITH_USDT=OFF
+          cmake --build build-datum-on --target bitcoind bitcoin-cli -j "$(nproc)"
+      - name: Run embedded DATUM functional test
+        run: |
+          python3 test/functional/feature_datum.py --configfile="$PWD/build-datum-on/test/config.ini"
+      - name: Build with DATUM disabled and no DATUM dependencies
+        run: |
+          sudo apt-get remove -y libcurl4-openssl-dev libjansson-dev libsodium-dev
+          cmake -S . -B build-datum-off -DBUILD_DATUM=OFF -DBUILD_TESTS=OFF -DBUILD_GUI=OFF -DENABLE_WALLET=OFF -DWITH_ZMQ=OFF -DWITH_USDT=OFF
+          cmake --build build-datum-off --target bitcoind -j "$(nproc)"
+
   runners:
     name: 'determine runners'
     runs-on: ubuntu-latest
@@ -84,7 +107,7 @@ jobs:
           echo "TEST_BASE=$(git rev-list -n$((${{ env.MAX_COUNT }} + 1)) --reverse HEAD $EXCLUDE_MERGE_BASE_ANCESTORS | head -1)" >> "$GITHUB_ENV"
       - run: |
           sudo apt-get update
-          sudo apt-get install clang ccache build-essential cmake pkgconf python3-zmq libevent-dev libboost-dev libsqlite3-dev libdb++-dev systemtap-sdt-dev libminiupnpc-dev libzmq3-dev qtbase5-dev qttools5-dev qttools5-dev-tools qtwayland5 libqrencode-dev librsvg2-bin imagemagick -y
+          sudo apt-get install clang ccache build-essential cmake pkgconf python3-zmq libevent-dev libcurl4-openssl-dev libjansson-dev libsodium-dev libboost-dev libsqlite3-dev libdb++-dev systemtap-sdt-dev libminiupnpc-dev libzmq3-dev qtbase5-dev qttools5-dev qttools5-dev-tools qtwayland5 libqrencode-dev librsvg2-bin imagemagick -y
       - name: Compile and run tests
         run: |
           # Run tests on commits after the last merge commit and before the PR head commit
@@ -145,7 +168,7 @@ jobs:
         run: |
           # A workaround for "The `brew link` step did not complete successfully" error.
           brew install --quiet python@3 || brew link --overwrite python@3
-          brew install --quiet coreutils ninja pkgconf gnu-getopt ccache boost libevent miniupnpc zeromq qt@5 qrencode imagemagick libicns librsvg
+          brew install --quiet coreutils ninja pkgconf gnu-getopt ccache boost libevent curl jansson libsodium miniupnpc zeromq qt@5 qrencode imagemagick libicns librsvg
 
       - name: Set Ccache directory
         run: echo "CCACHE_DIR=${RUNNER_TEMP}/ccache_dir" >> "$GITHUB_ENV"

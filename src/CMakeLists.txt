@@ -108,6 +108,9 @@ add_dependencies(bitcoin_clientversion generate_build_info)
 
 add_subdirectory(crypto)
 add_subdirectory(util)
+if(BUILD_DATUM)
+  add_subdirectory(datum)
+endif()
 if(WITH_MULTIPROCESS)
   add_subdirectory(ipc)
 endif()
@@ -327,6 +330,8 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   validation.cpp
   validationinterface.cpp
   versionbits.cpp
+  $<$<BOOL:${BUILD_DATUM}>:mining/datum_bridge.cpp>
+  $<$<BOOL:${BUILD_DATUM}>:rpc/datum.cpp>
   $<$<TARGET_EXISTS:bitcoin_wallet>:wallet/init.cpp>
   $<$<NOT:$<TARGET_EXISTS:bitcoin_wallet>>:dummywallet.cpp>
 )
@@ -344,6 +349,7 @@ target_link_libraries(bitcoin_node
     $<TARGET_NAME_IF_EXISTS:libevent::pthreads>
     $<TARGET_NAME_IF_EXISTS:MiniUPnPc::MiniUPnPc>
     $<TARGET_NAME_IF_EXISTS:USDT::headers>
+    $<TARGET_NAME_IF_EXISTS:datum_solo>
 )
 
 

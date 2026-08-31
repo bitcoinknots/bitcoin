@@ -52,7 +52,10 @@ Build requirements:
 
 Now, you can either build from self-compiled [depends](#dependencies) or install the required dependencies:
 
-    sudo apt-get install libevent-dev libboost-dev
+    sudo apt-get install libevent-dev libboost-dev libcurl4-openssl-dev libjansson-dev libsodium-dev
+
+The curl, jansson, and libsodium packages are required by the default embedded
+DATUM build. They are not required when configuring with `-DBUILD_DATUM=OFF`.
 
 SQLite is required for the descriptor wallet:
 

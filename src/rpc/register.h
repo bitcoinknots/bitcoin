@@ -23,6 +23,9 @@ void RegisterSignMessageRPCCommands(CRPCTable&);
 void RegisterSignerRPCCommands(CRPCTable &tableRPC);
 void RegisterTxoutProofRPCCommands(CRPCTable&);
 void RegisterStatsRPCCommands(CRPCTable&);
+#ifdef ENABLE_DATUM
+void RegisterDatumRPCCommands(CRPCTable&);
+#endif
 
 static inline void RegisterAllCoreRPCCommands(CRPCTable &t)
 {
@@ -40,6 +43,9 @@ static inline void RegisterAllCoreRPCCommands(CRPCTable &t)
 #endif // ENABLE_EXTERNAL_SIGNER
     RegisterTxoutProofRPCCommands(t);
     RegisterStatsRPCCommands(t);
+#ifdef ENABLE_DATUM
+    RegisterDatumRPCCommands(t);
+#endif
 }
 
 #endif // BITCOIN_RPC_REGISTER_H

@@ -4,6 +4,8 @@ boost_packages = boost
 
 libevent_packages = libevent
 
+datum_packages = curl jansson libsodium
+
 qrencode_linux_packages = qrencode
 qrencode_darwin_packages = qrencode
 qrencode_mingw32_packages = qrencode

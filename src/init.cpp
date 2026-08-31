@@ -42,6 +42,9 @@
 #include <kernel/warning.h>
 #include <key.h>
 #include <logging.h>
+#ifdef ENABLE_DATUM
+#include <mining/datum_bridge.h>
+#endif
 #include <mapport.h>
 #include <net.h>
 #include <net_permissions.h>
@@ -279,6 +282,10 @@ void Interrupt(NodeContext& node)
 #if HAVE_SYSTEM
     ShutdownNotify(*node.args);
 #endif
+    // DATUM must stop accepting work before its localhost RPC dependency is interrupted.
+#ifdef ENABLE_DATUM
+    mining::InterruptDatum();
+#endif
     // Wake any threads that may be waiting for the tip to change.
     if (node.notifications) WITH_LOCK(node.notifications->m_tip_block_mutex, node.notifications->m_tip_block_cv.notify_all());
     InterruptHTTPServer();
@@ -309,6 +316,9 @@ void Shutdown(NodeContext& node)
     util::ThreadRename("shutoff");
     if (node.mempool) node.mempool->AddTransactionsUpdated(1);
 
+#ifdef ENABLE_DATUM
+    mining::StopDatum(&node);
+#endif
     StopHTTPRPC();
     StopREST();
     StopRPC();
@@ -789,6 +799,9 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-blockmintxfee=<amt>", strprintf("Set lowest fee rate (in %s/kvB) for transactions to be included in block creation. (default: %s)", CURRENCY_UNIT, FormatMoney(DEFAULT_BLOCK_MIN_TX_FEE)), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockprioritysize=<n>", strprintf("Set maximum size of high-priority/low-fee transactions in bytes (default: %d)", DEFAULT_BLOCK_PRIORITY_SIZE), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockversion=<n>", "Override block version to test forking scenarios", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::BLOCK_CREATION);
+#ifdef ENABLE_DATUM
+    mining::SetupDatumArgs(argsman);
+#endif
 
     argsman.AddArg("-rest", strprintf("Accept public REST requests (default: %u)", DEFAULT_REST_ENABLE), ArgsManager::ALLOW_ANY, OptionsCategory::RPC);
     argsman.AddArg("-rpcallowip=<ip>", "Allow JSON-RPC connections from specified source. Valid values for <ip> are a single IP (e.g. 1.2.3.4), a network/netmask (e.g. 1.2.3.4/255.255.255.0), a network/CIDR (e.g. 1.2.3.4/24), all ipv4 (0.0.0.0/0), or all ipv6 (::/0). RFC4193 is allowed only if -cjdnsreachable=0. This option can be specified multiple times", ArgsManager::ALLOW_ANY, OptionsCategory::RPC);
@@ -1706,6 +1719,12 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
 
     // Check port numbers
     if (!CheckHostPortOptions(args)) return false;
+#ifdef ENABLE_DATUM
+    {
+        bilingual_str datum_error;
+        if (!mining::ValidateDatumOptions(args, datum_error)) return InitError(datum_error);
+    }
+#endif
 
     // Configure reachable networks before we start the RPC server.
     // This is necessary for -rpcallowip to distinguish CJDNS from other RFC4193
@@ -2493,6 +2512,13 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     // that the RPC's view of the best block is valid and consistent with
     // ChainstateManager's active tip.
     SetRPCWarmupFinished();
+
+#ifdef ENABLE_DATUM
+    {
+        bilingual_str datum_error;
+        if (!mining::StartDatum(node, datum_error)) return InitError(datum_error);
+    }
+#endif
 
     uiInterface.InitMessage(_("Done loading"));
 

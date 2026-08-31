@@ -59,6 +59,10 @@ ctest --test-dir build --build-config Release  # Append "-j N" for N parallel te
 cmake --install build --config Release         # Optional.
 ```
 
+To compile UPnP port-mapping support, append `-DWITH_MINIUPNPC=ON` to the
+configuration command. The vcpkg manifest provides the required MiniUPnPc
+dependency through its `miniupnpc` feature.
+
 ### 5. Building with Dynamic Linking without GUI
 
 ```
@@ -99,6 +103,8 @@ cmake -B build --preset vs2022 -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON -DVCPKG_M
 ```
 
 Available features are listed in the [`vcpkg.json`](/vcpkg.json) file.
+The `datum` manifest feature is added automatically while `BUILD_DATUM=ON`.
+Use `-DBUILD_DATUM=OFF` to omit curl, jansson, and libsodium entirely.
 
 ### 8. Antivirus Software
 

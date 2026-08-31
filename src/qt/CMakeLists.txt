@@ -211,6 +211,8 @@ add_library(bitcoinqt STATIC EXCLUDE_FROM_ALL
   blockview.h
   clientmodel.cpp
   clientmodel.h
+  $<$<BOOL:${BUILD_DATUM}>:datumwindow.cpp>
+  $<$<BOOL:${BUILD_DATUM}>:datumwindow.h>
   csvmodelwriter.cpp
   csvmodelwriter.h
   guiutil.cpp

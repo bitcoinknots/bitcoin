@@ -26,6 +26,9 @@
 #include <kernel/context.h>
 #include <kernel/mempool_entry.h>
 #include <logging.h>
+#ifdef ENABLE_DATUM
+#include <mining/datum_bridge.h>
+#endif
 #include <mapport.h>
 #include <net.h>
 #include <net_processing.h>
@@ -145,6 +148,10 @@ public:
 
         // Stop RPC for clean shutdown if any of waitfor* commands is executed.
         if (args().GetBoolArg("-server", false)) {
+#ifdef ENABLE_DATUM
+            mining::InterruptDatum();
+            mining::StopDatum(&ctx);
+#endif
             InterruptRPC();
             StopRPC();
         }

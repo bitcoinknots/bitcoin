@@ -20,6 +20,7 @@ class QCheckBox;
 class QDataWidgetMapper;
 class QDoubleSpinBox;
 class QEvent;
+class QLineEdit;
 class QRadioButton;
 class QSpinBox;
 class QString;
@@ -97,6 +98,10 @@ private Q_SLOTS:
     void updateDefaultProxyNets();
     void checkLineEdit();
 
+#ifdef ENABLE_DATUM
+    bool saveDatumSettings();
+#endif
+
     void incrementalrelayfee_changed();
     void blockmaxsize_changed(int);
     void blockmaxsize_increase(int);
@@ -168,6 +173,24 @@ private:
 
     BitcoinAmountField *blockmintxfee;
     QSpinBox *blockmaxsize, *blockprioritysize, *blockmaxweight;
+
+#ifdef ENABLE_DATUM
+    QCheckBox *datumEnable{nullptr};
+    QLineEdit *datumListen{nullptr};
+    QSpinBox *datumPort{nullptr};
+    QCheckBox *datumUpnp{nullptr};
+    QCheckBox *datumAuth{nullptr};
+    QLineEdit *datumUser{nullptr};
+    QLineEdit *datumPassword{nullptr};
+    QSpinBox *datumMaxClients{nullptr};
+    QSpinBox *datumMaxPerIp{nullptr};
+    QLineEdit *datumAddress{nullptr};
+    QSpinBox *datumDifficulty{nullptr};
+    QLineEdit *datumCoinbaseTag{nullptr};
+    QLineEdit *datumRpcUser{nullptr};
+    QLineEdit *datumRpcPassword{nullptr};
+    QLineEdit *datumRpcUrl{nullptr};
+#endif
 };
 
 #endif // BITCOIN_QT_OPTIONSDIALOG_H

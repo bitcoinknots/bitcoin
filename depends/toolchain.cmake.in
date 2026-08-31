@@ -173,6 +173,13 @@ else()
   set(WITH_USDT ON CACHE BOOL "")
 endif()
 
+set(datum_packages @datum_packages@)
+if(datum_packages STREQUAL "")
+  set(BUILD_DATUM OFF CACHE BOOL "")
+else()
+  set(BUILD_DATUM ON CACHE BOOL "")
+endif()
+
 if("@no_harden@")
   set(ENABLE_HARDENING OFF CACHE BOOL "")
 else()

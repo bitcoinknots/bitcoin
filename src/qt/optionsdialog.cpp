@@ -14,11 +14,17 @@
 #include <qt/guiutil.h>
 #include <qt/optionsmodel.h>
 
+#ifdef ENABLE_DATUM
+#include <mining/datum_bridge.h>
+#include <univalue.h>
+#endif
+
 #include <common/args.h>
 #include <common/system.h>
 #include <consensus/consensus.h> // for MAX_BLOCK_SERIALIZED_SIZE
 #include <index/blockfilterindex.h>
 #include <interfaces/node.h>
+#include <key_io.h>
 #include <netbase.h>
 #include <node/caches.h>
 #include <node/dbcache.h>
@@ -29,8 +35,12 @@
 #include <txmempool.h> // for maxmempoolMinimum
 #include <util/check.h>
 #include <util/strencodings.h>
+#include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <map>
+#include <string>
+#include <string_view>
 #include <utility>
 
 #include <QApplication>
@@ -39,11 +49,13 @@
 #include <QDir>
 #include <QDoubleSpinBox>
 #include <QFontDialog>
+#include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QIntValidator>
 #include <QLabel>
+#include <QLineEdit>
 #include <QLocale>
 #include <QMessageBox>
 #include <QRadioButton>
@@ -664,6 +676,151 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
 
     verticalLayout_Mining->addItem(new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding));
 
+#ifdef ENABLE_DATUM
+    /* DATUM tab */
+
+    QWidget * const tabDatum = new QWidget();
+    QVBoxLayout * const verticalLayout_Datum = new QVBoxLayout(tabDatum);
+    ui->tabWidget->insertTab(ui->tabWidget->indexOf(ui->tabWindow), ModScrollArea::fromWidget(this, tabDatum), tr("D&ATUM"));
+
+    QLabel * const datumNotice = new QLabel(tr("DATUM serves external SHA256d miners over Stratum V1. Share difficulty changes take effect immediately while DATUM is running; other changes take effect after restarting %1. UPnP maps only the DATUM Stratum port and falls back to PCP/NAT-PMP when needed. Configuration-file and command-line settings override these GUI values.").arg(CLIENT_NAME));
+    datumNotice->setWordWrap(true);
+    verticalLayout_Datum->addWidget(datumNotice);
+
+    QFormLayout * const datumForm = new QFormLayout();
+    verticalLayout_Datum->addLayout(datumForm);
+
+    datumEnable = new QCheckBox(tabDatum);
+    datumEnable->setText(tr("Enable embedded DATUM / Stratum solo mining"));
+    datumEnable->setToolTip(tr("Start the embedded Stratum V1 server after the next restart."));
+    datumForm->addRow(datumEnable);
+    FixTabOrder(datumEnable);
+
+    datumListen = new QLineEdit(tabDatum);
+    datumListen->setToolTip(tr("Numeric IPv4 or IPv6 address. Keep 127.0.0.1 for local-only mining."));
+    datumForm->addRow(tr("Stratum listen address:"), datumListen);
+    FixTabOrder(datumListen);
+
+    datumPort = new QSpinBox(tabDatum);
+    datumPort->setRange(1, 65535);
+    datumForm->addRow(tr("Stratum port:"), datumPort);
+    FixTabOrder(datumPort);
+
+    datumUpnp = new QCheckBox(tabDatum);
+    datumUpnp->setText(tr("Automatically configure the router for the DATUM Stratum port using UPnP"));
+    datumUpnp->setToolTip(tr("Maps the DATUM TCP port through UPnP, with PCP/NAT-PMP fallback. Use a non-loopback IPv4 listen address; this does not enable authentication."));
+#ifndef USE_UPNP
+    datumUpnp->setEnabled(false);
+#endif
+    datumForm->addRow(datumUpnp);
+    FixTabOrder(datumUpnp);
+
+    datumAuth = new QCheckBox(tabDatum);
+    datumAuth->setText(tr("Require Stratum authentication"));
+    datumAuth->setToolTip(tr("Require miners to provide the configured username and password."));
+    datumForm->addRow(datumAuth);
+    FixTabOrder(datumAuth);
+
+    datumUser = new QLineEdit(tabDatum);
+    datumUser->setToolTip(tr("The configured username, optionally followed by .worker from the miner."));
+    datumForm->addRow(tr("Stratum username:"), datumUser);
+    FixTabOrder(datumUser);
+
+    datumPassword = new QLineEdit(tabDatum);
+    datumPassword->setEchoMode(QLineEdit::Password);
+    datumPassword->setToolTip(tr("Shared Stratum password. It is not shown in status output."));
+    datumForm->addRow(tr("Stratum password:"), datumPassword);
+    FixTabOrder(datumPassword);
+
+    datumMaxClients = new QSpinBox(tabDatum);
+    datumMaxClients->setRange(1, 4096);
+    datumForm->addRow(tr("Maximum Stratum clients:"), datumMaxClients);
+    FixTabOrder(datumMaxClients);
+
+    datumMaxPerIp = new QSpinBox(tabDatum);
+    datumMaxPerIp->setRange(1, 4096);
+    datumForm->addRow(tr("Maximum clients per IP:"), datumMaxPerIp);
+    FixTabOrder(datumMaxPerIp);
+
+    datumAddress = new QLineEdit(tabDatum);
+    datumAddress->setToolTip(tr("Fixed Purity payout address for DATUM block candidates."));
+    datumForm->addRow(tr("Payout address:"), datumAddress);
+    FixTabOrder(datumAddress);
+
+    datumDifficulty = new QSpinBox(tabDatum);
+    datumDifficulty->setRange(1, std::numeric_limits<int>::max());
+    datumDifficulty->setToolTip(tr("Stratum share difficulty. Changes apply immediately while DATUM is running and do not change the network consensus target."));
+    datumForm->addRow(tr("Share difficulty:"), datumDifficulty);
+    FixTabOrder(datumDifficulty);
+
+    datumCoinbaseTag = new QLineEdit(tabDatum);
+    datumCoinbaseTag->setToolTip(tr("Optional operator-controlled coinbase tag, up to 63 bytes."));
+    datumForm->addRow(tr("Coinbase tag:"), datumCoinbaseTag);
+    FixTabOrder(datumCoinbaseTag);
+
+    datumRpcUrl = new QLineEdit(tabDatum);
+    datumRpcUrl->setPlaceholderText(tr("blank = node's loopback RPC URL"));
+    datumRpcUrl->setToolTip(tr("Optional loopback HTTP RPC URL override; embedded credentials are not allowed."));
+    datumForm->addRow(tr("DATUM RPC URL:"), datumRpcUrl);
+    FixTabOrder(datumRpcUrl);
+
+    datumRpcUser = new QLineEdit(tabDatum);
+    datumForm->addRow(tr("DATUM RPC username:"), datumRpcUser);
+    FixTabOrder(datumRpcUser);
+
+    datumRpcPassword = new QLineEdit(tabDatum);
+    datumRpcPassword->setEchoMode(QLineEdit::Password);
+    datumRpcPassword->setToolTip(tr("Optional explicit loopback RPC password; otherwise the node RPC cookie is used."));
+    datumForm->addRow(tr("DATUM RPC password:"), datumRpcPassword);
+    FixTabOrder(datumRpcPassword);
+
+    datumEnable->setChecked(gArgs.GetBoolArg("-datum", false));
+    datumListen->setText(QString::fromStdString(gArgs.GetArg("-datumlisten", "127.0.0.1")));
+    datumPort->setValue(gArgs.GetIntArg("-datumport", 23334));
+    datumUpnp->setChecked(gArgs.GetBoolArg("-datumupnp", false));
+    datumAuth->setChecked(gArgs.GetBoolArg("-datumauth", false));
+    datumUser->setText(QString::fromStdString(gArgs.GetArg("-datumuser", "")));
+    datumPassword->setText(QString::fromStdString(gArgs.GetArg("-datumpassword", "")));
+    datumMaxClients->setValue(gArgs.GetIntArg("-datummaxclients", 32));
+    datumMaxPerIp->setValue(gArgs.GetIntArg("-datummaxperip", 4));
+    datumAddress->setText(QString::fromStdString(gArgs.GetArg("-datumaddress", "")));
+    const UniValue datum_info{mining::GetDatumInfo()};
+    const bool datum_running{datum_info.exists("running") && datum_info["running"].get_bool()};
+    datumDifficulty->setValue(datum_running ? datum_info["share_difficulty"].getInt<int>() : gArgs.GetIntArg("-datumdiff", 65536));
+    datumCoinbaseTag->setText(QString::fromStdString(gArgs.GetArg("-datumcoinbasetag", "Bitcoin Purity")));
+    datumRpcUrl->setText(QString::fromStdString(gArgs.GetArg("-datumrpcurl", "")));
+    datumRpcUser->setText(QString::fromStdString(gArgs.GetArg("-datumrpcuser", "")));
+    datumRpcPassword->setText(QString::fromStdString(gArgs.GetArg("-datumrpcpassword", "")));
+
+    const auto updateDatumUi = [this] {
+        const bool enabled = datumEnable->isChecked();
+        datumListen->setEnabled(enabled);
+        datumPort->setEnabled(enabled);
+#ifdef USE_UPNP
+        datumUpnp->setEnabled(enabled);
+#else
+        datumUpnp->setEnabled(false);
+#endif
+        datumAuth->setEnabled(enabled);
+        datumMaxClients->setEnabled(enabled);
+        datumMaxPerIp->setEnabled(enabled);
+        datumAddress->setEnabled(enabled);
+        datumDifficulty->setEnabled(enabled);
+        datumCoinbaseTag->setEnabled(enabled);
+        datumRpcUrl->setEnabled(enabled);
+        datumRpcUser->setEnabled(enabled);
+        datumRpcPassword->setEnabled(enabled);
+        const bool auth_enabled = enabled && datumAuth->isChecked();
+        datumUser->setEnabled(auth_enabled);
+        datumPassword->setEnabled(auth_enabled);
+    };
+    connect(datumEnable, &QCheckBox::toggled, this, updateDatumUi);
+    connect(datumAuth, &QCheckBox::toggled, this, updateDatumUi);
+    updateDatumUi();
+
+    verticalLayout_Datum->addItem(new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding));
+#endif // ENABLE_DATUM
+
     /* Window elements init */
 #ifdef Q_OS_MACOS
     /* remove Window tab on Mac */
@@ -1135,6 +1292,157 @@ void OptionsDialog::on_openBitcoinConfButton_clicked()
         QMessageBox::critical(this, tr("Error"), tr("The configuration file could not be opened."));
 }
 
+#ifdef ENABLE_DATUM
+namespace {
+bool IsLoopbackDatumRpcUrl(const std::string& url)
+{
+    constexpr std::string_view prefix{"http://"};
+    if (!url.starts_with(prefix)) return false;
+    std::string authority{url.substr(prefix.size())};
+    if (authority.ends_with('/')) authority.pop_back();
+    if (authority.find_first_of("/?#@") != std::string::npos) return false;
+    uint16_t port{0};
+    std::string host;
+    return SplitHostPort(authority, port, host) && port != 0 &&
+        (host == "127.0.0.1" || host == "::1");
+}
+
+bool HasConfigUnsafeWhitespace(const std::string& value)
+{
+    constexpr std::string_view whitespace{" \t\r\n"};
+    return value.find_first_of("\r\n") != std::string::npos ||
+        (!value.empty() && (whitespace.find(value.front()) != std::string_view::npos || whitespace.find(value.back()) != std::string_view::npos));
+}
+} // namespace
+
+bool OptionsDialog::saveDatumSettings()
+{
+    const bool enabled{datumEnable->isChecked()};
+    const std::string listen{datumListen->text().toStdString()};
+    const std::string user{datumUser->text().toStdString()};
+    const std::string password{datumPassword->text().toStdString()};
+    const std::string address{datumAddress->text().trimmed().toStdString()};
+    const std::string coinbase_tag{datumCoinbaseTag->text().toUtf8().toStdString()};
+    const std::string rpc_url{datumRpcUrl->text().trimmed().toStdString()};
+    const std::string rpc_user{datumRpcUser->text().toStdString()};
+    const std::string rpc_password{datumRpcPassword->text().toStdString()};
+    const int64_t requested_difficulty{datumDifficulty->value()};
+
+    if (HasConfigUnsafeWhitespace(listen) || HasConfigUnsafeWhitespace(user) || HasConfigUnsafeWhitespace(password) ||
+        HasConfigUnsafeWhitespace(address) || HasConfigUnsafeWhitespace(coinbase_tag) || HasConfigUnsafeWhitespace(rpc_url) ||
+        HasConfigUnsafeWhitespace(rpc_user) || HasConfigUnsafeWhitespace(rpc_password)) {
+        QMessageBox::critical(this, tr("Invalid DATUM setting"), tr("DATUM values cannot contain leading or trailing whitespace or newlines."));
+        return false;
+    }
+    if (!LookupHost(listen, /*fAllowLookup=*/false)) {
+        QMessageBox::critical(this, tr("Invalid DATUM setting"), tr("The Stratum listen address must be a numeric IPv4 or IPv6 address."));
+        return false;
+    }
+#ifdef USE_UPNP
+    if (enabled && datumUpnp->isChecked()) {
+        const auto listen_addr{LookupHost(listen, /*fAllowLookup=*/false)};
+        if (!listen_addr || !listen_addr->IsIPv4() || (listen_addr->IsLocal() && !listen_addr->IsBindAny())) {
+            QMessageBox::critical(this, tr("Invalid DATUM setting"), tr("UPnP requires a non-loopback IPv4 listen address; 0.0.0.0 is allowed."));
+            return false;
+        }
+    }
+#else
+    if (enabled && datumUpnp->isChecked()) {
+        QMessageBox::critical(this, tr("Invalid DATUM setting"), tr("This build does not include UPnP support."));
+        return false;
+    }
+#endif
+    if (datumMaxPerIp->value() > datumMaxClients->value()) {
+        QMessageBox::critical(this, tr("Invalid DATUM setting"), tr("Maximum clients per IP cannot exceed maximum Stratum clients."));
+        return false;
+    }
+    if (coinbase_tag.size() > 63) {
+        QMessageBox::critical(this, tr("Invalid DATUM setting"), tr("The coinbase tag must be at most 63 bytes."));
+        return false;
+    }
+    if (enabled && datumAuth->isChecked() && (user.empty() || password.empty())) {
+        QMessageBox::critical(this, tr("Invalid DATUM setting"), tr("Authentication requires both a Stratum username and password."));
+        return false;
+    }
+    if (user.size() > 191 || std::any_of(user.begin(), user.end(), [](const unsigned char c) { return c < 0x20 || c == 0x7f; })) {
+        QMessageBox::critical(this, tr("Invalid DATUM setting"), tr("The Stratum username must be at most 191 bytes and contain no control characters."));
+        return false;
+    }
+    if (enabled && (address.empty() || !IsValidDestinationString(address, Params()))) {
+        QMessageBox::critical(this, tr("Invalid DATUM setting"), tr("A valid Purity payout address is required when DATUM is enabled."));
+        return false;
+    }
+    if (!rpc_url.empty() && !IsLoopbackDatumRpcUrl(rpc_url)) {
+        QMessageBox::critical(this, tr("Invalid DATUM setting"), tr("The DATUM RPC URL must be a loopback HTTP URL without embedded credentials."));
+        return false;
+    }
+    if (rpc_user.empty() != rpc_password.empty()) {
+        QMessageBox::critical(this, tr("Invalid DATUM setting"), tr("DATUM RPC username and password must be configured together."));
+        return false;
+    }
+
+    const mining::DatumStatusSnapshot datum_status{mining::GetDatumStatusSnapshot(/*include_miners=*/false)};
+    const bool datum_running{datum_status.running};
+    if (datum_running && datum_status.share_difficulty != static_cast<uint64_t>(requested_difficulty)) {
+        std::string error;
+        if (!mining::SetDatumDifficulty(requested_difficulty, error)) {
+            QMessageBox::critical(this, tr("DATUM share difficulty"), QString::fromStdString(error));
+            return false;
+        }
+    }
+    if (datum_running && enabled && (address != datum_status.payout_address || coinbase_tag != datum_status.coinbase_tag)) {
+        std::string error;
+        if (!mining::SetDatumPayoutAndCoinbase(address, coinbase_tag, error)) {
+            QMessageBox::critical(this, tr("DATUM payout settings"), QString::fromStdString(error));
+            return false;
+        }
+    }
+
+    std::map<std::string, std::string> updates{
+        {"datum", enabled ? "1" : "0"},
+        {"datumlisten", listen},
+        {"datumport", std::to_string(datumPort->value())},
+        {"datumupnp", datumUpnp->isChecked() ? "1" : "0"},
+        {"datumauth", datumAuth->isChecked() ? "1" : "0"},
+        {"datumuser", user},
+        {"datumpassword", password},
+        {"datummaxclients", std::to_string(datumMaxClients->value())},
+        {"datummaxperip", std::to_string(datumMaxPerIp->value())},
+        {"datumaddress", address},
+        {"datumdiff", std::to_string(requested_difficulty)},
+        {"datumcoinbasetag", coinbase_tag},
+    };
+
+    // Empty optional RPC values intentionally leave an existing override alone;
+    // the node's RPC cookie remains the safe default when no explicit pair is set.
+    if (!rpc_url.empty()) updates.emplace("datumrpcurl", rpc_url);
+    if (!rpc_user.empty()) {
+        updates.emplace("datumrpcuser", rpc_user);
+        updates.emplace("datumrpcpassword", rpc_password);
+    }
+
+    // DATUM credentials are kept out of settings.json, which is also used by
+    // older Core versions. They remain in the read/write config file instead.
+    gArgs.ModifyRWConfigFile(updates, /*also_settings_json=*/false);
+
+    const bool datum_requires_restart =
+        enabled != gArgs.GetBoolArg("-datum", false) ||
+        listen != gArgs.GetArg("-datumlisten", "127.0.0.1") ||
+        datumPort->value() != gArgs.GetIntArg("-datumport", 23334) ||
+        datumUpnp->isChecked() != gArgs.GetBoolArg("-datumupnp", false) ||
+        datumAuth->isChecked() != gArgs.GetBoolArg("-datumauth", false) ||
+        user != gArgs.GetArg("-datumuser", "") ||
+        password != gArgs.GetArg("-datumpassword", "") ||
+        datumMaxClients->value() != gArgs.GetIntArg("-datummaxclients", 32) ||
+        datumMaxPerIp->value() != gArgs.GetIntArg("-datummaxperip", 4) ||
+        rpc_url != gArgs.GetArg("-datumrpcurl", "") ||
+        rpc_user != gArgs.GetArg("-datumrpcuser", "") ||
+        rpc_password != gArgs.GetArg("-datumrpcpassword", "");
+    if (model && datum_requires_restart) model->setRestartRequired(true);
+    return true;
+}
+#endif // ENABLE_DATUM
+
 void OptionsDialog::on_okButton_clicked()
 {
     for (int i = 0; i < ui->tabWidget->count(); ++i) {
@@ -1180,6 +1488,10 @@ void OptionsDialog::on_okButton_clicked()
     } else {
         model->setData(model->index(OptionsModel::dustdynamic, 0), "off");
     }
+
+#ifdef ENABLE_DATUM
+    if (!saveDatumSettings()) return;
+#endif
 
     mapper->submit();
     accept();

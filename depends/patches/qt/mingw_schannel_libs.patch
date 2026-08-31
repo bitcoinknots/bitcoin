@@ -1,0 +1,11 @@
+Use the lowercase MinGW import-library names when Qt exports Schannel
+dependencies for CMake. The Windows library names are case-insensitive, but
+the MinGW import-library filenames on the Linux build host are lowercase.
+
+diff --git a/qtbase/src/network/ssl/ssl.pri b/qtbase/src/network/ssl/ssl.pri
+--- a/qtbase/src/network/ssl/ssl.pri
++++ b/qtbase/src/network/ssl/ssl.pri
+@@ -65 +65,2 @@ qtConfig(schannel) {
+-        LIBS_PRIVATE += "-lSecur32" "-lCrypt32" "-lbcrypt" "-lncrypt"
++        win32-g++: LIBS_PRIVATE += "-lsecur32" "-lcrypt32" "-lbcrypt" "-lncrypt"
++        else: LIBS_PRIVATE += "-lSecur32" "-lCrypt32" "-lbcrypt" "-lncrypt"

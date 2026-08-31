@@ -36,6 +36,15 @@ set(COPYRIGHT_YEAR "2026")
 
 set(CLIENT_VERSION_SUFFIX ".purity20260823")
 
+# This option must be known before project() so vcpkg can resolve the optional
+# manifest feature before the first language is enabled.
+option(BUILD_DATUM "Build embedded DATUM/Stratum mining support." ON)
+if(BUILD_DATUM)
+  list(APPEND VCPKG_MANIFEST_FEATURES datum)
+  list(REMOVE_DUPLICATES VCPKG_MANIFEST_FEATURES)
+  set(VCPKG_MANIFEST_FEATURES "${VCPKG_MANIFEST_FEATURES}" CACHE STRING "vcpkg manifest features" FORCE)
+endif()
+
 # During the enabling of the CXX and CXXOBJ languages, we modify
 # CMake's compiler/linker invocation strings by appending the content
 # of the user-defined `APPEND_*` variables, which allows overriding
@@ -102,6 +111,13 @@ set(WITH_QT_VERSION "5" CACHE STRING "Choose 5 or 6.")
 set_property(CACHE WITH_QT_VERSION PROPERTY STRINGS "5" "6")
 option(BUILD_CLI "Build bitcoin-cli executable." ON)
 option(BUILD_BITCOINCONSENSUS_LIB "Build libbitcoinconsensus library." OFF)
+
+if(BUILD_DATUM)
+  set(ENABLE_DATUM ON)
+  enable_language(C)
+  set(CMAKE_C_STANDARD 11)
+  set(CMAKE_C_STANDARD_REQUIRED ON)
+endif()
 
 option(BUILD_TESTS "Build test_bitcoin executable." ON)
 option(BUILD_TX "Build bitcoin-tx executable." ${BUILD_TESTS})
@@ -792,6 +808,7 @@ message("  bitcoin-chainstate (experimental) ... ${BUILD_UTIL_CHAINSTATE}")
 message("  libbitcoinkernel (experimental) ..... ${BUILD_KERNEL_LIB}")
 message("Optional features:")
 message("  wallet support ...................... ${ENABLE_WALLET}")
+message("  embedded DATUM/Stratum .............. ${BUILD_DATUM}")
 if(ENABLE_WALLET)
   message("   - descriptor wallets (SQLite) ...... ${WITH_SQLITE}")
   message("   - legacy wallets (Berkeley DB) ..... ${WITH_BDB}")

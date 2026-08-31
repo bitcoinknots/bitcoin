@@ -10,6 +10,9 @@
 #include <qt/blockview.h>
 #include <qt/clientmodel.h>
 #include <qt/createwalletdialog.h>
+#ifdef ENABLE_DATUM
+#include <qt/datumwindow.h>
+#endif
 #include <qt/guiconstants.h>
 #include <qt/guiutil.h>
 #include <qt/mempoolstats.h>
@@ -362,6 +365,12 @@ void BitcoinGUI::createActions()
     showMempoolStatsAction->setStatusTip(tr("Mempool Statistics"));
     // initially disable the mempool stats menu item
     showMempoolStatsAction->setEnabled(false);
+#ifdef ENABLE_DATUM
+    m_show_datum_action = new QAction(tr("&DATUM"), this);
+    m_show_datum_action->setStatusTip(tr("Open embedded DATUM mining status"));
+    m_show_datum_action->setEnabled(false);
+    m_show_datum_action->setObjectName("showDatumAction");
+#endif
 
     usedSendingAddressesAction = new QAction(tr("&Sending addresses"), this);
     usedSendingAddressesAction->setStatusTip(tr("Show the list of used sending addresses and labels"));
@@ -414,6 +423,9 @@ void BitcoinGUI::createActions()
     connect(m_show_netwatch_action, &QAction::triggered, this, &BitcoinGUI::showNetWatch);
     connect(openRPCConsoleAction, &QAction::triggered, this, &BitcoinGUI::showDebugWindow);
     connect(showMempoolStatsAction, &QAction::triggered, this, &BitcoinGUI::showMempoolStatsWindow);
+#ifdef ENABLE_DATUM
+    connect(m_show_datum_action, &QAction::triggered, this, &BitcoinGUI::showDatumWindow);
+#endif
 
     // prevents an open debug window from becoming stuck/unusable on client shutdown
     connect(quitAction, &QAction::triggered, rpcConsole, &QWidget::hide);
@@ -614,6 +626,9 @@ void BitcoinGUI::createMenuBar()
     window_menu->addSeparator();
     window_menu->addAction(m_show_netwatch_action);
     window_menu->addAction(showMempoolStatsAction);
+#ifdef ENABLE_DATUM
+    window_menu->addAction(m_show_datum_action);
+#endif
 
     auto show_blockview_action = new QAction(tr("Block &Visualizer"), this);
     window_menu->addAction(show_blockview_action);
@@ -743,6 +758,9 @@ void BitcoinGUI::setClientModel(ClientModel *_clientModel, interfaces::BlockAndH
         if (NetWatch) {
             NetWatch->setClientModel(nullptr);
         }
+#ifdef ENABLE_DATUM
+        if (m_datum_window) m_datum_window->hide();
+#endif
         rpcConsole->setClientModel(nullptr);
 #ifdef ENABLE_WALLET
         if (walletFrame)
@@ -1043,6 +1061,14 @@ void BitcoinGUI::showMempoolStatsWindow()
     mempoolStats->raise();
     mempoolStats->activateWindow();
 }
+
+#ifdef ENABLE_DATUM
+void BitcoinGUI::showDatumWindow()
+{
+    if (!m_datum_window) m_datum_window = new DatumWindow(this);
+    GUIUtil::bringToFront(m_datum_window);
+}
+#endif
 
 #ifdef ENABLE_WALLET
 void BitcoinGUI::openClicked()
@@ -1459,6 +1485,9 @@ void BitcoinGUI::showEvent(QShowEvent *event)
     // enable the debug window when the main window shows up
     openRPCConsoleAction->setEnabled(true);
     showMempoolStatsAction->setEnabled(true);
+#ifdef ENABLE_DATUM
+    m_show_datum_action->setEnabled(true);
+#endif
     aboutAction->setEnabled(true);
     optionsAction->setEnabled(true);
 }

@@ -42,6 +42,7 @@ NO_WALLET ?=
 NO_ZMQ ?=
 NO_UPNP ?=
 NO_USDT ?=
+NO_DATUM ?=
 MULTIPROCESS ?=
 LTO ?=
 NO_HARDEN ?=
@@ -170,8 +171,9 @@ upnp_packages_$(NO_UPNP) = $(upnp_packages)
 zmq_packages_$(NO_ZMQ) = $(zmq_packages)
 multiprocess_packages_$(MULTIPROCESS) = $(multiprocess_packages)
 usdt_packages_$(NO_USDT) = $(usdt_$(host_os)_packages)
+datum_packages_$(NO_DATUM) = $(datum_packages)
 
-packages += $($(host_arch)_$(host_os)_packages) $($(host_os)_packages) $(boost_packages_) $(libevent_packages_) $(qt_packages_) $(wallet_packages_) $(upnp_packages_) $(usdt_packages_)
+packages += $($(host_arch)_$(host_os)_packages) $($(host_os)_packages) $(boost_packages_) $(libevent_packages_) $(qt_packages_) $(wallet_packages_) $(upnp_packages_) $(usdt_packages_) $(datum_packages_)
 native_packages += $($(host_arch)_$(host_os)_native_packages) $($(host_os)_native_packages)
 
 ifneq ($(zmq_packages_),)
@@ -241,6 +243,7 @@ $(host_prefix)/toolchain.cmake : toolchain.cmake.in $(host_prefix)/.stamp_$(fina
             -e 's|@sqlite_packages@|$(sqlite_packages_)|' \
             -e 's|@upnp_packages@|$(upnp_packages_)|' \
             -e 's|@usdt_packages@|$(usdt_packages_)|' \
+            -e 's|@datum_packages@|$(datum_packages_)|' \
             -e 's|@no_harden@|$(NO_HARDEN)|' \
             -e 's|@multiprocess@|$(MULTIPROCESS)|' \
             $< > $@

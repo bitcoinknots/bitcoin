@@ -1053,6 +1053,10 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         """Checks whether the USDT tracepoints were compiled."""
         return self.config["components"].getboolean("ENABLE_USDT_TRACEPOINTS")
 
+    def is_datum_compiled(self):
+        """Checks whether embedded DATUM support was compiled."""
+        return self.config["components"].getboolean("ENABLE_DATUM", fallback=False)
+
     def is_sqlite_compiled(self):
         """Checks whether the wallet module was compiled with Sqlite support."""
         return self.config["components"].getboolean("USE_SQLITE")

@@ -51,6 +51,10 @@ Build using:
     cmake -B build --toolchain depends/x86_64-w64-mingw32/toolchain.cmake
     cmake --build build     # Append "-j N" for N parallel jobs.
 
+The depends build includes MiniUPnPc and enables UPnP unless it is configured
+with `NO_UPNP=1`. If configuring without the depends toolchain, pass
+`-DWITH_MINIUPNPC=ON` and provide a MiniUPnPc installation.
+
 ## Depends system
 
 For further documentation on the depends system see [README.md](../depends/README.md) in the depends directory.

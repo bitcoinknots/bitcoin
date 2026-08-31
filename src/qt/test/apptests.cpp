@@ -97,6 +97,16 @@ void AppTests::appTests()
 void AppTests::guiTests(BitcoinGUI* window)
 {
     HandleCallback callback{"guiTests", *this};
+#ifdef ENABLE_DATUM
+    QAction* datum_action = window->findChild<QAction*>("showDatumAction");
+    QVERIFY(datum_action);
+    datum_action->activate(QAction::Trigger);
+    QWidget* datum_window = window->findChild<QWidget*>("datumWindow");
+    QVERIFY(datum_window);
+    QVERIFY(datum_window->isVisible());
+    datum_action->activate(QAction::Trigger);
+    QCOMPARE(window->findChildren<QWidget*>("datumWindow").size(), 1);
+#endif
     connect(window, &BitcoinGUI::consoleShown, this, &AppTests::consoleTests);
     expectCallback("consoleTests");
     QAction* action = window->findChild<QAction*>("openRPCConsoleAction");

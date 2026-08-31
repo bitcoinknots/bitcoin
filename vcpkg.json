@@ -21,6 +21,14 @@
         "berkeleydb"
       ]
     },
+    "datum": {
+      "description": "Build embedded DATUM/Stratum solo mining support",
+      "dependencies": [
+        "curl",
+        "jansson",
+        "libsodium"
+      ]
+    },
     "miniupnpc": {
       "description": "Enable UPnP",
       "dependencies": [

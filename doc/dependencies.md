@@ -42,5 +42,8 @@ Bitcoin Core requires one of the following compilers.
 | [systemtap](../depends/packages/systemtap.mk) ([tracing](tracing.md)) | [link](https://sourceware.org/systemtap/) | [4.8](https://github.com/bitcoin/bitcoin/pull/26945)| N/A | No |
 | [capnproto](../depends/packages/capnp.mk) ([multiprocess](multiprocess.md)) | [link](https://capnproto.org/) | [1.2.0](https://github.com/bitcoin/bitcoin/pull/32760)| [0.7.0](https://github.com/bitcoin-core/libmultiprocess/pull/88) | No |
 | [libmultiprocess](../depends/packages/libmultiprocess.mk) ([multiprocess](multiprocess.md)) | [link](https://github.com/bitcoin-core/libmultiprocess) | [5.0](https://github.com/bitcoin/bitcoin/pull/31945)| [v5.0-pre1](https://github.com/bitcoin/bitcoin/pull/31740)* | No |
+| [curl](../depends/packages/curl.mk) (embedded DATUM) | [link](https://curl.se/download.html) | 8.11.1 | N/A | No |
+| [jansson](../depends/packages/jansson.mk) (embedded DATUM) | [link](https://github.com/akheron/jansson/releases) | 2.14.1 | N/A | No |
+| [libsodium](../depends/packages/libsodium.mk) (embedded DATUM) | [link](https://download.libsodium.org/libsodium/releases/) | 1.0.20 | N/A | No |
 
 \* Libmultiprocess 5.x versions should be compatible, but 6.0 and later are not due to bitcoin-core/libmultiprocess#160.
