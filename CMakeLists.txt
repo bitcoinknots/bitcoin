@@ -31,7 +31,7 @@ set(CLIENT_VERSION_MAJOR 1)
 set(CLIENT_VERSION_MINOR 0)
 set(CLIENT_VERSION_BUILD 0)
 set(CLIENT_VERSION_RC 1)
-set(CLIENT_VERSION_IS_RELEASE "false")
+set(CLIENT_VERSION_IS_RELEASE "true")
 set(COPYRIGHT_YEAR "2026")
 
 # Upstream baseline (see doc/VERSION.md). Informational only; does not determine the
