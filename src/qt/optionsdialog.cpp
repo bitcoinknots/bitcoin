@@ -16,6 +16,7 @@
 
 #ifdef ENABLE_DATUM
 #include <mining/datum_bridge.h>
+#include <qt/datumcoinbasetag.h>
 #include <univalue.h>
 #endif
 
@@ -753,9 +754,8 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     datumForm->addRow(tr("Share difficulty:"), datumDifficulty);
     FixTabOrder(datumDifficulty);
 
-    datumCoinbaseTag = new QLineEdit(tabDatum);
-    datumCoinbaseTag->setToolTip(tr("Optional operator-controlled coinbase tag, up to 63 bytes."));
-    datumForm->addRow(tr("Coinbase tag:"), datumCoinbaseTag);
+    QWidget* const datumCoinbaseTagRow = DatumCoinbaseTagUtil::CreateInputRow(tabDatum, &datumCoinbaseTag);
+    datumForm->addRow(tr("Coinbase tag:"), datumCoinbaseTagRow);
     FixTabOrder(datumCoinbaseTag);
 
     datumRpcUrl = new QLineEdit(tabDatum);
@@ -787,7 +787,7 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
     const UniValue datum_info{mining::GetDatumInfo()};
     const bool datum_running{datum_info.exists("running") && datum_info["running"].get_bool()};
     datumDifficulty->setValue(datum_running ? datum_info["share_difficulty"].getInt<int>() : gArgs.GetIntArg("-datumdiff", 65536));
-    datumCoinbaseTag->setText(QString::fromStdString(gArgs.GetArg("-datumcoinbasetag", "Bitcoin Purity")));
+    datumCoinbaseTag->setText(QString::fromStdString(gArgs.GetArg("-datumcoinbasetag", std::string{mining::DEFAULT_DATUM_COINBASE_TAG})));
     datumRpcUrl->setText(QString::fromStdString(gArgs.GetArg("-datumrpcurl", "")));
     datumRpcUser->setText(QString::fromStdString(gArgs.GetArg("-datumrpcuser", "")));
     datumRpcPassword->setText(QString::fromStdString(gArgs.GetArg("-datumrpcpassword", "")));
@@ -806,7 +806,7 @@ OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet)
         datumMaxPerIp->setEnabled(enabled);
         datumAddress->setEnabled(enabled);
         datumDifficulty->setEnabled(enabled);
-        datumCoinbaseTag->setEnabled(enabled);
+        if (QWidget* const row = datumCoinbaseTag->parentWidget()) row->setEnabled(enabled);
         datumRpcUrl->setEnabled(enabled);
         datumRpcUser->setEnabled(enabled);
         datumRpcPassword->setEnabled(enabled);

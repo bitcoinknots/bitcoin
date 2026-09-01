@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 class ArgsManager;
@@ -16,6 +17,8 @@ struct NodeContext;
 }
 
 namespace mining {
+
+inline constexpr std::string_view DEFAULT_DATUM_COINBASE_TAG{"Bitcoin Purity"};
 
 struct DatumMinerStatus {
     std::string worker;
@@ -90,6 +93,7 @@ struct DatumStatusSnapshot {
 };
 
 void SetupDatumArgs(ArgsManager& argsman);
+bool IsUnsetOrDefaultDatumCoinbaseTag(const ArgsManager& args);
 bool ValidateDatumOptions(const ArgsManager& args, bilingual_str& error);
 bool StartDatum(node::NodeContext& node, bilingual_str& error);
 void InterruptDatum();

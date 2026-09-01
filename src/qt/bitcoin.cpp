@@ -33,6 +33,9 @@
 #include <qt/splashscreen.h>
 #include <qt/utilitydialog.h>
 #include <qt/winshutdownmonitor.h>
+#ifdef ENABLE_DATUM
+#include <qt/datumcoinbasetag.h>
+#endif
 #include <stats/stats.h>
 #include <uint256.h>
 #include <util/exception.h>
@@ -426,6 +429,12 @@ void BitcoinApplication::initializeResult(bool success, interfaces::BlockAndHead
             window->showMinimized();
         }
         Q_EMIT windowShown(window);
+
+#ifdef ENABLE_DATUM
+        QTimer::singleShot(0, window, [this] {
+            DatumCoinbaseTagUtil::MaybePromptOnStartup(window);
+        });
+#endif
 
 #ifdef ENABLE_WALLET
         // Now that initialization/startup is done, process any command-line

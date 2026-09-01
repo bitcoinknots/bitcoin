@@ -377,10 +377,17 @@ void SetupDatumArgs(ArgsManager& argsman)
     argsman.AddArg("-datummaxperip=<n>", "Maximum embedded Stratum clients per IP (default: 4)", ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-datumaddress=<address>", "Fixed operator-controlled Purity payout address", ArgsManager::ALLOW_ANY | ArgsManager::NETWORK_ONLY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-datumdiff=<n>", "Fixed Stratum share difficulty (default: 65536)", ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
-    argsman.AddArg("-datumcoinbasetag=<tag>", "Embedded DATUM coinbase tag (default: Bitcoin Purity)", ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
+    argsman.AddArg("-datumcoinbasetag=<tag>", strprintf("Embedded DATUM coinbase tag (default: %s)", DEFAULT_DATUM_COINBASE_TAG), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-datumrpcuser=<user>", "Username for embedded DATUM localhost RPC", ArgsManager::ALLOW_ANY | ArgsManager::SENSITIVE, OptionsCategory::RPC);
     argsman.AddArg("-datumrpcpassword=<password>", "Password for embedded DATUM localhost RPC", ArgsManager::ALLOW_ANY | ArgsManager::SENSITIVE, OptionsCategory::RPC);
     argsman.AddArg("-datumrpcurl=<url>", "Advanced loopback HTTP RPC URL override", ArgsManager::ALLOW_ANY | ArgsManager::NETWORK_ONLY, OptionsCategory::RPC);
+}
+
+bool IsUnsetOrDefaultDatumCoinbaseTag(const ArgsManager& args)
+{
+    if (!args.IsArgSet("-datumcoinbasetag")) return true;
+    const std::string tag{args.GetArg("-datumcoinbasetag", std::string{DEFAULT_DATUM_COINBASE_TAG})};
+    return tag.empty() || tag == DEFAULT_DATUM_COINBASE_TAG;
 }
 
 bool ValidateDatumOptions(const ArgsManager& args, bilingual_str& error)
@@ -432,7 +439,7 @@ bool ValidateDatumOptions(const ArgsManager& args, bilingual_str& error)
         error = Untranslated("-datumaddress is missing or invalid for the active Purity network");
         return false;
     }
-    if (args.GetArg("-datumcoinbasetag", "Bitcoin Purity").size() > 63) {
+    if (args.GetArg("-datumcoinbasetag", std::string{DEFAULT_DATUM_COINBASE_TAG}).size() > 63) {
         error = Untranslated("-datumcoinbasetag must be at most 63 bytes");
         return false;
     }
@@ -470,7 +477,7 @@ bool StartDatum(node::NodeContext& node, bilingual_str& error)
     const std::string listen{args.GetArg("-datumlisten", "127.0.0.1")};
     const std::string auth_user{args.GetArg("-datumuser", "")};
     const std::string auth_password{args.GetArg("-datumpassword", "")};
-    const std::string coinbase_tag{args.GetArg("-datumcoinbasetag", "Bitcoin Purity")};
+    const std::string coinbase_tag{args.GetArg("-datumcoinbasetag", std::string{DEFAULT_DATUM_COINBASE_TAG})};
     const bool datum_upnp{args.GetBoolArg("-datumupnp", DEFAULT_DATUM_UPNP)};
 
     datum_embedded_config config{
@@ -589,7 +596,7 @@ DatumStatusSnapshot GetDatumStatusSnapshot(bool include_miners)
     result.payout_address = runtime.payout_address;
     result.configured_payout_address = gArgs.GetArg("-datumaddress", "");
     result.coinbase_tag = runtime.coinbase_tag;
-    result.configured_coinbase_tag = gArgs.GetArg("-datumcoinbasetag", "Bitcoin Purity");
+    result.configured_coinbase_tag = gArgs.GetArg("-datumcoinbasetag", std::string{DEFAULT_DATUM_COINBASE_TAG});
     result.session_started_ms = stats.session_started_ms;
     result.mapping_requested = runtime.upnp || mapping.requested;
     result.mapping_active = mapping.active;
