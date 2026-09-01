@@ -9,4 +9,5 @@ if [ -n "$SOURCE_DATE_EPOCH" ]; then
   find . -exec touch -d "@$SOURCE_DATE_EPOCH" {} +
 fi
 
+rm -f -- "$2"
 find . | sort | "$1" -X@ "$2"

@@ -59,6 +59,7 @@ function(add_windows_deploy_target)
       COMMAND ${CMAKE_STRIP} $<TARGET_FILE:bitcoin-wallet> -o ${PROJECT_BINARY_DIR}/release/$<TARGET_FILE_NAME:bitcoin-wallet>
       COMMAND ${CMAKE_STRIP} $<TARGET_FILE:bitcoin-util> -o ${PROJECT_BINARY_DIR}/release/$<TARGET_FILE_NAME:bitcoin-util>
       COMMAND ${CMAKE_STRIP} $<TARGET_FILE:test_bitcoin> -o ${PROJECT_BINARY_DIR}/release/$<TARGET_FILE_NAME:test_bitcoin>
+      COMMAND ${CMAKE_COMMAND} -E rm -f ${PROJECT_BINARY_DIR}/${WIN64_SETUP_EXE}
       COMMAND makensis -V2 ${PROJECT_BINARY_DIR}/bitcoin-win64-setup.nsi
       DEPENDS generate_nsis_images
       VERBATIM
@@ -103,6 +104,7 @@ function(add_macos_deploy_target)
     if(CMAKE_HOST_APPLE)
       add_custom_command(
         OUTPUT ${PROJECT_BINARY_DIR}/${osx_zip_name}.zip
+        COMMAND ${CMAKE_COMMAND} -E rm -f ${PROJECT_BINARY_DIR}/${osx_zip_name}.zip
         COMMAND ${PYTHON_COMMAND} ${PROJECT_SOURCE_DIR}/contrib/macdeploy/macdeployqtplus ${macos_app} ${osx_zip_name} -translations-dir=${QT_TRANSLATIONS_DIR} -zip
         DEPENDS ${PROJECT_BINARY_DIR}/${macos_app}/Contents/MacOS/Bitcoin-Qt
         VERBATIM
@@ -128,6 +130,7 @@ function(add_macos_deploy_target)
       add_custom_command(
         OUTPUT ${PROJECT_BINARY_DIR}/dist/${osx_zip_name}.zip
         WORKING_DIRECTORY dist
+        COMMAND ${CMAKE_COMMAND} -E rm -f ${PROJECT_BINARY_DIR}/dist/${osx_zip_name}.zip
         COMMAND ${PROJECT_SOURCE_DIR}/cmake/script/macos_zip.sh ${ZIP_COMMAND} ${osx_zip_name}.zip
         VERBATIM
       )
