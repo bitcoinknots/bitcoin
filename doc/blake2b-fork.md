@@ -2,7 +2,8 @@
 
 Status: draft, written against pull request #359 at `fee27ccfe9` and
 `v29.4.1.knots20260508rc2` on 2026-08-26; updated on 2026-08-31 for
-`v29.4.1.knots20260508rc4` and the mainnet activation. "Measured" means
+the mainnet activation and, later the same day, for
+`v29.4.1.knots20260508rc5`. "Measured" means
 observed on testnet4, mainnet, or a regtest node built from those
 sources, on the date given. Re-check anything you rely on against the
 release you actually run.
@@ -52,20 +53,21 @@ is rejected (`bad-version-blake2b`).
 
 | Network | `Blake2bHeight` | State on 2026-08-31 |
 |---|---|---|
-| mainnet | 961640 in rc4 | live since 2026-08-30 06:14 UTC |
+| mainnet | 961640 in rc4; hardcoded in rc5 | live since 2026-08-30 06:14 UTC |
 | testnet4 | 150308 in rc4 (149537 in rc2, 150027 in rc3; each cut re-forked it) | live since 2026-08-30 |
 | regtest | `-testactivationheight=blake2b@N` | for testing |
 
 Both networks are past their heights. Mainnet's fork block is 961640
 (`0000000000000050c1e5f69672f459293be14f46e5a494e7a8c8541396f18eeb`),
 and rc4 ships checkpoints at 961632 and 961639 against the transition
-being replayed differently. From the activation height, SHA-256
+being replayed differently; rc5 adds one for 961640, the fork block
+itself. From the activation height, SHA-256
 hardware is useless on this chain; blocks it mines there are invalid.
 
 ### The first BLAKE2b difficulty
 
 The first BLAKE2b block's target is the last SHA-256 target made
-easier by a factor of 2^`Blake2bTargetShift` (22 for mainnet in rc4,
+easier by a factor of 2^`Blake2bTargetShift` (22 for mainnet since rc4,
 20 by default), capped at the minimum difficulty. On mainnet that put
 block 961640 at difficulty 3.0e7, and enough hashrate turned up that
 the first day ran a few minutes per block (measured 2026-08-30). The
@@ -107,11 +109,15 @@ treat the peer that sent it as having sent a corrupt block (100
 misbehavior points, the disconnect threshold); an empty value matches
 anything and silently disables the check.
 
-#385, open at the time of writing, hardcodes the headline in the
-mainnet chain parameters, adds a checkpoint for block 961640, and
-reduces the option to a regtest-only debug setting, so a build that
-includes it needs no headline configuration and ignores a leftover
-bitcoin.conf line.
+All of that is rc4 only. rc5 ships #385: the headline is hardcoded in
+the mainnet chain parameters, block 961640 has a checkpoint, and the
+option is reduced to a regtest-only debug setting. An rc5 node needs
+no headline configuration, and a leftover bitcoin.conf line is
+recognized and ignored on mainnet (measured). The one place the option
+still does something is regtest, where it now requires
+`-testactivationheight=blake2b@<height>` and is a startup error
+without it — including when the line sits at the top level of a
+bitcoin.conf shared with a regtest node (measured).
 
 The current stable release, v29.4.0, does not know the option. On its
 command line it is fatal (`Error parsing command line arguments:
@@ -194,7 +200,7 @@ only view of a version 2 header is the raw hex
 settled in #363. `getblockhash <height>` needs the block itself, not only the
 header, so during initial sync use a hash you already have.
 
-`getdeploymentinfo` on rc4 reports the deployment as `blake2b`, with
+`getdeploymentinfo` since rc4 reports the deployment as `blake2b`, with
 `height` and `active`. #359 by itself does not report it in any RPC.
 
 Chain work keeps the same scale across the fork, so `chainwork` in
@@ -247,8 +253,8 @@ nothing. Two further things a template consumer must handle:
 - For the template at exactly the activation height — long past on
   mainnet and testnet4 — `coinbaseaux` carries `blake2b_headline` as
   hex, and the block is invalid without those bytes in its coinbase
-  scriptSig. The key is absent from every other template, and #385
-  removes it.
+  scriptSig. The key is absent from every other template, and rc5
+  (#385) removes it entirely.
 
 The template does not supply the header's height, transaction count,
 flags, extranonce or nonce fields. The pool or gateway builds those.
@@ -328,8 +334,8 @@ at 150308. That exercise found most of what is in this document.
 
 | Where | What | Matters for |
 |---|---|---|
-| #359 | the change itself; shipped in rc4, not yet merged | everything |
-| #385 | hardcoded headline and fork-block checkpoint; retires `blake2b_headline` | node config |
+| #359 | the change itself; shipped in rc4 and rc5, not yet merged | everything |
+| #385 | hardcoded headline and fork-block checkpoint; shipped in rc5, PR still open | node config |
 | #358 | activation tied to RDTS; startup warning if scheduled past RDTS expiry | startup |
 | #368 | `NODE_BLAKE2B` service bit and seed filter | peering |
 | #375 | testnet4 seed answering the fork filter | testnet4 peering |
