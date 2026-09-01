@@ -48,8 +48,9 @@ function(add_windows_deploy_target)
     #       See https://cmake.org/cmake/help/latest/cpack_gen/nsis.html
     include(GenerateSetupNsi)
     generate_setup_nsi()
+    set(WIN64_SETUP_EXE bitcoin-win64-setup-${CLIENT_VERSION_STRING}.exe)
     add_custom_command(
-      OUTPUT ${PROJECT_BINARY_DIR}/bitcoin-win64-setup.exe
+      OUTPUT ${PROJECT_BINARY_DIR}/${WIN64_SETUP_EXE}
       COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/release
       COMMAND ${CMAKE_STRIP} $<TARGET_FILE:bitcoin-qt> -o ${PROJECT_BINARY_DIR}/release/$<TARGET_FILE_NAME:bitcoin-qt>
       COMMAND ${CMAKE_STRIP} $<TARGET_FILE:bitcoind> -o ${PROJECT_BINARY_DIR}/release/$<TARGET_FILE_NAME:bitcoind>
@@ -62,7 +63,7 @@ function(add_windows_deploy_target)
       DEPENDS generate_nsis_images
       VERBATIM
     )
-    add_custom_target(deploy DEPENDS ${PROJECT_BINARY_DIR}/bitcoin-win64-setup.exe)
+    add_custom_target(deploy DEPENDS ${PROJECT_BINARY_DIR}/${WIN64_SETUP_EXE})
   endif()
 endfunction()
 
@@ -98,23 +99,24 @@ function(add_macos_deploy_target)
     )
 
     string(REPLACE " " "-" osx_volname ${CLIENT_NAME})
+    set(osx_zip_name "${osx_volname}-${CLIENT_VERSION_STRING}")
     if(CMAKE_HOST_APPLE)
       add_custom_command(
-        OUTPUT ${PROJECT_BINARY_DIR}/${osx_volname}.zip
-        COMMAND ${PYTHON_COMMAND} ${PROJECT_SOURCE_DIR}/contrib/macdeploy/macdeployqtplus ${macos_app} ${osx_volname} -translations-dir=${QT_TRANSLATIONS_DIR} -zip
+        OUTPUT ${PROJECT_BINARY_DIR}/${osx_zip_name}.zip
+        COMMAND ${PYTHON_COMMAND} ${PROJECT_SOURCE_DIR}/contrib/macdeploy/macdeployqtplus ${macos_app} ${osx_zip_name} -translations-dir=${QT_TRANSLATIONS_DIR} -zip
         DEPENDS ${PROJECT_BINARY_DIR}/${macos_app}/Contents/MacOS/Bitcoin-Qt
         VERBATIM
       )
       add_custom_target(deploydir
-        DEPENDS ${PROJECT_BINARY_DIR}/${osx_volname}.zip
+        DEPENDS ${PROJECT_BINARY_DIR}/${osx_zip_name}.zip
       )
       add_custom_target(deploy
-        DEPENDS ${PROJECT_BINARY_DIR}/${osx_volname}.zip
+        DEPENDS ${PROJECT_BINARY_DIR}/${osx_zip_name}.zip
       )
     else()
       add_custom_command(
         OUTPUT ${PROJECT_BINARY_DIR}/dist/${macos_app}/Contents/MacOS/Bitcoin-Qt
-        COMMAND OBJDUMP=${CMAKE_OBJDUMP} ${PYTHON_COMMAND} ${PROJECT_SOURCE_DIR}/contrib/macdeploy/macdeployqtplus ${macos_app} ${osx_volname} -translations-dir=${QT_TRANSLATIONS_DIR}
+        COMMAND OBJDUMP=${CMAKE_OBJDUMP} ${PYTHON_COMMAND} ${PROJECT_SOURCE_DIR}/contrib/macdeploy/macdeployqtplus ${macos_app} ${osx_zip_name} -translations-dir=${QT_TRANSLATIONS_DIR}
         DEPENDS ${PROJECT_BINARY_DIR}/${macos_app}/Contents/MacOS/Bitcoin-Qt
         VERBATIM
       )
@@ -124,13 +126,13 @@ function(add_macos_deploy_target)
 
       find_program(ZIP_COMMAND zip REQUIRED)
       add_custom_command(
-        OUTPUT ${PROJECT_BINARY_DIR}/dist/${osx_volname}.zip
+        OUTPUT ${PROJECT_BINARY_DIR}/dist/${osx_zip_name}.zip
         WORKING_DIRECTORY dist
-        COMMAND ${PROJECT_SOURCE_DIR}/cmake/script/macos_zip.sh ${ZIP_COMMAND} ${osx_volname}.zip
+        COMMAND ${PROJECT_SOURCE_DIR}/cmake/script/macos_zip.sh ${ZIP_COMMAND} ${osx_zip_name}.zip
         VERBATIM
       )
       add_custom_target(deploy
-        DEPENDS ${PROJECT_BINARY_DIR}/dist/${osx_volname}.zip
+        DEPENDS ${PROJECT_BINARY_DIR}/dist/${osx_zip_name}.zip
       )
     endif()
     add_dependencies(deploydir bitcoin-qt)

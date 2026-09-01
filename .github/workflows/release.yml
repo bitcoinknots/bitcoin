@@ -84,8 +84,8 @@ jobs:
       - name: Prepare package
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME:-manual}"
-          VERSION="${VERSION//\//-}"
+          VERSION="$(sed -n 's/^#define CLIENT_VERSION_STRING "\(.*\)"/\1/p' build/src/bitcoin-build-config.h)"
+          test -n "${VERSION}"
           PACKAGE="bitcoin-purity-${VERSION}-x86_64-linux-gnu"
 
           mkdir -p "release/${PACKAGE}/bin"
@@ -173,8 +173,8 @@ jobs:
       - name: Prepare package
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME:-manual}"
-          VERSION="${VERSION//\//-}"
+          VERSION="$(sed -n 's/^#define CLIENT_VERSION_STRING "\(.*\)"/\1/p' build/src/bitcoin-build-config.h)"
+          test -n "${VERSION}"
           PACKAGE="bitcoin-purity-${VERSION}-aarch64-linux-gnu"
 
           mkdir -p "release/${PACKAGE}/bin"
@@ -262,8 +262,8 @@ jobs:
       - name: Prepare package
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME:-manual}"
-          VERSION="${VERSION//\//-}"
+          VERSION="$(sed -n 's/^#define CLIENT_VERSION_STRING "\(.*\)"/\1/p' build/src/bitcoin-build-config.h)"
+          test -n "${VERSION}"
           PACKAGE="bitcoin-purity-${VERSION}-arm64-apple-darwin"
 
           mkdir -p "release/${PACKAGE}/bin"
@@ -353,8 +353,8 @@ jobs:
       - name: Prepare package
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME:-manual}"
-          VERSION="${VERSION//\//-}"
+          VERSION="$(sed -n 's/^#define CLIENT_VERSION_STRING "\(.*\)"/\1/p' build/src/bitcoin-build-config.h)"
+          test -n "${VERSION}"
           PACKAGE="bitcoin-purity-${VERSION}-x86_64-apple-darwin"
 
           mkdir -p "release/${PACKAGE}/bin"
@@ -479,14 +479,11 @@ jobs:
       - name: Prepare package
         shell: pwsh
         run: |
-          $version = "${env:GITHUB_REF_NAME}"
-
-          if ([string]::IsNullOrWhiteSpace($version)) {
-              $version = "manual"
+          $header = Get-Content -Raw "build\src\bitcoin-build-config.h"
+          if ($header -notmatch '#define CLIENT_VERSION_STRING "([^"]+)"') {
+              throw "Failed to read CLIENT_VERSION_STRING from bitcoin-build-config.h"
           }
-
-          $version = $version -replace '[\\/:*?"<>|]', '-'
-
+          $version = $Matches[1]
           $package = "bitcoin-purity-$version-win64"
           $target = "release\$package\bin"
 
