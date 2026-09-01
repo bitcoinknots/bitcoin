@@ -229,7 +229,7 @@ OfficialPackageTrustPolicy PackageDownloadTrustPolicy()
     if (FindDatadirOfficialPackagesConfigPath(gArgs, gArgs.GetChainType())) {
         return OfficialPackageTrustPolicy::LOCAL;
     }
-    return OfficialPackageTrustPolicy::STRICT;
+    return OfficialPackageTrustPolicy::REMOTE_SIGNED;
 }
 
 std::optional<std::vector<std::string>> ListZipEntryNames(const fs::path& archive_path, QString& error)

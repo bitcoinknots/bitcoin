@@ -41,11 +41,11 @@ BOOST_FIXTURE_TEST_SUITE(official_packages_tests, BasicTestingSetup)
 BOOST_AUTO_TEST_CASE(download_uri_policy)
 {
     BOOST_CHECK(IsOfficialDownloadUriAllowed(
-        "https://downloads.bitcoinpurity.org/mainnet/pkg.zip", OfficialPackageTrustPolicy::STRICT));
+        "https://downloads.bitcoinpurity.org/mainnet/pkg.zip", OfficialPackageTrustPolicy::REMOTE_SIGNED));
     BOOST_CHECK(!IsOfficialDownloadUriAllowed(
-        "http://downloads.bitcoinpurity.org/mainnet/pkg.zip", OfficialPackageTrustPolicy::STRICT));
+        "http://downloads.bitcoinpurity.org/mainnet/pkg.zip", OfficialPackageTrustPolicy::REMOTE_SIGNED));
     BOOST_CHECK(!IsOfficialDownloadUriAllowed(
-        "https://evil.example/mainnet/pkg.zip", OfficialPackageTrustPolicy::STRICT));
+        "https://evil.example/mainnet/pkg.zip", OfficialPackageTrustPolicy::REMOTE_SIGNED));
     BOOST_CHECK(IsOfficialDownloadUriAllowed(
         "http://localhost/pkg.zip", OfficialPackageTrustPolicy::LOCAL));
 }
@@ -137,7 +137,7 @@ BOOST_AUTO_TEST_CASE(parse_remote_manifest_requires_signature)
 })";
 
     const auto packages = ParseOfficialDataPackagesFromJson(
-        unsigned_json, "test", OfficialPackageTrustPolicy::STRICT);
+        unsigned_json, "test", OfficialPackageTrustPolicy::REMOTE_SIGNED);
     BOOST_CHECK(packages.empty());
 
     const auto local_packages = ParseOfficialDataPackagesFromJson(

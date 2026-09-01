@@ -20,13 +20,13 @@ class CPubKey;
 /**
  * Trust policy for official package manifests and download URIs.
  *
- * STRICT applies to manifests fetched from downloads.bitcoinpurity.org and
+ * REMOTE_SIGNED applies to manifests fetched from downloads.bitcoinpurity.org and
  * requires a valid detached signature plus HTTPS download URIs on an allowlist.
  * LOCAL applies to user-provided manifests (-officialpackages or datadir file)
  * and skips signature and URI host checks so developers can test offline.
  */
 enum class OfficialPackageTrustPolicy {
-    STRICT,
+    REMOTE_SIGNED,
     LOCAL,
 };
 
@@ -63,7 +63,7 @@ std::vector<OfficialDataPackage> ParseOfficialDataPackagesFromJson(
 std::optional<OfficialDataPackage> FindOfficialDataPackage(
     const std::vector<OfficialDataPackage>& packages, const std::string& id);
 
-/** Whether a download URI satisfies the trust policy (HTTPS + host allowlist for STRICT). */
+/** Whether a download URI satisfies the trust policy (HTTPS + host allowlist for REMOTE_SIGNED). */
 bool IsOfficialDownloadUriAllowed(const std::string& uri, OfficialPackageTrustPolicy trust_policy);
 
 /**

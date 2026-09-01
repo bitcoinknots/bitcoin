@@ -401,7 +401,7 @@ std::vector<OfficialDataPackage> ParseOfficialDataPackagesFromJson(
         return packages;
     }
 
-    if (trust_policy == OfficialPackageTrustPolicy::STRICT) {
+    if (trust_policy == OfficialPackageTrustPolicy::REMOTE_SIGNED) {
         const auto signing_pubkey = EmbeddedSigningPubKey();
         if (!signing_pubkey) {
             LogPrintf("Official packages config: missing embedded signing pubkey\n");
