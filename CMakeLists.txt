@@ -27,14 +27,20 @@ get_directory_property(precious_variables CACHE_VARIABLES)
 # Project / Package metadata
 #=============================
 set(CLIENT_NAME "Bitcoin Purity")
-set(CLIENT_VERSION_MAJOR 29)
-set(CLIENT_VERSION_MINOR 4)
+set(CLIENT_VERSION_MAJOR 1)
+set(CLIENT_VERSION_MINOR 0)
 set(CLIENT_VERSION_BUILD 0)
-set(CLIENT_VERSION_RC 0)
-set(CLIENT_VERSION_IS_RELEASE "true")
+set(CLIENT_VERSION_RC 1)
+set(CLIENT_VERSION_IS_RELEASE "false")
 set(COPYRIGHT_YEAR "2026")
 
-set(CLIENT_VERSION_SUFFIX ".purity20260823")
+# Upstream baseline (see doc/VERSION.md). Informational only; does not determine the
+# Bitcoin Purity release version or the P2P protocol version.
+set(UPSTREAM_KNOTS_VERSION_MAJOR 29)
+set(UPSTREAM_KNOTS_VERSION_MINOR 4)
+set(UPSTREAM_KNOTS_VERSION_BUILD 0)
+set(UPSTREAM_CORE_CONSENSUS_MAJOR 29)
+set(UPSTREAM_CORE_CONSENSUS_MINOR 4)
 
 # This option must be known before project() so vcpkg can resolve the optional
 # manifest feature before the first language is enabled.
@@ -68,7 +74,7 @@ project(BitcoinCore
   LANGUAGES NONE
 )
 
-set(CLIENT_VERSION_STRING ${PROJECT_VERSION}${CLIENT_VERSION_SUFFIX})
+set(CLIENT_VERSION_STRING ${PROJECT_VERSION})
 if(CLIENT_VERSION_RC GREATER 0)
   string(APPEND CLIENT_VERSION_STRING "rc${CLIENT_VERSION_RC}")
 endif()

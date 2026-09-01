@@ -50,54 +50,57 @@ const std::string UA_NAME("Satoshi");
 
 static const std::string CLIENT_BUILD(BUILD_DESC BUILD_SUFFIX);
 
-static std::string FormatVersion(int nVersion)
-{
-    return strprintf("%d.%d.%d", nVersion / 10000, (nVersion / 100) % 100, nVersion % 100);
-}
-
 std::string FormatFullVersion()
 {
     return CLIENT_BUILD;
 }
 
+std::string FormatUpstreamVersionInfo()
+{
+    return strprintf("Based on Bitcoin Knots %d.%d.%d\nBitcoin Core consensus baseline %d.%d\n",
+                     UPSTREAM_KNOTS_VERSION_MAJOR,
+                     UPSTREAM_KNOTS_VERSION_MINOR,
+                     UPSTREAM_KNOTS_VERSION_BUILD,
+                     UPSTREAM_CORE_CONSENSUS_MAJOR,
+                     UPSTREAM_CORE_CONSENSUS_MINOR);
+}
+
 /**
  * Format the subversion field according to BIP 14 spec (https://github.com/bitcoin/bips/blob/master/bip-0014.mediawiki)
  */
-std::string FormatSubVersion(const std::string& name, int nClientVersion, const std::vector<std::string>& comments, const bool base_name_only)
+std::string FormatSubVersion(const std::string& name, int /*nClientVersion*/, const std::vector<std::string>& comments, const bool base_name_only)
 {
     std::string comments_str;
     if (!comments.empty()) comments_str = strprintf("(%s)", Join(comments, "; "));
-    std::string ua = strprintf("/%s:%s%s/", name, FormatVersion(nClientVersion), comments_str);
+    const std::string satoshi_version = strprintf("%d.%d", UPSTREAM_CORE_CONSENSUS_MAJOR, UPSTREAM_CORE_CONSENSUS_MINOR);
+    std::string ua = strprintf("/%s:%s%s/", name, satoshi_version, comments_str);
     if (!base_name_only) {
-        static const auto ua_purity = []() -> std::string {
-            const auto pos{CLIENT_BUILD.find(".purity")};
-            if (pos == std::string::npos) {
-                return "Purity/";
-            }
-            return "Purity:" + CLIENT_BUILD.substr(pos + 7) + "/";
-        }();
-        ua += ua_purity;
+        const std::string purity_version = strprintf("%d.%d.%d", CLIENT_VERSION_MAJOR, CLIENT_VERSION_MINOR, CLIENT_VERSION_BUILD);
+        ua += strprintf("Purity:%s/", purity_version);
     }
     return ua;
 }
 
-std::string CopyrightHolders(const std::string& strPrefix)
+std::string CopyrightHolders(const bool symbol_only)
 {
-    const auto copyright_devs = strprintf(_(COPYRIGHT_HOLDERS), COPYRIGHT_HOLDERS_SUBSTITUTION).translated;
-    std::string strCopyrightHolders = strPrefix + copyright_devs;
+    const auto format_prefix = [&](int start_year) {
+        if (symbol_only) {
+            return strprintf("\xc2\xa9 %i-%i ", start_year, COPYRIGHT_YEAR);
+        }
+        return strprintf(_("Copyright (C) %i-%i "), start_year, COPYRIGHT_YEAR).translated;
+    };
 
-    // Make sure Bitcoin Core copyright is not removed by accident
-    if (copyright_devs.find("Bitcoin Core") == std::string::npos) {
-        strCopyrightHolders += "\n" + strPrefix + "The Bitcoin Core developers";
-    }
-    return strCopyrightHolders;
+    std::string result = format_prefix(2026) + "The Bitcoin Purity developers";
+    result += "\n" + format_prefix(2009) + "The Bitcoin Knots developers";
+    result += "\n" + format_prefix(2009) + "The Bitcoin Core developers";
+    return result;
 }
 
 std::string LicenseInfo()
 {
     const std::string URL_SOURCE_CODE = "<https://github.com/saltduck/bitcoinpurity>";
 
-    return CopyrightHolders(strprintf(_("Copyright (C) %i-%i"), 2009, COPYRIGHT_YEAR).translated + " ") + "\n" +
+    return CopyrightHolders(/*symbol_only=*/false) + "\n" +
            "\n" +
            strprintf(_("Please contribute if you find %s useful. "
                        "Visit %s for further information about the software."),

@@ -156,6 +156,15 @@
 /* Define to the version of this package. */
 #define CLIENT_VERSION_STRING "@CLIENT_VERSION_STRING@"
 
+/* Upstream Bitcoin Knots version (informational). */
+#define UPSTREAM_KNOTS_VERSION_MAJOR @UPSTREAM_KNOTS_VERSION_MAJOR@
+#define UPSTREAM_KNOTS_VERSION_MINOR @UPSTREAM_KNOTS_VERSION_MINOR@
+#define UPSTREAM_KNOTS_VERSION_BUILD @UPSTREAM_KNOTS_VERSION_BUILD@
+
+/* Upstream Bitcoin Core consensus baseline (informational). */
+#define UPSTREAM_CORE_CONSENSUS_MAJOR @UPSTREAM_CORE_CONSENSUS_MAJOR@
+#define UPSTREAM_CORE_CONSENSUS_MINOR @UPSTREAM_CORE_CONSENSUS_MINOR@
+
 /* Define to 1 if strerror_r returns char *. */
 #cmakedefine STRERROR_R_CHAR_P 1
 

@@ -26,6 +26,7 @@ GUI.
 
 Project documents:
 
+- [Versioning](doc/VERSION.md)
 - [Vision](doc/purity-vision.md)
 - [Consensus changes](doc/purity-consensus.md)
 - [Roadmap](doc/roadmap.md)

@@ -136,7 +136,7 @@ static bool ProcessInitCommands(ArgsManager& args)
 {
     // Process help and version before taking care about datadir
     if (HelpRequested(args) || args.GetBoolArg("-version", false)) {
-        std::string strUsage = CLIENT_NAME " daemon version " + FormatFullVersion() + "\n";
+        std::string strUsage = CLIENT_NAME " Daemon version " + FormatFullVersion() + "\n" + FormatUpstreamVersionInfo();
 
         if (args.GetBoolArg("-version", false)) {
             strUsage += FormatParagraph(LicenseInfo());

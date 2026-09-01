@@ -58,7 +58,7 @@ FUZZ_TARGET(string)
     BlockFilterType block_filter_type;
     (void)BlockFilterTypeByName(random_string_1, block_filter_type);
     (void)Capitalize(random_string_1);
-    (void)CopyrightHolders(random_string_1);
+    (void)CopyrightHolders();
     FeeEstimateMode fee_estimate_mode;
     (void)FeeModeFromString(random_string_1, fee_estimate_mode);
     const auto width{fuzzed_data_provider.ConsumeIntegralInRange<size_t>(1, 1000)};

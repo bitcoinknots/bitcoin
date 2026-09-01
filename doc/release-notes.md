@@ -1,8 +1,9 @@
-Bitcoin Purity version 29.4.0.purity20260823
-============================================
+Bitcoin Purity version 1.0.0rc1
+================================
 
-This is the first Bitcoin Purity documentation/branding cut, forked from
-Bitcoin Knots `v29.4.knots20260508`.
+This release adopts the independent versioning convention documented in
+[doc/VERSION.md](VERSION.md). It supersedes the legacy build
+`29.4.0.purity20260823`.
 
 Source and issues:
 

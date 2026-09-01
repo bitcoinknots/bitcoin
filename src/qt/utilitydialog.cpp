@@ -33,7 +33,8 @@ HelpMessageDialog::HelpMessageDialog(QWidget *parent, bool about) :
 {
     ui->setupUi(this);
 
-    QString version = QString{CLIENT_NAME} + " " + tr("version") + " " + QString::fromStdString(FormatFullVersion());
+    QString version = QString{CLIENT_NAME} + "\n" + tr("Version") + " " + QString::fromStdString(FormatFullVersion());
+    const QString upstream = QString::fromStdString(FormatUpstreamVersionInfo()).replace("\n", "<br>");
 
     if (about)
     {
@@ -50,8 +51,8 @@ HelpMessageDialog::HelpMessageDialog(QWidget *parent, bool about) :
 
         ui->aboutMessage->setTextFormat(Qt::RichText);
         ui->scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-        text = version + "\n" + QString::fromStdString(FormatParagraph(licenseInfo));
-        ui->aboutMessage->setText(version + "<br><br>" + licenseInfoHTML);
+        text = version + "\n" + QString::fromStdString(FormatUpstreamVersionInfo()) + "\n" + QString::fromStdString(FormatParagraph(licenseInfo));
+        ui->aboutMessage->setText(version + "<br>" + upstream + "<br><br>" + licenseInfoHTML);
         ui->aboutMessage->setWordWrap(true);
         ui->helpMessage->setVisible(false);
     } else {
