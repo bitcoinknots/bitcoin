@@ -537,6 +537,18 @@ if(BUILD_DAEMON OR BUILD_GUI OR BUILD_CLI OR BUILD_TESTS OR BUILD_BENCH OR BUILD
   find_package(Libevent 2.1.8 MODULE REQUIRED)
 endif()
 
+# Official-package extraction (ZIP64 inflate) lives in bitcoin_common.
+find_package(ZLIB)
+if(NOT ZLIB_FOUND)
+  message(FATAL_ERROR
+    "zlib is required to extract official data packages.\n"
+    "  Debian/Ubuntu: sudo apt install zlib1g-dev\n"
+    "  Fedora:        sudo dnf install zlib-devel\n"
+    "  Alpine:        apk add zlib-dev\n"
+    "  Or rebuild depends (packages/zlib.mk) and pass --toolchain."
+  )
+endif()
+
 include(cmake/iopriority.cmake)
 
 include(cmake/introspection.cmake)

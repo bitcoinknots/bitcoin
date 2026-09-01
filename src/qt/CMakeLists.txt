@@ -79,7 +79,7 @@ set(ICO_SPECS
   256 64 48 32 24 20 16
 )
 set(ICNS_SPECS
-  1024
+  16 32 128 256 512 1024
 )
 set(EXTRA_ICON_SPECS
   290 256
@@ -119,13 +119,45 @@ set(bitcoin_icns "${ICON_PATH}/bitcoin.icns")
 set(ICNS_SRC_FILES ${ICNS_SPECS})
 list(TRANSFORM ICNS_SRC_FILES PREPEND "${ICON_PATH}/bitcoin")
 list(TRANSFORM ICNS_SRC_FILES APPEND ".png")
-add_custom_command(
-  OUTPUT "${bitcoin_icns}"
-  COMMAND "${PNG2ICNS}" "${bitcoin_icns}" ${ICNS_SRC_FILES}
-  DEPENDS ${ICNS_SRC_FILES}
-  COMMENT "Generating ${bitcoin_icns} from individual images"
-  VERBATIM
-)
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+  # png2icns from libicns emits only ic10 for a 1024px PNG; Finder ignores that.
+  # iconutil produces a complete icns that macOS will actually display.
+  set(iconset_dir "${ICON_PATH}/bitcoin.iconset")
+  add_custom_command(
+    OUTPUT "${bitcoin_icns}"
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${iconset_dir}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${iconset_dir}"
+    COMMAND ${CMAKE_COMMAND} -E copy "${ICON_PATH}/bitcoin16.png" "${iconset_dir}/icon_16x16.png"
+    COMMAND ${CMAKE_COMMAND} -E copy "${ICON_PATH}/bitcoin32.png" "${iconset_dir}/icon_16x16@2x.png"
+    COMMAND ${CMAKE_COMMAND} -E copy "${ICON_PATH}/bitcoin32.png" "${iconset_dir}/icon_32x32.png"
+    COMMAND ${CMAKE_COMMAND} -E copy "${ICON_PATH}/bitcoin64.png" "${iconset_dir}/icon_32x32@2x.png"
+    COMMAND ${CMAKE_COMMAND} -E copy "${ICON_PATH}/bitcoin128.png" "${iconset_dir}/icon_128x128.png"
+    COMMAND ${CMAKE_COMMAND} -E copy "${ICON_PATH}/bitcoin256.png" "${iconset_dir}/icon_128x128@2x.png"
+    COMMAND ${CMAKE_COMMAND} -E copy "${ICON_PATH}/bitcoin256.png" "${iconset_dir}/icon_256x256.png"
+    COMMAND ${CMAKE_COMMAND} -E copy "${ICON_PATH}/bitcoin512.png" "${iconset_dir}/icon_256x256@2x.png"
+    COMMAND ${CMAKE_COMMAND} -E copy "${ICON_PATH}/bitcoin512.png" "${iconset_dir}/icon_512x512.png"
+    COMMAND ${CMAKE_COMMAND} -E copy "${ICON_PATH}/bitcoin1024.png" "${iconset_dir}/icon_512x512@2x.png"
+    COMMAND iconutil -c icns -o "${bitcoin_icns}" "${iconset_dir}"
+    DEPENDS
+      "${ICON_PATH}/bitcoin16.png"
+      "${ICON_PATH}/bitcoin32.png"
+      "${ICON_PATH}/bitcoin64.png"
+      "${ICON_PATH}/bitcoin128.png"
+      "${ICON_PATH}/bitcoin256.png"
+      "${ICON_PATH}/bitcoin512.png"
+      "${ICON_PATH}/bitcoin1024.png"
+    COMMENT "Generating ${bitcoin_icns} with iconutil"
+    VERBATIM
+  )
+else()
+  add_custom_command(
+    OUTPUT "${bitcoin_icns}"
+    COMMAND "${PNG2ICNS}" "${bitcoin_icns}" ${ICNS_SRC_FILES}
+    DEPENDS ${ICNS_SRC_FILES}
+    COMMENT "Generating ${bitcoin_icns} from individual images"
+    VERBATIM
+  )
+endif()
 add_custom_target(generate_icns DEPENDS "${bitcoin_icns}")
 
 set(bitcoin_ico "${ICON_PATH}/bitcoin.ico")

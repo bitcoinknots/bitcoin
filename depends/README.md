@@ -102,6 +102,9 @@ For linux S390X cross compilation:
 
 ### Dependency Options
 
+zlib is always built (required to extract official data packages). There is no
+`NO_ZLIB` option.
+
 The following can be set when running make: `make FOO=bar`
 
 - `SOURCES_PATH`: Downloaded sources will be placed here

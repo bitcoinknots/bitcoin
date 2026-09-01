@@ -67,8 +67,11 @@ std::optional<OfficialDataPackage> FindOfficialDataPackage(
 bool IsOfficialDownloadUriAllowed(const std::string& uri, OfficialPackageTrustPolicy trust_policy);
 
 /**
- * Whether snapshot_height/base_blockhash match a built-in assumeutxo entry or
- * consensus checkpoint for this chain.
+ * Whether a package snapshot may be offered for this chain.
+ *
+ * If snapshot_height is already an assumeutxo or checkpoint pin, the hash must
+ * match. Otherwise any post-activation height is accepted so signed remote
+ * manifests can publish new packages without a client release.
  */
 bool IsOfficialSnapshotTrusted(
     const CChainParams& params, int snapshot_height, const uint256& base_blockhash);

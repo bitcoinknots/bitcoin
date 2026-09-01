@@ -42,7 +42,7 @@ jobs:
             ninja-build \
             pkgconf \
             python3 \
-            libevent-dev \
+            libevent-dev zlib1g-dev \
             libcurl4-openssl-dev \
             libjansson-dev \
             libsodium-dev \
@@ -131,7 +131,7 @@ jobs:
             ninja-build \
             pkgconf \
             python3 \
-            libevent-dev \
+            libevent-dev zlib1g-dev \
             libcurl4-openssl-dev \
             libjansson-dev \
             libsodium-dev \

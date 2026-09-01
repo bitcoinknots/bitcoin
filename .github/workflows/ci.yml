@@ -31,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake python3 libevent-dev libboost-dev libcurl4-openssl-dev libjansson-dev libsodium-dev
+          sudo apt-get install -y build-essential cmake python3 libevent-dev zlib1g-dev libboost-dev libcurl4-openssl-dev libjansson-dev libsodium-dev
       - name: Build with DATUM enabled
         run: |
           cmake -S . -B build-datum-on -DBUILD_DATUM=ON -DBUILD_TESTS=OFF -DBUILD_GUI=OFF -DENABLE_WALLET=OFF -DWITH_ZMQ=OFF -DWITH_USDT=OFF
@@ -107,7 +107,7 @@ jobs:
           echo "TEST_BASE=$(git rev-list -n$((${{ env.MAX_COUNT }} + 1)) --reverse HEAD $EXCLUDE_MERGE_BASE_ANCESTORS | head -1)" >> "$GITHUB_ENV"
       - run: |
           sudo apt-get update
-          sudo apt-get install clang ccache build-essential cmake pkgconf python3-zmq libevent-dev libcurl4-openssl-dev libjansson-dev libsodium-dev libboost-dev libsqlite3-dev libdb++-dev systemtap-sdt-dev libminiupnpc-dev libzmq3-dev qtbase5-dev qttools5-dev qttools5-dev-tools qtwayland5 libqrencode-dev librsvg2-bin imagemagick -y
+          sudo apt-get install clang ccache build-essential cmake pkgconf python3-zmq libevent-dev zlib1g-dev libcurl4-openssl-dev libjansson-dev libsodium-dev libboost-dev libsqlite3-dev libdb++-dev systemtap-sdt-dev libminiupnpc-dev libzmq3-dev qtbase5-dev qttools5-dev qttools5-dev-tools qtwayland5 libqrencode-dev librsvg2-bin imagemagick -y
       - name: Compile and run tests
         run: |
           # Run tests on commits after the last merge commit and before the PR head commit

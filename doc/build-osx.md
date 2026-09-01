@@ -51,6 +51,9 @@ To install, run the following from your terminal:
 brew install cmake boost pkgconf libevent curl jansson libsodium
 ```
 
+zlib is required to extract official data packages. CMake uses the copy in the
+macOS SDK; Homebrew's `zlib` formula is keg-only and is not needed.
+
 ### 4. Clone Bitcoin repository
 
 `git` should already be installed by default on your system.

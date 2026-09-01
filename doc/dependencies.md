@@ -20,8 +20,15 @@ Bitcoin Core requires one of the following compilers.
 | CMake | [link](https://cmake.org/) | N/A | [3.22](https://github.com/bitcoin/bitcoin/pull/30454) | No |
 | [Boost](../depends/packages/boost.mk) | [link](https://www.boost.org/users/download/) | [1.81.0](https://github.com/bitcoin/bitcoin/pull/26557) | [1.73.0](https://github.com/bitcoin/bitcoin/pull/29066) | No |
 | [libevent](../depends/packages/libevent.mk) | [link](https://github.com/libevent/libevent/releases) | 2.1.13-stable | [2.1.8](https://github.com/bitcoin/bitcoin/pull/24681) | No |
+| [zlib](../depends/packages/zlib.mk) | [link](https://zlib.net) | [1.3.1](https://github.com/madler/zlib/releases/tag/v1.3.1) | 1.2.11 | No |
 | glibc | [link](https://www.gnu.org/software/libc/) | N/A | [2.31](https://github.com/bitcoin/bitcoin/pull/29987) | Yes |
 | Linux Kernel (if building that platform) | [link](https://www.kernel.org/) | N/A | [3.17.0](https://github.com/bitcoin/bitcoin/pull/27699) | Yes |
+
+zlib is required to inflate official datadir zip archives in-process. System
+builds need the development package: `zlib1g-dev` (Debian/Ubuntu), `zlib-devel`
+(Fedora), or the SDK/base copy on macOS and BSD. Guix/depends builds compile
+[`zlib.mk`](../depends/packages/zlib.mk). CMake fails with `Could NOT find ZLIB`
+if headers are missing.
 
 ## Optional
 

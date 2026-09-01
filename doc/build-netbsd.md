@@ -15,6 +15,9 @@ The example commands below use `pkgin`.
 pkgin install git cmake pkg-config boost-headers libevent
 ```
 
+zlib is required to extract official data packages and is provided by the
+NetBSD base system; no extra package is needed.
+
 NetBSD currently ships with an older version of `gcc` than is needed to build. You should upgrade your `gcc` and then pass this new version to the configure script.
 
 For example, grab `gcc12`:

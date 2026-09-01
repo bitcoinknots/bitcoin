@@ -26,7 +26,8 @@ Cross-compilation for Ubuntu and Windows Subsystem for Linux
 
 The steps below can be performed on Ubuntu or WSL. The depends system
 will also work on other Linux distributions, however the commands for
-installing the toolchain will be different.
+installing the toolchain will be different. depends always builds zlib for
+in-process official package extraction.
 
 See [README.md](../depends/README.md) in the depends directory for which
 dependencies to install and [dependencies.md](dependencies.md) for a complete overview.

@@ -37,7 +37,7 @@
   <string>Bitcoin-Qt</string>
 
   <key>CFBundleName</key>
-  <string>Bitcoin-Qt</string>
+  <string>@CLIENT_NAME@</string>
 
   <key>LSHasLocalizedDisplayName</key>
   <true/>

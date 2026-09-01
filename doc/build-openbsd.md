@@ -13,6 +13,9 @@ Run the following as root to install the base dependencies for building.
 pkg_add git cmake boost libevent
 ```
 
+zlib is required to extract official data packages and is provided by the
+OpenBSD base system; no extra package is needed.
+
 See [dependencies.md](dependencies.md) for a complete overview.
 
 ### 2. Clone Bitcoin Repo

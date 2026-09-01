@@ -14,6 +14,7 @@
 #include <util/fs.h>
 #include <util/fs_helpers.h>
 #include <util/strencodings.h>
+#include <util/zip.h>
 
 #include <univalue.h>
 
@@ -24,17 +25,17 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QDateTime>
+#include <QEventLoop>
+#include <QFont>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
-#include <QProcess>
-#include <QEventLoop>
-#include <QFont>
 #include <QProgressBar>
 #include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <fstream>
@@ -112,6 +113,28 @@ std::optional<UniValue> ReadPackageManifest(const fs::path& datadir)
     return json;
 }
 
+bool WritePackageManifest(const fs::path& datadir, const OfficialDataPackage& package, QString& error)
+{
+    UniValue json(UniValue::VOBJ);
+    json.pushKV("id", package.id);
+    json.pushKV("snapshot_height", package.snapshot_height);
+    json.pushKV("base_blockhash", package.base_blockhash.GetHex());
+    json.pushKV("prune_mib", package.prune_mib);
+
+    const fs::path manifest_path = datadir / "bitcoinpurity-package.json";
+    std::ofstream out{manifest_path};
+    if (!out) {
+        error = QObject::tr("Could not write the package manifest.");
+        return false;
+    }
+    out << json.write(2, 0) << '\n';
+    if (!out) {
+        error = QObject::tr("Could not write the package manifest.");
+        return false;
+    }
+    return true;
+}
+
 bool ValidateExtractedPackage(const fs::path& datadir, const OfficialDataPackage& package, QString& error)
 {
     if (!fs::exists(datadir / "blocks") || !fs::is_directory(datadir / "blocks")) {
@@ -129,12 +152,18 @@ bool ValidateExtractedPackage(const fs::path& datadir, const OfficialDataPackage
 
     const auto chainparams = CreateChainParams(gArgs, gArgs.GetChainType());
     if (!chainparams || !IsOfficialSnapshotTrusted(*chainparams, package.snapshot_height, package.base_blockhash)) {
-        error = QObject::tr("Package snapshot does not match a trusted chain checkpoint.");
+        error = QObject::tr("Package snapshot is not valid for this chain.");
         return false;
     }
 
-    const auto manifest = ReadPackageManifest(datadir);
-    if (!manifest || !manifest->isObject()) {
+    auto manifest = ReadPackageManifest(datadir);
+    if (!manifest) {
+        // Published archives may omit bitcoinpurity-package.json. The signed
+        // package catalog already supplies id / height / hash.
+        if (!WritePackageManifest(datadir, package, error)) return false;
+        return true;
+    }
+    if (!manifest->isObject()) {
         error = QObject::tr("Extracted data is missing a valid package manifest.");
         return false;
     }
@@ -182,7 +211,37 @@ std::string ArchiveFilenameFromUri(const std::string& uri, const std::string& pa
 
 bool ShouldSkipZipEntryPath(std::string_view entry)
 {
-    return entry.starts_with("__MACOSX/") || entry.starts_with("._") || entry.find("/._") != std::string_view::npos;
+    if (entry.starts_with("__MACOSX/") || entry.starts_with("._") || entry.find("/._") != std::string_view::npos) {
+        return true;
+    }
+
+    const size_t slash = entry.find_last_of('/');
+    const std::string_view base = slash == std::string_view::npos ? entry : entry.substr(slash + 1);
+    static constexpr std::string_view skip_names[] = {
+        ".DS_Store",
+        ".lock",
+        "bitcoin.conf",
+        "bitcoin_rw.conf",
+        "settings.json",
+        "debug.log",
+        "db.log",
+        "mempool.dat",
+        "banlist.json",
+        "banlist.dat",
+        "peers.dat",
+        "anchors.dat",
+        "onion_private_key",
+        "i2p_private_key",
+    };
+    for (const auto name : skip_names) {
+        if (base == name) return true;
+    }
+
+    auto is_wallets_path = [](std::string_view path) {
+        return path == "wallets" || path == "wallets/" || path.starts_with("wallets/") ||
+               path.ends_with("/wallets") || path.find("/wallets/") != std::string_view::npos;
+    };
+    return is_wallets_path(entry);
 }
 
 bool ValidateZipEntryPaths(const std::vector<std::string>& entries, QString& error)
@@ -234,32 +293,13 @@ OfficialPackageTrustPolicy PackageDownloadTrustPolicy()
 
 std::optional<std::vector<std::string>> ListZipEntryNames(const fs::path& archive_path, QString& error)
 {
-    QProcess process;
-    process.setProgram(QStringLiteral("unzip"));
-    process.setArguments({
-        QStringLiteral("-Z1"),
-        GUIUtil::PathToQString(archive_path),
-    });
-    process.start();
-    if (!process.waitForStarted(-1)) {
-        error = QObject::tr("Failed to start the archive listing tool.");
+    std::string native_error;
+    auto entries = ZipListEntries(archive_path, native_error);
+    if (!entries) {
+        error = native_error.empty()
+            ? QObject::tr("Could not read archive contents.")
+            : QString::fromStdString(native_error);
         return std::nullopt;
-    }
-    if (!process.waitForFinished(-1)) {
-        error = QObject::tr("Archive listing was interrupted.");
-        return std::nullopt;
-    }
-    if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
-        error = QObject::tr("Could not read archive contents: %1")
-            .arg(QString::fromLocal8Bit(process.readAllStandardError()));
-        return std::nullopt;
-    }
-
-    std::vector<std::string> entries;
-    const QStringList lines = QString::fromUtf8(process.readAllStandardOutput()).split('\n', Qt::SkipEmptyParts);
-    entries.reserve(lines.size());
-    for (const QString& line : lines) {
-        entries.push_back(line.trimmed().toStdString());
     }
     return entries;
 }
@@ -304,55 +344,6 @@ std::optional<int> DetectZipStripComponents(const std::vector<std::string>& entr
 
     const int slash_count = static_cast<int>(std::count(package_prefix->begin(), package_prefix->end(), '/'));
     return slash_count + 1;
-}
-
-bool RunExtractProcess(const QString& program, const QStringList& arguments, QString& error, const ProgressPumpFn& pump = {})
-{
-    QProcess process;
-    process.setProgram(program);
-    process.setArguments(arguments);
-    process.start();
-    if (!process.waitForStarted(-1)) {
-        return false;
-    }
-    while (!process.waitForFinished(250)) {
-        if (pump) pump(-1, QString());
-    }
-    if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
-        error = QObject::tr("Archive extraction failed: %1").arg(QString::fromLocal8Bit(process.readAllStandardError()));
-        return false;
-    }
-    return true;
-}
-
-bool ExtractArchiveWithStrip(const fs::path& archive_path, const fs::path& datadir, int strip_components, QString& error, const ProgressPumpFn& pump = {})
-{
-    const QString archive = GUIUtil::PathToQString(archive_path);
-    const QString dest = GUIUtil::PathToQString(datadir);
-    QStringList args{
-        QStringLiteral("-xf"),
-        archive,
-        QStringLiteral("-C"),
-        dest,
-        QStringLiteral("--exclude=__MACOSX"),
-        QStringLiteral("--exclude=*/.DS_Store"),
-        QStringLiteral("--exclude=*/._*"),
-    };
-    if (strip_components > 0) {
-        args << QStringLiteral("--strip-components=%1").arg(strip_components);
-    }
-
-    error.clear();
-    if (RunExtractProcess(QStringLiteral("bsdtar"), args, error, pump)) {
-        return true;
-    }
-    const QString bsdtar_error = error;
-    error.clear();
-    if (RunExtractProcess(QStringLiteral("tar"), args, error, pump)) {
-        return true;
-    }
-    error = bsdtar_error;
-    return false;
 }
 
 bool IsPackageDataRoot(const fs::path& path)
@@ -453,29 +444,24 @@ bool ExtractArchive(const fs::path& archive_path, const fs::path& datadir, QStri
 
     if (pump) pump(-1, QObject::tr("Extracting archive…"));
 
-    if (ExtractArchiveWithStrip(archive_path, datadir, *strip_components, error, pump)) {
-        fs::remove_all(datadir / "__MACOSX");
-        if (!AllExtractedPathsContained(datadir, error)) {
-            return false;
-        }
-        if (IsPackageDataRoot(datadir)) {
-            return true;
-        }
-        error = QObject::tr("Extracted data is missing the blocks directory.");
+    std::string extract_error;
+    if (!ZipExtractTo(archive_path, datadir, *strip_components, ShouldSkipZipEntryPath, extract_error,
+                      [&](uint64_t) {
+                          if (pump) pump(-1, QString());
+                      })) {
+        error = extract_error.empty()
+            ? QObject::tr("Archive extraction failed.")
+            : QString::fromStdString(extract_error);
         return false;
     }
 
-    // Fallback for systems without bsdtar/tar zip support.
-    QStringList unzip_args{
-        QStringLiteral("-q"),
-        GUIUtil::PathToQString(archive_path),
-        QStringLiteral("-d"),
-        GUIUtil::PathToQString(datadir),
-    };
-    if (!RunExtractProcess(QStringLiteral("unzip"), unzip_args, error, pump)) {
+    fs::remove_all(datadir / "__MACOSX");
+    if (!AllExtractedPathsContained(datadir, error)) {
         return false;
     }
-
+    if (IsPackageDataRoot(datadir)) {
+        return true;
+    }
     if (!HoistWrappedExtractRoot(datadir, error)) {
         return false;
     }
@@ -1155,7 +1141,7 @@ private:
 
         QNetworkRequest request = makeDownloadRequest();
         if (resuming) {
-            request.setRawHeader("Range", QByteArray("bytes=") + QByteArray::number(existing) + '-');
+            request.setRawHeader("Range", QByteArray("bytes=") + QByteArray::number(static_cast<qulonglong>(existing)) + '-');
         }
 
         m_download_output.setFileName(GUIUtil::PathToQString(m_download_path));

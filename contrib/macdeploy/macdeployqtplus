@@ -16,13 +16,24 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import sys, re, os, platform, shutil, stat, subprocess, os.path
+import sys, re, os, platform, shutil, stat, subprocess, os.path, time
 from argparse import ArgumentParser
 from pathlib import Path
 from subprocess import PIPE, run
 from typing import Optional
 
-# This is ported from the original macdeployqt with modifications
+def stamp_bundle_mtime(path: str) -> None:
+    """Give the deployed bundle a uniform timestamp so unzipped .app dates match the build."""
+    epoch = os.getenv("SOURCE_DATE_EPOCH")
+    times = (int(epoch), int(epoch)) if epoch else (time.time(), time.time())
+    for root, dirs, files in os.walk(path, followlinks=False):
+        for name in files + dirs:
+            entry = os.path.join(root, name)
+            try:
+                os.utime(entry, times, follow_symlinks=False)
+            except OSError:
+                pass
+    os.utime(path, times)
 
 class FrameworkInfo(object):
     def __init__(self):
@@ -395,6 +406,7 @@ ap.add_argument("-no-plugins", dest="plugins", action="store_false", default=Tru
 ap.add_argument("-no-strip", dest="strip", action="store_false", default=True, help="don't run 'strip' on the binaries")
 ap.add_argument("-translations-dir", nargs=1, metavar="path", default=None, help="Path to Qt's translations. Base translations will automatically be added to the bundle's resources.")
 ap.add_argument("-zip", nargs="?", const="", metavar="zip", help="create a .zip containing the app bundle")
+ap.add_argument("-zip-app-name", default=None, help="Name of the .app folder stored in the zip (without .app suffix).")
 
 config = ap.parse_args()
 
@@ -495,10 +507,26 @@ with open(os.path.join(applicationBundle.resourcesPath, "qt.conf"), "wb") as f:
 if platform.system() == "Darwin":
     subprocess.check_call(f"codesign --deep --force --sign - {target}", shell=True)
 
+stamp_bundle_mtime(target)
+
 # ------------------------------------------------
 
 if config.zip is not None:
-    shutil.make_archive('{}'.format(appname), format='zip', root_dir='dist', base_dir='Bitcoin-Qt.app')
+    zip_base = "Bitcoin-Qt.app"
+    if config.zip_app_name:
+        zip_base = f"{config.zip_app_name}.app"
+        zip_target = os.path.join("dist", zip_base)
+        if zip_target != target:
+            if os.path.exists(zip_target):
+                shutil.rmtree(zip_target)
+            os.rename(target, zip_target)
+            stamp_bundle_mtime(zip_target)
+    zip_path = os.path.abspath(f"{appname}.zip")
+    if os.path.exists(zip_path):
+        os.unlink(zip_path)
+    # zip -y preserves framework Current symlinks. shutil.make_archive follows
+    # them and writes empty directories, which makes the unzipped .app invalid.
+    subprocess.check_call(["zip", "-r", "-y", "-X", zip_path, zip_base], cwd="dist")
 
 # ------------------------------------------------
 

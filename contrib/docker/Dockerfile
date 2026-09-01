@@ -46,6 +46,7 @@ RUN apk add --no-cache \
     cmake \
     boost-dev \
     libevent-dev \
+    zlib-dev \
     sqlite-dev \
     zeromq-dev \
     coreutils \

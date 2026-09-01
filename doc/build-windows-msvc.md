@@ -9,6 +9,7 @@ For cross-compiling options, please see [`build-windows.md`](./build-windows.md)
 ### 1. Visual Studio
 
 This guide relies on using CMake and vcpkg package manager provided with the Visual Studio installation.
+vcpkg installs zlib from [`vcpkg.json`](../vcpkg.json); it is required to extract official data packages.
 Here are requirements for the Visual Studio installation:
 1. Minimum required version: Visual Studio 2022 version 17.6.
 2. Installed components:

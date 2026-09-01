@@ -5,7 +5,8 @@
   "dependencies": [
     "boost-multi-index",
     "boost-signals2",
-    "libevent"
+    "libevent",
+    "zlib"
   ],
   "default-features": [
     "miniupnpc",

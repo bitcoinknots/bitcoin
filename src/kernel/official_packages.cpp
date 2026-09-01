@@ -17,6 +17,7 @@
 #include <cctype>
 #include <fstream>
 #include <functional>
+#include <limits>
 #include <map>
 #include <optional>
 #include <string>
@@ -169,11 +170,19 @@ std::optional<OfficialDataPackage> ParsePackage(
 
         package.archive_size_bytes = 0;
         if (entry.exists("archive_size_bytes")) {
-            package.archive_size_bytes = entry.find_value("archive_size_bytes").getInt<uint64_t>();
+            try {
+                package.archive_size_bytes = entry.find_value("archive_size_bytes").getInt<uint64_t>();
+            } catch (const std::runtime_error&) {
+                LogPrintf("Official packages config: ignoring invalid archive_size_bytes for package %s\n", package.id);
+            }
         }
         package.extracted_size_bytes = 0;
         if (entry.exists("extracted_size_bytes")) {
-            package.extracted_size_bytes = entry.find_value("extracted_size_bytes").getInt<uint64_t>();
+            try {
+                package.extracted_size_bytes = entry.find_value("extracted_size_bytes").getInt<uint64_t>();
+            } catch (const std::runtime_error&) {
+                LogPrintf("Official packages config: ignoring invalid extracted_size_bytes for package %s\n", package.id);
+            }
         }
     } catch (const std::runtime_error& e) {
         LogPrintf("Official packages config: failed to parse package entry: %s\n", e.what());
@@ -253,6 +262,9 @@ bool IsOfficialSnapshotTrusted(
 {
     if (snapshot_height <= 0 || base_blockhash.IsNull()) return false;
 
+    // Heights that are already consensus-pinned must match. Unpinned heights are
+    // allowed so a signed remote manifest can publish a new snapshot without a
+    // client release.
     if (const auto assumeutxo = params.AssumeutxoForHeight(snapshot_height)) {
         return assumeutxo->blockhash == base_blockhash;
     }
@@ -263,7 +275,14 @@ bool IsOfficialSnapshotTrusted(
         return checkpoint->second == base_blockhash;
     }
 
-    return false;
+    const auto& consensus = params.GetConsensus();
+    if (params.GetChainType() == ChainType::MAIN &&
+        consensus.nPurityActivationHeight < std::numeric_limits<int>::max() &&
+        snapshot_height < consensus.nPurityActivationHeight) {
+        return false;
+    }
+
+    return true;
 }
 
 void CanonicalizeJsonValue(UniValue& value)
@@ -432,7 +451,8 @@ std::vector<OfficialDataPackage> ParseOfficialDataPackagesFromJson(
             continue;
         }
         if (!IsOfficialSnapshotTrusted(*chainparams, package->snapshot_height, package->base_blockhash)) {
-            LogPrintf("Official packages config: snapshot not trusted for package %s\n", package->id);
+            LogPrintf("Official packages config: snapshot not trusted for package %s (height %d hash %s)\n",
+                      package->id, package->snapshot_height, package->base_blockhash.GetHex());
             continue;
         }
         packages.push_back(*package);
