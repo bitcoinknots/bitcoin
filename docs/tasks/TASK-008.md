@@ -1,11 +1,17 @@
 # TASK-008: Qt DATUM mining status window
 
+## Status
+
+Superseded by [TASK-010](TASK-010.md). The standalone Window-menu DATUM window
+was removed; its status views now live only in the main-window Mining page.
+
 ## Goal
 
-Add a singleton read-only DATUM window under the Bitcoin-Qt `Window` menu and
-provide the bounded runtime snapshots needed by both the GUI and aggregate RPC.
+Originally added a singleton read-only DATUM window under the Bitcoin-Qt
+`Window` menu and the bounded runtime snapshots needed by both the GUI and
+aggregate RPC. The snapshot work remains; the window requirement does not.
 
-## Acceptance criteria
+## Historical acceptance criteria (superseded)
 
 - `BUILD_DATUM=ON` includes the action and window; OFF builds include neither.
 - The visible window refreshes every second and stops refreshing while hidden.

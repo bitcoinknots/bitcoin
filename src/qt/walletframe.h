@@ -5,11 +5,16 @@
 #ifndef BITCOIN_QT_WALLETFRAME_H
 #define BITCOIN_QT_WALLETFRAME_H
 
+#include <bitcoin-build-config.h> // IWYU pragma: keep
+
 #include <QFrame>
 #include <QMap>
 
 class ClientModel;
 class PairingPage;
+#ifdef ENABLE_DATUM
+class MiningPage;
+#endif
 class PlatformStyle;
 class SendCoinsRecipient;
 class WalletModel;
@@ -17,7 +22,9 @@ class WalletView;
 
 QT_BEGIN_NAMESPACE
 class QLabel;
+class QSplitter;
 class QStackedWidget;
+class QTabWidget;
 QT_END_NAMESPACE
 
 /**
@@ -56,13 +63,19 @@ Q_SIGNALS:
 private:
     QStackedWidget *m_global_stack;
     QStackedWidget *walletStack;
+    QSplitter* m_mining_splitter;
+    QTabWidget* m_wallet_overview_tabs;
     ClientModel *clientModel;
     QLabel* m_label_alerts;
     QMap<WalletModel*, WalletView*> mapWalletViews;
 
     PairingPage *m_page_pairing;
+#ifdef ENABLE_DATUM
+    MiningPage *m_page_mining;
+#endif
 
     bool bOutOfSync;
+    bool m_mining_visible{false};
 
     const PlatformStyle *platformStyle;
 
@@ -83,6 +96,12 @@ public Q_SLOTS:
     void gotoReceiveCoinsPage();
     /** Switch to send coins page */
     void gotoSendCoinsPage(QString addr = "");
+    /** Switch to the embedded address book page */
+    void gotoAddressBookPage();
+#ifdef ENABLE_DATUM
+    /** Switch to the DATUM mining dashboard */
+    void gotoMiningPage();
+#endif
 
     /** Show Sign/Verify Message dialog and switch to sign message tab */
     void gotoSignMessageTab(QString addr = "");
@@ -110,6 +129,9 @@ public Q_SLOTS:
 
 private Q_SLOTS:
     void updateAlerts(const QString &warnings);
+
+private:
+    void setMiningWorkspaceVisible(bool visible);
 };
 
 #endif // BITCOIN_QT_WALLETFRAME_H

@@ -25,7 +25,25 @@ physical ASIC is not required; an external GPU miner is an accepted verifier.
 This acceptance policy does not remove the product requirement to remain
 compatible with common SHA256 ASIC clients.
 
-## Bitcoin-Qt Settings
+## Bitcoin-Qt main window and Settings
+
+In wallet mode the main window uses a fixed left navigation rail with Overview,
+Send, Receive, Transactions, Address Book, and Mining entries. Pairing moves to
+the Window menu. Address Book embeds Sending and Receiving views while the
+existing standalone address windows remain available. Mining mode uses the
+reference three-region composition: the navigation rail, a compact overview of
+the current wallet, and the Mining dashboard. Other navigation entries retain
+the normal full-width wallet page.
+
+When `BUILD_DATUM=ON`, Mining opens a read-only dashboard backed by
+`DatumStatusSnapshot`. It displays runtime state, estimated miner hashrate,
+current height, a difficulty-derived chance per block, session share results,
+block-candidate results, and the existing miner/job diagnostics. Aggregate
+hashrate is calculated from cumulative accepted share difficulty using actual
+elapsed time and a rolling window of up to five minutes. Sampling begins with a
+baseline, occurs once per visible minute, keeps at most 24 hours in memory, and
+resets when Bitcoin-Qt restarts. Missing or incomplete inputs are shown as
+unavailable. `BUILD_DATUM=OFF` builds contain no Mining entry or dashboard.
 
 The Qt Settings dialog preserves the complete upstream/master Settings surface
 (including Main, Wallet, Network, Mempool, Spam filtering, Mining, and Display)
@@ -38,14 +56,16 @@ restart is required only for configuration changes other than the runtime
 share-difficulty, payout-address, and Coinbase-tag updates. The Qt fields use
 the same runtime update path while DATUM is running.
 
-The `Window` menu also provides a read-only `DATUM` status window. It refreshes
-only while visible and shows runtime and actual port-mapping state, session
-share totals, estimated miner hashrate, current job/template data, connected
-workers, and block-submit diagnostics. The active runtime payout address and
-Coinbase tag update immediately after a hot configuration change. Worker names,
-IP addresses, and user agents remain local to the GUI; the status RPC exposes
-aggregate data only.
-Session counters survive miner disconnects but reset on the next DATUM run.
+Mining status is presented only in the main-window Mining page; the Window menu
+does not expose a separate DATUM status window. The page refreshes only while
+visible and shows runtime and actual port-mapping state, session share totals,
+current job/template data, connected workers, and block-submit diagnostics.
+The active runtime payout address and Coinbase tag update immediately after a
+hot configuration change. Worker names, IP addresses, and user agents remain
+local to the GUI; the status RPC exposes aggregate data only. Session counters
+survive miner disconnects but reset on the next DATUM run. The cumulative
+accepted-difficulty input, GUI-derived hashrates and chance, and Best Share are
+internal-only and do not extend `getdatuminfo`.
 
 `datumupnp=1` is an explicit opt-in that maps only the configured DATUM TCP
 port, independently of the node's P2P `upnp` setting. It uses miniupnpc when

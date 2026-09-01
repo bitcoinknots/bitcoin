@@ -28,6 +28,7 @@
 #include <QHBoxLayout>
 #include <QProgressDialog>
 #include <QPushButton>
+#include <QTabWidget>
 #include <QVBoxLayout>
 
 WalletView::WalletView(WalletModel* wallet_model, const PlatformStyle* _platformStyle, QWidget* parent)
@@ -70,10 +71,22 @@ WalletView::WalletView(WalletModel* wallet_model, const PlatformStyle* _platform
     usedReceivingAddressesPage = new AddressBookPage(platformStyle, AddressBookPage::ForEditing, AddressBookPage::ReceivingTab, this);
     usedReceivingAddressesPage->setModel(walletModel->getAddressTableModel());
 
+    addressBookPage = new QTabWidget(this);
+    addressBookPage->setObjectName(QStringLiteral("addressBookPage"));
+    sendingAddressesPage = new AddressBookPage(platformStyle, AddressBookPage::ForEditing, AddressBookPage::SendingTab, addressBookPage);
+    receivingAddressesPage = new AddressBookPage(platformStyle, AddressBookPage::ForEditing, AddressBookPage::ReceivingTab, addressBookPage);
+    sendingAddressesPage->setEmbedded(true);
+    receivingAddressesPage->setEmbedded(true);
+    sendingAddressesPage->setModel(walletModel->getAddressTableModel());
+    receivingAddressesPage->setModel(walletModel->getAddressTableModel());
+    addressBookPage->addTab(sendingAddressesPage, tr("Sending"));
+    addressBookPage->addTab(receivingAddressesPage, tr("Receiving"));
+
     addWidget(overviewPage);
     addWidget(transactionsPage);
     addWidget(receiveCoinsPage);
     addWidget(sendCoinsPage);
+    addWidget(addressBookPage);
 
     connect(overviewPage, &OverviewPage::transactionClicked, this, &WalletView::transactionClicked);
     // Clicking on a transaction on the overview pre-selects the transaction on the transaction history page
@@ -123,6 +136,11 @@ void WalletView::setClientModel(ClientModel *_clientModel)
     walletModel->setClientModel(_clientModel);
 }
 
+void WalletView::setOverviewCompact(bool compact)
+{
+    overviewPage->setCompactMode(compact);
+}
+
 void WalletView::processNewTransaction(const QModelIndex& parent, int start, int /*end*/)
 {
     // Prevent balloon-spam when initial block download is in progress
@@ -165,6 +183,11 @@ void WalletView::gotoSendCoinsPage(QString addr)
 
     if (!addr.isEmpty())
         sendCoinsPage->setAddress(addr);
+}
+
+void WalletView::gotoAddressBookPage()
+{
+    setCurrentWidget(addressBookPage);
 }
 
 void WalletView::gotoSignMessageTab(QString addr)

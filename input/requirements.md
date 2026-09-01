@@ -45,22 +45,50 @@ provenance baseline. Do not silently update it.
   Existing configuration-file and command-line precedence remains
   authoritative.
 
-## Qt DATUM status window
+## Qt main window and DATUM mining dashboard
 
-- With `BUILD_DATUM=ON`, the `Window` menu includes a `DATUM` item that opens
-  one reusable, non-modal, read-only status window. The item and window are
-  absent from `BUILD_DATUM=OFF` builds.
-- The visible window refreshes once per second and stops polling while hidden.
-  It shows runtime/listener/authentication and actual port-mapping state,
-  active and configured payout addresses and Coinbase tags, mining totals and
-  estimated hashrate, the current template/job, connected worker details, and
-  block-submit/last-error diagnostics. Payout address and Coinbase tag changes
-  converge to the active runtime value without restarting DATUM.
+- In wallet mode, Bitcoin-Qt uses a fixed left navigation rail. The navigation
+  order is Overview, Send, Receive, Transactions, Address Book, and Mining.
+  Pairing remains available from the Window menu.
+- When Mining is selected, the main window follows the reference three-region
+  composition: navigation rail, a compact current-wallet overview column, and
+  the Mining dashboard. Other navigation entries continue to use the normal
+  full-width wallet page.
+- Address Book is an embedded wallet page with Sending and Receiving tabs. The
+  existing standalone sending and receiving address windows remain available.
+- Mining is compiled only with `BUILD_DATUM=ON`. Its dashboard shows only
+  values derived from `DatumStatusSnapshot`: runtime state, estimated miner
+  hashrate, current height, probability of the estimated miner hashrate finding
+  one block, session share results, and block-candidate results.
+- The dashboard derives aggregate miner hashrate from the change in cumulative
+  accepted share difficulty over actual elapsed time. It samples once per
+  minute while visible, uses up to five minutes of checkpoints, and requires at
+  least one complete minute plus accepted work before publishing an estimate.
+- The probability uses the GUI-derived miner hashrate and the estimated network
+  hashrate implied by current difficulty and a 600-second target interval.
+  Missing, zero, stopped, stale-session, or incomplete inputs render as
+  unavailable rather than fabricated success or precision.
+- The hashrate graph retains at most 24 hours in memory, preserves gaps between
+  hidden periods and DATUM sessions, and does not persist samples across a GUI
+  restart. Overview, miner, job, and diagnostic details remain available.
+- Mining status is presented only in the Bitcoin-Qt main window. There is no
+  standalone DATUM status window or Window-menu DATUM entry.
+- The visible Mining page refreshes once per second and stops polling while
+  hidden. It shows runtime/listener/authentication and actual port-mapping
+  state, active and configured payout addresses and Coinbase tags, mining
+  totals, the current template/job, connected worker details, and block-submit/
+  last-error diagnostics. Hot configuration changes converge without restart.
 - Worker names, remote IP addresses, and miner user agents are local-GUI-only.
   They must never be returned by `getdatuminfo`.
 - Session share and block counters reset when DATUM starts, persist when a
   miner disconnects, and are not persisted across DATUM or node restarts.
-- The window contains no configuration, start/stop, or difficulty controls;
+- Session accepted difficulty follows the same lifecycle, is transported only
+  through the internal DATUM status snapshot, and is not added to
+  `getdatuminfo`.
+- The Mining summary shows Best Share as the highest achieved difficulty among
+  accepted shares in the current DATUM session. It resets on DATUM startup,
+  survives miner disconnects, and remains internal to the Qt status snapshot.
+- The dashboard contains no configuration, start/stop, or difficulty controls;
   those remain in Settings and the existing RPC surface.
 
 ## Runtime contract
@@ -146,8 +174,8 @@ precedence chain.
 ## Non-goals
 
 - DATUM Prime, OCEAN pooled mining, accounting, payouts, Web dashboard/public
-  management API, Stratum V2, vardiff, or a public coordinator. The local Qt
-  status window and non-secret aggregate status RPC are explicitly in scope.
+  management API, Stratum V2, vardiff, or a public coordinator. The main-window
+  Qt Mining page and non-secret aggregate status RPC are explicitly in scope.
 - Direct access to `CBlockTemplate`, `ChainstateManager`, or consensus internals.
 - Changes to ASERT, difficulty adjustment, validation, chain selection,
   subsidy, P2P, mempool policy, address consensus, or any other consensus rule.

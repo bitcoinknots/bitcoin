@@ -124,6 +124,12 @@ AddressBookPage::~AddressBookPage()
     delete ui;
 }
 
+void AddressBookPage::setEmbedded(bool embedded)
+{
+    ui->closeButton->setVisible(!embedded);
+    if (embedded) setWindowFlags(Qt::Widget);
+}
+
 void AddressBookPage::setModel(AddressTableModel *_model)
 {
     this->model = _model;

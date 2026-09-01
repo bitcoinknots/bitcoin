@@ -25,6 +25,7 @@
 #include <qt/transactiontablemodel.h>
 #include <qt/transactionview.h>
 #include <qt/walletmodel.h>
+#include <qt/walletview.h>
 #include <script/solver.h>
 #include <test/util/setup_common.h>
 #include <validation.h>
@@ -44,6 +45,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QTextEdit>
+#include <QTabWidget>
 #include <QListView>
 #include <QDialogButtonBox>
 
@@ -315,6 +317,19 @@ void TestGUI(interfaces::Node& node, const std::shared_ptr<CWallet>& wallet)
     WalletModel& walletModel = *mini_gui.walletModel;
     SendCoinsDialog& sendCoinsDialog = mini_gui.sendCoinsDialog;
     TransactionView& transactionView = mini_gui.transactionView;
+
+    WalletView walletView(&walletModel, platformStyle.get(), nullptr);
+    walletView.gotoAddressBookPage();
+    QTabWidget* address_book = walletView.findChild<QTabWidget*>(QStringLiteral("addressBookPage"));
+    QVERIFY(address_book);
+    QCOMPARE(address_book->count(), 2);
+    QCOMPARE(address_book->tabText(0), QStringLiteral("Sending"));
+    QCOMPARE(address_book->tabText(1), QStringLiteral("Receiving"));
+    for (int tab = 0; tab < address_book->count(); ++tab) {
+        QPushButton* close_button = address_book->widget(tab)->findChild<QPushButton*>(QStringLiteral("closeButton"));
+        QVERIFY(close_button);
+        QVERIFY(close_button->isHidden());
+    }
 
     // Update walletModel cached balance which will trigger an update for the 'labelBalance' QLabel.
     walletModel.pollBalanceChanged();

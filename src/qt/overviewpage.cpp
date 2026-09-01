@@ -18,8 +18,11 @@
 
 #include <QAbstractItemDelegate>
 #include <QApplication>
+#include <QBoxLayout>
 #include <QDateTime>
+#include <QFontMetrics>
 #include <QPainter>
+#include <QSizePolicy>
 #include <QStatusTipEvent>
 
 #include <algorithm>
@@ -108,8 +111,19 @@ public:
         painter->setFont(font_saved);
 
         painter->setPen(option.palette.color(QPalette::Text));
+        const int date_width = std::max(0, amountRect.width() - amount_bounding_rect.width() - 6);
+        QString date_text = GUIUtil::dateTimeStr(date);
+        const QFontMetrics date_metrics(painter->font());
+        if (date_metrics.horizontalAdvance(date_text) > date_width) {
+            const QString time_text = date.toString("hh:mm");
+            date_text = date_metrics.horizontalAdvance(time_text) <= date_width
+                ? time_text
+                : date_metrics.elidedText(time_text, Qt::ElideLeft, date_width);
+        }
+        QRect dateRect = amountRect;
+        dateRect.setWidth(date_width);
         QRect date_bounding_rect;
-        painter->drawText(amountRect, Qt::AlignLeft | Qt::AlignVCenter, GUIUtil::dateTimeStr(date), &date_bounding_rect);
+        painter->drawText(dateRect, Qt::AlignLeft | Qt::AlignVCenter, date_text, &date_bounding_rect);
 
         // 0.4*date_bounding_rect.width() is used to visually distinguish a date from an amount.
         const int minimum_width = 1.4 * date_bounding_rect.width() + amount_bounding_rect.width();
@@ -173,6 +187,15 @@ void OverviewPage::handleTransactionClicked(const QModelIndex &index)
 {
     if(filter)
         Q_EMIT transactionClicked(filter->mapToSource(index));
+}
+
+void OverviewPage::setCompactMode(bool compact)
+{
+    ui->horizontalLayout->setDirection(compact ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
+    ui->listTransactions->setMinimumHeight(compact ? 170 : NUM_ITEMS * (DECORATION_SIZE + 2));
+    ui->verticalSpacer->changeSize(0, compact ? 0 : 40, QSizePolicy::Minimum, compact ? QSizePolicy::Fixed : QSizePolicy::Expanding);
+    ui->verticalSpacer_2->changeSize(0, compact ? 0 : 40, QSizePolicy::Minimum, compact ? QSizePolicy::Fixed : QSizePolicy::Expanding);
+    ui->topLayout->invalidate();
 }
 
 void OverviewPage::setPrivacy(bool privacy)

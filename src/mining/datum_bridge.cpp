@@ -613,6 +613,8 @@ DatumStatusSnapshot GetDatumStatusSnapshot(bool include_miners)
     result.rejected_shares = stats.rejected_shares;
     result.session_accepted_shares = stats.session_accepted_shares;
     result.session_rejected_shares = stats.session_rejected_shares;
+    result.session_accepted_difficulty = stats.session_accepted_difficulty;
+    result.session_best_share_difficulty = stats.session_best_share_difficulty;
     result.last_share_time_ms = stats.last_share_time_ms;
     result.estimated_hashrate_ths = stats.estimated_hashrate_ths;
     result.current_height = stats.current_height;

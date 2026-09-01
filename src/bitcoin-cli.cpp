@@ -539,7 +539,13 @@ public:
         if (!batch[ID_NETWORKINFO]["error"].isNull()) return batch[ID_NETWORKINFO];
 
         const UniValue& networkinfo{batch[ID_NETWORKINFO]["result"]};
-        if (networkinfo["version"].getInt<int>() < 209900) {
+        // Bitcoin Purity's independent release version is not comparable to the historical Core version integer.
+        const bool is_legacy_compatible{
+            networkinfo["version"].isNum() && networkinfo["version"].getInt<int>() >= 209900};
+        const bool is_purity_server{
+            networkinfo["subversion"].isStr() &&
+            networkinfo["subversion"].get_str().find("/Purity:") != std::string::npos};
+        if (!is_legacy_compatible && !is_purity_server) {
             throw std::runtime_error("-netinfo requires bitcoind server to be running v0.21.0 and up");
         }
         const int64_t time_now{TicksSinceEpoch<std::chrono::seconds>(CliClock::now())};

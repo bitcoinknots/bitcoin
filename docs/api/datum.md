@@ -39,6 +39,18 @@ the running coinbase template immediately. All three values are persisted as
 `datumdiff`, `datumaddress`, and `datumcoinbasetag`; other DATUM settings still
 require a restart.
 
+When compiled with `BUILD_DATUM=ON`, the Bitcoin-Qt main-window Mining page
+reads `DatumStatusSnapshot` directly. It does not add RPC fields or
+configuration controls, and no standalone DATUM status window is exposed. The
+dashboard receives an internal cumulative accepted-difficulty counter and
+derives a five-minute rolling hashrate, estimated network hashrate, and chance
+per block in Qt. These inputs and derived values do not add or change
+`getdatuminfo` fields. Unavailable inputs are displayed as unavailable. The
+24-hour graph is GUI-local, sampled while visible, bounded to 1,440 entries,
+and never persisted or exposed by `getdatuminfo`. Best Share is likewise a
+GUI-only internal snapshot value: it is the highest achieved difficulty among
+accepted shares in the current DATUM session and does not add an RPC field.
+
 ### Minimal local configuration
 
 ```ini

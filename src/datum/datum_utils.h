@@ -64,6 +64,7 @@ int append_bitcoin_varint_hex(uint64_t n, char *s);
 int append_UNum_hex(uint64_t n, char *s);
 void panic_from_thread(int a);
 bool double_sha256(void *out, const void *in, size_t length);
+long double get_approx_achieved_diff(const unsigned char *bytes);
 void hex_to_bin_le(const char *hex, unsigned char *bin);
 void hex_to_bin(const char *hex, unsigned char *bin);
 void hash2hex(unsigned char *bytes, char *hexString);

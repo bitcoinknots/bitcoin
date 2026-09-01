@@ -127,6 +127,8 @@ class DatumTest(BitcoinTestFramework):
         assert_equal(info["port_mapping"]["active"], False)
         assert_equal(info["current_job"]["height"], info["current_height"])
         assert "block_submission" in info
+        assert "session_accepted_difficulty" not in info
+        assert "session_best_share_difficulty" not in info
         serialized_info = json.dumps(info, default=str)
         for private_field in ["worker", "remote_host", "user_agent", "datumpassword", "datumrpcpassword"]:
             assert private_field not in serialized_info

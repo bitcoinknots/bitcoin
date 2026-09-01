@@ -36,6 +36,7 @@ public:
     void setClientModel(ClientModel *clientModel);
     void setWalletModel(WalletModel *walletModel);
     void showOutOfSyncWarning(bool fShow);
+    void setCompactMode(bool compact);
 
 public Q_SLOTS:
     void setBalance(const interfaces::WalletBalances& balances);

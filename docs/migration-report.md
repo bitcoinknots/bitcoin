@@ -68,6 +68,27 @@ An Apple M4 hashing run exposed the upstream small-height data-push encoding as
 advanced regtest from height 0 to 1 through the node's normal `submitblock`
 validation path.
 
+## Qt main-window migration
+
+The wallet GUI's horizontal tab toolbar is replaced by a fixed left navigation
+rail without changing wallet or node models. Address Book becomes an embedded
+two-tab wallet view, while Pairing and the existing standalone address windows
+remain reachable from the Window menu. The Mining entry is conditional on
+`BUILD_DATUM` and reuses the existing bounded status snapshot; no persistent
+format, RPC, configuration, mining protocol, or consensus migration is needed.
+
+The hashrate trend is a bounded process-local GUI queue. DATUM exposes an
+internal session cumulative accepted-difficulty counter so Qt can calculate
+aggregate hashrate from work deltas over a rolling five-minute window. The
+counter resets at DATUM startup, survives miner disconnect, is not persisted,
+and is not exposed by RPC. The GUI queue is discarded on GUI restart and uses
+gaps rather than synthetic zeros across hidden periods and DATUM sessions.
+The previous Window-menu DATUM status window is removed; the main-window Mining
+page is the only Qt presentation of DATUM status. The summary additionally
+carries an internal session maximum of achieved accepted-share difficulty for
+Best Share. Mining mode reuses the current wallet's existing Overview page as a
+compact middle column beside the dashboard; no wallet data is duplicated.
+
 ## Rollout
 
 Runtime defaults off, binds loopback by default, and requires explicit secure

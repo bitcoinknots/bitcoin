@@ -60,6 +60,8 @@ typedef struct {
     uint64_t rejected_shares;
     uint64_t session_accepted_shares;
     uint64_t session_rejected_shares;
+    uint64_t session_accepted_difficulty;
+    uint64_t session_best_share_difficulty;
     uint64_t session_started_ms;
     uint64_t last_share_time_ms;
     double estimated_hashrate_ths;

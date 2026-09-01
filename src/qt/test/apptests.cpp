@@ -16,13 +16,18 @@
 #include <validation.h>
 
 #include <QAction>
+#include <QLabel>
 #include <QLineEdit>
 #include <QRegularExpression>
 #include <QScopedPointer>
 #include <QSignalSpy>
+#include <QSplitter>
 #include <QString>
+#include <QTabBar>
+#include <QTabWidget>
 #include <QTest>
 #include <QTextEdit>
+#include <QToolBar>
 #include <QtGlobal>
 #include <QtTest/QtTestWidgets>
 #include <QtTest/QtTestGui>
@@ -97,15 +102,78 @@ void AppTests::appTests()
 void AppTests::guiTests(BitcoinGUI* window)
 {
     HandleCallback callback{"guiTests", *this};
+
+    QToolBar* navigation = window->findChild<QToolBar*>(QStringLiteral("mainNavigation"));
+    QVERIFY(navigation);
+    QCOMPARE(navigation->orientation(), Qt::Vertical);
+    QVERIFY(!navigation->isMovable());
+    QVERIFY(!navigation->isFloatable());
+    const QList<QAction*> navigation_actions = navigation->actions();
 #ifdef ENABLE_DATUM
-    QAction* datum_action = window->findChild<QAction*>("showDatumAction");
-    QVERIFY(datum_action);
-    datum_action->activate(QAction::Trigger);
-    QWidget* datum_window = window->findChild<QWidget*>("datumWindow");
-    QVERIFY(datum_window);
-    QVERIFY(datum_window->isVisible());
-    datum_action->activate(QAction::Trigger);
-    QCOMPARE(window->findChildren<QWidget*>("datumWindow").size(), 1);
+    const QStringList expected_navigation{QStringLiteral("Overview"), QStringLiteral("Send"), QStringLiteral("Receive"), QStringLiteral("Transactions"), QStringLiteral("Address Book"), QStringLiteral("Mining")};
+#else
+    const QStringList expected_navigation{QStringLiteral("Overview"), QStringLiteral("Send"), QStringLiteral("Receive"), QStringLiteral("Transactions"), QStringLiteral("Address Book")};
+#endif
+    QVERIFY(navigation_actions.size() >= expected_navigation.size());
+    for (int i = 0; i < expected_navigation.size(); ++i) {
+        QString text = navigation_actions.at(i)->text();
+        text.remove(QLatin1Char('&'));
+        QCOMPARE(text, expected_navigation.at(i));
+        QCOMPARE(navigation_actions.at(i)->shortcut(), QKeySequence(QStringLiteral("Alt+%1").arg(i + 1)));
+    }
+
+    QAction* pairing_action = window->findChild<QAction*>(QStringLiteral("pairingAction"));
+    QMenu* window_menu = window->findChild<QMenu*>(QStringLiteral("windowMenu"));
+    QVERIFY(pairing_action);
+    QVERIFY(window_menu);
+    QVERIFY(window_menu->actions().contains(pairing_action));
+    QVERIFY(!navigation_actions.contains(pairing_action));
+
+    QAction* address_book_action = window->findChild<QAction*>(QStringLiteral("addressBookAction"));
+    QVERIFY(address_book_action);
+    QVERIFY(!address_book_action->isEnabled());
+#ifdef ENABLE_DATUM
+    QAction* mining_action = window->findChild<QAction*>(QStringLiteral("miningAction"));
+    QVERIFY(mining_action);
+    QVERIFY(mining_action->actionGroup());
+    QVERIFY(mining_action->actionGroup()->isExclusive());
+    mining_action->activate(QAction::Trigger);
+    QVERIFY(mining_action->isChecked());
+    QVERIFY(!navigation_actions.constFirst()->isChecked());
+    QWidget* mining_page = window->findChild<QWidget*>(QStringLiteral("miningPage"));
+    QVERIFY(mining_page);
+    QVERIFY(mining_page->isVisible());
+    QSplitter* mining_workspace = window->findChild<QSplitter*>(QStringLiteral("miningWorkspace"));
+    QTabWidget* mining_wallet_overview = window->findChild<QTabWidget*>(QStringLiteral("miningWalletOverview"));
+    QVERIFY(mining_workspace);
+    QVERIFY(mining_wallet_overview);
+    QVERIFY(mining_workspace->isVisible());
+    QVERIFY(mining_wallet_overview->tabBar()->isVisible());
+    QCOMPARE(mining_wallet_overview->count(), 1);
+    QCOMPARE(mining_wallet_overview->tabText(0), QStringLiteral("Overview"));
+    QCOMPARE(mining_wallet_overview->maximumWidth(), 290);
+    QVERIFY(mining_page->findChild<QWidget*>(QStringLiteral("miningHashrateGraph")));
+    QVERIFY(mining_page->findChild<QWidget*>(QStringLiteral("miningShareSummary")));
+    QCOMPARE(mining_page->findChild<QLabel*>(QStringLiteral("miningDashboardStatus"))->text(), QStringLiteral("Disabled"));
+    QCOMPARE(mining_page->findChild<QLabel*>(QStringLiteral("miningDashboardHashrate"))->text(), QStringLiteral("—"));
+    QCOMPARE(mining_page->findChild<QLabel*>(QStringLiteral("miningDashboardChance"))->text(), QStringLiteral("—"));
+    QCOMPARE(mining_page->findChild<QLabel*>(QStringLiteral("miningDashboardHeight"))->text(), QStringLiteral("—"));
+    QCOMPARE(mining_page->findChild<QLabel*>(QStringLiteral("miningJobHeight"))->text(), QStringLiteral("—"));
+    QCOMPARE(mining_page->findChild<QLabel*>(QStringLiteral("miningJobId"))->text(), QStringLiteral("—"));
+    QCOMPARE(mining_page->findChild<QLabel*>(QStringLiteral("miningJobNetworkDifficulty"))->text(), QStringLiteral("—"));
+    QCOMPARE(mining_page->findChild<QLabel*>(QStringLiteral("miningJobTemplate"))->text(), QStringLiteral("—"));
+
+    navigation_actions.constFirst()->activate(QAction::Trigger);
+    QVERIFY(navigation_actions.constFirst()->isChecked());
+    QVERIFY(!mining_action->isChecked());
+    QVERIFY(mining_page->isHidden());
+    QVERIFY(mining_wallet_overview->tabBar()->isHidden());
+
+    QVERIFY(!window->findChild<QAction*>("showDatumAction"));
+    QVERIFY(!window->findChild<QWidget*>("datumWindow"));
+    for (const QAction* action : window_menu->actions()) {
+        QVERIFY(action->text().remove(QLatin1Char('&')) != QStringLiteral("DATUM"));
+    }
 #endif
     connect(window, &BitcoinGUI::consoleShown, this, &AppTests::consoleTests);
     expectCallback("consoleTests");

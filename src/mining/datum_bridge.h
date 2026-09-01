@@ -61,6 +61,8 @@ struct DatumStatusSnapshot {
     uint64_t rejected_shares{0};
     uint64_t session_accepted_shares{0};
     uint64_t session_rejected_shares{0};
+    uint64_t session_accepted_difficulty{0};
+    uint64_t session_best_share_difficulty{0};
     uint64_t last_share_time_ms{0};
     double estimated_hashrate_ths{0};
     uint64_t current_height{0};

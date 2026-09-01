@@ -34,6 +34,13 @@ if(ENABLE_WALLET)
   )
 endif()
 
+if(BUILD_DATUM)
+  target_sources(test_bitcoin-qt
+    PRIVATE
+      miningpagetests.cpp
+  )
+endif()
+
 add_test(NAME test_bitcoin-qt
   COMMAND test_bitcoin-qt
 )

@@ -9,3 +9,6 @@
 - [TASK-007: DATUM UPnP mapping and authentication default](TASK-007.md)
 - [TASK-008: Qt DATUM mining status window](TASK-008.md)
 - [TASK-009: DATUM payout and Coinbase hot configuration](TASK-009.md)
+- [TASK-010: Qt left navigation and mining dashboard](TASK-010.md)
+- [TASK-011: Mining dashboard data collection and calculations](TASK-011.md)
+- [TASK-012: Mining dashboard Best Share](TASK-012.md)

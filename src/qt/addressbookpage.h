@@ -42,6 +42,7 @@ public:
     ~AddressBookPage();
 
     void setModel(AddressTableModel *model);
+    void setEmbedded(bool embedded);
     const QString &getReturnValue() const { return returnValue; }
 
 public Q_SLOTS:

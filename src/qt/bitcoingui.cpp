@@ -10,9 +10,6 @@
 #include <qt/blockview.h>
 #include <qt/clientmodel.h>
 #include <qt/createwalletdialog.h>
-#ifdef ENABLE_DATUM
-#include <qt/datumwindow.h>
-#endif
 #include <qt/guiconstants.h>
 #include <qt/guiutil.h>
 #include <qt/mempoolstats.h>
@@ -296,11 +293,30 @@ void BitcoinGUI::createActions()
     historyAction->setShortcut(QKeySequence(QStringLiteral("Alt+4")));
     tabGroup->addAction(historyAction);
 
+    addressBookAction = new QAction(platformStyle->SingleColorIcon(":/icons/address-book"), tr("&Address Book"), this);
+    addressBookAction->setObjectName(QStringLiteral("addressBookAction"));
+    addressBookAction->setStatusTip(tr("Browse sending and receiving addresses"));
+    addressBookAction->setToolTip(addressBookAction->statusTip());
+    addressBookAction->setCheckable(true);
+    addressBookAction->setShortcut(QKeySequence(QStringLiteral("Alt+5")));
+    tabGroup->addAction(addressBookAction);
+
+#ifdef ENABLE_DATUM
+    miningAction = new QAction(platformStyle->SingleColorIcon(":/icons/tx_mined"), tr("&Mining"), this);
+    miningAction->setObjectName(QStringLiteral("miningAction"));
+    miningAction->setStatusTip(tr("Show the embedded DATUM mining dashboard"));
+    miningAction->setToolTip(miningAction->statusTip());
+    miningAction->setCheckable(true);
+    miningAction->setShortcut(QKeySequence(QStringLiteral("Alt+6")));
+    tabGroup->addAction(miningAction);
+#endif
+
     m_action_pairing = new QAction(platformStyle->SingleColorIcon(":/icons/connect_1"), tr("&Pairing"), this);
+    m_action_pairing->setObjectName(QStringLiteral("pairingAction"));
     m_action_pairing->setStatusTip(tr("Pair other software or devices with your node"));
     m_action_pairing->setToolTip(m_action_pairing->statusTip());
     m_action_pairing->setCheckable(true);
-    m_action_pairing->setShortcut(QKeySequence(QStringLiteral("Alt+5")));
+    m_action_pairing->setShortcut(QKeySequence(QStringLiteral("Alt+7")));
     tabGroup->addAction(m_action_pairing);
 
 #ifdef ENABLE_WALLET
@@ -314,6 +330,12 @@ void BitcoinGUI::createActions()
     connect(receiveCoinsAction, &QAction::triggered, this, &BitcoinGUI::gotoReceiveCoinsPage);
     connect(historyAction, &QAction::triggered, [this]{ showNormalIfMinimized(); });
     connect(historyAction, &QAction::triggered, this, &BitcoinGUI::gotoHistoryPage);
+    connect(addressBookAction, &QAction::triggered, [this]{ showNormalIfMinimized(); });
+    connect(addressBookAction, &QAction::triggered, this, &BitcoinGUI::gotoAddressBookPage);
+#ifdef ENABLE_DATUM
+    connect(miningAction, &QAction::triggered, [this]{ showNormalIfMinimized(); });
+    connect(miningAction, &QAction::triggered, this, &BitcoinGUI::gotoMiningPage);
+#endif
     connect(m_action_pairing, &QAction::triggered, this, [this]{ showNormalIfMinimized(); });
     connect(m_action_pairing, &QAction::triggered, this, &BitcoinGUI::gotoPairingPage);
 #endif // ENABLE_WALLET
@@ -365,13 +387,6 @@ void BitcoinGUI::createActions()
     showMempoolStatsAction->setStatusTip(tr("Mempool Statistics"));
     // initially disable the mempool stats menu item
     showMempoolStatsAction->setEnabled(false);
-#ifdef ENABLE_DATUM
-    m_show_datum_action = new QAction(tr("&DATUM"), this);
-    m_show_datum_action->setStatusTip(tr("Open embedded DATUM mining status"));
-    m_show_datum_action->setEnabled(false);
-    m_show_datum_action->setObjectName("showDatumAction");
-#endif
-
     usedSendingAddressesAction = new QAction(tr("&Sending addresses"), this);
     usedSendingAddressesAction->setStatusTip(tr("Show the list of used sending addresses and labels"));
     usedReceivingAddressesAction = new QAction(tr("&Receiving addresses"), this);
@@ -423,10 +438,6 @@ void BitcoinGUI::createActions()
     connect(m_show_netwatch_action, &QAction::triggered, this, &BitcoinGUI::showNetWatch);
     connect(openRPCConsoleAction, &QAction::triggered, this, &BitcoinGUI::showDebugWindow);
     connect(showMempoolStatsAction, &QAction::triggered, this, &BitcoinGUI::showMempoolStatsWindow);
-#ifdef ENABLE_DATUM
-    connect(m_show_datum_action, &QAction::triggered, this, &BitcoinGUI::showDatumWindow);
-#endif
-
     // prevents an open debug window from becoming stuck/unusable on client shutdown
     connect(quitAction, &QAction::triggered, rpcConsole, &QWidget::hide);
 
@@ -584,6 +595,7 @@ void BitcoinGUI::createMenuBar()
     settings->addAction(optionsAction);
 
     QMenu* window_menu = appMenuBar->addMenu(tr("&Window"));
+    window_menu->setObjectName(QStringLiteral("windowMenu"));
 
     QAction* minimize_action = window_menu->addAction(tr("&Minimize"));
     minimize_action->setShortcut(QKeySequence(tr("Ctrl+M")));
@@ -619,6 +631,8 @@ void BitcoinGUI::createMenuBar()
         });
 #endif
         window_menu->addSeparator();
+        window_menu->addAction(m_action_pairing);
+        window_menu->addSeparator();
         window_menu->addAction(usedSendingAddressesAction);
         window_menu->addAction(usedReceivingAddressesAction);
     }
@@ -626,10 +640,6 @@ void BitcoinGUI::createMenuBar()
     window_menu->addSeparator();
     window_menu->addAction(m_show_netwatch_action);
     window_menu->addAction(showMempoolStatsAction);
-#ifdef ENABLE_DATUM
-    window_menu->addAction(m_show_datum_action);
-#endif
-
     auto show_blockview_action = new QAction(tr("Block &Visualizer"), this);
     window_menu->addAction(show_blockview_action);
     connect(show_blockview_action, &QAction::triggered, [this] {
@@ -659,20 +669,31 @@ void BitcoinGUI::createToolBars()
 {
     if(walletFrame)
     {
-        QToolBar *toolbar = addToolBar(tr("Tabs toolbar"));
+        QToolBar *toolbar = new QToolBar(tr("Main navigation"), this);
+        addToolBar(Qt::LeftToolBarArea, toolbar);
         appToolBar = toolbar;
+        toolbar->setObjectName(QStringLiteral("mainNavigation"));
         toolbar->setMovable(false);
+        toolbar->setFloatable(false);
+        toolbar->setAllowedAreas(Qt::LeftToolBarArea);
+        toolbar->setOrientation(Qt::Vertical);
         toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+        toolbar->setIconSize(QSize(20, 20));
+        toolbar->setMinimumWidth(150);
+        toolbar->setStyleSheet(QStringLiteral("QToolBar#mainNavigation QToolButton { min-width: 128px; padding: 8px; text-align: left; }"));
         toolbar->addAction(overviewAction);
         toolbar->addAction(sendCoinsAction);
         toolbar->addAction(receiveCoinsAction);
         toolbar->addAction(historyAction);
-        toolbar->addAction(m_action_pairing);
+        toolbar->addAction(addressBookAction);
+#ifdef ENABLE_DATUM
+        toolbar->addAction(miningAction);
+#endif
         overviewAction->setChecked(true);
 
 #ifdef ENABLE_WALLET
         QWidget *spacer = new QWidget();
-        spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+        spacer->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
         toolbar->addWidget(spacer);
 
         m_wallet_selector = new QComboBox();
@@ -758,9 +779,6 @@ void BitcoinGUI::setClientModel(ClientModel *_clientModel, interfaces::BlockAndH
         if (NetWatch) {
             NetWatch->setClientModel(nullptr);
         }
-#ifdef ENABLE_DATUM
-        if (m_datum_window) m_datum_window->hide();
-#endif
         rpcConsole->setClientModel(nullptr);
 #ifdef ENABLE_WALLET
         if (walletFrame)
@@ -898,6 +916,7 @@ void BitcoinGUI::setWalletActionsEnabled(bool enabled)
     sendCoinsAction->setEnabled(enabled);
     receiveCoinsAction->setEnabled(enabled);
     historyAction->setEnabled(enabled && !isPrivacyModeActivated());
+    addressBookAction->setEnabled(enabled);
     encryptWalletAction->setEnabled(enabled);
     backupWalletAction->setEnabled(enabled);
     changePassphraseAction->setEnabled(enabled);
@@ -1062,14 +1081,6 @@ void BitcoinGUI::showMempoolStatsWindow()
     mempoolStats->activateWindow();
 }
 
-#ifdef ENABLE_DATUM
-void BitcoinGUI::showDatumWindow()
-{
-    if (!m_datum_window) m_datum_window = new DatumWindow(this);
-    GUIUtil::bringToFront(m_datum_window);
-}
-#endif
-
 #ifdef ENABLE_WALLET
 void BitcoinGUI::openClicked()
 {
@@ -1109,6 +1120,20 @@ void BitcoinGUI::gotoSendCoinsPage(QString addr)
     sendCoinsAction->setChecked(true);
     if (walletFrame) walletFrame->gotoSendCoinsPage(addr);
 }
+
+void BitcoinGUI::gotoAddressBookPage()
+{
+    addressBookAction->setChecked(true);
+    if (walletFrame) walletFrame->gotoAddressBookPage();
+}
+
+#ifdef ENABLE_DATUM
+void BitcoinGUI::gotoMiningPage()
+{
+    miningAction->setChecked(true);
+    if (walletFrame) walletFrame->gotoMiningPage();
+}
+#endif
 
 void BitcoinGUI::gotoSignMessageTab(QString addr)
 {
@@ -1428,6 +1453,10 @@ void BitcoinGUI::changeEvent(QEvent *e)
         sendCoinsAction->setIcon(platformStyle->SingleColorIcon(QStringLiteral(":/icons/send")));
         receiveCoinsAction->setIcon(platformStyle->SingleColorIcon(QStringLiteral(":/icons/receiving_addresses")));
         historyAction->setIcon(platformStyle->SingleColorIcon(QStringLiteral(":/icons/history")));
+        addressBookAction->setIcon(platformStyle->SingleColorIcon(QStringLiteral(":/icons/address-book")));
+#ifdef ENABLE_DATUM
+        miningAction->setIcon(platformStyle->SingleColorIcon(QStringLiteral(":/icons/tx_mined")));
+#endif
         m_action_pairing->setIcon(platformStyle->SingleColorIcon(QStringLiteral(":/icons/connect_1")));
     }
 
@@ -1485,9 +1514,6 @@ void BitcoinGUI::showEvent(QShowEvent *event)
     // enable the debug window when the main window shows up
     openRPCConsoleAction->setEnabled(true);
     showMempoolStatsAction->setEnabled(true);
-#ifdef ENABLE_DATUM
-    m_show_datum_action->setEnabled(true);
-#endif
     aboutAction->setEnabled(true);
     optionsAction->setEnabled(true);
 }

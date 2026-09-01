@@ -8,6 +8,9 @@
 #include <node/interface_ui.h>
 #include <psbt.h>
 #include <qt/guiutil.h>
+#ifdef ENABLE_DATUM
+#include <qt/miningpage.h>
+#endif
 #include <qt/overviewpage.h>
 #include <qt/psbtoperationsdialog.h>
 #include <qt/walletmodel.h>
@@ -24,6 +27,9 @@
 #include <QClipboard>
 #include <QLabel>
 #include <QPushButton>
+#include <QSplitter>
+#include <QTabBar>
+#include <QTabWidget>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -36,7 +42,18 @@ WalletFrame::WalletFrame(const PlatformStyle* _platformStyle, QWidget* parent)
     setContentsMargins(0,0,0,0);
     walletStack = new QStackedWidget(this);
     m_global_stack = new QStackedWidget(this);
-    m_global_stack->addWidget(walletStack);
+    m_mining_splitter = new QSplitter(Qt::Horizontal, this);
+    m_mining_splitter->setObjectName(QStringLiteral("miningWorkspace"));
+    m_mining_splitter->setChildrenCollapsible(false);
+    m_mining_splitter->setHandleWidth(1);
+
+    m_wallet_overview_tabs = new QTabWidget(m_mining_splitter);
+    m_wallet_overview_tabs->setObjectName(QStringLiteral("miningWalletOverview"));
+    m_wallet_overview_tabs->setDocumentMode(true);
+    m_wallet_overview_tabs->addTab(walletStack, tr("Overview"));
+    m_wallet_overview_tabs->tabBar()->hide();
+    m_mining_splitter->addWidget(m_wallet_overview_tabs);
+    m_global_stack->addWidget(m_mining_splitter);
     walletFrameLayout->setContentsMargins(0,0,0,0);
     walletFrameLayout->setSpacing(0);
 
@@ -67,6 +84,13 @@ WalletFrame::WalletFrame(const PlatformStyle* _platformStyle, QWidget* parent)
 
     m_page_pairing = new PairingPage(this);
     m_global_stack->addWidget(m_page_pairing);
+#ifdef ENABLE_DATUM
+    m_page_mining = new MiningPage(m_mining_splitter);
+    m_mining_splitter->addWidget(m_page_mining);
+    m_mining_splitter->setStretchFactor(0, 0);
+    m_mining_splitter->setStretchFactor(1, 1);
+    m_page_mining->hide();
+#endif
 }
 
 WalletFrame::~WalletFrame() = default;
@@ -102,6 +126,7 @@ bool WalletFrame::addView(WalletView* walletView)
     } else {
         walletView->gotoOverviewPage();
     }
+    walletView->setOverviewCompact(m_mining_visible);
 
     walletStack->addWidget(walletView);
     mapWalletViews[walletView->getWalletModel()] = walletView;
@@ -174,20 +199,31 @@ void WalletFrame::gotoOverviewPage()
     QMap<WalletModel*, WalletView*>::const_iterator i;
     for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
         i.value()->gotoOverviewPage();
-    m_global_stack->setCurrentWidget(walletStack);
+    setMiningWorkspaceVisible(false);
 }
 
 void WalletFrame::gotoPairingPage()
 {
+    setMiningWorkspaceVisible(false);
     m_global_stack->setCurrentWidget(m_page_pairing);
 }
+
+#ifdef ENABLE_DATUM
+void WalletFrame::gotoMiningPage()
+{
+    for (auto i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i) {
+        i.value()->gotoOverviewPage();
+    }
+    setMiningWorkspaceVisible(true);
+}
+#endif
 
 void WalletFrame::gotoHistoryPage()
 {
     QMap<WalletModel*, WalletView*>::const_iterator i;
     for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
         i.value()->gotoHistoryPage();
-    m_global_stack->setCurrentWidget(walletStack);
+    setMiningWorkspaceVisible(false);
 }
 
 void WalletFrame::gotoReceiveCoinsPage()
@@ -195,7 +231,7 @@ void WalletFrame::gotoReceiveCoinsPage()
     QMap<WalletModel*, WalletView*>::const_iterator i;
     for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
         i.value()->gotoReceiveCoinsPage();
-    m_global_stack->setCurrentWidget(walletStack);
+    setMiningWorkspaceVisible(false);
 }
 
 void WalletFrame::gotoSendCoinsPage(QString addr)
@@ -203,7 +239,33 @@ void WalletFrame::gotoSendCoinsPage(QString addr)
     QMap<WalletModel*, WalletView*>::const_iterator i;
     for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
         i.value()->gotoSendCoinsPage(addr);
-    m_global_stack->setCurrentWidget(walletStack);
+    setMiningWorkspaceVisible(false);
+}
+
+void WalletFrame::gotoAddressBookPage()
+{
+    QMap<WalletModel*, WalletView*>::const_iterator i;
+    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
+        i.value()->gotoAddressBookPage();
+    setMiningWorkspaceVisible(false);
+}
+
+void WalletFrame::setMiningWorkspaceVisible(bool visible)
+{
+    m_mining_visible = visible;
+    for (auto i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i) {
+        i.value()->setOverviewCompact(visible);
+    }
+    m_wallet_overview_tabs->tabBar()->setVisible(visible);
+    m_wallet_overview_tabs->setMinimumWidth(visible ? 250 : 0);
+    m_wallet_overview_tabs->setMaximumWidth(visible ? 290 : QWIDGETSIZE_MAX);
+#ifdef ENABLE_DATUM
+    m_page_mining->setVisible(visible);
+    if (visible) m_mining_splitter->setSizes({260, 670});
+#else
+    Q_UNUSED(visible);
+#endif
+    m_global_stack->setCurrentWidget(m_mining_splitter);
 }
 
 void WalletFrame::gotoSignMessageTab(QString addr)

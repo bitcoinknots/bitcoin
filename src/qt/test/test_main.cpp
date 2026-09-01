@@ -15,6 +15,10 @@
 #include <test/util/setup_common.h>
 #include <util/chaintype.h>
 
+#ifdef ENABLE_DATUM
+#include <qt/test/miningpagetests.h>
+#endif
+
 #ifdef ENABLE_WALLET
 #include <qt/test/addressbooktests.h>
 #include <qt/test/wallettests.h>
@@ -90,6 +94,11 @@ int main(int argc, char* argv[])
 
         RPCNestedTests test3(app.node());
         num_test_failures += QTest::qExec(&test3);
+
+#ifdef ENABLE_DATUM
+        MiningPageTests mining_page_tests;
+        num_test_failures += QTest::qExec(&mining_page_tests);
+#endif
 
 #ifdef ENABLE_WALLET
         WalletTests test5(app.node());

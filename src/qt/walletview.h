@@ -19,6 +19,7 @@ class SendCoinsRecipient;
 class TransactionView;
 class WalletModel;
 class AddressBookPage;
+class QTabWidget;
 
 QT_BEGIN_NAMESPACE
 class QModelIndex;
@@ -48,6 +49,7 @@ public:
     bool handlePaymentRequest(const SendCoinsRecipient& recipient);
 
     void showOutOfSyncWarning(bool fShow);
+    void setOverviewCompact(bool compact);
 
 private:
     ClientModel* clientModel{nullptr};
@@ -64,6 +66,9 @@ private:
     SendCoinsDialog *sendCoinsPage;
     AddressBookPage *usedSendingAddressesPage;
     AddressBookPage *usedReceivingAddressesPage;
+    AddressBookPage *sendingAddressesPage;
+    AddressBookPage *receivingAddressesPage;
+    QTabWidget *addressBookPage;
 
     TransactionView *transactionView;
 
@@ -79,6 +84,8 @@ public Q_SLOTS:
     void gotoReceiveCoinsPage();
     /** Switch to send coins page */
     void gotoSendCoinsPage(QString addr = "");
+    /** Switch to the embedded address book page */
+    void gotoAddressBookPage();
 
     /** Show Sign/Verify Message dialog and switch to sign message tab */
     void gotoSignMessageTab(QString addr = "");
