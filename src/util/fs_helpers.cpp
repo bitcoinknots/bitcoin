@@ -337,6 +337,17 @@ bool RenameOver(fs::path src, fs::path dest)
     return !error;
 }
 
+bool IsUsableDirectory(const fs::path& directory)
+{
+    std::error_code ec;
+    if (!fs::is_directory(directory, ec) || ec) {
+        return false;
+    }
+    // Some missing/mapped drives still report as directories but cannot be opened.
+    fs::directory_iterator it(directory, ec);
+    return !ec;
+}
+
 /**
  * Ignores exceptions thrown by create_directories if the requested directory exists.
  * Specifically handles case where path p exists, but it wasn't possible for the user to
@@ -347,7 +358,7 @@ bool TryCreateDirectories(const fs::path& p)
     try {
         return fs::create_directories(p);
     } catch (const fs::filesystem_error&) {
-        if (!fs::exists(p) || !fs::is_directory(p))
+        if (!IsUsableDirectory(p))
             throw;
     }
 

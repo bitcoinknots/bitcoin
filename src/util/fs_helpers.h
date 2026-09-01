@@ -72,6 +72,12 @@ void ReleaseDirectoryLocks();
 bool TryCreateDirectories(const fs::path& p);
 fs::path GetDefaultDataDir();
 
+/** Return true if path is an existing directory that can be opened and listed.
+ *  Uses the non-throwing filesystem overloads so missing drives and stale
+ *  network paths are treated as unavailable instead of raising filesystem_error.
+ */
+bool IsUsableDirectory(const fs::path& directory);
+
 /** Convert fs::perms to symbolic string of the form 'rwxrwxrwx'
  *
  * @param[in] p the perms to be converted

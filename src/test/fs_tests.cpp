@@ -163,4 +163,16 @@ BOOST_AUTO_TEST_CASE(create_directories)
 }
 #endif // __MINGW64__
 
+BOOST_AUTO_TEST_CASE(usable_directory)
+{
+    const fs::path tmpfolder{m_args.GetDataDirBase()};
+    BOOST_CHECK(IsUsableDirectory(tmpfolder));
+    BOOST_CHECK(!IsUsableDirectory(tmpfolder / "does-not-exist"));
+    {
+        std::ofstream file{tmpfolder / "usable_directory_not_a_dir.txt"};
+        file << "x";
+    }
+    BOOST_CHECK(!IsUsableDirectory(tmpfolder / "usable_directory_not_a_dir.txt"));
+}
+
 BOOST_AUTO_TEST_SUITE_END()

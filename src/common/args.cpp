@@ -293,7 +293,7 @@ fs::path ArgsManager::GetBlocksDirPath() const
 
     if (IsArgSet("-blocksdir")) {
         path = fs::absolute(GetPathArg("-blocksdir"));
-        if (!fs::is_directory(path)) {
+        if (!IsUsableDirectory(path)) {
             path = "";
             return path;
         }
@@ -301,9 +301,15 @@ fs::path ArgsManager::GetBlocksDirPath() const
         path = GetDataDirBase();
     }
 
-    path /= fs::PathFromString(BaseParams().DataDir());
+    if (!BaseParams().DataDir().empty()) {
+        path /= fs::PathFromString(BaseParams().DataDir());
+    }
     path /= "blocks";
-    fs::create_directories(path);
+    try {
+        fs::create_directories(path);
+    } catch (const fs::filesystem_error&) {
+        // Callers treat an unusable path as missing.
+    }
     return path;
 }
 
@@ -318,7 +324,7 @@ fs::path ArgsManager::GetDataDir(bool net_specific) const
     const fs::path datadir{GetPathArg("-datadir")};
     if (!datadir.empty()) {
         path = fs::absolute(datadir);
-        if (!fs::is_directory(path)) {
+        if (!IsUsableDirectory(path)) {
             path = "";
             return path;
         }
@@ -803,7 +809,7 @@ fs::path GetDefaultDataDir()
 bool CheckDataDirOption(const ArgsManager& args)
 {
     const fs::path datadir{args.GetPathArg("-datadir")};
-    return datadir.empty() || fs::is_directory(fs::absolute(datadir));
+    return datadir.empty() || IsUsableDirectory(fs::absolute(datadir));
 }
 
 fs::path ArgsManager::GetConfigFilePath() const

@@ -64,6 +64,9 @@ public:
      */
     static bool showIfNeeded(std::unique_ptr<Intro>& intro);
 
+    /** Tell the wizard that a previously saved data directory is no longer available. */
+    void setPreviousDataDirectoryUnavailable(const QString& missing_dir);
+
     /** Re-show the wizard after a failed official package download. Returns false if cancelled. */
     bool retryAfterPackageDownloadFailure();
 

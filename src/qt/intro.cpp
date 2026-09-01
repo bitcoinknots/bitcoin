@@ -30,6 +30,7 @@
 #include <QCheckBox>
 #include <QCoreApplication>
 #include <QDialogButtonBox>
+#include <QDir>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QGroupBox>
@@ -54,6 +55,7 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <system_error>
 
 namespace {
 
@@ -224,7 +226,8 @@ fs::path NetworkSettingsPath(const fs::path& base_datadir)
 bool NeedsSyncSetup(const fs::path& base_datadir)
 {
     const fs::path settings_path = NetworkSettingsPath(base_datadir);
-    if (!fs::exists(settings_path)) {
+    std::error_code ec;
+    if (!std::filesystem::exists(settings_path, ec) || ec) {
         return true;
     }
     std::map<std::string, common::SettingsValue> values;
@@ -271,6 +274,23 @@ void ApplyIntroDataDir(const QString& dataDir)
     }
     gArgs.ClearPathCache();
 }
+
+bool SavedDataDirIsUsable(const fs::path& datadir)
+{
+    if (!IsUsableDirectory(datadir)) {
+        return false;
+    }
+    fs::path blocks = datadir;
+    if (!BaseParams().DataDir().empty()) {
+        blocks /= fs::PathFromString(BaseParams().DataDir());
+    }
+    blocks /= "blocks";
+    std::error_code ec;
+    if (!std::filesystem::exists(blocks, ec) || ec) {
+        return true;
+    }
+    return IsUsableDirectory(blocks);
+}
 } // namespace
 
 FreespaceChecker::FreespaceChecker(Intro *_intro)
@@ -288,8 +308,11 @@ void FreespaceChecker::check()
 
     fs::path parentDir = dataDir;
     fs::path parentDirOld = fs::path();
-    while(parentDir.has_parent_path() && !fs::exists(parentDir))
-    {
+    while (parentDir.has_parent_path()) {
+        std::error_code ec;
+        if (std::filesystem::exists(parentDir, ec) && !ec) {
+            break;
+        }
         parentDir = parentDir.parent_path();
         if (parentDirOld == parentDir)
             break;
@@ -883,13 +906,6 @@ bool Intro::showIfNeeded(std::unique_ptr<Intro>& intro)
     QSettings settings;
     const bool datadir_from_cli = !gArgs.GetArg("-datadir", "").empty();
 
-    QString dataDir;
-    if (datadir_from_cli) {
-        dataDir = GUIUtil::PathToQString(fs::absolute(fs::PathFromString(gArgs.GetArg("-datadir", ""))));
-    } else {
-        dataDir = settings.value("strDataDir", GUIUtil::getDefaultDataDirectory()).toString();
-    }
-
     try {
         SelectParams(gArgs.GetChainType());
     } catch (const std::exception& e) {
@@ -898,9 +914,22 @@ bool Intro::showIfNeeded(std::unique_ptr<Intro>& intro)
         std::exit(EXIT_FAILURE);
     }
 
+    QString dataDir;
+    QString unavailable_datadir;
+    if (datadir_from_cli) {
+        dataDir = GUIUtil::PathToQString(fs::absolute(fs::PathFromString(gArgs.GetArg("-datadir", ""))));
+    } else {
+        dataDir = settings.value("strDataDir", GUIUtil::getDefaultDataDirectory()).toString();
+        if (!SavedDataDirIsUsable(GUIUtil::QStringToPath(dataDir))) {
+            unavailable_datadir = dataDir;
+            dataDir = GUIUtil::getDefaultDataDirectory();
+        }
+    }
+
     const fs::path datadir_path = GUIUtil::QStringToPath(dataDir);
     const bool need_intro =
-        !fs::exists(datadir_path) ||
+        !unavailable_datadir.isEmpty() ||
+        !SavedDataDirIsUsable(datadir_path) ||
         gArgs.GetBoolArg("-choosedatadir", DEFAULT_CHOOSE_DATADIR) ||
         settings.value("fReset", false).toBool() ||
         gArgs.GetBoolArg("-resetguisettings", false) ||
@@ -915,13 +944,17 @@ bool Intro::showIfNeeded(std::unique_ptr<Intro>& intro)
 
     // Apply the known path so GetDataDir* works during the wizard (official package files
     // under the datadir). SoftSetArg of the default path is intentionally avoided here —
-    // see ApplyIntroDataDir.
+    // see ApplyIntroDataDir. A missing previous directory is replaced with the default
+    // so stale GUI settings cannot keep pointing at a dead path.
     if (!datadir_from_cli) {
         ApplyIntroDataDir(dataDir);
     }
 
     intro = std::make_unique<Intro>(nullptr, Params().AssumedBlockchainSize(), Params().AssumedChainStateSize());
     intro->setDataDirectory(dataDir);
+    if (!unavailable_datadir.isEmpty()) {
+        intro->setPreviousDataDirectoryUnavailable(unavailable_datadir);
+    }
     if (datadir_from_cli) {
         intro->setSkipDataDirPage(true);
     }
@@ -953,6 +986,14 @@ bool Intro::showIfNeeded(std::unique_ptr<Intro>& intro)
         ApplyIntroDataDir(dataDir);
     }
     return true;
+}
+
+void Intro::setPreviousDataDirectoryUnavailable(const QString& missing_dir)
+{
+    m_data_dir_page->m_error_message->setText(
+        tr("The previously selected data directory \"%1\" is no longer available. Please choose a new location.")
+            .arg(QDir::toNativeSeparators(missing_dir)));
+    m_data_dir_page->m_error_message->setStyleSheet("QLabel { color: #800000 }");
 }
 
 void Intro::setStatus(int status, const QString &message, quint64 bytesAvailable)

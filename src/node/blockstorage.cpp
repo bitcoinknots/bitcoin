@@ -44,6 +44,8 @@
 #include <map>
 #include <optional>
 #include <ranges>
+#include <stdexcept>
+#include <system_error>
 #include <unordered_map>
 
 namespace kernel {
@@ -1279,9 +1281,19 @@ static auto InitBlocksdirXorKey(const BlockManager::Options& opts)
     // files (those which start with a .). Checking for a fully-empty dir would
     // be too aggressive as a .lock file may have already been written.
     bool first_run = true;
-    for (const auto& entry : fs::directory_iterator(opts.blocks_dir)) {
-        const std::string path = fs::PathToString(entry.path().filename());
-        if (!entry.is_regular_file() || !path.starts_with('.')) {
+    std::error_code ec;
+    fs::directory_iterator it{opts.blocks_dir, ec};
+    if (ec) {
+        throw std::runtime_error(strprintf("Cannot open blocks directory %s: %s",
+                                           fs::PathToString(opts.blocks_dir), ec.message()));
+    }
+    for (; it != fs::directory_iterator(); it.increment(ec)) {
+        if (ec) {
+            throw std::runtime_error(strprintf("Cannot read blocks directory %s: %s",
+                                               fs::PathToString(opts.blocks_dir), ec.message()));
+        }
+        const std::string path = fs::PathToString(it->path().filename());
+        if (!it->is_regular_file() || !path.starts_with('.')) {
             first_run = false;
             break;
         }

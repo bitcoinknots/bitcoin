@@ -1101,7 +1101,7 @@ bool AppInitParameterInteraction(const ArgsManager& args)
         InitWarning(warnings);
     }
 
-    if (!fs::is_directory(args.GetBlocksDirPath())) {
+    if (!IsUsableDirectory(args.GetBlocksDirPath())) {
         return InitError(strprintf(_("Specified blocks directory \"%s\" does not exist."), args.GetArg("-blocksdir", "")));
     }
 
