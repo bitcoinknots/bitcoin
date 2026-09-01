@@ -14,6 +14,7 @@
 
 class CBlock;
 class CBlockHeader;
+class CFeeRate;
 class CScript;
 class CTransaction;
 struct CMutableTransaction;
@@ -34,6 +35,7 @@ enum class TxVerbosity {
 // core_read.cpp
 CScript ParseScript(const std::string& s);
 std::string ScriptToAsmStr(const CScript& script, const bool fAttemptSighashDecode = false);
+[[nodiscard]] bool DecodeTx(CMutableTransaction& tx, const std::vector<unsigned char>& tx_data, bool try_no_witness, bool try_witness);
 [[nodiscard]] bool DecodeHexTx(CMutableTransaction& tx, const std::string& hex_tx, bool try_no_witness = false, bool try_witness = true);
 [[nodiscard]] bool DecodeHexBlk(CBlock&, const std::string& strHexBlk);
 bool DecodeHexBlockHeader(CBlockHeader&, const std::string& hex_header);
@@ -42,6 +44,7 @@ bool DecodeHexBlockHeader(CBlockHeader&, const std::string& hex_header);
 
 // core_write.cpp
 UniValue ValueFromAmount(const CAmount amount);
+UniValue ValueFromFeeRate(const CFeeRate& fee_rate);
 std::string FormatScript(const CScript& script);
 std::string EncodeHexTx(const CTransaction& tx);
 std::string SighashToStr(unsigned char sighash_type);

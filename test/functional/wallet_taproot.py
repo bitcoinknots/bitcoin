@@ -194,6 +194,8 @@ class WalletTaprootTest(BitcoinTestFramework):
         self.num_nodes = 2
         self.setup_clean_chain = True
         self.extra_args = [['-keypool=100'], ['-keypool=100']]
+        for ea in self.extra_args:
+            ea.append('-addresstype=bech32m')
         self.supports_cli = False
 
     def skip_test_if_missing_module(self):
@@ -305,7 +307,7 @@ class WalletTaprootTest(BitcoinTestFramework):
             assert rpc_online.gettransaction(res)["confirmations"] > 0
 
         # Cleanup
-        txid = rpc_online.sendall(recipients=[self.boring.getnewaddress()])["txid"]
+        txid = rpc_online.sendall(recipients=[self.boring.getnewaddress()], fee_rate=200)["txid"]
         self.generatetoaddress(self.nodes[0], 1, self.boring.getnewaddress(), sync_fun=self.no_op)
         assert rpc_online.gettransaction(txid)["confirmations"] > 0
         rpc_online.unloadwallet()
@@ -378,7 +380,7 @@ class WalletTaprootTest(BitcoinTestFramework):
             assert psbt_online.gettransaction(txid)['confirmations'] > 0
 
         # Cleanup
-        psbt = psbt_online.sendall(recipients=[self.boring.getnewaddress()], psbt=True)["psbt"]
+        psbt = psbt_online.sendall(recipients=[self.boring.getnewaddress()], psbt=True, conf_target=1, estimate_mode='conservative')["psbt"]
         res = psbt_offline.walletprocesspsbt(psbt=psbt, finalize=False)
         rawtx = self.nodes[0].finalizepsbt(res['psbt'])['hex']
         txid = self.nodes[0].sendrawtransaction(rawtx)

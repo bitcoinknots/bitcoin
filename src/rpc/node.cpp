@@ -6,6 +6,9 @@
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
 #include <chainparams.h>
+#include <clientversion.h>
+#include <common/args.h>
+#include <common/system.h>
 #include <httpserver.h>
 #include <index/blockfilterindex.h>
 #include <index/coinstatsindex.h>
@@ -16,6 +19,7 @@
 #include <interfaces/ipc.h>
 #include <kernel/cs_main.h>
 #include <logging.h>
+#include <net.h>
 #include <node/context.h>
 #include <rpc/server.h>
 #include <rpc/server_util.h>
@@ -192,6 +196,40 @@ static RPCHelpMan getmemoryinfo()
     };
 }
 
+static RPCHelpMan getgeneralinfo()
+{
+    return RPCHelpMan{"getgeneralinfo",
+                "Returns data about the bitcoin daemon.\n",
+                {},
+                RPCResult{
+                    RPCResult::Type::OBJ, "", "",
+                    {
+                        {RPCResult::Type::STR, "clientversion", "Client version"},
+                        {RPCResult::Type::STR, "useragent", "Client name"},
+                        {RPCResult::Type::STR, "datadir", "Data directory path"},
+                        {RPCResult::Type::STR, "blocksdir", "Blocks directory path"},
+                        {RPCResult::Type::NUM, "startuptime", "Startup time"},
+                    }
+                },
+                RPCExamples{
+                    HelpExampleCli("getgeneralinfo", "")
+            + HelpExampleRpc("getgeneralinfo", "")
+                },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+        const ArgsManager& args{EnsureAnyArgsman(request.context)};
+
+        UniValue obj(UniValue::VOBJ);
+        obj.pushKV("clientversion", FormatFullVersion());
+        obj.pushKV("useragent", strSubVersion);
+        obj.pushKV("datadir", fs::PathToString(args.GetDataDirNet()));
+        obj.pushKV("blocksdir", fs::PathToString(args.GetBlocksDirPath()));
+        obj.pushKV("startuptime", TicksSinceEpoch<std::chrono::seconds>(NodeClock::now() - GetUptime()));
+        return obj;
+},
+    };
+}
+
 static void EnableOrDisableLogCategories(UniValue cats, bool enable) {
     cats = cats.get_array();
     for (unsigned int i = 0; i < cats.size(); ++i) {
@@ -265,6 +303,32 @@ static RPCHelpMan logging()
     }
 
     return result;
+},
+    };
+}
+
+static RPCHelpMan format()
+{
+    return RPCHelpMan{"format",
+        "\nFormat data we have about an RPC command in the format specified\n",
+        {
+            {"command", RPCArg::Type::STR, RPCArg::Optional::NO, "Command to query"},
+            {"output", RPCArg::Type::STR, RPCArg::Optional::NO, "Output format. Accepted values: args_cli"},
+        },
+        RPCResult{RPCResult::Type::STR, "data", "Formated data about command"},
+        RPCExamples{""},
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    const std::string command = request.params[0].get_str();
+    JSONRPCRequest jreq(request);
+    jreq.mode = JSONRPCRequest::GET_HELP;
+
+    try {
+        tableRPC.execute(command, jreq);
+    } catch(const UniValue& e) {
+        return e["message"];
+    }
+    return NullUniValue;
 },
     };
 }
@@ -404,10 +468,12 @@ void RegisterNodeRPCCommands(CRPCTable& t)
 {
     static const CRPCCommand commands[]{
         {"control", &getmemoryinfo},
+        {"control", &getgeneralinfo},
         {"control", &logging},
         {"util", &getindexinfo},
         {"hidden", &setmocktime},
         {"hidden", &mockscheduler},
+        {"hidden", &format},
         {"hidden", &echo},
         {"hidden", &echojson},
         {"hidden", &echoipc},

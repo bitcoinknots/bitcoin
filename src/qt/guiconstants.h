@@ -26,6 +26,10 @@ static const bool DEFAULT_SPLASHSCREEN = true;
 
 /* Invalid field background style */
 #define STYLE_INVALID "border: 3px solid #FF8080"
+/* "Warning" field background style */
+#define STYLE_INCORRECT "border: 3px solid #FFFF80"
+/* Background style for active search in NetWatch */
+#define STYLE_ACTIVE "border: 3px solid #80FF80"
 
 /* Transaction list -- unconfirmed transaction */
 #define COLOR_UNCONFIRMED QColor(128, 128, 128)
@@ -54,10 +58,13 @@ static const int TOOLTIP_WRAP_THRESHOLD = 80;
 #define QAPP_APP_NAME_SIGNET "Bitcoin-Qt-signet"
 #define QAPP_APP_NAME_REGTEST "Bitcoin-Qt-regtest"
 
+/* One mebibyte (MiB) in bytes */
+static constexpr uint64_t MiB_BYTES{1024 * 1024};
+
 /* One gigabyte (GB) in bytes */
 static constexpr uint64_t GB_BYTES{1000000000};
 
 // Default prune target displayed in GUI.
-static constexpr int DEFAULT_PRUNE_TARGET_GB{2};
+static constexpr int DEFAULT_PRUNE_TARGET_MiB{1907};
 
 #endif // BITCOIN_QT_GUICONSTANTS_H

@@ -11,6 +11,7 @@
 #include <node/interface_ui.h>
 #include <sync.h>
 #include <univalue.h>
+#include <util/string.h>
 #include <util/translation.h>
 
 #include <utility>
@@ -26,9 +27,20 @@ Warnings::Warnings()
              _("This is a pre-release test build - use at your own risk - do not use for mining or merchant applications")});
     }
 }
-bool Warnings::Set(warning_type id, bilingual_str message)
+bool Warnings::Set(warning_type id, bilingual_str message, const bool update)
 {
-    const auto& [_, inserted]{WITH_LOCK(m_mutex, return m_warnings.insert({id, std::move(message)}))};
+    bool inserted{false};
+    if (update) {
+        LOCK(m_mutex);
+        auto& warning_msg = m_warnings[id];
+        if (warning_msg.original != message.original) {
+            warning_msg = message;
+            inserted = true;
+        }
+    } else {
+        const auto& [_, inserted_res]{WITH_LOCK(m_mutex, return m_warnings.insert({id, std::move(message)}))};
+        inserted = inserted_res;
+    }
     if (inserted) uiInterface.NotifyAlertChanged();
     return inserted;
 }
@@ -55,7 +67,7 @@ UniValue GetWarningsForRpc(const Warnings& warnings, bool use_deprecated)
 {
     if (use_deprecated) {
         const auto all_messages{warnings.GetMessages()};
-        return all_messages.empty() ? "" : all_messages.back().original;
+        return all_messages.empty() ? "" : util::Join(all_messages, Untranslated("\n")).original;
     }
 
     UniValue messages{UniValue::VARR};

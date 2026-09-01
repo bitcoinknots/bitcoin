@@ -6,11 +6,12 @@
 #include <span.h>
 #include <streams.h>
 #include <util/fs_helpers.h>
+#include <util/ioprio.h>
+#include <util/obfuscation.h>
 
 #include <array>
 
-AutoFile::AutoFile(std::FILE* file, std::vector<std::byte> data_xor)
-    : m_file{file}, m_xor{std::move(data_xor)}
+AutoFile::AutoFile(std::FILE* file, const Obfuscation& obfuscation) : m_file{file}, m_obfuscation{obfuscation}
 {
     if (!IsNull()) {
         auto pos{std::ftell(m_file)};
@@ -22,9 +23,9 @@ std::size_t AutoFile::detail_fread(Span<std::byte> dst)
 {
     if (!m_file) throw std::ios_base::failure("AutoFile::read: file handle is nullptr");
     size_t ret = std::fread(dst.data(), 1, dst.size(), m_file);
-    if (!m_xor.empty()) {
+    if (m_obfuscation) {
         if (!m_position.has_value()) throw std::ios_base::failure("AutoFile::read: position unknown");
-        util::Xor(dst.subspan(0, ret), m_xor, *m_position);
+        m_obfuscation(dst.subspan(0, ret), *m_position);
     }
     if (m_position.has_value()) *m_position += ret;
     return ret;
@@ -81,25 +82,35 @@ void AutoFile::ignore(size_t nSize)
 void AutoFile::write(Span<const std::byte> src)
 {
     if (!m_file) throw std::ios_base::failure("AutoFile::write: file handle is nullptr");
-    if (m_xor.empty()) {
+    if (!m_obfuscation) {
         if (std::fwrite(src.data(), 1, src.size(), m_file) != src.size()) {
             throw std::ios_base::failure("AutoFile::write: write failed");
         }
+        m_was_written = true;
         if (m_position.has_value()) *m_position += src.size();
     } else {
-        if (!m_position.has_value()) throw std::ios_base::failure("AutoFile::write: position unknown");
         std::array<std::byte, 4096> buf;
         while (src.size() > 0) {
             auto buf_now{Span{buf}.first(std::min<size_t>(src.size(), buf.size()))};
-            std::copy(src.begin(), src.begin() + buf_now.size(), buf_now.begin());
-            util::Xor(buf_now, m_xor, *m_position);
-            if (std::fwrite(buf_now.data(), 1, buf_now.size(), m_file) != buf_now.size()) {
-                throw std::ios_base::failure{"XorFile::write: failed"};
-            }
+            std::copy_n(src.begin(), buf_now.size(), buf_now.begin());
+            write_buffer(buf_now);
             src = src.subspan(buf_now.size());
-            *m_position += buf_now.size();
         }
     }
+}
+
+void AutoFile::write_buffer(std::span<std::byte> src)
+{
+    if (!m_file) throw std::ios_base::failure("AutoFile::write_buffer: file handle is nullptr");
+    if (m_obfuscation) {
+        if (!m_position) throw std::ios_base::failure("AutoFile::write_buffer: obfuscation position unknown");
+        m_obfuscation(src, *m_position); // obfuscate in-place
+        }
+    if (std::fwrite(src.data(), 1, src.size(), m_file) != src.size()) {
+        throw std::ios_base::failure("AutoFile::write_buffer: write failed");
+    }
+    m_was_written = true;
+    if (m_position) *m_position += src.size();
 }
 
 bool AutoFile::Commit()
@@ -107,8 +118,14 @@ bool AutoFile::Commit()
     return ::FileCommit(m_file);
 }
 
+void AutoFile::SetIdlePriority()
+{
+    ioprio_set_file_idle(m_file);
+}
+
 bool AutoFile::Truncate(unsigned size)
 {
+    m_was_written = true;
     return ::TruncateFile(m_file, size);
 }
 

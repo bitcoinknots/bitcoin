@@ -6,6 +6,7 @@
 #define BITCOIN_COMMON_PCP_H
 
 #include <netaddress.h>
+#include <util/threadinterrupt.h>
 
 #include <variant>
 
@@ -43,6 +44,8 @@ struct MappingResult {
     std::string ToString() const;
 };
 
+extern bool g_pcp_warn_for_unauthorized;
+
 //! Try to open a port using RFC 6886 NAT-PMP. IPv4 only.
 //!
 //! * gateway: Destination address for PCP requests (usually the default gateway).
@@ -51,7 +54,7 @@ struct MappingResult {
 //! * num_tries: Number of tries in case of no response.
 //!
 //! Returns the external_ip:external_port of the mapping if successful, otherwise a MappingError.
-std::variant<MappingResult, MappingError> NATPMPRequestPortMap(const CNetAddr &gateway, uint16_t port, uint32_t lifetime, int num_tries = 3, std::chrono::milliseconds timeout_per_try = std::chrono::milliseconds(1000));
+std::variant<MappingResult, MappingError> NATPMPRequestPortMap(const CNetAddr &gateway, uint16_t port, uint32_t lifetime, CThreadInterrupt& interrupt, int num_tries = 3, std::chrono::milliseconds timeout_per_try = std::chrono::milliseconds(1000));
 
 //! Try to open a port using RFC 6887 Port Control Protocol (PCP). Handles IPv4 and IPv6.
 //!
@@ -63,6 +66,6 @@ std::variant<MappingResult, MappingError> NATPMPRequestPortMap(const CNetAddr &g
 //! * num_tries: Number of tries in case of no response.
 //!
 //! Returns the external_ip:external_port of the mapping if successful, otherwise a MappingError.
-std::variant<MappingResult, MappingError> PCPRequestPortMap(const PCPMappingNonce &nonce, const CNetAddr &gateway, const CNetAddr &bind, uint16_t port, uint32_t lifetime, int num_tries = 3, std::chrono::milliseconds timeout_per_try = std::chrono::milliseconds(1000));
+std::variant<MappingResult, MappingError> PCPRequestPortMap(const PCPMappingNonce &nonce, const CNetAddr &gateway, const CNetAddr &bind, uint16_t port, uint32_t lifetime, CThreadInterrupt& interrupt, int num_tries = 3, std::chrono::milliseconds timeout_per_try = std::chrono::milliseconds(1000));
 
 #endif // BITCOIN_COMMON_PCP_H

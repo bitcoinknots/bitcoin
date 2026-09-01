@@ -152,7 +152,7 @@ void MinerTestingSetup::TestPackageSelection(const CScript& scriptPubKey, const 
     BOOST_CHECK(block.vtx[3]->GetHash() == hashMediumFeeTx);
 
     // Test the inclusion of package feerates in the block template and ensure they are sequential.
-    const auto block_package_feerates = BlockAssembler{m_node.chainman->ActiveChainstate(), &tx_mempool, options}.CreateNewBlock()->m_package_feerates;
+    const auto block_package_feerates = BlockAssembler{m_node.chainman->ActiveChainstate(), &tx_mempool, options, m_node}.CreateNewBlock()->m_package_feerates;
     BOOST_CHECK(block_package_feerates.size() == 2);
 
     // parent_tx and high_fee_tx are added to the block as a package.
@@ -220,7 +220,8 @@ void MinerTestingSetup::TestPackageSelection(const CScript& scriptPubKey, const 
     // This tx can't be mined by itself
     tx.vin[0].prevout.hash = hashFreeTx2;
     tx.vout.resize(1);
-    feeToUse = blockMinFeeRate.GetFee(freeTxSize);
+    const size_t lowFeeTx2VSize = GetVirtualTransactionSize(CTransaction{tx});
+    feeToUse = blockMinFeeRate.GetFee(lowFeeTx2VSize);
     tx.vout[0].nValue = 5000000000LL - 100000000 - feeToUse;
     Txid hashLowFeeTx2 = tx.GetHash();
     AddToMempool(tx_mempool, entry.Fee(feeToUse).SpendsCoinbase(false).FromTx(tx));
@@ -658,6 +659,8 @@ void MinerTestingSetup::TestPrioritisedMining(const CScript& scriptPubKey, const
 // NOTE: These tests rely on CreateNewBlock doing its own self-validation!
 BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 {
+    gArgs.ForceSetArg("-blockprioritysize", "0");
+
     auto mining{MakeMining()};
     BOOST_REQUIRE(mining);
 

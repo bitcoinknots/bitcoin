@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <clientversion.h>
 #include <consensus/validation.h>
 #include <node/context.h>
 #include <node/mempool_args.h>
@@ -100,7 +101,7 @@ void Finish(FuzzedDataProvider& fuzzed_data_provider, MockedTxPool& tx_pool, Cha
         BlockAssembler::Options options;
         options.nBlockMaxWeight = fuzzed_data_provider.ConsumeIntegralInRange(0U, MAX_BLOCK_WEIGHT);
         options.blockMinFeeRate = CFeeRate{ConsumeMoney(fuzzed_data_provider, /*max=*/COIN)};
-        auto assembler = BlockAssembler{chainstate, &tx_pool, options};
+        auto assembler = BlockAssembler{chainstate, &tx_pool, options, g_setup->m_node};
         auto block_template = assembler.CreateNewBlock();
         Assert(block_template->block.vtx.size() >= 1);
     }
@@ -118,7 +119,7 @@ void MockTime(FuzzedDataProvider& fuzzed_data_provider, const Chainstate& chains
 {
     const auto time = ConsumeTime(fuzzed_data_provider,
                                   chainstate.m_chain.Tip()->GetMedianTimePast() + 1,
-                                  std::numeric_limits<decltype(chainstate.m_chain.Tip()->nTime)>::max());
+                                  DEFAULT_SOFTWARE_EXPIRY - 1);
     SetMockTime(time);
 }
 

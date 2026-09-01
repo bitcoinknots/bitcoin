@@ -22,7 +22,7 @@ class COutPoint;
 class uint256;
 
 //! -dbbatchsize default (bytes)
-static const int64_t nDefaultDbBatchSize = 16 << 20;
+static const int64_t nDefaultDbBatchSize = 64 << 20;
 
 //! User-controlled performance and debug options.
 struct CoinsViewOptions {
@@ -33,7 +33,9 @@ struct CoinsViewOptions {
     int simulate_crash_ratio = 0;
 };
 
-/** CCoinsView backed by the coin database (chainstate/) */
+/** CCoinsView backed by the coin database (chainstate/)
+ * Cursor requires FlushStateToDisk for consistency.
+ */
 class CCoinsViewDB final : public CCoinsView
 {
 protected:

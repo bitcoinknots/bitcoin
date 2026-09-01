@@ -35,6 +35,9 @@ static constexpr int64_t MAX_FUTURE_BLOCK_TIME = 2 * 60 * 60;
  * MAX_FUTURE_BLOCK_TIME.
  */
 static constexpr int64_t TIMESTAMP_WINDOW = MAX_FUTURE_BLOCK_TIME;
+//! Init values for CBlockIndex nSequenceId when loaded from disk
+static constexpr int32_t SEQ_ID_BEST_CHAIN_FROM_DISK = 0;
+static constexpr int32_t SEQ_ID_INIT_FROM_DISK = 1;
 
 /**
  * Maximum gap between node time and block time used
@@ -137,7 +140,7 @@ enum BlockStatus : uint32_t {
  * candidates to be the next block. A blockindex may have multiple pprev pointing
  * to it, but at most one of them can be part of the currently active branch.
  */
-class CBlockIndex
+class CBlockIndex : public CompressedHeader
 {
 public:
     //! pointer to the hash of the block, if any. Memory is owned by this CBlockIndex
@@ -183,25 +186,16 @@ public:
     //! @sa ActivateSnapshot
     uint32_t nStatus GUARDED_BY(::cs_main){0};
 
-    //! block header
-    int32_t nVersion{0};
-    uint256 hashMerkleRoot{};
-    uint32_t nTime{0};
-    uint32_t nBits{0};
-    uint32_t nNonce{0};
-
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
-    int32_t nSequenceId{0};
+    //! Initialized to SEQ_ID_INIT_FROM_DISK{1} when loading blocks from disk, except for blocks
+    //! belonging to the best chain which overwrite it to SEQ_ID_BEST_CHAIN_FROM_DISK{0}.
+    int32_t nSequenceId{SEQ_ID_INIT_FROM_DISK};
 
     //! (memory only) Maximum nTime in the chain up to and including this block.
     unsigned int nTimeMax{0};
 
     explicit CBlockIndex(const CBlockHeader& block)
-        : nVersion{block.nVersion},
-          hashMerkleRoot{block.hashMerkleRoot},
-          nTime{block.nTime},
-          nBits{block.nBits},
-          nNonce{block.nNonce}
+        : CompressedHeader{block}
     {
     }
 
@@ -229,15 +223,7 @@ public:
 
     CBlockHeader GetBlockHeader() const
     {
-        CBlockHeader block;
-        block.nVersion = nVersion;
-        if (pprev)
-            block.hashPrevBlock = pprev->GetBlockHash();
-        block.hashMerkleRoot = hashMerkleRoot;
-        block.nTime = nTime;
-        block.nBits = nBits;
-        block.nNonce = nNonce;
-        return block;
+        return CBlockHeader(static_cast<const CompressedHeader&>(*this), pprev ? pprev->GetBlockHash() : uint256{}, nHeight);
     }
 
     uint256 GetBlockHash() const
@@ -257,16 +243,6 @@ public:
      * been set manually based on the related AssumeutxoData entry.
      */
     bool HaveNumChainTxs() const { return m_chain_tx_count != 0; }
-
-    NodeSeconds Time() const
-    {
-        return NodeSeconds{std::chrono::seconds{nTime}};
-    }
-
-    int64_t GetBlockTime() const
-    {
-        return (int64_t)nTime;
-    }
 
     int64_t GetBlockTimeMax() const
     {
@@ -374,6 +350,11 @@ public:
         hashPrev = (pprev ? pprev->GetBlockHash() : uint256());
     }
 
+    CBlockHeader GetBlockHeader() const
+    {
+        return CBlockHeader{static_cast<const CompressedHeader&>(*this), hashPrev, nHeight};
+    }
+
     SERIALIZE_METHODS(CDiskBlockIndex, obj)
     {
         LOCK(::cs_main);
@@ -388,24 +369,16 @@ public:
         if (obj.nStatus & BLOCK_HAVE_UNDO) READWRITE(VARINT(obj.nUndoPos));
 
         // block header
-        READWRITE(obj.nVersion);
-        READWRITE(obj.hashPrev);
-        READWRITE(obj.hashMerkleRoot);
-        READWRITE(obj.nTime);
-        READWRITE(obj.nBits);
-        READWRITE(obj.nNonce);
+        CBlockHeader header;
+        SER_WRITE(obj, header = obj.GetBlockHeader());
+        READWRITE(header);
+        SER_READ(obj, static_cast<CompressedHeader&>(obj) = header);
+        SER_READ(obj, obj.hashPrev = header.hashPrevBlock);
     }
 
     uint256 ConstructBlockHash() const
     {
-        CBlockHeader block;
-        block.nVersion = nVersion;
-        block.hashPrevBlock = hashPrev;
-        block.hashMerkleRoot = hashMerkleRoot;
-        block.nTime = nTime;
-        block.nBits = nBits;
-        block.nNonce = nNonce;
-        return block.GetHash();
+        return GetBlockHeader().GetHash();
     }
 
     uint256 GetBlockHash() = delete;

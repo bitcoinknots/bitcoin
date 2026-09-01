@@ -9,19 +9,22 @@
 #include <util/time.h>
 #include <util/vector.h>
 
+#include <iterator>
+#include <utility>
+
 // The two constants below are computed using the simulation script in
 // contrib/devtools/headerssync-params.py.
 
 //! Store one header commitment per HEADER_COMMITMENT_PERIOD blocks.
-constexpr size_t HEADER_COMMITMENT_PERIOD{624};
+constexpr size_t HEADER_COMMITMENT_PERIOD{378};
 
 //! Only feed headers to validation once this many headers on top have been
 //! received and validated against commitments.
-constexpr size_t REDOWNLOAD_BUFFER_SIZE{14827}; // 14827/624 = ~23.8 commitments
+constexpr size_t REDOWNLOAD_BUFFER_SIZE{8609}; // 8609/378 = ~22.8 commitments
 
-// Our memory analysis assumes 48 bytes for a CompressedHeader (so we should
+// Our memory analysis assumes 136 bytes for a CompressedHeader (so we should
 // re-calculate parameters if we compress further)
-static_assert(sizeof(CompressedHeader) == 48);
+static_assert(sizeof(CompressedHeader) == 136);
 
 HeadersSyncState::HeadersSyncState(NodeId id, const Consensus::Params& consensus_params,
         const CBlockIndex* chain_start, const arith_uint256& minimum_required_work) :
@@ -112,6 +115,9 @@ HeadersSyncState::ProcessingResult HeadersSyncState::ProcessNextHeaders(const
             }
         }
 
+        if (ret.success && ((!std::in_range<int32_t>(m_redownload_buffer_last_height)) || m_redownload_buffer_last_height < std::ssize(m_redownloaded_headers))) {
+            LogDebug(BCLog::NET, "Initial headers sync aborted with peer=%d: invalid height range at height=%i (redownload phase)\n", m_id, m_redownload_buffer_last_height);
+        } else
         if (ret.success) {
             // Return any headers that are ready for acceptance.
             ret.pow_validated_headers = PopHeadersReadyForAcceptance();
@@ -285,9 +291,11 @@ std::vector<CBlockHeader> HeadersSyncState::PopHeadersReadyForAcceptance()
     Assume(m_download_state == State::REDOWNLOAD);
     if (m_download_state != State::REDOWNLOAD) return ret;
 
+    auto height{(int32_t)(m_redownload_buffer_last_height - std::ssize(m_redownloaded_headers))};
     while (m_redownloaded_headers.size() > REDOWNLOAD_BUFFER_SIZE ||
             (m_redownloaded_headers.size() > 0 && m_process_all_remaining_headers)) {
-        ret.emplace_back(m_redownloaded_headers.front().GetFullHeader(m_redownload_buffer_first_prev_hash));
+        ++height;
+        ret.emplace_back(m_redownloaded_headers.front(), m_redownload_buffer_first_prev_hash, height);
         m_redownloaded_headers.pop_front();
         m_redownload_buffer_first_prev_hash = ret.back().GetHash();
     }

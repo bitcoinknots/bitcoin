@@ -22,12 +22,17 @@
 #include <QSettings>
 #include <QTextDocument>
 
+#include <ranges>
+
 ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, QWidget *parent) :
     QDialog(parent, GUIUtil::dialog_flags),
     ui(new Ui::ReceiveCoinsDialog),
     platformStyle(_platformStyle)
 {
     ui->setupUi(this);
+
+    m_sort_proxy = new QSortFilterProxyModel(this);
+    m_sort_proxy->setSortRole(Qt::UserRole);
 
     if (!_platformStyle->getImagesOnButtons()) {
         ui->clearButton->setIcon(QIcon());
@@ -51,21 +56,6 @@ ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, QWid
     connect(ui->recentRequestsView, &QWidget::customContextMenuRequested, this, &ReceiveCoinsDialog::showMenu);
 
     connect(ui->clearButton, &QPushButton::clicked, this, &ReceiveCoinsDialog::clear);
-
-    QTableView* tableView = ui->recentRequestsView;
-    tableView->verticalHeader()->hide();
-    tableView->setAlternatingRowColors(true);
-    tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
-    tableView->setSelectionMode(QAbstractItemView::ContiguousSelection);
-
-    QSettings settings;
-    if (!tableView->horizontalHeader()->restoreState(settings.value("RecentRequestsViewHeaderState").toByteArray())) {
-        tableView->setColumnWidth(RecentRequestsTableModel::Date, DATE_COLUMN_WIDTH);
-        tableView->setColumnWidth(RecentRequestsTableModel::Label, LABEL_COLUMN_WIDTH);
-        tableView->setColumnWidth(RecentRequestsTableModel::Amount, AMOUNT_MINIMUM_COLUMN_WIDTH);
-        tableView->horizontalHeader()->setMinimumSectionSize(MINIMUM_COLUMN_WIDTH);
-        tableView->horizontalHeader()->setStretchLastSection(true);
-    }
 }
 
 void ReceiveCoinsDialog::setModel(WalletModel *_model)
@@ -74,31 +64,54 @@ void ReceiveCoinsDialog::setModel(WalletModel *_model)
 
     if(_model && _model->getOptionsModel())
     {
-        _model->getRecentRequestsTableModel()->sort(RecentRequestsTableModel::Date, Qt::DescendingOrder);
         connect(_model->getOptionsModel(), &OptionsModel::displayUnitChanged, this, &ReceiveCoinsDialog::updateDisplayUnit);
+        connect(_model->getOptionsModel(), &OptionsModel::fontForMoneyChanged, this, &ReceiveCoinsDialog::updateFontForMoney);
         updateDisplayUnit();
 
         QTableView* tableView = ui->recentRequestsView;
-        tableView->setModel(_model->getRecentRequestsTableModel());
+
+        tableView->verticalHeader()->hide();
+        tableView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        tableView->setModel(m_sort_proxy);
+        m_sort_proxy->setSourceModel(_model->getRecentRequestsTableModel());
         tableView->sortByColumn(RecentRequestsTableModel::Date, Qt::DescendingOrder);
+
+        tableView->setAlternatingRowColors(true);
+        tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
+        tableView->setSelectionMode(QAbstractItemView::ExtendedSelection);
+
+        QSettings settings;
+        if (!tableView->horizontalHeader()->restoreState(settings.value("RecentRequestsViewHeaderState").toByteArray())) {
+            tableView->setColumnWidth(RecentRequestsTableModel::Date, DATE_COLUMN_WIDTH);
+            tableView->setColumnWidth(RecentRequestsTableModel::Label, LABEL_COLUMN_WIDTH);
+            tableView->setColumnWidth(RecentRequestsTableModel::Amount, AMOUNT_MINIMUM_COLUMN_WIDTH);
+        }
 
         connect(tableView->selectionModel(),
             &QItemSelectionModel::selectionChanged, this,
             &ReceiveCoinsDialog::recentRequestsView_selectionChanged);
+        // Last 2 columns are set by the columnResizingFixer, when the table geometry is ready.
+        columnResizingFixer = new GUIUtil::TableViewLastColumnResizingFixer(tableView, AMOUNT_MINIMUM_COLUMN_WIDTH, DATE_COLUMN_WIDTH, this);
 
         // Populate address type dropdown and select default
-        auto add_address_type = [&](OutputType type, const QString& text, const QString& tooltip) {
+        auto add_address_type = [&](OutputType type) {
+            const auto [text, tooltip] = GetOutputTypeDescription(type);
             const auto index = ui->addressType->count();
             ui->addressType->addItem(text, (int) type);
             ui->addressType->setItemData(index, tooltip, Qt::ToolTipRole);
             if (model->wallet().getDefaultAddressType() == type) ui->addressType->setCurrentIndex(index);
         };
-        add_address_type(OutputType::LEGACY, tr("Base58 (Legacy)"), tr("Not recommended due to higher fees and less protection against typos."));
-        add_address_type(OutputType::P2SH_SEGWIT, tr("Base58 (P2SH-SegWit)"), tr("Generates an address compatible with older wallets."));
-        add_address_type(OutputType::BECH32, tr("Bech32 (SegWit)"), tr("Generates a native segwit address (BIP-173). Some old wallets don't support it."));
+        add_address_type(OutputType::LEGACY);
+        add_address_type(OutputType::P2SH_SEGWIT);
+        add_address_type(OutputType::BECH32);
         if (model->wallet().taprootEnabled()) {
-            add_address_type(OutputType::BECH32M, tr("Bech32m (Taproot)"), tr("Bech32m (BIP-350) is an upgrade to Bech32, wallet support is still limited."));
+            add_address_type(OutputType::BECH32M);
         }
+
+        connect(_model->getOptionsModel(), &OptionsModel::addresstypeChanged, [this](const OutputType type) {
+            const int index = ui->addressType->findData((int) type);
+            if (index != -1) ui->addressType->setCurrentIndex(index);
+        });
 
         // Set the button to be enabled or disabled based on whether the wallet can give out new addresses.
         ui->receiveButton->setEnabled(model->wallet().canGetAddresses());
@@ -140,6 +153,17 @@ void ReceiveCoinsDialog::updateDisplayUnit()
     if(model && model->getOptionsModel())
     {
         ui->reqAmount->setDisplayUnit(model->getOptionsModel()->getDisplayUnit());
+        updateFontForMoney();
+    }
+}
+
+void ReceiveCoinsDialog::updateFontForMoney()
+{
+    if(model && model->getOptionsModel())
+    {
+        const BitcoinUnit display_unit = model->getOptionsModel()->getDisplayUnit();
+        const QFont font_for_money = model->getOptionsModel()->getFontForMoney(display_unit);
+        ui->reqAmount->setFontForMoney(font_for_money);
     }
 }
 
@@ -191,12 +215,10 @@ void ReceiveCoinsDialog::on_receiveButton_clicked()
 
 void ReceiveCoinsDialog::on_recentRequestsView_doubleClicked(const QModelIndex &index)
 {
-    const RecentRequestsTableModel *submodel = model->getRecentRequestsTableModel();
-    ReceiveRequestDialog *dialog = new ReceiveRequestDialog(this);
-    dialog->setModel(model);
-    dialog->setInfo(submodel->entry(index.row()).recipient);
-    dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->show();
+    QModelIndexList selection = SelectedRows();
+    if (!selection.isEmpty() && selection.at(0).isValid()) {
+        ShowReceiveRequestDialogForItem(selection.at(0));
+    }
 }
 
 void ReceiveCoinsDialog::recentRequestsView_selectionChanged(const QItemSelection &selected, const QItemSelection &deselected)
@@ -209,63 +231,128 @@ void ReceiveCoinsDialog::recentRequestsView_selectionChanged(const QItemSelectio
 
 void ReceiveCoinsDialog::on_showRequestButton_clicked()
 {
-    if(!model || !model->getRecentRequestsTableModel() || !ui->recentRequestsView->selectionModel())
-        return;
-    QModelIndexList selection = ui->recentRequestsView->selectionModel()->selectedRows();
+    QModelIndexList selection = SelectedRows();
 
     for (const QModelIndex& index : selection) {
-        on_recentRequestsView_doubleClicked(index);
+        ShowReceiveRequestDialogForItem(index);
     }
 }
 
 void ReceiveCoinsDialog::on_removeRequestButton_clicked()
 {
-    if(!model || !model->getRecentRequestsTableModel() || !ui->recentRequestsView->selectionModel())
-        return;
-    QModelIndexList selection = ui->recentRequestsView->selectionModel()->selectedRows();
+    QModelIndexList selection = SelectedRows();
     if(selection.empty())
         return;
-    // correct for selection mode ContiguousSelection
-    QModelIndex firstIndex = selection.at(0);
-    model->getRecentRequestsTableModel()->removeRows(firstIndex.row(), selection.length(), firstIndex.parent());
+
+    // Collect row indices in a set (sorted) and pass in reverse order to removeRows
+    // to avoid having to keep track of changed source indices after each removal
+    std::set<int> row_indices;
+    for (const QModelIndex& ind : selection) {
+        row_indices.insert(ind.row());
+    }
+
+    for (auto row_ind : row_indices | std::views::reverse) {
+        model->getRecentRequestsTableModel()->removeRows(row_ind, 1);
+    }
 }
 
-QModelIndex ReceiveCoinsDialog::selectedRow()
+// We override the virtual resizeEvent of the QWidget to adjust tables column
+// sizes as the tables width is proportional to the dialogs width.
+void ReceiveCoinsDialog::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    columnResizingFixer->stretchColumnWidth(RecentRequestsTableModel::Message);
+}
+
+QModelIndexList ReceiveCoinsDialog::SelectedRows()
 {
     if(!model || !model->getRecentRequestsTableModel() || !ui->recentRequestsView->selectionModel())
-        return QModelIndex();
+        return QModelIndexList();
     QModelIndexList selection = ui->recentRequestsView->selectionModel()->selectedRows();
-    if(selection.empty())
-        return QModelIndex();
-    // correct for selection mode ContiguousSelection
-    QModelIndex firstIndex = selection.at(0);
-    return firstIndex;
+    QModelIndexList source_mapped;
+    for (auto row : selection) {
+        source_mapped.append(m_sort_proxy->mapToSource(row));
+    }
+
+    return source_mapped;
 }
 
 // copy column of selected row to clipboard
 void ReceiveCoinsDialog::copyColumnToClipboard(int column)
 {
-    QModelIndex firstIndex = selectedRow();
-    if (!firstIndex.isValid()) {
+    const QModelIndexList sel = SelectedRows();
+    if (sel.isEmpty()) {
         return;
     }
-    GUIUtil::setClipboard(model->getRecentRequestsTableModel()->index(firstIndex.row(), column).data(Qt::EditRole).toString());
+
+    const RecentRequestsTableModel* const submodel = model->getRecentRequestsTableModel();
+    QString column_value;
+    for (int sel_ind = 0; sel_ind < sel.size(); ++sel_ind) {
+        if (!sel.at(sel_ind).isValid()) {
+            continue;
+        }
+        column_value += submodel->index(sel.at(sel_ind).row(), column).data(Qt::EditRole).toString();
+        if (sel_ind < sel.size() - 1) {
+            column_value += QString("\n");
+        }
+    }
+    GUIUtil::setClipboard(column_value);
+}
+
+void ReceiveCoinsDialog::ShowReceiveRequestDialogForItem(const QModelIndex& index)
+{
+    if (!index.isValid()) {
+        return;
+    }
+    const RecentRequestsTableModel* submodel = model->getRecentRequestsTableModel();
+    ReceiveRequestDialog* dialog = new ReceiveRequestDialog(this);
+    dialog->setModel(model);
+    dialog->setInfo(submodel->entry(index.row()).recipient);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->show();
 }
 
 // context menu
 void ReceiveCoinsDialog::showMenu(const QPoint &point)
 {
-    const QModelIndex sel = selectedRow();
-    if (!sel.isValid()) {
+    const QModelIndexList sel = SelectedRows();
+    if (sel.isEmpty()) {
         return;
     }
 
+    if (sel.size() == 1 && sel.at(0).isValid()) {
     // disable context menu actions when appropriate
     const RecentRequestsTableModel* const submodel = model->getRecentRequestsTableModel();
-    const RecentRequestEntry& req = submodel->entry(sel.row());
+        const RecentRequestEntry& req = submodel->entry(sel.at(0).row());
     copyLabelAction->setDisabled(req.recipient.label.isEmpty());
     copyMessageAction->setDisabled(req.recipient.message.isEmpty());
     copyAmountAction->setDisabled(req.recipient.amount == 0);
+    } else if (sel.size() > 1) {
+        // multiple selection
+
+        copyLabelAction->setDisabled(true);
+        copyMessageAction->setDisabled(true);
+        copyAmountAction->setDisabled(true);
+
+        // disable context menu actions when appropriate
+        const RecentRequestsTableModel* const submodel = model->getRecentRequestsTableModel();
+
+        for (auto selection : sel) {
+            if (!selection.isValid()) {
+                continue;
+            }
+            const RecentRequestEntry& req = submodel->entry(selection.row());
+            if (!req.recipient.label.isEmpty()) {
+                copyLabelAction->setDisabled(false);
+            }
+            if (!req.recipient.message.isEmpty()) {
+                copyMessageAction->setDisabled(false);
+            }
+            if (req.recipient.amount != 0) {
+                copyAmountAction->setDisabled(false);
+            }
+        }
+    }
 
     contextMenu->exec(QCursor::pos());
 }
@@ -273,26 +360,46 @@ void ReceiveCoinsDialog::showMenu(const QPoint &point)
 // context menu action: copy URI
 void ReceiveCoinsDialog::copyURI()
 {
-    QModelIndex sel = selectedRow();
-    if (!sel.isValid()) {
+    const QModelIndexList sel = SelectedRows();
+    if (sel.isEmpty()) {
         return;
     }
 
     const RecentRequestsTableModel * const submodel = model->getRecentRequestsTableModel();
-    const QString uri = GUIUtil::formatBitcoinURI(submodel->entry(sel.row()).recipient);
+    QString uri;
+    for (int sel_ind = 0; sel_ind < sel.size(); ++sel_ind) {
+        if (!sel.at(sel_ind).isValid()) {
+            continue;
+        }
+        const RecentRequestEntry& req = submodel->entry(sel.at(sel_ind).row());
+        uri += GUIUtil::formatBitcoinURI(req.recipient);
+        if (sel_ind < sel.size() - 1) {
+            uri += QString("\n");
+        }
+    }
     GUIUtil::setClipboard(uri);
 }
 
 // context menu action: copy address
 void ReceiveCoinsDialog::copyAddress()
 {
-    const QModelIndex sel = selectedRow();
-    if (!sel.isValid()) {
+    const QModelIndexList sel = SelectedRows();
+    if (sel.isEmpty()) {
         return;
     }
 
     const RecentRequestsTableModel* const submodel = model->getRecentRequestsTableModel();
-    const QString address = submodel->entry(sel.row()).recipient.address;
+    QString address;
+    for (int sel_ind = 0; sel_ind < sel.size(); ++sel_ind) {
+        if (!sel.at(sel_ind).isValid()) {
+            continue;
+        }
+        const RecentRequestEntry& req = submodel->entry(sel.at(sel_ind).row());
+        address += req.recipient.address;
+        if (sel_ind < sel.size() - 1) {
+            address += QString("\n");
+        }
+    }
     GUIUtil::setClipboard(address);
 }
 

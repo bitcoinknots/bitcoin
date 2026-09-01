@@ -20,13 +20,16 @@ add_executable(test_bitcoin
   bip324_tests.cpp
   blockchain_tests.cpp
   blockencodings_tests.cpp
+  block_header_tests.cpp
   blockfilter_index_tests.cpp
   blockfilter_tests.cpp
   blockmanager_tests.cpp
   bloom_tests.cpp
   bswap_tests.cpp
+  chainstate_write_tests.cpp
   checkqueue_tests.cpp
   cluster_linearize_tests.cpp
+  codex32_tests.cpp
   coins_tests.cpp
   coinscachepair_tests.cpp
   coinstatsindex_tests.cpp
@@ -57,7 +60,6 @@ add_executable(test_bitcoin
   miner_tests.cpp
   miniminer_tests.cpp
   miniscript_tests.cpp
-  minisketch_tests.cpp
   multisig_tests.cpp
   net_peer_connection_tests.cpp
   net_peer_eviction_tests.cpp
@@ -122,12 +124,14 @@ add_executable(test_bitcoin
   validation_tests.cpp
   validationinterface_tests.cpp
   versionbits_tests.cpp
+  ../stats/test/stats_tests.cpp
 )
 
 include(TargetDataSources)
 target_json_data_sources(test_bitcoin
   data/base58_encode_decode.json
   data/bip341_wallet_vectors.json
+  data/block_header_v2.json
   data/blockfilters.json
   data/key_io_invalid.json
   data/key_io_valid.json
@@ -143,10 +147,10 @@ target_raw_data_sources(test_bitcoin NAMESPACE test::data
 target_link_libraries(test_bitcoin
   core_interface
   test_util
+  $<TARGET_NAME_IF_EXISTS:bitcoinconsensus>
   bitcoin_cli
   bitcoin_node
   bitcoin_consensus
-  minisketch
   secp256k1
   Boost::headers
   libevent::extra
@@ -208,4 +212,5 @@ endfunction()
 
 add_all_test_targets()
 
+make_libbitcoinconsensus_dll_available(test_bitcoin)
 install_binary_component(test_bitcoin)

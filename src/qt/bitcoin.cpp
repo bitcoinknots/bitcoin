@@ -7,6 +7,7 @@
 #include <qt/bitcoin.h>
 
 #include <chainparams.h>
+#include <clientversion.h>
 #include <common/args.h>
 #include <common/init.h>
 #include <common/system.h>
@@ -30,11 +31,13 @@
 #include <qt/splashscreen.h>
 #include <qt/utilitydialog.h>
 #include <qt/winshutdownmonitor.h>
+#include <stats/stats.h>
 #include <uint256.h>
 #include <util/exception.h>
 #include <util/string.h>
 #include <util/threadnames.h>
 #include <util/translation.h>
+#include <univalue.h>
 #include <validation.h>
 
 #ifdef ENABLE_WALLET
@@ -55,6 +58,7 @@
 #include <QLocale>
 #include <QMessageBox>
 #include <QSettings>
+#include <QString>
 #include <QThread>
 #include <QTimer>
 #include <QTranslator>
@@ -85,6 +89,7 @@ static void RegisterMetaTypes()
     // Register typedefs (see https://doc.qt.io/qt-5/qmetatype.html#qRegisterMetaType)
     // IMPORTANT: if CAmount is no longer a typedef use the normal variant above (see https://doc.qt.io/qt-5/qmetatype.html#qRegisterMetaType-1)
     qRegisterMetaType<CAmount>("CAmount");
+    qRegisterMetaType<CTransactionRef>("CTransactionRef");
     qRegisterMetaType<size_t>("size_t");
 
     qRegisterMetaType<std::function<void()>>("std::function<void()>");
@@ -325,7 +330,7 @@ void BitcoinApplication::parameterSetup()
 
 void BitcoinApplication::InitPruneSetting(int64_t prune_MiB)
 {
-    optionsModel->SetPruneTargetGB(PruneMiBtoGB(prune_MiB));
+    optionsModel->SetPruneTargetMiB(prune_MiB);
 }
 
 void BitcoinApplication::requestInitialize()
@@ -389,13 +394,13 @@ void BitcoinApplication::initializeResult(bool success, interfaces::BlockAndHead
 {
     qDebug() << __func__ << ": Initialization result: " << success;
 
-    if (success) {
+    if (success && !m_node->shutdownRequested()) {
         delete m_splash;
         m_splash = nullptr;
 
         // Log this only after AppInitMain finishes, as then logging setup is guaranteed complete
         qInfo() << "Platform customization:" << platformStyle->getName();
-        clientModel = new ClientModel(node(), optionsModel);
+        clientModel = new ClientModel(node(), optionsModel, *platformStyle);
         window->setClientModel(clientModel, &tip_info);
 
         // If '-min' option passed, start window minimized (iconified) or minimized to tray
@@ -478,6 +483,7 @@ bool BitcoinApplication::event(QEvent* e)
 static void SetupUIArgs(ArgsManager& argsman)
 {
     argsman.AddArg("-choosedatadir", strprintf("Choose data directory on startup (default: %u)", DEFAULT_CHOOSE_DATADIR), ArgsManager::ALLOW_ANY, OptionsCategory::GUI);
+    argsman.AddArg("-guisettingsdir=<path>", "Choose a custom data directory especially for the Qt Settings", ArgsManager::ALLOW_ANY, OptionsCategory::GUI);
     argsman.AddArg("-lang=<lang>", "Set language, for example \"de_DE\" (default: system locale)", ArgsManager::ALLOW_ANY, OptionsCategory::GUI);
     argsman.AddArg("-min", "Start minimized", ArgsManager::ALLOW_ANY, OptionsCategory::GUI);
     argsman.AddArg("-resetguisettings", "Reset all settings changed in the GUI", ArgsManager::ALLOW_ANY, OptionsCategory::GUI);
@@ -507,6 +513,7 @@ int GuiMain(int argc, char* argv[])
     /// 1. Basic Qt initialization (not dependent on parameters or configuration)
     Q_INIT_RESOURCE(bitcoin);
     Q_INIT_RESOURCE(bitcoin_locale);
+    Q_INIT_RESOURCE(font);
 
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
     // Generate high-dpi pixmaps
@@ -574,6 +581,11 @@ int GuiMain(int argc, char* argv[])
     QApplication::setOrganizationName(QAPP_ORG_NAME);
     QApplication::setOrganizationDomain(QAPP_ORG_DOMAIN);
     QApplication::setApplicationName(QAPP_APP_NAME_DEFAULT);
+    const std::string qt_settings_path = gArgs.GetArg("-guisettingsdir", "");
+    if (!qt_settings_path.empty()) {
+        QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, QString::fromStdString(qt_settings_path));
+    }
 
     /// 4. Initialization of translations, so that intro dialog is in user's language
     // Now that QSettings are accessible, initialize translations
@@ -593,10 +605,9 @@ int GuiMain(int argc, char* argv[])
 
     /// 5. Now that settings and translations are available, ask user for data directory
     // User language is set up: pick a data directory
-    bool did_show_intro = false;
-    int64_t prune_MiB = 0;  // Intro dialog prune configuration
+    std::unique_ptr<Intro> intro;
     // Gracefully exit if the user cancels
-    if (!Intro::showIfNeeded(did_show_intro, prune_MiB)) return EXIT_SUCCESS;
+    if (!Intro::showIfNeeded(intro)) return EXIT_SUCCESS;
 
     /// 6-7. Parse bitcoin.conf, determine network, switch to network specific
     /// options, and create datadir and settings.json.
@@ -662,6 +673,9 @@ int GuiMain(int argc, char* argv[])
     app.parameterSetup();
     GUIUtil::LogQtInfo();
 
+    // Enable mempool stats by default
+    gArgs.SoftSetBoolArg("-statsenable", true);
+
     if (gArgs.GetBoolArg("-splash", DEFAULT_SPLASHSCREEN) && !gArgs.GetBoolArg("-min", false))
         app.createSplashScreen(networkStyle.data());
 
@@ -672,9 +686,10 @@ int GuiMain(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    if (did_show_intro) {
+    if (intro) {
         // Store intro dialog settings other than datadir (network specific)
-        app.InitPruneSetting(prune_MiB);
+        app.InitPruneSetting(intro->getPruneMiB());
+        gArgs.ForceSetArg("-assumevalid", intro->getAssumeValid().toStdString());
     }
 
     try
@@ -684,6 +699,13 @@ int GuiMain(int argc, char* argv[])
         // This is acceptable because this function only contains steps that are quick to execute,
         // so the GUI thread won't be held up.
         if (app.baseInitialize()) {
+            if (intro) {
+                // Store intro dialog settings other than datadir (network specific)
+                common::SettingsValue intro_assumevalid = intro->getAssumeValid().toStdString();
+                app.node().context()->chain->overwriteRwSetting("assumevalid", intro_assumevalid);
+                // We can release the Intro widget now
+                intro.reset();
+            }
             app.requestInitialize();
 #if defined(Q_OS_WIN)
             WinShutdownMonitor::registerShutdownBlockReason(QObject::tr("%1 didn't yet exit safely…").arg(CLIENT_NAME), (HWND)app.getMainWinId());

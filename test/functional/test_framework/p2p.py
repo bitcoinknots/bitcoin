@@ -71,8 +71,10 @@ from test_framework.messages import (
     msg_version,
     MSG_WTX,
     msg_wtxidrelay,
+    NODE_BLAKE2B,
     NODE_NETWORK,
     NODE_WITNESS,
+    NODE_REDUCED_DATA,
     MAGIC_BYTES,
     sha256,
 )
@@ -95,7 +97,7 @@ MIN_P2P_VERSION_SUPPORTED = 60001
 # Version 70016 supports wtxid relay
 P2P_VERSION = 70016
 # The services that this test framework offers in its `version` message
-P2P_SERVICES = NODE_NETWORK | NODE_WITNESS
+P2P_SERVICES = NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA | NODE_BLAKE2B
 # The P2P user agent string that this test framework sends in its `version` message
 P2P_SUBVERSION = "/python-p2p-tester:0.0.3/"
 # Value for relay that this test framework sends in its `version` message
@@ -736,7 +738,7 @@ class NetworkThread(threading.Thread):
         """Start the network thread."""
         self.network_event_loop.run_forever()
 
-    def close(self, *, timeout=10):
+    def close(self, *, timeout):
         """Close the connections and network event loop."""
         self.network_event_loop.call_soon_threadsafe(self.network_event_loop.stop)
         wait_until_helper_internal(lambda: not self.network_event_loop.is_running(), timeout=timeout)

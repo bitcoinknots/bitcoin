@@ -103,7 +103,7 @@ enum Network ParseNetwork(const std::string& net_in) {
     if (net == "ipv6") return NET_IPV6;
     if (net == "onion") return NET_ONION;
     if (net == "tor") {
-        LogPrintf("Warning: net name 'tor' is deprecated and will be removed in the future. You should use 'onion' instead.\n");
+        LogWarning("Net name 'tor' is deprecated and will be removed in the future. You should use 'onion' instead.");
         return NET_ONION;
     }
     if (net == "i2p") {
@@ -277,6 +277,14 @@ enum SOCKS5Reply: uint8_t {
     TTLEXPIRED = 0x06,       //!< TTL expired
     CMDUNSUPPORTED = 0x07,   //!< Command not supported
     ATYPEUNSUPPORTED = 0x08, //!< Address type not supported
+    TOR_HS_DESC_NOT_FOUND = 0xf0,      //!< Tor: Onion service descriptor can not be found
+    TOR_HS_DESC_INVALID = 0xf1,        //!< Tor: Onion service descriptor is invalid
+    TOR_HS_INTRO_FAILED = 0xf2,        //!< Tor: Onion service introduction failed
+    TOR_HS_REND_FAILED = 0xf3,         //!< Tor: Onion service rendezvous failed
+    TOR_HS_MISSING_CLIENT_AUTH = 0xf4, //!< Tor: Onion service missing client authorization
+    TOR_HS_WRONG_CLIENT_AUTH = 0xf5,   //!< Tor: Onion service wrong client authorization
+    TOR_HS_BAD_ADDRESS = 0xf6,         //!< Tor: Onion service invalid address
+    TOR_HS_INTRO_TIMEOUT = 0xf7,       //!< Tor: Onion service introduction timed out
 };
 
 /** Values defined for ATYPE in RFC1928 */
@@ -364,8 +372,24 @@ static std::string Socks5ErrorString(uint8_t err)
             return "protocol error";
         case SOCKS5Reply::ATYPEUNSUPPORTED:
             return "address type not supported";
+        case SOCKS5Reply::TOR_HS_DESC_NOT_FOUND:
+            return "onion service descriptor can not be found";
+        case SOCKS5Reply::TOR_HS_DESC_INVALID:
+            return "onion service descriptor is invalid";
+        case SOCKS5Reply::TOR_HS_INTRO_FAILED:
+            return "onion service introduction failed";
+        case SOCKS5Reply::TOR_HS_REND_FAILED:
+            return "onion service rendezvous failed";
+        case SOCKS5Reply::TOR_HS_MISSING_CLIENT_AUTH:
+            return "onion service missing client authorization";
+        case SOCKS5Reply::TOR_HS_WRONG_CLIENT_AUTH:
+            return "onion service wrong client authorization";
+        case SOCKS5Reply::TOR_HS_BAD_ADDRESS:
+            return "onion service invalid address";
+        case SOCKS5Reply::TOR_HS_INTRO_TIMEOUT:
+            return "onion service introduction timed out";
         default:
-            return "unknown";
+            return strprintf("unknown (0x%02x)", err);
     }
 }
 
@@ -725,6 +749,43 @@ bool IsProxy(const CNetAddr &addr) {
     return false;
 }
 
+/**
+ * Generate unique credentials for Tor stream isolation. Tor will create
+ * separate circuits for SOCKS5 proxy connections with different credentials, which
+ * makes it harder to correlate the connections.
+ */
+class TorStreamIsolationCredentialsGenerator
+{
+public:
+    TorStreamIsolationCredentialsGenerator():
+        m_prefix(GenerateUniquePrefix()) {
+    }
+
+    /** Return the next unique proxy credentials. */
+    ProxyCredentials Generate() {
+        ProxyCredentials auth;
+        auth.username = auth.password = strprintf("%s%i", m_prefix, m_counter);
+        ++m_counter;
+        return auth;
+    }
+
+    /** Size of session prefix in bytes. */
+    static constexpr size_t PREFIX_BYTE_LENGTH = 8;
+private:
+    const std::string m_prefix;
+    std::atomic<uint64_t> m_counter;
+
+    /** Generate a random prefix for each of the credentials returned by this generator.
+     * This makes sure that different launches of the application (either successively or in parallel)
+     * will not share the same circuits, as would be the case with a bare counter.
+     */
+    static std::string GenerateUniquePrefix() {
+        std::array<uint8_t, PREFIX_BYTE_LENGTH> prefix_bytes;
+        GetRandBytes(prefix_bytes);
+        return HexStr(prefix_bytes) + "-";
+    }
+};
+
 std::unique_ptr<Sock> ConnectThroughProxy(const Proxy& proxy,
                                           const std::string& dest,
                                           uint16_t port,
@@ -739,9 +800,8 @@ std::unique_ptr<Sock> ConnectThroughProxy(const Proxy& proxy,
 
     // do socks negotiation
     if (proxy.m_randomize_credentials) {
-        ProxyCredentials random_auth;
-        static std::atomic_int counter(0);
-        random_auth.username = random_auth.password = strprintf("%i", counter++);
+        static TorStreamIsolationCredentialsGenerator generator;
+        ProxyCredentials random_auth{generator.Generate()};
         if (!Socks5(dest, port, &random_auth, *sock)) {
             return {};
         }
