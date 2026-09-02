@@ -503,7 +503,9 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-fastprune", "Use smaller block files and lower minimum prune height for testing purposes", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::DEBUG_TEST);
     SetupSighashRulesArgs(argsman);
 #if HAVE_SYSTEM
-    argsman.AddArg("-blocknotify=<cmd>", "Execute command when the best block changes (%s in cmd is replaced by block hash)", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-blocknotify=<cmd>", "Execute command when the best block changes (%s in cmd is replaced by block hash). Supports http:// URLs for native HTTP GET notifications (works independently of shell command support).", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+#else
+    argsman.AddArg("-blocknotify=<cmd>", "Shell commands are not available on this build. Only http:// URLs are supported: an HTTP GET request will be sent to the given URL (%s in URL is replaced by block hash).", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
 #endif
     argsman.AddArg("-blockreconstructionextratxn=<n>", strprintf("Extra transactions to keep in memory for compact block reconstructions (default: %u)", DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-blockreconstructionextratxnsize=<n>",
@@ -2187,7 +2189,6 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         }
     }
 
-#if HAVE_SYSTEM
     if (args.IsArgSet("-blocknotify")) {
         auto blocknotify_commands = args.GetArgs("-blocknotify");
         uiInterface.NotifyBlockTip_connect([blocknotify_commands](SynchronizationState sync_state, const CBlockIndex* pBlockIndex) {
@@ -2197,11 +2198,10 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
                 ReplaceAll(command, "%s", blockhash_hex);
 
                 std::thread t(runCommand, command);
-                t.detach(); // thread runs free
+                t.detach();
             }
         });
     }
-#endif
 
     std::vector<fs::path> vImportFiles;
     for (const std::string& strFile : args.GetArgs("-loadblock")) {

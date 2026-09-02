@@ -167,6 +167,7 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   core_write.cpp
   deploymentinfo.cpp
   external_signer.cpp
+  httpnotify.cpp
   init/common.cpp
   kernel/chainparams.cpp
   key.cpp
