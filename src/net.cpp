@@ -2984,6 +2984,18 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect, Spa
                 continue;
             }
 
+            // Prefer NODE_BLAKE2B peers for the first outbound-full-relay slots
+            // so the node quickly has peers that can serve the header chain past
+            // the hard fork. #368 demotes any non-BLAKE2B full-outbound peer to
+            // stale, so nOutboundFullRelay already counts only fork-capable ones.
+            // Fall back to any desirable peer after enough tries so a node that
+            // cannot yet find one still bootstraps.
+            if (conn_type == ConnectionType::OUTBOUND_FULL_RELAY &&
+                nOutboundFullRelay < SEED_OUTBOUND_CONNECTION_THRESHOLD &&
+                !(addr.nServices & NODE_BLAKE2B) && nTries < 30) {
+                continue;
+            }
+
             // Do not connect to bad ports, unless 50 invalid addresses have been selected already.
             if (nTries < 50 && (addr.IsIPv4() || addr.IsIPv6()) && IsBadPort(addr.GetPort())) {
                 continue;
