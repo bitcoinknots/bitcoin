@@ -6,8 +6,6 @@ name: Build Release
 on:
   # Automatically build and publish when a version tag is pushed.
   push:
-    branches:
-      - 'codex/datum-solo-mining'
     tags:
       - 'v*'
 

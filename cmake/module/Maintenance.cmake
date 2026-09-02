@@ -4,6 +4,8 @@
 
 include_guard(GLOBAL)
 
+include(DeployHostTriplet)
+
 function(setup_split_debug_script)
   if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
     set(OBJCOPY ${CMAKE_OBJCOPY})
@@ -46,9 +48,11 @@ function(add_windows_deploy_target)
   if(MINGW AND TARGET bitcoin-qt AND TARGET bitcoind AND TARGET bitcoin-cli AND TARGET bitcoin-tx AND TARGET bitcoin-wallet AND TARGET bitcoin-util AND TARGET test_bitcoin)
     # TODO: Consider replacing this code with the CPack NSIS Generator.
     #       See https://cmake.org/cmake/help/latest/cpack_gen/nsis.html
+    get_deploy_host_triplet(deploy_host_triplet)
+    set(DEPLOY_HOST_TRIPLET ${deploy_host_triplet})
     include(GenerateSetupNsi)
     generate_setup_nsi()
-    set(WIN64_SETUP_EXE bitcoin-win64-setup-${CLIENT_VERSION_STRING}.exe)
+    set(WIN64_SETUP_EXE bitcoin-win64-setup-${CLIENT_VERSION_STRING}-${deploy_host_triplet}.exe)
     # Always delete and recreate: an OUTPUT rule would skip rm when the installer
     # already exists, and makensis / zip would then append to the old package.
     add_custom_target(deploy
@@ -126,7 +130,8 @@ function(add_macos_deploy_target)
     )
 
     string(REPLACE " " "-" osx_volname ${CLIENT_NAME})
-    set(osx_zip_name "${osx_volname}-${CLIENT_VERSION_STRING}")
+    get_deploy_host_triplet(deploy_host_triplet)
+    set(osx_zip_name "${osx_volname}-${CLIENT_VERSION_STRING}-${deploy_host_triplet}")
     set(macos_zip_app "${CLIENT_NAME}.app")
     if(NOT QT_TRANSLATIONS_DIR)
       foreach(_qt_ver 5 6)

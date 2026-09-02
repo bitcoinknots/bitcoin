@@ -52,7 +52,7 @@ Var StartMenuGroup
 !insertmacro MUI_LANGUAGE English
 
 # Installer attributes
-OutFile "@abs_top_builddir@/bitcoin-win64-setup-@CLIENT_VERSION_STRING@.exe"
+OutFile "@abs_top_builddir@/bitcoin-win64-setup-@CLIENT_VERSION_STRING@-@DEPLOY_HOST_TRIPLET@.exe"
 InstallDir $PROGRAMFILES64\Bitcoin
 CRCCheck force
 XPStyle on

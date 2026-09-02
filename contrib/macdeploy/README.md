@@ -6,7 +6,8 @@ The `macdeployqtplus` script should not be run manually. Instead, after building
 make deploy
 ```
 
-When complete, it will have produced `Bitcoin-Purity-<version>.zip`.
+When complete, it will have produced `Bitcoin-Purity-<version>-<platform>.zip`
+(for example `Bitcoin-Purity-1.0.0rc1-arm64-apple-darwin.zip`).
 
 ## SDK Extraction
 
