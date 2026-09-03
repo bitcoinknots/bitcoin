@@ -1225,10 +1225,16 @@ bool AppInitParameterInteraction(const ArgsManager& args)
         g_weight_per_data_byte = ((*parsed * WITNESS_SCALE_FACTOR) + 99) / 100;
     }
 
-    g_script_size_policy_limit = args.GetIntArg("-maxscriptsize", g_script_size_policy_limit);
+    if (auto err = args.AssignIntArgToVar("maxscriptsize", g_script_size_policy_limit); !err) {
+        return InitError(util::ErrorString(err));
+    }
 
-    nBytesPerSigOp = args.GetIntArg("-bytespersigop", nBytesPerSigOp);
-    nBytesPerSigOpStrict = args.GetIntArg("-bytespersigopstrict", nBytesPerSigOpStrict);
+    if (auto err = args.AssignIntArgToVar("bytespersigop", nBytesPerSigOp); !err) {
+        return InitError(util::ErrorString(err));
+    }
+    if (auto err = args.AssignIntArgToVar("bytespersigopstrict", nBytesPerSigOpStrict); !err) {
+        return InitError(util::ErrorString(err));
+    }
 
     if (!g_wallet_init_interface.ParameterInteraction()) return false;
 
