@@ -146,7 +146,7 @@ PSBTAnalysis AnalyzePSBT(PartiallySignedTransaction psbtx)
 
         if (success) {
             CTransaction ctx = CTransaction(mtx);
-            size_t size(GetVirtualTransactionSize(GetTransactionWeight(ctx) + CalculateExtraTxWeight(ctx, view, ::g_weight_per_data_byte), GetTransactionSigOpCost(ctx, view, STANDARD_SCRIPT_VERIFY_FLAGS), ::nBytesPerSigOp));
+            size_t size(GetVirtualTransactionSize(GetTransactionWeight(ctx) + CalculateExtraTxWeight(ctx, view, ::g_weight_per_data_byte, DataOutputBytes(ctx)), GetTransactionSigOpCost(ctx, view, STANDARD_SCRIPT_VERIFY_FLAGS), ::nBytesPerSigOp));
             result.estimated_vsize = size;
             // Estimate fee rate
             CFeeRate feerate(fee, size);
