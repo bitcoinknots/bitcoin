@@ -1651,6 +1651,10 @@ BOOST_AUTO_TEST_CASE(script_DataCarrierBytes)
     BOOST_CHECK_EQUAL("0+6", DatacarrierBytesStr(CScript() << OP_FALSE << OP_IF << OP_TRUE << OP_IF << OP_ENDIF << OP_ENDIF));
     // pushing then immediately dropping is data: length(1), zero(11), OP_DROP
     BOOST_CHECK_EQUAL("0+13", DatacarrierBytesStr(CScript() << zeros(11) << OP_DROP));
+    // bare/BIP-110 envelope: a run of pushes balanced by OP_2DROP is all data
+    BOOST_CHECK_EQUAL("0+25", DatacarrierBytesStr(CScript() << zeros(11) << zeros(11) << OP_2DROP));
+    // pushnums interleaved in the run don't strand earlier pushes: 12 + 1 (OP_7) + 12 + 1 (OP_2DROP)
+    BOOST_CHECK_EQUAL("0+26", DatacarrierBytesStr(CScript() << zeros(11) << OP_7 << zeros(11) << OP_2DROP));
     // OLGA data obfuscated as p2wsh
     const auto olga_header = CScript() << OP_0 << "003e7374616d703a000000000000000000000000000000000000000000000000"_hex;
     BOOST_CHECK_EQUAL("0+82", DatacarrierBytesStr(olga_header, 2));
