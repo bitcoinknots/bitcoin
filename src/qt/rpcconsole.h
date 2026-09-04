@@ -153,8 +153,8 @@ public Q_SLOTS:
     /** set which tab has the focus (is visible) */
     void setTabFocus(enum TabTypes tabType);
 #ifdef ENABLE_WALLET
-    /** Set the current (ie - active) wallet */
-    void setCurrentWallet(WalletModel* const wallet_model);
+    /** Set the wallet displayed in the main window, followed when the selector is on "Use displayed wallet" */
+    void setDisplayedWallet(WalletModel* const wallet_model);
 #endif // ENABLE_WALLET
 
 private:
@@ -198,6 +198,11 @@ private:
     QThread thread;
     RPCExecutor* m_executor{nullptr};
     WalletModel* m_last_wallet_model{nullptr};
+#ifdef ENABLE_WALLET
+    /** Wallet the selector resolves to while "Use displayed wallet" is selected */
+    WalletModel* m_displayed_wallet_model{nullptr};
+    WalletModel* currentWalletModel() const;
+#endif // ENABLE_WALLET
     bool m_is_executing{false};
     QByteArray m_peer_widget_header_state;
     QByteArray m_banlist_widget_header_state;
