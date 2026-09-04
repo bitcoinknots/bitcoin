@@ -73,6 +73,7 @@ add_executable(test_bitcoin
   psbt_tests.cpp
   pmt_tests.cpp
   policy_fee_tests.cpp
+  policy_tests.cpp
   policyestimator_tests.cpp
   pool_tests.cpp
   pow_tests.cpp

@@ -1642,6 +1642,28 @@ public:
     //! Check whether this node is safe as a script on its own.
     bool IsSane() const { return IsValidTopLevel() && IsSaneSubexpression() && NeedsSignature(); }
 
+    //! Check whether this node or any sub-node contains OP_IF/NOTIF-emitting fragments
+    //! (WRAP_D, WRAP_J, ANDOR, OR_C, OR_D, OR_I). In Tapscript, these should be replaced
+    //! by separate Taptree leaves for better privacy and efficiency.
+    bool HasBranchingOpcodes(size_t depth = 0) const {
+        if (depth > 100) return true;
+        switch (fragment) {
+        case Fragment::WRAP_D:
+        case Fragment::WRAP_J:
+        case Fragment::ANDOR:
+        case Fragment::OR_C:
+        case Fragment::OR_D:
+        case Fragment::OR_I:
+            return true;
+        default:
+            break;
+        }
+        for (const auto& sub : subs) {
+            if (sub->HasBranchingOpcodes(depth + 1)) return true;
+        }
+        return false;
+    }
+
     //! Produce a witness for this script, if possible and given the information available in the context.
     //! The non-malleable satisfaction is guaranteed to be valid if it exists, and ValidSatisfaction()
     //! is true. If IsSane() holds, this satisfaction is guaranteed to succeed in case the node's

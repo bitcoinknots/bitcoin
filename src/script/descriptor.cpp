@@ -9,6 +9,7 @@
 #include <pubkey.h>
 #include <script/miniscript.h>
 #include <script/parsing.h>
+#include <script/policy.h>
 #include <script/script.h>
 #include <script/signingprovider.h>
 #include <script/solver.h>
@@ -1939,6 +1940,85 @@ std::vector<std::unique_ptr<DescriptorImpl>> ParseScript(uint32_t& key_exp_index
         return ret;
     } else if (Func("addr", expr)) {
         error = "Can only have addr() at top level";
+        return {};
+    }
+    if (ctx == ParseScriptContext::TOP && Func("compile_tr", expr)) {
+        auto arg = Expr(expr);
+        auto internal_keys = ParsePubkey(key_exp_index, arg, ParseScriptContext::P2TR, out, error);
+        if (internal_keys.empty()) {
+            error = strprintf("compile_tr(): %s", error);
+            return {};
+        }
+        ++key_exp_index;
+        if (!Const(",", expr)) {
+            error = "compile_tr(): expected ',' after internal key";
+            return {};
+        }
+
+        KeyParser parser(/*out=*/&out, /*in=*/nullptr, /*ctx=*/miniscript::MiniscriptContext::TAPSCRIPT, key_exp_index);
+        auto pol = policy::ParsePolicy<uint32_t>(expr, parser);
+        if (!pol || !expr.empty()) {
+            error = "compile_tr(): invalid policy expression";
+            if (!parser.m_key_parsing_error.empty()) error = strprintf("compile_tr(): %s", parser.m_key_parsing_error);
+            return {};
+        }
+
+        auto result = policy::CompileTrNative<uint32_t>(*pol);
+        if (!result) {
+            error = "compile_tr(): policy compilation failed (too many leaves or unsupported policy)";
+            return {};
+        }
+
+        auto& [scripts, depths] = *result;
+
+        size_t max_providers_len = internal_keys.size();
+        if (!parser.m_keys.empty()) {
+            max_providers_len = std::max(max_providers_len, std::max_element(parser.m_keys.begin(), parser.m_keys.end(),
+                    [](const std::vector<std::unique_ptr<PubkeyProvider>>& a, const std::vector<std::unique_ptr<PubkeyProvider>>& b) {
+                        return a.size() < b.size();
+                    })->size());
+        }
+
+        for (auto& vec : parser.m_keys) {
+            if (vec.size() == 1) {
+                for (size_t j = 1; j < max_providers_len; ++j) {
+                    vec.emplace_back(vec.at(0)->Clone());
+                }
+            } else if (vec.size() != max_providers_len) {
+                error = "compile_tr(): multipath derivation paths have mismatched lengths";
+                return {};
+            }
+        }
+
+        if (internal_keys.size() > 1 && internal_keys.size() != max_providers_len) {
+            error = "compile_tr(): multipath internal key mismatches multipath subscripts lengths";
+            return {};
+        }
+        while (internal_keys.size() < max_providers_len) {
+            internal_keys.emplace_back(internal_keys.at(0)->Clone());
+        }
+
+        key_exp_index += parser.m_keys.size();
+        assert(TaprootBuilder::ValidDepths(depths));
+
+        for (size_t mp = 0; mp < max_providers_len; ++mp) {
+            std::vector<std::unique_ptr<DescriptorImpl>> descs;
+            descs.reserve(scripts.size());
+            for (size_t i = 0; i < scripts.size(); ++i) {
+                std::vector<std::unique_ptr<PubkeyProvider>> leaf_keys;
+                leaf_keys.reserve(parser.m_keys.size());
+                for (auto& key_vec : parser.m_keys) {
+                    leaf_keys.push_back(key_vec.at(mp)->Clone());
+                }
+                descs.push_back(std::make_unique<MiniscriptDescriptor>(
+                    std::move(leaf_keys), (mp == max_providers_len - 1) ? std::move(scripts[i]) : scripts[i]->Clone()));
+            }
+            ret.emplace_back(std::make_unique<TRDescriptor>(std::move(internal_keys.at(mp)), std::move(descs), depths));
+        }
+        return ret;
+
+    } else if (Func("compile_tr", expr)) {
+        error = "Can only have compile_tr at top level";
         return {};
     }
     if (ctx == ParseScriptContext::TOP && Func("tr", expr)) {
