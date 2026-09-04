@@ -159,6 +159,7 @@ target_link_libraries(test_bitcoin
   secp256k1
   Boost::headers
   libevent::extra
+  $<TARGET_NAME_IF_EXISTS:Jemalloc::Jemalloc>
 )
 
 if(ENABLE_WALLET)
@@ -170,6 +171,7 @@ if(WITH_MULTIPROCESS)
     PRIVATE
       core_interface
       univalue
+      $<TARGET_NAME_IF_EXISTS:Jemalloc::Jemalloc>
   )
 
   target_sources(test_bitcoin
