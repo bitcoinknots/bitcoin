@@ -22,6 +22,7 @@ EXCLUDE_FILES_WITH_PREFIX = ['contrib/devtools/bitcoin-tidy',
                              'src/crypto/ctaes',
                              'src/tinyformat.h',
                              'src/bench/nanobench.h',
+                             'src/univalue/yyjson/',
                              'src/test/fuzz/FuzzedDataProvider.h'] + SHARED_EXCLUDED_SUBTREES
 
 
