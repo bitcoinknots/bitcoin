@@ -22,6 +22,11 @@ Conservatively, you will need:
 If you don't have Guix installed and set up, please follow the instructions in
 [INSTALL.md](./INSTALL.md)
 
+Additionally the `guix-build` script will build a docker compatible image
+which require to install QEMU user static binary.
+
+On Debian you can install `qemu-user-static` package.
+
 # Usage
 
 If you haven't considered your security model yet, please read [the relevant
@@ -224,7 +229,7 @@ details.
 
   _(defaults to "x86\_64-linux-gnu arm-linux-gnueabihf aarch64-linux-gnu
   riscv64-linux-gnu powerpc64-linux-gnu powerpc64le-linux-gnu
-  x86\_64-w64-mingw32 x86\_64-apple-darwin arm64-apple-darwin")_
+  x86\_64-w64-mingw32 x86\_64-apple-darwin arm64-apple-darwin docker-x86\_64-linux docker-aarch64-linux")_
 
 * _**SOURCES_PATH**_
 
