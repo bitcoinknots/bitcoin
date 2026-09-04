@@ -220,6 +220,7 @@ BASE_SCRIPTS = [
     'mining_coin_age_priority.py',
     'rpc_getchaintips.py',
     'rpc_misc.py',
+    'rpc_settings.py',
     'p2p_1p1c_network.py',
     'interface_rest.py',
     'mempool_spend_coinbase.py',

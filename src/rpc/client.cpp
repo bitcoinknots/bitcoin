@@ -322,6 +322,8 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "psbtbumpfee", 1, "original_change_index"},
     { "logging", 0, "include" },
     { "logging", 1, "exclude" },
+    { "dumpsettings", 0, "detailed" },
+    { "setsettings", 0, "settings" },
     { "disconnectnode", 1, "nodeid" },
     { "upgradewallet", 0, "version" },
     { "gethdkeys", 0, "active_only" },
