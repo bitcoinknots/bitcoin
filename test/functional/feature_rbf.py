@@ -123,6 +123,9 @@ class ReplaceByFeeTest(BitcoinTestFramework):
         self.log.info("Running test full replace by fee...")
         self.test_fullrbf()
 
+        self.log.info("Running test replace by feerate mode...")
+        self.test_feerate_mode()
+
         self.log.info("Running test incremental relay feerates...")
         self.test_incremental_relay_feerates()
 
@@ -867,6 +870,106 @@ class ReplaceByFeeTest(BitcoinTestFramework):
         # Optout_tx is not anymore in the mempool.
         assert optout_tx['txid'] not in self.nodes[0].getrawmempool()
         assert conflicting_tx['txid'] in self.nodes[0].getrawmempool()
+
+    def test_feerate_mode(self):
+        self.restart_node(0, extra_args=self.extra_args[0])
+        self.connect_nodes(0, 1)
+        confirmed_utxo = self.make_utxo(self.nodes[0], int(2 * COIN))
+        confirmed_utxo2 = self.make_utxo(self.nodes[0], int(2 * COIN))
+        confirmed_utxo3 = self.make_utxo(self.nodes[0], int(2 * COIN))
+        confirmed_utxo4 = self.make_utxo(self.nodes[0], int(2 * COIN))
+        confirmed_utxo5 = self.make_utxo(self.nodes[0], int(2 * COIN))
+        self.restart_node(0, extra_args=["-mempoolreplacement=feerate,-optin"])
+        assert self.nodes[0].getmempoolinfo()["fullrbf"]
+        assert_equal(self.nodes[0].getmempoolinfo()["rbf_policy"], 'always')
+        assert_equal(self.nodes[0].getmempoolinfo()["rbf_feerate"], True)
+
+        # Create a tx at 0.01 BTC/kvB. A slightly higher-feerate replacement would
+        # normally fail Rule 4 (additional fees < incremental relay fee * vsize).
+        # In feerate mode, Rule 4 is relaxed — only need to cover own relay cost.
+        original_tx = self.wallet.send_self_transfer(
+            from_node=self.nodes[0],
+            utxo_to_spend=confirmed_utxo,
+            fee_rate=Decimal('0.01'),
+        )
+
+        # Replacement with slightly higher feerate: additional fee is too small for
+        # Rule 4, but the replacement covers its own relay cost and improves the
+        # feerate diagram.
+        replacement_tx = self.wallet.create_self_transfer(
+            utxo_to_spend=confirmed_utxo,
+            fee_rate=Decimal('0.0105'),
+        )
+
+        # Under normal RBF this fails Rule 4 (insufficient additional fees to relay).
+        # Under feerate mode it succeeds because it improves the feerate diagram
+        # and covers its own relay cost.
+        self.nodes[0].sendrawtransaction(replacement_tx['hex'], 0)
+        assert original_tx['txid'] not in self.nodes[0].getrawmempool()
+        assert replacement_tx['txid'] in self.nodes[0].getrawmempool()
+
+        # Test: replacement with lower feerate should be rejected (Rule #6)
+        high_feerate_tx = self.wallet.send_self_transfer(
+            from_node=self.nodes[0],
+            utxo_to_spend=confirmed_utxo2,
+            fee_rate=Decimal('0.01'),
+        )
+        low_feerate_tx = self.wallet.create_self_transfer(
+            utxo_to_spend=confirmed_utxo2,
+            fee_rate=Decimal('0.005'),
+        )
+        assert_raises_rpc_error(-26, "insufficient fee", self.nodes[0].sendrawtransaction, low_feerate_tx['hex'], 0)
+        assert high_feerate_tx['txid'] in self.nodes[0].getrawmempool()
+
+        # Test: feerate,-optin allows replacement of non-signaling (BIP125 opt-out) txs
+        non_signaling_tx = self.wallet.send_self_transfer(
+            from_node=self.nodes[0],
+            utxo_to_spend=confirmed_utxo3,
+            fee_rate=Decimal('0.01'),
+            sequence=0xffffffff,
+        )
+        signaling_replacement = self.wallet.create_self_transfer(
+            utxo_to_spend=confirmed_utxo3,
+            fee_rate=Decimal('0.0105'),
+        )
+        self.nodes[0].sendrawtransaction(signaling_replacement['hex'], 0)
+        assert non_signaling_tx['txid'] not in self.nodes[0].getrawmempool()
+        assert signaling_replacement['txid'] in self.nodes[0].getrawmempool()
+
+        # Test: feerate,optin mode respects BIP125 signaling
+        self.restart_node(0, extra_args=["-mempoolreplacement=feerate,optin"])
+        assert_equal(self.nodes[0].getmempoolinfo()["fullrbf"], False)
+        assert_equal(self.nodes[0].getmempoolinfo()["rbf_policy"], 'optin')
+        assert_equal(self.nodes[0].getmempoolinfo()["rbf_feerate"], True)
+
+        # Non-signaling tx should NOT be replaceable in optin mode
+        non_signaling_tx2 = self.wallet.send_self_transfer(
+            from_node=self.nodes[0],
+            utxo_to_spend=confirmed_utxo4,
+            fee_rate=Decimal('0.01'),
+            sequence=0xffffffff,
+        )
+        replacement2 = self.wallet.create_self_transfer(
+            utxo_to_spend=confirmed_utxo4,
+            fee_rate=Decimal('0.0105'),
+        )
+        assert_raises_rpc_error(-26, "txn-mempool-conflict", self.nodes[0].sendrawtransaction, replacement2['hex'], 0)
+        assert non_signaling_tx2['txid'] in self.nodes[0].getrawmempool()
+
+        # Signaling tx SHOULD be replaceable with feerate rules
+        signaling_tx = self.wallet.send_self_transfer(
+            from_node=self.nodes[0],
+            utxo_to_spend=confirmed_utxo5,
+            fee_rate=Decimal('0.01'),
+            sequence=0,
+        )
+        signaling_replacement2 = self.wallet.create_self_transfer(
+            utxo_to_spend=confirmed_utxo5,
+            fee_rate=Decimal('0.0105'),
+        )
+        self.nodes[0].sendrawtransaction(signaling_replacement2['hex'], 0)
+        assert signaling_tx['txid'] not in self.nodes[0].getrawmempool()
+        assert signaling_replacement2['txid'] in self.nodes[0].getrawmempool()
 
 if __name__ == '__main__':
     ReplaceByFeeTest(__file__).main()

@@ -168,8 +168,21 @@ std::optional<std::string> PaysForRBF(CAmount original_fees,
                                       CAmount replacement_fees,
                                       size_t replacement_vsize,
                                       CFeeRate relay_fee,
-                                      const uint256& txid)
+                                      const uint256& txid,
+                                      bool skip_absolute_fee_check)
 {
+    if (skip_absolute_fee_check) {
+        // Feerate mode: skip Rule #3 (absolute fee check). For Rule #4, just ensure
+        // the replacement pays enough fee to cover its own relay bandwidth.
+        if (replacement_fees < relay_fee.GetFee(replacement_vsize)) {
+            return strprintf("rejecting replacement %s, not enough fees to relay; %s < %s",
+                             txid.ToString(),
+                             FormatMoney(replacement_fees),
+                             FormatMoney(relay_fee.GetFee(replacement_vsize)));
+        }
+        return std::nullopt;
+    }
+
     // Rule #3: The replacement fees must be greater than or equal to fees of the
     // transactions it replaces, otherwise the bandwidth used by those conflicting transactions
     // would not be paid for.
@@ -178,9 +191,7 @@ std::optional<std::string> PaysForRBF(CAmount original_fees,
                          txid.ToString(), FormatMoney(replacement_fees), FormatMoney(original_fees));
     }
 
-    // Rule #4: The new transaction must pay for its own bandwidth. Otherwise, we have a DoS
-    // vector where attackers can cause a transaction to be replaced (and relayed) repeatedly by
-    // increasing the fee by tiny amounts.
+    // Rule #4: The new transaction must pay for its own bandwidth.
     CAmount additional_fees = replacement_fees - original_fees;
     if (additional_fees < relay_fee.GetFee(replacement_vsize)) {
         return strprintf("rejecting replacement %s, not enough additional fees to relay; %s < %s",

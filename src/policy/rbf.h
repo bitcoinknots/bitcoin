@@ -116,7 +116,8 @@ std::optional<std::string> PaysForRBF(CAmount original_fees,
                                       CAmount replacement_fees,
                                       size_t replacement_vsize,
                                       CFeeRate relay_fee,
-                                      const uint256& txid);
+                                      const uint256& txid,
+                                      bool skip_absolute_fee_check = false);
 
 /**
  * The replacement transaction must improve the feerate diagram of the mempool.
