@@ -159,14 +159,18 @@ ifneq ($(LTO),)
 $(package)_config_opts_linux += -ltcg
 endif
 
+# -platform is the spec Qt builds qmake and the other host_build tools with, so
+# it has to describe the build machine, which uses build_CXX. Only -xplatform
+# follows host_CXX.
+$(package)_config_opts_linux += -platform linux-g++
 ifneq (,$(findstring clang,$($(package)_cxx)))
   ifneq (,$(findstring -stdlib=libc++,$($(package)_cxx)))
-    $(package)_config_opts_linux += -platform linux-clang-libc++ -xplatform linux-clang-libc++
+    $(package)_config_opts_linux += -xplatform linux-clang-libc++
   else
-    $(package)_config_opts_linux += -platform linux-clang -xplatform linux-clang
+    $(package)_config_opts_linux += -xplatform linux-clang
   endif
 else
-  $(package)_config_opts_linux += -platform linux-g++ -xplatform bitcoin-linux-g++
+  $(package)_config_opts_linux += -xplatform bitcoin-linux-g++
 endif
 
 $(package)_config_opts_mingw32 = -no-opengl
@@ -245,6 +249,9 @@ define $(package)_preprocess_cmds
   echo "!host_build: QMAKE_CFLAGS     += $($(package)_cflags) $($(package)_cppflags)" >> qtbase/mkspecs/common/gcc-base.conf && \
   echo "!host_build: QMAKE_CXXFLAGS   += $($(package)_cxxflags) $($(package)_cppflags)" >> qtbase/mkspecs/common/gcc-base.conf && \
   echo "!host_build: QMAKE_LFLAGS     += $($(package)_ldflags)" >> qtbase/mkspecs/common/gcc-base.conf && \
+  printf 'host_build {\n    QMAKE_CFLAGS   += %s\n    QMAKE_CXXFLAGS += %s\n    QMAKE_LFLAGS   += %s\n}\n' "$(build_CFLAGS)" "$(build_CXXFLAGS)" "$(build_LDFLAGS)" >> qtbase/mkspecs/features/default_post.prf && \
+  echo "EXTRA_CPPFLAGS += $(build_CFLAGS)" >> qtbase/qmake/Makefile.unix && \
+  echo "LFLAGS += $(build_LDFLAGS)" >> qtbase/qmake/Makefile.unix && \
   sed -i.old "s|QMAKE_CC                = \$$$$\$$$${CROSS_COMPILE}clang|QMAKE_CC                = $($(package)_cc)|" qtbase/mkspecs/common/clang.conf && \
   sed -i.old "s|QMAKE_CXX               = \$$$$\$$$${CROSS_COMPILE}clang++|QMAKE_CXX               = $($(package)_cxx)|" qtbase/mkspecs/common/clang.conf
 endef
