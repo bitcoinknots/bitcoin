@@ -10,6 +10,10 @@ to addrman with).
 
 Update `MIN_BLOCKS` in  `makeseeds.py` and the `-m`/`--minblocks` arguments below, as needed.
 
+`makeseeds.py` judges uptime over 30 days by default. Pass `-u 7` while the
+network is younger than 30 days, since no node that joined at a hardfork can
+meet a 30-day threshold until a month after it.
+
 The seeds compiled into the release are created from sipa's and achow101's
 DNS seed, virtu's crawler, and asmap community AS map data. Run the following commands
 from the `/contrib/seeds` directory:
