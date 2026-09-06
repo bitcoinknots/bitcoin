@@ -1,0 +1,18 @@
+[Unit]
+Description=knots-txbridge: carry legacy-network transactions into the local Bitcoin Knots node
+After=bitcoind.service
+Wants=bitcoind.service
+
+[Service]
+DynamicUser=yes
+ExecStart=/usr/bin/python3 /opt/knots-txbridge/txbridge.py --mode submit --node 127.0.0.1:8333 --stats-interval 300
+Restart=on-failure
+RestartSec=30
+MemoryMax=128M
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
