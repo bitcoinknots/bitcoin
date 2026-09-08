@@ -15,7 +15,10 @@ void FindCoins(const NodeContext& node, std::map<COutPoint, Coin>& coins)
     assert(node.chainman);
     LOCK2(cs_main, node.mempool->cs);
     CCoinsViewCache& chain_view = node.chainman->ActiveChainstate().CoinsTip();
-    CCoinsViewMemPool mempool_view(&chain_view, *node.mempool);
+    const int height{node.chainman->ActiveChain().Height() + 1};
+    const std::optional<int> relock_height{height >= node.chainman->GetConsensus().CoinbaseRelockHeight
+        ? std::optional<int>{height} : std::nullopt};
+    CCoinsViewMemPool mempool_view(&chain_view, *node.mempool, relock_height);
     for (auto& [outpoint, coin] : coins) {
         if (auto c{mempool_view.GetCoin(outpoint)}) {
             coin = std::move(*c);

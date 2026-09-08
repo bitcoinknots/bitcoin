@@ -150,7 +150,7 @@ CAmount CachedTxGetImmatureCredit(const CWallet& wallet, const CWalletTx& wtx, c
 {
     AssertLockHeld(wallet.cs_wallet);
 
-    if (wallet.IsTxImmatureCoinBase(wtx) && wtx.isConfirmed()) {
+    if ((wallet.IsTxImmatureCoinBase(wtx) && wtx.isConfirmed()) || wallet.GetTxCoinbaseRelockBlocksToMaturity(wtx) > 0) {
         return GetCachableAmount(wallet, wtx, CWalletTx::IMMATURE_CREDIT, filter);
     }
 
@@ -164,8 +164,8 @@ CAmount CachedTxGetAvailableCredit(const CWallet& wallet, const CWalletTx& wtx, 
     // Avoid caching ismine for NO or ALL cases (could remove this check and simplify in the future).
     bool allow_cache = (filter & ISMINE_ALL) && (filter & ISMINE_ALL) != ISMINE_ALL;
 
-    // Must wait until coinbase is safely deep enough in the chain before valuing it
-    if (wallet.IsTxImmatureCoinBase(wtx))
+    // Exclude both immature coinbases and their temporarily relocked payouts.
+    if (wallet.IsTxImmatureCoinBase(wtx) || wallet.GetTxCoinbaseRelockBlocksToMaturity(wtx) > 0)
         return 0;
 
     if (allow_cache && wtx.m_amounts[CWalletTx::AVAILABLE_CREDIT].m_cached[filter]) {

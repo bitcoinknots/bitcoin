@@ -276,10 +276,20 @@ bool BlockAssembler::TestPackage(uint64_t packageSize, int64_t packageSigOpsCost
 // - serialized size (in case -blockmaxsize is in use)
 bool BlockAssembler::TestPackageTransactions(const CTxMemPool::setEntries& package) const
 {
+    AssertLockHeld(::cs_main);
+    const std::optional<int> relock_height{nHeight >= chainparams.GetConsensus().CoinbaseRelockHeight
+        ? std::optional<int>{nHeight} : std::nullopt};
+    const CCoinsViewMemPool payout_view{&m_chainstate.CoinsTip(), *Assert(m_mempool), relock_height};
     uint64_t nPotentialBlockSize = nBlockSize; // only used with fNeedSizeAccounting
     for (CTxMemPool::txiter it : package) {
         if (!IsFinalTx(it->GetTx(), nHeight, m_lock_time_cutoff)) {
             return false;
+        }
+        if (relock_height) {
+            for (const auto& input : it->GetTx().vin) {
+                if (const auto coin{payout_view.GetCoin(input.prevout)};
+                    coin && !Consensus::IsCoinbasePayoutMature(*coin, nHeight)) return false;
+            }
         }
         if (fNeedSizeAccounting) {
             uint64_t nTxSize = ::GetSerializeSize(TX_WITH_WITNESS(it->GetTx()));

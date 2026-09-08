@@ -3,17 +3,72 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <chainparams.h>
+#include <coins.h>
+#include <hash.h>
 #include <index/coinstatsindex.h>
 #include <interfaces/chain.h>
 #include <kernel/coinstats.h>
+#include <span.h>
 #include <test/util/index.h>
 #include <test/util/setup_common.h>
 #include <test/util/validation.h>
+#include <txdb.h>
 #include <validation.h>
 
 #include <boost/test/unit_test.hpp>
 
 BOOST_AUTO_TEST_SUITE(coinstatsindex_tests)
+
+BOOST_FIXTURE_TEST_CASE(coinbase_relock_hash_commitments, TestChain100Setup)
+{
+    CCoinsViewDB db{{.path = "relock_hash", .cache_bytes = 1_MiB, .memory_only = true}, {}};
+    CCoinsViewCache cache{&db};
+    const COutPoint outpoint{Txid::FromUint256(uint256{1}), 0};
+    const Coin ordinary{CTxOut{123, CScript{} << OP_TRUE}, 100, false};
+    const Coin relocked{ordinary.out, 100, false, true};
+    cache.AddCoin(outpoint, Coin{ordinary}, false);
+    cache.SetBestBlock(WITH_LOCK(cs_main, return m_node.chainman->ActiveChain().Tip()->GetBlockHash()));
+    BOOST_REQUIRE(cache.Flush());
+
+    // Independently encode a coin using the historical commitment format.
+    DataStream legacy_bytes;
+    legacy_bytes << outpoint << uint32_t{200} << ordinary.out;
+    HashWriter legacy_hash;
+    legacy_hash << outpoint << uint32_t{200} << ordinary.out;
+    MuHash3072 legacy_muhash;
+    legacy_muhash.Insert(MakeUCharSpan(legacy_bytes));
+    uint256 expected_muhash;
+    legacy_muhash.Finalize(expected_muhash);
+
+    const auto serialized{kernel::ComputeUTXOStats(kernel::CoinStatsHashType::HASH_SERIALIZED, &db, m_node.chainman->m_blockman)};
+    const auto muhash{kernel::ComputeUTXOStats(kernel::CoinStatsHashType::MUHASH, &db, m_node.chainman->m_blockman)};
+    BOOST_REQUIRE(serialized);
+    BOOST_REQUIRE(muhash);
+    BOOST_CHECK(serialized->hashSerialized == legacy_hash.GetHash());
+    BOOST_CHECK(muhash->hashSerialized == expected_muhash);
+
+    cache.AddCoin(outpoint, Coin{relocked}, true);
+    BOOST_REQUIRE(cache.Flush());
+    const auto marked_serialized{kernel::ComputeUTXOStats(kernel::CoinStatsHashType::HASH_SERIALIZED, &db, m_node.chainman->m_blockman)};
+    const auto marked_muhash{kernel::ComputeUTXOStats(kernel::CoinStatsHashType::MUHASH, &db, m_node.chainman->m_blockman)};
+    BOOST_REQUIRE(marked_serialized);
+    BOOST_REQUIRE(marked_muhash);
+    BOOST_CHECK(marked_serialized->hashSerialized != serialized->hashSerialized);
+    BOOST_CHECK(marked_muhash->hashSerialized != muhash->hashSerialized);
+
+    MuHash3072 accumulator;
+    kernel::ApplyCoinHash(accumulator, outpoint, relocked);
+    uint256 marked_hash;
+    accumulator.Finalize(marked_hash);
+    BOOST_CHECK(marked_hash == marked_muhash->hashSerialized);
+    kernel::RemoveCoinHash(accumulator, outpoint, relocked);
+    uint256 removed_hash;
+    accumulator.Finalize(removed_hash);
+    MuHash3072 empty;
+    uint256 empty_hash;
+    empty.Finalize(empty_hash);
+    BOOST_CHECK(removed_hash == empty_hash);
+}
 
 BOOST_FIXTURE_TEST_CASE(coinstatsindex_initial_sync, TestChain100Setup)
 {

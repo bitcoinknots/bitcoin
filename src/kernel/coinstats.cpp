@@ -52,6 +52,11 @@ static void TxOutSer(T& ss, const COutPoint& outpoint, const Coin& coin)
 {
     ss << outpoint;
     ss << static_cast<uint32_t>((coin.nHeight << 1) + coin.fCoinBase);
+    // Preserve existing assumeutxo and MuHash commitments for unmarked coins.
+    // An amount of -1 cannot occur in an unspent CTxOut, so this escape makes
+    // marked and unmarked encodings disjoint without changing the old prefix.
+    assert(!coin.IsSpent());
+    if (coin.IsCoinbaseRelocked()) ss << CAmount{-1};
     ss << coin.out;
 }
 

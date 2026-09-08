@@ -19,6 +19,10 @@ static const unsigned int REDUCED_DATA_MAX_BLOCK_WEIGHT = 800000;
 static const int64_t MAX_BLOCK_SIGOPS_COST = 80000;
 /** Coinbase transaction outputs can only be spent after this number of new blocks (network rule) */
 static const int COINBASE_MATURITY = 100;
+/** Coinbase spends before this age create outputs with a second maturity period. */
+static constexpr int COINBASE_RELOCK_WINDOW{1000};
+/** Maturity of an early coinbase payout, measured from the payout's own block. */
+static constexpr int COINBASE_PAYOUT_MATURITY{1000};
 
 static const int WITNESS_SCALE_FACTOR = 4;
 

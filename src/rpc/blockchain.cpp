@@ -14,6 +14,7 @@
 #include <chainparamsbase.h>
 #include <clientversion.h>
 #include <coins.h>
+#include <consensus/consensus.h>
 #include <common/args.h>
 #include <consensus/amount.h>
 #include <consensus/params.h>
@@ -1572,6 +1573,8 @@ static RPCHelpMan gettxout()
                     {RPCResult::Type::STR, "address", /*optional=*/true, "The Bitcoin address (only if a well-defined address exists)"},
                 }},
                 {RPCResult::Type::BOOL, "coinbase", "Coinbase or not"},
+                {RPCResult::Type::BOOL, "coinbase_relocked", "Whether this output has the one-time coinbase payout maturity restriction"},
+                {RPCResult::Type::NUM, "coinbase_relock_height", /*optional=*/true, "First block height in which this relocked output may be spent (confirmed outputs only)"},
             }},
         },
         RPCExamples{
@@ -1603,7 +1606,9 @@ static RPCHelpMan gettxout()
     if (fMempool) {
         const CTxMemPool& mempool = EnsureMemPool(node);
         LOCK(mempool.cs);
-        CCoinsViewMemPool view(coins_view, mempool);
+        const int next_height{active_chainstate.m_chain.Height() + 1};
+        const std::optional<int> relock_spend_height{next_height >= chainman.GetParams().GetConsensus().CoinbaseRelockHeight ? std::make_optional(next_height) : std::nullopt};
+        CCoinsViewMemPool view(coins_view, mempool, relock_spend_height);
         if (!mempool.isSpent(out)) coin = view.GetCoin(out);
     } else {
         coin = coins_view->GetCoin(out);
@@ -1628,6 +1633,10 @@ static RPCHelpMan gettxout()
     ScriptToUniv(coin->out.scriptPubKey, /*out=*/o, /*include_hex=*/true, /*include_address=*/true);
     ret.pushKV("scriptPubKey", std::move(o));
     ret.pushKV("coinbase", (bool)coin->fCoinBase);
+    ret.pushKV("coinbase_relocked", coin->IsCoinbaseRelocked());
+    if (coin->IsCoinbaseRelocked() && coin->nHeight != MEMPOOL_HEIGHT) {
+        ret.pushKV("coinbase_relock_height", static_cast<int64_t>(coin->nHeight) + COINBASE_PAYOUT_MATURITY);
+    }
 
     return ret;
 },
@@ -1995,6 +2004,10 @@ RPCHelpMan getdeploymentinfo()
                     {RPCResult::Type::NUM, "height", "the height the hardfork activates at"},
                     {RPCResult::Type::BOOL, "active", "whether the hardfork rules apply to the block after this one"},
                 }},
+                {RPCResult::Type::OBJ, "coinbaserelock", /*optional=*/true, "experimental coinbase payout relock schedule, present only when configured", {
+                    {RPCResult::Type::NUM, "height", "the height the payout relock rules activate at"},
+                    {RPCResult::Type::BOOL, "active", "whether the payout relock rules apply to the block after this one"},
+                }},
             }
         },
         RPCExamples{ HelpExampleCli("getdeploymentinfo", "") + HelpExampleRpc("getdeploymentinfo", "") },
@@ -2035,6 +2048,13 @@ RPCHelpMan getdeploymentinfo()
                 hf.pushKV("active", DeploymentActiveAfter(blockindex, chainman,
                                                           Consensus::DEPLOYMENT_BLAKE2B));
                 deploymentinfo.pushKV("blake2b", std::move(hf));
+            }
+            const int relock_height{chainman.GetConsensus().CoinbaseRelockHeight};
+            if (relock_height != std::numeric_limits<int>::max()) {
+                UniValue relock(UniValue::VOBJ);
+                relock.pushKV("height", relock_height);
+                relock.pushKV("active", DeploymentActiveAfter(blockindex, chainman, Consensus::DEPLOYMENT_COINBASE_RELOCK));
+                deploymentinfo.pushKV("coinbaserelock", std::move(relock));
             }
             return deploymentinfo;
         },

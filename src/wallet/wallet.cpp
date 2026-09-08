@@ -3642,7 +3642,7 @@ int CWallet::GetTxBlocksToMaturity(const CWalletTx& wtx) const
     AssertLockHeld(cs_wallet);
 
     if (!wtx.IsCoinBase()) {
-        return 0;
+        return GetTxCoinbaseRelockBlocksToMaturity(wtx);
     }
     int chain_depth = GetTxDepthInMainChain(wtx);
     assert(chain_depth >= 0); // coinbase tx should not be conflicted
@@ -3653,8 +3653,34 @@ bool CWallet::IsTxImmatureCoinBase(const CWalletTx& wtx) const
 {
     AssertLockHeld(cs_wallet);
 
-    // note GetBlocksToMaturity is 0 for non-coinbase tx
-    return GetTxBlocksToMaturity(wtx) > 0;
+    return wtx.IsCoinBase() && GetTxBlocksToMaturity(wtx) > 0;
+}
+
+int CWallet::GetTxCoinbaseRelockBlocksToMaturity(const CWalletTx& wtx) const
+{
+    AssertLockHeld(cs_wallet);
+    if (wtx.IsCoinBase() || !HaveChain() || m_last_block_processed_height < 0) return 0;
+    const int depth{GetTxDepthInMainChain(wtx)};
+    if (depth < 0 || depth >= COINBASE_PAYOUT_MATURITY) return 0;
+    if (!wtx.isConfirmed() && !wtx.InMempool()) return 0;
+
+    // Before activation there cannot be relocked outputs. Avoid UTXO lookups
+    // altogether on networks where this proposal has not been activated.
+    if (GetLastBlockHeight() + 1 < Params().GetConsensus().CoinbaseRelockHeight) return 0;
+
+    std::map<COutPoint, Coin> coins;
+    for (unsigned int i = 0; i < wtx.tx->vout.size(); ++i) {
+        const COutPoint outpoint{wtx.GetHash(), i};
+        if (!IsSpent(outpoint) && IsMine(wtx.tx->vout[i])) coins.try_emplace(outpoint);
+    }
+    if (coins.empty()) return 0;
+    chain().findCoins(coins);
+    for (const auto& [outpoint, coin] : coins) {
+        if (!coin.IsSpent() && coin.IsCoinbaseRelocked()) {
+            return COINBASE_PAYOUT_MATURITY - depth;
+        }
+    }
+    return 0;
 }
 
 bool CWallet::IsTxAssumed(const CWalletTx& wtx) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet)

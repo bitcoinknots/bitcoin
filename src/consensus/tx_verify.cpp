@@ -172,6 +172,33 @@ bool Consensus::CheckOutputSizes(const CTransaction& tx, TxValidationState& stat
     return true;
 }
 
+bool Consensus::IsEarlyCoinbaseSpend(const Coin& coin, int spend_height)
+{
+    if (!coin.IsCoinBase()) return false;
+    const int64_t age{int64_t{spend_height} - coin.nHeight};
+    return age >= COINBASE_MATURITY && age < COINBASE_RELOCK_WINDOW;
+}
+
+bool Consensus::HasEarlyCoinbaseInput(const CTransaction& tx, const CCoinsView& inputs, int spend_height)
+{
+    if (tx.IsCoinBase()) return false;
+    for (const auto& input : tx.vin) {
+        // Missing base-view inputs may belong to ordinary mempool parents. Coinbase
+        // transactions are never in the mempool, so these cannot trigger a relock.
+        if (const auto coin{inputs.GetCoin(input.prevout)}; coin && IsEarlyCoinbaseSpend(*coin, spend_height)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool Consensus::IsCoinbasePayoutMature(const Coin& coin, int spend_height)
+{
+    // MEMPOOL_HEIGHT is larger than every candidate block height: unconfirmed
+    // payouts therefore fail this signed age check, including package children.
+    return !coin.IsCoinbaseRelocked() || int64_t{spend_height} - coin.nHeight >= COINBASE_PAYOUT_MATURITY;
+}
+
 bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, const CheckTxInputsRules rules)
 {
     // are the actual inputs available?
@@ -195,6 +222,11 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, 
         if (coin.IsCoinBase() && nSpendHeight - coin.nHeight < COINBASE_MATURITY) {
             return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, "bad-txns-premature-spend-of-coinbase",
                 strprintf("tried to spend coinbase at depth %d", nSpendHeight - coin.nHeight));
+        }
+
+        if (!IsCoinbasePayoutMature(coin, nSpendHeight)) {
+            return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND,
+                "bad-txns-premature-spend-of-coinbase-payout");
         }
 
         // Check for negative or overflow input values

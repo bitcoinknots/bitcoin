@@ -3,6 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <consensus/validation.h>
+#include <consensus/consensus.h>
+#include <consensus/tx_verify.h>
 #include <key_io.h>
 #include <policy/packages.h>
 #include <policy/policy.h>
@@ -20,6 +22,51 @@
 
 
 BOOST_AUTO_TEST_SUITE(txvalidation_tests)
+
+BOOST_AUTO_TEST_CASE(coinbase_payout_relock_boundaries)
+{
+    const CTxOut output{10'000, CScript{} << OP_TRUE};
+    const Coin coinbase{output, /*height=*/10, /*coinbase=*/true};
+    BOOST_CHECK(!Consensus::IsEarlyCoinbaseSpend(coinbase, 9));
+    BOOST_CHECK(!Consensus::IsEarlyCoinbaseSpend(coinbase, 109));
+    BOOST_CHECK(Consensus::IsEarlyCoinbaseSpend(coinbase, 110));
+    BOOST_CHECK(Consensus::IsEarlyCoinbaseSpend(coinbase, 1009));
+    BOOST_CHECK(!Consensus::IsEarlyCoinbaseSpend(coinbase, 1010));
+
+    const Coin payout{output, /*height=*/110, /*coinbase=*/false, /*relock=*/true};
+    BOOST_CHECK(!Consensus::IsCoinbasePayoutMature(payout, 110));
+    BOOST_CHECK(!Consensus::IsCoinbasePayoutMature(payout, 1109));
+    BOOST_CHECK(Consensus::IsCoinbasePayoutMature(payout, 1110));
+    // Expiry permits an ordinary spend; the metadata must never act as a
+    // coinbase flag and restart maturity on the next generation of outputs.
+    BOOST_CHECK(!Consensus::IsEarlyCoinbaseSpend(payout, 1110));
+    BOOST_CHECK(!Consensus::IsCoinbasePayoutMature(Coin{output, MEMPOOL_HEIGHT, false, true}, 1110));
+
+    CCoinsView empty;
+    CCoinsViewCache inputs{&empty};
+    const COutPoint ordinary_out{Txid::FromUint256(uint256{1}), 0};
+    const COutPoint coinbase_out{Txid::FromUint256(uint256{2}), 0};
+    const COutPoint payout_out{Txid::FromUint256(uint256{3}), 0};
+    inputs.AddCoin(ordinary_out, Coin{output, 10, false}, false);
+    inputs.AddCoin(coinbase_out, Coin{coinbase}, false);
+    inputs.AddCoin(payout_out, Coin{payout}, false);
+    CMutableTransaction tx;
+    tx.vin.emplace_back(ordinary_out);
+    tx.vin.emplace_back(coinbase_out);
+    tx.vout.emplace_back(19'000, CScript{} << OP_TRUE);
+    BOOST_CHECK(Consensus::HasEarlyCoinbaseInput(CTransaction{tx}, inputs, 110));
+    BOOST_CHECK(!Consensus::HasEarlyCoinbaseInput(CTransaction{tx}, inputs, 1010));
+
+    tx.vin[1].prevout = payout_out;
+    BOOST_CHECK(!Consensus::HasEarlyCoinbaseInput(CTransaction{tx}, inputs, 1110));
+    CAmount fee{0};
+    TxValidationState immature;
+    BOOST_CHECK(!Consensus::CheckTxInputs(CTransaction{tx}, immature, inputs, 1109, fee, CheckTxInputsRules::None));
+    BOOST_CHECK_EQUAL(immature.GetRejectReason(), "bad-txns-premature-spend-of-coinbase-payout");
+    TxValidationState mature;
+    BOOST_CHECK(Consensus::CheckTxInputs(CTransaction{tx}, mature, inputs, 1110, fee, CheckTxInputsRules::None));
+    BOOST_CHECK_EQUAL(fee, 1000);
+}
 
 std::optional<std::pair<std::string, CTransactionRef>> SingleTRUCChecks(const CTransactionRef& ptx, const CTxMemPool::setEntries& mempool_ancestors, const std::set<Txid>& direct_conflicts, int64_t vsize)
 {

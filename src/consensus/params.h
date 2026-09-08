@@ -27,8 +27,9 @@ enum BuriedDeployment : int16_t {
     DEPLOYMENT_CSV,
     DEPLOYMENT_SEGWIT,
     DEPLOYMENT_BLAKE2B,
+    DEPLOYMENT_COINBASE_RELOCK,
 };
-constexpr bool ValidDeployment(BuriedDeployment dep) { return dep <= DEPLOYMENT_BLAKE2B; }
+constexpr bool ValidDeployment(BuriedDeployment dep) { return dep <= DEPLOYMENT_COINBASE_RELOCK; }
 
 enum DeploymentPos : uint16_t {
     DEPLOYMENT_TESTDUMMY,
@@ -107,6 +108,8 @@ struct Params {
     int SegwitHeight;
     /** Block height at which BLAKE2b hardfork becomes active */
     int Blake2bHeight{std::numeric_limits<int>::max()};
+    /** Experimental coinbase payout relock; no public-network activation is scheduled. */
+    int CoinbaseRelockHeight{std::numeric_limits<int>::max()};
     std::vector<unsigned char> Blake2bHeadline;
     uint8_t Blake2bTargetShift{20};
     /**
@@ -177,6 +180,8 @@ struct Params {
             return SegwitHeight;
         case DEPLOYMENT_BLAKE2B:
             return Blake2bHeight;
+        case DEPLOYMENT_COINBASE_RELOCK:
+            return CoinbaseRelockHeight;
         } // no default case, so the compiler can warn about missing cases
         return std::numeric_limits<int>::max();
     }

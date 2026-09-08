@@ -203,15 +203,15 @@ private:
 
     // Methods for how to add transactions to a block.
     /** Add transactions based on tx "priority" */
-    void addPriorityTxs(const CTxMemPool& mempool, int &nPackagesSelected) EXCLUSIVE_LOCKS_REQUIRED(mempool.cs);
+    void addPriorityTxs(const CTxMemPool& mempool, int &nPackagesSelected) EXCLUSIVE_LOCKS_REQUIRED(::cs_main, mempool.cs);
     /** Add transactions based on feerate including unconfirmed ancestors
       * Increments nPackagesSelected / nDescendantsUpdated with corresponding
       * statistics from the package selection (for logging statistics). */
-    void addPackageTxs(const CTxMemPool& mempool, int& nPackagesSelected, int& nDescendantsUpdated) EXCLUSIVE_LOCKS_REQUIRED(mempool.cs);
+    void addPackageTxs(const CTxMemPool& mempool, int& nPackagesSelected, int& nDescendantsUpdated) EXCLUSIVE_LOCKS_REQUIRED(::cs_main, mempool.cs);
 
     // helper function for addPriorityTxs
     /** Test if tx will still "fit" in the block */
-    bool TestForBlock(CTxMemPool::txiter iter);
+    bool TestForBlock(CTxMemPool::txiter iter) EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
     /** Test if tx still has unconfirmed parents not yet in block */
     bool isStillDependent(const CTxMemPool& mempool, CTxMemPool::txiter iter) EXCLUSIVE_LOCKS_REQUIRED(mempool.cs);
 
@@ -221,10 +221,10 @@ private:
     /** Test if a new package would "fit" in the block */
     bool TestPackage(uint64_t packageSize, int64_t packageSigOpsCost) const;
     /** Perform checks on each transaction in a package:
-      * locktime, premature-witness, serialized size (if necessary)
+      * locktime, coinbase payout maturity, serialized size (if necessary)
       * These checks should always succeed, and they're here
       * only as an extra check in case of suboptimal node configuration */
-    bool TestPackageTransactions(const CTxMemPool::setEntries& package) const;
+    bool TestPackageTransactions(const CTxMemPool::setEntries& package) const EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
     /** Sort the package in an order that is valid to appear in a block */
     void SortForBlock(const CTxMemPool::setEntries& package, std::vector<CTxMemPool::txiter>& sortedEntries);
 };

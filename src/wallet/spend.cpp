@@ -3,10 +3,12 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <algorithm>
+#include <coins.h>
 #include <common/args.h>
 #include <common/messages.h>
 #include <common/system.h>
 #include <consensus/amount.h>
+#include <consensus/consensus.h>
 #include <consensus/validation.h>
 #include <interfaces/chain.h>
 #include <node/types.h>
@@ -269,8 +271,16 @@ util::Result<PreSelectedInputs> FetchSelectedInputs(const CWallet& wallet, const
 {
     PreSelectedInputs result;
     const bool can_grind_r = wallet.CanGrindR();
+    std::map<COutPoint, Coin> selected_coins;
+    for (const COutPoint& outpoint : coin_control.ListSelected()) selected_coins.try_emplace(outpoint);
+    wallet.chain().findCoins(selected_coins);
     std::map<COutPoint, CAmount> map_of_bump_fees = wallet.chain().calculateIndividualBumpFees(coin_control.ListSelected(), coin_selection_params.m_effective_feerate);
     for (const COutPoint& outpoint : coin_control.ListSelected()) {
+        const Coin& coin{selected_coins.at(outpoint)};
+        if (!coin.IsSpent() && coin.IsCoinbaseRelocked() &&
+            wallet.GetLastBlockHeight() + 1 - static_cast<int>(coin.nHeight) < COINBASE_PAYOUT_MATURITY) {
+            return util::Error{strprintf(_("Pre-selected input %s is a locked coinbase payout"), outpoint.ToString())};
+        }
         int64_t input_bytes = coin_control.GetInputWeight(outpoint).value_or(-1);
         if (input_bytes != -1) {
             input_bytes = GetVirtualTransactionSize(input_bytes, 0, 0);
@@ -346,6 +356,8 @@ CoinsResult AvailableCoins(const CWallet& wallet,
         // It's possible for these to be conflicted via ancestors which we may never be able to detect
         if (nDepth == 0 && !wtx.InMempool())
             continue;
+
+        const bool relocked{wallet.GetTxCoinbaseRelockBlocksToMaturity(wtx) > 0};
 
         bool safeTx = CachedTxIsTrusted(wallet, wtx, trusted_parents);
 
@@ -434,6 +446,7 @@ CoinsResult AvailableCoins(const CWallet& wallet,
             // it is safe to assume that this input is solvable if input_bytes is greater than -1.
             bool solvable = input_bytes > -1;
             bool spendable = ((mine & ISMINE_SPENDABLE) != ISMINE_NO) || (((mine & ISMINE_WATCH_ONLY) != ISMINE_NO) && (coinControl && coinControl->fAllowWatchOnly && solvable));
+            spendable &= !relocked;
 
             // Filter by spendable outputs only
             if (!spendable && params.only_spendable) continue;
