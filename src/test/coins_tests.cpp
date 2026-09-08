@@ -5,6 +5,7 @@
 #include <addresstype.h>
 #include <clientversion.h>
 #include <coins.h>
+#include <node/utxo_snapshot.h>
 #include <streams.h>
 #include <test/util/poolresourcetester.h>
 #include <test/util/random.h>
@@ -34,6 +35,7 @@ bool operator==(const Coin &a, const Coin &b) {
     // Empty Coin objects are always equal.
     if (a.IsSpent() && b.IsSpent()) return true;
     return a.fCoinBase == b.fCoinBase &&
+           a.IsCoinbaseRelocked() == b.IsCoinbaseRelocked() &&
            a.nHeight == b.nHeight &&
            a.out == b.out;
 }
@@ -185,6 +187,7 @@ void SimulationTest(CCoinsView* base, bool fake_best_block)
                 Coin newcoin;
                 newcoin.out.nValue = RandMoney(m_rng);
                 newcoin.nHeight = 1;
+                newcoin.fCoinbaseRelock = m_rng.randbool();
 
                 // Infrequently test adding unspendable coins.
                 if (m_rng.randrange(16) == 0 && coin.IsSpent()) {
@@ -559,6 +562,161 @@ BOOST_AUTO_TEST_CASE(ccoins_serialization)
         BOOST_CHECK_MESSAGE(false, "We should have thrown");
     } catch (const std::ios_base::failure&) {
     }
+}
+
+BOOST_AUTO_TEST_CASE(coinbase_relock_serialization)
+{
+    // Existing chainstate/snapshot bytes must roundtrip byte for byte, and
+    // decoding an unmarked coin over a marked one must clear the new flag.
+    for (const auto* hex : {
+             "97f23c835800816115944e077fe7c803cfa57f29b36bf87c1d35",
+             "8ddf77bbd123008c988f1a4a4de2161e0f50aac7f17e7f9555caa4",
+             "000006"}) {
+        const auto bytes{ParseHex(hex)};
+        DataStream input{bytes};
+        Coin coin{CTxOut{1, CScript{}}, 200, false, true};
+        input >> coin;
+        BOOST_CHECK(!coin.IsCoinbaseRelocked());
+        DataStream output;
+        output << coin;
+        BOOST_CHECK_EQUAL(HexStr(output), HexStr(bytes));
+    }
+
+    // Check height boundaries and the separate historical undo formatter.
+    for (const int height : {0, 1, 200, std::numeric_limits<int32_t>::max()}) {
+        for (const bool relock : {false, true}) {
+            const Coin original{CTxOut{123, CScript{} << OP_TRUE}, height, false, relock};
+            DataStream serialized;
+            serialized << original;
+            Coin decoded;
+            serialized >> decoded;
+            BOOST_CHECK(decoded == original);
+            BOOST_CHECK(serialized.empty());
+
+            CBlockUndo undo;
+            undo.vtxundo.resize(1);
+            undo.vtxundo[0].vprevout.push_back(original);
+            DataStream serialized_undo;
+            serialized_undo << undo;
+            CBlockUndo decoded_undo;
+            serialized_undo >> decoded_undo;
+            BOOST_REQUIRE_EQUAL(decoded_undo.vtxundo.size(), 1U);
+            BOOST_REQUIRE_EQUAL(decoded_undo.vtxundo[0].vprevout.size(), 1U);
+            BOOST_CHECK(decoded_undo.vtxundo[0].vprevout[0] == original);
+            BOOST_CHECK(serialized_undo.empty());
+
+            DataStream formatted_undo;
+            formatted_undo << Using<TxInUndoFormatter>(original);
+            uint32_t legacy_code{0};
+            if (relock) {
+                // All old Coin and undo readers use this uint32_t decoder.
+                DataStream legacy_coin;
+                legacy_coin << original;
+                BOOST_CHECK_THROW(legacy_coin >> VARINT(legacy_code), std::ios_base::failure);
+                BOOST_CHECK_THROW(formatted_undo >> VARINT(legacy_code), std::ios_base::failure);
+            } else {
+                // Independently construct the original undo byte format.
+                DataStream legacy_undo;
+                legacy_undo << VARINT(uint32_t(height) * 2);
+                if (height > 0) legacy_undo << uint8_t{0};
+                legacy_undo << Using<TxOutCompression>(original.out);
+                BOOST_CHECK_EQUAL(HexStr(formatted_undo), HexStr(legacy_undo));
+            }
+        }
+    }
+
+    // Unknown extension bits and an impossible coinbase+relock combination
+    // must be rejected by both deserializers before reading the output.
+    for (const uint64_t code : {uint64_t{1} << 33, (uint64_t{1} << 32) | 1}) {
+        Coin coin;
+        DataStream serialized;
+        serialized << VARINT(code);
+        BOOST_CHECK_THROW(serialized >> coin, std::ios_base::failure);
+        DataStream serialized_undo;
+        serialized_undo << VARINT(code);
+        BOOST_CHECK_THROW(serialized_undo >> Using<TxInUndoFormatter>(coin), std::ios_base::failure);
+    }
+    Coin invalid{CTxOut{1, CScript{}}, 200, true, true};
+    DataStream invalid_output;
+    BOOST_CHECK_THROW(invalid_output << invalid, std::ios_base::failure);
+    BOOST_CHECK_THROW(invalid_output << Using<TxInUndoFormatter>(invalid), std::ios_base::failure);
+
+    Coin cleared{CTxOut{1, CScript{}}, 200, false, true};
+    cleared.Clear();
+    BOOST_CHECK(cleared.IsSpent());
+    BOOST_CHECK(!cleared.IsCoinbaseRelocked());
+    BOOST_CHECK(!cleared.IsCoinBase());
+    BOOST_CHECK_EQUAL(cleared.nHeight, 0U);
+}
+
+BOOST_AUTO_TEST_CASE(coinbase_relock_snapshot)
+{
+    // Snapshot v2 groups Coin records by txid. The extended Coin varint
+    // preserves the marker, while an old reader rejects its uint32 overflow.
+    const node::SnapshotMetadata metadata{Params().MessageStart(), uint256{1}, 1};
+    const Txid txid{Txid::FromUint256(uint256{2})};
+    const Coin original{CTxOut{123, CScript{} << OP_TRUE}, 200, false, true};
+    DataStream snapshot;
+    snapshot << metadata << txid;
+    WriteCompactSize(snapshot, 1);
+    WriteCompactSize(snapshot, 0);
+    snapshot << original;
+
+    node::SnapshotMetadata decoded_metadata{Params().MessageStart()};
+    Txid decoded_txid;
+    snapshot >> decoded_metadata >> decoded_txid;
+    BOOST_CHECK(decoded_metadata.m_base_blockhash == metadata.m_base_blockhash);
+    BOOST_CHECK_EQUAL(decoded_metadata.m_coins_count, 1U);
+    BOOST_CHECK(decoded_txid == txid);
+    BOOST_CHECK_EQUAL(ReadCompactSize(snapshot), 1U);
+    BOOST_CHECK_EQUAL(ReadCompactSize(snapshot), 0U);
+    DataStream old_reader{snapshot};
+    uint32_t legacy_code{0};
+    BOOST_CHECK_THROW(old_reader >> VARINT(legacy_code), std::ios_base::failure);
+    Coin decoded;
+    snapshot >> decoded;
+    BOOST_CHECK(decoded == original);
+    BOOST_CHECK(snapshot.empty());
+}
+
+BOOST_AUTO_TEST_CASE(coinbase_relock_persistence)
+{
+    const auto path{m_args.GetDataDirBase() / "coinbase_relock_chainstate"};
+    const COutPoint outpoint{Txid::FromUint256(m_rng.rand256()), 0};
+    const Coin original{CTxOut{123, CScript{} << OP_TRUE}, 200, false, true};
+    {
+        CCoinsViewDB db{{.path = path, .cache_bytes = 1_MiB, .wipe_data = true}, {}};
+        CCoinsViewCache cache{&db};
+        cache.AddCoin(outpoint, Coin{original}, false);
+        cache.SetBestBlock(uint256{1});
+        BOOST_CHECK(cache.Flush());
+    }
+    {
+        CCoinsViewDB db{{.path = path, .cache_bytes = 1_MiB}, {}};
+        BOOST_REQUIRE(db.GetCoin(outpoint));
+        BOOST_CHECK(*db.GetCoin(outpoint) == original);
+        CCoinsViewCache cache{&db};
+        cache.SetBestBlock(db.GetBestBlock());
+        Coin undo;
+        BOOST_CHECK(cache.SpendCoin(outpoint, &undo));
+        BOOST_CHECK(undo == original);
+        BOOST_CHECK(cache.Flush());
+        BOOST_CHECK(!db.GetCoin(outpoint));
+    }
+
+    CCoinsView view;
+    CCoinsViewCache cache{&view};
+    CMutableTransaction tx;
+    tx.vin.resize(1);
+    tx.vin[0].prevout = outpoint;
+    tx.vout.emplace_back(1, CScript{} << OP_TRUE);
+    tx.vout.emplace_back(2, CScript{} << OP_TRUE);
+    tx.vout.emplace_back(0, CScript{} << OP_RETURN);
+    const CTransaction payout{tx};
+    AddCoins(cache, payout, 200, false, true);
+    BOOST_CHECK(cache.AccessCoin(COutPoint{payout.GetHash(), 0}).IsCoinbaseRelocked());
+    BOOST_CHECK(cache.AccessCoin(COutPoint{payout.GetHash(), 1}).IsCoinbaseRelocked());
+    BOOST_CHECK(!cache.HaveCoin(COutPoint{payout.GetHash(), 2}));
 }
 
 const static COutPoint OUTPOINT;

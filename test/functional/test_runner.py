@@ -157,6 +157,8 @@ BASE_SCRIPTS = [
     'p2p_headers_sync_with_minchainwork.py',
     'p2p_feefilter.py',
     'feature_csv_activation.py',
+    'feature_coinbase_relock.py',
+    'wallet_coinbase_relock.py --descriptors',
     'feature_reduced_data_utxo_height.py',
     'feature_rdts_migration.py',
     'p2p_sendheaders.py',

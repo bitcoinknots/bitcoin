@@ -5,6 +5,7 @@
 #include <chainparams.h>
 #include <coins.h>
 #include <common/args.h>
+#include <consensus/tx_verify.h>
 #include <crypto/muhash.h>
 #include <index/coinstatsindex.h>
 #include <kernel/coinstats.h>
@@ -14,6 +15,8 @@
 #include <txdb.h>
 #include <undo.h>
 #include <validation.h>
+
+#include <algorithm>
 
 using kernel::ApplyCoinHash;
 using kernel::CCoinsStats;
@@ -25,6 +28,17 @@ static constexpr uint8_t DB_BLOCK_HEIGHT{'t'};
 static constexpr uint8_t DB_MUHASH{'M'};
 
 namespace {
+
+//! The index reconstructs output metadata from the block's input undo records,
+//! using the same activation and trigger as block connection and replay.
+bool IsRelockedPayout(const CTransaction& tx, const CBlockUndo& undo, size_t tx_index, int height)
+{
+    if (tx.IsCoinBase() || height < Params().GetConsensus().CoinbaseRelockHeight) return false;
+    const auto& prevouts{undo.vtxundo.at(tx_index - 1).vprevout};
+    return std::any_of(prevouts.begin(), prevouts.end(), [height](const Coin& coin) {
+        return Consensus::IsEarlyCoinbaseSpend(coin, height);
+    });
+}
 
 struct DBVal {
     uint256 muhash;
@@ -156,9 +170,10 @@ bool CoinStatsIndex::CustomAppend(const interfaces::BlockInfo& block)
                 continue;
             }
 
+            const bool relock{IsRelockedPayout(*tx, block_undo, i, block.height)};
             for (uint32_t j = 0; j < tx->vout.size(); ++j) {
                 const CTxOut& out{tx->vout[j]};
-                Coin coin{out, block.height, tx->IsCoinBase()};
+                Coin coin{out, block.height, tx->IsCoinBase(), relock};
                 COutPoint outpoint{tx->GetHash(), j};
 
                 // Skip unspendable coins
@@ -440,10 +455,11 @@ bool CoinStatsIndex::ReverseBlock(const CBlock& block, const CBlockIndex* pindex
     for (size_t i = 0; i < block.vtx.size(); ++i) {
         const auto& tx{block.vtx.at(i)};
 
+        const bool relock{IsRelockedPayout(*tx, block_undo, i, pindex->nHeight)};
         for (uint32_t j = 0; j < tx->vout.size(); ++j) {
             const CTxOut& out{tx->vout[j]};
             COutPoint outpoint{tx->GetHash(), j};
-            Coin coin{out, pindex->nHeight, tx->IsCoinBase()};
+            Coin coin{out, pindex->nHeight, tx->IsCoinBase(), relock};
 
             // Skip unspendable coins
             if (coin.out.scriptPubKey.IsUnspendable()) {

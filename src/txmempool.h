@@ -473,7 +473,7 @@ public:
      * all inputs are in the mapNextTx array). If sanity-checking is turned off,
      * check does nothing.
      */
-    void check(const CCoinsViewCache& active_coins_tip, int64_t spendheight) const EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
+    void check(const CCoinsViewCache& active_coins_tip, int64_t spendheight, bool coinbase_relock_active = false) const EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
 
 
     void removeRecursive(const CTransaction& tx, MemPoolRemovalReason reason) EXCLUSIVE_LOCKS_REQUIRED(cs);
@@ -960,6 +960,10 @@ private:
  */
 class CCoinsViewMemPool : public CCoinsViewBacked
 {
+    /** Candidate block height when payout relocking is active, otherwise unset.
+     * Derive metadata from direct chain inputs on each lookup, so tip changes
+     * do not leave a cached age-999/1000 decision on a mempool entry. */
+    const std::optional<int> m_coinbase_relock_spend_height;
     /**
     * Coins made available by transactions being validated. Tracking these allows for package
     * validation, since we can access transaction outputs without submitting them to mempool.
@@ -975,7 +979,8 @@ protected:
     const CTxMemPool& mempool;
 
 public:
-    CCoinsViewMemPool(CCoinsView* baseIn, const CTxMemPool& mempoolIn);
+    CCoinsViewMemPool(CCoinsView* baseIn, const CTxMemPool& mempoolIn,
+                     std::optional<int> coinbase_relock_spend_height = std::nullopt);
     /** GetCoin, returning whether it exists and is not spent. Also updates m_non_base_coins if the
      * coin is not fetched from base. */
     std::optional<Coin> GetCoin(const COutPoint& outpoint) const override;

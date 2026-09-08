@@ -11,6 +11,8 @@
 #include <vector>
 
 class CBlockIndex;
+class Coin;
+class CCoinsView;
 class CCoinsViewCache;
 class CTransaction;
 class TxValidationState;
@@ -42,6 +44,12 @@ public:
 };
 
 namespace Consensus {
+/** True only for a direct coinbase input spent at ages 100 through 999. */
+bool IsEarlyCoinbaseSpend(const Coin& coin, int spend_height);
+/** Inspect direct inputs only; an ordinary relocked payout never triggers another lock. */
+bool HasEarlyCoinbaseInput(const CTransaction& tx, const CCoinsView& inputs, int spend_height);
+/** A relocked payout cannot be spent until 1,000 blocks after its own confirmation. */
+bool IsCoinbasePayoutMature(const Coin& coin, int spend_height);
 /**
  * Check whether all outputs of this transaction satisfy size limits.
  * Regular outputs must be <= MAX_OUTPUT_SCRIPT_SIZE (34 bytes).

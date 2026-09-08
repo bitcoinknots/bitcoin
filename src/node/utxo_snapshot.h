@@ -32,6 +32,9 @@ namespace node {
 //! before being used. Thus, new fields should be added only if needed.
 class SnapshotMetadata
 {
+    // Coin records retain the v2 layout, with bit 32 of their metadata varint
+    // reserved for the experimental coinbase relock. Older readers reject
+    // such records (uint32 overflow); unmarked snapshots remain compatible.
     inline static const uint16_t VERSION{2};
     const std::set<uint16_t> m_supported_versions{VERSION};
     const MessageStartChars m_network_magic;

@@ -275,6 +275,14 @@ bool CheckSequenceLocksAtTip(CBlockIndex* tip,
 // Returns the script flags which should be checked for a given block
 static unsigned int GetBlockScriptFlags(const CBlockIndex& block_index, const ChainstateManager& chainman);
 
+/** Supply the next-block context used to derive unconfirmed payout metadata. */
+static std::optional<int> CoinbaseRelockSpendHeight(const Chainstate& chainstate) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+{
+    const int height{chainstate.m_chain.Height() + 1};
+    if (height >= chainstate.m_chainman.GetConsensus().CoinbaseRelockHeight) return height;
+    return std::nullopt;
+}
+
 /** Whether the hardfork rules will apply to a block built on `pindexPrev`.
  *
  * A height is known before the block exists, so a caller can reach the same
@@ -421,7 +429,7 @@ void Chainstate::MaybeUpdateMempoolForReorg(
                 return true;
             }
         } else {
-            const CCoinsViewMemPool view_mempool{&CoinsTip(), *m_mempool};
+            const CCoinsViewMemPool view_mempool{&CoinsTip(), *m_mempool, CoinbaseRelockSpendHeight(*this)};
             const std::optional<LockPoints> new_lock_points{CalculateLockPointsAtTip(m_chain.Tip(), view_mempool, tx)};
             if (new_lock_points.has_value() && CheckSequenceLocksAtTip(m_chain.Tip(), *new_lock_points)) {
                 // Now update the mempool entry lockpoints as well.
@@ -441,6 +449,15 @@ void Chainstate::MaybeUpdateMempoolForReorg(
                 if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < COINBASE_MATURITY) {
                     return true;
                 }
+            }
+        }
+        // A reorg can make a payout immature again, or move its still-unconfirmed
+        // parent's direct coinbase input from age 1000 back to age 999.
+        if (const auto relock_height{CoinbaseRelockSpendHeight(*this)}) {
+            const CCoinsViewMemPool payout_view{&CoinsTip(), *m_mempool, relock_height};
+            for (const auto& input : tx.vin) {
+                if (const auto coin{payout_view.GetCoin(input.prevout)};
+                    coin && !Consensus::IsCoinbasePayoutMature(*coin, *relock_height)) return true;
             }
         }
         // Transaction is still valid and cached LockPoints are updated.
@@ -504,7 +521,7 @@ public:
     explicit MemPoolAccept(CTxMemPool& mempool, Chainstate& active_chainstate) :
         m_pool(mempool),
         m_view(&m_dummy),
-        m_viewmempool(&active_chainstate.CoinsTip(), m_pool),
+        m_viewmempool(&active_chainstate.CoinsTip(), m_pool, CoinbaseRelockSpendHeight(active_chainstate)),
         m_active_chainstate(active_chainstate)
     {
     }
@@ -2419,8 +2436,11 @@ void Chainstate::InvalidBlockFound(CBlockIndex* pindex, const BlockValidationSta
     }
 }
 
-void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txundo, int nHeight)
+void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txundo, int nHeight, bool coinbase_relock_active)
 {
+    // Derive the flag before consuming inputs. Never inherit it from an ordinary
+    // payout: only a direct early coinbase spend starts the one-time lock.
+    const bool relock{coinbase_relock_active && Consensus::HasEarlyCoinbaseInput(tx, inputs, nHeight)};
     // mark inputs spent
     if (!tx.IsCoinBase()) {
         txundo.vprevout.reserve(tx.vin.size());
@@ -2431,7 +2451,13 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txund
         }
     }
     // add outputs
-    AddCoins(inputs, tx, nHeight);
+    AddCoins(inputs, tx, nHeight, /*check_for_overwrite=*/false, relock);
+}
+
+// Preserve the helper used by pre-activation UTXO cache tests.
+void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo& txundo, int height)
+{
+    UpdateCoins(tx, inputs, txundo, height, /*coinbase_relock_active=*/false);
 }
 
 std::optional<std::pair<ScriptError, std::string>> CScriptCheck::operator()() {
@@ -2593,6 +2619,7 @@ int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out)
         if (!alternate.IsSpent()) {
             undo.nHeight = alternate.nHeight;
             undo.fCoinBase = alternate.fCoinBase;
+            undo.fCoinbaseRelock = alternate.fCoinbaseRelock;
         } else {
             return DISCONNECT_FAILED; // adding output for transaction without known metadata
         }
@@ -2640,6 +2667,16 @@ DisconnectResult Chainstate::DisconnectBlock(const CBlock& block, const CBlockIn
         Txid hash = tx.GetHash();
         bool is_coinbase = tx.IsCoinBase();
         bool is_bip30_exception = (is_coinbase && !fEnforceBIP30);
+        bool expected_relock{false};
+        if (!is_coinbase) {
+            const auto& txundo{blockUndo.vtxundo[i - 1]};
+            if (txundo.vprevout.size() != tx.vin.size()) return DISCONNECT_FAILED;
+            if (pindex->nHeight >= m_chainman.GetConsensus().CoinbaseRelockHeight) {
+                expected_relock = std::ranges::any_of(txundo.vprevout, [&](const Coin& input) {
+                    return Consensus::IsEarlyCoinbaseSpend(input, pindex->nHeight);
+                });
+            }
+        }
 
         // Check that all outputs are available and match the outputs in the block itself
         // exactly.
@@ -2648,7 +2685,8 @@ DisconnectResult Chainstate::DisconnectBlock(const CBlock& block, const CBlockIn
                 COutPoint out(hash, o);
                 Coin coin;
                 bool is_spent = view.SpendCoin(out, &coin);
-                if (!is_spent || tx.vout[o] != coin.out || pindex->nHeight != coin.nHeight || is_coinbase != coin.fCoinBase) {
+                if (!is_spent || tx.vout[o] != coin.out || pindex->nHeight != coin.nHeight ||
+                    is_coinbase != coin.fCoinBase || expected_relock != coin.IsCoinbaseRelocked()) {
                     if (!is_bip30_exception) {
                         fClean = false; // transaction output mismatch
                     }
@@ -3082,7 +3120,8 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         if (i > 0) {
             blockundo.vtxundo.emplace_back();
         }
-        UpdateCoins(tx, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
+        UpdateCoins(tx, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight,
+                    pindex->nHeight >= params.GetConsensus().CoinbaseRelockHeight);
     }
     const auto time_3{SteadyClock::now()};
     m_chainman.time_connect += time_3 - time_2;
@@ -3872,8 +3911,15 @@ bool Chainstate::ActivateBestChainStep(BlockValidationState& state, CBlockIndex*
         // If any blocks were disconnected, disconnectpool may be non empty.  Add
         // any disconnected transactions back to the mempool.
         MaybeUpdateMempoolForReorg(disconnectpool, true);
+    } else if (CoinbaseRelockSpendHeight(*this).has_value() &&
+               (!pindexOldTip || pindexOldTip->nHeight + 1 < m_chainman.GetConsensus().CoinbaseRelockHeight)) {
+        // Children admitted under the old rules may depend on early coinbase
+        // spends still in the mempool. Revalidate at activation, after all
+        // disconnected inputs have been restored or their spenders removed.
+        MaybeUpdateMempoolForReorg(disconnectpool, /*fAddToMempool=*/false);
     }
-    if (m_mempool) m_mempool->check(this->CoinsTip(), this->m_chain.Height() + 1);
+    if (m_mempool) m_mempool->check(this->CoinsTip(), this->m_chain.Height() + 1,
+                                  CoinbaseRelockSpendHeight(*this).has_value());
 
     CheckForkWarningConditions();
 
@@ -5493,14 +5539,32 @@ bool Chainstate::RollforwardBlock(const CBlockIndex* pindex, CCoinsViewCache& in
         return false;
     }
 
-    for (const CTransactionRef& tx : block.vtx) {
+    // An interrupted flush may already have removed these inputs. Use undo
+    // metadata, rather than the partially replayed view, to reconstruct relocks.
+    const bool relock_active{pindex->nHeight >= m_chainman.GetConsensus().CoinbaseRelockHeight};
+    CBlockUndo blockundo;
+    if (relock_active && block.vtx.size() > 1 &&
+        (!m_blockman.ReadBlockUndo(blockundo, *pindex) || blockundo.vtxundo.size() + 1 != block.vtx.size())) {
+        LogError("ReplayBlock(): missing coinbase payout metadata\n");
+        return false;
+    }
+    for (size_t i{0}; i < block.vtx.size(); ++i) {
+        const CTransactionRef& tx{block.vtx[i]};
+        bool relock{false};
+        if (relock_active && i > 0) {
+            const auto& txundo{blockundo.vtxundo[i - 1]};
+            if (txundo.vprevout.size() != tx->vin.size()) return false;
+            relock = std::ranges::any_of(txundo.vprevout, [&](const Coin& input) {
+                return Consensus::IsEarlyCoinbaseSpend(input, pindex->nHeight);
+            });
+        }
         if (!tx->IsCoinBase()) {
             for (const CTxIn &txin : tx->vin) {
                 inputs.SpendCoin(txin.prevout);
             }
         }
         // Pass check = true as every addition may be an overwrite.
-        AddCoins(inputs, *tx, pindex->nHeight, true);
+        AddCoins(inputs, *tx, pindex->nHeight, /*check_for_overwrite=*/true, relock);
     }
     return true;
 }

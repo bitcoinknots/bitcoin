@@ -91,10 +91,11 @@ struct PrecomputedData
                 std::copy(hash.begin(), hash.begin() + 32, coins[i].out.scriptPubKey.begin() + 2);
                 break;
             }
-            /* Hash again to construct nValue and fCoinBase. */
+            /* Hash again to construct nValue and coin metadata flags. */
             CSHA256().Write(PREFIX_M, 1).Write(ser, sizeof(ser)).Finalize(hash.begin());
             coins[i].out.nValue = CAmount(hash.GetUint64(0) % MAX_MONEY);
             coins[i].fCoinBase = (hash.GetUint64(1) & 7) == 0;
+            coins[i].fCoinbaseRelock = !coins[i].IsCoinBase() && (hash.GetUint64(1) & 8) != 0;
             coins[i].nHeight = 0; /* Real nHeight used in simulation is set dynamically. */
         }
     }
@@ -183,6 +184,7 @@ public:
                     assert(it2 != m_data.end());
                     assert(it->second.coin.out == it2->second.out);
                     assert(it->second.coin.fCoinBase == it2->second.fCoinBase);
+                    assert(it->second.coin.IsCoinbaseRelocked() == it2->second.IsCoinbaseRelocked());
                     assert(it->second.coin.nHeight == it2->second.nHeight);
                 }
             }
@@ -304,6 +306,7 @@ FUZZ_TARGET(coinscache_sim)
                     const auto& simcoin = data.coins[sim->first];
                     assert(simcoin.out == realcoin.out);
                     assert(simcoin.fCoinBase == realcoin.fCoinBase);
+                    assert(simcoin.IsCoinbaseRelocked() == realcoin.IsCoinbaseRelocked());
                     assert(realcoin.nHeight == sim->second);
                 }
             },
@@ -363,6 +366,7 @@ FUZZ_TARGET(coinscache_sim)
                     const auto& simcoin = data.coins[sim->first];
                     assert(simcoin.out == realcoin.out);
                     assert(simcoin.fCoinBase == realcoin.fCoinBase);
+                    assert(simcoin.IsCoinbaseRelocked() == realcoin.IsCoinbaseRelocked());
                     assert(realcoin.nHeight == sim->second);
                 }
             },
@@ -445,6 +449,7 @@ FUZZ_TARGET(coinscache_sim)
                 assert(!real.IsSpent());
                 assert(real.out == data.coins[sim->first].out);
                 assert(real.fCoinBase == data.coins[sim->first].fCoinBase);
+                assert(real.IsCoinbaseRelocked() == data.coins[sim->first].IsCoinbaseRelocked());
                 assert(real.nHeight == sim->second);
             }
         }

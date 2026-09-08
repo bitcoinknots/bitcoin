@@ -220,6 +220,16 @@ FUZZ_TARGET_DESERIALIZE(blockheader_deserialize, {
 FUZZ_TARGET_DESERIALIZE(txundo_deserialize, {
     CTxUndo tu;
     DeserializeFromFuzzingInput(buffer, tu);
+    const CTxUndo roundtrip{Deserialize<CTxUndo>(Serialize(tu))};
+    assert(tu.vprevout.size() == roundtrip.vprevout.size());
+    for (size_t i = 0; i < tu.vprevout.size(); ++i) {
+        const Coin& original{tu.vprevout[i]};
+        const Coin& decoded{roundtrip.vprevout[i]};
+        assert(original.out == decoded.out);
+        assert(original.nHeight == decoded.nHeight);
+        assert(original.IsCoinBase() == decoded.IsCoinBase());
+        assert(original.IsCoinbaseRelocked() == decoded.IsCoinbaseRelocked());
+    }
 })
 FUZZ_TARGET_DESERIALIZE(blockundo_deserialize, {
     CBlockUndo bu;
@@ -228,6 +238,11 @@ FUZZ_TARGET_DESERIALIZE(blockundo_deserialize, {
 FUZZ_TARGET_DESERIALIZE(coins_deserialize, {
     Coin coin;
     DeserializeFromFuzzingInput(buffer, coin);
+    const Coin roundtrip{Deserialize<Coin>(Serialize(coin))};
+    assert(coin.out == roundtrip.out);
+    assert(coin.nHeight == roundtrip.nHeight);
+    assert(coin.IsCoinBase() == roundtrip.IsCoinBase());
+    assert(coin.IsCoinbaseRelocked() == roundtrip.IsCoinbaseRelocked());
 })
 FUZZ_TARGET(netaddr_deserialize, .init = initialize_deserialize)
 {

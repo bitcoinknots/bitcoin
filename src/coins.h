@@ -20,14 +20,20 @@
 #include <stdint.h>
 
 #include <functional>
+#include <limits>
 #include <unordered_map>
 
 /**
  * A UTXO entry.
  *
  * Serialized format:
- * - VARINT((coinbase ? 1 : 0) | (height << 1))
+ * - VARINT((coinbase ? 1 : 0) | (uint64_t{height} << 1) | (relock ? (uint64_t{1} << 32) : 0))
  * - the non-spent CTxOut (via TxOutCompression)
+ *
+ * Unmarked coins retain their historical encoding. Relocked coins exceed
+ * UINT32_MAX so legacy chainstate, snapshot, and undo readers fail closed.
+ * The experimental relock consensus rule is disabled by default; this format
+ * is exercised by the explicit regtest activation and serialization tests.
  */
 class Coin
 {
@@ -41,37 +47,67 @@ public:
     //! at which height this containing transaction was included in the active block chain
     uint32_t nHeight : 31;
 
+    //! whether this output has the one-time maturity triggered by an early coinbase spend
+    unsigned int fCoinbaseRelock : 1;
+
     //! construct a Coin from a CTxOut and height/coinbase information.
-    Coin(CTxOut&& outIn, int nHeightIn, bool fCoinBaseIn) : out(std::move(outIn)), fCoinBase(fCoinBaseIn), nHeight(nHeightIn) {}
-    Coin(const CTxOut& outIn, int nHeightIn, bool fCoinBaseIn) : out(outIn), fCoinBase(fCoinBaseIn),nHeight(nHeightIn) {}
+    Coin(CTxOut&& outIn, int nHeightIn, bool fCoinBaseIn, bool coinbase_relock = false) : out(std::move(outIn)), fCoinBase(fCoinBaseIn), nHeight(nHeightIn), fCoinbaseRelock(coinbase_relock) {}
+    Coin(const CTxOut& outIn, int nHeightIn, bool fCoinBaseIn, bool coinbase_relock = false) : out(outIn), fCoinBase(fCoinBaseIn), nHeight(nHeightIn), fCoinbaseRelock(coinbase_relock) {}
 
     void Clear() {
         out.SetNull();
         fCoinBase = false;
         nHeight = 0;
+        fCoinbaseRelock = false;
     }
 
     //! empty constructor
-    Coin() : fCoinBase(false), nHeight(0) { }
+    Coin() : fCoinBase(false), nHeight(0), fCoinbaseRelock(false) { }
 
     bool IsCoinBase() const {
         return fCoinBase;
     }
 
+    bool IsCoinbaseRelocked() const { return fCoinbaseRelock; }
+
+    //! Shared chainstate and undo metadata encoding. Bit 32 is deliberately
+    //! outside the range accepted by the old uint32_t VARINT decoder.
+    uint64_t GetMetadataCode() const
+    {
+        if (IsCoinBase() && IsCoinbaseRelocked()) {
+            throw std::ios_base::failure("Coin cannot be both coinbase and relocked");
+        }
+        return uint64_t{nHeight} * 2 + fCoinBase + (uint64_t{fCoinbaseRelock} << 32);
+    }
+
+    void SetMetadataCode(uint64_t code)
+    {
+        if (code >> 33) {
+            throw std::ios_base::failure("Unknown coin metadata flags");
+        }
+        const bool coinbase{(code & 1) != 0};
+        const bool relock{(code >> 32) != 0};
+        if (coinbase && relock) {
+            throw std::ios_base::failure("Coin cannot be both coinbase and relocked");
+        }
+        nHeight = (code & std::numeric_limits<uint32_t>::max()) >> 1;
+        fCoinBase = coinbase;
+        fCoinbaseRelock = relock;
+    }
+
     template<typename Stream>
     void Serialize(Stream &s) const {
         assert(!IsSpent());
-        uint32_t code = nHeight * uint32_t{2} + fCoinBase;
+        const uint64_t code{GetMetadataCode()};
         ::Serialize(s, VARINT(code));
         ::Serialize(s, Using<TxOutCompression>(out));
     }
 
     template<typename Stream>
     void Unserialize(Stream &s) {
-        uint32_t code = 0;
+        uint64_t code{0};
         ::Unserialize(s, VARINT(code));
-        nHeight = code >> 1;
-        fCoinBase = code & 1;
+        SetMetadataCode(code);
         ::Unserialize(s, Using<TxOutCompression>(out));
     }
 
@@ -493,7 +529,7 @@ private:
 //! an overwrite.
 // TODO: pass in a boolean to limit these possible overwrites to known
 // (pre-BIP34) cases.
-void AddCoins(CCoinsViewCache& cache, const CTransaction& tx, int nHeight, bool check = false);
+void AddCoins(CCoinsViewCache& cache, const CTransaction& tx, int nHeight, bool check = false, bool coinbase_relock = false);
 
 //! Utility function to find any unspent output with a given txid.
 //! This function can be quite expensive because in the event of a transaction
