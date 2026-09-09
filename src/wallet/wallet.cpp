@@ -788,18 +788,16 @@ void CWallet::SyncMalleatedTxMetadata(const CWalletTx& wtx)
     // First tx is the oldest one (smallest nOrderPos)
     const CWalletTx* copyFrom = *txs.begin();
 
+    // The metadata that is kept in sync between malleated variants.
+    // fTimeReceivedIsTxTime, nTimeReceived, nOrderPos and cached members are not copied on purpose.
+    const auto metadata = [](auto& tx) {
+        return std::tie(tx.mapValue, tx.vOrderForm, tx.nTimeSmart, tx.fFromMe);
+    };
+
     // Now copy data from copyFrom to rest:
-    for (auto it = ++txs.begin(); it != txs.end(); ++it)
-    {
-        CWalletTx* copyTo = *it;
-        copyTo->mapValue = copyFrom->mapValue;
-        copyTo->vOrderForm = copyFrom->vOrderForm;
-        // fTimeReceivedIsTxTime not copied on purpose
-        // nTimeReceived not copied on purpose
-        copyTo->nTimeSmart = copyFrom->nTimeSmart;
-        copyTo->fFromMe = copyFrom->fFromMe;
-        // nOrderPos not copied on purpose
-        // cached members not copied on purpose
+    for (CWalletTx* copyTo : txs) {
+        if (copyTo == copyFrom) continue;
+        metadata(*copyTo) = metadata(*copyFrom);
     }
 }
 
