@@ -356,6 +356,19 @@ size_t CScript::OPNetWitnessSize(const CScriptWitness& witness) const
     return stack[0].size() + stack[3].size() - deduct;
 }
 
+// Static truthiness of a byte vector, matching CastToBool in the interpreter:
+// any nonzero byte is true, except a lone trailing sign bit (negative zero).
+static bool DataCarrierCastToBool(const std::vector<unsigned char>& vch)
+{
+    for (size_t i = 0; i < vch.size(); ++i) {
+        if (vch[i] != 0) {
+            if (i == vch.size() - 1 && vch[i] == 0x80) return false;
+            return true;
+        }
+    }
+    return false;
+}
+
 std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outputs, const CScriptWitness* witness) const
 {
     if (size_t olga_bytes = IsOLGA(remaining_outputs); olga_bytes) {
@@ -372,12 +385,21 @@ std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outpu
     opcodetype opcode, last_opcode{OP_INVALIDOPCODE};
     std::vector<unsigned char> push_data;
     unsigned int inside_noop{0}, inside_conditional{0};
+    int last_const{-1};  // truthiness of the previous constant push: -1 none, 0 false, 1 true
     CScript::const_iterator opcode_it = begin(), data_began = begin();
     for (CScript::const_iterator it = begin(); it < end(); last_opcode = opcode) {
         opcode_it = it;
         if (!GetOp(it, opcode, push_data)) {
             // Invalid scripts are necessarily all data
             return {0, size()};
+        }
+
+        // Static truthiness of this opcode when it pushes a constant, else -1.
+        int this_const{-1};
+        if (opcode <= OP_PUSHDATA4) {
+            this_const = DataCarrierCastToBool(push_data) ? 1 : 0;
+        } else if (opcode == OP_1NEGATE || (opcode >= OP_1 && opcode <= OP_16)) {
+            this_const = 1;
         }
 
         if (opcode == OP_IF || opcode == OP_NOTIF) {
@@ -390,7 +412,10 @@ std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outpu
             return {size(), 0};
         }
 
-        // Match OP_FALSE OP_IF
+        // Count a provably dead conditional branch guarded by a pushed
+        // constant: <false> OP_IF ... OP_ENDIF (this includes the OP_FALSE
+        // OP_IF inscription envelope) or <true> OP_NOTIF ... OP_ENDIF. Pushes
+        // inside such a branch cannot affect the spend, so they are data.
         if (inside_noop) {
             switch (opcode) {
             case OP_IF: case OP_NOTIF:
@@ -403,7 +428,7 @@ std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outpu
                 break;
             default: /* do nothing */;
             }
-        } else if (opcode == OP_IF && last_opcode == OP_FALSE) {
+        } else if ((opcode == OP_IF && last_const == 0) || (opcode == OP_NOTIF && last_const == 1)) {
             inside_noop = 1;
             data_began = opcode_it;
         // Match <data> OP_DROP
@@ -412,6 +437,8 @@ std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outpu
         } else if (opcode == OP_DROP && last_opcode <= OP_PUSHDATA4) {
             counted += it - data_began;
         }
+
+        last_const = this_const;
     }
     return {0, counted};
 }
