@@ -8,6 +8,9 @@ In the proposed system, the pool coordinator supplies the snapshot commitment
 for the mining job, and miners verify its supporting data locally before hashing.
 The experiment demonstrates only how that supplied commitment binds the header;
 it does not implement coordinator messages or miner-side proposal verification.
+The broader objective is evidence of work on different transaction templates.
+This experiment does not measure that diversity or prove that miners independently
+selected transactions or used DATUM.
 
 From the repository root, with Python 3:
 

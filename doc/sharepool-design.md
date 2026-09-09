@@ -1,4 +1,4 @@
-# Replicated mining pools on Knots: feasibility and protocol draft
+# Template-work evidence and replicated pool settlement on Knots
 
 Status: design only, with a separate synthetic commitment experiment. No mining
 network, payout system, new RPC, or consensus change is implemented by this draft.
@@ -6,6 +6,72 @@ network, payout system, new RPC, or consensus change is implemented by this draf
 Base: `bitcoinknots/bitcoin`, tag `v29.4.1.knots20260508`, commit
 `8c85b1585dac23f964e2dd32045624de7f02aa58`. Local branch:
 `sharepool/design-prototype`. This checkout has not been published as a GitHub fork.
+
+## Objective: miner control and evidence of work on different templates
+
+The intended purpose is to establish that miners are working on different
+templates and to require DATUM-style miner control across pools. Settlement
+commitments are the evidence transport and accounting mechanism for that purpose.
+The desired enforcement scope is every accepted block on the proposed fork,
+regardless of its declared pool. The exact observable validation rule remains
+undefined; no consensus change is implemented or activated.
+
+There is a fundamental distinction between three claims:
+
+| Claim | What this evidence can establish |
+| --- | --- |
+| Work was produced against a specific template | Valid share PoW, correctly bound to the template's transactions and job context, provides evidence of work on that template. |
+| Published work covers different transaction selections | Compare authenticated transaction sets and account for the verified share difficulty. This describes the published sample, not every miner's undisclosed work. |
+| Independent miners selected those transactions or used DATUM | Neither PoW nor a Merkle commitment establishes who made that choice or which software/protocol was used. |
+
+A pool can centrally create multiple templates, present multiple miner identities,
+and obtain precisely the same share evidence as independent miners. Conversely,
+independent DATUM miners with similar mempools may choose identical transactions.
+Public keys or coordinator signatures establish control of keys, not independent
+ownership or transaction-selection authority. Requiring a DATUM-compatible proof
+format therefore cannot enforce use of DATUM software or genuine miner autonomy.
+
+For observable template-work evidence, each record would provide the share header,
+the data authenticating its transactions, its main-chain parent and job context,
+and the applicable share target. Nodes must verify those bindings and actual work;
+an unsigned list of template hashes or a coordinator's hashrate assertion is not
+sufficient. A public share verifier for this tag's hidden-key mode is still needed
+if that mode is retained.
+
+Use two separate identifiers:
+
+- An exact job/template identifier with precisely defined permitted header and
+  coinbase mutations, for validating the submitted work.
+- A comparison fingerprint of the selected non-coinbase transaction set, with a
+  versioned canonical encoding, count, and hash domain. For this metric, sorting
+  transaction identifiers prevents mere reordering from appearing as a different
+  selection. Nonces, extranonces, coinbase tags, payout changes, and the settlement
+  root itself must not create artificial transaction-selection diversity.
+
+Recompute the comparison fingerprint from transactions authenticated by the actual
+share header; do not hash a normalized substitute header as evidence of mining
+work. Full template validity is checked in its proper chain context before using
+the derived metric. Excluding coinbase differences from the comparison does not
+exclude coinbase validity or payouts from full verification.
+
+Any consensus requirement would need an objective parent-block window, minimum
+share work, replay prevention, resource bounds, and a historical data-availability
+scheme. The winning template must commit to previously available evidence; it
+cannot commit to every share that will arrive before the eventual block is found.
+Pool labels are not a reliable registry of independently controlled organizations.
+
+A requirement for a minimum number of different sets could be satisfied by a
+central pool adding trivial transactions or dropping transactions from several
+variants. It could also penalize honest miners, low-transaction periods, or small
+participants. No diversity threshold is selected here. The evidence can support
+auditing of disclosed work; it must not be described as a cryptographic proof of
+decentralized control or as enforcement of DATUM use across all pools.
+
+The direct guarantee for a participating miner remains local: its own node and
+gateway choose or approve the transaction selection and verify the exact job
+sent to its hardware. Extending that guarantee to a remote observer requires
+additional assumptions about identity and control that the proposed commitments
+do not supply.
 
 ## Feasibility
 
@@ -66,10 +132,11 @@ flowchart LR
     G --> H[Peers verify and settle that snapshot]
 ```
 
-Start with an **opt-in overlay** whose participants run validating Knots nodes.
-Use a separate peer service and an explicit pool namespace. Pool participation,
-template selection, and relay policy are local choices. Base-chain block validity
-continues to follow the upstream rules.
+The first development stages can use an isolated peer service and explicit pool
+namespaces for testing. The intended network-wide requirement would need a
+separately specified and activated consensus rule for every accepted fork block.
+Pool participation, template selection, and additional relay preferences remain
+local choices. This branch currently leaves upstream block validity unchanged.
 
 With DATUM specifically, the gateway obtains a template from the miner's local
 node and the pool supplies reward splits; the pool does not supply the transaction
@@ -265,8 +332,11 @@ permanent block-invalidity rule. Unilateral deployment can split the chain.
 Adding a restriction is not automatically a hard fork relative to this tag;
 classification depends on the final rules and compatibility.
 
-The user-facing enforcement choice remains open. The local branch intentionally
-does not choose or activate new chain validity rules.
+The intended scope is mandatory evidence across pools on the proposed fork.
+However, only observable proof properties can be consensus rules; DATUM use and
+independence of template selection are not proved by those properties. The exact
+enforceable requirement remains open. The local branch does not activate new
+chain validity rules.
 
 ## Implementation boundary and next work
 
@@ -275,16 +345,20 @@ synthetic experiment using the upstream Python header hashing implementation.
 The experiment does not validate real miner shares, run `bitcoind`, exchange data,
 persist rounds, pay miners, or demonstrate acceptance by a live or regtest chain.
 
-The coordinator's role and pre-mining commitment timing are now established.
-Next specify and test manifests, accepted-share accounting, and miner-side proposal
-verification before integrating peer transport and mining jobs. The optional versus
-mandatory base-chain enforcement choice remains open.
+The coordinator's role, pre-mining commitment timing, and intended enforcement
+scope are now established. First resolve the gap between observable template-work
+evidence and the desired guarantee of independent transaction selection. Then
+specify and test manifests, authenticated template comparisons, share accounting,
+and miner-side verification before integrating peer transport and mining jobs.
 Relevant integration points are `src/node/miner.cpp`, `src/rpc/mining.cpp`, the
-mining interfaces, and an isolated share-state store. Base-chain validation should
-only change if mandatory enforcement is selected.
+mining interfaces, and an isolated share-state store. Base-chain validation must
+only change once the exact evidence rule and its activation have been specified.
 
 Required integration scenarios include delayed shares, duplicate/replayed work,
 invalid templates, false payout attribution, unavailable snapshots, conflicting
 coordinator proposals, newer snapshots overtaking still-eligible jobs, two winners,
 peer partitions, main-chain reorganizations, crash recovery,
 bounded storage, and interoperability with unchanged nodes in overlay mode.
+Template-evidence tests must also cover nonce/coinbase-only differences, reordered
+transactions, identical honest selections, centrally generated variants, invented
+miner identities, stale or replayed work, and low-transaction periods.
