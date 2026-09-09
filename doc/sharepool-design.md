@@ -82,6 +82,71 @@ These existing roles are described in the
 This proposal does not claim existing DATUM supports `m_mm_rhs` or this tag's
 BLAKE2b header; compatibility requires implementation and testing.
 
+## How miners refuse a commitment
+
+Enforce the decision in software controlled by the miner: a validating node or
+accounting verifier feeds a job-admission check in the miner's gateway. Mining
+hardware only receives jobs that pass this check. A miner using only a remote
+pool connection without such a verifier cannot independently audit the records
+behind an opaque commitment.
+
+Evaluate proposals in two stages:
+
+1. **Verify the proposal.** Authenticate the coordinator, fetch the required
+   records, verify their work and eligibility, reject duplicate credit, recompute
+   the snapshot root and payout calculation, and check chain/round context.
+   Missing records leave the proposal pending; they do not establish misconduct.
+2. **Apply miner policy.** Check locally chosen pool/coordinator allowlists,
+   supported accounting rules, fee limits, required payout terms, and any
+   acknowledged-share inclusion requirements. A technically consistent proposal
+   can still fail these preferences.
+
+The proposed admission flow is:
+
+```text
+proposal arrives
+  data incomplete       -> request data; do not issue this job
+  verification fails    -> reject this proposal with a reason
+  local policy declines -> decline this proposal
+  verification + policy pass
+                        -> construct candidate with approved root and payouts
+                        -> verify exact final candidate and allowed mutations
+                        -> issue work to the miner's hardware
+```
+
+The final check prevents a coordinator update, template rebuild, or changed payout
+from silently replacing already approved data. Approval is attached to the exact
+proposal/job context and must be reconsidered when that context changes. Policy
+settings are versioned locally and never supplied as authoritative instructions
+by the coordinator.
+
+Refusal does not require the coordinator's permission or even a rejection message:
+the gateway withholds the miner's hashrate from that proposal. A future protocol
+may send an authenticated response containing the proposal ID, a reason such as
+`root-mismatch`, `payout-mismatch`, or `policy-declined`, and bounded supporting
+evidence when appropriate. These are proposed messages, not existing DATUM RPCs.
+
+After refusal, the gateway may continue an older **still eligible and locally
+approved** job, request a corrected proposal, or use another configured coordinator.
+Solo mining is a separate explicit miner preference with its own payout template.
+If there is no acceptable job, pause work or use the gateway's supported worker
+disconnect/failover behavior. Configure hardware backup pools to obey the same
+approved-pool policy. Never silently accept a rejected commitment merely
+to keep hardware busy. If an active job is withdrawn locally, replace/stop it using
+the supported worker protocol; in-flight work and delayed solutions may still arrive.
+
+A miner can construct a different commitment before mining, but it becomes a new
+job. The original pool need not credit its shares unless its protocol accepts that
+variant. Removing a disliked pool from an aggregate similarly requires a new root
+and, where affected, a new payout plan and coordinator agreement for pooled credit.
+
+This refuses participation in a job, not the existence of another miner's block.
+Under the optional-overlay model, an otherwise valid base-chain block remains
+valid even when its commitment fails local preferences. Rejecting chain blocks
+requires the separate, commonly enforced consensus rules described below.
+
+## Template and share validation
+
 Templates advertise a content identifier and enough retrievable transaction and
 coinbase data for local validation against the referenced chain state. Template
 identity must define permitted nonce, extranonce, and time mutations precisely.
