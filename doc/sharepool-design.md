@@ -9,24 +9,39 @@ Base: `bitcoinknots/bitcoin`, tag `v29.4.1.knots20260508`, commit
 
 ## Objective: miner control and evidence of work on different templates
 
-The intended purpose is to establish that miners are working on different
-templates and to require DATUM-style miner control across pools. Settlement
+The intended purpose is to establish that miners are working on templates
+distinguished by each DATUM node's coinbase tag, and to require that evidence
+across pools in support of miner control. Settlement
 commitments are the evidence transport and accounting mechanism for that purpose.
 The desired enforcement scope is every accepted block on the proposed fork,
 regardless of its declared pool. The exact observable validation rule remains
 undefined; no consensus change is implemented or activated.
 
-There is a fundamental distinction between three claims:
+Different coinbase tags do make the full templates different, even when every
+non-coinbase transaction is identical. The protocol's primary evidence therefore
+retains and checks the tag; it must not discard tag differences merely because
+the transaction selections match. The user is asking to track work by this node
+identifier, not to require every node to select different non-coinbase transactions.
+
+DATUM exposes a configurable secondary coinbase tag for pooled mining. Its
+[example configuration](https://github.com/OCEAN-xyz/datum_gateway/blob/master/doc/example_datum_gateway_config.json)
+uses a generic example value, so distinct values are not guaranteed simply by
+running DATUM. A protocol using tags as identifiers must define their canonical
+encoding, identity binding, and collision/duplicate handling.
+
+There is a fundamental distinction between these claims:
 
 | Claim | What this evidence can establish |
 | --- | --- |
 | Work was produced against a specific template | Valid share PoW, correctly bound to the template's transactions and job context, provides evidence of work on that template. |
-| Published work covers different transaction selections | Compare authenticated transaction sets and account for the verified share difficulty. This describes the published sample, not every miner's undisclosed work. |
+| Published work covers templates with different coinbase tags | Authenticate each actual coinbase against its share header, extract its tag, and account for verified work under that identifier. Different transaction selections are not required. |
+| Published work covers different transaction selections | An optional, separate metric can compare authenticated non-coinbase transaction sets. It is not the uniqueness criterion requested here. |
 | Independent miners selected those transactions or used DATUM | Neither PoW nor a Merkle commitment establishes who made that choice or which software/protocol was used. |
 
-A pool can centrally create multiple templates, present multiple miner identities,
-and obtain precisely the same share evidence as independent miners. Conversely,
-independent DATUM miners with similar mempools may choose identical transactions.
+A pool can centrally create multiple templates with different tags, present
+multiple miner identities, and obtain precisely the same share evidence as
+independent miners. Independent DATUM miners with similar mempools may choose
+identical transactions while their distinct tags still distinguish their templates.
 Public keys or coordinator signatures establish control of keys, not independent
 ownership or transaction-selection authority. Requiring a DATUM-compatible proof
 format therefore cannot enforce use of DATUM software or genuine miner autonomy.
@@ -38,15 +53,27 @@ an unsigned list of template hashes or a coordinator's hashrate assertion is not
 sufficient. A public share verifier for this tag's hidden-key mode is still needed
 if that mode is retained.
 
-Use two separate identifiers:
+For tag attribution, a verification record needs the actual serialized coinbase
+and a valid transaction-Merkle proof or full block data binding it to the share's
+header. A coordinator-supplied label next to a share is insufficient. The actual
+tag must have been committed before hashing. A plain tag can be copied; an optional
+node public-key identifier in the coinbase plus a signed job commitment can
+authenticate approval by that key holder. This authenticates a key, not a distinct
+operator, exclusive hardware, or execution of DATUM software. Full template
+validation still needs the other required transaction and chain-state data.
 
+Keep the following identifiers separate:
+
+- The declared node tag or authenticated public-key identifier extracted from
+  the committed coinbase, for grouping and auditing work by claimed node identity.
 - An exact job/template identifier with precisely defined permitted header and
   coinbase mutations, for validating the submitted work.
-- A comparison fingerprint of the selected non-coinbase transaction set, with a
+- An optional comparison fingerprint of the selected non-coinbase transaction set, with a
   versioned canonical encoding, count, and hash domain. For this metric, sorting
   transaction identifiers prevents mere reordering from appearing as a different
   selection. Nonces, extranonces, coinbase tags, payout changes, and the settlement
-  root itself must not create artificial transaction-selection diversity.
+  root itself do not represent different transaction selections. This optional
+  comparison does not erase tag differences from the primary work evidence.
 
 Recompute the comparison fingerprint from transactions authenticated by the actual
 share header; do not hash a normalized substitute header as evidence of mining
@@ -60,11 +87,14 @@ scheme. The winning template must commit to previously available evidence; it
 cannot commit to every share that will arrive before the eventual block is found.
 Pool labels are not a reliable registry of independently controlled organizations.
 
-A requirement for a minimum number of different sets could be satisfied by a
+A separate requirement for a minimum number of different transaction sets could be satisfied by a
 central pool adding trivial transactions or dropping transactions from several
 variants. It could also penalize honest miners, low-transaction periods, or small
-participants. No diversity threshold is selected here. The evidence can support
-auditing of disclosed work; it must not be described as a cryptographic proof of
+participants. That requirement is not part of the user's tag-based definition of
+template uniqueness. No minimum tag count is selected either: creating additional
+tags or keys alone does not establish additional independent operators. The
+evidence can support auditing of disclosed work across templates with distinct
+tags; it must not be described as a cryptographic proof of
 decentralized control or as enforcement of DATUM use across all pools.
 
 The direct guarantee for a participating miner remains local: its own node and
@@ -346,9 +376,10 @@ The experiment does not validate real miner shares, run `bitcoind`, exchange dat
 persist rounds, pay miners, or demonstrate acceptance by a live or regtest chain.
 
 The coordinator's role, pre-mining commitment timing, and intended enforcement
-scope are now established. First resolve the gap between observable template-work
-evidence and the desired guarantee of independent transaction selection. Then
-specify and test manifests, authenticated template comparisons, share accounting,
+scope are now established. The observable objective is verified work attributed
+to the identifiers inside distinct tagged coinbases; independent operator control
+is a separate property that these proofs do not establish. Next specify and test
+manifests, coinbase tag extraction and binding, authenticated jobs, share accounting,
 and miner-side verification before integrating peer transport and mining jobs.
 Relevant integration points are `src/node/miner.cpp`, `src/rpc/mining.cpp`, the
 mining interfaces, and an isolated share-state store. Base-chain validation must
@@ -359,6 +390,7 @@ invalid templates, false payout attribution, unavailable snapshots, conflicting
 coordinator proposals, newer snapshots overtaking still-eligible jobs, two winners,
 peer partitions, main-chain reorganizations, crash recovery,
 bounded storage, and interoperability with unchanged nodes in overlay mode.
-Template-evidence tests must also cover nonce/coinbase-only differences, reordered
-transactions, identical honest selections, centrally generated variants, invented
+Template-evidence tests must also cover distinct tags with identical transaction
+selections, forged labels, copied tags, invalid coinbase-Merkle proofs, nonce-only
+differences, reordered transactions, centrally generated variants, invented
 miner identities, stale or replayed work, and low-transaction periods.
