@@ -368,7 +368,11 @@ private:
     /** Mark a transaction's inputs dirty, thus forcing the outputs to be recomputed */
     void MarkInputsDirty(const CTransactionRef& tx) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
-    void SyncMetaData(std::pair<TxSpends::iterator, TxSpends::iterator>) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    /** Collects all wallet txs that differ from wtx only in their scriptSigs (i.e. different tx id malleated variants)
+     *  plus wtx itself. Sorted by the order in which they were inserted in the wallet (CWalletTx::nOrderPos) */
+    std::set<CWalletTx*, WalletTxOrderComparator> GetMalleatedVariants(const CWalletTx& wtx) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+
+    void SyncMalleatedTxMetadata(const CWalletTx& wtx) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
     void SyncTransaction(const CTransactionRef& tx, const SyncTxState& state, bool update_tx = true, bool rescanning_old_block = false) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
