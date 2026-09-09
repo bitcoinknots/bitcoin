@@ -9,11 +9,16 @@ Base: `bitcoinknots/bitcoin`, tag `v29.4.1.knots20260508`, commit
 
 ## Feasibility
 
-Yes. Nodes can exchange templates and miner shares, independently validate them,
-replicate accounting state, and mine a commitment to that state. This resembles
-[P2Pool](https://github.com/p2pool/p2pool), adapted to this release's PoW and header.
-It requires a separate share protocol; ordinary block and transaction propagation
-does not provide agreement about pool accounting.
+Yes. The pool coordinator proposes the settlement snapshot and supplies its
+commitment for inclusion in each mining template **before hashing**. Nodes exchange
+templates and shares, replicate accounting data, and independently check the
+coordinator's proposal. Miners choose whether to accept the job.
+
+The coordinator supplies the ordering and snapshot-selection role. A permissionless
+sharechain such as [P2Pool](https://github.com/p2pool/p2pool) is therefore an
+alternative architecture, not a prerequisite for this design. The coordinator's
+selection remains auditable and subject to miner acceptance; it is not evidence
+that every submitted share has been included.
 
 This exact tag uses a version-2 BLAKE2b header at its configured activation.
 `src/primitives/block.h` serializes the 256-bit `m_mm_rhs` field.
@@ -23,24 +28,24 @@ location, not a sidechain database or an existing pool-settlement protocol.
 Compatibility here means compatibility with this exact Knots chain and its rules;
 it does not imply compatibility with SHA256d-only software or miners.
 
-## Correct the timing
+## Coordinator supplies the commitment before mining
 
 The settlement root must be fixed **before** miners hash a job. Replacing it after
 finding a block changes the hash; the old solution provides no assurance that the
 modified block meets the target. Coinbase payouts must also be fixed before mining.
 
-There are two coherent interpretations of a round:
+The coordinator publishes an immutable snapshot and commitment for a particular
+job. It can continue collecting shares and issue newer jobs with updated snapshots.
+A winning block settles **the snapshot in the winning job**, which may be older
+than the coordinator's latest proposal. Nodes must retain that snapshot and cannot
+replace it with their current round data at settlement time.
 
-1. Mine a snapshot of already eligible shares. A winning block settles that
-   particular snapshot. Shares outside it follow the specified future eligibility
-   rules; they cannot be inserted retroactively into the winning job.
-2. Close a round when a block is found, reconcile it under explicit ordering rules,
-   and commit the resulting settlement in a **later** block. Payments must then
-   use a separately defined delayed-payment mechanism.
-
-The first interpretation is the working assumption for this draft. It does not
-promise to include every share submitted anywhere before the block was found.
-No peer can establish that a privately withheld share does not exist.
+Define which jobs remain eligible, share cutoffs, how omitted or later shares are
+credited in future jobs, and what closes a round. These are published pool rules,
+not decisions based on whichever records each peer happened to receive first.
+No peer can establish that a privately withheld share does not exist. A newer job
+does not retroactively change an earlier job's commitment or the base-chain
+validity of a solution to it.
 
 The winning share itself cannot be an ordinary leaf in the root its own PoW
 commits to: that would introduce a circular dependency. Use a predecessor state,
@@ -51,19 +56,31 @@ credit the winning contribution through a later, explicitly defined transition.
 
 ```mermaid
 flowchart LR
-    A[Local template validation] --> B[Share verification and relay]
-    B --> C[Ordered share history]
-    C --> D[Eligible snapshot and payout calculation]
-    D --> E[Set mm_rhs and coinbase outputs]
+    A[Coordinator selects snapshot and payout plan] --> B[Publish commitment and supporting data]
+    B --> C[Miner node verifies proposal locally]
+    C --> D{Miner accepts job?}
+    D -->|Yes| E[Gateway sets mm_rhs and coinbase outputs]
+    D -->|No| I[Decline job]
     E --> F[Mine the exact candidate]
-    F --> G[Winning block and snapshot data]
-    G --> H[Independent verification and reversible settlement]
+    F --> G[Winning block identifies its snapshot]
+    G --> H[Peers verify and settle that snapshot]
 ```
 
 Start with an **opt-in overlay** whose participants run validating Knots nodes.
 Use a separate peer service and an explicit pool namespace. Pool participation,
 template selection, and relay policy are local choices. Base-chain block validity
 continues to follow the upstream rules.
+
+With DATUM specifically, the gateway obtains a template from the miner's local
+node and the pool supplies reward splits; the pool does not supply the transaction
+template. This extension would add the settlement commitment and supporting
+accounting data to the pool-to-gateway exchange. The gateway verifies them and
+incorporates them into its locally constructed job before distributing work to
+mining hardware. A conventional pool could instead supply the complete template.
+These existing roles are described in the
+[DATUM Gateway documentation](https://github.com/OCEAN-xyz/datum_gateway#datum-protocol).
+This proposal does not claim existing DATUM supports `m_mm_rhs` or this tag's
+BLAKE2b header; compatibility requires implementation and testing.
 
 Templates advertise a content identifier and enough retrievable transaction and
 coinbase data for local validation against the referenced chain state. Template
@@ -72,8 +89,8 @@ The upstream `getblocktemplate` implementation requires clients to declare
 `blake2b` support when applicable; this is not a drop-in SHA256 Stratum integration.
 
 Each share must bind the protocol version, base-chain identity, pool identity,
-previous main block, preceding share state, template, payout destination, and
-protocol-approved target **in the mined commitment**. An attached miner name or
+previous main block, coordinator-selected predecessor state, template, payout
+destination, and protocol-approved target **in the mined commitment**. An attached miner name or
 signature alone cannot prevent relabeling work. Define which fields are committed
 before mining and which are derived afterward to avoid another self-reference.
 
@@ -84,21 +101,42 @@ Weight accounting by verified work, not the number of connections, pool names, o
 arbitrarily easy shares. Miner submissions at low local difficulty need not all be
 global accounting shares; a higher protocol difficulty can bound network load.
 
-## Agreement and multiple pools
+## Coordinator manifests and multiple pools
 
-Gossip does not guarantee equal local inventories. Sorting each node's received
-shares only creates the same root when their input sets already match.
+The coordinator selects a concrete dataset; validating nodes reconstruct that
+proposal instead of requiring equality with their local share inventories.
+Gossip supports replication and auditing. It does not certify completeness.
+Signed coordinator receipts for accepted shares can provide evidence when an
+acknowledged share is omitted contrary to the published inclusion policy. They
+cannot prove that every submission was acknowledged or disclosed.
 
-A candidate approach is a sharechain with cumulative-work fork choice and a
-deterministic tie-break. A production specification must still define difficulty
-adjustment, predecessor validity, stale-share eligibility, scoring windows, and
-behavior during partitions. These rules are not settled by this draft.
+A proposed settlement manifest identifies:
 
-If each independent pool keeps its own sharechain, aggregate a canonical list of
-`(pool_id, eligible_tip, accounting_root)` entries. The aggregator still needs rules
-for which pools and tips are eligible and how work across them is counted. A
-Merkle tree over independently advertised roots does not solve that problem.
-A single shared accounting sharechain is a simpler first implementation.
+- Protocol/ruleset and base-chain identity, pool and coordinator identity.
+- Previous main block, round identifier, predecessor settlement, and proposal sequence.
+- Selected-share Merkle root, record count, and the applicable cutoff/eligibility rule.
+- Payout specification and the data needed to verify its calculation for the job.
+
+Bind this metadata into the commitment using a versioned canonical encoding.
+Authenticate the proposal, for example with a coordinator signature over its
+commitment. Bind the final job identifier to the commitment and the exact allowed
+template mutations. Avoid a circular definition in which a template identifier
+includes the same commitment that depends on that identifier. The signature proves
+authorship, not correctness or payment. Exact encoding and authentication remain
+to be specified; the synthetic experiment is not a manifest implementation.
+
+Two different signed proposals at the same logical sequence can be evidence of
+coordinator equivocation. Legitimate newer snapshots or template-specific payout
+variants must have distinct identifiers. Peers can preserve and relay conflict
+evidence; a conflict does not automatically establish a base-chain invalidity rule.
+
+For commitments spanning multiple pools, aggregate a canonical list of
+`(pool_id, proposal_id, settlement_root)` entries. The proposing coordinator names
+the included pools and miners validate each referenced dataset they are required
+to audit before accepting that aggregate. Committing another pool's root does not
+authorize spending its funds or settle balances absent agreed cross-pool rules.
+No global vote is required merely to mine an explicitly selected aggregate, but
+claims that it includes every eligible pool still need a defined eligibility policy.
 
 Each job names an immutable predecessor snapshot. Record eligible shares in a
 canonical format and order, reject duplicates, distinguish leaf and internal
@@ -114,8 +152,9 @@ it does not establish share validity, completeness, or data availability.
 
 ## Payment and settlement
 
-For a first implementation, calculate direct coinbase outputs from eligible work.
-Participants verify the exact reward allocation before contributing work. Define
+For a first implementation, the coordinator calculates direct coinbase outputs
+from eligible work and participants independently recompute the allocation before
+contributing work. Bind any template-dependent subsidy and fees correctly. Define
 fees, payout rounding, dust handling, finder reward, and payout-output limits.
 Direct coinbase outputs pay the included recipients if the block remains in the
 chain, subject to coinbase maturity. They do not make upstream nodes enforce the
@@ -127,9 +166,10 @@ require an additional explicit design.
 
 Persist verified shares, templates or retrievable references, snapshot records,
 block associations, and state-transition undo records. Closing a round must be
-atomic and idempotent. Parent-chain and sharechain reorganizations must undo
-affected accounting. Do not treat the first block announcement as irreversible
-finality. Retention and pruning must preserve whatever historical validation a
+atomic and idempotent. Retain issued snapshots while their jobs can still produce
+eligible solutions. Parent-chain reorganizations and any defined accounting-history
+rollback must undo affected settlement. Do not treat the first block announcement
+as irreversible finality. Retention and pruning must preserve whatever historical validation a
 new participant is expected to perform.
 
 ## This release's hidden XOR key
@@ -140,8 +180,9 @@ from that key. Publishing full headers containing the key to all peers makes the
 key public and gives up that concealment's anti-withholding property.
 
 A simple public-validation prototype can use a zero/public key. Preserving the
-hidden-key property needs a dedicated public partial-work verifier and a defined
-key-holder trust model, or further cryptographic design. Do not claim ordinary
+hidden-key property can assign key custody to the coordinator, but independent
+share verification still needs a dedicated public partial-work verifier and an
+explicit key-release and availability protocol. Do not claim ordinary
 full-header validation preserves the secret-key protection. The accompanying
 experiment uses a zero key and does not implement such a verifier.
 
@@ -169,13 +210,16 @@ synthetic experiment using the upstream Python header hashing implementation.
 The experiment does not validate real miner shares, run `bitcoind`, exchange data,
 persist rounds, pay miners, or demonstrate acceptance by a live or regtest chain.
 
-After choosing the enforcement model and settlement semantics, specify and test
-the share-state machine before integrating peer transport and mining jobs.
+The coordinator's role and pre-mining commitment timing are now established.
+Next specify and test manifests, accepted-share accounting, and miner-side proposal
+verification before integrating peer transport and mining jobs. The optional versus
+mandatory base-chain enforcement choice remains open.
 Relevant integration points are `src/node/miner.cpp`, `src/rpc/mining.cpp`, the
 mining interfaces, and an isolated share-state store. Base-chain validation should
 only change if mandatory enforcement is selected.
 
 Required integration scenarios include delayed shares, duplicate/replayed work,
-invalid templates, false payout attribution, unavailable snapshots, two winners,
-peer partitions, sharechain and main-chain reorganizations, crash recovery,
+invalid templates, false payout attribution, unavailable snapshots, conflicting
+coordinator proposals, newer snapshots overtaking still-eligible jobs, two winners,
+peer partitions, main-chain reorganizations, crash recovery,
 bounded storage, and interoperability with unchanged nodes in overlay mode.

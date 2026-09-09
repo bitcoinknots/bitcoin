@@ -4,6 +4,11 @@ This directory is a **synthetic commitment experiment**, not a working pool.
 See [the protocol draft](../../doc/sharepool-design.md) for the proposed system,
 unresolved rules, and limitations.
 
+In the proposed system, the pool coordinator supplies the snapshot commitment
+for the mining job, and miners verify its supporting data locally before hashing.
+The experiment demonstrates only how that supplied commitment binds the header;
+it does not implement coordinator messages or miner-side proposal verification.
+
 From the repository root, with Python 3:
 
 ```sh
