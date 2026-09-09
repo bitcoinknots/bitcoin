@@ -1,4 +1,4 @@
-# Share-pool feasibility experiment
+# Share-pool feasibility experiments
 
 This directory is a **synthetic commitment experiment**, not a working pool.
 See [the protocol draft](../../doc/sharepool-design.md) for the proposed system,
@@ -30,3 +30,13 @@ Opaque example records are not actual validated miner shares. The synthetic
 header has no complete block or chain context. No networking, round persistence,
 payouts, consensus rules, or live/regtest acceptance are implemented or tested.
 The zero XOR key also does not exercise hidden-key pool protection.
+
+`work_concentration.py` implements the exact arithmetic predicate for the user's
+10% limit: `total_work > 0` and `10 * group_work <= total_work` for every group.
+It operates on supplied credited-share records for one pool and window. Its
+result does not verify PoW, authenticate a coinbase tag, check target assignment,
+select a window, or establish that the records include all eligible pool work.
+The draft groups refreshed jobs by their stable coinbase node identifier.
+
+This concentration check is not wired into Knots block validation. The test
+fixtures exercise the arithmetic and duplicate handling, not a live mining pool.
