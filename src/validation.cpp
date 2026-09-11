@@ -4689,7 +4689,7 @@ arith_uint256 CalculateClaimedHeadersWork(std::span<const CBlockHeader> headers)
  *  in ConnectBlock().
  *  Note that -reindex-chainstate skips the validation that happens here!
  */
-static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidationState& state, BlockManager& blockman, const ChainstateManager& chainman, const CBlockIndex* pindexPrev) EXCLUSIVE_LOCKS_REQUIRED(::cs_main)
+static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidationState& state, BlockManager& blockman, const ChainstateManager& chainman, const CBlockIndex* pindexPrev, bool fCheckPOW = true) EXCLUSIVE_LOCKS_REQUIRED(::cs_main)
 {
     AssertLockHeld(::cs_main);
     assert(pindexPrev != nullptr);
@@ -4699,6 +4699,18 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     const Consensus::Params& consensusParams = chainman.GetConsensus();
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-diffbits", "incorrect proof of work");
+
+    // Extra-work (see ExtraWorkCache): while the temporary soft fork is active,
+    // the hash must also meet the header target divided by the current factor.
+    // CheckBlockHeader has already verified the hash against the header target;
+    // skipped, like that check, for a block whose proof of work is not checked
+    // (an unsolved template under TestBlockValidity).
+    if (fCheckPOW && consensusParams.ExtraWorkActiveAt(pindexPrev->GetMedianTimePast())) {
+        const arith_uint256 effective_target{chainman.m_extra_work_cache.EffectiveTarget(consensusParams, pindexPrev, block.nBits)};
+        if (UintToArith256(block.GetHash()) > effective_target) {
+            return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-extra-work", "insufficient proof of work under the extra-work rule");
+        }
+    }
 
     // Check against checkpoints
     if (chainman.m_options.checkpoints_enabled) {
@@ -5230,7 +5242,7 @@ bool TestBlockValidity(BlockValidationState& state,
     indexDummy.phashBlock = &block_hash;
 
     // NOTE: CheckBlockHeader is called by CheckBlock
-    if (!ContextualCheckBlockHeader(block, state, chainstate.m_blockman, chainstate.m_chainman, pindexPrev)) {
+    if (!ContextualCheckBlockHeader(block, state, chainstate.m_blockman, chainstate.m_chainman, pindexPrev, fCheckPOW)) {
         LogError("%s: Consensus::ContextualCheckBlockHeader: %s\n", __func__, state.ToString());
         return false;
     }
