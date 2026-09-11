@@ -8,8 +8,7 @@ signed registries and reward jobs, verified-work commitment updates, parent seal
 and branch-specific pending claims to handle the old-job winning race.
 
 Base: `bitcoinknots/bitcoin`, tag `v29.4.1.knots20260508`, commit
-`8c85b1585dac23f964e2dd32045624de7f02aa58`. Local branch:
-`sharepool/design-prototype`. This checkout has not been published as a GitHub fork.
+`8c85b1585dac23f964e2dd32045624de7f02aa58`.
 
 ## Objective: miner control and evidence of work on different templates
 
@@ -464,13 +463,14 @@ absolute work budget using a nominal duration; the test report records that
 configuration. The authenticated registry and live update path now have a separate
 [executable reference implementation](sharepool-live-protocol.md).
 
-The coordinator's role, pre-mining commitment timing, and intended enforcement
-scope and absolute work budget are now established. The observable objective is verified work attributed
+The coordinator's role, pre-mining commitment timing, intended enforcement
+scope, and absolute work-budget objective are specified above. The observable objective is verified work attributed
 to the identifiers inside distinct tagged coinbases; independent operator control
 is a separate property that these proofs do not establish. Next specify the
 measurement window, complete eligible-share history, initial accounting state, and
-reward-job eligibility. Extend the tested tag binding and accounting to
-authenticated manifests and actual miner jobs before integrating peer transport.
+production reward-job eligibility. Extend the reference's authenticated manifests
+and synthetic reward jobs to full transaction templates and actual mining-protocol
+messages, and replace loopback replication with a production peer transport.
 Relevant integration points are `src/node/miner.cpp`, `src/rpc/mining.cpp`, the
 mining interfaces, and an isolated share-state store. Base-chain validation must
 only change once the exact evidence rule and its activation have been specified.

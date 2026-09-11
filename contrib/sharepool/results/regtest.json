@@ -2,7 +2,7 @@
   "scope": "Two installed stock Knots nodes; regtest; loopback RPC only; no wallets or P2P",
   "settlement_rules_implemented": false,
   "snapshot_contents": "Opaque Merkle fixture records, not actual verified miner shares",
-  "binary": "/Users/jeronimolopez/Library/Application Support/m1n3/bin/bitcoin-knotsd",
+  "binary": "bitcoin-knotsd",
   "binary_provenance": "Version self-report only; not a reproducible-build verification",
   "cases": [
     {
@@ -10,20 +10,20 @@
       "passed": true,
       "activation_height": 1,
       "normal_height": 2,
-      "normal_block": "59288dd2e31f556d8f0dc8f0ccc5a85464b0ce7b312842a61b7274d14174b51f"
+      "normal_block": "71172dac74f18948b7973ff4054ced90d25af54f8032ae8d635098e93250b336"
     },
     {
       "name": "post_solve_commitment_mutation_rejected",
       "passed": true,
       "reason": "high-hash",
-      "original_nonce": 0,
-      "mutated_nonce": 0,
+      "original_nonce": 1,
+      "mutated_nonce": 1,
       "note": "Mutation chosen to fail the easy target; not every root mutation must fail"
     },
     {
       "name": "tagged_coinbase_and_merkle_root_accepted",
       "passed": true,
-      "block": "18e0e89a786274b065fe229d2dba7a95ef0dbf4096b91925f0940f104ecfcd54",
+      "block": "5548925cbc1db95f2592bacc09518576dbbc2ff50361f0b11bd1d5064e99bf84",
       "root": "f8273d8ad99b9cfee3b68aed0f30a4178e5526a223b6150d4d038c0a4f83ed2f",
       "tag": "DATUM/test-01",
       "supplied_snapshot_to_nodes": false
@@ -31,32 +31,32 @@
     {
       "name": "arbitrary_root_without_snapshot_accepted",
       "passed": true,
-      "block": "733e7df2c143c28b61b876f9b038e45df819a234150c4049d5947c81d53f3317",
+      "block": "2d5cdb4998e0cf1fcf9ce4716e03e83d5aa2b9f72f24ef680d9d770d34922059",
       "proves": "Stock nodes do not enforce pool snapshot validity or availability"
     },
     {
       "name": "equal_work_siblings_converge_after_extension",
       "passed": true,
       "first_seen_tips": [
-        "1a226b099f80aec9c979dda76ddd03687b58f6ddd662ba730c19fdf0014b7641",
-        "32e9585b81ca5b78182d65ac13511a080039fd323864aeaa2b682daf402ea4d3"
+        "1a8e4f0c4151111b2350150ce9333afd920ca534e605a40cce8beb4736e05cad",
+        "1124cac39d6daa8c8a1bff28d9fadc0d373db49dd36834ac2c44026c63814e53"
       ],
       "cross_relay_results": [
         "inconclusive",
         "inconclusive"
       ],
-      "converged_tip": "46eadca663d7ff7f408038a82250d996514baa50bf1d177692a14581ca23c23c",
+      "converged_tip": "59beb0311f8833b1c64cc3478f83d8d1330e09c5bbdf8f1dafd2cb0bb4024738",
       "note": "Both siblings validated as active tips on their initial nodes; equal-work side-branch storage may return inconclusive"
     },
     {
       "name": "administrative_disagreement_and_reconsideration",
       "passed": true,
       "split_tips": [
-        "2ca422d46b04e46dc611f7337a7149f0d313ddbfb9cfe229cbc0b781bfaf1584",
-        "32e9585b81ca5b78182d65ac13511a080039fd323864aeaa2b682daf402ea4d3"
+        "135e35e2d1e6a6fefd43f46fa1de77cff71684d21af80cfcfd6788e0fe038fa7",
+        "1124cac39d6daa8c8a1bff28d9fadc0d373db49dd36834ac2c44026c63814e53"
       ],
       "descendant_rejection": "bad-prevblk",
-      "healed_tip": "2ca422d46b04e46dc611f7337a7149f0d313ddbfb9cfe229cbc0b781bfaf1584",
+      "healed_tip": "135e35e2d1e6a6fefd43f46fa1de77cff71684d21af80cfcfd6788e0fe038fa7",
       "mechanism": "Explicit invalidateblock/reconsiderblock; not automatic settlement consensus"
     }
   ],

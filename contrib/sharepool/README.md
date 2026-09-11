@@ -105,8 +105,8 @@ full transaction validation, and trustworthy physical hashrate remain unresolved
 see [its implementation report](../../doc/sharepool-live-protocol.md).
 
 - A Merkle proof proves inclusion. It does not prove the committed set contains
-  all eligible work: a coordinator can disclose a balanced sample of a
-  concentrated inventory under the model's current rule.
+  all eligible work: a coordinator can disclose an under-budget subset of an
+  over-budget inventory under the model's current rule.
 - Supporting shares use zero-payout evidence templates. The model does not yet
   require them to be eligible settlement-bearing reward-mining jobs. Thus it
   does not prove diversity of a pool's actual reward mining.

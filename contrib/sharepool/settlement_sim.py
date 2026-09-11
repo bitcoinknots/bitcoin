@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 The Bitcoin Core developers
+# Distributed under the MIT software license, see the accompanying
+# file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Deterministic settlement/chain simulation, NOT Knots consensus implementation.
 
 Uses actual header-v2 hashes and serialized coinbases with synthetic easy targets.

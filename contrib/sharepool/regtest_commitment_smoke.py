@@ -15,6 +15,7 @@ import base64
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import socket
 import subprocess
@@ -48,7 +49,7 @@ class IsolatedNode:
             self.port = listener.getsockname()[1]
         self.output = (self.datadir / "process.log").open("wb")
         args = [
-            str(binary), "-regtest", "-nosettings", "-conf=/dev/null",
+            str(binary), "-regtest", "-nosettings", "-conf=" + os.devnull,
             "-datadir=" + str(self.datadir), "-networkactive=0", "-listen=0",
             "-connect=0", "-dnsseed=0", "-discover=0", "-listenonion=0",
             "-disablewallet=1", "-server=1", "-rest=0", "-persistmempool=0",
@@ -151,7 +152,7 @@ def run(binary):
         "scope": "Two installed stock Knots nodes; regtest; loopback RPC only; no wallets or P2P",
         "settlement_rules_implemented": False,
         "snapshot_contents": "Opaque Merkle fixture records, not actual verified miner shares",
-        "binary": str(binary),
+        "binary": Path(binary).name,
         "binary_provenance": "Version self-report only; not a reproducible-build verification",
         "cases": [],
         "success": False,
@@ -164,7 +165,7 @@ def run(binary):
 
     try:
         for _ in range(2):
-            directory = tempfile.TemporaryDirectory(prefix="knots-sharepool-regtest-", dir="/private/tmp")
+            directory = tempfile.TemporaryDirectory(prefix="knots-sharepool-regtest-")
             directories.append(directory)
             node = IsolatedNode(binary, directory.name)
             nodes.append(node)

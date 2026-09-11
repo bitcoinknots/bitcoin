@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 The Bitcoin Core developers
+# Distributed under the MIT software license, see the accompanying
+# file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Executable authenticated pool protocol reference, not activated Knots consensus.
 
 Real synthetic BLAKE2b reward jobs, signed registry/history, append-only receipts,

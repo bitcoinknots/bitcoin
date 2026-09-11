@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 The Bitcoin Core developers
+# Distributed under the MIT software license, see the accompanying
+# file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Authenticated miner registry experiment, not production cryptography.
 
 Uses this checkout's real secp256k1 ECDSA test implementation, which is slow,

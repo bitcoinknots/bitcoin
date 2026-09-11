@@ -195,8 +195,8 @@ python3 contrib/sharepool/regtest_commitment_smoke.py --bitcoind /absolute/path/
 ```
 
 The last command needs a compatible Knots binary and permission to bind loopback
-RPC ports. The tested binary was
-`/Users/jeronimolopez/Library/Application Support/m1n3/bin/bitcoin-knotsd`.
+RPC ports. The tested executable was named `bitcoin-knotsd` and reported
+`/Satoshi:29.4.1/Knots:20260508/`; its build provenance was not independently verified.
 Each runner exits unsuccessfully if an assertion or required operation fails.
 See [the experiment README](../contrib/sharepool/README.md) for file roles and
 [the protocol draft](sharepool-design.md) for integration decisions still needed.

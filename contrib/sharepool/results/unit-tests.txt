@@ -112,6 +112,6 @@ test_single_group_can_account_for_all_work_within_its_budget (test_work_rate_bud
 test_work_weights_not_equal_share_counts_control_budget (test_work_rate_budget.WorkRateBudgetTest) ... ok
 
 ----------------------------------------------------------------------
-Ran 112 tests in 10.476s
+Ran 112 tests in 10.566s
 
 OK
