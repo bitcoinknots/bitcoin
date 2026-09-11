@@ -131,6 +131,10 @@ public:
         // reaching ACTIVE, and that deployment has been removed.)
         consensus.RdtsExpiryTime = 1819756800; // September 1st, 2027 00:00 UTC
 
+        // Extended coinbase maturity (temporary soft fork, expires with RDTS
+        // above): the start time is set at release cut. Unscheduled until then.
+        // consensus.ExtendedCoinbaseMaturityStartTime = ...;
+
         consensus.nMinimumChainWork = uint256{"00000000000000000000000000000000000000013e00277374c9f9eeadc70200"};
         consensus.defaultAssumeValid = uint256{"0000000000000078ed1e20cac1acf78df6d1060c78059fb6331e17141c881fc8"}; // 964264
 
@@ -403,6 +407,7 @@ public:
 
         consensus.Blake2bHeight = 150308;
         consensus.RdtsExpiryTime = 1791903600; // October 13th, 2026 15:00:00 UTC
+        // Extended coinbase maturity: unscheduled until release cut (see mainnet).
 
         consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000001d6dce8651b6094e4c1"};
         consensus.defaultAssumeValid = uint256{"0000000000003ed4f08dbdf6f7d6b271a6bcffce25675cb40aa9fa43179a89f3"}; // 72600
@@ -663,6 +668,13 @@ public:
         // default, so regtest behaviour is unchanged.
         if (opts.rdts_expiry_time) {
             consensus.RdtsExpiryTime = *opts.rdts_expiry_time;
+        }
+
+        // Optionally schedule the extended coinbase maturity soft fork (see
+        // -extendedcoinbasematurity). It expires with RDTS, so it requires the
+        // RDTS expiry scheduled above.
+        if (opts.extended_coinbase_maturity_start_time) {
+            consensus.ExtendedCoinbaseMaturityStartTime = *opts.extended_coinbase_maturity_start_time;
         }
 
         for (const auto& [deployment_pos, version_bits_params] : opts.version_bits_parameters) {

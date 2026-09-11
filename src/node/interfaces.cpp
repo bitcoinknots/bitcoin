@@ -10,7 +10,9 @@
 #include <chainparamsbase.h>
 #include <common/args.h>
 #include <common/pcp.h>
+#include <consensus/consensus.h>
 #include <consensus/merkle.h>
+#include <consensus/tx_verify.h>
 #include <consensus/validation.h>
 #include <deploymentstatus.h>
 #include <external_signer.h>
@@ -580,6 +582,13 @@ public:
         LOCK(::cs_main);
         const CBlockIndex* block{chainman().ActiveChain()[height]};
         return block && ((block->nStatus & BLOCK_HAVE_DATA) != 0) && block->nTx > 0;
+    }
+    int coinbaseMaturity(int coinbase_height) override
+    {
+        LOCK(::cs_main);
+        const CBlockIndex* tip{chainman().ActiveChain().Tip()};
+        if (!tip) return COINBASE_MATURITY;
+        return Consensus::RequiredCoinbaseMaturity(coinbase_height, ExtendedCoinbaseMaturityStartHeight(chainman().GetConsensus(), *tip));
     }
     bool pruneLockExists(const std::string& name) const override
     {

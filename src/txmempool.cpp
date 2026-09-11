@@ -877,9 +877,10 @@ void CTxMemPool::check(const CCoinsViewCache& active_coins_tip, int64_t spendhei
         TxValidationState dummy_state; // Not used. CheckTxInputs() should always pass
         CAmount txfee = 0;
         assert(!tx.IsCoinBase());
-        // Skip output size checks (CheckTxInputsRules::None), as these transactions already passed
-        // output size limits at mempool acceptance; this check only verifies UTXO consistency
-        assert(Consensus::CheckTxInputs(tx, dummy_state, mempoolDuplicate, spendheight, txfee, CheckTxInputsRules::None));
+        // Skip output size checks (CheckTxInputsRules::None) and the extended coinbase
+        // maturity rule, as these transactions already passed both at mempool acceptance;
+        // this check only verifies UTXO consistency
+        assert(Consensus::CheckTxInputs(tx, dummy_state, mempoolDuplicate, spendheight, txfee, CheckTxInputsRules::None, std::numeric_limits<int>::max()));
         for (const auto& input: tx.vin) mempoolDuplicate.SpendCoin(input.prevout);
         AddCoins(mempoolDuplicate, tx, std::numeric_limits<int>::max());
     }

@@ -50,12 +50,23 @@ namespace Consensus {
 bool CheckOutputSizes(const CTransaction& tx, TxValidationState& state);
 
 /**
+ * Number of blocks a coinbase output created at coinbase_height must be buried
+ * under before it may be spent: EXTENDED_COINBASE_MATURITY for outputs created
+ * at or after extended_maturity_start_height, COINBASE_MATURITY otherwise.
+ * Callers pass ExtendedCoinbaseMaturityStartHeight() (validation.h) for the
+ * spending block, which is std::numeric_limits<int>::max() (no output
+ * qualifies) whenever the extended-maturity soft fork is not active for it.
+ */
+int RequiredCoinbaseMaturity(int coinbase_height, int extended_maturity_start_height);
+
+/**
  * Check whether all inputs of this transaction are valid (no double spends and amounts)
  * This does not modify the UTXO set. This does not check scripts and sigs.
  * @param[out] txfee Set to the transaction fee if successful.
+ * @param[in] extended_maturity_start_height See RequiredCoinbaseMaturity.
  * Preconditions: tx.IsCoinBase() is false.
  */
-[[nodiscard]] bool CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, CheckTxInputsRules rules);
+[[nodiscard]] bool CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, CheckTxInputsRules rules, int extended_maturity_start_height);
 } // namespace Consensus
 
 /** Auxiliary functions for transaction validation (ideally should not be exposed) */

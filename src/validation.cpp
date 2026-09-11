@@ -272,6 +272,34 @@ bool CheckSequenceLocksAtTip(CBlockIndex* tip,
     return EvaluateSequenceLocks(index, {lock_points.height, lock_points.time});
 }
 
+int MedianTimePastActivationHeight(const CBlockIndex& tip, int64_t start_time)
+{
+    assert(tip.GetMedianTimePast() >= start_time);
+    // Binary search over the ancestors for the lowest height whose
+    // median-time-past has reached start_time; the block after it is the first
+    // whose parent's has. Valid because a block's time must exceed its parent's
+    // median-time-past, which keeps median-time-past non-decreasing along a chain.
+    int lo{0};
+    int hi{tip.nHeight};
+    while (lo < hi) {
+        const int mid{lo + (hi - lo) / 2};
+        if (Assert(tip.GetAncestor(mid))->GetMedianTimePast() >= start_time) {
+            hi = mid;
+        } else {
+            lo = mid + 1;
+        }
+    }
+    return lo + 1;
+}
+
+int ExtendedCoinbaseMaturityStartHeight(const Consensus::Params& params, const CBlockIndex& block_prev)
+{
+    if (!params.ExtendedCoinbaseMaturityActiveAt(block_prev.GetMedianTimePast())) {
+        return std::numeric_limits<int>::max();
+    }
+    return MedianTimePastActivationHeight(block_prev, params.ExtendedCoinbaseMaturityStartTime);
+}
+
 // Returns the script flags which should be checked for a given block
 static unsigned int GetBlockScriptFlags(const CBlockIndex& block_index, const ChainstateManager& chainman);
 
@@ -432,13 +460,18 @@ void Chainstate::MaybeUpdateMempoolForReorg(
         }
 
         // If the transaction spends any coinbase outputs, it must be mature.
+        // The required maturity depends on the new tip too: the extended
+        // coinbase maturity rule may apply to the next block again after a
+        // reorg back across its expiry, or its window may start at a different
+        // height on the new branch (see ExtendedCoinbaseMaturityStartHeight).
         if (it->GetSpendsCoinbase()) {
+            const auto mempool_spend_height{m_chain.Tip()->nHeight + 1};
+            const int extended_maturity_start_height{ExtendedCoinbaseMaturityStartHeight(m_chainman.GetConsensus(), *m_chain.Tip())};
             for (const CTxIn& txin : tx.vin) {
                 if (m_mempool->exists(GenTxid::Txid(txin.prevout.hash))) continue;
                 const Coin& coin{CoinsTip().AccessCoin(txin.prevout)};
                 assert(!coin.IsSpent());
-                const auto mempool_spend_height{m_chain.Tip()->nHeight + 1};
-                if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < COINBASE_MATURITY) {
+                if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < Consensus::RequiredCoinbaseMaturity(coin.nHeight, extended_maturity_start_height)) {
                     return true;
                 }
             }
@@ -1015,7 +1048,11 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     // The mempool holds txs for the next block, so pass height+1 to CheckTxInputs
     const auto block_height_current = m_active_chainstate.m_chain.Height();
     const auto block_height_next = block_height_current + 1;
-    if (!Consensus::CheckTxInputs(tx, state, m_view, block_height_next, ws.m_base_fees, CheckTxInputsRules::OutputSizeLimit)) {
+    // The extended coinbase maturity rule (see ExtendedCoinbaseMaturityStartHeight)
+    // is likewise evaluated for the next block, whose parent is the tip.
+    const int extended_maturity_start_height{ExtendedCoinbaseMaturityStartHeight(
+        m_active_chainstate.m_chainman.GetConsensus(), *m_active_chainstate.m_chain.Tip())};
+    if (!Consensus::CheckTxInputs(tx, state, m_view, block_height_next, ws.m_base_fees, CheckTxInputsRules::OutputSizeLimit, extended_maturity_start_height)) {
         return false; // state filled in by CheckTxInputs
     }
 
@@ -2993,6 +3030,13 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
 
     const CheckTxInputsRules chk_input_rules{reduced_data_active ? CheckTxInputsRules::OutputSizeLimit : CheckTxInputsRules::None};
 
+    // Extended coinbase maturity (see ExtendedCoinbaseMaturityStartHeight): a
+    // temporary soft fork that expires with RDTS. While it is active for this
+    // block, coinbase outputs created since its activation on this chain must
+    // be buried under EXTENDED_COINBASE_MATURITY blocks; earlier outputs keep
+    // COINBASE_MATURITY. When inactive no output qualifies.
+    const int extended_maturity_start_height{ExtendedCoinbaseMaturityStartHeight(params.GetConsensus(), *pindex->pprev)};
+
     // Check generation tx output sizes if REDUCED_DATA is active
     if (chk_input_rules.test(CheckTxInputsRules::OutputSizeLimit)) {
         TxValidationState tx_state;
@@ -3020,7 +3064,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         {
             CAmount txfee = 0;
             TxValidationState tx_state;
-            if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, chk_input_rules)) {
+            if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, chk_input_rules, extended_maturity_start_height)) {
                 // Any transaction validation failure in ConnectBlock is a block consensus failure
                 state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
                               tx_state.GetRejectReason(),

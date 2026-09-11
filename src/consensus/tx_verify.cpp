@@ -172,7 +172,12 @@ bool Consensus::CheckOutputSizes(const CTransaction& tx, TxValidationState& stat
     return true;
 }
 
-bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, const CheckTxInputsRules rules)
+int Consensus::RequiredCoinbaseMaturity(int coinbase_height, int extended_maturity_start_height)
+{
+    return coinbase_height >= extended_maturity_start_height ? EXTENDED_COINBASE_MATURITY : COINBASE_MATURITY;
+}
+
+bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, const CheckTxInputsRules rules, const int extended_maturity_start_height)
 {
     // are the actual inputs available?
     if (!inputs.HaveInputs(tx)) {
@@ -192,9 +197,12 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, 
         assert(!coin.IsSpent());
 
         // If prev is coinbase, check that it's matured
-        if (coin.IsCoinBase() && nSpendHeight - coin.nHeight < COINBASE_MATURITY) {
-            return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, "bad-txns-premature-spend-of-coinbase",
-                strprintf("tried to spend coinbase at depth %d", nSpendHeight - coin.nHeight));
+        if (coin.IsCoinBase()) {
+            const int maturity{RequiredCoinbaseMaturity(coin.nHeight, extended_maturity_start_height)};
+            if (nSpendHeight - coin.nHeight < maturity) {
+                return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, "bad-txns-premature-spend-of-coinbase",
+                    strprintf("tried to spend coinbase at depth %d (maturity %d)", nSpendHeight - coin.nHeight, maturity));
+            }
         }
 
         // Check for negative or overflow input values

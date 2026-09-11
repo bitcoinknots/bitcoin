@@ -1082,6 +1082,12 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
     if (rdts_active) {
         aRules.push_back("reduced_data");
     }
+    // Extended coinbase maturity (a flag-day deployment expiring with RDTS).
+    // Enforced during transaction selection; advertised unprefixed like
+    // "reduced_data", as clients need no special support for it.
+    if (pindexPrev != nullptr && consensusParams.ExtendedCoinbaseMaturityActiveAt(pindexPrev->GetMedianTimePast())) {
+        aRules.push_back("extended_coinbase_maturity");
+    }
 
     result.pushKV("version", block_header.GetCompleteVersion());
     result.pushKV("rules", std::move(aRules));
