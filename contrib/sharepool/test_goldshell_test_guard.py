@@ -212,6 +212,53 @@ class TestGoldshellTestGuard(unittest.TestCase):
         self.assertFalse(result.test_completed)
         self.assert_original()
 
+    def test_restore_hook_runs_before_cleanup_when_test_never_started(self):
+        for failure_point in (("POST", "/api/miner/pools"),
+                              ("PUT", "/api/miner/pools/order")):
+            with self.subTest(failure_point=failure_point):
+                bridge = FakeBridge()
+                bridge.fail_after[failure_point] = 1
+                restoring = [False]
+                hooks = []
+                original_call = bridge.__call__
+                failed = [False]
+                def dispatch(method, path, body=None):
+                    if failed[0]:
+                        self.assertTrue(restoring[0], "restore began before watchdog transition")
+                    try:
+                        return original_call(method, path, body)
+                    except RuntimeError:
+                        failed[0] = True
+                        raise
+                def before_restore():
+                    restoring[0] = True
+                    hooks.append("disarmed")
+                result = guarded_test(dispatch, test_pool=TEST_POOL,
+                    run_test=lambda: self.fail("Test callback must not start"),
+                    before_restore=before_restore,
+                    backup_path=Path(self.directory.name) / (failure_point[0] + "-backup.json"))
+                self.assertEqual(hooks, ["disarmed"])
+                self.assertTrue(result.restored)
+                self.assertFalse(result.ok)
+                self.assertEqual(identities(bridge.pools), identities(ORIGINAL))
+
+    def test_failed_restore_hook_never_prevents_pool_restoration(self):
+        def before_restore():
+            raise RuntimeError("test-secret")
+        result = guarded_test(self.bridge, test_pool=TEST_POOL, run_test=lambda: None,
+                              before_restore=before_restore, backup_path=self.backup)
+        self.assertTrue(result.restored)
+        self.assertFalse(result.ok)
+        self.assertEqual(result.failure_stage, "before_restore")
+        self.assertNotIn("test-secret", repr(result))
+        self.assert_original()
+
+    def test_invalid_restore_hook_refuses_before_mutation(self):
+        with self.assertRaises(GuardError):
+            guarded_test(self.bridge, test_pool=TEST_POOL, run_test=lambda: None,
+                         before_restore=True, backup_path=self.backup)
+        self.assertEqual(self.bridge.mutations, [])
+
     def test_ignored_priority_fields_prevent_running_test(self):
         original_bridge = self.bridge
         reorder_count = [0]

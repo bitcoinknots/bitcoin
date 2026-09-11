@@ -1,0 +1,111 @@
+{
+  "format": 1,
+  "profile": "SPN1 native settlement test profile v1",
+  "success": true,
+  "started_utc": "2026-09-11T21:29:39.422000Z",
+  "finished_utc": "2026-09-11T21:29:43.542000Z",
+  "functional_log_elapsed_seconds": 4.12,
+  "test": "test/functional/feature_sharepool_enforcement.py",
+  "log_sha256": "31d8650e7e2938c5b94fc80b099954f6dc208b921a3eb9be49ca242f0e7a6e0a",
+  "binary": "bitcoind",
+  "binary_provenance": "Locally built modified working tree; not a reproducible-build attestation.",
+  "network": "regtest",
+  "activation_height": 1,
+  "native_consensus_enforcement": true,
+  "public_network_activation": false,
+  "native_nodes": 2,
+  "final_height": 103,
+  "both_nodes_enforcing_during_final_agreement": true,
+  "all_nodes_stopped": true,
+  "transport": "Explicit loopback RPC block delivery to separate native node processes; no P2P propagation or partition test.",
+  "reorganization": "Native greater-work fork selection; historical invalid-payout removal was performed by reindex validation, not administrative invalidation.",
+  "fixture_share_bits": "207fffff",
+  "fixture_keys": "Public deterministic functional-test Schnorr keys.",
+  "actual_transaction_fee_satoshis": 12345,
+  "physical_miner_used": false,
+  "cases": [
+    {
+      "name": "mandatory_manifest",
+      "passed": true,
+      "behavior": "An otherwise valid manifest-free block was rejected with enforcement and accepted by the disabled peer."
+    },
+    {
+      "name": "native_share_validation",
+      "passed": true,
+      "behavior": "Native RPC accepted authorized proofs, including the extended physical nonce fields, and rejected forged signatures, owner binding and header commitment; disabled RPC refused admission."
+    },
+    {
+      "name": "full_template_job_gate",
+      "passed": true,
+      "behavior": "The miner gate required active native GBT metadata and cached native-validated origin bodies; a nonexistent-input template and snapshot proofs with unknown origin bodies were rejected."
+    },
+    {
+      "name": "local_inclusion_policy",
+      "passed": true,
+      "behavior": "A native-valid job omitting known eligible work was rejected locally; later work required refresh without changing the prior job bytes."
+    },
+    {
+      "name": "invalid_evidence_and_carriers",
+      "passed": true,
+      "behavior": "Wrong envelope/share/state roots, owner signatures, share PoW, duplicate proofs, parent-state openings and malformed or nonzero chunks were rejected natively."
+    },
+    {
+      "name": "exact_payout_validation",
+      "passed": true,
+      "behavior": "Self-consistently recomputed commitments with a wrong recipient, underpayment or reallocation were rejected by enforcement and accepted by the disabled peer."
+    },
+    {
+      "name": "payout_script_aggregation",
+      "passed": true,
+      "behavior": "Two different owner keys paying the same script aggregated together, with a second destination and exact integer remainder allocation."
+    },
+    {
+      "name": "immutable_snapshot_and_tail",
+      "passed": true,
+      "behavior": "Later eligible work and the winning proof were paid in the next native block, without editing the solved commitment."
+    },
+    {
+      "name": "replay_expiry_boundary",
+      "passed": true,
+      "behavior": "A fresh proof from height j was eligible at j+3 and ineligible at j+4; already paid proofs were rejected within the eligibility window."
+    },
+    {
+      "name": "native_work_reorganization",
+      "passed": true,
+      "behavior": "A longer native branch replaced the earlier branch and settled its own tail under its actual native parent state."
+    },
+    {
+      "name": "restart_and_reindex",
+      "passed": true,
+      "behavior": "Restart and reindex-chainstate retained the valid native chain and continued rejecting already paid proof IDs."
+    },
+    {
+      "name": "native_transaction_fees",
+      "passed": true,
+      "behavior": "A matured fixture coinbase was spent with an actual 12345-satoshi fee; the block had to allocate 5000012345 satoshis exactly."
+    },
+    {
+      "name": "historical_invalid_payout_reindex",
+      "passed": true,
+      "behavior": "The disabled peer first accepted wrong-payout block 103; enabling enforcement and reindexing independently marked it invalid and restored height 102."
+    },
+    {
+      "name": "two_enforcing_replicas",
+      "passed": true,
+      "behavior": "Both enforcing nodes accepted the same fresh block 103 and derived its paid state from block evidence despite different local pool histories; both rejected replay at 104 without changing tips."
+    },
+    {
+      "name": "public_activation_refusal",
+      "passed": true,
+      "behavior": "Startup activation requests on mainnet, Testnet4 and signet were refused."
+    }
+  ],
+  "limits": [
+    "This functional run used no physical miner. A separate SPN1 Goldshell regtest capture and independent native replay are recorded in native-hardware-regtest.json and native-hardware-replay.json; the older public Testnet4 capture used a different profile.",
+    "Native consensus validates committed share headers, owner bindings and PoW; complete unmined origin bodies are checked by the local miner gate, not this native evidence format.",
+    "Native consensus cannot establish complete disclosure of unseen work. The miner gate only enforces inclusion of locally known eligible unpaid work.",
+    "Fixed easy share targets, bounded state and native-height expiry are experimental rules, not a physical hashrate cap or a production security analysis.",
+    "No mainnet deployment or activation mechanism, public-network SPN1 block, long-running multi-pool test or production-readiness claim is established."
+  ],
+  "separate_physical_test_report": "native-hardware-regtest.json"
+}

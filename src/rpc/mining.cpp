@@ -14,6 +14,7 @@
 #include <consensus/consensus.h>
 #include <consensus/merkle.h>
 #include <consensus/params.h>
+#include <consensus/sharepool.h>
 #include <consensus/validation.h>
 #include <core_io.h>
 #include <deploymentinfo.h>
@@ -34,6 +35,7 @@
 #include <script/descriptor.h>
 #include <script/script.h>
 #include <script/signingprovider.h>
+#include <streams.h>
 #include <txmempool.h>
 #include <univalue.h>
 #include <util/check.h>
@@ -45,6 +47,8 @@
 #include <validation.h>
 #include <validationinterface.h>
 
+#include <algorithm>
+#include <limits>
 #include <memory>
 #include <stdint.h>
 
@@ -644,6 +648,7 @@ static RPCHelpMan getblocktemplate()
                 {
                     {"segwit", RPCArg::Type::STR, RPCArg::Optional::NO, "(literal) indicates client side segwit support"},
                     {"blake2b", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "(literal) indicates client side BLAKE2b header support"},
+                    {"sharepool", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "(literal) indicates support for the opt-in regtest settlement profile; complete the manifest and validate in proposal mode before mining"},
                     {"str", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "other client side supported softfork deployment"},
                 }},
                 {"longpollid", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "delay processing request until the result would vary significantly from the \"longpollid\" of a prior template"},
@@ -710,6 +715,18 @@ static RPCHelpMan getblocktemplate()
                 {RPCResult::Type::NUM, "height", "The height of the next block"},
                 {RPCResult::Type::STR_HEX, "signet_challenge", /*optional=*/true, "Only on signet"},
                 {RPCResult::Type::STR_HEX, "default_witness_commitment", /*optional=*/true, "a valid witness commitment for the unmodified block template"},
+                {RPCResult::Type::OBJ, "sharepool", /*optional=*/true, "Required regtest settlement construction parameters. The base template is incomplete until its manifest and payouts are added and proposal validation succeeds.",
+                {
+                    {RPCResult::Type::NUM, "version", "Settlement wire profile version"},
+                    {RPCResult::Type::NUM, "activation_height", "First block requiring settlement evidence"},
+                    {RPCResult::Type::STR_HEX, "genesis", "Native genesis hash in RPC display order"},
+                    {RPCResult::Type::STR_HEX, "rules_root", "Settlement rules hash in RPC display order"},
+                    {RPCResult::Type::STR_HEX, "share_bits", "Approved compact share target"},
+                    {RPCResult::Type::NUM, "max_share_age", "Maximum settlement height minus origin job height"},
+                    {RPCResult::Type::NUM, "max_shares", "Maximum shares in the committed snapshot"},
+                    {RPCResult::Type::NUM, "max_manifest_bytes", "Maximum serialized settlement evidence size"},
+                    {RPCResult::Type::BOOL, "requires_completion", "Always true: base templates require a settlement manifest and exact payouts"},
+                }},
             }},
         },
         RPCExamples{
@@ -884,6 +901,11 @@ static RPCHelpMan getblocktemplate()
     }
 
     const Consensus::Params& consensusParams = chainman.GetParams().GetConsensus();
+
+    if (chainman.ActiveChain().Height() + 1 >= consensusParams.SharePoolHeight &&
+        setClientRules.count("sharepool") != 1) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Support for 'sharepool' rule requires explicit client support; complete the settlement manifest and validate the resulting block in proposal mode before mining");
+    }
 
     // GBT must be called with 'signet' set in the rules for signet chains
     if (consensusParams.signet_blocks && setClientRules.count("signet") != 1) {
@@ -1082,6 +1104,20 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
     if (rdts_active) {
         aRules.push_back("reduced_data");
     }
+    if (pindexPrev->nHeight + 1 >= consensusParams.SharePoolHeight) {
+        aRules.push_back("!sharepool");
+        UniValue settlement(UniValue::VOBJ);
+        settlement.pushKV("version", 1);
+        settlement.pushKV("activation_height", consensusParams.SharePoolHeight);
+        settlement.pushKV("genesis", consensusParams.hashGenesisBlock.GetHex());
+        settlement.pushKV("rules_root", sharepool::RulesHash().GetHex());
+        settlement.pushKV("share_bits", strprintf("%08x", sharepool::SHARE_BITS));
+        settlement.pushKV("max_share_age", sharepool::MAX_SHARE_AGE);
+        settlement.pushKV("max_shares", sharepool::MAX_SHARES);
+        settlement.pushKV("max_manifest_bytes", sharepool::MAX_MANIFEST);
+        settlement.pushKV("requires_completion", true);
+        result.pushKV("sharepool", std::move(settlement));
+    }
 
     result.pushKV("version", block_header.GetCompleteVersion());
     result.pushKV("rules", std::move(aRules));
@@ -1235,6 +1271,78 @@ static RPCHelpMan submitheader()
     };
 }
 
+static RPCHelpMan validatesharepoolshare()
+{
+    return RPCHelpMan{"validatesharepoolshare",
+        "Validate one SPN1 share against the current native ancestry using native PoW and Schnorr verification.\n"
+        "Available only while the opt-in regtest profile is active. This does not credit or publish work,\n"
+        "check whether it was already paid, or validate the full body of its origin template.\n",
+        {
+            {"share", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Canonical serialized SPN1 share"},
+        },
+        RPCResult{RPCResult::Type::OBJ, "", "Verified share and the native tip used for eligibility",
+        {
+            {RPCResult::Type::BOOL, "valid", "True after native proof verification"},
+            {RPCResult::Type::STR_HEX, "proof_id", "Native PoW hash in RPC display order"},
+            {RPCResult::Type::NUM, "origin_height", "Height of the authorized origin job"},
+            {RPCResult::Type::STR_HEX, "pool", "Pool ID in RPC display order"},
+            {RPCResult::Type::STR_HEX, "owner", "Precommitted x-only owner public key"},
+            {RPCResult::Type::STR_HEX, "payout_script", "Precommitted direct payout script"},
+            {RPCResult::Type::STR_HEX, "share_bits", "Approved compact share target"},
+            {RPCResult::Type::STR_HEX, "native_tip", "Tip hash used to check eligibility"},
+            {RPCResult::Type::NUM, "settlement_height", "Next native block height"},
+        }},
+        RPCExamples{HelpExampleCli("validatesharepoolshare", "\"serialized_share_hex\"")},
+        [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
+            const auto text = request.params[0].get_str();
+            if (text.empty() || text.size() > 2048 || !IsHex(text)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Share must contain at most 1024 bytes of hexadecimal data");
+            }
+            sharepool::Share share;
+            try {
+                const auto raw = ParseHex(text);
+                DataStream stream{raw};
+                stream >> share;
+                DataStream canonical;
+                canonical << share;
+                if (!stream.empty() || HexStr(canonical) != HexStr(raw)) {
+                    throw std::ios_base::failure("Noncanonical share encoding");
+                }
+            } catch (const std::exception&) {
+                throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Noncanonical or malformed SPN1 share");
+            }
+            ChainstateManager& chainman = EnsureAnyChainman(request.context);
+            LOCK(cs_main);
+            const auto& params = chainman.GetParams();
+            const auto& consensus = params.GetConsensus();
+            const auto* parent = chainman.ActiveChain().Tip();
+            if (params.GetChainType() != ChainType::REGTEST || !parent ||
+                parent->nHeight + 1 < consensus.SharePoolHeight) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Native sharepool validation is not active on this chain");
+            }
+            const auto settlement_time = std::max<int64_t>(parent->GetMedianTimePast() + 1, GetTime());
+            if (settlement_time < 0 || settlement_time > std::numeric_limits<uint32_t>::max()) {
+                throw JSONRPCError(RPC_MISC_ERROR, "Native time is outside the header range");
+            }
+            std::string error;
+            if (!sharepool::CheckShare(share, parent, static_cast<uint32_t>(settlement_time), consensus, error)) {
+                throw JSONRPCError(RPC_VERIFY_REJECTED, error);
+            }
+            UniValue result(UniValue::VOBJ);
+            result.pushKV("valid", true);
+            result.pushKV("proof_id", share.header.GetHash().GetHex());
+            result.pushKV("origin_height", share.origin.height);
+            result.pushKV("pool", share.origin.pool.GetHex());
+            result.pushKV("owner", HexStr(share.origin.owner));
+            result.pushKV("payout_script", HexStr(share.origin.payout_script));
+            result.pushKV("share_bits", strprintf("%08x", sharepool::SHARE_BITS));
+            result.pushKV("native_tip", parent->GetBlockHash().GetHex());
+            result.pushKV("settlement_height", parent->nHeight + 1);
+            return result;
+        },
+    };
+}
+
 void RegisterMiningRPCCommands(CRPCTable& t)
 {
     static const CRPCCommand commands[]{
@@ -1245,6 +1353,7 @@ void RegisterMiningRPCCommands(CRPCTable& t)
         {"mining", &getblocktemplate},
         {"mining", &submitblock},
         {"mining", &submitheader},
+        {"mining", &validatesharepoolshare},
 
         {"hidden", &generatetoaddress},
         {"hidden", &generatetodescriptor},

@@ -24,6 +24,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <stdexcept>
 #include <type_traits>
 
 using namespace util::hex_literals;
@@ -655,6 +656,14 @@ public:
 
         if (opts.blake2b_headline) {
             consensus.Blake2bHeadline = *opts.blake2b_headline;
+        }
+
+        if (opts.sharepool_height) {
+            if (*opts.sharepool_height < 1 || *opts.sharepool_height >= std::numeric_limits<int>::max() ||
+                *opts.sharepool_height < consensus.Blake2bHeight) {
+                throw std::runtime_error("Regtest sharepool activation must be at least 1 and at or after an explicitly scheduled BLAKE2b activation.");
+            }
+            consensus.SharePoolHeight = *opts.sharepool_height;
         }
 
         // Optionally schedule the RDTS deployment (see -rdtsexpiry). RDTS

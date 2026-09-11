@@ -116,6 +116,7 @@ BASE_SCRIPTS = [
     'mempool_updatefromblock.py',
     'mempool_persist.py --descriptors',
     # vv Tests less than 60s vv
+    'feature_sharepool_enforcement.py',
     'rpc_psbt.py --legacy-wallet',
     'rpc_psbt.py --descriptors',
     'wallet_fundrawtransaction.py --legacy-wallet',

@@ -14,6 +14,7 @@
 #include <consensus/amount.h>
 #include <consensus/consensus.h>
 #include <consensus/merkle.h>
+#include <consensus/sharepool.h>
 #include <consensus/tx_check.h>
 #include <consensus/tx_verify.h>
 #include <consensus/validation.h>
@@ -3106,6 +3107,13 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         LogInfo("Block validation error: %s", state.ToString());
         return false;
     }
+    // Recheck the complete native settlement profile after actual UTXO-derived
+    // fees are known. ConnectBlock does not call ContextualCheckBlock, so this
+    // must also run during reindex-chainstate, VerifyDB, and background validation.
+    // It is deliberately independent of CBlock::fChecked and script caches.
+    if (!CheckSharePoolBlock(block, state, params.GetConsensus(), pindex->pprev, blockReward)) {
+        return false;
+    }
     const auto time_4{SteadyClock::now()};
     m_chainman.time_verify += time_4 - time_2;
     LogDebug(BCLog::BENCH, "    - Verify %u txins: %.2fms (%.3fms/txin) [%.2fs (%.2fms/blk)]\n", nInputs - 1,
@@ -4875,6 +4883,12 @@ static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& stat
         chainman.GetConsensus().RdtsActiveAt(nHeight, pindexPrev->GetMedianTimePast()) &&
         block_weight > REDUCED_DATA_MAX_BLOCK_WEIGHT) {
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-weight-reduced_data", strprintf("%s : RDTS weight limit failed", __func__));
+    }
+
+    // This check uses only authenticated block data and its native ancestry.
+    // ConnectBlock separately checks the exact subsidy plus validated fees.
+    if (!CheckSharePoolBlock(block, state, chainman.GetConsensus(), pindexPrev)) {
+        return false;
     }
 
     return true;

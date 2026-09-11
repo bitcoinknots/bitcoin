@@ -279,6 +279,10 @@ class HardwareCapture:
                                                  "job_id": active.template.job_id})
         return True
 
+    def prepare_dispatch(self, active):
+        """Optional final dispatch fence; native subclasses may use an owner thread."""
+        return True
+
     def start(self):
         capture = self
 
@@ -301,6 +305,8 @@ class HardwareCapture:
                         with capture.lock:
                             active = capture.current
                         if subscribed and user and sent != active.template.job_id:
+                            if not capture.prepare_dispatch(active):
+                                continue
                             send({"id": None, "method": "mining.set_difficulty", "params": [capture.difficulty]})
                             send({"id": None, "method": "mining.notify", "params": sia_notify(active.template, prefix, clean=active.clean)})
                             with capture.lock:

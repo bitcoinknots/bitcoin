@@ -1,0 +1,13 @@
+test_dispatch_fence_runs_on_owner_and_can_refuse (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+test_empty_template_and_exact_reward_are_required (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+test_handler_ack_waits_for_both_durable_stores_and_native_acceptance (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+test_historical_payments_do_not_expire_back_into_pending (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+test_old_parent_work_is_credited_without_submitting_side_block (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+test_partial_archive_retry_completes_existing_gate_receipt (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+test_post_receipt_native_rejection_stops_and_raises_run (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+test_shutdown_cancels_bounded_queue_and_never_acknowledges (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.113s
+
+OK

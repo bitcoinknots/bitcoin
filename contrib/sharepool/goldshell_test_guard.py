@@ -246,7 +246,7 @@ def _restore(bridge, original, settings, test_identity):
     return tuple(failures)
 
 
-def guarded_test(bridge, *, test_pool, run_test, backup_path):
+def guarded_test(bridge, *, test_pool, run_test, backup_path, before_restore=None):
     """Temporarily prioritize a new test pool and always attempt restoration.
 
     ``bridge(method, path, body)`` must implement the documented loopback bridge
@@ -255,10 +255,15 @@ def guarded_test(bridge, *, test_pool, run_test, backup_path):
     Preparation errors raise credential-free GuardError before any mutation.
     After mutation starts, failures return GuardResult with ``ok=False``.
     ``restored`` proves configuration equality, not a live Lazarus connection.
+    Optional ``before_restore()`` runs before every restoration path, including
+    failures before the test callback starts. It can disarm a caller's watchdog;
+    a failed hook is reported and never prevents the restoration attempt.
     """
     test_identity = _identity(test_pool)
     if not callable(run_test):
         raise GuardError("A bounded test callback is required")
+    if before_restore is not None and not callable(before_restore):
+        raise GuardError("The restoration hook must be callable")
     path = Path(backup_path)
     original = _pools(bridge)
     if not original:
@@ -299,6 +304,11 @@ def guarded_test(bridge, *, test_pool, run_test, backup_path):
         failure = "interrupted"
         interrupted = exc
     finally:
+        if before_restore is not None:
+            try:
+                before_restore()
+            except BaseException:
+                failure = failure or "before_restore"
         restore_failures = _restore(bridge, original, settings, test_identity)
     if interrupted is not None:
         # Never let interrupt output contain callback text or mask restoration

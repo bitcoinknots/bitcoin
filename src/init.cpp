@@ -475,11 +475,14 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     const auto testnet4BaseParams = CreateBaseChainParams(ChainType::TESTNET4);
     const auto signetBaseParams = CreateBaseChainParams(ChainType::SIGNET);
     const auto regtestBaseParams = CreateBaseChainParams(ChainType::REGTEST);
-    const auto defaultChainParams = CreateChainParams(argsman, ChainType::MAIN);
-    const auto testnetChainParams = CreateChainParams(argsman, ChainType::TESTNET);
-    const auto testnet4ChainParams = CreateChainParams(argsman, ChainType::TESTNET4);
-    const auto signetChainParams = CreateChainParams(argsman, ChainType::SIGNET);
-    const auto regtestChainParams = CreateChainParams(argsman, ChainType::REGTEST);
+    // These parameters supply help-text defaults for every network. Do not
+    // apply a selected network's test overrides to the other networks here.
+    const ArgsManager default_args;
+    const auto defaultChainParams = CreateChainParams(default_args, ChainType::MAIN);
+    const auto testnetChainParams = CreateChainParams(default_args, ChainType::TESTNET);
+    const auto testnet4ChainParams = CreateChainParams(default_args, ChainType::TESTNET4);
+    const auto signetChainParams = CreateChainParams(default_args, ChainType::SIGNET);
+    const auto regtestChainParams = CreateChainParams(default_args, ChainType::REGTEST);
 
     // Hidden Options
     std::vector<std::string> hidden_args = {

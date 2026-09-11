@@ -1,5 +1,9 @@
 # Hardware integration and production readiness
 
+This report records the hardware milestone before the later
+[SPN1 native regtest enforcement](sharepool-native-enforcement.md) was added.
+Its physical results apply to the capture/observer envelope, not SPN1 mining.
+
 Status on 2026-09-11: the reference now has a real Testnet4/Sia adapter, physical
 Goldshell evidence, and a durable passive observer tested against native Knots.
 **It is not a mainnet-ready settlement protocol.** The public hardware test does

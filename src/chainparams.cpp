@@ -75,6 +75,21 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         }
     }
 
+    if (const auto arg{args.GetArg("-sharepoolheight")}; arg) {
+        if (args.GetArgs("-sharepoolheight").size() != 1) {
+            throw std::runtime_error("-sharepoolheight must be specified exactly once.");
+        }
+        int32_t height;
+        if (!ParseInt32(*arg, &height) || height < 1 || height >= std::numeric_limits<int>::max()) {
+            throw std::runtime_error("-sharepoolheight must be a positive height below INT_MAX.");
+        }
+        const auto blake2b = options.activation_heights.find(Consensus::BuriedDeployment::DEPLOYMENT_BLAKE2B);
+        if (blake2b == options.activation_heights.end() || height < blake2b->second) {
+            throw std::runtime_error("-sharepoolheight requires -testactivationheight=blake2b@<height> at or before sharepool activation.");
+        }
+        options.sharepool_height = height;
+    }
+
     if (const auto arg{args.GetArg("-rdtsexpiry", "")}; !arg.empty()) {
         // RDTS activates at the BLAKE2b fork height: one fork instant, as on
         // mainnet. Only the deployment's expiry is schedulable here; a
@@ -162,6 +177,9 @@ const CChainParams &Params() {
 
 std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, const ChainType chain)
 {
+    if (chain != ChainType::REGTEST && args.IsArgSet("-sharepoolheight")) {
+        throw std::runtime_error("-sharepoolheight is restricted to regtest; public-network activation is not supported.");
+    }
     switch (chain) {
     case ChainType::MAIN:
         return CChainParams::Main();

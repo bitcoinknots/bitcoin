@@ -1,9 +1,12 @@
 # Template-work evidence and replicated pool settlement on Knots
 
-Status: protocol draft with an executable settlement model and isolated stock
-Knots regtest checks. No production mining network, payout system, new RPC, or
-settlement consensus change is implemented. See the [test report](sharepool-test-report.md).
-The current [permissionless checkpoint reference](sharepool-pow-ledger.md) adds
+Status: broader protocol proposal, with a newer
+[native enforcement profile](sharepool-native-enforcement.md) implementing a
+bounded subset on explicitly enabled regtest nodes. That profile adds native
+snapshot/share/payout checks, parent-anchored replay protection and a miner gate;
+it is not a production release or public-network activation. Earlier model
+results remain in the [test report](sharepool-test-report.md).
+The earlier [permissionless checkpoint reference](sharepool-pow-ledger.md) adds
 PoW ordering, checkpoint-age eligibility, quota renewal by empty checkpoints,
 and provisional settlement reorganization. It supersedes coordinator seals as
 the proposed accounting-ordering direction. The earlier
@@ -28,8 +31,9 @@ absolute budget of verified share work over an agreed origin epoch, initially
 scoped to each pool. All tags and miner IDs paying that script share its allowance.
 Registered miners use distinct tags, and winning coinbase
 payments must match the referenced registry and accounting state. The measurement
-window and eligibility rules remain to be specified; no consensus change is
-implemented or activated.
+window and broader quota rules remain to be specified. The separate native
+regtest profile defines a three-block share-age rule and exact payouts, without
+activating the broader absolute work-budget proposal.
 
 The permissionless reference now selects checkpoint-height epochs and explicit
 ancestor/age eligibility. These are work quotas per ledger epoch, not physical
@@ -461,19 +465,22 @@ classification depends on the final rules and compatibility.
 The intended scope is mandatory evidence across pools on the proposed fork.
 However, only observable proof properties can be consensus rules; DATUM use and
 independence of template selection are not proved by those properties. The exact
-enforceable requirement remains open. The local branch does not activate new
-chain validity rules.
+enforceable requirement for the broader proposal remains open. The local branch
+now provides explicitly enabled regtest-only rules for the narrower
+[native profile](sharepool-native-enforcement.md); public-network activation is
+not supported.
 
 ## Implementation boundary and next work
 
-The current [experiments](../contrib/sharepool/README.md) include upstream
+The earlier [experiments](../contrib/sharepool/README.md) include upstream
 header-hash checks, exact integer work accounting, synthetic tagged share proofs,
 canonical snapshot inclusions, and a multi-node settlement model with payout
 checks, delayed-data recovery, reorg accounting, and restart replay. Two actual
 stock Knots processes were also tested in isolated regtest through loopback RPC.
 They accepted arbitrary `m_mm_rhs` roots without snapshots, demonstrating that
 stock validation does not enforce this proposal. The model's settlement rules
-are not integrated into Knots. See the [test report](sharepool-test-report.md)
+are not integrated into Knots as that model. The new native profile has its own
+wire rules and actual native enforcement. See the [earlier test report](sharepool-test-report.md)
 for measured results, disagreement behavior, and limitations.
 
 The model deliberately selects one pool, a current-parent share window, a fixed

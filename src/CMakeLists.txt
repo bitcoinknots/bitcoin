@@ -163,6 +163,7 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   common/system_ram.cpp
   common/url.cpp
   compressor.cpp
+  consensus/sharepool.cpp
   core_read.cpp
   core_write.cpp
   deploymentinfo.cpp

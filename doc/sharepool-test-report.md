@@ -5,7 +5,9 @@ Updated and tested on 2026-09-11 against a checkout based on Knots tag
 
 **The settlement model behaves deterministically for the tested inputs, including
 fork rollback and delayed data. Stock Knots accepts the commitment without
-checking settlement. Mandatory settlement validation remains unimplemented.**
+checking settlement. These earlier tests did not implement mandatory native
+settlement validation.** The later [native regtest profile](sharepool-native-enforcement.md)
+adds actual enforcement for its separately specified snapshot and payout rules.
 
 This report describes the earlier fixed-snapshot model. The
 [coordinator-signed ledger baseline](sharepool-live-protocol.md) adds authenticated

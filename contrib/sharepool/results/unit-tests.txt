@@ -28,13 +28,16 @@ test_distinct_worker_on_same_url_is_preserved (test_goldshell_test_guard.TestGol
 test_empty_original_pool_list_refuses_mutation (test_goldshell_test_guard.TestGoldshellTestGuard) ... ok
 test_existing_backup_is_never_overwritten (test_goldshell_test_guard.TestGoldshellTestGuard) ... ok
 test_existing_exact_test_pool_is_not_owned (test_goldshell_test_guard.TestGoldshellTestGuard) ... ok
+test_failed_restore_hook_never_prevents_pool_restoration (test_goldshell_test_guard.TestGoldshellTestGuard) ... ok
 test_ignored_priority_fields_prevent_running_test (test_goldshell_test_guard.TestGoldshellTestGuard) ... ok
+test_invalid_restore_hook_refuses_before_mutation (test_goldshell_test_guard.TestGoldshellTestGuard) ... ok
 test_keyboard_interrupt_restores_and_reports_failure (test_goldshell_test_guard.TestGoldshellTestGuard) ... ok
 test_missing_original_password_refuses_mutation (test_goldshell_test_guard.TestGoldshellTestGuard) ... ok
 test_nested_pool_response (test_goldshell_test_guard.TestGoldshellTestGuard) ... ok
 test_reorder_failure_restores_and_does_not_run_test (test_goldshell_test_guard.TestGoldshellTestGuard) ... ok
 test_reorder_lost_response_still_restores (test_goldshell_test_guard.TestGoldshellTestGuard) ... ok
 test_restoration_reorder_failure_still_removes_test_pool (test_goldshell_test_guard.TestGoldshellTestGuard) ... ok
+test_restore_hook_runs_before_cleanup_when_test_never_started (test_goldshell_test_guard.TestGoldshellTestGuard) ... ok
 test_success_keeps_original_fallbacks_then_restores (test_goldshell_test_guard.TestGoldshellTestGuard) ... ok
 test_symlink_backup_is_never_followed (test_goldshell_test_guard.TestGoldshellTestGuard) ... ok
 test_timeout_restores_without_exposing_error (test_goldshell_test_guard.TestGoldshellTestGuard) ... ok
@@ -87,6 +90,32 @@ test_sibling_registry_histories_cannot_mix_claims_and_payouts (test_live_protoco
 test_signing_key_rotation_keeps_shared_payout_budget (test_live_protocol.LiveProtocolTests) ... ok
 test_winner_that_also_has_receipt_is_deduplicated (test_live_protocol.LiveProtocolTests) ... ok
 test_wrong_job_signatures_never_enter_job_cache (test_live_protocol.LiveProtocolTests) ... ok
+test_carrier_layout_roundtrip_and_rdts_bound (test_native_enforcement.NativeWireTests) ... ok
+test_different_signatures_never_change_proof_id (test_native_enforcement.NativeWireTests) ... ok
+test_fixed_cross_language_domain_vector_and_signature (test_native_enforcement.NativeWireTests) ... ok
+test_noncanonical_compact_size_trailing_and_parent_discriminator (test_native_enforcement.NativeWireTests) ... ok
+test_shared_destination_and_largest_remainder_allocation (test_native_enforcement.NativeWireTests) ... ok
+test_state_pruning_and_native_eligibility_boundary (test_native_enforcement.NativeWireTests) ... ok
+test_dispatch_fence_runs_on_owner_and_can_refuse (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+test_empty_template_and_exact_reward_are_required (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+test_handler_ack_waits_for_both_durable_stores_and_native_acceptance (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+test_historical_payments_do_not_expire_back_into_pending (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+test_old_parent_work_is_credited_without_submitting_side_block (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+test_partial_archive_retry_completes_existing_gate_receipt (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+test_post_receipt_native_rejection_stops_and_raises_run (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+test_shutdown_cancels_bounded_queue_and_never_acknowledges (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+test_base_template_requires_explicit_completion_and_support (test_native_mining_gate.NativeGateTests) ... ok
+test_capacity_and_disk_failure_do_not_acknowledge_work (test_native_mining_gate.NativeGateTests) ... ok
+test_coordinator_cannot_inject_unknown_origin_and_new_work_stays_known (test_native_mining_gate.NativeGateTests) ... ok
+test_inactive_native_peer_cannot_authorize_even_if_proposal_accepts (test_native_mining_gate.NativeGateTests) ... ok
+test_job_receipt_batch_rolls_back_when_capacity_is_exhausted (test_native_mining_gate.NativeGateTests) ... ok
+test_late_work_requests_refresh_without_rewriting_authorized_job (test_native_mining_gate.NativeGateTests) ... ok
+test_missing_known_work_rejects_job_but_not_native_block (test_native_mining_gate.NativeGateTests) ... ok
+test_receive_uses_native_validation_and_persists_once_across_restart (test_native_mining_gate.NativeGateTests) ... ok
+test_store_is_bound_to_miner_and_detects_corrupt_receipt (test_native_mining_gate.NativeGateTests) ... ok
+test_tip_change_and_network_change_fail_closed (test_native_mining_gate.NativeGateTests) ... ok
+test_unknown_or_corrupt_full_origin_templates_do_not_receive_credit (test_native_mining_gate.NativeGateTests) ... ok
+test_wrong_miner_binding_and_native_payout_failure_never_authorize (test_native_mining_gate.NativeGateTests) ... ok
 test_all_scripts_exactly_capped_resume_after_empty_epoch_heartbeat (test_pow_share_ledger.PowShareLedgerTests) ... ok
 test_authorized_payout_update_does_not_redirect_old_work (test_pow_share_ledger.PowShareLedgerTests) ... ok
 test_branch_work_counts_ancestors_once_and_never_sums_siblings (test_pow_share_ledger.PowShareLedgerTests) ... ok
@@ -222,6 +251,15 @@ test_replay_accepts_live_legacy_and_extended_search_encodings (test_verify_hardw
 test_replay_still_rejects_invalid_live_search_field_lengths (test_verify_hardware_capture.HardwareReplayTests) ... ok
 test_rewritten_proof_header_and_nonce_fail (test_verify_hardware_capture.HardwareReplayTests) ... ok
 test_snapshot_cannot_reference_future_job (test_verify_hardware_capture.HardwareReplayTests) ... ok
+test_candidate_only_work_cannot_claim_harder_credit (test_verify_native_hardware_capture.NativeHardwareVerifierTests) ... ok
+test_current_manifest_and_direct_payout_archive_are_exact (test_verify_native_hardware_capture.NativeHardwareVerifierTests) ... ok
+test_exact_asic_and_native_header_and_full_body_are_required (test_verify_native_hardware_capture.NativeHardwareVerifierTests) ... ok
+test_expired_paid_nullifiers_do_not_become_pending_again (test_verify_native_hardware_capture.NativeHardwareVerifierTests) ... ok
+test_failed_capture_and_counter_tampering_reject (test_verify_native_hardware_capture.NativeHardwareVerifierTests) ... ok
+test_fresh_native_replay_visits_all_origins_and_blocks (test_verify_native_hardware_capture.NativeHardwareVerifierTests) ... ok
+test_missing_proof_or_candidate_never_partially_verifies (test_verify_native_hardware_capture.NativeHardwareVerifierTests) ... ok
+test_native_replay_refuses_wrong_network_existing_chain_and_proposal_failure (test_verify_native_hardware_capture.NativeHardwareVerifierTests) ... ok
+test_replays_every_proof_and_historical_payment (test_verify_native_hardware_capture.NativeHardwareVerifierTests) ... ok
 test_arbitrary_precision_group_totals (test_work_accounting.WorkAccountingTest) ... ok
 test_canonical_immutable_result (test_work_accounting.WorkAccountingTest) ... ok
 test_duplicate_share_ids_are_rejected_even_across_groups (test_work_accounting.WorkAccountingTest) ... ok
@@ -243,6 +281,6 @@ test_single_group_can_account_for_all_work_within_its_budget (test_work_rate_bud
 test_work_weights_not_equal_share_counts_control_budget (test_work_rate_budget.WorkRateBudgetTest) ... ok
 
 ----------------------------------------------------------------------
-Ran 243 tests in 15.877s
+Ran 281 tests in 17.229s
 
 OK

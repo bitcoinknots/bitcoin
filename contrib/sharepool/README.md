@@ -3,17 +3,30 @@
 This directory contains executable tests of commitments, tagged share proofs,
 snapshot settlement, and disagreement between nodes. It also includes a smoke
 test that ran two actual stock Knots nodes in isolated regtest.
-**The proposed settlement and absolute work-budget rules are not integrated into Knots consensus.**
+
+The new [native enforcement profile](../../doc/sharepool-native-enforcement.md)
+implements mandatory snapshot, authenticated share-work, replay and exact direct
+coinbase payout validation on explicitly enabled regtest nodes. Its miner gate
+also validates full origin templates and rejects omissions of locally known
+eligible work. Mainnet and public testnet activation are disabled. This native
+profile has its own [wire contract](../../doc/sharepool-native-format.md); it does
+not transplant the synthetic checkpoint ledger or its absolute work-budget policy.
+
+The [physical SPN1 test](results/native-hardware-regtest.json) captured 28 accepted
+Goldshell proofs and 28 enforcing regtest blocks, settling 27 prior proofs with
+the last winner pending. A [second enforcing node](results/native-hardware-replay.json)
+replayed all 29 full origin proposals and the same chain. These isolated test
+results do not establish public-network or production readiness.
 
 The [hardware and production report](../../doc/sharepool-hardware-and-production.md)
 records 13 actual Goldshell shares verified on this Knots release's Testnet4
-branch, followed by confirmed restoration to Lazarus. The new native-template
+branch, followed by confirmed restoration to Lazarus. That earlier native-template
 adapter, capture/replay tools, and durable passive base-chain observer are
 separate integration components. Eight disposable native-node cases test the
 observer. Neither these results nor the earlier checkpoint model establish
 mainnet readiness; the report lists the remaining integration and release gates.
 
-The current [permissionless checkpoint reference](../../doc/sharepool-pow-ledger.md)
+The earlier [permissionless checkpoint reference](../../doc/sharepool-pow-ledger.md)
 orders registry changes, shares, and candidate settlements using verified PoW.
 Anyone can mine checkpoints, including empty checkpoints that renew work epochs
 without a coordinator seal or reward block. Jobs bind an ancestral snapshot with
@@ -46,6 +59,10 @@ python3 contrib/sharepool/live_protocol_peer.py --run-smoke
 
 | Reference component | Purpose |
 | --- | --- |
+| `../../src/consensus/sharepool.cpp` | Native regtest snapshot, share, parent-state and exact coinbase enforcement. |
+| `native_enforcement.py` | Independent SPN1 wire builder and public-key fixtures for native tests. |
+| `native_mining_gate.py` | Local native validation of full templates, durable proof admission, known-work inclusion policy and immutable mining authorizations. |
+| `native_hardware_capture.py`, `verify_native_hardware_capture.py` | Bounded isolated-regtest Sia transport through the native gate, durable proof/block capture and independent archive replay. |
 | `testnet_template.py` | Full GBT transaction/witness preservation and exact Sia ASIC-to-Knots header reconstruction. |
 | `testnet_hardware_capture.py`, `verify_hardware_capture.py` | Bounded testnet-only Stratum capture, durable admission, native proposals, and recorded-proof replay. |
 | `base_chain_settlement.py` | Versioned native commitment envelope and durable passive observation of base-chain payouts/reorgs/maturity. |
@@ -58,7 +75,7 @@ python3 contrib/sharepool/live_protocol_peer.py --run-smoke
 | `job_gateway.py` | Verify new work and automatically replace the active commitment; discard stale proposal responses. |
 | `live_protocol_peer.py` | Bounded loopback HTTP replication and replay tests. |
 
-The reference uses test-only cryptography, synthetic coinbase-only jobs, fixed
+The earlier Python ledger reference uses test-only cryptography, synthetic coinbase-only jobs, fixed
 rewards, and public XOR keys. Rules commit `budget_basis = "payout-script"`:
 all tags and miner IDs assigned to the same registered payout script share one
 allowance per pool and origin epoch. Tags identify templates and bind their miner

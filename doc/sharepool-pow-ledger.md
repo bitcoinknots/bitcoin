@@ -12,6 +12,9 @@ Its gateway and HTTP replication are not connected to this checkpoint ledger.
 The newer [hardware integration report](sharepool-hardware-and-production.md)
 adds actual Testnet4 ASIC proofs and a separate passive native-chain observer.
 Those components are also not yet integrated with this synthetic reward ledger.
+The subsequent [native regtest profile](sharepool-native-enforcement.md) derives
+settlement state from actual native parents. It is a separate protocol profile;
+it does not make this checkpoint-selected synthetic reward history authoritative.
 
 ## Ordering and participation
 

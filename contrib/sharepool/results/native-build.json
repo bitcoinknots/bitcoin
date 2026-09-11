@@ -1,0 +1,215 @@
+{
+  "format": 1,
+  "date_utc": "2026-09-11",
+  "scope": "Fresh local Debug build and native unit/startup validation of the opt-in regtest sharepool profile. Evidence applies only to this macOS arm64 build; no other platform, public-network activation, or production-readiness claim.",
+  "build": {
+    "result": "passed",
+    "fresh_build_directory": true,
+    "platform": "macOS",
+    "architecture": "arm64",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "build_type": "Debug",
+    "wallet_enabled": false,
+    "gui_enabled": false,
+    "zmq_enabled": false,
+    "native_tests_enabled": true,
+    "binaries": [
+      {
+        "name": "bitcoind",
+        "sha256": "172f106638670320d7ccd67e48928c27f41cbffb73581a12c2450576a2b339f0",
+        "bytes": 39766776
+      },
+      {
+        "name": "bitcoin-cli",
+        "sha256": "a0f1d69d24573846367dddca2156574c7e77e3b03355d3ae5900bd36bbbe7848",
+        "bytes": 2286584
+      },
+      {
+        "name": "test_bitcoin",
+        "sha256": "d38c945575ae31892a8e300b17c8ef9fe62952a5550ea9d9c22d8f982f7ed6c7",
+        "bytes": 62520928
+      }
+    ],
+    "hash_scope": "SHA256 of the exact locally built executable files; this is not reproducible-build verification."
+  },
+  "focused_native_tests": {
+    "command": "bin/test_bitcoin --run_test='sharepool*' --log_level=test_suite",
+    "exit_code": 0,
+    "passed_cases": 12,
+    "failed_cases": 0,
+    "suites": [
+      {
+        "name": "sharepool_params_tests",
+        "passed_cases": 2
+      },
+      {
+        "name": "sharepool_tests",
+        "passed_cases": 10
+      }
+    ]
+  },
+  "existing_native_regression_tests": {
+    "command": "bin/test_bitcoin --run_test='getarg_tests,pow_tests,validation_block_tests,validation_chainstate_tests,versionbits_tests,blockencodings_tests,merkle_tests,miner_tests' --log_level=test_suite",
+    "exit_code": 0,
+    "passed_cases": 58,
+    "failed_cases": 0,
+    "suites": [
+      {
+        "name": "blockencodings_tests",
+        "passed_cases": 8
+      },
+      {
+        "name": "getarg_tests",
+        "passed_cases": 8
+      },
+      {
+        "name": "merkle_tests",
+        "passed_cases": 7
+      },
+      {
+        "name": "miner_tests",
+        "passed_cases": 1
+      },
+      {
+        "name": "pow_tests",
+        "passed_cases": 16
+      },
+      {
+        "name": "validation_block_tests",
+        "passed_cases": 3
+      },
+      {
+        "name": "validation_chainstate_tests",
+        "passed_cases": 2
+      },
+      {
+        "name": "versionbits_tests",
+        "passed_cases": 13
+      }
+    ]
+  },
+  "actual_daemon_startup_guards": {
+    "passed_cases": 9,
+    "failed_cases": 0,
+    "method": "Actual built bitcoind subprocesses, each with a fresh temporary datadir, disabled P2P networking and wallets, and no inherited configuration. Each exited with code 1 and the expected activation error before starting services.",
+    "cases": [
+      {
+        "chain": "main",
+        "options": [
+          "-sharepoolheight=2",
+          "-testactivationheight=blake2b@1"
+        ],
+        "exit_code": 1,
+        "observed_error_contains": "restricted to regtest",
+        "passed": true
+      },
+      {
+        "chain": "test",
+        "options": [
+          "-sharepoolheight=2",
+          "-testactivationheight=blake2b@1"
+        ],
+        "exit_code": 1,
+        "observed_error_contains": "restricted to regtest",
+        "passed": true
+      },
+      {
+        "chain": "testnet4",
+        "options": [
+          "-sharepoolheight=2",
+          "-testactivationheight=blake2b@1"
+        ],
+        "exit_code": 1,
+        "observed_error_contains": "restricted to regtest",
+        "passed": true
+      },
+      {
+        "chain": "signet",
+        "options": [
+          "-sharepoolheight=2",
+          "-testactivationheight=blake2b@1"
+        ],
+        "exit_code": 1,
+        "observed_error_contains": "restricted to regtest",
+        "passed": true
+      },
+      {
+        "chain": "regtest",
+        "options": [
+          "-sharepoolheight=0",
+          "-testactivationheight=blake2b@1"
+        ],
+        "exit_code": 1,
+        "observed_error_contains": "must be a positive height below INT_MAX",
+        "passed": true
+      },
+      {
+        "chain": "regtest",
+        "options": [
+          "-sharepoolheight=2"
+        ],
+        "exit_code": 1,
+        "observed_error_contains": "requires -testactivationheight=blake2b@<height>",
+        "passed": true
+      },
+      {
+        "chain": "regtest",
+        "options": [
+          "-sharepoolheight=2",
+          "-testactivationheight=blake2b@3"
+        ],
+        "exit_code": 1,
+        "observed_error_contains": "requires -testactivationheight=blake2b@<height>",
+        "passed": true
+      },
+      {
+        "chain": "regtest",
+        "options": [
+          "-sharepoolheight=2147483647",
+          "-testactivationheight=blake2b@1"
+        ],
+        "exit_code": 1,
+        "observed_error_contains": "must be a positive height below INT_MAX",
+        "passed": true
+      },
+      {
+        "chain": "regtest",
+        "options": [
+          "-sharepoolheight=2",
+          "-sharepoolheight=3",
+          "-testactivationheight=blake2b@1"
+        ],
+        "exit_code": 1,
+        "observed_error_contains": "must be specified exactly once",
+        "passed": true
+      }
+    ]
+  },
+  "evidence_method": "Test results transcribed from the successful recorded runs and their passing native unit logs. Executable hashes were measured after those runs. No passing tests were rerun to prepare this report.",
+  "mainnet_activation_supported": false,
+  "physical_miner_used_by_these_checks": false,
+  "existing_datadirs_or_services_modified": false,
+  "additional_existing_native_tests": {
+    "suite": "rdts_params_tests",
+    "passed_cases": 2,
+    "passed_assertions": 19,
+    "exit_code": 0,
+    "log_sha256": "80ed737c123c358eb9ff4c8f32d58c7586c635f6eb6d8228f79c1671e3872792"
+  },
+  "existing_functional_regression_tests": [
+    {
+      "script": "mining_basic.py",
+      "exit_code": 0,
+      "started_utc": "2026-09-11T21:27:17.331Z",
+      "completed_utc": "2026-09-11T21:27:53.556Z"
+    },
+    {
+      "script": "rpc_help.py",
+      "exit_code": 0,
+      "started_utc": "2026-09-11T21:27:28.772Z",
+      "completed_utc": "2026-09-11T21:27:30.812Z",
+      "wallet_help_exercised": false
+    }
+  ],
+  "functional_evidence_method": "Exact successful process outputs were captured by the tool runner; default functional-test cleanup removed those two passing datadirs/logfiles. Both used the fresh build and disposable nodes."
+}
