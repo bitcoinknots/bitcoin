@@ -18,17 +18,21 @@ import struct
 
 from precommit_demo import CBlockHeader, solve_header, uint256_from_compact
 from proof_fixtures import BASE_BITS, ShareProof, verify_share
-from work_concentration import evaluate, expected_work
+from work_accounting import evaluate, expected_work
+from work_rate_budget import evaluate as evaluate_budget
 from test_framework.blocktools import create_coinbase
 from test_framework.messages import CTransaction, CTxOut
 from test_framework.script import CScript, OP_0
 
 
-NETWORK_ID = b"knots-sharepool-simulation-v1"
+NETWORK_ID = b"knots-sharepool-simulation-v2-work-budget"
 ANCHOR_HASH = int.from_bytes(hashlib.sha256(NETWORK_ID).digest(), "little")
 BLOCK_BITS = BASE_BITS
 REWARD = 100003
 MAX_SHARES = 1024
+# Tiny illustrative quota for easy synthetic shares, NOT a production hashrate.
+DEFAULT_CAP_HASHES_PER_SECOND = 1
+DEFAULT_WINDOW_SECONDS = 2
 
 
 def digest(kind, data=b""):
@@ -158,12 +162,12 @@ def credited_records(snapshot):
 
 
 def payout_plan(snapshot):
-    concentration = evaluate(credited_records(snapshot))
-    if concentration.total_work == 0:
+    accounting = evaluate(credited_records(snapshot))
+    if accounting.total_work == 0:
         raise ValueError("empty work set")
-    total = concentration.total_work
-    amounts = {g.group_id: snapshot.reward * g.credited_work // total for g in concentration.groups}
-    remainder_order = sorted(concentration.groups,
+    total = accounting.total_work
+    amounts = {g.group_id: snapshot.reward * g.credited_work // total for g in accounting.groups}
+    remainder_order = sorted(accounting.groups,
                              key=lambda g: (-(snapshot.reward * g.credited_work % total), g.group_id))
     for group in remainder_order[:snapshot.reward - sum(amounts.values())]:
         amounts[group.group_id] += 1
@@ -241,15 +245,18 @@ def make_candidate(snapshot, salt=0, payout_override=None):
 class Node:
     """Model node: real hashes, toy consensus and in-memory block delivery.
 
-    cap_percent other than 10 intentionally models incompatible consensus rules.
+    Different absolute budgets intentionally model incompatible consensus rules.
+    The common window duration is a configured nominal value, not observed time.
     Local inventory/latest-proposal are NOT consensus inputs. All balances are
     provisional expected coinbase payouts on the active branch, rebuilt on reorg.
     """
 
-    def __init__(self, name, cap_percent=10):
-        if type(cap_percent) is not int or not 0 < cap_percent <= 100:
-            raise ValueError("invalid cap")
-        self.name, self.cap_percent = name, cap_percent
+    def __init__(self, name, cap_hashes_per_second=DEFAULT_CAP_HASHES_PER_SECOND,
+                 window_seconds=DEFAULT_WINDOW_SECONDS):
+        evaluate_budget([], cap_hashes_per_second=cap_hashes_per_second,
+                        window_seconds=window_seconds)  # Validate configured rules.
+        self.name = name
+        self.cap_hashes_per_second, self.window_seconds = cap_hashes_per_second, window_seconds
         self.blocks, self.snapshots, self.states, self.reasons = {}, {}, {}, {}
         self.known_shares, self.conflicts = set(), set()
         self.latest_snapshot = None
@@ -316,10 +323,10 @@ class Node:
             return "invalid", "snapshot-context", None
         try:
             records = credited_records(snapshot)
-            concentration = evaluate(records)
-            if (concentration.total_work <= 0 or any(100 * g.credited_work >
-                    self.cap_percent * concentration.total_work for g in concentration.groups)):
-                return "invalid", "concentration", None
+            budget = evaluate_budget(records, cap_hashes_per_second=self.cap_hashes_per_second,
+                                     window_seconds=self.window_seconds)
+            if not budget.passes:
+                return "invalid", "work-budget", None
             plan = payout_plan(snapshot)
             if block.coinbase != settlement_coinbase(h.m_height, plan):
                 return "invalid", "payouts", None
@@ -362,7 +369,9 @@ class Node:
 
     def save(self, path):
         path = Path(path)
-        obj = {"name": self.name, "cap": self.cap_percent, "tip": f"{self.tip:064x}",
+        obj = {"format": 2, "name": self.name,
+               "cap_hashes_per_second": self.cap_hashes_per_second,
+               "window_seconds": self.window_seconds, "tip": f"{self.tip:064x}",
                "snapshots": [s.to_object() for s in self.snapshots.values()],
                "blocks": [{"header": b.header.hex(), "coinbase": b.coinbase.hex()} for b in self.blocks.values()]}
         temporary = path.with_name(path.name + ".tmp")
@@ -372,7 +381,9 @@ class Node:
     @classmethod
     def restore(cls, path):
         obj = json.loads(Path(path).read_text())
-        node = cls(obj["name"], obj["cap"])
+        if obj.get("format") != 2:
+            raise ValueError("unsupported settlement store format")
+        node = cls(obj["name"], obj["cap_hashes_per_second"], obj["window_seconds"])
         for item in obj["snapshots"]:
             snapshot = SnapshotBundle.from_object(item)
             node.supply_snapshot(snapshot.root, snapshot)

@@ -1,6 +1,6 @@
 # Share-pool settlement and disagreement test report
 
-Tested on 2026-09-11 against a checkout based on Knots tag
+Updated and tested on 2026-09-11 against a checkout based on Knots tag
 `v29.4.1.knots20260508` (`8c85b1585dac23f964e2dd32045624de7f02aa58`).
 
 **The settlement model behaves deterministically for the tested inputs, including
@@ -11,7 +11,7 @@ checking settlement. Mandatory settlement validation remains unimplemented.**
 
 | Layer | Recorded result | What it establishes |
 | --- | --- | --- |
-| Python unit tests | 48 passing tests, including 50 seeded delivery permutations | Hash/tag binding, work accounting, Merkle inclusions, validation states, payout checks, rollback, and replay within the stated model. |
+| Python unit tests | 60 passing tests, including 50 seeded delivery permutations | Hash/tag binding, work accounting, absolute budgets, Merkle inclusions, validation states, payout checks, rollback, and replay within the stated model. |
 | Settlement model scenarios | 11 passing scenarios | Reproducible node disagreement, data recovery, chain selection, and examples exposing unresolved protocol rules. |
 | Two actual stock Knots processes | 6 passing regtest cases | Header commitment behavior, actual block acceptance, equal-work branches, and explicit local rejection/reconsideration. |
 
@@ -40,8 +40,10 @@ P2P propagation, live-miner, or network-performance test.
    requires checking PoW again. A changed hash is not guaranteed to fail an easy
    target; the actual-node mutation test deliberately chose one that failed.
 4. Each model node obtains the referenced snapshot and checks its root, context,
-   share proofs, duplicates, work concentration, and exact coinbase allocation.
-   The cap is `total_work > 0` and `10 * group_work <= total_work` for every tag.
+   share proofs, duplicates, absolute work budgets, and exact coinbase allocation.
+   The cap is `group_work <= cap_hashes_per_second * window_seconds` for every
+   tag. There is no relative percentage limit or minimum group count. Empty
+   evidence remains insufficient to calculate the model's work-based payouts.
    Credit is `floor(2^256 / (approved_target + 1))` per accepted share.
 5. Valid blocks compete by cumulative valid chainwork. The node derives its
    provisional payout balances and consumed shares from the selected branch.
@@ -51,6 +53,13 @@ The model uses a toy reward of 100,003 units and deterministic largest-remainder
 rounding, with tag-byte order breaking ties. Recipient scripts are synthetic;
 the balances are expected outputs, not matured or spendable balances. This is
 not a sidechain withdrawal or custody implementation.
+
+The model's default budget is 2 work units per stable tag: rate 1 times nominal
+duration 2. Each default share contributes 2 units, so a second share for the
+same tag exceeds this intentionally tiny illustrative budget. These are not
+production parameters or measured submission times. The separate arithmetic
+tests exercise 5 TH/s over 600 seconds, yielding exactly 3,000,000,000,000,000
+work units. A single group containing all pool work passes if under budget.
 
 The fixtures deliberately avoid a circular commitment: supporting proofs are
 separate zero-payout evidence jobs, and the reward candidate commits to them.
@@ -66,11 +75,11 @@ reward-mining jobs, including their previously issued settlement commitments.
 | One node has additional or newer local shares | The winning job's issued snapshot is used. | Local inventory alone does not invalidate the block. |
 | Snapshot or parent has not arrived | Block and dependent descendants remain pending and contribute no active-chain settlement. | Validation resumes when correct data arrives; indefinite withholding can stall a node. |
 | A peer supplies bytes that do not match the committed root, or an unbound coinbase variant | Reject that response without poisoning the header's validity. | Another peer can supply the authentic data. |
-| Matching-root snapshot contains a duplicate, forged tag, replay, excessive concentration, or wrong context | Reject the block under the model rules and exclude descendants. | Additional work on that ancestry does not cure the violation. |
+| Matching-root snapshot contains a duplicate, forged tag, replay, work above its absolute budget, or wrong context | Reject the block under the model rules and exclude descendants. | Additional work on that ancestry does not cure the violation. |
 | Correct snapshot accompanies diverted or incorrectly rounded payouts | Reject the candidate even though its PoW and snapshot root are correct. | Commitment alone does not authorize incorrect payment. |
 | Two valid blocks extend the same parent with equal work | Nodes can retain different first-seen tips. | A branch with more valid cumulative work reunites nodes; old provisional settlement is undone. |
-| A group has 15.38% of work; one node enforces 10% and another 20% | The strict node rejects that branch while the relaxed node can follow it and its descendants. | A split can persist while work extends rejected ancestry. |
-| A branch valid under both the 10% and 20% rules becomes heaviest | Both nodes adopt it. | Different rules do not guarantee permanent divergence; acceptance overlap and chainwork matter. |
+| A group has 4 work units; one node permits 2 and another 4 | The strict node rejects that branch while the relaxed node can follow it and its descendants. | A split can persist while work extends rejected ancestry. |
+| A branch valid under both absolute budgets becomes heaviest | Both nodes adopt it. | Different rules do not guarantee permanent divergence; acceptance overlap and chainwork matter. |
 | Operator explicitly invalidates an ancestor in stock Knots | That node rejects descendants with `bad-prevblk`, even when the other node extends the branch. | Explicit reconsideration restored convergence in the actual-node test. |
 
 Nodes do not vote on whether a root is acceptable. A root differing from a local
@@ -95,7 +104,7 @@ even when records are relabeled. Reordering the same records preserves the root.
 Share tests reject a tag declaration that differs from the coinbase, a coinbase
 not bound to the header, wrong parent/height/pool, altered approved target,
 unsupported fields, and insufficient PoW. Nonce and extranonce/job refreshes
-under the same tag stay in the same concentration group. Distinct tags can use
+under the same tag stay in the same work-budget group. Distinct tags can use
 identical non-coinbase transaction selections. Fixtures contain only a coinbase;
 arbitrary transaction sets and general coinbase Merkle branches are not tested.
 
@@ -108,11 +117,11 @@ historical target assignment is not implemented here.
 ## Protocol gaps exposed by the tests
 
 **A valid inclusion proof does not establish complete disclosure.** In the
-omission scenario, a committed snapshot has ten equally weighted tags, so each
-has 10%. The observed inventory contains ten extra shares for one tag, making
-that tag 55% of observed work. The committed sample still passes the current
-model. Thus the check enforces a cap over disclosed eligible records, not yet
-over all verified work of the pool. Rejecting based on each node's private
+omission scenario, the committed work for a tag is 2 units, equal to its budget.
+The observed inventory contains ten extra shares for that tag, making its
+observed work 22 units. The committed sample still passes the current model.
+Thus the check enforces a cap over disclosed eligible records, not yet over
+all verified work of that template group. Rejecting based on each node's private
 inventory would instead make validity depend on message arrival. A common
 eligible-share ledger, window, cutoff, and omission policy must be specified.
 
@@ -122,13 +131,15 @@ elsewhere. The fixture checks do not exclude this. Real job eligibility, payout
 binding, and predecessor snapshots need to be validated for the supporting
 shares, not only for the eventual settlement candidate.
 
-**A strict per-round cap has bootstrap and sampling effects.** Zero work is
-invalid, nine groups cannot pass, and exactly ten groups pass only with equal
-credited work. More than ten groups do not guarantee compliance. Random share
-arrivals can push a group over the threshold without a matching change in its
-underlying hashrate. Work shares are probabilistic evidence, not a measurement
-of every attempted hash. A rolling window, activation history, or another
-explicit bootstrap design needs evaluation before enforcing this rule.
+**Work budgets require an agreed window and have sampling effects.** One or
+more groups can pass; there is no percentage or fixed minimum-group requirement.
+An empty snapshot still cannot derive work-based payouts. Random share arrivals
+can exceed a budget without a matching change in actual hashrate. Work shares
+are probabilistic evidence, not a measurement of every attempted hash. The
+duration used by nodes must be defined by shared rules, not local receipt times
+or a coordinator-chosen interval. A nominal epoch quota does not establish
+elapsed real time. The work-budget helper checks arithmetic, not these time or
+eligibility assumptions.
 
 **Tags cannot establish DATUM execution or independent control.** One operator
 can assign many tags and contribute real PoW to each. The binding prevents
@@ -146,6 +157,13 @@ Testing and review found and fixed malformed-wire handling, mutable snapshot
 metadata after caching, and an uncommitted coinbase-witness variant that could
 poison the cache entry for a valid header. Regression tests now cover recovery
 with the authentic payload. Cached snapshot roots are rechecked during validation.
+
+The work-accounting API contains no percentage acceptance predicate. The budget
+helper and simulator enforce only absolute per-group limits, with regression
+tests for single-group acceptance, rate-times-duration boundaries, stable grouping,
+and persistence of custom budget settings. The model store uses format 2 and a
+new simulation network domain; older model state is rejected rather than silently
+interpreted under different rules.
 
 Fifty seeded permutations deliver competing blocks, parents, children, snapshots,
 and duplicates in different orders. Once all required data arrives and one

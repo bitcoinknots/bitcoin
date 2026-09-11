@@ -4,7 +4,9 @@
   "assumptions": {
     "pool": "pool-A",
     "window": "shares reference candidate's parent",
-    "cap_percent": 10,
+    "cap_hashes_per_second": 1,
+    "window_seconds": 2,
+    "window_time_basis": "configured nominal duration; no share arrival clock",
     "reward": 100003,
     "xor_key": "zero/public",
     "snapshot_inclusion": "coordinator-disclosed set",
@@ -20,7 +22,7 @@
       "nodes": [
         {
           "node": "ordered",
-          "tip": "0b8e49e27f5d9f89450bce12b56115471d89daaac3794d0648b29007017b5df9",
+          "tip": "028ae7d37f52ffc79ed74402dee4b6cd69976ff84d154ac812f378776b4e4c00",
           "valid_blocks": 1,
           "pending_blocks": 0,
           "invalid_blocks": 0,
@@ -29,7 +31,7 @@
         },
         {
           "node": "reversed",
-          "tip": "0b8e49e27f5d9f89450bce12b56115471d89daaac3794d0648b29007017b5df9",
+          "tip": "028ae7d37f52ffc79ed74402dee4b6cd69976ff84d154ac812f378776b4e4c00",
           "valid_blocks": 1,
           "pending_blocks": 0,
           "invalid_blocks": 0,
@@ -44,7 +46,7 @@
       "behavior": "Wait, discard a wrong reply, then validate both parent and child when correct data arrives.",
       "before": {
         "node": "missing-data",
-        "tip": "3a7fe447835f05b917cbb075722411e6237caeb93ab84d384a40a927f68bfb65",
+        "tip": "7441e9528e91dc3bb19c698773b07540e73db638b6021a432b979cf85d8b15a5",
         "valid_blocks": 0,
         "pending_blocks": 2,
         "invalid_blocks": 0,
@@ -53,7 +55,7 @@
       },
       "after": {
         "node": "missing-data",
-        "tip": "02e26b9a875bdccdb9e8ffe38991e13d250d54c04e7dbd819bd1a45802de55eb",
+        "tip": "03c0fc2b336b8543a8de8c7acddbafd7741f32e3a313b49c0456f42f94775387",
         "valid_blocks": 2,
         "pending_blocks": 0,
         "invalid_blocks": 0,
@@ -78,7 +80,7 @@
       ],
       "node": {
         "node": "invalid-evidence",
-        "tip": "3a7fe447835f05b917cbb075722411e6237caeb93ab84d384a40a927f68bfb65",
+        "tip": "7441e9528e91dc3bb19c698773b07540e73db638b6021a432b979cf85d8b15a5",
         "valid_blocks": 0,
         "pending_blocks": 0,
         "invalid_blocks": 2,
@@ -99,7 +101,7 @@
       "before": [
         {
           "node": "fork-A",
-          "tip": "0e916aa6b30fe9a47bd2db558f16f702b8380c8458c08ff6a04fc56599c6d411",
+          "tip": "0213c76e179bc95ec52883f0595d3f109393fcf2c5de4555333f290c7091a540",
           "valid_blocks": 2,
           "pending_blocks": 0,
           "invalid_blocks": 0,
@@ -108,7 +110,7 @@
         },
         {
           "node": "fork-B",
-          "tip": "09125a655cbc735f1d591568f65457db9f38cb9cdfbe7b19719d1c82fea2c088",
+          "tip": "0bbda465ce99dc83a7fd2e0bac8f8e9a0c23bb5e51efc04a21c9dd05344b9ba2",
           "valid_blocks": 2,
           "pending_blocks": 0,
           "invalid_blocks": 0,
@@ -119,7 +121,7 @@
       "after": [
         {
           "node": "fork-A",
-          "tip": "02ede01aa4bd6d1f5fae466f6aa8ccfb1a591cc67790230e1da2f7c2c2e1bfc7",
+          "tip": "0683d46def439cba254017c5199aed7769d587a0184f646fa073da4ee884fe4c",
           "valid_blocks": 3,
           "pending_blocks": 0,
           "invalid_blocks": 0,
@@ -128,7 +130,7 @@
         },
         {
           "node": "fork-B",
-          "tip": "02ede01aa4bd6d1f5fae466f6aa8ccfb1a591cc67790230e1da2f7c2c2e1bfc7",
+          "tip": "0683d46def439cba254017c5199aed7769d587a0184f646fa073da4ee884fe4c",
           "valid_blocks": 3,
           "pending_blocks": 0,
           "invalid_blocks": 0,
@@ -147,13 +149,14 @@
     {
       "name": "different_consensus_rules",
       "passed": true,
-      "behavior": "A 15.38% group passes a 20% node but fails a 10% node; more work cannot cure the invalid ancestor.",
-      "dominant_work": 4,
-      "total_work": 26,
+      "behavior": "A group with 4 work units passes a budget of 4 but fails a budget of 2; more work cannot cure the invalid ancestor.",
+      "group_work": 4,
+      "strict_budget": 2,
+      "relaxed_budget": 4,
       "nodes": [
         {
-          "node": "cap-10",
-          "tip": "0e916aa6b30fe9a47bd2db558f16f702b8380c8458c08ff6a04fc56599c6d411",
+          "node": "budget-2",
+          "tip": "0213c76e179bc95ec52883f0595d3f109393fcf2c5de4555333f290c7091a540",
           "valid_blocks": 1,
           "pending_blocks": 0,
           "invalid_blocks": 2,
@@ -161,8 +164,8 @@
           "active_share_count": 12
         },
         {
-          "node": "cap-20",
-          "tip": "0c373cd47a6e57e83e60d3fadbc8f3179c22508053b2ca817913a309ca3afa76",
+          "node": "budget-4",
+          "tip": "0758dd94e1a9ac21d3e64cad14f25dc85181a7496e8b2596c9ac7c5f1f8ea790",
           "valid_blocks": 3,
           "pending_blocks": 0,
           "invalid_blocks": 0,
@@ -177,8 +180,8 @@
       "behavior": "A branch valid under both caps can reunite nodes when it gains the greatest cumulative work.",
       "nodes": [
         {
-          "node": "cap-10",
-          "tip": "0b4f3944c3e0da2428dd14abbe3926cec1088c2983b85123c447ca827ed7efb4",
+          "node": "budget-2",
+          "tip": "0a7faf701771628c9a3b75e604b934e37a2a7b40d97b4273122194117fab3228",
           "valid_blocks": 3,
           "pending_blocks": 0,
           "invalid_blocks": 2,
@@ -186,8 +189,8 @@
           "active_share_count": 36
         },
         {
-          "node": "cap-20",
-          "tip": "0b4f3944c3e0da2428dd14abbe3926cec1088c2983b85123c447ca827ed7efb4",
+          "node": "budget-4",
+          "tip": "0a7faf701771628c9a3b75e604b934e37a2a7b40d97b4273122194117fab3228",
           "valid_blocks": 5,
           "pending_blocks": 0,
           "invalid_blocks": 0,
@@ -199,31 +202,39 @@
     {
       "name": "omission_limitation",
       "passed": true,
-      "behavior": "A balanced committed sample can pass despite concentrated known extra work; this model does not prove total-pool disclosure.",
-      "finding": "Unresolved inclusion/denominator rule",
-      "committed_work": 20,
-      "observed_work": 40,
-      "observed_dominant_work": 22
+      "behavior": "A committed sample fits the work budget despite known extra work exceeding it; this model does not prove total-pool disclosure.",
+      "finding": "Unresolved complete eligible-share history",
+      "committed_group_work": 2,
+      "observed_group_work": 22,
+      "per_group_budget": 2
     },
     {
-      "name": "current_round_bootstrap",
+      "name": "no_minimum_group_count",
       "passed": true,
-      "behavior": "Zero or nine groups cannot satisfy a mandatory 10% cap, even with valid block PoW.",
+      "behavior": "Any nonempty group count may pass its absolute budgets; no pool-percentage threshold applies.",
       "outcomes": [
         {
           "groups": 0,
           "outcome": "invalid"
         },
         {
+          "groups": 1,
+          "outcome": "valid"
+        },
+        {
+          "groups": 2,
+          "outcome": "valid"
+        },
+        {
           "groups": 9,
-          "outcome": "invalid"
+          "outcome": "valid"
         },
         {
           "groups": 10,
           "outcome": "valid"
         }
       ],
-      "finding": "Production bootstrap/window rule required"
+      "finding": "Empty snapshots still cannot derive work-based payouts"
     }
   ]
 }

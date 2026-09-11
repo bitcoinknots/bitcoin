@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from io import BytesIO
 
 from precommit_demo import CBlockHeader, uint256_from_compact  # Sets framework path.
-from work_concentration import CreditedRecord, expected_work
+from work_accounting import CreditedRecord, expected_work
 from test_framework.blocktools import create_coinbase, script_BIP34_coinbase_height
 from test_framework.messages import CBlock, CTransaction, tagged_hash
 from test_framework.script import CScript, CScriptInvalidError, OP_TRUE

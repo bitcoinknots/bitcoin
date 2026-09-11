@@ -9,7 +9,7 @@ from io import BytesIO
 import unittest
 
 from proof_fixtures import BASE_BITS, CBlockHeader, CTransaction, ShareProof, make_share, verify_share
-from work_concentration import evaluate
+from work_accounting import evaluate
 
 
 def change_header(share, field, value):

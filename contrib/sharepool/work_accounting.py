@@ -2,7 +2,7 @@
 # Copyright (c) 2026 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Exact 10% arithmetic over supplied, already-credited records for one pool/window.
+"""Exact work accounting over supplied, already-credited records for one pool/window.
 
 The caller supplies stable tag group IDs and credited work. This module does
 not verify shares, tag ownership, target assignment, ledger completeness, or
@@ -27,7 +27,7 @@ class GroupWork:
 
 
 @dataclass(frozen=True)
-class ConcentrationResult:
+class WorkAccountingResult:
     record_count: int
     total_work: int
     groups: tuple[GroupWork, ...]  # Canonical lexicographic group-ID order.
@@ -36,14 +36,6 @@ class ConcentrationResult:
     def group_count(self) -> int:
         return len(self.groups)
 
-    @property
-    def offenders(self) -> tuple[GroupWork, ...]:
-        return tuple(group for group in self.groups
-                     if 10 * group.credited_work > self.total_work)
-
-    @property
-    def passes(self) -> bool:
-        return self.total_work > 0 and not self.offenders
 
 
 def expected_work(target: int) -> int:
@@ -57,8 +49,8 @@ def expected_work(target: int) -> int:
     return (1 << 256) // (target + 1)
 
 
-def evaluate(records: Iterable[CreditedRecord]) -> ConcentrationResult:
-    """Evaluate every supplied group; empty input returns passes=False.
+def evaluate(records: Iterable[CreditedRecord]) -> WorkAccountingResult:
+    """Aggregate every supplied group; empty input produces zero totals.
 
     Reject duplicate share IDs instead of silently counting or discarding them.
     Multiple jobs with the same stable group ID accumulate in the same group.
@@ -76,4 +68,4 @@ def evaluate(records: Iterable[CreditedRecord]) -> ConcentrationResult:
         seen.add(record.share_id)
         totals[record.group_id] = totals.get(record.group_id, 0) + record.credited_work
     groups = tuple(GroupWork(identity, work) for identity, work in sorted(totals.items()))
-    return ConcentrationResult(len(seen), sum(totals.values()), groups)
+    return WorkAccountingResult(len(seen), sum(totals.values()), groups)

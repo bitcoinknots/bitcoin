@@ -150,15 +150,15 @@ class SettlementTests(unittest.TestCase):
                 block = make_candidate(invalid, payout_override=payout_plan(self.base))
                 self.assertEqual(deliver(Node("binding"), invalid, block)[1], "invalid")
 
-    def test_mined_job_refreshes_keep_same_tag_group(self):
-        # 13 valid distinct share headers; one stable tag has 2/13 of the work.
+    def test_mined_job_refreshes_accumulate_against_absolute_tag_work_budget(self):
+        # 13 valid distinct shares; one tag has work 4 against its budget of 2.
         tags = [s.declared_tag for s in self.base.shares] + [self.base.shares[0].declared_tag]
-        concentrated = bundle(tags=tags, seed=100)
-        self.assertEqual(len({s.share_id for s in concentrated.shares}), 13)
-        node = Node("cap")
-        block, state = deliver(node, concentrated)
+        over_budget = bundle(tags=tags, seed=100)
+        self.assertEqual(len({s.share_id for s in over_budget.shares}), 13)
+        node = Node("work-budget")
+        block, state = deliver(node, over_budget)
         self.assertEqual(state, "invalid")
-        self.assertEqual(node.reasons[block.block_id], "concentration")
+        self.assertEqual(node.reasons[block.block_id], "work-budget")
 
     def test_old_issued_snapshot_is_not_replaced_by_latest_or_local_inventory(self):
         node = Node("old-job")
@@ -205,14 +205,23 @@ class SettlementTests(unittest.TestCase):
                 self.assertEqual(deliver(node, self.base, block)[1], "invalid")
                 self.assertEqual(node.reasons[block.block_id], "payouts")
 
-    def test_empty_and_nine_groups_fail_bootstrap_exact_ten_passes(self):
-        for groups in (0, 9, 10):
+    def test_nonempty_work_can_pass_with_any_number_of_groups(self):
+        # A lone tag may supply all recorded work; there is no percentage rule.
+        for groups in (0, 1, 2, 9, 10, 12):
             with self.subTest(groups=groups):
                 snapshot = bundle(tags=[f"group-{i}".encode() for i in range(groups)])
                 block = make_candidate(snapshot, payout_override=((b"bootstrap", REWARD),)) if not groups else None
-                self.assertEqual(deliver(Node("bootstrap"), snapshot, block)[1], "valid" if groups == 10 else "invalid")
+                self.assertEqual(deliver(Node("bootstrap"), snapshot, block)[1], "valid" if groups else "invalid")
 
-    def test_cherry_picked_balanced_sample_passes_without_completeness_evidence(self):
+    def test_absolute_budget_uses_rate_times_duration_and_allows_exact_boundary(self):
+        snapshot = bundle(tags=[b"only-node", b"only-node"], seed=100)
+        block = make_candidate(snapshot)  # Two shares credit work 4 to one tag.
+        for rate, seconds, expected in ((1, 3, "invalid"), (1, 4, "valid"), (2, 2, "valid")):
+            with self.subTest(rate=rate, seconds=seconds):
+                node = Node("absolute-budget", cap_hashes_per_second=rate, window_seconds=seconds)
+                self.assertEqual(deliver(node, snapshot, block)[1], expected)
+
+    def test_omitted_work_can_conceal_a_tag_exceeding_its_absolute_budget(self):
         omitted = tuple(make_share(b"node-00", ANCHOR_HASH, 1, nonce_seed=100 + i) for i in range(12))
         full = replace(self.base, shares=(*self.base.shares, *omitted))
         node = Node("auditor")
@@ -250,14 +259,14 @@ class SettlementTests(unittest.TestCase):
         self.assertTrue({s.declared_tag for s in self.base.shares}.isdisjoint(left.balances))
         self.assertEqual(sum(left.balances.values()), 2 * REWARD)
 
-    def test_more_work_on_rejected_ancestry_does_not_change_strict_validity(self):
-        concentrated = bundle(tags=[s.declared_tag for s in self.base.shares] + [b"node-00"], seed=100)
-        winner = make_candidate(concentrated)
-        strict, relaxed = Node("strict"), Node("relaxed", cap_percent=20)
+    def test_more_chain_work_does_not_override_absolute_work_budget_validity(self):
+        over_budget = bundle(tags=[s.declared_tag for s in self.base.shares] + [b"node-00"], seed=100)
+        winner = make_candidate(over_budget)
+        strict, relaxed = Node("strict"), Node("relaxed", cap_hashes_per_second=2, window_seconds=2)
         for node in (strict, relaxed):
             deliver(node, self.base, self.base_block)
-            deliver(node, concentrated, winner)
-        child_snapshot = bundle(winner.block_id, 2, previous=concentrated.root)
+            deliver(node, over_budget, winner)
+        child_snapshot = bundle(winner.block_id, 2, previous=over_budget.root)
         child = make_candidate(child_snapshot)
         for node in (strict, relaxed):
             deliver(node, child_snapshot, child)
@@ -266,15 +275,15 @@ class SettlementTests(unittest.TestCase):
         self.assertEqual(strict.tip, self.base_block.block_id)
         self.assertEqual(relaxed.tip, child.block_id)
 
-    def test_different_caps_reconverge_when_common_valid_branch_gains_more_work(self):
-        concentrated = bundle(tags=[s.declared_tag for s in self.base.shares] + [b"node-00"], seed=100)
-        rejected_root = make_candidate(concentrated)
-        relaxed_child_snapshot = bundle(rejected_root.block_id, 2, previous=concentrated.root)
+    def test_different_absolute_budgets_reconverge_on_more_work_common_valid_branch(self):
+        over_budget = bundle(tags=[s.declared_tag for s in self.base.shares] + [b"node-00"], seed=100)
+        rejected_root = make_candidate(over_budget)
+        relaxed_child_snapshot = bundle(rejected_root.block_id, 2, previous=over_budget.root)
         relaxed_child = make_candidate(relaxed_child_snapshot)
-        strict, relaxed = Node("strict"), Node("relaxed", cap_percent=20)
+        strict, relaxed = Node("strict"), Node("relaxed", cap_hashes_per_second=2, window_seconds=2)
         for node in (strict, relaxed):
             deliver(node, self.base, self.base_block)
-            deliver(node, concentrated, rejected_root)
+            deliver(node, over_budget, rejected_root)
             deliver(node, relaxed_child_snapshot, relaxed_child)
         self.assertNotEqual(strict.tip, relaxed.tip)
 
@@ -294,12 +303,12 @@ class SettlementTests(unittest.TestCase):
         self.assertEqual(strict.balances, relaxed.balances)
         self.assertEqual(strict.consumed_shares, relaxed.consumed_shares)
         self.assertEqual(sum(relaxed.balances.values()), 3 * REWARD)
-        self.assertTrue({s.share_id for s in concentrated.shares}.isdisjoint(relaxed.consumed_shares))
+        self.assertTrue({s.share_id for s in over_budget.shares}.isdisjoint(relaxed.consumed_shares))
         self.assertEqual(strict.states[rejected_root.block_id], "invalid")
         self.assertEqual(relaxed.states[rejected_root.block_id], "valid")
 
     def test_repeated_delivery_and_persistence_do_not_double_settle(self):
-        node = Node("persistent")
+        node = Node("persistent", cap_hashes_per_second=2, window_seconds=3)
         deliver(node, self.base, self.base_block)
         expected_balances, expected_consumed = dict(node.balances), set(node.consumed_shares)
         for _ in range(3):
@@ -310,6 +319,8 @@ class SettlementTests(unittest.TestCase):
             node.save(path)
             restored = Node.restore(path)
         self.assertEqual(restored.tip, node.tip)
+        self.assertEqual(restored.cap_hashes_per_second, 2)
+        self.assertEqual(restored.window_seconds, 3)
         self.assertEqual(restored.balances, expected_balances)
         self.assertEqual(restored.consumed_shares, expected_consumed)
 

@@ -15,10 +15,12 @@ distinguished by each DATUM node's coinbase tag, and to require that evidence
 across pools in support of miner control. Settlement
 commitments are the evidence transport and accounting mechanism for that purpose.
 The desired enforcement scope is every accepted block on the proposed fork,
-regardless of its declared pool. The specified concentration limit is at most
-10% of a pool's verified work in any one template group. The measurement window,
-eligibility rules, and bootstrap behavior remain to be specified; no consensus
-change is implemented or activated.
+regardless of its declared pool. Each stable template group has a configurable
+absolute budget of verified share work over an agreed accounting window, initially
+scoped to each pool. Registered miners use distinct tags, and winning coinbase
+payments must match the referenced registry and accounting state. The measurement
+window and eligibility rules remain to be specified; no consensus change is
+implemented or activated.
 
 Different coinbase tags do make the full templates different, even when every
 non-coinbase transaction is identical. The protocol's primary evidence therefore
@@ -41,20 +43,25 @@ There is a fundamental distinction between these claims:
 | Published work covers different transaction selections | An optional, separate metric can compare authenticated non-coinbase transaction sets. It is not the uniqueness criterion requested here. |
 | Independent miners selected those transactions or used DATUM | Neither PoW nor a Merkle commitment establishes who made that choice or which software/protocol was used. |
 
-## At most 10% of pool work per template group
+## Absolute work budget per stable template group
 
 For each pool and a single explicitly identified accounting window, let `W_g`
-be the sum of credited work for unique eligible shares belonging to group `g`,
-and `W_pool` the sum across that pool's groups in the same window. Require:
+be the sum of credited work for unique eligible shares belonging to stable group
+`g`. The ruleset supplies a positive window duration and configured rate budget:
 
 ```text
-W_pool > 0
-for every group g: 10 * W_g <= W_pool
+W_g = sum(floor(2^256 / (approved_share_target_i + 1)))
+for every group g: W_g <= maximum_hashes_per_second * window_seconds
 ```
 
-Equality at exactly 10% is permitted. Use exact integer arithmetic, without
-floating-point percentages or rounding down a value above the limit. Check pools
-separately; work from another pool cannot dilute a pool's concentrated share.
+Equality at the budget is permitted. Use exact integer arithmetic without rounding
+down an over-budget total. A rate budget of 5 TH/s and a 600-second window would
+allow 3,000,000,000,000,000 work units per pool/group; these are examples, not
+activated parameters. Other groups' work does not change a group's allowance.
+There is no fixed minimum group count: a single contributing group can pass when
+its eligible work fits the budget. Empty evidence does not establish zero hashrate
+or a payable settlement. The initial scope is per pool and stable group; a global
+cross-pool budget would need additional identity aggregation rules.
 
 The working grouping assumption is the stable node identifier/tag in the
 authenticated coinbase, across that node's job refreshes. Nonce, extranonce,
@@ -73,37 +80,31 @@ share, or count a share twice. Raw share counts are sufficient only when every
 share has the same credited work. Credited work measures the published proof
 sample; it is not an exact measurement of all hashes physically performed.
 
-| Recorded work distribution | Result |
-| --- | --- |
-| One group has 100% | Fails |
-| Ten groups each have exactly 10% | Passes |
-| Twenty groups each have 5% | Passes |
-| Any group has more than 10%, regardless of the number of others | Fails |
-
-At least ten groups with positive credited work are necessary. With exactly ten,
-all ten must have exactly equal work. Empty groups cannot help, and an empty
-window does not pass. The test is of shares already credited to an eligible
-window, not a rule that discards the next share whenever its group exceeds 10%:
-discarding those shares would conceal the concentration being measured.
-
 A coordinator-selected subset can pass while the pool's full share history fails.
-To claim a cap on total verified pool work, all nodes need the same objective
+To claim a cap on each group's total verified work, all nodes need the same objective
 inclusion/cutoff rules and an auditable accepted-share history, rather than a
-coordinator choosing convenient records for the denominator. Until then the
-check only establishes concentration in the supplied snapshot.
+coordinator choosing convenient records. Until then the check only bounds work in
+the supplied snapshot. Discarding over-budget shares would hide the behavior being
+measured. Ordinary share luck can also exceed a work budget even when physical
+hashrate is unchanged.
 
-The original current-round model needs an explicit startup rule: a fresh round
-initially has fewer than ten contributing groups, and a winning block can arrive
-before the evidence passes. Ordinary share luck can also exceed a hard 10% cap.
-Any rolling window, startup mechanism, or activation prehistory must be specified
-explicitly; this draft neither silently waives the cap nor invents a window.
-Supporting-share generation must not depend circularly on already having a
-cap-compliant snapshot to create the first eligible job.
+Local share-arrival times differ between nodes and cannot determine block validity.
+The protocol needs a common window and eligibility cutoff established before the
+job is mined. A chain epoch with a declared nominal duration gives a deterministic
+work quota, not proof of elapsed wall-clock time or an instantaneous hardware rate.
+Supporting-share generation must not depend circularly on the snapshot committed
+by those shares themselves.
 
 The coordinator includes the qualifying snapshot's commitment before mining,
 and enforcing nodes check that particular snapshot under the shared rules. A
-single operator can satisfy the cap by distributing real work among enough tags;
-the rule enforces work distribution among identifiers, not independent ownership.
+single operator can distribute real work among multiple tags; the rule bounds
+credited work per identifier without establishing independent ownership.
+
+The [rule proposal](sharepool-rule-proposal.md) specifies the work formula, stable
+groups, time/withholding limitations, different tagged jobs for registered miners,
+and exact registry-version binding for payouts. The registry's accepted history
+and window still require consensus rules. Registry and full node integration
+remain future work.
 
 ## What template-work evidence establishes
 
@@ -160,8 +161,7 @@ A separate requirement for a minimum number of different transaction sets could 
 central pool adding trivial transactions or dropping transactions from several
 variants. It could also penalize honest miners, low-transaction periods, or small
 participants. That requirement is not part of the user's tag-based definition of
-template uniqueness. The 10% cap implies at least ten groups with positive work,
-but creating additional tags or keys does not establish independent operators. The
+template uniqueness. Creating additional tags or keys does not establish independent operators. The
 evidence can support auditing of disclosed work across templates with distinct
 tags; it must not be described as a cryptographic proof of
 decentralized control or as enforcement of DATUM use across all pools.
@@ -440,7 +440,7 @@ chain validity rules.
 ## Implementation boundary and next work
 
 The current [experiments](../contrib/sharepool/README.md) include upstream
-header-hash checks, exact 10% work accounting, synthetic tagged share proofs,
+header-hash checks, exact integer work accounting, synthetic tagged share proofs,
 canonical snapshot inclusions, and a multi-node settlement model with payout
 checks, delayed-data recovery, reorg accounting, and restart replay. Two actual
 stock Knots processes were also tested in isolated regtest through loopback RPC.
@@ -453,15 +453,17 @@ The model deliberately selects one pool, a current-parent share window, a fixed
 toy reward, zero XOR keys, and the coordinator's disclosed share set. These are
 test assumptions, not settled production rules. Supporting shares use separate
 zero-payout evidence templates; eligibility as actual settlement-bearing reward
-jobs remains unproved. Tests demonstrate that balanced disclosed work can hide
-concentrated extra work and that the strict cap cannot bootstrap with fewer than
-ten groups. Model balances are provisional accounting, not spendable payments.
+jobs remains unproved. A disclosed snapshot can omit extra work, so it cannot
+establish the pool's complete work history. Model balances are provisional
+accounting, not spendable payments. The current model applies a configurable
+absolute work budget using a nominal duration; the test report records that
+configuration. The authenticated registry remains specified in the rule proposal.
 
 The coordinator's role, pre-mining commitment timing, and intended enforcement
-scope and 10% cap are now established. The observable objective is verified work attributed
+scope and absolute work budget are now established. The observable objective is verified work attributed
 to the identifiers inside distinct tagged coinbases; independent operator control
 is a separate property that these proofs do not establish. Next specify the
-measurement window, complete eligible-share history, bootstrap behavior, and
+measurement window, complete eligible-share history, initial accounting state, and
 reward-job eligibility. Extend the tested tag binding and accounting to
 authenticated manifests and actual miner jobs before integrating peer transport.
 Relevant integration points are `src/node/miner.cpp`, `src/rpc/mining.cpp`, the

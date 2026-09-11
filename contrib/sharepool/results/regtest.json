@@ -1,7 +1,6 @@
 {
   "scope": "Two installed stock Knots nodes; regtest; loopback RPC only; no wallets or P2P",
   "settlement_rules_implemented": false,
-  "ten_percent_rule_implemented": false,
   "snapshot_contents": "Opaque Merkle fixture records, not actual verified miner shares",
   "binary": "/Users/jeronimolopez/Library/Application Support/m1n3/bin/bitcoin-knotsd",
   "binary_provenance": "Version self-report only; not a reproducible-build verification",

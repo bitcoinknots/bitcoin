@@ -4,7 +4,7 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Run two isolated stock Knots regtest nodes and probe commitment/fork behavior.
 
-No settlement or 10% consensus rules are implemented by this script. Its roots
+No settlement consensus rules are implemented by this script. Its roots
 commit to opaque fixtures; stock nodes never receive or validate those fixtures.
 The local-disagreement case uses invalidateblock/reconsiderblock explicitly.
 All block relay is manual RPC over loopback; P2P and wallets are disabled.
@@ -150,7 +150,6 @@ def run(binary):
     report = {
         "scope": "Two installed stock Knots nodes; regtest; loopback RPC only; no wallets or P2P",
         "settlement_rules_implemented": False,
-        "ten_percent_rule_implemented": False,
         "snapshot_contents": "Opaque Merkle fixture records, not actual verified miner shares",
         "binary": str(binary),
         "binary_provenance": "Version self-report only; not a reproducible-build verification",

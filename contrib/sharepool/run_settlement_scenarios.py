@@ -8,9 +8,10 @@ from pathlib import Path
 import tempfile
 
 from proof_fixtures import make_share
-from settlement_sim import (ANCHOR_HASH, REWARD, Node, SnapshotBundle,
+from settlement_sim import (ANCHOR_HASH, REWARD, DEFAULT_CAP_HASHES_PER_SECOND,
+                            DEFAULT_WINDOW_SECONDS, Node, SnapshotBundle,
                             make_candidate, payout_plan, credited_records)
-from work_concentration import evaluate
+from work_rate_budget import evaluate as evaluate_budget
 
 
 def bundle(parent=None, prefix="tag", count=12, sequence=0):
@@ -129,22 +130,24 @@ def run():
         assert restored.consumed_shares == b.consumed_shares
     record("restart_replay", "Revalidate stored objects and reconstruct the active settlement without double counting.")
 
-    concentrated = bundle(prefix="concentrated")
-    dominant = make_share(b"concentrated-0", ANCHOR_HASH, 1, nonce_seed=12)
-    concentrated = replace(concentrated, shares=(*concentrated.shares, dominant))
-    bad_under_ten = make_candidate(concentrated)
-    strict, relaxed = Node("cap-10", 10), Node("cap-20", 20)
+    over_budget = bundle(prefix="over-budget")
+    extra_work = make_share(b"over-budget-0", ANCHOR_HASH, 1, nonce_seed=12)
+    over_budget = replace(over_budget, shares=(*over_budget.shares, extra_work))
+    bad_under_strict_budget = make_candidate(over_budget)
+    strict = Node("budget-2", cap_hashes_per_second=1, window_seconds=2)
+    relaxed = Node("budget-4", cap_hashes_per_second=2, window_seconds=2)
     assert deliver(strict, ba, sa) == "valid"
-    assert deliver(relaxed, bad_under_ten, concentrated) == "valid"
-    assert deliver(strict, bad_under_ten, concentrated) == "invalid"
+    assert deliver(relaxed, bad_under_strict_budget, over_budget) == "valid"
+    assert deliver(strict, bad_under_strict_budget, over_budget) == "invalid"
     assert deliver(relaxed, ba, sa) == "valid"
-    longer_s = bundle(bad_under_ten, prefix="relaxed-child")
+    longer_s = bundle(bad_under_strict_budget, prefix="relaxed-child")
     longer = make_candidate(longer_s)
     assert deliver(strict, longer, longer_s) == "invalid"
     assert deliver(relaxed, longer, longer_s) == "valid"
     assert strict.tip == ba.block_id and relaxed.tip == longer.block_id
-    record("different_consensus_rules", "A 15.38% group passes a 20% node but fails a 10% node; more work cannot cure the invalid ancestor.",
-           dominant_work=4, total_work=26, nodes=[state(strict), state(relaxed)])
+    record("different_consensus_rules", "A group with 4 work units passes a budget of 4 but fails a budget of 2; more work cannot cure the invalid ancestor.",
+           group_work=4, strict_budget=2, relaxed_budget=4,
+           nodes=[state(strict), state(relaxed)])
 
     common_parent = ba
     for prefix in ("common-child", "common-grandchild"):
@@ -160,27 +163,31 @@ def run():
     local_history = (*original.shares, *(make_share(b"tag-0", ANCHOR_HASH, 1, nonce_seed=i)
                                        for i in range(100, 110)))
     full = replace(original, shares=local_history)
-    assert not evaluate(credited_records(full)).passes
+    assert not evaluate_budget(credited_records(full), cap_hashes_per_second=1,
+                               window_seconds=2).passes
     observer = Node("observes-extra-work")
     observer.known_shares.update(s.share_id for s in local_history)
     assert deliver(observer, block, original) == "valid"
-    record("omission_limitation", "A balanced committed sample can pass despite concentrated known extra work; this model does not prove total-pool disclosure.",
-           finding="Unresolved inclusion/denominator rule", committed_work=20,
-           observed_work=40, observed_dominant_work=22)
+    record("omission_limitation", "A committed sample fits the work budget despite known extra work exceeding it; this model does not prove total-pool disclosure.",
+           finding="Unresolved complete eligible-share history", committed_group_work=2,
+           observed_group_work=22, per_group_budget=2)
 
     startup = []
-    for count in (0, 9, 10):
+    for count in (0, 1, 2, 9, 10):
         snapshot = bundle(prefix="startup", count=count)
         candidate = make_candidate(snapshot, payout_override=((b"bootstrap", REWARD),)) if count == 0 else make_candidate(snapshot)
         node = Node("startup-" + str(count))
         outcome = deliver(node, candidate, snapshot)
-        assert outcome == ("valid" if count == 10 else "invalid")
+        assert outcome == ("valid" if count > 0 else "invalid")
         startup.append({"groups": count, "outcome": outcome})
-    record("current_round_bootstrap", "Zero or nine groups cannot satisfy a mandatory 10% cap, even with valid block PoW.",
-           outcomes=startup, finding="Production bootstrap/window rule required")
+    record("no_minimum_group_count", "Any nonempty group count may pass its absolute budgets; no pool-percentage threshold applies.",
+           outcomes=startup, finding="Empty snapshots still cannot derive work-based payouts")
     return {"success": True, "scope": "Deterministic model nodes; actual synthetic BLAKE2b proofs; not live settlement consensus",
             "assumptions": {"pool": "pool-A", "window": "shares reference candidate's parent",
-                            "cap_percent": 10, "reward": REWARD, "xor_key": "zero/public",
+                            "cap_hashes_per_second": DEFAULT_CAP_HASHES_PER_SECOND,
+                            "window_seconds": DEFAULT_WINDOW_SECONDS,
+                            "window_time_basis": "configured nominal duration; no share arrival clock",
+                            "reward": REWARD, "xor_key": "zero/public",
                             "snapshot_inclusion": "coordinator-disclosed set",
                             "supporting_templates": "zero-payout evidence jobs; eligibility as settlement-bearing reward-mining jobs is not established",
                             "signatures_and_full_bitcoin_consensus": False,
