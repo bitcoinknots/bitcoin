@@ -7367,22 +7367,20 @@ std::pair<int, int> ChainstateManager::GetPruneRange(const Chainstate& chainstat
 
 int FirstHeightWithParentMtpAtLeast(const CBlockIndex& tip, int64_t time)
 {
-    if (!tip.pprev) return std::numeric_limits<int>::max();
-    if (tip.pprev->GetMedianTimePast() < time) return std::numeric_limits<int>::max();
-    // Binary search: first height whose parent MTP >= time. Same answer as
-    // knots#402 MedianTimePastActivationHeight once the tip has reached `time`.
-    int lo{1};
+    if (tip.GetMedianTimePast() < time) {
+        return std::numeric_limits<int>::max();
+    }
+    int lo{0};
     int hi{tip.nHeight};
     while (lo < hi) {
         const int mid{lo + (hi - lo) / 2};
-        const CBlockIndex* anc{Assert(tip.GetAncestor(mid))};
-        if (anc->pprev->GetMedianTimePast() >= time) {
+        if (Assert(tip.GetAncestor(mid))->GetMedianTimePast() >= time) {
             hi = mid;
         } else {
             lo = mid + 1;
         }
     }
-    return lo;
+    return lo + 1;
 }
 
 void ExtendedCoinbaseMaturityBounds(const Consensus::Params& params, const CBlockIndex& tip, int& start_height, int& expiry_height)

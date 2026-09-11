@@ -136,10 +136,10 @@ class ExtendedCoinbaseMaturityTest(BitcoinTestFramework):
         self.stop_node(0)
         node.assert_start_raises_init_error(
             extra_args=[f'-testactivationheight=blake2b@{BLAKE2B_HEIGHT}', f'-extendedcoinbasematurity={START}'],
-            expected_msg='-extendedcoinbasematurity requires -rdtsexpiry')
+            expected_msg='Error: -extendedcoinbasematurity requires -rdtsexpiry=<time> (window ends at RDTS expiry).')
         node.assert_start_raises_init_error(
             extra_args=[f'-testactivationheight=blake2b@{BLAKE2B_HEIGHT}', f'-rdtsexpiry={EXPIRY}', f'-extendedcoinbasematurity={EXPIRY}'],
-            expected_msg='must precede the RDTS expiry')
+            expected_msg=f'Error: Invalid start ({EXPIRY}) for -extendedcoinbasematurity=<time>: must precede the RDTS expiry ({EXPIRY}).')
         self.start_node(0)
         node.add_p2p_connection(P2PInterface())  # getblocktemplate needs a peer
 
@@ -258,7 +258,7 @@ class ExtendedCoinbaseMaturityTest(BitcoinTestFramework):
         self.assert_gbt_rule(active=False)
         # #402 would accept still_locked_spend here. The lock sticks:
         self.assert_spend_rejected(still_locked_spend['hex'])
-
+        self.generate(self.wallet, 1, sync_fun=self.no_op)
         post_h = node.getblockcount()
         post_utxo = self.coinbase_utxo(post_h)
         post_spend = self.wallet.create_self_transfer(utxo_to_spend=post_utxo)
