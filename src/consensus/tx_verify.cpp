@@ -177,7 +177,7 @@ int Consensus::RequiredCoinbaseMaturity(int coinbase_height, int ext_start_heigh
     if (coinbase_height < ext_start_height || coinbase_height >= ext_expiry_height) {
         return COINBASE_MATURITY;
     }
-    // 1/6 of window blocks: 2016; 2/6: 8064; 1/2: 26280. Relative to
+    // 1/6 of window blocks: 2016; 2/6: 4032; 1/2: 8064. Relative to
     // the first window height so the cadence does not depend on abs height.
     const int batch = (coinbase_height - ext_start_height) % 6;
     if (batch == 0) return EXTENDED_COINBASE_MATURITY_SHORT;
