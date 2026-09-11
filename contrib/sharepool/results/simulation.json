@@ -1,0 +1,229 @@
+{
+  "success": true,
+  "scope": "Deterministic model nodes; actual synthetic BLAKE2b proofs; not live settlement consensus",
+  "assumptions": {
+    "pool": "pool-A",
+    "window": "shares reference candidate's parent",
+    "cap_percent": 10,
+    "reward": 100003,
+    "xor_key": "zero/public",
+    "snapshot_inclusion": "coordinator-disclosed set",
+    "supporting_templates": "zero-payout evidence jobs; eligibility as settlement-bearing reward-mining jobs is not established",
+    "signatures_and_full_bitcoin_consensus": false,
+    "balances": "provisional expected payouts; no maturity/spendability simulation"
+  },
+  "cases": [
+    {
+      "name": "snapshot_order_independence",
+      "passed": true,
+      "behavior": "Same selected records produce the same root and settlement.",
+      "nodes": [
+        {
+          "node": "ordered",
+          "tip": "0b8e49e27f5d9f89450bce12b56115471d89daaac3794d0648b29007017b5df9",
+          "valid_blocks": 1,
+          "pending_blocks": 0,
+          "invalid_blocks": 0,
+          "provisional_payout_total": 100003,
+          "active_share_count": 10
+        },
+        {
+          "node": "reversed",
+          "tip": "0b8e49e27f5d9f89450bce12b56115471d89daaac3794d0648b29007017b5df9",
+          "valid_blocks": 1,
+          "pending_blocks": 0,
+          "invalid_blocks": 0,
+          "provisional_payout_total": 100003,
+          "active_share_count": 10
+        }
+      ]
+    },
+    {
+      "name": "missing_and_wrong_peer_data",
+      "passed": true,
+      "behavior": "Wait, discard a wrong reply, then validate both parent and child when correct data arrives.",
+      "before": {
+        "node": "missing-data",
+        "tip": "3a7fe447835f05b917cbb075722411e6237caeb93ab84d384a40a927f68bfb65",
+        "valid_blocks": 0,
+        "pending_blocks": 2,
+        "invalid_blocks": 0,
+        "provisional_payout_total": 0,
+        "active_share_count": 0
+      },
+      "after": {
+        "node": "missing-data",
+        "tip": "02e26b9a875bdccdb9e8ffe38991e13d250d54c04e7dbd819bd1a45802de55eb",
+        "valid_blocks": 2,
+        "pending_blocks": 0,
+        "invalid_blocks": 0,
+        "provisional_payout_total": 200006,
+        "active_share_count": 22
+      }
+    },
+    {
+      "name": "older_issued_job",
+      "passed": true,
+      "behavior": "Settle the winning job's snapshot, not a newer local share inventory.",
+      "included_shares": 10,
+      "later_share_included": false
+    },
+    {
+      "name": "duplicate_committed_share",
+      "passed": true,
+      "behavior": "Correctly committed duplicate proof invalidates the block and excludes descendants.",
+      "reasons": [
+        "share-or-snapshot: duplicate share ID",
+        "invalid-ancestor"
+      ],
+      "node": {
+        "node": "invalid-evidence",
+        "tip": "3a7fe447835f05b917cbb075722411e6237caeb93ab84d384a40a927f68bfb65",
+        "valid_blocks": 0,
+        "pending_blocks": 0,
+        "invalid_blocks": 2,
+        "provisional_payout_total": 0,
+        "active_share_count": 0
+      }
+    },
+    {
+      "name": "payout_diversion",
+      "passed": true,
+      "behavior": "A valid PoW and snapshot do not excuse coinbase outputs that violate the committed payout calculation.",
+      "rejection": "payouts"
+    },
+    {
+      "name": "same_rules_fork_and_reorg",
+      "passed": true,
+      "behavior": "Equal-work tips may differ; more valid work converges nodes and replaces the old branch's provisional settlement.",
+      "before": [
+        {
+          "node": "fork-A",
+          "tip": "0e916aa6b30fe9a47bd2db558f16f702b8380c8458c08ff6a04fc56599c6d411",
+          "valid_blocks": 2,
+          "pending_blocks": 0,
+          "invalid_blocks": 0,
+          "provisional_payout_total": 100003,
+          "active_share_count": 12
+        },
+        {
+          "node": "fork-B",
+          "tip": "09125a655cbc735f1d591568f65457db9f38cb9cdfbe7b19719d1c82fea2c088",
+          "valid_blocks": 2,
+          "pending_blocks": 0,
+          "invalid_blocks": 0,
+          "provisional_payout_total": 100003,
+          "active_share_count": 12
+        }
+      ],
+      "after": [
+        {
+          "node": "fork-A",
+          "tip": "02ede01aa4bd6d1f5fae466f6aa8ccfb1a591cc67790230e1da2f7c2c2e1bfc7",
+          "valid_blocks": 3,
+          "pending_blocks": 0,
+          "invalid_blocks": 0,
+          "provisional_payout_total": 200006,
+          "active_share_count": 24
+        },
+        {
+          "node": "fork-B",
+          "tip": "02ede01aa4bd6d1f5fae466f6aa8ccfb1a591cc67790230e1da2f7c2c2e1bfc7",
+          "valid_blocks": 3,
+          "pending_blocks": 0,
+          "invalid_blocks": 0,
+          "provisional_payout_total": 200006,
+          "active_share_count": 24
+        }
+      ],
+      "duplicate_delivery_idempotent": true,
+      "unsigned_proposal_conflict_observed": true
+    },
+    {
+      "name": "restart_replay",
+      "passed": true,
+      "behavior": "Revalidate stored objects and reconstruct the active settlement without double counting."
+    },
+    {
+      "name": "different_consensus_rules",
+      "passed": true,
+      "behavior": "A 15.38% group passes a 20% node but fails a 10% node; more work cannot cure the invalid ancestor.",
+      "dominant_work": 4,
+      "total_work": 26,
+      "nodes": [
+        {
+          "node": "cap-10",
+          "tip": "0e916aa6b30fe9a47bd2db558f16f702b8380c8458c08ff6a04fc56599c6d411",
+          "valid_blocks": 1,
+          "pending_blocks": 0,
+          "invalid_blocks": 2,
+          "provisional_payout_total": 100003,
+          "active_share_count": 12
+        },
+        {
+          "node": "cap-20",
+          "tip": "0c373cd47a6e57e83e60d3fadbc8f3179c22508053b2ca817913a309ca3afa76",
+          "valid_blocks": 3,
+          "pending_blocks": 0,
+          "invalid_blocks": 0,
+          "provisional_payout_total": 200006,
+          "active_share_count": 25
+        }
+      ]
+    },
+    {
+      "name": "different_rules_common_valid_branch_reconverges",
+      "passed": true,
+      "behavior": "A branch valid under both caps can reunite nodes when it gains the greatest cumulative work.",
+      "nodes": [
+        {
+          "node": "cap-10",
+          "tip": "0b4f3944c3e0da2428dd14abbe3926cec1088c2983b85123c447ca827ed7efb4",
+          "valid_blocks": 3,
+          "pending_blocks": 0,
+          "invalid_blocks": 2,
+          "provisional_payout_total": 300009,
+          "active_share_count": 36
+        },
+        {
+          "node": "cap-20",
+          "tip": "0b4f3944c3e0da2428dd14abbe3926cec1088c2983b85123c447ca827ed7efb4",
+          "valid_blocks": 5,
+          "pending_blocks": 0,
+          "invalid_blocks": 0,
+          "provisional_payout_total": 300009,
+          "active_share_count": 36
+        }
+      ]
+    },
+    {
+      "name": "omission_limitation",
+      "passed": true,
+      "behavior": "A balanced committed sample can pass despite concentrated known extra work; this model does not prove total-pool disclosure.",
+      "finding": "Unresolved inclusion/denominator rule",
+      "committed_work": 20,
+      "observed_work": 40,
+      "observed_dominant_work": 22
+    },
+    {
+      "name": "current_round_bootstrap",
+      "passed": true,
+      "behavior": "Zero or nine groups cannot satisfy a mandatory 10% cap, even with valid block PoW.",
+      "outcomes": [
+        {
+          "groups": 0,
+          "outcome": "invalid"
+        },
+        {
+          "groups": 9,
+          "outcome": "invalid"
+        },
+        {
+          "groups": 10,
+          "outcome": "valid"
+        }
+      ],
+      "finding": "Production bootstrap/window rule required"
+    }
+  ]
+}

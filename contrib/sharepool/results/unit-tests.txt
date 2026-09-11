@@ -1,0 +1,53 @@
+test_changed_commitment_can_also_pass_easy_target (test_precommit_demo.HeaderCommitmentTest) ... ok
+test_demo_reports_limited_scope (test_precommit_demo.HeaderCommitmentTest) ... ok
+test_search_is_bounded (test_precommit_demo.HeaderCommitmentTest) ... ok
+test_upstream_header_v2_hash_vectors (test_precommit_demo.HeaderCommitmentTest) ... ok
+test_v2_root_serialization_and_pow_binding (test_precommit_demo.HeaderCommitmentTest) ... ok
+test_input_bounds (test_precommit_demo.SnapshotTest) ... ok
+test_order_independent_and_duplicate_rejected (test_precommit_demo.SnapshotTest) ... ok
+test_root_count_context_and_leaf_boundary_binding (test_precommit_demo.SnapshotTest) ... ok
+test_snapshot_is_copied_and_frozen (test_precommit_demo.SnapshotTest) ... ok
+test_actual_pow_is_checked (test_proof_fixtures.ProofFixtureTest) ... ok
+test_exact_deserialization_and_coinbase_shape (test_proof_fixtures.ProofFixtureTest) ... ok
+test_immutable_bytes_and_input_bounds (test_proof_fixtures.ProofFixtureTest) ... ok
+test_parent_height_pool_target_and_commitment_binding (test_proof_fixtures.ProofFixtureTest) ... ok
+test_preapproved_target_controls_credit (test_proof_fixtures.ProofFixtureTest) ... ok
+test_real_proof_and_stable_tag_across_jobs (test_proof_fixtures.ProofFixtureTest) ... ok
+test_tag_template_changes_and_false_declaration (test_proof_fixtures.ProofFixtureTest) ... ok
+test_canonical_order_and_metadata_binding (test_settlement_sim.SettlementTests) ... ok
+test_cherry_picked_balanced_sample_passes_without_completeness_evidence (test_settlement_sim.SettlementTests) ... ok
+test_committed_forged_tag_or_coinbase_proof_is_invalid (test_settlement_sim.SettlementTests) ... ok
+test_competing_proposals_are_not_automatically_invalid (test_settlement_sim.SettlementTests) ... ok
+test_different_caps_reconverge_when_common_valid_branch_gains_more_work (test_settlement_sim.SettlementTests) ... ok
+test_duplicate_share_is_invalid_committed_data (test_settlement_sim.SettlementTests) ... ok
+test_empty_and_nine_groups_fail_bootstrap_exact_ten_passes (test_settlement_sim.SettlementTests) ... ok
+test_every_snapshot_leaf_has_count_bound_inclusion_proof (test_settlement_sim.SettlementTests) ... ok
+test_fifty_delivery_permutations_converge_without_double_settlement (test_settlement_sim.SettlementTests) ... ok
+test_malformed_block_delivery_does_not_crash_or_poison_cache (test_settlement_sim.SettlementTests) ... ok
+test_mined_job_refreshes_keep_same_tag_group (test_settlement_sim.SettlementTests) ... ok
+test_missing_snapshot_stalls_descendants_then_data_arrival_retries (test_settlement_sim.SettlementTests) ... ok
+test_more_work_on_rejected_ancestry_does_not_change_strict_validity (test_settlement_sim.SettlementTests) ... ok
+test_mutable_metadata_is_copied_and_cached_root_is_rechecked (test_settlement_sim.SettlementTests) ... ok
+test_old_issued_snapshot_is_not_replaced_by_latest_or_local_inventory (test_settlement_sim.SettlementTests) ... ok
+test_payouts_reject_underpay_overpay_wrong_recipient_and_reallocation (test_settlement_sim.SettlementTests) ... ok
+test_previous_window_share_cannot_be_replayed_in_child (test_settlement_sim.SettlementTests) ... ok
+test_repeated_delivery_and_persistence_do_not_double_settle (test_settlement_sim.SettlementTests) ... ok
+test_same_rules_tie_then_more_work_converges_and_undoes_old_settlement (test_settlement_sim.SettlementTests) ... ok
+test_snapshot_bound_limits_admission (test_settlement_sim.SettlementTests) ... ok
+test_snapshot_context_must_match_block_chain_and_rules (test_settlement_sim.SettlementTests) ... ok
+test_uncommitted_coinbase_witness_cannot_poison_header_id (test_settlement_sim.SettlementTests) ... ok
+test_wrong_coinbase_payload_can_be_replaced_by_authentic_payload (test_settlement_sim.SettlementTests) ... ok
+test_wrong_peer_snapshot_cannot_poison_block_validity (test_settlement_sim.SettlementTests) ... ok
+test_above_cap_by_one_work_unit_with_huge_integers (test_work_concentration.ConcentrationTest) ... ok
+test_duplicate_share_ids_are_rejected_even_across_groups (test_work_concentration.ConcentrationTest) ... ok
+test_empty_input_does_not_pass (test_work_concentration.ConcentrationTest) ... ok
+test_equal_share_counts_can_have_unequal_work (test_work_concentration.ConcentrationTest) ... ok
+test_exact_ten_percent_and_canonical_immutable_result (test_work_concentration.ConcentrationTest) ... ok
+test_invalid_work_and_target_inputs (test_work_concentration.ConcentrationTest) ... ok
+test_many_groups_do_not_guarantee_compliance (test_work_concentration.ConcentrationTest) ... ok
+test_same_tag_across_jobs_is_aggregated (test_work_concentration.ConcentrationTest) ... ok
+
+----------------------------------------------------------------------
+Ran 48 tests in 1.640s
+
+OK

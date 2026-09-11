@@ -1,7 +1,8 @@
 # Template-work evidence and replicated pool settlement on Knots
 
-Status: design only, with a separate synthetic commitment experiment. No mining
-network, payout system, new RPC, or consensus change is implemented by this draft.
+Status: protocol draft with an executable settlement model and isolated stock
+Knots regtest checks. No production mining network, payout system, new RPC, or
+settlement consensus change is implemented. See the [test report](sharepool-test-report.md).
 
 Base: `bitcoinknots/bitcoin`, tag `v29.4.1.knots20260508`, commit
 `8c85b1585dac23f964e2dd32045624de7f02aa58`. Local branch:
@@ -438,22 +439,31 @@ chain validity rules.
 
 ## Implementation boundary and next work
 
-Current artifacts are this draft, `contrib/sharepool/precommit_demo.py`, a
-synthetic experiment using the upstream Python header hashing implementation,
-and `contrib/sharepool/work_concentration.py`, an arithmetic check of the 10% cap
-over supplied credited-share records. The latter does not establish that those
-records are valid or complete; production callers would need to verify PoW,
-approved targets, tags, pool/window membership, and the accepted history first.
-These experiments do not validate real miner shares, run `bitcoind`, exchange data,
-persist rounds, pay miners, or demonstrate acceptance by a live or regtest chain.
+The current [experiments](../contrib/sharepool/README.md) include upstream
+header-hash checks, exact 10% work accounting, synthetic tagged share proofs,
+canonical snapshot inclusions, and a multi-node settlement model with payout
+checks, delayed-data recovery, reorg accounting, and restart replay. Two actual
+stock Knots processes were also tested in isolated regtest through loopback RPC.
+They accepted arbitrary `m_mm_rhs` roots without snapshots, demonstrating that
+stock validation does not enforce this proposal. The model's settlement rules
+are not integrated into Knots. See the [test report](sharepool-test-report.md)
+for measured results, disagreement behavior, and limitations.
+
+The model deliberately selects one pool, a current-parent share window, a fixed
+toy reward, zero XOR keys, and the coordinator's disclosed share set. These are
+test assumptions, not settled production rules. Supporting shares use separate
+zero-payout evidence templates; eligibility as actual settlement-bearing reward
+jobs remains unproved. Tests demonstrate that balanced disclosed work can hide
+concentrated extra work and that the strict cap cannot bootstrap with fewer than
+ten groups. Model balances are provisional accounting, not spendable payments.
 
 The coordinator's role, pre-mining commitment timing, and intended enforcement
 scope and 10% cap are now established. The observable objective is verified work attributed
 to the identifiers inside distinct tagged coinbases; independent operator control
 is a separate property that these proofs do not establish. Next specify the
-measurement window, eligible-share history, and bootstrap behavior, then test
-manifests, coinbase tag extraction and binding, authenticated jobs, share accounting,
-and miner-side verification before integrating peer transport and mining jobs.
+measurement window, complete eligible-share history, bootstrap behavior, and
+reward-job eligibility. Extend the tested tag binding and accounting to
+authenticated manifests and actual miner jobs before integrating peer transport.
 Relevant integration points are `src/node/miner.cpp`, `src/rpc/mining.cpp`, the
 mining interfaces, and an isolated share-state store. Base-chain validation must
 only change once the exact evidence rule and its activation have been specified.
