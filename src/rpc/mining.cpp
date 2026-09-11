@@ -140,7 +140,17 @@ static bool GenerateBlock(ChainstateManager& chainman, CBlock&& block, uint64_t&
     block_out.reset();
     block.hashMerkleRoot = BlockMerkleRoot(block);
 
-    while (max_tries > 0 && block.nNonce < std::numeric_limits<uint32_t>::max() && !CheckProofOfWork(block.GetHash(), block.nBits, chainman.GetConsensus()) && !chainman.m_interrupt) {
+    // The extra-work rule may require a lower hash than the header target does
+    // (see ExtraWorkCache); mine against the effective target for the parent.
+    arith_uint256 effective_target;
+    {
+        LOCK(cs_main);
+        const CBlockIndex* pindexPrev{chainman.m_blockman.LookupBlockIndex(block.hashPrevBlock)};
+        effective_target = chainman.m_extra_work_cache.EffectiveTarget(chainman.GetConsensus(), pindexPrev, block.nBits);
+    }
+    while (max_tries > 0 && block.nNonce < std::numeric_limits<uint32_t>::max() &&
+           !(CheckProofOfWork(block.GetHash(), block.nBits, chainman.GetConsensus()) && UintToArith256(block.GetHash()) <= effective_target) &&
+           !chainman.m_interrupt) {
         ++block.nNonce;
         --max_tries;
     }
@@ -695,7 +705,8 @@ static RPCHelpMan getblocktemplate()
                 }},
                 {RPCResult::Type::NUM, "coinbasevalue", "maximum allowable input to coinbase transaction, including the generation award and transaction fees (in satoshis)"},
                 {RPCResult::Type::STR, "longpollid", "an id to include with a request to longpoll on an update to this template"},
-                {RPCResult::Type::STR, "target", "The hash target"},
+                {RPCResult::Type::STR, "target", "The hash target (under the extra-work rule, lower than \"bits\" encodes)"},
+                {RPCResult::Type::NUM, "extra_work_factor", /*optional=*/true, "the extra-work factor the target was divided by (only while the extra_work rule is active)"},
                 {RPCResult::Type::NUM_TIME, "mintime", "The minimum timestamp appropriate for the next block time, expressed in " + UNIX_EPOCH_TIME + ". Adjusted for the proposed BIP94 timewarp rule."},
                 {RPCResult::Type::ARR, "mutable", "list of ways the block template may be changed",
                 {
@@ -1081,6 +1092,20 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
         consensusParams.RdtsActiveAt(pindexPrev->nHeight + 1, pindexPrev->GetMedianTimePast())};
     if (rdts_active) {
         aRules.push_back("reduced_data");
+    }
+
+    // Extra-work (a flag-day deployment expiring with RDTS, see ExtraWorkCache):
+    // the block must meet "target", which is then lower than "bits" encodes.
+    // Advertised with the "!" prefix because a client that derives the target
+    // from "bits" would build blocks the network rejects.
+    const bool extra_work_active{pindexPrev != nullptr && consensusParams.ExtraWorkActiveAt(pindexPrev->GetMedianTimePast())};
+    if (extra_work_active) {
+        aRules.push_back("!extra_work");
+        if (!setClientRules.count("extra_work")) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Support for 'extra_work' rule requires explicit client support");
+        }
+        hashTarget = chainman.m_extra_work_cache.EffectiveTarget(consensusParams, pindexPrev, block_header.nBits);
+        result.pushKV("extra_work_factor", double(chainman.m_extra_work_cache.FactorFixed(consensusParams, pindexPrev)) / double(EXTRA_WORK_FACTOR_ONE));
     }
 
     result.pushKV("version", block_header.GetCompleteVersion());
