@@ -1,0 +1,439 @@
+{
+  "assumptions": [
+    "Deterministic public fixture keys and easy proof-of-work targets.",
+    "Direct bundle/checkpoint delivery; no real peer transport or ASIC integration.",
+    "Checkpoint-selected reward history is lab accounting, not Bitcoin fork choice.",
+    "Heartbeat epochs are checkpoint-based; this does not measure physical TH/s.",
+    "Quotas aggregate registered payout scripts; tags retain template and miner attribution.",
+    "A proof-of-work ledger chooses among disclosed histories; unobserved work cannot be accounted for."
+  ],
+  "cases": [
+    {
+      "behavior": "Different registered miner IDs and tags share one payout-script allowance.",
+      "budget": 4,
+      "distinct_payout_still_available": true,
+      "name": "shared_payout_budget",
+      "passed": true,
+      "rejected_refreshes": [
+        "payout destination has no work budget for another proof",
+        "payout destination has no work budget for another proof"
+      ],
+      "replicas": [
+        {
+          "balances": {},
+          "chainwork": 6,
+          "checkpoint": "595892a3bfa853578dab499f4bf43c0a612d602dbfa42c8d80e438585023b227",
+          "checkpoint_height": 3,
+          "claim_count": 2,
+          "paid_count": 0,
+          "pending_count": 2,
+          "reward_height": 0,
+          "reward_tip": "7d3685fd6c16da9d48b50e29f33683c0b3bced82c247f996b70bb963dd001aad",
+          "state_root": "359b774110a7da2e3f435a483bb87cf30e1557243dd2a9a56289869f2e58a547"
+        },
+        {
+          "balances": {},
+          "chainwork": 6,
+          "checkpoint": "595892a3bfa853578dab499f4bf43c0a612d602dbfa42c8d80e438585023b227",
+          "checkpoint_height": 3,
+          "claim_count": 2,
+          "paid_count": 0,
+          "pending_count": 2,
+          "reward_height": 0,
+          "reward_tip": "7d3685fd6c16da9d48b50e29f33683c0b3bced82c247f996b70bb963dd001aad",
+          "state_root": "359b774110a7da2e3f435a483bb87cf30e1557243dd2a9a56289869f2e58a547"
+        },
+        {
+          "balances": {},
+          "chainwork": 6,
+          "checkpoint": "595892a3bfa853578dab499f4bf43c0a612d602dbfa42c8d80e438585023b227",
+          "checkpoint_height": 3,
+          "claim_count": 2,
+          "paid_count": 0,
+          "pending_count": 2,
+          "reward_height": 0,
+          "reward_tip": "7d3685fd6c16da9d48b50e29f33683c0b3bced82c247f996b70bb963dd001aad",
+          "state_root": "359b774110a7da2e3f435a483bb87cf30e1557243dd2a9a56289869f2e58a547"
+        }
+      ],
+      "work": 4
+    },
+    {
+      "before": {
+        "balances": {},
+        "chainwork": 4,
+        "checkpoint": "6cca8ad2bdfd70a3687a4d5209a27f9e2eb53453883044dcb9002af02a405aa3",
+        "checkpoint_height": 2,
+        "claim_count": 1,
+        "paid_count": 0,
+        "pending_count": 1,
+        "reward_height": 0,
+        "reward_tip": "0fc42c2813c0046c41ab244d2ecd54f0ac9bf454c1259e0c3179aeb524a718d3",
+        "state_root": "514d86be6930c73616829cb62149f2146d85a4340d70be9165cfd17e754e5477"
+      },
+      "behavior": "An empty proof-of-work checkpoint advances the accounting epoch and permits fresh work.",
+      "coordinator_required": false,
+      "name": "heartbeat_progress_without_reward_block",
+      "passed": true,
+      "renewed_epoch": 1,
+      "replicas": [
+        {
+          "balances": {},
+          "chainwork": 6,
+          "checkpoint": "058eaafc160b79320163375962cf97034191ae72e756ffb2177927ed43ac22aa",
+          "checkpoint_height": 3,
+          "claim_count": 1,
+          "paid_count": 0,
+          "pending_count": 1,
+          "reward_height": 0,
+          "reward_tip": "0fc42c2813c0046c41ab244d2ecd54f0ac9bf454c1259e0c3179aeb524a718d3",
+          "state_root": "c8b97607b15f8c634c5ca63065dda0665801d53a7ba830f6b7f3960d2a879c85"
+        },
+        {
+          "balances": {},
+          "chainwork": 6,
+          "checkpoint": "058eaafc160b79320163375962cf97034191ae72e756ffb2177927ed43ac22aa",
+          "checkpoint_height": 3,
+          "claim_count": 1,
+          "paid_count": 0,
+          "pending_count": 1,
+          "reward_height": 0,
+          "reward_tip": "0fc42c2813c0046c41ab244d2ecd54f0ac9bf454c1259e0c3179aeb524a718d3",
+          "state_root": "c8b97607b15f8c634c5ca63065dda0665801d53a7ba830f6b7f3960d2a879c85"
+        },
+        {
+          "balances": {},
+          "chainwork": 6,
+          "checkpoint": "058eaafc160b79320163375962cf97034191ae72e756ffb2177927ed43ac22aa",
+          "checkpoint_height": 3,
+          "claim_count": 1,
+          "paid_count": 0,
+          "pending_count": 1,
+          "reward_height": 0,
+          "reward_tip": "0fc42c2813c0046c41ab244d2ecd54f0ac9bf454c1259e0c3179aeb524a718d3",
+          "state_root": "c8b97607b15f8c634c5ca63065dda0665801d53a7ba830f6b7f3960d2a879c85"
+        }
+      ]
+    },
+    {
+      "behavior": "An old job settles its committed work; the later canonical tail and winning proof are carried into the following settlement exactly once.",
+      "first_settlement": {
+        "balances": {
+          "51": 100003
+        },
+        "chainwork": 6,
+        "checkpoint": "5c67f8a86fb7e4486fcc555b99a5b4f4018261a80453ed000d35be89ae9cc304",
+        "checkpoint_height": 3,
+        "claim_count": 2,
+        "paid_count": 0,
+        "pending_count": 2,
+        "reward_height": 1,
+        "reward_tip": "0bb2cf94c0e086115d26612068ad8fdb2bda86df7c6f8622d7de8c61824e1dbd",
+        "state_root": "b2aecabd2bc1f9a3902ed372c9d255501882bcd093caa25658052f1fcfac10c8"
+      },
+      "name": "old_winner_preserves_later_work",
+      "paid_later": [
+        "c174e64883cca6facac9bb680c3e8fd666fa5956ad79e32d69002744ea46be74",
+        "bd1d4e82618cded722866f7cdf86da2bdb8fad682061265d1186e0c094cfb20b"
+      ],
+      "passed": true,
+      "replicas": [
+        {
+          "balances": {
+            "51": 150005,
+            "52": 50001
+          },
+          "chainwork": 8,
+          "checkpoint": "2b1735d4e37f43b78559b9199e3b12258c5ee131617381dd593569d8909b508f",
+          "checkpoint_height": 4,
+          "claim_count": 3,
+          "paid_count": 2,
+          "pending_count": 1,
+          "reward_height": 2,
+          "reward_tip": "0204112aad196f9b9628cffee4a6944f345456069779551175a4464d008be9bd",
+          "state_root": "87c693b9af0866979f24de6d023ea558a59a7d474404ba10057b9d5a6e4a4dc5"
+        },
+        {
+          "balances": {
+            "51": 150005,
+            "52": 50001
+          },
+          "chainwork": 8,
+          "checkpoint": "2b1735d4e37f43b78559b9199e3b12258c5ee131617381dd593569d8909b508f",
+          "checkpoint_height": 4,
+          "claim_count": 3,
+          "paid_count": 2,
+          "pending_count": 1,
+          "reward_height": 2,
+          "reward_tip": "0204112aad196f9b9628cffee4a6944f345456069779551175a4464d008be9bd",
+          "state_root": "87c693b9af0866979f24de6d023ea558a59a7d474404ba10057b9d5a6e4a4dc5"
+        },
+        {
+          "balances": {
+            "51": 150005,
+            "52": 50001
+          },
+          "chainwork": 8,
+          "checkpoint": "2b1735d4e37f43b78559b9199e3b12258c5ee131617381dd593569d8909b508f",
+          "checkpoint_height": 4,
+          "claim_count": 3,
+          "paid_count": 2,
+          "pending_count": 1,
+          "reward_height": 2,
+          "reward_tip": "0204112aad196f9b9628cffee4a6944f345456069779551175a4464d008be9bd",
+          "state_root": "87c693b9af0866979f24de6d023ea558a59a7d474404ba10057b9d5a6e4a4dc5"
+        }
+      ]
+    },
+    {
+      "behavior": "The same old job is expired on the deeper branch and eligible at a recent checkpoint on its sibling; all replicas accept the greater-work valid branch.",
+      "eligible_sibling": "7f3cf51a95913a2884fdeba80f253fff20aa3a232e859d3bc6bb21092f52253a",
+      "name": "job_admission_age_depends_on_parent_branch",
+      "passed": true,
+      "rejection": "job exceeds checkpoint age limit",
+      "replicas": [
+        {
+          "balances": {},
+          "chainwork": 8,
+          "checkpoint": "7178c53ddfb841c3c52ac052c378ead5416b3115c996514b3ee57acfdab46e3d",
+          "checkpoint_height": 4,
+          "claim_count": 1,
+          "paid_count": 0,
+          "pending_count": 1,
+          "reward_height": 0,
+          "reward_tip": "5db7e078f44ae24e903d069d4223ada9b1cc37acd344f75469afabcc26f26558",
+          "state_root": "96bb7bc6f7d11fece8660463d5e877bd9c2b33eafb80c0bf4092b9e556467f2d"
+        },
+        {
+          "balances": {},
+          "chainwork": 8,
+          "checkpoint": "7178c53ddfb841c3c52ac052c378ead5416b3115c996514b3ee57acfdab46e3d",
+          "checkpoint_height": 4,
+          "claim_count": 1,
+          "paid_count": 0,
+          "pending_count": 1,
+          "reward_height": 0,
+          "reward_tip": "5db7e078f44ae24e903d069d4223ada9b1cc37acd344f75469afabcc26f26558",
+          "state_root": "96bb7bc6f7d11fece8660463d5e877bd9c2b33eafb80c0bf4092b9e556467f2d"
+        },
+        {
+          "balances": {},
+          "chainwork": 8,
+          "checkpoint": "7178c53ddfb841c3c52ac052c378ead5416b3115c996514b3ee57acfdab46e3d",
+          "checkpoint_height": 4,
+          "claim_count": 1,
+          "paid_count": 0,
+          "pending_count": 1,
+          "reward_height": 0,
+          "reward_tip": "5db7e078f44ae24e903d069d4223ada9b1cc37acd344f75469afabcc26f26558",
+          "state_root": "96bb7bc6f7d11fece8660463d5e877bd9c2b33eafb80c0bf4092b9e556467f2d"
+        }
+      ]
+    },
+    {
+      "behavior": "A child waits for its missing checkpoint parent; resubmission after dependency delivery reproduces the same state.",
+      "name": "missing_parent_retry",
+      "passed": true,
+      "replicas": [
+        {
+          "balances": {},
+          "chainwork": 6,
+          "checkpoint": "315f46e026386b2ab788a4105bcea6f2007747b00e1201a466dc420b0561b53b",
+          "checkpoint_height": 3,
+          "claim_count": 0,
+          "paid_count": 0,
+          "pending_count": 0,
+          "reward_height": 0,
+          "reward_tip": "1be21b48a673d4f68b89e847faa62b79fd2e08f29d754e49b6958eeca2321e86",
+          "state_root": "f172bbeb42623a8c0ec71e8327e1bf91809646737fadf7a61a3f7b1049b0b133"
+        },
+        {
+          "balances": {},
+          "chainwork": 6,
+          "checkpoint": "315f46e026386b2ab788a4105bcea6f2007747b00e1201a466dc420b0561b53b",
+          "checkpoint_height": 3,
+          "claim_count": 0,
+          "paid_count": 0,
+          "pending_count": 0,
+          "reward_height": 0,
+          "reward_tip": "1be21b48a673d4f68b89e847faa62b79fd2e08f29d754e49b6958eeca2321e86",
+          "state_root": "f172bbeb42623a8c0ec71e8327e1bf91809646737fadf7a61a3f7b1049b0b133"
+        },
+        {
+          "balances": {},
+          "chainwork": 6,
+          "checkpoint": "315f46e026386b2ab788a4105bcea6f2007747b00e1201a466dc420b0561b53b",
+          "checkpoint_height": 3,
+          "claim_count": 0,
+          "paid_count": 0,
+          "pending_count": 0,
+          "reward_height": 0,
+          "reward_tip": "1be21b48a673d4f68b89e847faa62b79fd2e08f29d754e49b6958eeca2321e86",
+          "state_root": "f172bbeb42623a8c0ec71e8327e1bf91809646737fadf7a61a3f7b1049b0b133"
+        }
+      ]
+    },
+    {
+      "abandoned_checkpoint": "54255afa655c60b18c21cd7f5149096ff46813f3936dd0b73967f763eb232b68",
+      "behavior": "Greater checkpoint chainwork selects the right branch and rolls back the other branch's provisional payouts and work.",
+      "bitcoin_fork_choice_tested": false,
+      "chosen_checkpoint": "4d7b9576cbe754531f22ba35b762919f7d42e5ca928c96e5aa49ce814116933d",
+      "name": "checkpoint_fork_reorganizes_lab_reward_accounting",
+      "passed": true,
+      "previous_balances": {
+        "51": 100003
+      },
+      "replicas": [
+        {
+          "balances": {
+            "52": 100003
+          },
+          "chainwork": 6,
+          "checkpoint": "708421737a92fc86447d49180a2767bda315866cacd28fcfbecf50ee9dff2090",
+          "checkpoint_height": 3,
+          "claim_count": 1,
+          "paid_count": 0,
+          "pending_count": 1,
+          "reward_height": 1,
+          "reward_tip": "0abbbbeab6a10b8b654cda85436066767cc30d3b6a450b2b8b2e57c885fc2130",
+          "state_root": "d87f0372b622f5d063eda61646b0553c89236c03891736420a31e3525185e119"
+        },
+        {
+          "balances": {
+            "52": 100003
+          },
+          "chainwork": 6,
+          "checkpoint": "708421737a92fc86447d49180a2767bda315866cacd28fcfbecf50ee9dff2090",
+          "checkpoint_height": 3,
+          "claim_count": 1,
+          "paid_count": 0,
+          "pending_count": 1,
+          "reward_height": 1,
+          "reward_tip": "0abbbbeab6a10b8b654cda85436066767cc30d3b6a450b2b8b2e57c885fc2130",
+          "state_root": "d87f0372b622f5d063eda61646b0553c89236c03891736420a31e3525185e119"
+        },
+        {
+          "balances": {
+            "52": 100003
+          },
+          "chainwork": 6,
+          "checkpoint": "708421737a92fc86447d49180a2767bda315866cacd28fcfbecf50ee9dff2090",
+          "checkpoint_height": 3,
+          "claim_count": 1,
+          "paid_count": 0,
+          "pending_count": 1,
+          "reward_height": 1,
+          "reward_tip": "0abbbbeab6a10b8b654cda85436066767cc30d3b6a450b2b8b2e57c885fc2130",
+          "state_root": "d87f0372b622f5d063eda61646b0553c89236c03891736420a31e3525185e119"
+        }
+      ]
+    },
+    {
+      "alternatives": [
+        "77c5c93c2eaece73c67867e5dd8316b4d83937f3eec38ea1769d523e8f9312f0",
+        "103c17f90831b7078e8c8fa5f4b6725f80ae0fb03141ae99bed41d39784bdf93"
+      ],
+      "behavior": "Identical checkpoint chainwork uses the same hash tie break regardless of arrival order or serialization round trip.",
+      "name": "equal_work_tie_is_delivery_order_independent",
+      "passed": true,
+      "replicas": [
+        {
+          "balances": {},
+          "chainwork": 4,
+          "checkpoint": "103c17f90831b7078e8c8fa5f4b6725f80ae0fb03141ae99bed41d39784bdf93",
+          "checkpoint_height": 2,
+          "claim_count": 0,
+          "paid_count": 0,
+          "pending_count": 0,
+          "reward_height": 0,
+          "reward_tip": "1be21b48a673d4f68b89e847faa62b79fd2e08f29d754e49b6958eeca2321e86",
+          "state_root": "aedca2e7d68c05126945bb50ee4390fed57d474d42a8b1fd455e5428259c6d91"
+        },
+        {
+          "balances": {},
+          "chainwork": 4,
+          "checkpoint": "103c17f90831b7078e8c8fa5f4b6725f80ae0fb03141ae99bed41d39784bdf93",
+          "checkpoint_height": 2,
+          "claim_count": 0,
+          "paid_count": 0,
+          "pending_count": 0,
+          "reward_height": 0,
+          "reward_tip": "1be21b48a673d4f68b89e847faa62b79fd2e08f29d754e49b6958eeca2321e86",
+          "state_root": "aedca2e7d68c05126945bb50ee4390fed57d474d42a8b1fd455e5428259c6d91"
+        },
+        {
+          "balances": {},
+          "chainwork": 4,
+          "checkpoint": "103c17f90831b7078e8c8fa5f4b6725f80ae0fb03141ae99bed41d39784bdf93",
+          "checkpoint_height": 2,
+          "claim_count": 0,
+          "paid_count": 0,
+          "pending_count": 0,
+          "reward_height": 0,
+          "reward_tip": "1be21b48a673d4f68b89e847faa62b79fd2e08f29d754e49b6958eeca2321e86",
+          "state_root": "aedca2e7d68c05126945bb50ee4390fed57d474d42a8b1fd455e5428259c6d91"
+        }
+      ]
+    },
+    {
+      "before": {
+        "balances": {},
+        "chainwork": 4,
+        "checkpoint": "707c9c2c23e090c16e545ec2574af1bc5de3606eb8fa5d22d85038815eca5d3c",
+        "checkpoint_height": 2,
+        "claim_count": 1,
+        "paid_count": 0,
+        "pending_count": 1,
+        "reward_height": 0,
+        "reward_tip": "1be21b48a673d4f68b89e847faa62b79fd2e08f29d754e49b6958eeca2321e86",
+        "state_root": "3575a8cc06d79d83b559925b93b78cd4d4b6e7d2b75889f002668812757ca856"
+      },
+      "behavior": "Restoration revalidates the checkpoint archive, duplicate delivery leaves credit unchanged, and the restored node can extend the ledger.",
+      "name": "restart_revalidation_and_duplicate_delivery",
+      "passed": true,
+      "replicas": [
+        {
+          "balances": {},
+          "chainwork": 6,
+          "checkpoint": "5bcf81e650bd304b6aff5c24d14db40f775629caadaec403219248ee0aa6f02b",
+          "checkpoint_height": 3,
+          "claim_count": 1,
+          "paid_count": 0,
+          "pending_count": 1,
+          "reward_height": 0,
+          "reward_tip": "1be21b48a673d4f68b89e847faa62b79fd2e08f29d754e49b6958eeca2321e86",
+          "state_root": "977f5deb218c979196cf1056c300839949dddffa2adac7927ef35d6cd548d250"
+        },
+        {
+          "balances": {},
+          "chainwork": 6,
+          "checkpoint": "5bcf81e650bd304b6aff5c24d14db40f775629caadaec403219248ee0aa6f02b",
+          "checkpoint_height": 3,
+          "claim_count": 1,
+          "paid_count": 0,
+          "pending_count": 1,
+          "reward_height": 0,
+          "reward_tip": "1be21b48a673d4f68b89e847faa62b79fd2e08f29d754e49b6958eeca2321e86",
+          "state_root": "977f5deb218c979196cf1056c300839949dddffa2adac7927ef35d6cd548d250"
+        },
+        {
+          "balances": {},
+          "chainwork": 6,
+          "checkpoint": "5bcf81e650bd304b6aff5c24d14db40f775629caadaec403219248ee0aa6f02b",
+          "checkpoint_height": 3,
+          "claim_count": 1,
+          "paid_count": 0,
+          "pending_count": 1,
+          "reward_height": 0,
+          "reward_tip": "1be21b48a673d4f68b89e847faa62b79fd2e08f29d754e49b6958eeca2321e86",
+          "state_root": "977f5deb218c979196cf1056c300839949dddffa2adac7927ef35d6cd548d250"
+        }
+      ]
+    }
+  ],
+  "format": 1,
+  "passed": true,
+  "replicas_per_scenario": 3,
+  "scenario_count": 8,
+  "scope": "permissionless proof-of-work checkpoint reference scenarios"
+}

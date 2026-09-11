@@ -7,14 +7,20 @@ Updated and tested on 2026-09-11 against a checkout based on Knots tag
 fork rollback and delayed data. Stock Knots accepts the commitment without
 checking settlement. Mandatory settlement validation remains unimplemented.**
 
-This report describes the earlier fixed-snapshot model. The new
-[continuous protocol](sharepool-live-protocol.md) adds authenticated registries,
-reward-job shares, automatic snapshot updates, and tail settlement. The linked
-unit-test log contains the combined regression suite. The payout-script grouping
-change updates both models: tags remain template/miner attribution, while work
-for all tags sharing a payout script accumulates in one allowance. The model and
-unit results below were rerun with that change; the stock-node results are from
-the separate prior run of the unchanged header-commitment smoke test.
+This report describes the earlier fixed-snapshot model. The
+[coordinator-signed ledger baseline](sharepool-live-protocol.md) adds authenticated
+registries, reward-job shares, automatic snapshot updates, and tail settlement.
+The current permissionless reference is documented separately in
+[Proof-of-work share ledger](sharepool-pow-ledger.md). It is not wired into the
+baseline gateway or HTTP replication flow, and it introduces no native Knots
+consensus changes. The measurements and tables below retain their earlier scope.
+
+The linked unit-test log contains the combined regression suite. The payout-script
+grouping change updates both earlier models: tags remain template/miner
+attribution, while work for all tags sharing a payout script accumulates in one
+allowance. The model and unit results below were rerun with that change; the
+stock-node results are from the separate prior run of the unchanged
+header-commitment smoke test.
 
 ## What was executed
 

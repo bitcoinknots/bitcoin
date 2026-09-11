@@ -5,18 +5,41 @@ snapshot settlement, and disagreement between nodes. It also includes a smoke
 test that ran two actual stock Knots nodes in isolated regtest.
 **The proposed settlement and absolute work-budget rules are not integrated into Knots consensus.**
 
-The new [continuous protocol](../../doc/sharepool-live-protocol.md) implements
+The current [permissionless checkpoint reference](../../doc/sharepool-pow-ledger.md)
+orders registry changes, shares, and candidate settlements using verified PoW.
+Anyone can mine checkpoints, including empty checkpoints that renew work epochs
+without a coordinator seal or reward block. Jobs bind an ancestral snapshot with
+a bounded checkpoint age. Delayed included shares carry forward, and provisional
+payout history reorganizes with the selected checkpoint branch. Epochs count
+checkpoint work, not elapsed seconds; this does not measure a hard TH/s limit.
+
+```sh
+python3 -m unittest discover -s contrib/sharepool -p 'test_*.py' -v
+python3 contrib/sharepool/run_pow_ledger_scenarios.py
+```
+
+The eight [checkpoint scenarios](results/pow-ledger.json) use three independent
+replicas per case with direct object delivery in one process. The bounded store,
+easy fixed targets, synthetic reward history, and test cryptography are laboratory
+tools. Bitcoin anchoring, production difficulty/incentives, pruning, and actual
+DATUM/ASIC integration remain open. No network or GPU benchmark is claimed.
+
+The earlier [continuous protocol](../../doc/sharepool-live-protocol.md) implements
 authenticated registry versions, signed reward jobs, live Merkle updates,
 race-safe gateway refreshes, old-job winners, and carried pending work. Its
 loopback smoke transfers signed objects between three validating replicas.
+That gateway and HTTP path remain a separate coordinator-signed baseline; they
+are not connected to the new permissionless checkpoint reference.
 
 ```sh
 python3 -m unittest discover -s contrib/sharepool -p 'test_*.py' -v
 python3 contrib/sharepool/live_protocol_peer.py --run-smoke
 ```
 
-| New reference component | Purpose |
+| Reference component | Purpose |
 | --- | --- |
+| `pow_share_ledger.py` | Permissionless checkpoint PoW, deterministic fork selection, bounded job age, quota heartbeats, exact snapshot settlement, and replay. |
+| `run_pow_ledger_scenarios.py` | Eight three-replica checkpoint scenarios, including competing reward histories. |
 | `signed_registry.py` | Authenticated miner registration, key rotation, and immutable payout versions. |
 | `live_protocol.py` | Signed ledger prefixes, snapshot inclusions, eligible reward shares, parent seals, and branch-specific pending/paid claims. |
 | `job_gateway.py` | Verify new work and automatically replace the active commitment; discard stale proposal responses. |

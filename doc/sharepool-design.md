@@ -3,9 +3,12 @@
 Status: protocol draft with an executable settlement model and isolated stock
 Knots regtest checks. No production mining network, payout system, new RPC, or
 settlement consensus change is implemented. See the [test report](sharepool-test-report.md).
-The [continuous protocol reference](sharepool-live-protocol.md) now implements
-signed registries and reward jobs, verified-work commitment updates, parent seals,
-and branch-specific pending claims to handle the old-job winning race.
+The current [permissionless checkpoint reference](sharepool-pow-ledger.md) adds
+PoW ordering, checkpoint-age eligibility, quota renewal by empty checkpoints,
+and provisional settlement reorganization. It supersedes coordinator seals as
+the proposed accounting-ordering direction. The earlier
+[continuous protocol reference](sharepool-live-protocol.md) remains an executable
+signed-receipt baseline with a separate gateway and HTTP path.
 
 Base: `bitcoinknots/bitcoin`, tag `v29.4.1.knots20260508`, commit
 `8c85b1585dac23f964e2dd32045624de7f02aa58`.
@@ -24,6 +27,13 @@ Registered miners use distinct tags, and winning coinbase
 payments must match the referenced registry and accounting state. The measurement
 window and eligibility rules remain to be specified; no consensus change is
 implemented or activated.
+
+The permissionless reference now selects checkpoint-height epochs and explicit
+ancestor/age eligibility. These are work quotas per ledger epoch, not physical
+TH/s over a verified time interval. Its synthetic candidate reward history follows
+checkpoint forks; integrating that history with Bitcoin's actual block chain
+remains unspecified. The rules below describe the broader proposal; the linked
+reference document defines the current executable subset and its limits.
 
 Different coinbase tags do make the full templates different, even when every
 non-coinbase transaction is identical. The protocol's primary evidence therefore

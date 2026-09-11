@@ -6,6 +6,13 @@ used by the toy settlement model. The registry, authenticated jobs, and live upd
 [executable reference](sharepool-live-protocol.md). Full node consensus integration
 and the production protocol remain outstanding.
 
+The current [permissionless reference](sharepool-pow-ledger.md) selects a PoW
+checkpoint history instead of coordinator seals. It measures quotas per
+checkpoint-height epoch, admits ancestral jobs within a fixed checkpoint age,
+and lets anyone mine empty checkpoints to advance an exhausted epoch. The
+nominal seconds below convert an illustrative allowance; they are not a verified
+epoch duration. The earlier signed reference remains a separate baseline.
+
 ## 1. Aggregate the work budget by registered payout script
 
 For each pool, registered payout script `p`, and agreed origin epoch `e`, define:

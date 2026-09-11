@@ -1,10 +1,16 @@
 # Continuous commitment updates and delayed-work settlement
 
-This is the implemented reference flow for the requested registry, authenticated
-reward jobs, continuously refreshed share snapshots, and settlement of work that
-arrives after a job's commitment. The implementation uses real synthetic BLAKE2b
-proofs and real signatures from the upstream **test-only** secp256k1 library.
-It does not activate Knots consensus rules or connect to DATUM/ASIC hardware.
+This document describes the **earlier coordinator-signed ledger baseline** for
+authenticated reward jobs, continuously refreshed share snapshots, and settlement
+of work that arrives after a job's commitment. The current permissionless
+reference is documented in [Proof-of-work share ledger](sharepool-pow-ledger.md).
+That separate module is not wired into the `job_gateway.py` or
+`live_protocol_peer.py` gateway and HTTP flow described here.
+
+The baseline uses real synthetic BLAKE2b proofs and real signatures from the
+upstream **test-only** secp256k1 library. Its recorded tests below remain baseline
+results. Neither reference activates Knots consensus rules or connects to
+DATUM/ASIC hardware.
 
 ## The timing rule
 

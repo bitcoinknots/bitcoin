@@ -43,6 +43,31 @@ test_sibling_registry_histories_cannot_mix_claims_and_payouts (test_live_protoco
 test_signing_key_rotation_keeps_shared_payout_budget (test_live_protocol.LiveProtocolTests) ... ok
 test_winner_that_also_has_receipt_is_deduplicated (test_live_protocol.LiveProtocolTests) ... ok
 test_wrong_job_signatures_never_enter_job_cache (test_live_protocol.LiveProtocolTests) ... ok
+test_all_scripts_exactly_capped_resume_after_empty_epoch_heartbeat (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_authorized_payout_update_does_not_redirect_old_work (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_branch_work_counts_ancestors_once_and_never_sums_siblings (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_checkpoint_action_duplicates_and_winner_order_are_rejected (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_checkpoint_pow_payload_state_and_rules_forgery_never_poison_retry (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_empty_permissionless_heartbeat_adds_work_and_no_reward_credit (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_fork_reorg_rolls_back_reward_balances_and_paid_claims (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_insufficient_share_pow_and_mutated_committed_header_are_rejected (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_job_age_exact_boundary_uses_event_parent_and_then_expires (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_job_checkpoint_must_be_event_ancestor_even_if_signature_is_valid (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_job_signature_registry_target_and_snapshot_forgery_are_rejected (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_jobs_bind_checkpoint_snapshot_tag_and_exact_coinbase_payout (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_legitimate_checkpoint_reorg_can_orphan_then_reinclude_a_share (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_missing_dependencies_and_reordered_forks_converge_only_after_validation (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_old_winner_pays_its_snapshot_and_tail_and_winner_are_paid_once (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_ordinary_old_parent_share_can_arrive_after_a_reward_winner (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_paid_work_still_consumes_original_script_and_epoch_budget (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_pending_claim_reserves_expired_script_until_actual_settlement (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_registration_that_cannot_fit_one_job_payout_is_rejected (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_registry_aggregate_payout_capacity_is_reserved_before_work_arrives (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_restart_replays_branches_and_rejects_legacy_or_mismatched_rules (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_rotation_reserves_eligible_old_destinations_and_releases_unused_ones (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_rules_reject_malformed_and_unbounded_resource_parameters (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_same_script_tags_share_budget_and_inflight_overrun_remains_credit (test_pow_share_ledger.PowShareLedgerTests) ... ok
+test_winning_proof_promotes_existing_share_once_and_cannot_win_twice (test_pow_share_ledger.PowShareLedgerTests) ... ok
 test_changed_commitment_can_also_pass_easy_target (test_precommit_demo.HeaderCommitmentTest) ... ok
 test_demo_reports_limited_scope (test_precommit_demo.HeaderCommitmentTest) ... ok
 test_search_is_bounded (test_precommit_demo.HeaderCommitmentTest) ... ok
@@ -124,6 +149,6 @@ test_single_group_can_account_for_all_work_within_its_budget (test_work_rate_bud
 test_work_weights_not_equal_share_counts_control_budget (test_work_rate_budget.WorkRateBudgetTest) ... ok
 
 ----------------------------------------------------------------------
-Ran 124 tests in 12.982s
+Ran 149 tests in 15.717s
 
 OK
