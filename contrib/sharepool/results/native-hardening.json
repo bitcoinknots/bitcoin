@@ -1,0 +1,117 @@
+{
+  "format": 1,
+  "profile": "SPN1 regtest-only",
+  "platform": "macOS arm64; Apple clang 21.0.0",
+  "scope": "Native signer, durable gate, local evidence exchange and native validation; no public deployment or production-readiness claim.",
+  "source_base_commit": "d1212f1495929cf8f52dd58cf361751b3417acc4",
+  "source_state": "Final hardening changes on the recorded base. Source and binary hashes identify observed inputs, not reproducible-build proof.",
+  "native_binary_sha256": "ca489b2abe4b3d65aa49455c540d772b46d0e4de5dbe1fc2025508dfd64abb34",
+  "signer_binary_sha256": "256c00eb2a30f319f9ee7d691916b1120f3e6f02603ef6ea8d958a2196dd10b9",
+  "python": {
+    "result": "passed",
+    "tests": 333,
+    "skipped": 0,
+    "seconds": 29.482,
+    "log_sha256": "42652d32b5645be0431ce80372ea10569c29069d014660252638ff4c765c44c4",
+    "log": "unit-tests.txt",
+    "command": "SHAREPOOL_SIGNER_BINARY=<built signer> python3 -B -m unittest discover -s contrib/sharepool -p 'test_*.py'"
+  },
+  "native_enforcement_regression": {
+    "result": "passed",
+    "started_utc": "2026-09-11T23:09:09.117000Z",
+    "finished_utc": "2026-09-11T23:09:14.310000Z",
+    "log_sha256": "4b969aea87bbee1c7741b2429966c2a1d9d8d855eba4bc19fa519d53b33070e7"
+  },
+  "native_peer_integration": {
+    "result": "passed",
+    "started_utc": "2026-09-11T23:12:41.819000Z",
+    "finished_utc": "2026-09-11T23:13:10.686000Z",
+    "log_sha256": "4e3051c6b745febfae1c8b72c8a826e0a6cd0f25738a02046e5a382c528e0e38",
+    "native_nodes": 2,
+    "local_gate_services": 3,
+    "fresh_native_owner_keys": 3,
+    "final_height": 162,
+    "accelerated_blocks": true,
+    "real_time_endurance_benchmark": false,
+    "covers": [
+      "Distinct full origin templates and native owner signatures exchanged through loopback HTTP",
+      "Native full-body validation before share admission and local known-work omission rejection",
+      "Exact direct coinbase payouts to two owners and native P2P block relay",
+      "Late old-template work retained across service restart",
+      "Fresh gate receives eligible historical full origins after native tip advances",
+      "Deliberate withholding preserves partial durable progress; exact retry completes admission",
+      "Previous winner and late proof settle once, with the current winner left for a later job",
+      "160 additional native blocks cross the former 128-receipt lifetime limit",
+      "Exact subsidy payouts across the regtest height150 halving",
+      "Retention pruning and gate restart preserve exact active inventory",
+      "Administrative rollback below retained anchor latches local recovery without peer penalty",
+      "Restoring native chain and reopening gate does not silently clear recovery"
+    ],
+    "final_gate_state": {
+      "revision": 164,
+      "anchor_height": 18,
+      "anchor_hash": "0310e9d3a6fdc025a86a838e7d1fc3d6d37207ea1363f5b3ecbfe5def690c2e4",
+      "pruned_through": 17,
+      "recovery": 1,
+      "receipts": 147,
+      "templates": 147,
+      "jobs": 64
+    },
+    "deep_rollback_scope": "Administrative invalidateblock test. Actual P2P competing-branch tests are recorded separately in native-adversarial.json.",
+    "last_winning_proof_pending": true
+  },
+  "gate": {
+    "focused_unit_tests": 30,
+    "peer_unit_tests": 16,
+    "schema": 2,
+    "retention_blocks": 144,
+    "active_templates": 128,
+    "active_receipts": 128,
+    "max_retained_each": 18944,
+    "max_template_bytes": 268435456,
+    "audit_jobs": 64,
+    "pruning": "Only origin_height <= saved_native_anchor_height - 3; paid/orphaned evidence retained until cutoff",
+    "revision": "Permanent signed64 high-water; pruning never reuses sequence",
+    "recovery": "Persistently refuses admission when the saved native anchor disappears; no clear-latch API",
+    "atomic_migration": true,
+    "exclusive_posix_sidecar_lock": true,
+    "parser_fix": "Canonical byte-bounded structural preflight and exact-read stream precede the framework deserializer",
+    "parser_rejection_vectors": {
+      "huge_or_noncanonical_nested_counts": 9,
+      "truncations": 8,
+      "valid_witness_roundtrip": true
+    }
+  },
+  "related_results": [
+    "native-signer.json",
+    "native-adversarial.json"
+  ],
+  "sources": {
+    "contrib/sharepool/native_mining_gate.py": "c1240c47bc096d0529e91010f76bcd4a295a6ef32896515ea5ddd34ead989bb3",
+    "contrib/sharepool/native_peer.py": "39db791bd73986eb5e4e8e8603cf2c7e7ec9329a9364f996aaa3ca88af510da9",
+    "contrib/sharepool/test_native_mining_gate.py": "455cecb57f10a76b3d4633af9720b23544c0e00c89229c4fe97c07d003ae205f",
+    "contrib/sharepool/test_native_peer.py": "31963c61512129ece3d16838c557b76a41dc333191783de8327a7b26a2068900",
+    "test/functional/feature_sharepool_peer.py": "4e1fae9838fe8d8c5258c2a8994d235698029d5d40709e0edd4d412c9b45ea9f",
+    "test/functional/feature_sharepool_enforcement.py": "1fe375a4430aea1f00adb9389dc8e943952164ac8dc9e801f023e4dde95382b9",
+    "test/functional/feature_sharepool_network.py": "94324efb38214aa2dda104f4f4a6ff7e63d1265b52e4d97263ab35baac6e4ee6",
+    "test/functional/feature_sharepool_ancestor.py": "d2afe2a76015f9a63b65fce632083b45ddc7357092fe60ddef0ef60ae34c5eb3",
+    "src/rpc/mining.cpp": "b4ef8a4b9d10a1980b8f9ed6cedebec09125970468253df5ef31a2b793faf739",
+    "src/validation.cpp": "9069d9b6cab4ac4721871d6740050bd6fcc036a552bd9936fa272d882a8ac367",
+    "src/validation.h": "d596e6ec41f67cb915586654ad250c0932f8e91578a0c0ac4c50747d89a6b683"
+  },
+  "hardware_used_in_this_run": false,
+  "public_network_enabled": false,
+  "mainnet_activation_enabled": false,
+  "temporary_native_keys_removed_after_testing": true,
+  "limitations": [
+    "Loopback-only transport library; no WAN discovery, TLS or deployment daemon",
+    "Trusted local factory/RPC timeout contract; arbitrary local factory or CPU work is not hard-preempted",
+    "Permissionless evidence validation does not prove complete disclosure or use of a particular DATUM executable",
+    "Fixed easy regtest share target and 32-share snapshots; no measured TH/s cap or large-pool economic/scaling claim",
+    "Historical full-body validation needs recent native block and undo data",
+    "Deep-history archive recovery remains an explicit operational gap",
+    "Native owner keys are protected unencrypted local files; production key provisioning/recovery remains open",
+    "Sanitizer work is a bounded deterministic corpus run, not sustained coverage-guided fuzzing",
+    "Not an external independent security review; additional platforms and activation design remain open"
+  ]
+}

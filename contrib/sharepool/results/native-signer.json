@@ -1,0 +1,75 @@
+{
+  "format": 1,
+  "recorded_utc": "2026-09-11T23:00:03.550121+00:00",
+  "scope": "Local regtest-only walletless native owner signer; no production-readiness or other-platform claim.",
+  "build": {
+    "platform": "macOS",
+    "architecture": "arm64",
+    "compiler": "Apple clang 21.0.0",
+    "build_type": "Debug",
+    "build_util": true,
+    "reused_fresh_native_build_tree": true,
+    "base_commit": "d1212f1495929cf8f52dd58cf361751b3417acc4",
+    "source_state": "Uncommitted signer changes plus concurrent native test RPC/refactor changes. Source hashes identify signer inputs; binary hashes are observed files, not reproducible-build proof.",
+    "binaries": [
+      {
+        "name": "bitcoin-sharepool-signer",
+        "sha256": "256c00eb2a30f319f9ee7d691916b1120f3e6f02603ef6ea8d958a2196dd10b9",
+        "bytes": 3202776
+      },
+      {
+        "name": "test_bitcoin",
+        "sha256": "395b1c714a9a6fe4e49cfa8ad860ea8798a37ea1b86df4778fecc23182cc08c0",
+        "bytes": 62715520
+      },
+      {
+        "name": "bitcoind",
+        "sha256": "ca489b2abe4b3d65aa49455c540d772b46d0e4de5dbe1fc2025508dfd64abb34",
+        "bytes": 39792840
+      }
+    ]
+  },
+  "sources": {
+    "src/bitcoin-sharepool-signer.cpp": "7d7bdc0ca19c1a3d99585c6b13ef6c9536ed17e55f4db09b26f72a7d1760145d",
+    "src/sharepool/signer.h": "fd2175c46cc096a2e1152a63931dabcd6b46603f4e95474cd5bbce44bc79f54f",
+    "src/sharepool/signer.cpp": "5b3ac984e847ffd13395ebd9dafaa66482bdca2a3b5a802d0e084595007c9b05",
+    "src/test/sharepool_signer_tests.cpp": "0e400c23813ef34f60f8ee54b9670f6d655d05749791edeb791d16e4a2c6b227",
+    "contrib/sharepool/native_signer.py": "b30915e937c0d1a42da8b0ac75c4930de6fa6cb007d3889b32562284f18ba027",
+    "contrib/sharepool/test_native_signer.py": "a46eb8cb55dacf7853155f5cda746028cec606e3246c0e482cf5ed5361a87fd1",
+    "contrib/sharepool/native_enforcement.py": "f4fa91005e8b222915cf27fb1f272c369f18d2ea8a33074e1701d777b31d6cba"
+  },
+  "native_tests": {
+    "command": "test_bitcoin --run_test='sharepool*' --report_level=detailed",
+    "exit_code": 0,
+    "passed_cases": 16,
+    "passed_assertions": 114,
+    "signer_cases": 4,
+    "signer_assertions": 24,
+    "log_sha256": "f5bac9b798a2beb556741e27124c9a21ce162ad9926ae4e3fa207862a015662d"
+  },
+  "python_tests": {
+    "command": "SHAREPOOL_SIGNER_BINARY=<built signer> python3 -B -m unittest test_native_signer test_native_enforcement",
+    "exit_code": 0,
+    "passed_cases": 24,
+    "skipped_cases": 0,
+    "seconds": 6.89,
+    "signer_adapter_cases": 7,
+    "native_signer_executable_cases": 11,
+    "existing_builder_cases": 6,
+    "evidence": "Successful tool-runner output; includes disposable random native keys, canonical bytes, true signature verification, native policy mismatch rejection, mode/symlink/hardlink/FIFO checks, macOS ACL rejection and inheritance removal, exclusive creation, subprocess output bounds and timeouts."
+  },
+  "secrets": {
+    "only_disposable_generated_keys": true,
+    "existing_credentials_read": false,
+    "private_key_bytes_on_cli_rpc_or_python": false,
+    "key_files_removed_after_tests": true
+  },
+  "hardware_used": false,
+  "public_network_enabled": false,
+  "limits": [
+    "Offline owner/round authorization does not verify native tip, entire template or snapshot completeness.",
+    "Signer uses unencrypted mode0600 local key files; trusted private directory and host required.",
+    "No private key import, remote signing service, HSM, wallet or production provisioning/recovery.",
+    "POSIX executable; tested on macOS arm64 only."
+  ]
+}

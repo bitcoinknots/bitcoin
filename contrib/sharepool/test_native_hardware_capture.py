@@ -52,6 +52,13 @@ class FakeNativeRPC:
                 "pool": f"{share.envelope.pool:064x}", "owner": share.envelope.public_key.hex(),
                 "origin_height": share.envelope.height, "payout_script": share.envelope.payout_script.hex(),
                 "share_bits": f"{SHARE_BITS:08x}"}
+        if method == "validatesharepooltemplate":
+            block = parse_block(bytes.fromhex(args[0]))
+            assert f"{block.hashPrevBlock:064x}" == self.chain[block.m_height - 1]
+            assert len(self.chain) - MAX_SHARE_AGE <= block.m_height <= len(self.chain)
+            return {"valid": True, "native_tip": self.chain[-1],
+                "native_parent": f"{block.hashPrevBlock:064x}", "origin_height": block.m_height,
+                "commitment": f"{block.m_mm_rhs:064x}"}
         if method == "getblocktemplate":
             if args[0].get("mode") == "proposal":
                 return None

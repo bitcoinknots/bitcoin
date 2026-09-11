@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "profile": "SPN1 regtest-only",
+  "platform": "macOS arm64; Apple clang 21.0.0.21000101",
+  "native_binary_sha256": "ca489b2abe4b3d65aa49455c540d772b46d0e4de5dbe1fc2025508dfd64abb34",
+  "functional": {
+    "p2p": {
+      "result": "passed",
+      "log_sha256": "e7668f3405e28607db89efac91aac36414f45afeaa9f814db1d74389b861d07f",
+      "started_utc": "2026-09-11T22:59:40.771000Z",
+      "finished_utc": "2026-09-11T22:59:47.425000Z"
+    },
+    "ancestor": {
+      "result": "passed",
+      "log_sha256": "45324b83f3e0ecb222683a13db0c2963dcdb5184dd7de70f4225353018e1077b",
+      "started_utc": "2026-09-11T22:59:40.739000Z",
+      "finished_utc": "2026-09-11T22:59:44.224000Z"
+    },
+    "mining_basic": {
+      "result": "passed",
+      "log_sha256": "7fcdf895a71647832f24f567b353b60701d0c1bebab6a1eb09f8936dd14b4378",
+      "started_utc": "2026-09-11T22:59:41.403000Z",
+      "finished_utc": "2026-09-11T23:00:17.881000Z"
+    }
+  },
+  "p2p_scope": {
+    "nodes": 3,
+    "all_nodes_enforce": true,
+    "valid_blocks_submitted_to_one_node_only": true,
+    "other_nodes_receive_via_native_p2p": true,
+    "invalid_bodies_received_via_p2p_test_connections": true,
+    "covers": [
+      "partition and greater-work rejoin",
+      "orphaned payout rollback and resettlement",
+      "P2P replay and wrong payout rejection",
+      "offline node catch-up",
+      "full reindex"
+    ],
+    "physical_hardware_used": false
+  },
+  "ancestor_scope": {
+    "max_rollback_blocks": 3,
+    "temporary_utxo_view": true,
+    "candidate_pow_required": false,
+    "real_transaction_fee_satoshis": 12345,
+    "covers": [
+      "UTXO already spent differently on current active chain",
+      "script and input checks at the origin parent",
+      "exact full fee payout",
+      "unchanged native active state",
+      "valid side branch ineligible",
+      "age boundary and restart",
+      "missing undo fails closed then recovery"
+    ]
+  },
+  "fuzz": {
+    "target": "sharepool",
+    "mode": "deterministic corpus runner; not coverage-guided",
+    "inputs": 2685,
+    "result": "passed",
+    "reported_seconds": 5,
+    "sanitizers": [
+      "address",
+      "undefined"
+    ],
+    "leak_detection": false,
+    "external_prebuilt_dependencies_instrumented": false,
+    "fuzz_binary_sha256": "6aac3cdbaf8fb124346013dc54c10daa74ddcca37f9133d7adc13f5c2911499b",
+    "corpus_listing_sha256": "f1e453ee0779c2be5326d3500228257521f6a90466c6c085b2e28f44f783b519",
+    "log_sha256": "b8fb14eb03b41ad5819c08fcd9d6902bc9c4c2123d4b1f7fef55812f49bccbcc",
+    "generator": "contrib/sharepool/native_fuzz_corpus.py",
+    "signer_policy_and_envelope_parsers": true
+  },
+  "limitations": [
+    "No public network or mainnet activation",
+    "Not an external independent security audit",
+    "No coverage-guided fuzzing campaign yet",
+    "No claim of large-pool performance or undisclosed-share detection"
+  ]
+}

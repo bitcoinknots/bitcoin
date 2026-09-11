@@ -12,11 +12,24 @@ eligible work. Mainnet and public testnet activation are disabled. This native
 profile has its own [wire contract](../../doc/sharepool-native-format.md); it does
 not transplant the synthetic checkpoint ledger or its absolute work-budget policy.
 
-The [physical SPN1 test](results/native-hardware-regtest.json) captured 28 accepted
+The latest [hardening pass](results/native-hardening.json) adds native owner
+signing without Python private keys, full historical-origin validation through a
+temporary native UTXO view, 144-block retained gate evidence with a persistent
+recovery latch, and bounded read-only loopback peer exchange. The final combined
+suite passed 333 Python tests with no skips. Its integrated native test reached
+162 accelerated blocks, covering multiple owner/payout bindings, delayed work, the regtest
+halving, archive pruning, restart and deep rollback. Separate
+[adversarial checks](results/native-adversarial.json) cover native P2P partitions
+and 2,685 deterministic sanitizer corpus inputs. See the
+[signer](../../doc/sharepool-native-signer.md) and
+[recovery](../../doc/sharepool-native-recovery.md) interfaces and limitations.
+
+The earlier [physical SPN1 test](results/native-hardware-regtest.json) captured 28 accepted
 Goldshell proofs and 28 enforcing regtest blocks, settling 27 prior proofs with
 the last winner pending. A [second enforcing node](results/native-hardware-replay.json)
 replayed all 29 full origin proposals and the same chain. These isolated test
-results do not establish public-network or production readiness.
+results predate the new signer and peer/recovery pass, which did not use the
+hardware again. They do not establish public-network or production readiness.
 
 The [hardware and production report](../../doc/sharepool-hardware-and-production.md)
 records 13 actual Goldshell shares verified on this Knots release's Testnet4
@@ -35,9 +48,15 @@ payout history reorganizes with the selected checkpoint branch. Epochs count
 checkpoint work, not elapsed seconds; this does not measure a hard TH/s limit.
 
 ```sh
-python3 -m unittest discover -s contrib/sharepool -p 'test_*.py' -v
+SHAREPOOL_SIGNER_BINARY=/absolute/build/bin/bitcoin-sharepool-signer \
+  python3 -B -m unittest discover -s contrib/sharepool -p 'test_*.py' -v
 python3 contrib/sharepool/run_pow_ledger_scenarios.py
 ```
+
+Build the native signer with `BUILD_UTIL=ON` on POSIX to include its executable
+tests; without that environment variable those native signer tests are skipped.
+The [native reproduction instructions](../../doc/sharepool-native-enforcement.md#reproduction)
+also run the separate enforcing-node functional tests.
 
 The eight [checkpoint scenarios](results/pow-ledger.json) use three independent
 replicas per case with direct object delivery in one process. The bounded store,
@@ -60,8 +79,11 @@ python3 contrib/sharepool/live_protocol_peer.py --run-smoke
 | Reference component | Purpose |
 | --- | --- |
 | `../../src/consensus/sharepool.cpp` | Native regtest snapshot, share, parent-state and exact coinbase enforcement. |
-| `native_enforcement.py` | Independent SPN1 wire builder and public-key fixtures for native tests. |
-| `native_mining_gate.py` | Local native validation of full templates, durable proof admission, known-work inclusion policy and immutable mining authorizations. |
+| `native_enforcement.py` | Independent SPN1 wire builder, deterministic public-key fixtures and an external owner-signing callback. |
+| `native_signer.py`, `../../src/bitcoin-sharepool-signer.cpp` | Bounded local adapter and native walletless regtest owner signer with immutable pool/payout policy. |
+| `native_mining_gate.py` | Full current/historical origin validation, durable proof admission, known-work inclusion policy, immutable jobs and bounded retained evidence with recovery latching. |
+| `native_peer.py` | Read-only loopback inventory/object exchange through independently validating miner gates, with transfer bounds and retry backoff. |
+| `native_fuzz_corpus.py`, `../../src/test/fuzz/sharepool.cpp` | Deterministic malformed/valid native corpus and sanitizer target for settlement and signer parsers. |
 | `native_hardware_capture.py`, `verify_native_hardware_capture.py` | Bounded isolated-regtest Sia transport through the native gate, durable proof/block capture and independent archive replay. |
 | `testnet_template.py` | Full GBT transaction/witness preservation and exact Sia ASIC-to-Knots header reconstruction. |
 | `testnet_hardware_capture.py`, `verify_hardware_capture.py` | Bounded testnet-only Stratum capture, durable admission, native proposals, and recorded-proof replay. |

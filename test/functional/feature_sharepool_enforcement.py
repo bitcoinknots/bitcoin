@@ -162,12 +162,8 @@ class SharePoolEnforcementTest(BitcoinTestFramework):
             invalid_transaction.vout = [CTxOut(1, CScript(self.scripts[0]))]
             invalid_transaction.rehash()
             invalid_body, unused = self.make(transactions=(invalid_transaction,))
-            try:
-                gate.register_template(invalid_body.serialize())
-            except ValueError as error:
-                assert "native node rejected" in str(error), str(error)
-            else:
-                raise AssertionError("Miner gate registered a template spending nonexistent inputs")
+            assert_raises_rpc_error(-26, "bad-txns-inputs-missingorspent",
+                                    gate.register_template, invalid_body.serialize())
             assert_equal(gate.receive(a.serialize()), True)
             assert_equal(gate.receive(a.serialize()), False)
             assert_equal(self.nodes[0].getblocktemplate({"mode": "proposal", "data": origin_a.serialize().hex(),

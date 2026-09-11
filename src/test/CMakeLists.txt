@@ -97,6 +97,7 @@ add_executable(test_bitcoin
   serialize_tests.cpp
   settings_tests.cpp
   sharepool_params_tests.cpp
+  sharepool_signer_tests.cpp
   sharepool_tests.cpp
   sighash_tests.cpp
   sigopcount_tests.cpp

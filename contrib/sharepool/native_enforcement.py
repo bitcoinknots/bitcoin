@@ -4,9 +4,11 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Independent wire/fixture builder for the regtest-only native SPN1 profile.
 
-Uses public functional-test Schnorr keys, never production key handling. Native
-consensus remains authoritative. Parsing checks canonical wire encoding, not
-native ancestor context, signatures, proof eligibility, or transaction validity.
+The default signing helpers use public functional-test Schnorr keys. Callers can
+instead provide public_key and sign_owner to delegate signing to a local native
+signer without importing its secret. Native consensus remains authoritative.
+Parsing checks canonical wire encoding, not native ancestor context, signatures,
+proof eligibility, or transaction validity.
 """
 
 from dataclasses import dataclass
@@ -325,16 +327,27 @@ def parse_coinbase(coinbase):
     return Manifest.deserialize(b"".join(payload for unused, payload in chunks)), tuple(money)
 
 
-def build_manifest(*, genesis, height, native_parent, pool, secret, payout_script,
-                   reward, shares=(), parent_envelope=None, parent_state=()):
+def build_manifest(*, genesis, height, native_parent, pool, payout_script,
+                   reward, secret=None, public_key=None, sign_owner=None,
+                   shares=(), parent_envelope=None, parent_state=()):
     shares = tuple(sorted(shares, key=lambda share: share.proof_id))
     if len(shares) > MAX_SHARES or len(parent_state) > MAX_STATE:
         raise ValueError("profile evidence limit")
-    public = compute_xonly_pubkey(secret)[0]
+    if secret is not None:
+        if public_key is not None or sign_owner is not None:
+            raise ValueError("choose fixture secret or external signer, not both")
+        public = compute_xonly_pubkey(secret)[0]
+    else:
+        if type(public_key) is not bytes or len(public_key) != 32 or not callable(sign_owner):
+            raise ValueError("external signer requires public_key and sign_owner")
+        public = public_key
     outputs = monetary_outputs(shares, reward=reward, fallback_script=payout_script)
     env = Envelope(genesis, RULES_HASH, height, native_parent, pool, public, payout_script,
                    shares_root(shares), state_root(derive_state(parent_state, shares, height)), payouts_root(outputs))
-    return Manifest(env, env.sign(secret), parent_envelope, tuple(parent_state), shares), outputs
+    signature = env.sign(secret) if secret is not None else sign_owner(env)
+    if type(signature) is not bytes or len(signature) != 64 or not verify_schnorr(public, signature, env.owner_message):
+        raise ValueError("owner signer returned an invalid signature")
+    return Manifest(env, signature, parent_envelope, tuple(parent_state), shares), outputs
 
 
 def apply_to_coinbase(block, manifest, outputs, *, witness=False):
@@ -350,11 +363,13 @@ def apply_to_coinbase(block, manifest, outputs, *, witness=False):
     return block
 
 
-def candidate(*, genesis, native_parent, height, ntime, pool, secret, payout_script,
-              shares=(), parent_manifest=None, parent_state=None, fees=0, transactions=(), witness=False):
+def candidate(*, genesis, native_parent, height, ntime, pool, payout_script,
+              secret=None, public_key=None, sign_owner=None, shares=(), parent_manifest=None,
+              parent_state=None, fees=0, transactions=(), witness=False):
     coinbase = create_coinbase(height, fees=fees)
     manifest, outputs = build_manifest(genesis=genesis, height=height, native_parent=native_parent,
-        pool=pool, secret=secret, payout_script=payout_script, reward=coinbase.vout[0].nValue,
+        pool=pool, secret=secret, public_key=public_key, sign_owner=sign_owner,
+        payout_script=payout_script, reward=coinbase.vout[0].nValue,
         shares=shares, parent_envelope=parent_manifest.envelope if parent_manifest else None,
         parent_state=(parent_manifest.post_state if parent_manifest and parent_state is None else (parent_state or ())))
     block = create_block(native_parent, coinbase, ntime, version=0x20000000,

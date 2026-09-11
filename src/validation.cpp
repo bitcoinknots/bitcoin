@@ -5226,17 +5226,17 @@ MempoolAcceptResult ChainstateManager::ProcessTransaction(const CTransactionRef&
     return result;
 }
 
-bool TestBlockValidity(BlockValidationState& state,
+static bool TestBlockValidityWithCoins(BlockValidationState& state,
                        const CChainParams& chainparams,
                        Chainstate& chainstate,
                        const CBlock& block,
                        CBlockIndex* pindexPrev,
+                       CCoinsViewCache& viewNew,
                        bool fCheckPOW,
-                       bool fCheckMerkleRoot)
+                       bool fCheckMerkleRoot) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
 {
     AssertLockHeld(cs_main);
-    assert(pindexPrev && pindexPrev == chainstate.m_chain.Tip());
-    CCoinsViewCache viewNew(&chainstate.CoinsTip());
+    assert(pindexPrev && pindexPrev->GetBlockHash() == viewNew.GetBestBlock());
     uint256 block_hash(block.GetHash());
     CBlockIndex indexDummy(block);
     indexDummy.pprev = pindexPrev;
@@ -5262,6 +5262,50 @@ bool TestBlockValidity(BlockValidationState& state,
     assert(state.IsValid());
 
     return true;
+}
+
+bool TestBlockValidity(BlockValidationState& state,
+                       const CChainParams& chainparams,
+                       Chainstate& chainstate,
+                       const CBlock& block,
+                       CBlockIndex* pindexPrev,
+                       bool fCheckPOW,
+                       bool fCheckMerkleRoot)
+{
+    AssertLockHeld(cs_main);
+    assert(pindexPrev && pindexPrev == chainstate.m_chain.Tip());
+    CCoinsViewCache viewNew(&chainstate.CoinsTip());
+    return TestBlockValidityWithCoins(state, chainparams, chainstate, block, pindexPrev,
+                                      viewNew, fCheckPOW, fCheckMerkleRoot);
+}
+
+bool TestSharePoolTemplateOnAncestor(BlockValidationState& state,
+                                    const CChainParams& chainparams,
+                                    Chainstate& chainstate,
+                                    const CBlock& block,
+                                    CBlockIndex* pindexPrev)
+{
+    AssertLockHeld(cs_main);
+    const auto& consensus = chainparams.GetConsensus();
+    const auto* tip = chainstate.m_chain.Tip();
+    if (chainparams.GetChainType() != ChainType::REGTEST ||
+        consensus.SharePoolHeight == std::numeric_limits<int>::max() || !tip || !pindexPrev ||
+        !chainstate.m_chain.Contains(pindexPrev) || pindexPrev->nHeight + 1 < consensus.SharePoolHeight ||
+        tip->nHeight - pindexPrev->nHeight > int(sharepool::MAX_SHARE_AGE)) {
+        return state.Error("Sharepool template parent is not an eligible active regtest ancestor");
+    }
+    // This view is never flushed. Reads may populate ordinary validation
+    // caches, but neither rollback nor candidate connection reaches CoinsTip.
+    CCoinsViewCache viewNew(&chainstate.CoinsTip());
+    for (const CBlockIndex* index = tip; index != pindexPrev; index = index->pprev) {
+        CBlock previous_block;
+        if (!chainstate.m_blockman.ReadBlock(previous_block, *index) ||
+            chainstate.DisconnectBlock(previous_block, index, viewNew) != DISCONNECT_OK) {
+            return state.Error("Native block or undo data unavailable for sharepool template validation");
+        }
+    }
+    return TestBlockValidityWithCoins(state, chainparams, chainstate, block, pindexPrev,
+                                      viewNew, /*fCheckPOW=*/false, /*fCheckMerkleRoot=*/true);
 }
 
 /* This function is called from the RPC code for pruneblockchain */

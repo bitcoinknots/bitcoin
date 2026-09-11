@@ -4,10 +4,20 @@ This report records the hardware milestone before the later
 [SPN1 native regtest enforcement](sharepool-native-enforcement.md) was added.
 Its physical results apply to the capture/observer envelope, not SPN1 mining.
 
-Status on 2026-09-11: the reference now has a real Testnet4/Sia adapter, physical
+At that milestone on 2026-09-11, the reference had a real Testnet4/Sia adapter, physical
 Goldshell evidence, and a durable passive observer tested against native Knots.
 **It is not a mainnet-ready settlement protocol.** The public hardware test does
 not connect the earlier PoW checkpoint ledger to native block validity.
+
+The later SPN1 run produced [28 enforcing regtest blocks](../contrib/sharepool/results/native-hardware-regtest.json)
+from the Goldshell, with [independent native replay](../contrib/sharepool/results/native-hardware-replay.json)
+and verified restoration to Lazarus. The latest software-only
+[hardening pass](../contrib/sharepool/results/native-hardening.json) then added
+native owner signing, historical-template validation, bounded peer exchange and
+retained evidence recovery. It passed 333 Python tests and a 162-block native
+integration run. Those changes did not reroute the miner again. The physical
+measurements below remain the earlier Testnet4 results, not measurements of the
+later software pass.
 
 ## Physical test and restoration
 
@@ -121,8 +131,10 @@ settlement consensus has been added by these adapters.
 
 ## Reproduction
 
-The final combined regression suite passes 243 tests. Reproduce it and the
-disposable native observer test with:
+The combined suite recorded at this earlier hardware milestone passed 243 tests.
+The latest combined suite passed 333 with the built native signer enabled; see
+[current native reproduction](sharepool-native-enforcement.md#reproduction).
+The legacy capture/observer components can still be exercised with:
 
 ```sh
 python3 -m unittest discover -s contrib/sharepool -p 'test_*.py' -v
@@ -152,20 +164,22 @@ restoration and separately verified Lazarus activity.
 
 ## Remaining mainnet release gates
 
-These are unresolved engineering/protocol requirements, not an assertion that
-test coverage or one more configuration switch enables mainnet safely.
+The native SPN1 profile now implements self-contained block rejection, direct
+coinbase allocation and native-parent replay state. Its local signer, peer and
+recovery path has integrated tests. The table below distinguishes that progress
+from work still required; test coverage or another configuration switch does
+not make mainnet activation safe.
 
-| Gate | Required before mainnet use |
+| Gate | Current evidence and remaining requirement |
 | --- | --- |
-| Single definition of settlement canonicality | Specify how native accepted blocks anchor checkpoint history without allowing a checkpoint reorganization to erase a still-canonical payout. The passive observer supplies a boundary, not integrated share-ledger consensus. |
-| Mandatory block validity and deployment | Define exact self-contained validation data, rule activation and behavior for nonparticipating blocks; implement and review native validation. New mandatory rejection rules split unchanged peers. A locally selected checkpoint tip is unsuitable as a Bitcoin validity predicate. |
-| Data availability and omitted work | Define bounded publication/download, missing-data recovery, censorship behavior and data retention. A Merkle root cannot establish disclosure of unseen shares. |
-| Checkpoint security and quota meaning | Specify difficulty adjustment, work incentives, attack budget and anchored renewal/expiry policy. Easy fixed targets and accelerated checkpoint epochs cannot enforce physical TH/s. |
-| Production authorization | Replace functional-test key handling with reviewed production cryptography, secure keys, replay/network separation and a defined miner/gateway authorization protocol. Sia Stratum username authorization in this harness is not cryptographic miner authentication. |
-| Integrated registry/payout rules | Validate registry and snapshot contents against native jobs, then prove delayed work is settled once across base-chain and checkpoint forks. The hardware capture and passive observer are currently separate from `PowLedger`. |
-| Long-running resource and recovery behavior | Replace the reference's 4096-checkpoint stop with specified pruning/fork eviction, bounded download queues, incremental validated storage and operational recovery. SQLite durability for capture/observer does not fix the old checkpoint archive. |
-| Complete mining pipeline | Integrate transactions, actual rewards/fees, miner refresh/expiry, candidate replay and native block results into one end-to-end protocol. Exercise actual testnet wins, peer loss, partitions, restart and many independent miners/pools. |
-| Independent security and deployment evidence | Obtain protocol/implementation review, sustained adversarial multi-node testing and reproducible builds. These short local tests and version self-report do not establish production security. |
+| Settlement canonicality and deployment | SPN1 derives paid state from the actual native parent and rechecks exact payouts in `ConnectBlock`. Activation remains regtest-only. Specify and review public deployment, nonparticipating blocks and composition with other `m_mm_rhs` users; unchanged peers otherwise disagree on validity. |
+| Data availability and omitted work | Loopback peers exchange bounded full origins and proofs; miners enforce their locally known work. External transport, censorship behavior and availability incentives remain. A commitment cannot prove disclosure of unseen shares. |
+| Difficulty and quota meaning | SPN1 uses an easy fixed target and no percentage or physical TH/s cap. Production difficulty, sampling, incentives and attack budgets need specification; the earlier synthetic checkpoint quotas are separate. |
+| Production authorization | The new local signer uses native libsecp256k1 and an exclusive mode-0600 key file with regtest/pool/payout policy. Secure provisioning/recovery, further platform support, independent review and a deployed DATUM/gateway authorization protocol remain. Legacy Sia username authorization is not cryptographic miner authentication. |
+| Origin and payout validation | Native consensus verifies contained header work, signatures and exact script/amount allocation; miner gates additionally validate full current or recent historical origins through a temporary UTXO view. Review that consensus/policy boundary and exercise many independently operated miners and pools. |
+| Resource and recovery behavior | Gates retain a bounded archive behind a 144-block anchor and latch deep-reorg recovery across restart. Queues, downloads and parser allocations are bounded. Sustained load, capacity planning, complete archive restoration and operational failure recovery still need validation. |
+| Complete mining pipeline | Earlier hardware tests cover ASIC/native hash binding and 28 regtest settlements; the later native-signer/peer test covers 162 blocks including delayed proofs, halving, pruning and restart. A sustained deployed DATUM pipeline, the new service path on hardware and public-test-network activation remain untested. |
+| Independent security and deployment evidence | Native P2P partition/rejoin and historical UTXO cases pass, as does a 2,685-input deterministic address/undefined-behavior sanitizer corpus. Coverage-guided fuzzing, external review, additional platforms, reproducible builds and sustained adversarial campaigns remain. |
 
 No mainnet node, wallet, consensus, or activation configuration was changed.
 Miner routing changed temporarily for the test and was restored. The existing

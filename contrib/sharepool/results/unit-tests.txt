@@ -104,18 +104,70 @@ test_old_parent_work_is_credited_without_submitting_side_block (test_native_hard
 test_partial_archive_retry_completes_existing_gate_receipt (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
 test_post_receipt_native_rejection_stops_and_raises_run (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
 test_shutdown_cancels_bounded_queue_and_never_acknowledges (test_native_hardware_capture.NativeHardwareCaptureTests) ... ok
+test_active_inventory_filters_expired_and_orphaned_but_keeps_archive (test_native_mining_gate.NativeGateTests) ... ok
 test_base_template_requires_explicit_completion_and_support (test_native_mining_gate.NativeGateTests) ... ok
+test_body_byte_limit_does_not_remove_existing_evidence (test_native_mining_gate.NativeGateTests) ... ok
 test_capacity_and_disk_failure_do_not_acknowledge_work (test_native_mining_gate.NativeGateTests) ... ok
 test_coordinator_cannot_inject_unknown_origin_and_new_work_stays_known (test_native_mining_gate.NativeGateTests) ... ok
+test_deep_reorg_latches_recovery_even_after_original_chain_returns (test_native_mining_gate.NativeGateTests) ... ok
+test_historical_full_origin_uses_native_rewind_validation_only (test_native_mining_gate.NativeGateTests) ... ok
+test_historical_origin_rpc_binding_mismatch_is_not_cached (test_native_mining_gate.NativeGateTests) ... ok
 test_inactive_native_peer_cannot_authorize_even_if_proposal_accepts (test_native_mining_gate.NativeGateTests) ... ok
+test_interrupted_v1_schema_migration_rolls_back_all_ddl (test_native_mining_gate.NativeGateTests) ... ok
+test_inventory_uses_bounded_metadata_without_reading_bodies (test_native_mining_gate.NativeGateTests) ... ok
 test_job_receipt_batch_rolls_back_when_capacity_is_exhausted (test_native_mining_gate.NativeGateTests) ... ok
 test_late_work_requests_refresh_without_rewriting_authorized_job (test_native_mining_gate.NativeGateTests) ... ok
+test_lifetime_exceeds_128_proofs_and_pruning_never_reuses_revision (test_native_mining_gate.NativeGateTests) ... ok
+test_malicious_nested_counts_fail_before_framework_allocation (test_native_mining_gate.NativeGateTests) ... ok
 test_missing_known_work_rejects_job_but_not_native_block (test_native_mining_gate.NativeGateTests) ... ok
+test_paid_proof_and_body_survive_until_anchor_cannot_resurrect_it (test_native_mining_gate.NativeGateTests) ... ok
+test_pruning_detects_corrupt_height_before_deleting_acknowledged_work (test_native_mining_gate.NativeGateTests) ... ok
 test_receive_uses_native_validation_and_persists_once_across_restart (test_native_mining_gate.NativeGateTests) ... ok
+test_revision_rollback_on_failed_receipt_insert (test_native_mining_gate.NativeGateTests) ... ok
+test_same_height_anchor_replacement_requires_recovery (test_native_mining_gate.NativeGateTests) ... ok
+test_second_owner_cannot_race_retained_anchor_or_revisions (test_native_mining_gate.NativeGateTests) ... ok
+test_startup_detects_hash_corruption_before_exposing_inventory (test_native_mining_gate.NativeGateTests) ... ok
+test_startup_rejects_oversized_archive_before_decoding_blobs (test_native_mining_gate.NativeGateTests) ... ok
 test_store_is_bound_to_miner_and_detects_corrupt_receipt (test_native_mining_gate.NativeGateTests) ... ok
 test_tip_change_and_network_change_fail_closed (test_native_mining_gate.NativeGateTests) ... ok
+test_truncated_blocks_fail_preflight_and_valid_witness_roundtrips (test_native_mining_gate.NativeGateTests) ... ok
 test_unknown_or_corrupt_full_origin_templates_do_not_receive_credit (test_native_mining_gate.NativeGateTests) ... ok
+test_v1_migration_preserves_receipts_and_origin_integrity (test_native_mining_gate.NativeGateTests) ... ok
 test_wrong_miner_binding_and_native_payout_failure_never_authorize (test_native_mining_gate.NativeGateTests) ... ok
+test_changed_digest_or_native_identity_is_never_admitted (test_native_peer.NativePeerTests) ... ok
+test_failed_peer_backoff_preserves_fair_polling (test_native_peer.NativePeerTests) ... ok
+test_http_duplicate_lengths_and_chunking_are_rejected (test_native_peer.NativePeerTests) ... ok
+test_incomplete_withheld_object_preserves_previous_durable_progress (test_native_peer.NativePeerTests) ... ok
+test_inventory_change_between_status_and_page_requires_retry (test_native_peer.NativePeerTests) ... ok
+test_json_duplicate_keys_and_nonfinite_values_reject (test_native_peer.NativePeerTests) ... ok
+test_local_inventory_failure_is_not_attributed_to_remote_peer (test_native_peer.NativePeerTests) ... ok
+test_loopback_pull_orders_full_origins_before_proofs_and_is_idempotent (test_native_peer.NativePeerTests) ... ok
+test_native_chain_disagreement_prevents_all_import (test_native_peer.NativePeerTests) ... ok
+test_native_rejection_is_backoff_but_local_recovery_stops_replication (test_native_peer.NativePeerTests) ... ok
+test_no_network_mutation_route_or_historical_object_or_arbitrary_local_call (test_native_peer.NativePeerTests) ... ok
+test_peer_destination_cannot_redirect_credentials_or_use_dns_or_public_hosts (test_native_peer.NativePeerTests) ... ok
+test_progress_and_duplicate_receipts_do_not_claim_new_credit_or_completeness (test_native_peer.NativePeerTests) ... ok
+test_rpc_operation_deadline_prevents_acknowledgment_after_slow_validation (test_native_peer.NativePeerTests) ... ok
+test_service_shutdown_rejects_further_work (test_native_peer.NativePeerTests) ... ok
+test_transfer_budget_defers_proofs_until_origins_can_be_admitted (test_native_peer.NativePeerTests) ... ok
+test_fifo_and_directory_rejected_without_blocking (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_group_readable_and_wrong_modes_rejected (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_init_never_overwrites_existing_key (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_key_file_truncated_and_oversized_fail_closed (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_macos_extended_acl_rejected_and_inheritance_cleared (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_native_init_policy_rejections_do_not_create_keys (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_native_stdin_strict_bounds_and_canonical_encoding (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_policy_and_network_checks_are_native (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_random_key_policy_file_and_valid_signature (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_secretless_builder_and_owner_signature (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_symlink_and_hardlink_rejected (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_bad_policy_and_timeout_rejected_before_launch (test_native_signer.SignerAdapterTests) ... ok
+test_exact_output_and_command_paths (test_native_signer.SignerAdapterTests) ... ok
+test_external_builder_signature_and_identity_requirements (test_native_signer.SignerAdapterTests) ... ok
+test_rejects_failure_or_ambiguous_output (test_native_signer.SignerAdapterTests) ... ok
+test_rejects_oversized_stdout_and_stderr (test_native_signer.SignerAdapterTests) ... ok
+test_sign_timeout_is_bounded_even_when_child_does_not_read (test_native_signer.SignerAdapterTests) ... ok
+test_timeout_kills_silent_process (test_native_signer.SignerAdapterTests) ... ok
 test_all_scripts_exactly_capped_resume_after_empty_epoch_heartbeat (test_pow_share_ledger.PowShareLedgerTests) ... ok
 test_authorized_payout_update_does_not_redirect_old_work (test_pow_share_ledger.PowShareLedgerTests) ... ok
 test_branch_work_counts_ancestors_once_and_never_sums_siblings (test_pow_share_ledger.PowShareLedgerTests) ... ok
@@ -281,6 +333,6 @@ test_single_group_can_account_for_all_work_within_its_budget (test_work_rate_bud
 test_work_weights_not_equal_share_counts_control_budget (test_work_rate_budget.WorkRateBudgetTest) ... ok
 
 ----------------------------------------------------------------------
-Ran 281 tests in 17.229s
+Ran 333 tests in 29.482s
 
 OK

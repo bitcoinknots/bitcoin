@@ -194,6 +194,7 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   script/sign.cpp
   script/signingprovider.cpp
   script/solver.cpp
+  sharepool/signer.cpp
 )
 target_link_libraries(bitcoin_common
   PRIVATE
@@ -442,6 +443,15 @@ if(BUILD_UTIL)
     bitcoin_util
   )
   install_binary_component(bitcoin-util HAS_MANPAGE)
+  if(UNIX)
+    add_executable(bitcoin-sharepool-signer bitcoin-sharepool-signer.cpp)
+    target_link_libraries(bitcoin-sharepool-signer
+      core_interface
+      bitcoin_common
+      bitcoin_util
+    )
+    install_binary_component(bitcoin-sharepool-signer)
+  endif()
 endif()
 
 

@@ -35,7 +35,10 @@ BIP340 owner authorization signs H("SharePool/owner/v1\0" || genesis || rules ||
 uint32(height) || native_parent || pool || public_key || vector(payout_script)).
 It authorizes that key/script/pool/native round. The owner binding is in the
 envelope before PoW; supplying a new signature cannot redirect a public proof.
-The signature excludes the containing coinbase and the solved header.
+The signature excludes the snapshot roots, containing coinbase and solved header.
+The [local native signer](sharepool-native-signer.md) constrains this exact
+authorization to its regtest pool/key/payout policy. It does not independently
+attest to the full template or current chain state.
 
 A state entry is uint32(origin_height), uint256(proof_id). Its leaf is
 H("SharePool/state/v1\0" || entry). A share is a full native CBlockHeader,
@@ -108,6 +111,28 @@ ConnectBlock. The latter compares exact subsidy plus actual fees after UTXO fee
 calculation, including reindex-chainstate and VerifyDB paths. No local snapshot,
 sidecar, best checkpoint or external RPC contributes to consensus validity.
 
+## Miner-side validation and evidence recovery
+
+The native `validatesharepooltemplate` RPC validates a complete origin block at
+its active-chain parent, skipping only candidate PoW. At most three recent
+blocks are disconnected in a temporary UTXO view to recover the original input,
+script and fee context. The live chain is not rewound. An unavailable block or
+undo record, orphaned parent or expired origin prevents admission. The separate
+`validatesharepoolshare` RPC validates the header proof and its attribution.
+
+The miner gate requires that full origin validation before storing a share or
+accepting one introduced through a proposed settlement job. Its local omission
+policy uses durably received, eligible unpaid proofs; another node's different
+receipt history cannot change native block validity. The new local peer
+transport exchanges bounded inventories, full templates and proofs through this
+gate. Inventories never select settlement ancestry or authorize signing.
+
+The gate's 144-block retained archive and persistent deep-reorganization
+recovery latch are operational storage rules, not additions to the wire format.
+The consensus eligibility window remains `j` through `j+3`; retaining older
+evidence cannot make it payable again. See [native enforcement](sharepool-native-enforcement.md)
+and [retention/recovery](sharepool-native-recovery.md) for implementation limits.
+
 ## Scope and unresolved policy
 
 This profile verifies the selected snapshot and prevents repeat native payouts
@@ -120,6 +145,9 @@ with native-parent state; it does not transplant checkpoint-based quotas or clai
 an absolute physical hash-rate cap. Registrations here are self-authorized
 key/script bindings per native round, not a global identity authority.
 
-Native validation, fixture builders, network/reorg/reindex tests, and a job
-verification entry point must be exercised together. This test activation is
-not a mainnet deployment mechanism or a declaration of production readiness.
+The native signer, historical-origin RPC, miner gates and loopback evidence
+exchange are exercised together in the recorded 162-block integration test.
+Separate native P2P/reorg/reindex cases and a deterministic sanitizer corpus
+provide additional evidence. These bounded tests do not establish large-pool
+performance, undisclosed-work detection, independent security review or mainnet
+deployment readiness. See the [hardening report](../contrib/sharepool/results/native-hardening.json).

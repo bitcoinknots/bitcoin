@@ -418,6 +418,18 @@ bool TestBlockValidity(BlockValidationState& state,
                        bool fCheckPOW = true,
                        bool fCheckMerkleRoot = true) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
+/** Validate a complete SPN1 template on a recent active-chain ancestor.
+ * Regtest only, at most sharepool::MAX_SHARE_AGE disconnections into a temporary
+ * coins view. Does not change the active chain, flush coins, or publish a block.
+ * Like a mining proposal, candidate PoW is not required; transaction validity,
+ * merkle commitments, signatures, payouts and actual fees are checked.
+ */
+bool TestSharePoolTemplateOnAncestor(BlockValidationState& state,
+                                    const CChainParams& chainparams,
+                                    Chainstate& chainstate,
+                                    const CBlock& block,
+                                    CBlockIndex* pindexPrev) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+
 /** Check with the proof of work on each blockheader matches the value in nBits */
 bool HasValidProofOfWork(const std::vector<CBlockHeader>& headers, const Consensus::Params& consensusParams);
 

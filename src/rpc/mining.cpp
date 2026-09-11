@@ -1271,6 +1271,74 @@ static RPCHelpMan submitheader()
     };
 }
 
+static RPCHelpMan validatesharepooltemplate()
+{
+    return RPCHelpMan{"validatesharepooltemplate",
+        "Validate a complete SPN1 template against its recent active-chain parent.\n"
+        "Available only for the opt-in regtest profile, at most three blocks behind the native tip.\n"
+        "Checks transactions, commitments, authorization and actual fee payouts using a temporary\n"
+        "UTXO view. Candidate proof of work is not required. Does not change the chain, publish a\n"
+        "block, or authorize mining. Historical block and undo data must be locally available.\n",
+        {{"template", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Canonical full block template, at most 4000000 bytes"}},
+        RPCResult{RPCResult::Type::OBJ, "", "Validated template context",
+        {
+            {RPCResult::Type::BOOL, "valid", "True after complete native template validation"},
+            {RPCResult::Type::STR_HEX, "native_tip", "Active tip used to check eligibility"},
+            {RPCResult::Type::STR_HEX, "native_parent", "Actual active ancestor used for the UTXO view"},
+            {RPCResult::Type::NUM, "origin_height", "Height of the validated template"},
+            {RPCResult::Type::STR_HEX, "commitment", "SPN1 envelope commitment in RPC display order"},
+        }},
+        RPCExamples{HelpExampleCli("validatesharepooltemplate", "\"serialized_block_hex\"")},
+        [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
+            const auto text = request.params[0].get_str();
+            if (text.empty() || text.size() > 2 * MAX_BLOCK_SERIALIZED_SIZE || !IsHex(text)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Template must contain at most 4000000 bytes of hexadecimal data");
+            }
+            CBlock block;
+            try {
+                const auto raw = ParseHex(text);
+                DataStream stream{raw};
+                stream >> TX_WITH_WITNESS(block);
+                DataStream canonical;
+                canonical << TX_WITH_WITNESS(block);
+                if (!stream.empty() || HexStr(canonical) != HexStr(raw)) {
+                    throw std::ios_base::failure("Noncanonical block encoding");
+                }
+            } catch (const std::exception&) {
+                throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Noncanonical or malformed SPN1 template");
+            }
+            ChainstateManager& chainman = EnsureAnyChainman(request.context);
+            LOCK(cs_main);
+            const auto& params = chainman.GetParams();
+            const auto& consensus = params.GetConsensus();
+            auto& chainstate = chainman.ActiveChainstate();
+            const auto* tip = chainstate.m_chain.Tip();
+            if (params.GetChainType() != ChainType::REGTEST || !tip ||
+                consensus.SharePoolHeight == std::numeric_limits<int>::max() ||
+                tip->nHeight + 1 < consensus.SharePoolHeight) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Native sharepool validation is not active on this chain");
+            }
+            auto* parent = chainman.m_blockman.LookupBlockIndex(block.hashPrevBlock);
+            if (!parent || !chainstate.m_chain.Contains(parent) ||
+                parent->nHeight + 1 < consensus.SharePoolHeight ||
+                tip->nHeight - parent->nHeight > int(sharepool::MAX_SHARE_AGE)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Template parent is not an eligible active native ancestor");
+            }
+            BlockValidationState state;
+            if (!TestSharePoolTemplateOnAncestor(state, params, chainstate, block, parent)) {
+                throw JSONRPCError(state.IsError() ? RPC_VERIFY_ERROR : RPC_VERIFY_REJECTED, state.ToString());
+            }
+            UniValue result(UniValue::VOBJ);
+            result.pushKV("valid", true);
+            result.pushKV("native_tip", tip->GetBlockHash().GetHex());
+            result.pushKV("native_parent", parent->GetBlockHash().GetHex());
+            result.pushKV("origin_height", parent->nHeight + 1);
+            result.pushKV("commitment", block.m_mm_rhs.GetHex());
+            return result;
+        },
+    };
+}
+
 static RPCHelpMan validatesharepoolshare()
 {
     return RPCHelpMan{"validatesharepoolshare",
@@ -1354,6 +1422,7 @@ void RegisterMiningRPCCommands(CRPCTable& t)
         {"mining", &submitblock},
         {"mining", &submitheader},
         {"mining", &validatesharepoolshare},
+        {"mining", &validatesharepooltemplate},
 
         {"hidden", &generatetoaddress},
         {"hidden", &generatetodescriptor},

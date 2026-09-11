@@ -117,6 +117,9 @@ BASE_SCRIPTS = [
     'mempool_persist.py --descriptors',
     # vv Tests less than 60s vv
     'feature_sharepool_enforcement.py',
+    'feature_sharepool_network.py',
+    'feature_sharepool_ancestor.py',
+    'feature_sharepool_peer.py',
     'rpc_psbt.py --legacy-wallet',
     'rpc_psbt.py --descriptors',
     'wallet_fundrawtransaction.py --legacy-wallet',
