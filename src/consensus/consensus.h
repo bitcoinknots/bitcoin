@@ -23,8 +23,8 @@ static const int COINBASE_MATURITY = 100;
  *  (coinbase_height - window_start) % 6 so 1/6 of window coinbases mature
  *  at 2016, 2/6 at 8064, and 1/2 at 26280. No extra coinbase outputs. */
 static const int EXTENDED_COINBASE_MATURITY_SHORT = 2016;
-static const int EXTENDED_COINBASE_MATURITY_MID = 8064;
-static const int EXTENDED_COINBASE_MATURITY_LONG = 26280;
+static const int EXTENDED_COINBASE_MATURITY_MID = 4032;
+static const int EXTENDED_COINBASE_MATURITY_LONG = 8064;
 
 static const int WITNESS_SCALE_FACTOR = 4;
 

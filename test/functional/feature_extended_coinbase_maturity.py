@@ -9,8 +9,8 @@ human diff against that PR is mostly the two intended deltas:
 
   1. Window coinbases use (height - activation) % 6
        0        -> 2016 confirmations   (1/6 of blocks)
-       1 or 2   -> 8064 confirmations   (2/6)
-       3, 4, 5  -> 26280 confirmations  (1/2)
+       1 or 2   -> 4032 confirmations   (2/6)
+       3, 4, 5  -> 8064 confirmations  (1/2)
      instead of a single 26280-block lock. Coinbase size is unchanged.
   2. The lock is attached to the creating height. After RDTS expiry,
      *new* coinbases use COINBASE_MATURITY (100). Window-created
@@ -43,8 +43,8 @@ from test_framework.util import (
 from test_framework.wallet import MiniWallet
 
 EXTENDED_SHORT = 2016
-EXTENDED_MID = 8064
-EXTENDED_LONG = 26280
+EXTENDED_MID = 4032
+EXTENDED_LONG = 8064
 BLAKE2B_HEIGHT = 120
 # Mock clock: pre-activation blocks are stamped from T0, the window opens once
 # the median-time-past reaches START, and RDTS (with it, this rule's *creation*
