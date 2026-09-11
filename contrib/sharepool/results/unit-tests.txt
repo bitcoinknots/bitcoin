@@ -1,3 +1,5 @@
+test_distinct_miner_tags_share_one_payout_budget_and_latest_refresh_stays_paused (test_job_gateway.GatewayPayoutBudgetTests) ... ok
+test_shared_payout_inflight_overflow_is_credited_and_auto_refresh_remains_paused (test_job_gateway.GatewayPayoutBudgetTests) ... ok
 test_callback_receipt_race_does_not_sign_or_activate_stale_proposal (test_job_gateway.GatewayTests) ... ok
 test_concurrent_refresh_response_cannot_replace_newer_activation (test_job_gateway.GatewayTests) ... ok
 test_coordinator_cannot_rewind_requested_ledger_or_registry (test_job_gateway.GatewayTests) ... ok
@@ -16,13 +18,16 @@ test_authenticated_jobs_are_full_reward_templates_with_distinct_tags (test_live_
 test_authenticated_unapproved_target_and_wrong_commitments_rejected (test_live_protocol.LiveProtocolTests) ... ok
 test_coordinator_and_miner_cannot_authorize_redirected_coinbase (test_live_protocol.LiveProtocolTests) ... ok
 test_distinct_proofs_from_one_job_are_credited_once_each (test_live_protocol.LiveProtocolTests) ... ok
-test_inflight_overbudget_work_is_retained_and_stops_new_group_jobs (test_live_protocol.LiveProtocolTests) ... ok
+test_distinct_tags_and_miner_ids_share_one_payout_budget (test_live_protocol.LiveProtocolTests) ... ok
+test_import_rejects_legacy_or_conflicting_budget_basis (test_live_protocol.LiveProtocolTests) ... ok
+test_inflight_overbudget_work_is_retained_and_stops_new_payout_jobs (test_live_protocol.LiveProtocolTests) ... ok
 test_insufficient_share_pow_is_not_credited (test_live_protocol.LiveProtocolTests) ... ok
-test_job_refresh_cannot_reset_aggregated_group_work_budget (test_live_protocol.LiveProtocolTests) ... ok
+test_job_refresh_cannot_reset_aggregated_payout_work_budget (test_live_protocol.LiveProtocolTests) ... ok
 test_late_share_after_parent_seal_is_rejected (test_live_protocol.LiveProtocolTests) ... ok
 test_live_snapshot_inclusions_bind_every_receipt_context_and_leaf_count (test_live_protocol.LiveProtocolTests) ... ok
 test_missing_transport_dependencies_remain_uncredited (test_live_protocol.LiveProtocolTests) ... ok
 test_new_origin_epoch_gets_new_budget_without_relabeling_old_claims (test_live_protocol.LiveProtocolTests) ... ok
+test_new_registered_tag_same_payout_does_not_get_fresh_budget (test_live_protocol.LiveProtocolTests) ... ok
 test_new_verified_prefix_updates_sidechain_commitment_and_keeps_old_job (test_live_protocol.LiveProtocolTests) ... ok
 test_old_job_winner_carries_tail_and_itself_into_next_payout_once (test_live_protocol.LiveProtocolTests) ... ok
 test_out_of_order_export_import_and_restore_revalidate_all_objects (test_live_protocol.LiveProtocolTests) ... ok
@@ -32,8 +37,10 @@ test_registry_update_cannot_redirect_preexisting_claims (test_live_protocol.Live
 test_resigned_job_with_wrong_snapshot_merkle_root_is_rejected (test_live_protocol.LiveProtocolTests) ... ok
 test_seal_cannot_attach_a_conflicting_registry_tail_to_winner (test_live_protocol.LiveProtocolTests) ... ok
 test_share_origin_on_orphaned_branch_is_rejected (test_live_protocol.LiveProtocolTests) ... ok
+test_shared_payout_inflight_excess_survives_winner_and_restore (test_live_protocol.LiveProtocolTests) ... ok
 test_shares_cannot_change_target_coinbase_or_authenticated_job (test_live_protocol.LiveProtocolTests) ... ok
 test_sibling_registry_histories_cannot_mix_claims_and_payouts (test_live_protocol.LiveProtocolTests) ... ok
+test_signing_key_rotation_keeps_shared_payout_budget (test_live_protocol.LiveProtocolTests) ... ok
 test_winner_that_also_has_receipt_is_deduplicated (test_live_protocol.LiveProtocolTests) ... ok
 test_wrong_job_signatures_never_enter_job_cache (test_live_protocol.LiveProtocolTests) ... ok
 test_changed_commitment_can_also_pass_easy_target (test_precommit_demo.HeaderCommitmentTest) ... ok
@@ -46,9 +53,11 @@ test_order_independent_and_duplicate_rejected (test_precommit_demo.SnapshotTest)
 test_root_count_context_and_leaf_boundary_binding (test_precommit_demo.SnapshotTest) ... ok
 test_snapshot_is_copied_and_frozen (test_precommit_demo.SnapshotTest) ... ok
 test_actual_pow_is_checked (test_proof_fixtures.ProofFixtureTest) ... ok
+test_distinct_tags_share_the_actual_bound_payout_group (test_proof_fixtures.ProofFixtureTest) ... ok
 test_exact_deserialization_and_coinbase_shape (test_proof_fixtures.ProofFixtureTest) ... ok
 test_immutable_bytes_and_input_bounds (test_proof_fixtures.ProofFixtureTest) ... ok
 test_parent_height_pool_target_and_commitment_binding (test_proof_fixtures.ProofFixtureTest) ... ok
+test_payout_destination_is_bound_before_hashing_and_not_redirectable (test_proof_fixtures.ProofFixtureTest) ... ok
 test_preapproved_target_controls_credit (test_proof_fixtures.ProofFixtureTest) ... ok
 test_real_proof_and_stable_tag_across_jobs (test_proof_fixtures.ProofFixtureTest) ... ok
 test_tag_template_changes_and_false_declaration (test_proof_fixtures.ProofFixtureTest) ... ok
@@ -57,17 +66,20 @@ test_canonical_order_and_metadata_binding (test_settlement_sim.SettlementTests) 
 test_committed_forged_tag_or_coinbase_proof_is_invalid (test_settlement_sim.SettlementTests) ... ok
 test_competing_proposals_are_not_automatically_invalid (test_settlement_sim.SettlementTests) ... ok
 test_different_absolute_budgets_reconverge_on_more_work_common_valid_branch (test_settlement_sim.SettlementTests) ... ok
+test_distinct_tags_to_same_destination_share_one_budget_and_payout (test_settlement_sim.SettlementTests) ... ok
 test_duplicate_share_is_invalid_committed_data (test_settlement_sim.SettlementTests) ... ok
 test_every_snapshot_leaf_has_count_bound_inclusion_proof (test_settlement_sim.SettlementTests) ... ok
 test_fifty_delivery_permutations_converge_without_double_settlement (test_settlement_sim.SettlementTests) ... ok
 test_malformed_block_delivery_does_not_crash_or_poison_cache (test_settlement_sim.SettlementTests) ... ok
-test_mined_job_refreshes_accumulate_against_absolute_tag_work_budget (test_settlement_sim.SettlementTests) ... ok
+test_mined_job_refreshes_accumulate_against_absolute_payout_work_budget (test_settlement_sim.SettlementTests) ... ok
 test_missing_snapshot_stalls_descendants_then_data_arrival_retries (test_settlement_sim.SettlementTests) ... ok
 test_more_chain_work_does_not_override_absolute_work_budget_validity (test_settlement_sim.SettlementTests) ... ok
 test_mutable_metadata_is_copied_and_cached_root_is_rechecked (test_settlement_sim.SettlementTests) ... ok
+test_new_destination_does_not_redirect_old_share_credit (test_settlement_sim.SettlementTests) ... ok
 test_nonempty_work_can_pass_with_any_number_of_groups (test_settlement_sim.SettlementTests) ... ok
 test_old_issued_snapshot_is_not_replaced_by_latest_or_local_inventory (test_settlement_sim.SettlementTests) ... ok
-test_omitted_work_can_conceal_a_tag_exceeding_its_absolute_budget (test_settlement_sim.SettlementTests) ... ok
+test_old_tag_grouped_metadata_and_store_are_not_reinterpreted (test_settlement_sim.SettlementTests) ... ok
+test_omitted_work_can_conceal_a_payout_destination_exceeding_its_budget (test_settlement_sim.SettlementTests) ... ok
 test_payouts_reject_underpay_overpay_wrong_recipient_and_reallocation (test_settlement_sim.SettlementTests) ... ok
 test_previous_window_share_cannot_be_replayed_in_child (test_settlement_sim.SettlementTests) ... ok
 test_repeated_delivery_and_persistence_do_not_double_settle (test_settlement_sim.SettlementTests) ... ok
@@ -97,12 +109,12 @@ test_duplicate_share_ids_are_rejected_even_across_groups (test_work_accounting.W
 test_empty_input_has_zero_totals (test_work_accounting.WorkAccountingTest) ... ok
 test_equal_share_counts_can_have_unequal_work (test_work_accounting.WorkAccountingTest) ... ok
 test_invalid_work_and_target_inputs (test_work_accounting.WorkAccountingTest) ... ok
-test_same_tag_across_jobs_is_aggregated (test_work_accounting.WorkAccountingTest) ... ok
+test_same_destination_across_jobs_is_aggregated (test_work_accounting.WorkAccountingTest) ... ok
 test_whole_pool_can_be_accounted_to_one_group (test_work_accounting.WorkAccountingTest) ... ok
 test_arbitrary_precision_budget_preserves_boundary (test_work_rate_budget.WorkRateBudgetTest) ... ok
 test_canonical_order_generator_input_and_immutable_result (test_work_rate_budget.WorkRateBudgetTest) ... ok
 test_complete_configured_window_is_used (test_work_rate_budget.WorkRateBudgetTest) ... ok
-test_different_miners_and_jobs_aggregate_under_same_group (test_work_rate_budget.WorkRateBudgetTest) ... ok
+test_different_tags_miners_and_jobs_aggregate_under_same_payout_script (test_work_rate_budget.WorkRateBudgetTest) ... ok
 test_empty_evidence_does_not_certify_zero_hashrate (test_work_rate_budget.WorkRateBudgetTest) ... ok
 test_five_terahashes_per_second_exact_boundary_and_one_above (test_work_rate_budget.WorkRateBudgetTest) ... ok
 test_invalid_records_and_cross_group_duplicate_ids_are_rejected (test_work_rate_budget.WorkRateBudgetTest) ... ok
@@ -112,6 +124,6 @@ test_single_group_can_account_for_all_work_within_its_budget (test_work_rate_bud
 test_work_weights_not_equal_share_counts_control_budget (test_work_rate_budget.WorkRateBudgetTest) ... ok
 
 ----------------------------------------------------------------------
-Ran 112 tests in 10.566s
+Ran 124 tests in 12.982s
 
 OK

@@ -294,5 +294,97 @@ class GatewayTests(unittest.TestCase):
             self.assertGreater(replacement.manifest.serial, active.manifest.serial)
 
 
+class GatewayPayoutBudgetTests(unittest.TestCase):
+    def setUp(self):
+        self.coordinator = private_key(601)
+        self.keys = (private_key(602), private_key(603), private_key(604))
+        self.scripts = (b"\x51", b"\x51", b"\x52")
+        self.rules = Rules(public_key(self.coordinator), cap_hashes_per_second=1,
+                           window_seconds=4)
+        self.server = Engine(self.rules)
+        registry_root = self.server.genesis_registry
+        for index, (key, script) in enumerate(zip(self.keys, self.scripts)):
+            change = register(self.server.registry(registry_root), key,
+                              f"quota-miner-{index}".encode(), script)
+            registry_root = self.server.add_change(change)
+        self.gateways = []
+        for key in self.keys:
+            replica = Engine(self.rules)
+            self.assertEqual(replica.import_objects(self.server.export()), 0)
+            self.gateways.append(Gateway(replica, key, registry_root))
+
+    def callback(self, miner_id, registry_root, ledger_root, parent, serial):
+        return propose_job(self.server, self.coordinator, miner_id, registry_root,
+                           ledger_root, parent, serial)
+
+    def refresh(self, index):
+        job = self.gateways[index].refresh(self.callback)
+        self.server.add_job(job)
+        for gateway in self.gateways:
+            gateway.ingest_job(job)
+        return job
+
+    def acknowledge(self, job, previous_root, *, extranonce):
+        proof = mine(job, extranonce=extranonce)
+        receipt = append_receipt(self.server, self.coordinator, previous_root, proof=proof)
+        for gateway in self.gateways:
+            gateway.ingest_receipt(receipt)
+        return receipt
+
+    def exhaust_shared_payout_budget(self):
+        first = self.refresh(0)
+        first_receipt = self.acknowledge(first, self.server.empty_ledger, extranonce=1)
+        second = self.refresh(1)
+        self.assertEqual(second.manifest.ledger_root, first_receipt.root)
+        self.assertNotEqual(first.manifest.miner_id, second.manifest.miner_id)
+        registry = self.server.registry(first.manifest.registry_root)
+        first_entry = registry.entry(first.manifest.miner_id)
+        second_entry = registry.entry(second.manifest.miner_id)
+        self.assertNotEqual(first_entry.tag, second_entry.tag)
+        self.assertEqual(first_entry.payout_script, second_entry.payout_script)
+        exhausted = self.acknowledge(second, first_receipt.root, extranonce=2)
+        claims = self.server.claims_for(self.server.tip, exhausted.root)
+        self.assertEqual(sum(claim.work for claim in claims.values()), self.rules.budget)
+        return first, second, exhausted
+
+    def test_distinct_miner_tags_share_one_payout_budget_and_latest_refresh_stays_paused(self):
+        first, second, exhausted = self.exhaust_shared_payout_budget()
+        for index, issued in ((0, first), (1, second)):
+            gateway = self.gateways[index]
+            generation, known_jobs = gateway.generation, set(gateway.issued)
+            self.assertEqual(gateway.ledger_root, exhausted.root)
+            with self.assertRaisesRegex(ValueError, "budget"):
+                gateway.refresh(self.callback)
+            self.assertIsNone(gateway.active_job)
+            self.assertEqual(gateway.ledger_root, exhausted.root)
+            self.assertEqual(gateway.generation, generation)
+            self.assertEqual(set(gateway.issued), known_jobs)
+            self.assertIn(issued.job_id, gateway.issued)
+        self.assertEqual(self.server.budget_violations(exhausted.root), {})
+        other = self.refresh(2)
+        self.assertIs(self.gateways[2].active_job, other)
+        self.assertEqual(other.manifest.ledger_root, exhausted.root)
+        entry = self.server.registry(other.manifest.registry_root).entry(other.manifest.miner_id)
+        self.assertNotEqual(entry.payout_script, self.scripts[0])
+
+    def test_shared_payout_inflight_overflow_is_credited_and_auto_refresh_remains_paused(self):
+        _, second, exhausted = self.exhaust_shared_payout_budget()
+        proof = mine(second, extranonce=3)
+        overflow = append_receipt(self.server, self.coordinator, exhausted.root, proof=proof)
+        gateway = self.gateways[1]
+        known_jobs = set(gateway.issued)
+        with self.assertRaisesRegex(ValueError, "budget"):
+            gateway.receive_and_refresh(overflow, self.callback)
+        self.assertIsNone(gateway.active_job)
+        self.assertEqual(gateway.ledger_root, overflow.root)
+        self.assertEqual(set(gateway.issued), known_jobs)
+        self.assertIn(proof.proof_id, gateway.engine.pending(overflow.root))
+        self.assertEqual(gateway.engine.budget_violations(overflow.root),
+                         {(second.manifest.epoch, self.scripts[0]): 6})
+        claims = gateway.engine.claims_for(gateway.engine.tip, overflow.root)
+        self.assertEqual(len(claims), 3)
+        self.assertEqual(sum(claim.work for claim in claims.values()), 6)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -116,7 +116,7 @@ def run():
         assert deliver(node, extension, extension_snapshot) == "valid"
     assert a.tip == b.tip == extension.block_id and a.balances == b.balances
     assert not old_b_shares.intersection(b.consumed_shares)
-    assert not any(tag.startswith(b"branch-B") for tag in b.balances)
+    assert {record.group_id for record in credited_records(sb)}.isdisjoint(b.balances)
     assert sum(b.balances.values()) == 2 * REWARD
     before_repeat = dict(b.balances)
     deliver(b, extension, extension_snapshot)
@@ -163,6 +163,29 @@ def run():
     record("different_rules_common_valid_branch_reconverges", "A branch valid under both caps can reunite nodes when it gains the greatest cumulative work.",
            nodes=[state(strict), state(relaxed)])
 
+    shared_script = b"\x00\x20" + b"\x41" * 32
+    other_script = b"\x00\x20" + b"\x42" * 32
+    shared_destination = SnapshotBundle(ANCHOR_HASH, 1, (
+        make_share(b"shared-miner-A", ANCHOR_HASH, 1, payout_script=shared_script),
+        make_share(b"shared-miner-B", ANCHOR_HASH, 1, payout_script=shared_script),
+        make_share(b"other-miner-C", ANCHOR_HASH, 1, payout_script=other_script),
+    ))
+    shared_candidate = make_candidate(shared_destination)
+    shared_records = credited_records(shared_destination)
+    shared_budget = evaluate_budget(shared_records, cap_hashes_per_second=1, window_seconds=2)
+    assert [(entry.group_id, entry.credited_work) for entry in shared_budget.offenders] == [(shared_script, 4)]
+    strict = Node("same-address-budget-2")
+    relaxed = Node("same-address-budget-4", window_seconds=4)
+    assert deliver(strict, shared_candidate, shared_destination) == "invalid"
+    assert deliver(relaxed, shared_candidate, shared_destination) == "valid"
+    assert relaxed.balances == {shared_script: 66669, other_script: 33334}
+    other_only = replace(shared_destination, shares=(shared_destination.shares[2],))
+    assert deliver(Node("other-address-budget-2"), make_candidate(other_only), other_only) == "valid"
+    record("same_payout_script_multiple_tags", "Different tags sharing one PoW-bound payout script share its work budget and final payout; another script keeps its own allowance.",
+           distinct_tags=3, distinct_payout_scripts=2, shared_destination_work=4,
+           other_destination_work=2, strict_budget=2, relaxed_budget=4,
+           strict_outcome="invalid", relaxed_outcome="valid")
+
     local_history = (*original.shares, *(make_share(b"tag-0", ANCHOR_HASH, 1, nonce_seed=i)
                                        for i in range(100, 110)))
     full = replace(original, shares=local_history)
@@ -192,6 +215,8 @@ def run():
                             "window_time_basis": "configured nominal duration; no share arrival clock",
                             "reward": REWARD, "xor_key": "zero/public",
                             "snapshot_inclusion": "coordinator-disclosed set",
+                            "budget_grouping": "canonical payout script; all tags to one destination aggregate",
+                            "payout_binding": "actual zero-value share coinbase output bound into share PoW; no signed registry in this earlier model",
                             "supporting_templates": "zero-payout evidence jobs; eligibility as settlement-bearing reward-mining jobs is not established",
                             "signatures_and_full_bitcoin_consensus": False,
                             "balances": "provisional expected payouts; no maturity/spendability simulation"},

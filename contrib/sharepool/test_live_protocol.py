@@ -21,15 +21,16 @@ from settlement_sim import inclusion_proof, merkle_root, verify_inclusion
 
 
 class Fixture:
-    def __init__(self, **rules):
+    def __init__(self, payout_scripts=None, **rules):
         self.coordinator = private_key(901)
-        self.keys = (private_key(902), private_key(903))
+        payout_scripts = (tuple(payout_scripts) if payout_scripts is not None else
+                          tuple(b"\x00\x20" + bytes([index + 1]) * 32 for index in range(2)))
+        self.keys = tuple(private_key(902 + index) for index in range(len(payout_scripts)))
         self.rules = Rules(public_key(self.coordinator), **rules)
         self.engine = Engine(self.rules)
         self.registry_root = self.engine.genesis_registry
         self.ids, self.scripts = [], []
-        for index, key in enumerate(self.keys):
-            script = b"\x00\x20" + bytes([index + 1]) * 32
+        for index, (key, script) in enumerate(zip(self.keys, payout_scripts)):
             change = register(self.engine.registry(self.registry_root), key,
                               f"miner-{index}".encode(), script)
             self.registry_root = self.engine.add_change(change)
@@ -398,7 +399,108 @@ class LiveProtocolTests(unittest.TestCase):
         self.assertEqual(replica.receipts, {})
         self.assertEqual(replica.pending(replica.empty_ledger), {})
 
-    def test_job_refresh_cannot_reset_aggregated_group_work_budget(self):
+    def test_distinct_tags_and_miner_ids_share_one_payout_budget(self):
+        address_a, address_b = b"\x51", b"\x52"
+        f = Fixture(payout_scripts=(address_a, address_a, address_b),
+                    window_seconds=1, cap_hashes_per_second=4)
+        first_job = f.job()
+        first = f.receipt(f.engine.empty_ledger, mine(first_job, extranonce=1))
+        second_job = f.job(1, root=first.root)
+        second = f.receipt(first.root, mine(second_job, extranonce=2))
+        claims = f.engine.ledger(second.root).claims
+        self.assertEqual(len({claim.tag for claim in claims}), 2)
+        self.assertEqual(len({claim.miner_id for claim in claims}), 2)
+        self.assertEqual({claim.payout_script for claim in claims}, {address_a})
+        self.assertNotEqual(first_job.coinbase, second_job.coinbase)
+        self.assertEqual(f.engine.budget_violations(second.root), {})  # Exactly the allowance.
+        for index in (0, 1):
+            with self.subTest(index=index), self.assertRaisesRegex(ValueError, "budget"):
+                f.job(index, root=second.root, serial=1)
+        paying_job = f.job(2, root=second.root)
+        self.assertEqual([(bytes(o.scriptPubKey), o.nValue)
+                          for o in decode_coinbase(paying_job.coinbase).vout],
+                         [(address_a, f.rules.reward)])
+        block = f.engine.add_block(mine(paying_job, extranonce=3, full_block=True))
+        seal = f.seal(second.root, block)
+        self.assertEqual(f.engine.state(block).paid, frozenset(c.proof_id for c in claims))
+        # Paying the combined balance must not replenish either tag's allowance.
+        for index in (0, 1):
+            with self.subTest(index=index), self.assertRaisesRegex(ValueError, "budget"):
+                f.job(index, root=seal.root)
+        self.assertTrue(f.engine.validate_job(f.job(2, root=seal.root)))
+
+    def test_shared_payout_inflight_excess_survives_winner_and_restore(self):
+        address_a, address_b = b"\x51", b"\x52"
+        f = Fixture(payout_scripts=(address_a, address_a, address_b),
+                    window_seconds=1, cap_hashes_per_second=4)
+        jobs = (f.job(), f.job(1))
+        root = f.engine.empty_ledger
+        for nonce, index in enumerate((0, 1, 0), 1):
+            root = f.receipt(root, mine(jobs[index], extranonce=nonce)).root
+        self.assertEqual(f.engine.budget_violations(root), {(0, address_a): 6})
+        winner = f.engine.add_block(mine(jobs[1], extranonce=4, full_block=True))
+        seal = f.seal(root, winner)
+        self.assertEqual(f.engine.budget_violations(seal.root), {(0, address_a): 8})
+        self.assertEqual(len(f.engine.pending(seal.root)), 4)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "shared-payout.json"
+            f.engine.save(path)
+            restored = Engine.restore(path, f.rules)
+        self.assertEqual(restored.budget_violations(seal.root), {(0, address_a): 8})
+        for index in (0, 1):
+            with self.subTest(index=index), self.assertRaisesRegex(ValueError, "budget"):
+                issue_job(restored, f.keys[index], f.coordinator,
+                          f.registry_root, seal.root)
+        job = issue_job(restored, f.keys[2], f.coordinator, f.registry_root, seal.root)
+        self.assertEqual([(bytes(o.scriptPubKey), o.nValue)
+                          for o in decode_coinbase(job.coinbase).vout],
+                         [(address_a, f.rules.reward)])
+
+    def test_new_registered_tag_same_payout_does_not_get_fresh_budget(self):
+        f = Fixture(window_seconds=1, cap_hashes_per_second=4)
+        job = f.job()
+        root = f.engine.empty_ledger
+        for nonce in (1, 2):
+            root = f.receipt(root, mine(job, extranonce=nonce)).root
+        newcomer = private_key(904)
+        change = register(f.engine.registry(f.registry_root), newcomer,
+                          b"another-tag", f.scripts[0])
+        registry = f.engine.add_change(change)
+        self.assertNotEqual(change.entry.miner_id, f.ids[0])
+        with self.assertRaisesRegex(ValueError, "budget"):
+            issue_job(f.engine, newcomer, f.coordinator, registry, root)
+
+    def test_signing_key_rotation_keeps_shared_payout_budget(self):
+        f = Fixture(payout_scripts=(b"\x51", b"\x51"),
+                    window_seconds=1, cap_hashes_per_second=4)
+        jobs = (f.job(), f.job(1))
+        first = f.receipt(f.engine.empty_ledger, mine(jobs[0], extranonce=1))
+        second = f.receipt(first.root, mine(jobs[1], extranonce=2))
+        replacement_key = private_key(905)
+        change = update(f.engine.registry(f.registry_root), f.ids[1],
+                        f.keys[1], replacement_key, f.scripts[1])
+        registry = f.engine.add_change(change)
+        with self.assertRaisesRegex(ValueError, "budget"):
+            issue_job(f.engine, replacement_key, f.coordinator, registry, second.root)
+
+    def test_import_rejects_legacy_or_conflicting_budget_basis(self):
+        f = Fixture()
+        f.job()
+        self.assertEqual(f.rules.to_object()["budget_basis"], "payout-script")
+        for basis in (None, "tag"):
+            old_bundle = copy.deepcopy(f.engine.export())
+            if basis is None:
+                del old_bundle["rules"]["budget_basis"]
+            else:
+                old_bundle["rules"]["budget_basis"] = basis
+            replica = Engine(f.rules)
+            with self.subTest(basis=basis), self.assertRaisesRegex(ValueError, "rules"):
+                replica.import_objects(old_bundle)
+            self.assertEqual(replica.jobs, {})
+        with self.assertRaisesRegex(ValueError, "budget basis"):
+            Rules(public_key(f.coordinator), budget_basis="tag")
+
+    def test_job_refresh_cannot_reset_aggregated_payout_work_budget(self):
         f = Fixture(window_seconds=1, cap_hashes_per_second=4)
         initial = f.job()
         first = f.receipt(f.engine.empty_ledger, mine(initial, extranonce=1))
@@ -409,7 +511,7 @@ class LiveProtocolTests(unittest.TestCase):
         # Another miner retains its own allowance; there is no percentage cap.
         self.assertTrue(f.engine.validate_job(f.job(1, root=second.root)))
 
-    def test_inflight_overbudget_work_is_retained_and_stops_new_group_jobs(self):
+    def test_inflight_overbudget_work_is_retained_and_stops_new_payout_jobs(self):
         f = Fixture(window_seconds=1, cap_hashes_per_second=4)
         initial = f.job()
         first = f.receipt(f.engine.empty_ledger, mine(initial, extranonce=1))
@@ -417,7 +519,7 @@ class LiveProtocolTests(unittest.TestCase):
         third = f.receipt(second.root, mine(initial, extranonce=3))
         self.assertEqual(len(f.engine.ledger(third.root).claims), 3)
         self.assertEqual(sum(c.work for c in f.engine.ledger(third.root).claims), 6)
-        self.assertEqual(f.engine.budget_violations(third.root), {(0, b"miner-0"): 6})
+        self.assertEqual(f.engine.budget_violations(third.root), {(0, f.scripts[0]): 6})
         self.assertEqual(f.engine.rules.budget, 4)
         with self.assertRaisesRegex(ValueError, "budget"):
             f.job(root=third.root)
@@ -426,7 +528,7 @@ class LiveProtocolTests(unittest.TestCase):
         # and all valid in-flight receipts instead of resetting the allowance.
         winner = f.engine.add_block(mine(initial, extranonce=4, full_block=True))
         seal = f.seal(third.root, winner)
-        self.assertEqual(f.engine.budget_violations(seal.root), {(0, b"miner-0"): 8})
+        self.assertEqual(f.engine.budget_violations(seal.root), {(0, f.scripts[0]): 8})
         self.assertEqual(len(f.engine.pending(seal.root)), 4)
         with self.assertRaisesRegex(ValueError, "budget"):
             f.job(root=seal.root)

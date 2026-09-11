@@ -25,7 +25,7 @@ from work_accounting import evaluate, expected_work
 from work_rate_budget import evaluate as evaluate_budget
 from test_framework.blocktools import create_coinbase
 from test_framework.messages import CTransaction, CTxOut
-from test_framework.script import CScript, OP_0
+from test_framework.script import CScript
 
 
 NETWORK_ID = b"knots-sharepool-simulation-v2-work-budget"
@@ -33,6 +33,8 @@ ANCHOR_HASH = int.from_bytes(hashlib.sha256(NETWORK_ID).digest(), "little")
 BLOCK_BITS = BASE_BITS
 REWARD = 100003
 MAX_SHARES = 1024
+SNAPSHOT_FORMAT = 3
+BUDGET_GROUPING = "payout-script"
 # Tiny illustrative quota for easy synthetic shares, NOT a production hashrate.
 DEFAULT_CAP_HASHES_PER_SECOND = 1
 DEFAULT_WINDOW_SECONDS = 2
@@ -132,7 +134,8 @@ class SnapshotBundle:
 
     @property
     def metadata(self):
-        return {"parent": f"{self.parent_hash:064x}", "height": self.height,
+        return {"format": SNAPSHOT_FORMAT, "budget_grouping": BUDGET_GROUPING,
+                "parent": f"{self.parent_hash:064x}", "height": self.height,
                 "pool": self.pool_id.hex(), "sequence": self.sequence,
                 "previous_settlement": self.previous_settlement.hex(),
                 "network": self.network_id.hex(), "reward": self.reward}
@@ -151,6 +154,8 @@ class SnapshotBundle:
     @classmethod
     def from_object(cls, obj):
         m = obj["metadata"]
+        if m.get("format") != SNAPSHOT_FORMAT or m.get("budget_grouping") != BUDGET_GROUPING:
+            raise ValueError("unsupported snapshot format or work-budget grouping")
         shares = tuple(ShareProof(**{k: bytes.fromhex(v) for k, v in s.items()}) for s in obj["shares"])
         return cls(int(m["parent"], 16), m["height"], shares, bytes.fromhex(m["pool"]),
                    m["sequence"], bytes.fromhex(m["previous_settlement"]),
@@ -179,8 +184,9 @@ def payout_plan(snapshot):
 
 def settlement_coinbase(height, payouts):
     tx = create_coinbase(height)
-    # Distinct synthetic recipient scripts; balances are not spendable/matured money.
-    tx.vout = [CTxOut(amount, CScript([OP_0, hashlib.sha256(tag).digest()])) for tag, amount in payouts]
+    # Use each proof's committed destination directly. Tags cannot create new
+    # payout groups, and these model balances are not spendable/matured money.
+    tx.vout = [CTxOut(amount, CScript(script)) for script, amount in payouts]
     return tx.serialize()
 
 
@@ -366,13 +372,13 @@ class Node:
         for identity in reversed(path):
             records, plan = settlements[identity]
             consumed.update(record.share_id for record in records)
-            for tag, amount in plan:
-                balances[tag] = balances.get(tag, 0) + amount
+            for script, amount in plan:
+                balances[script] = balances.get(script, 0) + amount
         self.balances, self.consumed_shares = balances, consumed
 
     def save(self, path):
         path = Path(path)
-        obj = {"format": 2, "name": self.name,
+        obj = {"format": 3, "name": self.name,
                "cap_hashes_per_second": self.cap_hashes_per_second,
                "window_seconds": self.window_seconds, "tip": f"{self.tip:064x}",
                "snapshots": [s.to_object() for s in self.snapshots.values()],
@@ -384,7 +390,7 @@ class Node:
     @classmethod
     def restore(cls, path):
         obj = json.loads(Path(path).read_text())
-        if obj.get("format") != 2:
+        if obj.get("format") != 3:
             raise ValueError("unsupported settlement store format")
         node = cls(obj["name"], obj["cap_hashes_per_second"], obj["window_seconds"])
         for item in obj["snapshots"]:

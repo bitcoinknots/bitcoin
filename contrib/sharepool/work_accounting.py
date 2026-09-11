@@ -4,9 +4,10 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Exact work accounting over supplied, already-credited records for one pool/window.
 
-The caller supplies stable tag group IDs and credited work. This module does
-not verify shares, tag ownership, target assignment, ledger completeness, or
-pool/window membership. It selects no window and parses no network messages.
+The caller supplies canonical payout-script group IDs and credited work. This
+arithmetic module does not verify scripts, shares, tag ownership, target
+assignment, ledger completeness, or pool/window membership. It selects no window
+and parses no network messages. Tags and miner IDs must not split one destination.
 """
 
 from dataclasses import dataclass
@@ -53,7 +54,7 @@ def evaluate(records: Iterable[CreditedRecord]) -> WorkAccountingResult:
     """Aggregate every supplied group; empty input produces zero totals.
 
     Reject duplicate share IDs instead of silently counting or discarding them.
-    Multiple jobs with the same stable group ID accumulate in the same group.
+    Multiple tags, miners, and jobs paying one script accumulate in one group.
     """
     seen = set()
     totals = {}

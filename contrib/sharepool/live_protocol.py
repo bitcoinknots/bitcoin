@@ -59,6 +59,7 @@ class Rules:
     cap_hashes_per_second: int = 5_000_000_000_000
     max_events: int = 128
     inflight_policy: str = "credit-and-stop"
+    budget_basis: str = "payout-script"
 
     def __post_init__(self):
         byte_field(self.coordinator_key, 33)
@@ -68,6 +69,8 @@ class Rules:
         integer(self.max_events, 1, 256)
         if self.inflight_policy != "credit-and-stop":
             raise ValueError("unsupported in-flight work policy")
+        if self.budget_basis != "payout-script":
+            raise ValueError("unsupported work budget basis")
         for bits in (self.share_bits, self.block_bits):
             integer(bits, 1, (1 << 32) - 1)
             if bits & 0x00800000:
@@ -407,9 +410,12 @@ class Engine:
         if any(closed == m.parent for closed, _ in ledger.seals):
             raise ValueError("cannot issue job on sealed parent")
         claims = self.claims_for(m.parent, m.ledger_root, m.registry_root)
-        used = sum(c.work for c in claims.values() if c.tag == entry.tag and c.epoch == m.epoch)
+        # Claims retain the payout script authorized by their original registry.
+        # All tags and miner IDs paying that same script share one allowance.
+        used = sum(c.work for c in claims.values()
+                   if c.payout_script == entry.payout_script and c.epoch == m.epoch)
         if used + expected_work(uint256_from_compact(m.share_bits)) > self.rules.budget:
-            raise ValueError("group has no work budget for another proof")
+            raise ValueError("payout destination has no work budget for another proof")
         outputs, _ = self.outputs(m.parent, m.ledger_root, m.registry_root, m.miner_id)
         if m.payout_root != payout_root(outputs):
             raise ValueError("wrong manifest payout commitment")
@@ -512,7 +518,7 @@ class Engine:
         parent = self.tip if parent is None else parent
         totals = {}
         for claim in self.claims_for(parent, ledger_root).values():
-            key = (claim.epoch, claim.tag)
+            key = (claim.epoch, claim.payout_script)
             totals[key] = totals.get(key, 0) + claim.work
         return {key: work for key, work in totals.items() if work > self.rules.budget}
 

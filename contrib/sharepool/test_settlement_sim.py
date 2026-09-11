@@ -5,6 +5,7 @@
 """Adversarial settlement/chain tests: simulation rules, not Knots consensus."""
 
 from dataclasses import replace
+import json
 from pathlib import Path
 import random
 from tempfile import TemporaryDirectory
@@ -13,7 +14,8 @@ import unittest
 from proof_fixtures import make_share
 from settlement_sim import (
     ANCHOR_HASH, MAX_SHARES, REWARD, Candidate, Node, SnapshotBundle,
-    decode_coinbase, inclusion_proof, make_candidate, merkle_root, payout_plan, verify_inclusion,
+    credited_records, decode_coinbase, inclusion_proof, make_candidate, merkle_root,
+    payout_plan, verify_inclusion,
 )
 from test_framework.messages import CTxInWitness
 
@@ -153,8 +155,8 @@ class SettlementTests(unittest.TestCase):
                 block = make_candidate(invalid, payout_override=payout_plan(self.base))
                 self.assertEqual(deliver(Node("binding"), invalid, block)[1], "invalid")
 
-    def test_mined_job_refreshes_accumulate_against_absolute_tag_work_budget(self):
-        # 13 valid distinct shares; one tag has work 4 against its budget of 2.
+    def test_mined_job_refreshes_accumulate_against_absolute_payout_work_budget(self):
+        # One destination has work 4 against its budget of 2 across distinct jobs.
         tags = [s.declared_tag for s in self.base.shares] + [self.base.shares[0].declared_tag]
         over_budget = bundle(tags=tags, seed=100)
         self.assertEqual(len({s.share_id for s in over_budget.shares}), 13)
@@ -162,6 +164,44 @@ class SettlementTests(unittest.TestCase):
         block, state = deliver(node, over_budget)
         self.assertEqual(state, "invalid")
         self.assertEqual(node.reasons[block.block_id], "work-budget")
+
+    def test_distinct_tags_to_same_destination_share_one_budget_and_payout(self):
+        destination = b"\x00\x20" + b"\x41" * 32
+        other_destination = b"\x00\x20" + b"\x42" * 32
+        first = make_share(b"miner-A", ANCHOR_HASH, 1, payout_script=destination)
+        second = make_share(b"miner-B", ANCHOR_HASH, 1, payout_script=destination)
+        other = make_share(b"miner-C", ANCHOR_HASH, 1, payout_script=other_destination)
+        snapshot = SnapshotBundle(ANCHOR_HASH, 1, (first, second, other))
+        self.assertEqual({record.group_id for record in credited_records(snapshot)},
+                         {destination, other_destination})
+        self.assertEqual(len({share.declared_tag for share in snapshot.shares}), 3)
+        strict = Node("shared-destination-budget-2")
+        block, outcome = deliver(strict, snapshot)
+        self.assertEqual(outcome, "invalid")
+        self.assertEqual(strict.reasons[block.block_id], "work-budget")
+        self.assertEqual(deliver(Node("other-destination"),
+                                 SnapshotBundle(ANCHOR_HASH, 1, (other,)))[1], "valid")
+        relaxed = Node("shared-destination-budget-4", window_seconds=4)
+        self.assertEqual(deliver(relaxed, snapshot, block)[1], "valid")
+        self.assertEqual(relaxed.balances, {destination: 66669, other_destination: 33334})
+        outputs = decode_coinbase(block.coinbase).vout
+        self.assertEqual([(bytes(output.scriptPubKey), output.nValue) for output in outputs],
+                         [(destination, 66669), (other_destination, 33334)])
+
+    def test_new_destination_does_not_redirect_old_share_credit(self):
+        old_script = b"\x00\x20" + b"\x51" * 32
+        new_script = b"\x00\x20" + b"\x52" * 32
+        old = make_share(b"same-miner", ANCHOR_HASH, 1, payout_script=old_script)
+        new = make_share(b"same-miner", ANCHOR_HASH, 1, payout_script=new_script)
+        snapshot = SnapshotBundle(ANCHOR_HASH, 1, (old, new))
+        plan = payout_plan(snapshot)
+        self.assertEqual(plan, ((old_script, 50002), (new_script, 50001)))
+        redirected = make_candidate(snapshot, payout_override=((new_script, REWARD),))
+        node = Node("origin-destinations")
+        self.assertEqual(deliver(node, snapshot, redirected)[1], "invalid")
+        self.assertEqual(node.reasons[redirected.block_id], "payouts")
+        self.assertEqual(deliver(node, snapshot)[1], "valid")
+        self.assertEqual(node.balances, dict(plan))
 
     def test_old_issued_snapshot_is_not_replaced_by_latest_or_local_inventory(self):
         node = Node("old-job")
@@ -209,7 +249,7 @@ class SettlementTests(unittest.TestCase):
                 self.assertEqual(node.reasons[block.block_id], "payouts")
 
     def test_nonempty_work_can_pass_with_any_number_of_groups(self):
-        # A lone tag may supply all recorded work; there is no percentage rule.
+        # One payout destination may receive all work; there is no percentage rule.
         for groups in (0, 1, 2, 9, 10, 12):
             with self.subTest(groups=groups):
                 snapshot = bundle(tags=[f"group-{i}".encode() for i in range(groups)])
@@ -218,13 +258,13 @@ class SettlementTests(unittest.TestCase):
 
     def test_absolute_budget_uses_rate_times_duration_and_allows_exact_boundary(self):
         snapshot = bundle(tags=[b"only-node", b"only-node"], seed=100)
-        block = make_candidate(snapshot)  # Two shares credit work 4 to one tag.
+        block = make_candidate(snapshot)  # Two shares credit work 4 to one payout script.
         for rate, seconds, expected in ((1, 3, "invalid"), (1, 4, "valid"), (2, 2, "valid")):
             with self.subTest(rate=rate, seconds=seconds):
                 node = Node("absolute-budget", cap_hashes_per_second=rate, window_seconds=seconds)
                 self.assertEqual(deliver(node, snapshot, block)[1], expected)
 
-    def test_omitted_work_can_conceal_a_tag_exceeding_its_absolute_budget(self):
+    def test_omitted_work_can_conceal_a_payout_destination_exceeding_its_budget(self):
         omitted = tuple(make_share(b"node-00", ANCHOR_HASH, 1, nonce_seed=100 + i) for i in range(12))
         full = replace(self.base, shares=(*self.base.shares, *omitted))
         node = Node("auditor")
@@ -259,7 +299,7 @@ class SettlementTests(unittest.TestCase):
         self.assertEqual(left.balances, right.balances)
         self.assertEqual(left.consumed_shares, right.consumed_shares)
         self.assertTrue({s.share_id for s in self.base.shares}.isdisjoint(left.consumed_shares))
-        self.assertTrue({s.declared_tag for s in self.base.shares}.isdisjoint(left.balances))
+        self.assertTrue({r.group_id for r in credited_records(self.base)}.isdisjoint(left.balances))
         self.assertEqual(sum(left.balances.values()), 2 * REWARD)
 
     def test_more_chain_work_does_not_override_absolute_work_budget_validity(self):
@@ -326,6 +366,24 @@ class SettlementTests(unittest.TestCase):
         self.assertEqual(restored.window_seconds, 3)
         self.assertEqual(restored.balances, expected_balances)
         self.assertEqual(restored.consumed_shares, expected_consumed)
+
+    def test_old_tag_grouped_metadata_and_store_are_not_reinterpreted(self):
+        self.assertEqual(self.base.metadata["budget_grouping"], "payout-script")
+        encoded = self.base.to_object()
+        self.assertEqual(SnapshotBundle.from_object(encoded), self.base)
+        for grouping in (None, "tag"):
+            changed = self.base.to_object()
+            if grouping is None:
+                del changed["metadata"]["budget_grouping"]
+            else:
+                changed["metadata"]["budget_grouping"] = grouping
+            with self.assertRaisesRegex(ValueError, "format|grouping"):
+                SnapshotBundle.from_object(changed)
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "old-node.json"
+            path.write_text(json.dumps({"format": 2}))
+            with self.assertRaisesRegex(ValueError, "format"):
+                Node.restore(path)
 
     def test_snapshot_bound_limits_admission(self):
         with self.assertRaises(ValueError):

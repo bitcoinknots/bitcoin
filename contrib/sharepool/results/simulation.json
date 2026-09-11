@@ -10,6 +10,8 @@
     "reward": 100003,
     "xor_key": "zero/public",
     "snapshot_inclusion": "coordinator-disclosed set",
+    "budget_grouping": "canonical payout script; all tags to one destination aggregate",
+    "payout_binding": "actual zero-value share coinbase output bound into share PoW; no signed registry in this earlier model",
     "supporting_templates": "zero-payout evidence jobs; eligibility as settlement-bearing reward-mining jobs is not established",
     "signatures_and_full_bitcoin_consensus": false,
     "balances": "provisional expected payouts; no maturity/spendability simulation"
@@ -22,7 +24,7 @@
       "nodes": [
         {
           "node": "ordered",
-          "tip": "028ae7d37f52ffc79ed74402dee4b6cd69976ff84d154ac812f378776b4e4c00",
+          "tip": "07709405a626e5e61eea7a62e393aac9ad238c5c626a5a1208e009a215e6b077",
           "valid_blocks": 1,
           "pending_blocks": 0,
           "invalid_blocks": 0,
@@ -31,7 +33,7 @@
         },
         {
           "node": "reversed",
-          "tip": "028ae7d37f52ffc79ed74402dee4b6cd69976ff84d154ac812f378776b4e4c00",
+          "tip": "07709405a626e5e61eea7a62e393aac9ad238c5c626a5a1208e009a215e6b077",
           "valid_blocks": 1,
           "pending_blocks": 0,
           "invalid_blocks": 0,
@@ -55,7 +57,7 @@
       },
       "after": {
         "node": "missing-data",
-        "tip": "03c0fc2b336b8543a8de8c7acddbafd7741f32e3a313b49c0456f42f94775387",
+        "tip": "0ab00778f6e00e442162a2da09d431d5f1444461de4724ef5d07d0b853a08528",
         "valid_blocks": 2,
         "pending_blocks": 0,
         "invalid_blocks": 0,
@@ -101,7 +103,7 @@
       "before": [
         {
           "node": "fork-A",
-          "tip": "0213c76e179bc95ec52883f0595d3f109393fcf2c5de4555333f290c7091a540",
+          "tip": "05d5f8501d614c5b23441009a92cf5dd220e3b9ac1042b511fa3d60faf7b74ca",
           "valid_blocks": 2,
           "pending_blocks": 0,
           "invalid_blocks": 0,
@@ -110,7 +112,7 @@
         },
         {
           "node": "fork-B",
-          "tip": "0bbda465ce99dc83a7fd2e0bac8f8e9a0c23bb5e51efc04a21c9dd05344b9ba2",
+          "tip": "0a8f0300d17b424195b6fed888c78f6d9d3099ca4e31602edc586f97afd9cad3",
           "valid_blocks": 2,
           "pending_blocks": 0,
           "invalid_blocks": 0,
@@ -121,7 +123,7 @@
       "after": [
         {
           "node": "fork-A",
-          "tip": "0683d46def439cba254017c5199aed7769d587a0184f646fa073da4ee884fe4c",
+          "tip": "091bcb3eaa0d4e7f5cf235c7effaa908e4ff5de93e131d7bdb8f7ab6968ccb7a",
           "valid_blocks": 3,
           "pending_blocks": 0,
           "invalid_blocks": 0,
@@ -130,7 +132,7 @@
         },
         {
           "node": "fork-B",
-          "tip": "0683d46def439cba254017c5199aed7769d587a0184f646fa073da4ee884fe4c",
+          "tip": "091bcb3eaa0d4e7f5cf235c7effaa908e4ff5de93e131d7bdb8f7ab6968ccb7a",
           "valid_blocks": 3,
           "pending_blocks": 0,
           "invalid_blocks": 0,
@@ -156,7 +158,7 @@
       "nodes": [
         {
           "node": "budget-2",
-          "tip": "0213c76e179bc95ec52883f0595d3f109393fcf2c5de4555333f290c7091a540",
+          "tip": "05d5f8501d614c5b23441009a92cf5dd220e3b9ac1042b511fa3d60faf7b74ca",
           "valid_blocks": 1,
           "pending_blocks": 0,
           "invalid_blocks": 2,
@@ -165,7 +167,7 @@
         },
         {
           "node": "budget-4",
-          "tip": "0758dd94e1a9ac21d3e64cad14f25dc85181a7496e8b2596c9ac7c5f1f8ea790",
+          "tip": "0eb12b6bdbf3d8e0a2c748662af9fa924e0d16ab280ce95eafc5daf2daa8c346",
           "valid_blocks": 3,
           "pending_blocks": 0,
           "invalid_blocks": 0,
@@ -181,7 +183,7 @@
       "nodes": [
         {
           "node": "budget-2",
-          "tip": "0a7faf701771628c9a3b75e604b934e37a2a7b40d97b4273122194117fab3228",
+          "tip": "0b1fa3246497c8ed9f95dec0fed0a1e129cd98e3327724817ab9b620408e6bfa",
           "valid_blocks": 3,
           "pending_blocks": 0,
           "invalid_blocks": 2,
@@ -190,7 +192,7 @@
         },
         {
           "node": "budget-4",
-          "tip": "0a7faf701771628c9a3b75e604b934e37a2a7b40d97b4273122194117fab3228",
+          "tip": "0b1fa3246497c8ed9f95dec0fed0a1e129cd98e3327724817ab9b620408e6bfa",
           "valid_blocks": 5,
           "pending_blocks": 0,
           "invalid_blocks": 0,
@@ -198,6 +200,19 @@
           "active_share_count": 36
         }
       ]
+    },
+    {
+      "name": "same_payout_script_multiple_tags",
+      "passed": true,
+      "behavior": "Different tags sharing one PoW-bound payout script share its work budget and final payout; another script keeps its own allowance.",
+      "distinct_tags": 3,
+      "distinct_payout_scripts": 2,
+      "shared_destination_work": 4,
+      "other_destination_work": 2,
+      "strict_budget": 2,
+      "relaxed_budget": 4,
+      "strict_outcome": "invalid",
+      "relaxed_outcome": "valid"
     },
     {
       "name": "omission_limitation",

@@ -26,14 +26,15 @@ class WorkRateBudgetTest(unittest.TestCase):
         self.assertEqual([(group.group_id, group.credited_work) for group in result.offenders],
                          [(b"\x00", budget + 1)])
 
-    def test_different_miners_and_jobs_aggregate_under_same_group(self):
-        records = [CreditedRecord(b"miner-A job-1 share-1", b"template-A", 40),
-                   CreditedRecord(b"miner-B job-2 share-1", b"template-A", 60)]
+    def test_different_tags_miners_and_jobs_aggregate_under_same_payout_script(self):
+        destination = b"\x00\x20" + b"\x41" * 32
+        records = [CreditedRecord(b"miner-A tag-A job-1 share-1", destination, 40),
+                   CreditedRecord(b"miner-B tag-B job-2 share-1", destination, 60)]
         kwargs = dict(cap_hashes_per_second=10, window_seconds=10)
         result = evaluate(records, **kwargs)
         self.assertTrue(result.passes)
         self.assertEqual(result.accounting.group_count, 1)
-        records.append(CreditedRecord(b"miner-C job-3 share-1", b"template-A", 1))
+        records.append(CreditedRecord(b"miner-C tag-C job-3 share-1", destination, 1))
         self.assertFalse(evaluate(records, **kwargs).passes)
 
     def test_work_weights_not_equal_share_counts_control_budget(self):

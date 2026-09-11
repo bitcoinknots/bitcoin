@@ -46,7 +46,7 @@ class WorkAccountingTest(unittest.TestCase):
         self.assertEqual((easy, harder), (1, 2))
         self.assertEqual([g.credited_work for g in result.groups], [1, 2])
 
-    def test_same_tag_across_jobs_is_aggregated(self):
+    def test_same_destination_across_jobs_is_aggregated(self):
         records = [CreditedRecord(bytes([group, job]), bytes([group]), 5)
                    for group in range(3) for job in range(2)]
         result = evaluate(records)

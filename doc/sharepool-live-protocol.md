@@ -69,6 +69,9 @@ They are no longer separate zero-payout evidence jobs in this implementation.
 Their header retains the base-chain target, while the manifest fixes the easier
 protocol-approved share target. The reference supports coinbase-only templates,
 not arbitrary mempool transactions or full Bitcoin script/UTXO validation.
+The ruleset commits `budget_basis = "payout-script"`. Tags bind each template to
+its miner and registered payout history; several tags paying the same script
+share one work allowance.
 
 ## Update races and old-job winners
 
@@ -110,7 +113,8 @@ An old-root winner does not erase the newer acknowledged ledger suffix. A
 compatible suffix is preserved through the parent seal and included in the next
 fresh job. Its contributions keep their original miner, payout script, target,
 and work epoch. Paying a claim, refreshing a job, or rotating a signing key does
-not reset that group's work count.
+not reset the work counted for its original payout script and epoch. An authorized
+payout update does not move past credit into the new destination's bucket.
 
 Registry versions must belong to one compatible history. A later authorized
 payout update does not redirect a claim already bound to an earlier script.
@@ -131,14 +135,20 @@ or that every public receipt is instantly available to every node.
 
 ## Work budgets and the in-flight policy
 
-The reference ruleset explicitly commits `inflight_policy = credit-and-stop`.
-It retains credit for valid shares already in flight, reports a budget violation
-when they exceed the limit, and refuses further jobs for the depleted group.
-Other groups can continue creating valid jobs and settling the recorded claims.
+The reference ruleset explicitly commits `budget_basis = "payout-script"` and
+`inflight_policy = "credit-and-stop"`. It sums work under the exact key
+`(pool_id, origin_epoch, payout_script_bytes)`, using the registered destination
+committed by each claim's original job. All tags and miner IDs paying that same
+script share one allowance. A tag or miner registration is not a fresh budget.
+
+The reference retains credit for valid shares already in flight, reports a budget
+violation when they exceed the limit, and rejects new jobs whose committed prefix
+has exhausted their payout script's allowance. Other payout scripts can continue
+creating valid jobs and settling the recorded claims.
 This is the credit-preserving default used while the policy question remains
 open; it is not a guarantee that total in-flight work stays below the quota.
 
-Before issuing a job, the gateway checks that the group's counted work plus
+Before issuing a job, the gateway checks that the payout script's counted work plus
 one approved share's work fits the budget. Existing hardware assignments can
 produce several proofs concurrently, so that check cannot reserve every future
 hash. Excess work is visible through `Engine.budget_violations()`; it is not
@@ -146,11 +156,19 @@ silently deleted to make the audit appear compliant. A strict admission cap
 would require the alternative policy of refusing excess credit, with its own
 miner-facing terms. Neither policy proves an upper bound on physical hashing.
 
-There is no percentage-of-pool rule or fixed minimum number of groups. Work is
-aggregated per pool, stable tag, and origin epoch. Epochs are defined by block
+The restriction is relative to a job's committed prefix. The honest gateway
+requests its current verified checkpoint and does not reactivate an older one.
+Engine validation still permits an eligible older prefix, including in a new
+signed job; it does not establish a globally latest checkpoint. Previously
+anchored usage cannot be rewound. Changing the budget grouping does not close
+that freshness or disclosure gap.
+
+There is no percentage-of-pool rule or fixed minimum number of recipients or
+templates. Epochs are defined by block
 height and a nominal configured duration; the code does not treat that duration
 as measured wall-clock time. Carried work keeps its original epoch rather than
-being relabeled to obtain fresh allowance.
+being relabeled to obtain fresh allowance. A new origin epoch gets its configured
+allowance; the current policy does not deduct a previous epoch's excess from it.
 
 ## Explicit reference assumptions
 
@@ -175,11 +193,13 @@ operate indefinitely with no pruning design.
 
 ## Verification and reproduction
 
-The recorded run passes **112 unit tests**: 60 existing regressions, 14 registry
-tests, 24 authenticated live-protocol tests, and 14 gateway tests. All **6 real
-loopback HTTP replication cases** also pass, with every listener closed and
-thread joined afterward. These are three replicas in one process, not three
-Knots daemons.
+The payout-script aggregation implementation passes **124 unit tests**:
+65 fixed-snapshot/accounting regressions, 14 registry tests, 29 authenticated
+live-protocol tests, and 16 gateway tests. All **6 real loopback HTTP replication
+cases** also pass, with every listener closed and thread joined afterward. These
+are three replicas in one process, not three Knots daemons. The fixed-snapshot
+runner separately passes **12 scenarios**, including combined budgets for
+distinct tags paying the same script.
 
 From the repository root:
 
@@ -199,6 +219,10 @@ and [loopback replication cases](../contrib/sharepool/results/live-peer.json).
 Tests include live Merkle inclusion/tampering, forged signed roots, concurrent
 refresh responses, old-job winners, sealed-parent races, registry forks, tail
 carryover, winner deduplication, origin-epoch budgets, replay, and restoration.
+Shared-payout regressions cover combined allowances across miner IDs and tags,
+registration and key rotation without fresh same-script credit, paid work and
+implicit winners, excess-work reporting, gateway pauses, and rejection of stores
+whose rules omit or change the payout-script budget basis.
 
 The previous [fixed-snapshot tests](sharepool-test-report.md) remain as regression
 coverage. Actual stock Knots acceptance was tested separately; it still does not

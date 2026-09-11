@@ -11,18 +11,20 @@ The zero-payout evidence jobs are not settlement-bearing reward-mining jobs.
 """
 
 from dataclasses import dataclass
+import hashlib
 from io import BytesIO
 
 from precommit_demo import CBlockHeader, uint256_from_compact  # Sets framework path.
 from work_accounting import CreditedRecord, expected_work
 from test_framework.blocktools import create_coinbase, script_BIP34_coinbase_height
 from test_framework.messages import CBlock, CTransaction, tagged_hash
-from test_framework.script import CScript, CScriptInvalidError, OP_TRUE
+from test_framework.script import CScript, CScriptInvalidError
 
 DEFAULT_BITS = 0x207FFFFF
 BASE_BITS = 0x200FFFFF
 FIXTURE_TIME = 1_700_000_000
 MAGIC = b"SPF1"
+MAX_PAYOUT_SCRIPT_BYTES = 1024
 
 
 class _ExactReader(BytesIO):
@@ -96,14 +98,32 @@ def _merkle_root(coinbase):
     return block.calc_merkle_root()
 
 
+def fixture_payout_script(tag):
+    """Choose a deterministic test destination; verification never infers it."""
+    return b"\x00\x20" + hashlib.sha256(tag).digest()
+
+
+def _payout_script(script):
+    if type(script) is not bytes or not 1 <= len(script) <= MAX_PAYOUT_SCRIPT_BYTES:
+        raise ValueError("payout script must contain 1..1024 immutable bytes")
+    return script
+
+
 def make_share(tag: bytes, parent_hash: int, height: int, nonce_seed: int = 0,
-               pool_id: bytes = b"pool-A", share_bits: int = DEFAULT_BITS) -> ShareProof:
-    """Mine at most 100000 real hashes; distinct seeds select distinct jobs."""
+               pool_id: bytes = b"pool-A", share_bits: int = DEFAULT_BITS,
+               payout_script: bytes = None) -> ShareProof:
+    """Mine a tagged fixture committing its selected destination before work.
+
+    Distinct tags may share an explicit payout script. Only the fixture builder
+    chooses a synthetic script from a tag when none is supplied; the verifier
+    reads the actual coinbase output, independently of the tag.
+    """
     _context(tag, parent_hash, height, pool_id)
     target = _target(share_bits)
     if type(nonce_seed) is not int or not 0 <= nonce_seed < (1 << 128):
         raise ValueError("nonce_seed must be a uint128")
-    coinbase = create_coinbase(height, nValue=0)
+    payout_script = _payout_script(fixture_payout_script(tag) if payout_script is None else payout_script)
+    coinbase = create_coinbase(height, nValue=0, script_pubkey=CScript(payout_script))
     coinbase.vin[0].scriptSig = _script(height, tag, pool_id)
     coinbase.rehash()
     header = CBlockHeader()
@@ -143,8 +163,9 @@ def verify_share(share: ShareProof, expected_parent: int, expected_height: int,
         raise ValueError("wrong synthetic coinbase shape")
     txin, txout = coinbase.vin[0], coinbase.vout[0]
     if (txin.prevout.hash != 0 or txin.prevout.n != 0xFFFFFFFF or txin.nSequence != 0xFFFFFFFF
-            or txout.nValue != 0 or txout.scriptPubKey != bytes(CScript([OP_TRUE]))):
+            or txout.nValue != 0):
         raise ValueError("wrong synthetic coinbase input or output")
+    payout_script = _payout_script(bytes(txout.scriptPubKey))
     prefix = bytes(script_BIP34_coinbase_height(expected_height))
     if not txin.scriptSig.startswith(prefix):
         raise ValueError("wrong coinbase height")
@@ -158,4 +179,6 @@ def verify_share(share: ShareProof, expected_parent: int, expected_height: int,
         raise ValueError("coinbase is not bound to the header Merkle root")
     if header.rehash() > target:
         raise ValueError("share does not meet the approved target")
-    return CreditedRecord(header.sha256.to_bytes(32, "little"), fields[1], expected_work(target))
+    # The output script and tag are both authenticated by the share PoW. The
+    # destination is the accounting group; tags remain attribution fields.
+    return CreditedRecord(header.sha256.to_bytes(32, "little"), payout_script, expected_work(target))

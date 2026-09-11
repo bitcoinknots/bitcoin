@@ -10,15 +10,19 @@ checking settlement. Mandatory settlement validation remains unimplemented.**
 This report describes the earlier fixed-snapshot model. The new
 [continuous protocol](sharepool-live-protocol.md) adds authenticated registries,
 reward-job shares, automatic snapshot updates, and tail settlement. The linked
-unit-test log now contains the combined regression suite.
+unit-test log contains the combined regression suite. The payout-script grouping
+change updates both models: tags remain template/miner attribution, while work
+for all tags sharing a payout script accumulates in one allowance. The model and
+unit results below were rerun with that change; the stock-node results are from
+the separate prior run of the unchanged header-commitment smoke test.
 
 ## What was executed
 
 | Layer | Recorded result | What it establishes |
 | --- | --- | --- |
-| Earlier model/unit-test subset | 60 passing tests, including 50 seeded delivery permutations | Hash/tag binding, work accounting, absolute budgets, Merkle inclusions, validation states, payout checks, rollback, and replay within the stated model. |
-| Settlement model scenarios | 11 passing scenarios | Reproducible node disagreement, data recovery, chain selection, and examples exposing unresolved protocol rules. |
-| Two actual stock Knots processes | 6 passing regtest cases | Header commitment behavior, actual block acceptance, equal-work branches, and explicit local rejection/reconsideration. |
+| Fixed-snapshot/accounting unit-test subset | 65 passing tests, including 50 seeded delivery permutations | Hash/tag/payout-script binding, shared-destination budgets, Merkle inclusions, validation states, payout checks, rollback, and replay within the stated model. |
+| Settlement model scenarios | 12 passing scenarios | Reproducible node disagreement, shared-address accounting, data recovery, chain selection, and examples exposing unresolved protocol rules. |
+| Two actual stock Knots processes, prior run | 6 passing regtest cases | Header commitment behavior, actual block acceptance, equal-work branches, and explicit local rejection/reconsideration. |
 
 Recorded outputs: [unit tests](../contrib/sharepool/results/unit-tests.txt),
 [model scenarios](../contrib/sharepool/results/simulation.json), and
@@ -33,21 +37,24 @@ P2P propagation, live-miner, or network-performance test.
 ## How settlement works in the model
 
 1. Supporting share proofs bind a pool, parent block, height, approved share
-   target, and a stable tag inside the coinbase. The coinbase transaction binds
-   to the header Merkle root, and the header must satisfy the approved share
+   target, a stable tag, and a payout script inside the coinbase. The script is
+   the actual zero-value supporting output, not a destination inferred from the
+   tag. The coinbase transaction binds to the header Merkle root, and the header
+   must satisfy the approved share
    target. Header `nBits` retains the base-chain target.
 2. A coordinator selects an immutable snapshot. Canonically sorted records and
    metadata produce a domain-separated, count-bound Merkle root. Metadata binds
    network, pool, parent, height, proposal sequence, predecessor settlement root,
-   and the model's fixed reward.
+   the model's fixed reward, and the payout-script budget grouping/version.
 3. Before solving the candidate header, the builder puts that root in `m_mm_rhs`
    and constructs the deterministic payout coinbase. Changing either afterward
    requires checking PoW again. A changed hash is not guaranteed to fail an easy
    target; the actual-node mutation test deliberately chose one that failed.
 4. Each model node obtains the referenced snapshot and checks its root, context,
    share proofs, duplicates, absolute work budgets, and exact coinbase allocation.
-   The cap is `group_work <= cap_hashes_per_second * window_seconds` for every
-   tag. There is no relative percentage limit or minimum group count. Empty
+   The cap is `payout_script_work <= cap_hashes_per_second * window_seconds` for
+   every distinct script, aggregating all tags that pay it. There is no relative
+   percentage limit or minimum recipient/template count. Empty
    evidence remains insufficient to calculate the model's work-based payouts.
    Credit is `floor(2^256 / (approved_target + 1))` per accepted share.
 5. Valid blocks compete by cumulative valid chainwork. The node derives its
@@ -55,16 +62,26 @@ P2P propagation, live-miner, or network-performance test.
    A reorg removes the old branch's entries and applies the new branch's entries.
 
 The model uses a toy reward of 100,003 units and deterministic largest-remainder
-rounding, with tag-byte order breaking ties. Recipient scripts are synthetic;
+rounding, with payout-script-byte order breaking ties. Recipient scripts are synthetic;
 the balances are expected outputs, not matured or spendable balances. This is
 not a sidechain withdrawal or custody implementation.
 
-The model's default budget is 2 work units per stable tag: rate 1 times nominal
+The model's default budget is 2 work units per payout script: rate 1 times nominal
 duration 2. Each default share contributes 2 units, so a second share for the
-same tag exceeds this intentionally tiny illustrative budget. These are not
-production parameters or measured submission times. The separate arithmetic
+same script exceeds this intentionally tiny illustrative budget even under a
+different tag. These are not production parameters or measured submission times. The separate arithmetic
 tests exercise 5 TH/s over 600 seconds, yielding exactly 3,000,000,000,000,000
-work units. A single group containing all pool work passes if under budget.
+work units. One recipient containing all pool work passes if under budget.
+
+Unlike the fixed-snapshot checker, the continuous reference commits
+`budget_basis = "payout-script"` and `inflight_policy = "credit-and-stop"`. It
+uses authenticated historical registry destinations, aggregates all associated
+miner IDs/tags per pool and origin epoch, and retains accepted in-flight excess
+for payment. Its new-job restriction is relative to the proposed prefix; an
+honest gateway requests its current verified prefix, but eligible older-prefix
+jobs can still win or be newly signed. Neither model measures a hard upper bound
+on physical hashing. Updating a registry payout destination does not reassign
+previous claims or their counted work.
 
 The fixtures deliberately avoid a circular commitment: supporting proofs are
 separate zero-payout evidence jobs, and the reward candidate commits to them.
@@ -83,7 +100,7 @@ reward-mining jobs, including their previously issued settlement commitments.
 | Matching-root snapshot contains a duplicate, forged tag, replay, work above its absolute budget, or wrong context | Reject the block under the model rules and exclude descendants. | Additional work on that ancestry does not cure the violation. |
 | Correct snapshot accompanies diverted or incorrectly rounded payouts | Reject the candidate even though its PoW and snapshot root are correct. | Commitment alone does not authorize incorrect payment. |
 | Two valid blocks extend the same parent with equal work | Nodes can retain different first-seen tips. | A branch with more valid cumulative work reunites nodes; old provisional settlement is undone. |
-| A group has 4 work units; one node permits 2 and another 4 | The strict node rejects that branch while the relaxed node can follow it and its descendants. | A split can persist while work extends rejected ancestry. |
+| A budget bucket has 4 work units; one node permits 2 and another 4 | The strict node rejects that branch while the relaxed node can follow it and its descendants. | A split can persist while work extends rejected ancestry. |
 | A branch valid under both absolute budgets becomes heaviest | Both nodes adopt it. | Different rules do not guarantee permanent divergence; acceptance overlap and chainwork matter. |
 | Operator explicitly invalidates an ancestor in stock Knots | That node rejects descendants with `bad-prevblk`, even when the other node extends the branch. | Explicit reconsideration restored convergence in the actual-node test. |
 
@@ -109,8 +126,9 @@ even when records are relabeled. Reordering the same records preserves the root.
 Share tests reject a tag declaration that differs from the coinbase, a coinbase
 not bound to the header, wrong parent/height/pool, altered approved target,
 unsupported fields, and insufficient PoW. Nonce and extranonce/job refreshes
-under the same tag stay in the same work-budget group. Distinct tags can use
-identical non-coinbase transaction selections. Fixtures contain only a coinbase;
+do not reset work under the same payout script. Different tags naming that script
+share its allowance, while still distinguishing their templates. Distinct tags
+can use identical non-coinbase transaction selections. Fixtures contain only a coinbase;
 arbitrary transaction sets and general coinbase Merkle branches are not tested.
 
 Separate arithmetic and proof tests exercise unequal approved share targets.
@@ -122,11 +140,12 @@ historical target assignment is not implemented here.
 ## Protocol gaps exposed by the tests
 
 **A valid inclusion proof does not establish complete disclosure.** In the
-omission scenario, the committed work for a tag is 2 units, equal to its budget.
-The observed inventory contains ten extra shares for that tag, making its
+recorded omission scenario, one tag's synthetic destination has 2
+committed work units, equal to its budget. The observed inventory contains ten
+extra shares for that same destination, making its
 observed work 22 units. The committed sample still passes the current model.
 Thus the check enforces a cap over disclosed eligible records, not yet over
-all verified work of that template group. Rejecting based on each node's private
+all verified work assigned to that payout destination. Rejecting based on each node's private
 inventory would instead make validity depend on message arrival. A common
 eligible-share ledger, window, cutoff, and omission policy must be specified.
 
@@ -137,7 +156,8 @@ binding, and predecessor snapshots need to be validated for the supporting
 shares, not only for the eventual settlement candidate.
 
 **Work budgets require an agreed window and have sampling effects.** One or
-more groups can pass; there is no percentage or fixed minimum-group requirement.
+more payout scripts can meet the budget; there is no percentage or fixed minimum
+recipient/template requirement.
 An empty snapshot still cannot derive work-based payouts. Random share arrivals
 can exceed a budget without a matching change in actual hashrate. Work shares
 are probabilistic evidence, not a measurement of every attempted hash. The
@@ -146,9 +166,10 @@ or a coordinator-chosen interval. A nominal epoch quota does not establish
 elapsed real time. The work-budget helper checks arithmetic, not these time or
 eligibility assumptions.
 
-**Tags cannot establish DATUM execution or independent control.** One operator
-can assign many tags and contribute real PoW to each. The binding prevents
-relabeling an existing proof; it does not prevent creating new tagged jobs.
+**Tags bind template attribution, not an independent allowance.** The binding
+prevents relabeling an existing proof. All tags sharing a payout script contribute
+to its combined work budget. A tagged proof does not establish DATUM execution
+or independent control.
 
 **Stock nodes do not validate settlement.** Both actual nodes accepted a tagged
 coinbase with a nonzero Merkle commitment without receiving its snapshot, and
@@ -164,11 +185,11 @@ poison the cache entry for a valid header. Regression tests now cover recovery
 with the authentic payload. Cached snapshot roots are rechecked during validation.
 
 The work-accounting API contains no percentage acceptance predicate. The budget
-helper and simulator enforce only absolute per-group limits, with regression
-tests for single-group acceptance, rate-times-duration boundaries, stable grouping,
-and persistence of custom budget settings. The model store uses format 2 and a
-new simulation network domain; older model state is rejected rather than silently
-interpreted under different rules.
+helper and fixed-snapshot simulator apply absolute payout-script limits. The
+grouping update binds snapshot `budget_grouping = "payout-script"` and uses
+store format 3; older stores are rejected rather than silently interpreted under
+the new grouping rule. Regression tests cover shared-script aggregation, script
+binding, ordinary job refreshes, and historical destination retention.
 
 Fifty seeded permutations deliver competing blocks, parents, children, snapshots,
 and duplicates in different orders. Once all required data arrives and one

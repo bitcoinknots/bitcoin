@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-09-11T09:45:20.339835+00:00",
+  "timestamp_utc": "2026-09-11T18:10:56.315398+00:00",
   "success": true,
   "scope": "Three Engine objects in one process; real loopback HTTP; signed fixtures and synthetic work",
   "knots_integration": false,
@@ -28,23 +28,23 @@
       "name": "complete_retry_converges_and_accepts_correct_receipt",
       "passed": true,
       "state": {
-        "rules_root": "45aea85f6623bff90d79411322d635cc00365f4fb92ab908029313bc0a10d742",
-        "tip": "0e1a50efb6b7ac6a62e498d487480591f3d0cf350fbfa273e27fa068ff043dc3",
+        "rules_root": "369db934ecad81980519af37130ac568c055f649d2d7585b2f3fac70d7472831",
+        "tip": "048ed6be7e04311bc3058aaf4d98c0dbf26f9b848d751fc3e99a50e38da4e8dc",
         "height": 1,
-        "anchored_ledger_root": "90830fd12eb1090d0517e05263aaf7636cb3433486dc6d0fcd9cdd496d4e2959",
-        "verified_ledger_root": "7a79b96413171cc7cb920f79aaa9101cabf445fc462107f48b70322e9c798db6",
+        "anchored_ledger_root": "83e820d9265d4ee8afb95f843f04ccf51345ae794a09ec26a4bf0d2dbe97febf",
+        "verified_ledger_root": "0cac4104f53b5740e99e14f457fd8fc85fdcc6071750aa357fb13e6414aa8a7c",
         "verified_receipts": 1,
         "registry_root": "ded652accd11c7eed080af40673d80482246cae64ce5a68774dd9c263faddf87",
         "paid": [],
         "pending": [
-          "62e157ec9479dcbcf449fbdf2164abc362fa9010aa384dc1a845b1a71f64c93f",
-          "c33d04ff68a07fe273a2bf0f35cfd0f391054887d498e4626aacb7b6ef501a0e"
+          "3dfd03bcdb8a78d9d67930f52d9b7af55758dca56d66065948ada3f6da5d626a",
+          "dce8a48de3509ae9c31f758d849b6ff2dbc0984daf8a05c31b31047ebed68e04"
         ],
         "claims": [
-          "62e157ec9479dcbcf449fbdf2164abc362fa9010aa384dc1a845b1a71f64c93f"
+          "3dfd03bcdb8a78d9d67930f52d9b7af55758dca56d66065948ada3f6da5d626a"
         ],
         "winners": [
-          "c33d04ff68a07fe273a2bf0f35cfd0f391054887d498e4626aacb7b6ef501a0e"
+          "dce8a48de3509ae9c31f758d849b6ff2dbc0984daf8a05c31b31047ebed68e04"
         ],
         "balances": [
           [
@@ -59,35 +59,35 @@
           "blocks": 1
         }
       },
-      "old_snapshot_merkle_root": "54b6db9fd1cf2060943c515f0366a08bd224ad445b1cfbc5f6925fda6a1308f8",
-      "refreshed_snapshot_merkle_root": "e39cc3f3342315753da1944251856378a5e261a13da867be3de9897ece0e0aa4",
-      "old_sidechain_commitment": "bd6dce0617dc5f6e71967beb16a097145f6cc5193851976459395003d2500faa",
-      "refreshed_sidechain_commitment": "c80b0b5413201e66fd666d7ccf1c3e662eeb89f1ee703f482faa169d42cd7d4c"
+      "old_snapshot_merkle_root": "e131bc67e6f5a5b46c146f287c6692656eb63a12850b1ea2a0afa3fa20a42f01",
+      "refreshed_snapshot_merkle_root": "ad5d526aca7ef830484270c77a14387cf55e880e05c65bcd48c6e69117c8109b",
+      "old_sidechain_commitment": "cb95cc0c6c684b10e3e7e4a64e5e65e8b055b3db19ec75845f02eb0017fd1d57",
+      "refreshed_sidechain_commitment": "b1147bcc5e7b027d93c358e6d7e2e6381ef0141e4da17ab7210e39df7b365b6d"
     },
     {
       "name": "signed_seal_and_next_job_settle_tail_once",
       "passed": true,
       "state": {
-        "rules_root": "45aea85f6623bff90d79411322d635cc00365f4fb92ab908029313bc0a10d742",
-        "tip": "0a839660e00fbf12a8fe905165af7ff809324e7eca030d6db79e4a86fd03e468",
+        "rules_root": "369db934ecad81980519af37130ac568c055f649d2d7585b2f3fac70d7472831",
+        "tip": "0c3882e120d7fd7cb2e37f718e19e05a422e5a703b2bfd760ca3b7435cef5acf",
         "height": 2,
-        "anchored_ledger_root": "839f79c29b1baf747a1b1b6ac905a23f946d4ff80dd22d9cd846f1b97b2c01a8",
-        "verified_ledger_root": "839f79c29b1baf747a1b1b6ac905a23f946d4ff80dd22d9cd846f1b97b2c01a8",
+        "anchored_ledger_root": "18d7f3a058d693fb9da861b60dd2c7a04a90b2d315bf20f0833f223faa990d69",
+        "verified_ledger_root": "18d7f3a058d693fb9da861b60dd2c7a04a90b2d315bf20f0833f223faa990d69",
         "verified_receipts": 2,
         "registry_root": "ded652accd11c7eed080af40673d80482246cae64ce5a68774dd9c263faddf87",
         "paid": [
-          "62e157ec9479dcbcf449fbdf2164abc362fa9010aa384dc1a845b1a71f64c93f",
-          "c33d04ff68a07fe273a2bf0f35cfd0f391054887d498e4626aacb7b6ef501a0e"
+          "3dfd03bcdb8a78d9d67930f52d9b7af55758dca56d66065948ada3f6da5d626a",
+          "dce8a48de3509ae9c31f758d849b6ff2dbc0984daf8a05c31b31047ebed68e04"
         ],
         "pending": [
-          "68e403fd864a9eb76d0d03ca7e4e3209f87faf655190fea812bf0fe06096830a"
+          "cf5aef5c43b7a30c76fd2b3b705a2e425ae0198e717fe3b27cfdd720e182380c"
         ],
         "claims": [
-          "62e157ec9479dcbcf449fbdf2164abc362fa9010aa384dc1a845b1a71f64c93f"
+          "3dfd03bcdb8a78d9d67930f52d9b7af55758dca56d66065948ada3f6da5d626a"
         ],
         "winners": [
-          "68e403fd864a9eb76d0d03ca7e4e3209f87faf655190fea812bf0fe06096830a",
-          "c33d04ff68a07fe273a2bf0f35cfd0f391054887d498e4626aacb7b6ef501a0e"
+          "cf5aef5c43b7a30c76fd2b3b705a2e425ae0198e717fe3b27cfdd720e182380c",
+          "dce8a48de3509ae9c31f758d849b6ff2dbc0984daf8a05c31b31047ebed68e04"
         ],
         "balances": [
           [
@@ -112,28 +112,28 @@
       "name": "later_payout_does_not_repay_old_claims",
       "passed": true,
       "state": {
-        "rules_root": "45aea85f6623bff90d79411322d635cc00365f4fb92ab908029313bc0a10d742",
-        "tip": "0e9c328bfc351cd5c240801e7e00335d0f211545adbc49b774bdcb2e9f3aa7d7",
+        "rules_root": "369db934ecad81980519af37130ac568c055f649d2d7585b2f3fac70d7472831",
+        "tip": "0e2be3f3d4a9cc14443ffeee23f6aa86125b0058c536f20db3867608feef0efb",
         "height": 3,
-        "anchored_ledger_root": "25db84c7323a0b249ecec30601b68a399df9b3894e340105b4724d92f79fe2a9",
-        "verified_ledger_root": "25db84c7323a0b249ecec30601b68a399df9b3894e340105b4724d92f79fe2a9",
+        "anchored_ledger_root": "46a24606726331cab906ba3ce851609a0b07dcaa37ab62081f229fcc6d1858e4",
+        "verified_ledger_root": "46a24606726331cab906ba3ce851609a0b07dcaa37ab62081f229fcc6d1858e4",
         "verified_receipts": 3,
         "registry_root": "ded652accd11c7eed080af40673d80482246cae64ce5a68774dd9c263faddf87",
         "paid": [
-          "62e157ec9479dcbcf449fbdf2164abc362fa9010aa384dc1a845b1a71f64c93f",
-          "68e403fd864a9eb76d0d03ca7e4e3209f87faf655190fea812bf0fe06096830a",
-          "c33d04ff68a07fe273a2bf0f35cfd0f391054887d498e4626aacb7b6ef501a0e"
+          "3dfd03bcdb8a78d9d67930f52d9b7af55758dca56d66065948ada3f6da5d626a",
+          "cf5aef5c43b7a30c76fd2b3b705a2e425ae0198e717fe3b27cfdd720e182380c",
+          "dce8a48de3509ae9c31f758d849b6ff2dbc0984daf8a05c31b31047ebed68e04"
         ],
         "pending": [
-          "d7a73a9f2ecbbd74b749bcad4515210f5d33007e1e8040c2d51c35fc8b329c0e"
+          "fb0eeffe087686b30df236c558005b1286aaf623eefe3f4414cca9d4f3e32b0e"
         ],
         "claims": [
-          "62e157ec9479dcbcf449fbdf2164abc362fa9010aa384dc1a845b1a71f64c93f"
+          "3dfd03bcdb8a78d9d67930f52d9b7af55758dca56d66065948ada3f6da5d626a"
         ],
         "winners": [
-          "68e403fd864a9eb76d0d03ca7e4e3209f87faf655190fea812bf0fe06096830a",
-          "c33d04ff68a07fe273a2bf0f35cfd0f391054887d498e4626aacb7b6ef501a0e",
-          "d7a73a9f2ecbbd74b749bcad4515210f5d33007e1e8040c2d51c35fc8b329c0e"
+          "cf5aef5c43b7a30c76fd2b3b705a2e425ae0198e717fe3b27cfdd720e182380c",
+          "dce8a48de3509ae9c31f758d849b6ff2dbc0984daf8a05c31b31047ebed68e04",
+          "fb0eeffe087686b30df236c558005b1286aaf623eefe3f4414cca9d4f3e32b0e"
         ],
         "balances": [
           [
@@ -164,7 +164,8 @@
     "window_seconds": 600,
     "cap_hashes_per_second": 5000000000000,
     "max_events": 128,
-    "inflight_policy": "credit-and-stop"
+    "inflight_policy": "credit-and-stop",
+    "budget_basis": "payout-script"
   },
   "listeners_closed": true,
   "threads_joined": true

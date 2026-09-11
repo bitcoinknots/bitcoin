@@ -6,47 +6,49 @@ used by the toy settlement model. The registry, authenticated jobs, and live upd
 [executable reference](sharepool-live-protocol.md). Full node consensus integration
 and the production protocol remain outstanding.
 
-## 1. Bound aggregate credited work per stable template group
+## 1. Aggregate the work budget by registered payout script
 
-For each pool, template group `g`, and agreed accounting window `e`, define:
+For each pool, registered payout script `p`, and agreed origin epoch `e`, define:
 
 ```text
 w_i = floor(2^256 / (approved_share_target_i + 1))
-W_g = sum(w_i for each distinct eligible share in group g in window e)
-W_g <= maximum_hashes_per_second * window_seconds
+W_p = sum(w_i for each distinct eligible share assigned to script p in epoch e)
+W_p <= maximum_hashes_per_second * window_seconds
+budget_basis = "payout-script"
 ```
 
-All records for a group accumulate together, regardless of how many connections,
-workers, or job refreshes produced them. No floating-point comparison or rounding
-down an over-limit total is permitted. Every share must have a verified proof,
+The budget key is `(pool_id, origin_epoch, payout_script_bytes)`. The script is
+the destination authorized by the registry version committed by each share's job;
+it is not the address's display spelling. All miners and tags registered to the
+same payout script share one allowance. Extra tags, miner IDs, connections,
+workers, or job refreshes do not create additional allowance. No floating-point
+comparison or rounding down an over-limit total is permitted. Every share must have a verified proof,
 an approved target assigned before work, and a unique identity. A lucky share
 earns credit from that assigned target, not its unusually low achieved hash.
 
-An estimated average rate is `W_g / window_seconds`. With the example parameters:
+An estimated average rate is `W_p / window_seconds`. With the example parameters:
 
 ```text
 maximum_hashes_per_second = 5,000,000,000,000
 window_seconds = 600
-per-group budget = 3,000,000,000,000,000 work units
+per-payout-script budget = 3,000,000,000,000,000 work units
 ```
 
-Equality passes; one extra work unit fails. This is an average over the window,
+Equality meets the budget; one extra work unit exceeds it. The continuous
+reference uses the credit-preserving policy explained below, so exceeding the
+budget does not itself discard accepted work or invalidate its settlement.
+This is an average over the window,
 not a limit at every instant. The estimate concerns disclosed credited work,
 not an exact count of hashes physically attempted. Share luck creates sampling
 variation; intentionally withheld proofs can conceal excess hashing. Passing
 this check cannot prove that hardware stayed below 5 TH/s.
 
-Other groups' work does not change a group's allowance. There is no fixed minimum
-group count: a single contributing group can pass when its eligible work fits
-the budget. Empty input is insufficient evidence, not verified zero hashrate or
-a payable settlement. The initial budget scope is `(pool_id, stable_group_id)`.
-A group participating in two pools is checked separately in each. Enforcing a
-global cross-pool budget would require additional identity aggregation rules;
-this proposal does not require a global registry.
-
-If a pool has 100 TH/s of *credited average work*, a 5 TH/s budget requires at
-least twenty nonempty groups for that window. This arithmetic does not establish
-twenty independently controlled miners.
+Other payout scripts' work does not change this allowance. There is no percentage
+rule or fixed minimum number of miners, templates, or payout scripts. One
+recipient can meet the budget. The same script participating in two pools is
+checked separately in each; this proposal does not impose a global cross-pool
+budget. Empty evidence is not measured zero hashrate. The continuous reference
+has an explicit finder-payout bootstrap for jobs with no unpaid claims.
 
 ## 2. Specify a common window; do not use local arrival time for validity
 
@@ -77,41 +79,43 @@ boundaries, minimum sample sizes, late-share treatment, and initial accounting
 state still require agreed parameters. A fixed epoch allows bursts within or across its
 boundaries; it does not imply a sliding-window or instantaneous cap.
 
-Do not silently discard over-budget shares to make the evidence pass. That turns
-the cap into an accounting filter and hides the behavior it was intended to
-measure. An over-budget snapshot fails the proposed check. Gateways can manage
-future work assignments, but a cap cannot prevent someone from physically
-hashing, and changing an ordinary job must not reset accumulated group work.
+Do not silently discard over-budget shares to make the evidence appear compliant.
+The continuous reference commits `inflight_policy = "credit-and-stop"`: it keeps
+accepted in-flight work payable and refuses a new job when that job's verified
+prefix has exhausted its payout script's allowance. The honest gateway uses its
+latest verified prefix. An older eligible job can still win, and Engine validation
+does not impose globally latest-prefix freshness. A strict rejection of excess
+credit or blocks would be a separate policy. Changing an ordinary job or paying
+a claim must not reset the accumulated work for its original script and epoch.
 
-## 3. Distinguish registered miners, stable groups, and exact jobs
+## 3. Distinguish payout budgets, miner tags, and exact jobs
 
-Use three identifiers with different purposes:
+Use these identifiers for different purposes:
 
 | Identifier | Proposed meaning |
 | --- | --- |
 | `miner_key` | Registered key authorizing jobs and a payout destination. It identifies a key, not a person or ASIC. |
-| `group_id` / stable coinbase tag | The accounting bucket for a template family throughout the window. |
+| `payout_script` | The registered destination whose exact bytes identify the shared work-budget bucket within the pool and origin epoch. |
+| Stable coinbase tag | Binds a template to its registered miner and payout history; it does not grant a separate allowance. |
 | `job_id` | A commitment to one approved mining job and its precisely permitted mutations. |
 
-Different registered miner keys must use different registered coinbase tags;
-several workers mining jobs with the same stable tag contribute to one bucket.
+Different registered miner keys must use different registered coinbase tags.
+Different tags pointing to the same payout script accumulate in the same bucket.
 Bind the tag and owner key to the actual mined coinbase or an unambiguous mined
 commitment. A label or signature supplied beside otherwise identical work cannot
-change its ownership or group. Reject reattribution of an existing share.
+change its ownership or payout bucket. Reject reattribution of an existing share.
 
-For the first registry design, each miner key has one active stable group per
-window, and each group has one owner key. Ordinary nonce/extranonce/time changes,
+For the first registry design, each miner key has one active stable tag and each
+tag has one owner key. Ordinary nonce/extranonce/time changes,
 transaction refreshes, reconnects, and new payout/snapshot commitments create new
-jobs in the same group. Register distinct logical miners/tags when a deployment
-intentionally divides work among multiple groups. The protocol must define
-registration activation and key rotation so a replacement key cannot reset
-credited history mid-window. This one-group-per-key rule is a proposed registry
-choice, not a claim that one physical machine equals one key.
+jobs without moving previously credited work. A claim retains the payout script
+from its job's historical registry even after an authorized payout or key update.
+New jobs use their own committed registry version. Adding another miner/tag with
+the same payout script therefore leaves the shared allowance unchanged.
 
 Under the user's definition, different tags make templates different even when
 the selected non-coinbase transactions match. No rule here forces artificial
-transaction differences. One operator can still create many keys and tags, and
-multiple devices can share a key. These checks cannot prove independent miners,
+transaction differences. These checks cannot prove independent miners,
 DATUM execution, or exclusive use of a template by particular hardware.
 
 Every credited share must be work on an eligible reward-mining job. Validate the
@@ -129,7 +133,7 @@ the node has most recently received. Proposed registry entries record:
 
 ```text
 network, ruleset, pool, registry version, predecessor registry root
-miner public key, stable group/tag, payout script
+miner public key, stable coinbase tag, payout script
 registration activation, permitted key/payout updates
 authenticated job registrations and approved target assignments
 ```
@@ -158,8 +162,8 @@ share_snapshot_root, share_count, predecessor_settlement_root
 payout_rule_id, payout_outputs_commitment
 ```
 
-The ruleset fixes the rate budget, window semantics, and payout rules;
-the miner/coordinator cannot substitute easier parameters. Put a namespaced
+The ruleset fixes `budget_basis = "payout-script"`, the rate budget, window
+semantics, and payout rules; the miner/coordinator cannot substitute easier parameters. Put a namespaced
 commitment to this manifest in `m_mm_rhs` before hashing. It selects the exact
 states to validate without depending on the finished job's own hash. A job ID
 may commit to the manifest afterward; the manifest cannot recursively include
@@ -171,8 +175,9 @@ For the job's committed registry and eligible-share snapshot, each node:
 
 1. Validates the registry's accepted predecessor history, registrations, ownership,
    and payout destinations; verifies all share eligibility and attribution.
-2. Recomputes the work budget for each pool/group from the complete
-   protocol-eligible share set.
+2. Recomputes work for each pool, original payout script, and origin epoch from
+   the protocol-eligible share set, aggregating all corresponding tags and miner
+   IDs. Applies the declared in-flight policy without moving historical claims.
 3. Computes payments to the registered payout scripts using the published
    reward allocation, pool/finder fees, rounding, and output-order rules.
    The available reward must reflect this candidate's valid subsidy and actual

@@ -17,9 +17,10 @@ distinguished by each DATUM node's coinbase tag, and to require that evidence
 across pools in support of miner control. Settlement
 commitments are the evidence transport and accounting mechanism for that purpose.
 The desired enforcement scope is every accepted block on the proposed fork,
-regardless of its declared pool. Each stable template group has a configurable
-absolute budget of verified share work over an agreed accounting window, initially
-scoped to each pool. Registered miners use distinct tags, and winning coinbase
+regardless of its declared pool. Each registered payout script has a configurable
+absolute budget of verified share work over an agreed origin epoch, initially
+scoped to each pool. All tags and miner IDs paying that script share its allowance.
+Registered miners use distinct tags, and winning coinbase
 payments must match the referenced registry and accounting state. The measurement
 window and eligibility rules remain to be specified; no consensus change is
 implemented or activated.
@@ -45,33 +46,36 @@ There is a fundamental distinction between these claims:
 | Published work covers different transaction selections | An optional, separate metric can compare authenticated non-coinbase transaction sets. It is not the uniqueness criterion requested here. |
 | Independent miners selected those transactions or used DATUM | Neither PoW nor a Merkle commitment establishes who made that choice or which software/protocol was used. |
 
-## Absolute work budget per stable template group
+## Absolute work budget per registered payout script
 
-For each pool and a single explicitly identified accounting window, let `W_g`
-be the sum of credited work for unique eligible shares belonging to stable group
-`g`. The ruleset supplies a positive window duration and configured rate budget:
+For each pool and an explicitly identified origin epoch, let `W_p` be the sum of
+credited work for unique eligible shares assigned to registered payout script
+`p`. The budget key is `(pool_id, origin_epoch, payout_script_bytes)`, using the
+exact script bytes authorized by each share's original job registry. The ruleset
+commits `budget_basis = "payout-script"` and supplies a positive nominal window
+duration and configured rate budget:
 
 ```text
-W_g = sum(floor(2^256 / (approved_share_target_i + 1)))
-for every group g: W_g <= maximum_hashes_per_second * window_seconds
+W_p = sum(floor(2^256 / (approved_share_target_i + 1)))
+for every payout script p: W_p <= maximum_hashes_per_second * window_seconds
 ```
 
 Equality at the budget is permitted. Use exact integer arithmetic without rounding
 down an over-budget total. A rate budget of 5 TH/s and a 600-second window would
-allow 3,000,000,000,000,000 work units per pool/group; these are examples, not
-activated parameters. Other groups' work does not change a group's allowance.
-There is no fixed minimum group count: a single contributing group can pass when
-its eligible work fits the budget. Empty evidence does not establish zero hashrate
-or a payable settlement. The initial scope is per pool and stable group; a global
-cross-pool budget would need additional identity aggregation rules.
+allow 3,000,000,000,000,000 work units per pool/payout script; these are examples,
+not activated parameters. Other scripts' work does not change that allowance.
+There is no percentage limit or fixed minimum count of recipients or templates.
+Empty evidence does not establish zero hashrate; the continuous reference has an
+explicit finder-payout bootstrap for jobs with no unpaid claims. This budget is
+per pool, not global across pools.
 
-The working grouping assumption is the stable node identifier/tag in the
-authenticated coinbase, across that node's job refreshes. Nonce, extranonce,
-timestamp, transaction updates, or a refreshed settlement root do not create a
-new group under this assumption. The exact job identifier still validates each
-share's template and permitted mutations. This grouping prevents ordinary job
-rotation from trivially evading the cap; it does not prevent an operator from
-creating additional tags or keys.
+The coinbase tag identifies the registered miner and its template. It does not
+identify an independent allowance: every miner ID and tag pointing to the same
+payout script contributes to one budget. Nonce, extranonce, timestamp, transaction
+updates, or a refreshed settlement root cannot reset that total. A claim keeps
+the payout script from its historical job registry even after a payout update;
+past credit does not move to the new destination. The exact job identifier still
+validates the template and its permitted mutations.
 
 Credit each unique share according to its protocol-approved, predeclared target
 `T`, for example using `floor(2^256 / (T + 1))` integer work units. This follows
@@ -83,7 +87,7 @@ share has the same credited work. Credited work measures the published proof
 sample; it is not an exact measurement of all hashes physically performed.
 
 A coordinator-selected subset can pass while the pool's full share history fails.
-To claim a cap on each group's total verified work, all nodes need the same objective
+To claim a cap on each payout script's total verified work, all nodes need the same objective
 inclusion/cutoff rules and an auditable accepted-share history, rather than a
 coordinator choosing convenient records. Until then the check only bounds work in
 the supplied snapshot. Discarding over-budget shares would hide the behavior being
@@ -97,13 +101,18 @@ work quota, not proof of elapsed wall-clock time or an instantaneous hardware ra
 Supporting-share generation must not depend circularly on the snapshot committed
 by those shares themselves.
 
-The coordinator includes the qualifying snapshot's commitment before mining,
-and enforcing nodes check that particular snapshot under the shared rules. A
-single operator can distribute real work among multiple tags; the rule bounds
-credited work per identifier without establishing independent ownership.
+The coordinator includes the snapshot's commitment before mining, and enforcing
+nodes check that particular snapshot under the shared rules. The continuous
+reference's `credit-and-stop` policy retains accepted in-flight work and rejects
+new jobs whose own committed prefix has exhausted their payout script's budget.
+The honest gateway uses its latest verified prefix. Eligible older-prefix jobs
+can still win, and Engine validation does not impose global latest-prefix
+freshness, even for newly signed jobs. This is not a hard maximum on all accepted
+work. The stricter fixed-snapshot checker and the continuous policy must not be
+confused.
 
-The [rule proposal](sharepool-rule-proposal.md) specifies the work formula, stable
-groups, time/withholding limitations, different tagged jobs for registered miners,
+The [rule proposal](sharepool-rule-proposal.md) specifies the work formula, payout
+aggregation, time/withholding limitations, different tagged jobs for registered miners,
 and exact registry-version binding for payouts. The registry's accepted history
 and window still require production consensus integration. Authenticated reference
 registries and immutable jobs are now implemented in the
@@ -137,8 +146,10 @@ validation still needs the other required transaction and chain-state data.
 
 Keep the following identifiers separate:
 
+- The registered payout script, for aggregating the budget across all miners and
+  tags assigned to that destination within a pool and origin epoch.
 - The declared node tag or authenticated public-key identifier extracted from
-  the committed coinbase, for grouping and auditing work by claimed node identity.
+  the committed coinbase, for auditing the template's registered miner attribution.
 - An exact job/template identifier with precisely defined permitted header and
   coinbase mutations, for validating the submitted work.
 - An optional comparison fingerprint of the selected non-coinbase transaction set, with a
@@ -465,7 +476,7 @@ configuration. The authenticated registry and live update path now have a separa
 
 The coordinator's role, pre-mining commitment timing, intended enforcement
 scope, and absolute work-budget objective are specified above. The observable objective is verified work attributed
-to the identifiers inside distinct tagged coinbases; independent operator control
+to registered payout scripts through distinct tagged coinbases; independent operator control
 is a separate property that these proofs do not establish. Next specify the
 measurement window, complete eligible-share history, initial accounting state, and
 production reward-job eligibility. Extend the reference's authenticated manifests

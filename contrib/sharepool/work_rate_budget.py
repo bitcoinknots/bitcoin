@@ -5,10 +5,10 @@
 """Exact work budgets for supplied records in one externally agreed window.
 
 A group passes the budget when its summed credited work is no greater than
-cap_hashes_per_second * window_seconds. All records with the same stable group
-ID accumulate together, regardless of miner, job, or submission order.
+cap_hashes_per_second * window_seconds. All records with the same canonical payout
+script accumulate together, regardless of tag, miner, job, or submission order.
 
-The caller must establish window membership, stable grouping, preassigned share
+The caller must establish window membership, verified payout-script grouping, preassigned share
 targets, valid proofs, and the complete eligible record set. This module does
 none of those things. The configured duration is the full common window, never
 the elapsed time between the first and last disclosed shares. Dividing credited
@@ -46,7 +46,7 @@ class WorkRateBudgetResult:
 
 def evaluate(records: Iterable[CreditedRecord], *, cap_hashes_per_second: int,
              window_seconds: int) -> WorkRateBudgetResult:
-    """Apply one configured budget per stable group over the full common window.
+    """Apply one budget per supplied payout-script group over the common window.
 
     Use credited work derived from preassigned share targets, not share counts
     or the achieved hash. Invalid record fields and duplicate share IDs raise

@@ -23,16 +23,24 @@ python3 contrib/sharepool/live_protocol_peer.py --run-smoke
 | `live_protocol_peer.py` | Bounded loopback HTTP replication and replay tests. |
 
 The reference uses test-only cryptography, synthetic coinbase-only jobs, fixed
-rewards, and public XOR keys. Its explicit `credit-and-stop` in-flight policy
-keeps acknowledged work payable, reports budget excess, and stops future jobs
-for the affected group. A hard cap on credited submissions is a different policy.
-The gateway exposes assignments; it does not send ASIC/DATUM messages.
+rewards, and public XOR keys. Rules commit `budget_basis = "payout-script"`:
+all tags and miner IDs assigned to the same registered payout script share one
+allowance per pool and origin epoch. Tags identify templates and bind their miner
+and registry payout history; they do not grant extra allowance. Claims keep their
+original payout script when a registry update changes future jobs' destination.
+
+The explicit `credit-and-stop` policy keeps acknowledged in-flight work payable,
+reports excess, and rejects new jobs whose own committed prefix has exhausted
+their payout script's budget. The honest gateway uses its current verified
+prefix. Eligible older-prefix jobs remain possible; this is not globally enforced
+latest-prefix freshness or a hard cap on accepted submissions. The gateway
+exposes assignments; it does not send ASIC/DATUM messages.
 
 Read the [test report](../../doc/sharepool-test-report.md) for measured behavior,
 design gaps, and the distinction between real nodes and model nodes. The
 [protocol draft](../../doc/sharepool-design.md) describes the proposed system.
 The [additional rule proposal](../../doc/sharepool-rule-proposal.md) specifies
-the absolute budget, registered miner tags, and registry-bound coinbase payouts.
+the payout-script budget, registered miner tags, and registry-bound coinbase payouts.
 
 ## Earlier fixed-snapshot model
 
@@ -54,26 +62,30 @@ they are not submissions from live miners.
 | --- | --- |
 | `precommit_demo.py` | Pre-mining root commitment and header hash binding, using opaque records. |
 | `work_accounting.py` | Exact target-derived work aggregation and duplicate record checks. |
-| `work_rate_budget.py` | Configurable absolute work budget per stable group over a supplied common window. |
-| `proof_fixtures.py` | Coinbase tag extraction, coinbase/header binding, context, approved share target, and synthetic PoW. |
+| `work_rate_budget.py` | Configurable absolute work budget over supplied groups; protocol callers group by payout-script bytes. |
+| `proof_fixtures.py` | Coinbase tag and payout-script extraction, coinbase/header binding, context, approved share target, and synthetic PoW. |
 | `settlement_sim.py` | Canonical snapshots, counted Merkle inclusion proofs, payout calculation, pending/invalid/valid states, chain selection, reorg accounting, and restart replay. |
 | `run_settlement_scenarios.py` | Reproducible multi-node model scenarios, including disagreement and known design limitations. |
 | `regtest_commitment_smoke.py` | Actual stock-node commitment acceptance, competing blocks, and explicit administrative rejection/reconsideration. |
 
-The earlier `settlement_sim.py` model checks one pool and a current-parent share window. Tags remain stable
-across refreshed jobs and extranonce changes. Non-coinbase transaction selections
+The `settlement_sim.py` model checks one pool and a current-parent share window.
+Its payout-script aggregation uses the script actually bound into each supporting
+share's zero-value coinbase output. It has no signed registry; that authentication
+belongs to the continuous reference. Tags remain available for attribution across
+refreshed jobs and extranonce changes. Non-coinbase transaction selections
 may be identical. Work credit uses the approved share target, separately from
 the base-chain target in header `nBits`; unexpectedly good hashes earn no extra
 credit. The default model uses a common approved share target; separate tests
 exercise different targets and unequal work weights.
 
-The only work cap is `group_work <= cap_hashes_per_second * window_seconds`.
+The fixed-snapshot check is `payout_script_work <= cap_hashes_per_second * window_seconds`.
 The simulator uses a tiny illustrative rate of 1 and nominal duration of 2,
-giving a budget of 2 work units per group. These values suit the easy synthetic
+giving a budget of 2 work units per payout script. These values suit the easy synthetic
 proofs and are not production hashrate parameters. Budget tests also exercise
 the example 5 TH/s over 600 seconds, including the exact boundary and one unit
-above. There is no percentage-of-pool rule or minimum number of groups; a single
-group may contain all disclosed work if it fits its budget. Empty snapshots
+above. Different tags sharing one script aggregate under that same budget. There
+is no percentage-of-pool rule or minimum number of recipients or templates; one
+recipient may contain all disclosed work if it fits the budget. Empty snapshots
 still cannot produce the model's work-based payouts.
 
 ## Run the actual-node smoke test
@@ -113,9 +125,9 @@ see [its implementation report](../../doc/sharepool-live-protocol.md).
 - Share difficulty and a common window support a disclosed-work rate estimate,
   not an upper bound on physical hashing. Timing, window membership, withholding,
   sampling variation, and cross-pool scope require explicit protocol rules.
-- A tag proves a label was bound into the work, not independent ownership or
-  execution of DATUM. One operator can create multiple tags and mine real work
-  for each of them.
+- A tag binds template attribution; it does not prove independent ownership or
+  execution of DATUM. The budget separately aggregates all tags paying the same
+  script, so changing tags does not provide more allowance for that destination.
 - Snapshot transfer, coordinator signatures, authenticated jobs, multiple pools,
   a complete eligible-share ledger, hidden XOR keys, full transaction validation,
   spendable payouts, maturity, durable crash recovery, and resource-exhaustion

@@ -8,7 +8,8 @@ from dataclasses import FrozenInstanceError, replace
 from io import BytesIO
 import unittest
 
-from proof_fixtures import BASE_BITS, CBlockHeader, CTransaction, ShareProof, make_share, verify_share
+from proof_fixtures import (BASE_BITS, CBlockHeader, CTransaction, ShareProof,
+                            fixture_payout_script, make_share, verify_share)
 from work_accounting import evaluate
 
 
@@ -31,7 +32,8 @@ class ProofFixtureTest(unittest.TestCase):
         first, second = self.verify(self.share), self.verify(other)
         self.assertEqual(first.share_id, self.share.share_id)
         self.assertNotEqual(first.share_id, second.share_id)
-        self.assertEqual(first.group_id, b"datum-A")
+        self.assertEqual(first.group_id, fixture_payout_script(b"datum-A"))
+        self.assertEqual(self.share.declared_tag, other.declared_tag)
         result = evaluate([first, second])
         self.assertEqual((result.group_count, result.total_work), (1, 4))
         with self.assertRaises(ValueError):
@@ -45,6 +47,28 @@ class ProofFixtureTest(unittest.TestCase):
             self.verify(replace(self.share, declared_tag=b"datum-B"))
         with self.assertRaisesRegex(ValueError, "Merkle"):
             self.verify(replace(self.share, coinbase=other.coinbase, declared_tag=b"datum-B"))
+
+    def test_distinct_tags_share_the_actual_bound_payout_group(self):
+        destination = b"\x00\x20" + b"\x41" * 32
+        first = make_share(b"miner-A", 123, 100, payout_script=destination)
+        second = make_share(b"miner-B", 123, 100, payout_script=destination)
+        self.assertNotEqual(first.declared_tag, second.declared_tag)
+        self.assertNotEqual(first.share_id, second.share_id)
+        self.assertEqual(self.verify(first).group_id, destination)
+        self.assertEqual(self.verify(second).group_id, destination)
+        result = evaluate([self.verify(first), self.verify(second)])
+        self.assertEqual((result.group_count, result.total_work), (1, 4))
+
+    def test_payout_destination_is_bound_before_hashing_and_not_redirectable(self):
+        original = self.verify(self.share)
+        destination = b"\x00\x20" + b"\x42" * 32
+        changed_job = make_share(b"datum-A", 123, 100, payout_script=destination)
+        self.assertEqual(self.verify(changed_job).group_id, destination)
+        self.assertEqual(self.verify(self.share), original)
+        self.assertNotEqual(original.group_id, destination)
+        # Replacing the coinbase without redoing its committed work is invalid.
+        with self.assertRaisesRegex(ValueError, "Merkle"):
+            self.verify(replace(self.share, coinbase=changed_job.coinbase))
 
     def test_parent_height_pool_target_and_commitment_binding(self):
         for kwargs in ({"expected_parent": 124}, {"expected_height": 101},
@@ -101,7 +125,9 @@ class ProofFixtureTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             ShareProof(bytearray(self.share.header), self.share.coinbase, b"tag", b"pool")
         for kwargs in ({"tag": b""}, {"tag": b"t" * 33}, {"height": 0},
-                       {"parent_hash": -1}, {"nonce_seed": True}, {"share_bits": 0}):
+                       {"parent_hash": -1}, {"nonce_seed": True}, {"share_bits": 0},
+                       {"payout_script": b""}, {"payout_script": b"x" * 1025},
+                       {"payout_script": bytearray(b"\x51")}):
             arguments = dict(tag=b"tag", parent_hash=123, height=100)
             arguments.update(kwargs)
             with self.assertRaises(ValueError):
