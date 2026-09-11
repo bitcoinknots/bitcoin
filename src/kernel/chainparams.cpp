@@ -130,6 +130,8 @@ public:
         // via versionbits; the stall at 961633 prevented it from ever
         // reaching ACTIVE, and that deployment has been removed.)
         consensus.RdtsExpiryTime = 1819756800; // September 1st, 2027 00:00 UTC
+        // Batched extended coinbase maturity: start unset until flag day.
+        // consensus.ExtendedCoinbaseMaturityStartTime = ...;
 
         consensus.nMinimumChainWork = uint256{"00000000000000000000000000000000000000013e00277374c9f9eeadc70200"};
         consensus.defaultAssumeValid = uint256{"0000000000000078ed1e20cac1acf78df6d1060c78059fb6331e17141c881fc8"}; // 964264
@@ -663,6 +665,10 @@ public:
         // default, so regtest behaviour is unchanged.
         if (opts.rdts_expiry_time) {
             consensus.RdtsExpiryTime = *opts.rdts_expiry_time;
+        }
+
+        if (opts.extended_coinbase_maturity_start_time) {
+            consensus.ExtendedCoinbaseMaturityStartTime = *opts.extended_coinbase_maturity_start_time;
         }
 
         for (const auto& [deployment_pos, version_bits_params] : opts.version_bits_parameters) {

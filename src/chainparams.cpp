@@ -93,6 +93,17 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         options.rdts_expiry_time = expiry;
     }
 
+    if (const auto arg{args.GetArg("-extendedcoinbasematurity", "")}; !arg.empty()) {
+        if (!options.rdts_expiry_time) {
+            throw std::runtime_error("-extendedcoinbasematurity requires -rdtsexpiry=<time> (window ends at RDTS expiry).");
+        }
+        int64_t start;
+        if (!ParseInt64(arg, &start) || start >= *options.rdts_expiry_time) {
+            throw std::runtime_error(strprintf("Invalid start (%s) for -extendedcoinbasematurity=<time>: must precede the RDTS expiry (%d).", arg, *options.rdts_expiry_time));
+        }
+        options.extended_coinbase_maturity_start_time = start;
+    }
+
     if (const auto arg{args.GetArg("-blake2b_headline")}; arg) {
         if (!options.activation_heights.contains(Consensus::BuriedDeployment::DEPLOYMENT_BLAKE2B)) {
             throw std::runtime_error("-blake2b_headline requires -testactivationheight=blake2b@<height>");

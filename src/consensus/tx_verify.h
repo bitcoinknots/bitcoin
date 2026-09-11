@@ -7,6 +7,7 @@
 
 #include <consensus/amount.h>
 
+#include <limits>
 #include <stdint.h>
 #include <vector>
 
@@ -50,12 +51,20 @@ namespace Consensus {
 bool CheckOutputSizes(const CTransaction& tx, TxValidationState& state);
 
 /**
+ * Confirmations required before a coinbase created at coinbase_height may
+ * be spent. Coins created in [ext_start_height, ext_expiry_height) keep
+ * the batched extended schedule after RDTS expiry. Pass INT_MAX for both
+ * bounds when the deployment is unscheduled on this chain.
+ */
+int RequiredCoinbaseMaturity(int coinbase_height, int ext_start_height, int ext_expiry_height);
+
+/**
  * Check whether all inputs of this transaction are valid (no double spends and amounts)
  * This does not modify the UTXO set. This does not check scripts and sigs.
  * @param[out] txfee Set to the transaction fee if successful.
  * Preconditions: tx.IsCoinBase() is false.
  */
-[[nodiscard]] bool CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, CheckTxInputsRules rules);
+[[nodiscard]] bool CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, CheckTxInputsRules rules, int ext_start_height = (std::numeric_limits<int>::max)(), int ext_expiry_height = (std::numeric_limits<int>::max)());
 } // namespace Consensus
 
 /** Auxiliary functions for transaction validation (ideally should not be exposed) */

@@ -4,7 +4,9 @@
 
 #include <chainparams.h>
 #include <consensus/amount.h>
+#include <consensus/consensus.h>
 #include <consensus/merkle.h>
+#include <consensus/tx_verify.h>
 #include <core_io.h>
 #include <hash.h>
 #include <net.h>
@@ -13,7 +15,9 @@
 #include <util/chaintype.h>
 #include <validation.h>
 
+#include <limits>
 #include <string>
+#include <vector>
 
 #include <test/util/setup_common.h>
 
@@ -396,6 +400,61 @@ BOOST_AUTO_TEST_CASE(block_malleation)
         }
         BOOST_CHECK(is_mutated(block, /*check_witness_root=*/true));
     }
+}
+
+
+#include <consensus/consensus.h>
+#include <consensus/tx_verify.h>
+#include <limits>
+#include <vector>
+
+static std::vector<CBlockIndex> MakeTimedChain(const std::vector<int64_t>& times)
+{
+    std::vector<CBlockIndex> chain(times.size());
+    for (size_t i = 0; i < times.size(); ++i) {
+        chain[i].nHeight = static_cast<int>(i);
+        chain[i].nTime = times[i];
+        chain[i].pprev = i == 0 ? nullptr : &chain[i - 1];
+        chain[i].BuildSkip();
+    }
+    return chain;
+}
+
+BOOST_AUTO_TEST_CASE(batched_coinbase_maturity_schedule)
+{
+    constexpr int inactive{std::numeric_limits<int>::max()};
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(10, inactive, inactive), COINBASE_MATURITY);
+    const int start = 51;
+    const int expiry = 151;
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(50, start, expiry), COINBASE_MATURITY);
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(51, start, expiry), EXTENDED_COINBASE_MATURITY_SHORT); // %6==0
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(52, start, expiry), EXTENDED_COINBASE_MATURITY_MID);
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(53, start, expiry), EXTENDED_COINBASE_MATURITY_MID);
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(54, start, expiry), EXTENDED_COINBASE_MATURITY_LONG);
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(151, start, expiry), COINBASE_MATURITY);
+    // lock sticks: a window coin evaluated with the same bounds after "now" is past expiry
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(51, start, expiry), EXTENDED_COINBASE_MATURITY_SHORT);
+}
+
+BOOST_AUTO_TEST_CASE(extended_coinbase_maturity_bounds)
+{
+    std::vector<int64_t> times;
+    for (int i = 0; i < 200; ++i) times.push_back(1000 + 10 * i);
+    const auto chain{MakeTimedChain(times)};
+    Consensus::Params params{};
+    constexpr int inactive{std::numeric_limits<int>::max()};
+    int start, expiry;
+    ExtendedCoinbaseMaturityBounds(params, chain.back(), start, expiry);
+    BOOST_CHECK_EQUAL(start, inactive);
+
+    params.ExtendedCoinbaseMaturityStartTime = chain[50].GetMedianTimePast();
+    params.RdtsExpiryTime = chain[150].GetMedianTimePast();
+    ExtendedCoinbaseMaturityBounds(params, chain[100], start, expiry);
+    BOOST_CHECK_EQUAL(start, 51);
+    BOOST_CHECK_EQUAL(expiry, inactive); // tip 100 has not reached expiry mtp
+    ExtendedCoinbaseMaturityBounds(params, chain.back(), start, expiry);
+    BOOST_CHECK_EQUAL(start, 51);
+    BOOST_CHECK_EQUAL(expiry, 151);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

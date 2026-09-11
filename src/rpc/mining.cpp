@@ -1082,6 +1082,9 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
     if (rdts_active) {
         aRules.push_back("reduced_data");
     }
+    if (pindexPrev != nullptr && consensusParams.ExtendedCoinbaseMaturityCreatedAt(pindexPrev->GetMedianTimePast())) {
+        aRules.push_back("extended_coinbase_maturity");
+    }
 
     result.pushKV("version", block_header.GetCompleteVersion());
     result.pushKV("rules", std::move(aRules));

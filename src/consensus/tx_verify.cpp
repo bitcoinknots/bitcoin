@@ -172,7 +172,20 @@ bool Consensus::CheckOutputSizes(const CTransaction& tx, TxValidationState& stat
     return true;
 }
 
-bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, const CheckTxInputsRules rules)
+int Consensus::RequiredCoinbaseMaturity(int coinbase_height, int ext_start_height, int ext_expiry_height)
+{
+    if (coinbase_height < ext_start_height || coinbase_height >= ext_expiry_height) {
+        return COINBASE_MATURITY;
+    }
+    // 1/6 of window blocks: 2016; 2/6: 8064; 1/2: 26280. Relative to
+    // the first window height so the cadence does not depend on abs height.
+    const int batch = (coinbase_height - ext_start_height) % 6;
+    if (batch == 0) return EXTENDED_COINBASE_MATURITY_SHORT;
+    if (batch == 1 || batch == 2) return EXTENDED_COINBASE_MATURITY_MID;
+    return EXTENDED_COINBASE_MATURITY_LONG;
+}
+
+bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, const CheckTxInputsRules rules, int ext_start_height, int ext_expiry_height)
 {
     // are the actual inputs available?
     if (!inputs.HaveInputs(tx)) {
@@ -192,9 +205,12 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, 
         assert(!coin.IsSpent());
 
         // If prev is coinbase, check that it's matured
-        if (coin.IsCoinBase() && nSpendHeight - coin.nHeight < COINBASE_MATURITY) {
-            return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, "bad-txns-premature-spend-of-coinbase",
-                strprintf("tried to spend coinbase at depth %d", nSpendHeight - coin.nHeight));
+        if (coin.IsCoinBase()) {
+            const int maturity = RequiredCoinbaseMaturity(coin.nHeight, ext_start_height, ext_expiry_height);
+            if (nSpendHeight - coin.nHeight < maturity) {
+                return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, "bad-txns-premature-spend-of-coinbase",
+                    strprintf("tried to spend coinbase at depth %d (maturity %d)", nSpendHeight - coin.nHeight, maturity));
+            }
         }
 
         // Check for negative or overflow input values
