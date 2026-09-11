@@ -1,0 +1,81 @@
+{
+  "scope": "One disposable stock Knots regtest node; P2P and wallets disabled; actual native block validation and passive SQLite observation",
+  "binary": "bitcoin-knotsd",
+  "binary_provenance": "Version self-report; not a reproducible-build verification",
+  "public_testnet_block_found": false,
+  "settlement_rules_enforced_by_native_node": false,
+  "snapshot_provenance": "Deterministic digest and payout fixtures; snapshot/share contents are not validated by this observer",
+  "reorganization_method": "Administrative invalidateblock/reconsiderblock on the disposable regtest chain",
+  "cases": [
+    {
+      "name": "fresh_isolated_regtest",
+      "passed": true,
+      "initial_height": 0,
+      "peer_connections": 0,
+      "wallets_enabled": false
+    },
+    {
+      "name": "native_envelope_and_exact_coinbase",
+      "passed": true,
+      "height": 2,
+      "block_hash": "51581ed73d71bc88a9ab1d7f7f9893e5b922adf6043736187e0a7f0b4bf6743e",
+      "commitment": "832327e4c0bbb6c699cd4abe873501850918ea3c758ac689ef3c95f71b0a2a27",
+      "outputs_including_witness": 3,
+      "confirmations": 1,
+      "status": "immature",
+      "native_body_verified": true
+    },
+    {
+      "name": "native_acceptance_does_not_enforce_pool_payouts",
+      "passed": true,
+      "native_block_accepted": true,
+      "observer_rejected": true,
+      "failure": "native coinbase differs from observed payouts",
+      "atomic_status": "pending"
+    },
+    {
+      "name": "administrative_native_reorg_rolls_back_observer",
+      "passed": true,
+      "status": "orphaned",
+      "observed_tip": "4a90e44573e909274c04ac7d13e714c175106b78965ceb5535dbd272fa23ac43",
+      "payout_credit_available": false,
+      "method": "invalidateblock plus a submitted alternate branch"
+    },
+    {
+      "name": "administrative_reconsider_restores_observer",
+      "passed": true,
+      "status": "immature",
+      "descendants": 2,
+      "observed_tip": "1efdb65ff33a068d61b27effb3fdb59c79bdd0d2492826c6042432adb7c136af"
+    },
+    {
+      "name": "coinbase_next_block_boundary",
+      "passed": true,
+      "descendants": 99,
+      "confirmations": 100,
+      "spendable_next_block": true,
+      "status": "immature",
+      "coins_spent": false
+    },
+    {
+      "name": "conservative_maturity_after_100_descendants",
+      "passed": true,
+      "descendants": 100,
+      "confirmations": 101,
+      "status": "mature",
+      "coins_spent": false
+    },
+    {
+      "name": "durable_store_reopen_and_refresh",
+      "passed": true,
+      "status": "mature",
+      "payload_verified": true
+    }
+  ],
+  "success": true,
+  "version": "/Satoshi:29.4.1/Knots:20260508/",
+  "network_genesis": "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206",
+  "final_height": 102,
+  "temporary_datadir_removed": true,
+  "wall_seconds": 0.417
+}

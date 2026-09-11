@@ -9,6 +9,9 @@ and provisional settlement reorganization. It supersedes coordinator seals as
 the proposed accounting-ordering direction. The earlier
 [continuous protocol reference](sharepool-live-protocol.md) remains an executable
 signed-receipt baseline with a separate gateway and HTTP path.
+The [hardware integration report](sharepool-hardware-and-production.md) adds a
+measured Testnet4 Goldshell run and passive native settlement observation, while
+explicitly separating those components from integrated consensus enforcement.
 
 Base: `bitcoinknots/bitcoin`, tag `v29.4.1.knots20260508`, commit
 `8c85b1585dac23f964e2dd32045624de7f02aa58`.

@@ -5,6 +5,14 @@ snapshot settlement, and disagreement between nodes. It also includes a smoke
 test that ran two actual stock Knots nodes in isolated regtest.
 **The proposed settlement and absolute work-budget rules are not integrated into Knots consensus.**
 
+The [hardware and production report](../../doc/sharepool-hardware-and-production.md)
+records 13 actual Goldshell shares verified on this Knots release's Testnet4
+branch, followed by confirmed restoration to Lazarus. The new native-template
+adapter, capture/replay tools, and durable passive base-chain observer are
+separate integration components. Eight disposable native-node cases test the
+observer. Neither these results nor the earlier checkpoint model establish
+mainnet readiness; the report lists the remaining integration and release gates.
+
 The current [permissionless checkpoint reference](../../doc/sharepool-pow-ledger.md)
 orders registry changes, shares, and candidate settlements using verified PoW.
 Anyone can mine checkpoints, including empty checkpoints that renew work epochs
@@ -38,6 +46,11 @@ python3 contrib/sharepool/live_protocol_peer.py --run-smoke
 
 | Reference component | Purpose |
 | --- | --- |
+| `testnet_template.py` | Full GBT transaction/witness preservation and exact Sia ASIC-to-Knots header reconstruction. |
+| `testnet_hardware_capture.py`, `verify_hardware_capture.py` | Bounded testnet-only Stratum capture, durable admission, native proposals, and recorded-proof replay. |
+| `base_chain_settlement.py` | Versioned native commitment envelope and durable passive observation of base-chain payouts/reorgs/maturity. |
+| `goldshell_test_guard.py` | Private configuration backup, temporary test routing, and verified pool/settings restoration through an existing local bridge. |
+| `regtest_settlement_observer_smoke.py` | Eight real-node observer tests in a disposable regtest chain. |
 | `pow_share_ledger.py` | Permissionless checkpoint PoW, deterministic fork selection, bounded job age, quota heartbeats, exact snapshot settlement, and replay. |
 | `run_pow_ledger_scenarios.py` | Eight three-replica checkpoint scenarios, including competing reward histories. |
 | `signed_registry.py` | Authenticated miner registration, key rotation, and immutable payout versions. |

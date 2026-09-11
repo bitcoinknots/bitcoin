@@ -9,6 +9,9 @@ The current reference is
 [`pow_share_ledger.py`](../contrib/sharepool/pow_share_ledger.py). The earlier
 [signed receipt protocol](sharepool-live-protocol.md) remains a separate baseline.
 Its gateway and HTTP replication are not connected to this checkpoint ledger.
+The newer [hardware integration report](sharepool-hardware-and-production.md)
+adds actual Testnet4 ASIC proofs and a separate passive native-chain observer.
+Those components are also not yet integrated with this synthetic reward ledger.
 
 ## Ordering and participation
 
@@ -182,8 +185,9 @@ retry, reward-history reorganization, equal-work ties, and store replay. These
 are direct object deliveries in one process, not network or GPU benchmarks.
 The [unit-test log](../contrib/sharepool/results/unit-tests.txt) includes the new
 adversarial checkpoint tests and earlier accounting, registry, and gateway tests.
-The recorded combined run passes 149 tests: 25 checkpoint tests and 124 baseline
-tests. New cases exercise forged PoW and post-state roots, immutable payout
+This reference's subset contains 149 tests: 25 checkpoint tests and 124 earlier
+baseline tests. The combined log also includes the later native/hardware tests.
+Checkpoint cases exercise forged PoW and post-state roots, immutable payout
 origins, repeated proofs, exact age boundaries, payout-capacity admission and
 release, reordered dependencies, and settlement rollback.
 The earlier six HTTP scenarios and previously recorded stock-node regtest
