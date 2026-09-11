@@ -1,3 +1,41 @@
+test_callback_receipt_race_does_not_sign_or_activate_stale_proposal (test_job_gateway.GatewayTests) ... ok
+test_concurrent_refresh_response_cannot_replace_newer_activation (test_job_gateway.GatewayTests) ... ok
+test_coordinator_cannot_rewind_requested_ledger_or_registry (test_job_gateway.GatewayTests) ... ok
+test_cursor_restore_keeps_archive_but_requires_fresh_authorization (test_job_gateway.GatewayTests) ... ok
+test_future_registry_receipt_survives_old_winner_before_registry_selection (test_job_gateway.GatewayTests) ... ok
+test_invalid_receipt_preserves_active_job_head_and_generation (test_job_gateway.GatewayTests) ... ok
+test_missing_receipt_dependency_can_be_retried_without_cursor_change (test_job_gateway.GatewayTests) ... ok
+test_old_job_can_win_after_refresh_and_requires_seal_for_next_parent (test_job_gateway.GatewayTests) ... ok
+test_receipt_event_automatically_refreshes_and_ancestor_does_not_reissue (test_job_gateway.GatewayTests) ... ok
+test_registry_arrival_during_callback_discards_old_version_proposal (test_job_gateway.GatewayTests) ... ok
+test_registry_payout_update_pauses_without_mutating_old_job (test_job_gateway.GatewayTests) ... ok
+test_signed_receipt_siblings_pause_until_anchored_choice (test_job_gateway.GatewayTests) ... ok
+test_slow_callback_does_not_hold_replica_lock (test_job_gateway.GatewayTests) ... ok
+test_verified_receipt_pauses_and_refreshes_sidechain_commitment (test_job_gateway.GatewayTests) ... ok
+test_authenticated_jobs_are_full_reward_templates_with_distinct_tags (test_live_protocol.LiveProtocolTests) ... ok
+test_authenticated_unapproved_target_and_wrong_commitments_rejected (test_live_protocol.LiveProtocolTests) ... ok
+test_coordinator_and_miner_cannot_authorize_redirected_coinbase (test_live_protocol.LiveProtocolTests) ... ok
+test_distinct_proofs_from_one_job_are_credited_once_each (test_live_protocol.LiveProtocolTests) ... ok
+test_inflight_overbudget_work_is_retained_and_stops_new_group_jobs (test_live_protocol.LiveProtocolTests) ... ok
+test_insufficient_share_pow_is_not_credited (test_live_protocol.LiveProtocolTests) ... ok
+test_job_refresh_cannot_reset_aggregated_group_work_budget (test_live_protocol.LiveProtocolTests) ... ok
+test_late_share_after_parent_seal_is_rejected (test_live_protocol.LiveProtocolTests) ... ok
+test_live_snapshot_inclusions_bind_every_receipt_context_and_leaf_count (test_live_protocol.LiveProtocolTests) ... ok
+test_missing_transport_dependencies_remain_uncredited (test_live_protocol.LiveProtocolTests) ... ok
+test_new_origin_epoch_gets_new_budget_without_relabeling_old_claims (test_live_protocol.LiveProtocolTests) ... ok
+test_new_verified_prefix_updates_sidechain_commitment_and_keeps_old_job (test_live_protocol.LiveProtocolTests) ... ok
+test_old_job_winner_carries_tail_and_itself_into_next_payout_once (test_live_protocol.LiveProtocolTests) ... ok
+test_out_of_order_export_import_and_restore_revalidate_all_objects (test_live_protocol.LiveProtocolTests) ... ok
+test_paid_work_and_winner_keep_origin_epoch_budget (test_live_protocol.LiveProtocolTests) ... ok
+test_receipt_authorization_and_predecessor_are_verified (test_live_protocol.LiveProtocolTests) ... ok
+test_registry_update_cannot_redirect_preexisting_claims (test_live_protocol.LiveProtocolTests) ... ok
+test_resigned_job_with_wrong_snapshot_merkle_root_is_rejected (test_live_protocol.LiveProtocolTests) ... ok
+test_seal_cannot_attach_a_conflicting_registry_tail_to_winner (test_live_protocol.LiveProtocolTests) ... ok
+test_share_origin_on_orphaned_branch_is_rejected (test_live_protocol.LiveProtocolTests) ... ok
+test_shares_cannot_change_target_coinbase_or_authenticated_job (test_live_protocol.LiveProtocolTests) ... ok
+test_sibling_registry_histories_cannot_mix_claims_and_payouts (test_live_protocol.LiveProtocolTests) ... ok
+test_winner_that_also_has_receipt_is_deduplicated (test_live_protocol.LiveProtocolTests) ... ok
+test_wrong_job_signatures_never_enter_job_cache (test_live_protocol.LiveProtocolTests) ... ok
 test_changed_commitment_can_also_pass_easy_target (test_precommit_demo.HeaderCommitmentTest) ... ok
 test_demo_reports_limited_scope (test_precommit_demo.HeaderCommitmentTest) ... ok
 test_search_is_bounded (test_precommit_demo.HeaderCommitmentTest) ... ok
@@ -39,6 +77,20 @@ test_snapshot_context_must_match_block_chain_and_rules (test_settlement_sim.Sett
 test_uncommitted_coinbase_witness_cannot_poison_header_id (test_settlement_sim.SettlementTests) ... ok
 test_wrong_coinbase_payload_can_be_replaced_by_authentic_payload (test_settlement_sim.SettlementTests) ... ok
 test_wrong_peer_snapshot_cannot_poison_block_validity (test_settlement_sim.SettlementTests) ... ok
+test_aggregate_registry_bytes_are_bounded (test_signed_registry.RegistryTests) ... ok
+test_bounded_fields_and_snapshot_count (test_signed_registry.RegistryTests) ... ok
+test_context_is_signed_not_only_checked_at_apply (test_signed_registry.RegistryTests) ... ok
+test_duplicate_tags_keys_and_miner_ids_rejected (test_signed_registry.RegistryTests) ... ok
+test_payout_update_without_rotation_and_removed_key_cannot_update (test_signed_registry.RegistryTests) ... ok
+test_real_ecdsa_authentication_and_malformed_inputs (test_signed_registry.RegistryTests) ... ok
+test_registration_requires_identity_key_and_possession (test_signed_registry.RegistryTests) ... ok
+test_registry_and_change_serialization_roundtrip (test_signed_registry.RegistryTests) ... ok
+test_replay_and_forked_predecessor_rejected (test_signed_registry.RegistryTests) ... ok
+test_signed_conflicting_updates_do_not_select_canonical_history (test_signed_registry.RegistryTests) ... ok
+test_update_cannot_change_tag_or_impersonate_other_owner (test_signed_registry.RegistryTests) ... ok
+test_update_requires_both_keys_and_preserves_old_payout_version (test_signed_registry.RegistryTests) ... ok
+test_values_are_immutable_and_mutable_byte_inputs_are_copied (test_signed_registry.RegistryTests) ... ok
+test_wire_objects_reject_unknown_fields_and_noncanonical_encodings (test_signed_registry.RegistryTests) ... ok
 test_arbitrary_precision_group_totals (test_work_accounting.WorkAccountingTest) ... ok
 test_canonical_immutable_result (test_work_accounting.WorkAccountingTest) ... ok
 test_duplicate_share_ids_are_rejected_even_across_groups (test_work_accounting.WorkAccountingTest) ... ok
@@ -60,6 +112,6 @@ test_single_group_can_account_for_all_work_within_its_budget (test_work_rate_bud
 test_work_weights_not_equal_share_counts_control_budget (test_work_rate_budget.WorkRateBudgetTest) ... ok
 
 ----------------------------------------------------------------------
-Ran 60 tests in 1.662s
+Ran 112 tests in 10.476s
 
 OK

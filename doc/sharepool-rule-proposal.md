@@ -2,8 +2,9 @@
 
 This proposal records the requested rules. **5 TH/s and 600 seconds are examples,
 not activated parameters.** The work-budget arithmetic has a test helper and is
-used by the toy settlement model. The registry, authenticated job protocol, and
-full node consensus integration described here remain to be implemented.
+used by the toy settlement model. The registry, authenticated jobs, and live update path now have an
+[executable reference](sharepool-live-protocol.md). Full node consensus integration
+and the production protocol remain outstanding.
 
 ## 1. Bound aggregate credited work per stable template group
 
@@ -116,8 +117,9 @@ DATUM execution, or exclusive use of a template by particular hardware.
 Every credited share must be work on an eligible reward-mining job. Validate the
 template, chain context, payout requirements, approved target, and predecessor
 settlement that the share actually commits to. Separate balanced evidence jobs
-do not establish distribution of reward mining. The current synthetic fixtures
-still have this limitation.
+do not establish distribution of reward mining. The earlier synthetic fixtures still have this limitation. The continuous
+reference now requires all credited proofs to come from its authenticated
+reward-job structure; full production template validation remains outstanding.
 
 ## 4. Make the local registry a replica of a specific committed state
 
@@ -213,8 +215,10 @@ Both registry and settlement state must follow branch-specific history. Reorgs
 undo departed registrations and provisional payouts before applying the selected
 branch. Re-delivering a block must not pay it twice.
 
-The current settlement simulator tests a toy payout mapping and fixed snapshot,
-not this authenticated registry. The new work-budget helper checks exact integer
+The earlier settlement simulator tests a toy payout mapping and fixed snapshot.
+The [continuous reference](sharepool-live-protocol.md) implements authenticated
+registries, eligible reward jobs, and delayed-work accounting within its bounded
+model, including an explicit credit-preserving in-flight budget policy. The new work-budget helper checks exact integer
 arithmetic over supplied credited records, not timing, signatures, complete
 disclosure, physical hashrate, or a live node. This proposal does not activate
 new Knots validity rules or establish trustless total-pool work disclosure.

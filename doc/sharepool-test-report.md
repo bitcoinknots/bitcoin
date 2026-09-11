@@ -7,11 +7,16 @@ Updated and tested on 2026-09-11 against a checkout based on Knots tag
 fork rollback and delayed data. Stock Knots accepts the commitment without
 checking settlement. Mandatory settlement validation remains unimplemented.**
 
+This report describes the earlier fixed-snapshot model. The new
+[continuous protocol](sharepool-live-protocol.md) adds authenticated registries,
+reward-job shares, automatic snapshot updates, and tail settlement. The linked
+unit-test log now contains the combined regression suite.
+
 ## What was executed
 
 | Layer | Recorded result | What it establishes |
 | --- | --- | --- |
-| Python unit tests | 60 passing tests, including 50 seeded delivery permutations | Hash/tag binding, work accounting, absolute budgets, Merkle inclusions, validation states, payout checks, rollback, and replay within the stated model. |
+| Earlier model/unit-test subset | 60 passing tests, including 50 seeded delivery permutations | Hash/tag binding, work accounting, absolute budgets, Merkle inclusions, validation states, payout checks, rollback, and replay within the stated model. |
 | Settlement model scenarios | 11 passing scenarios | Reproducible node disagreement, data recovery, chain selection, and examples exposing unresolved protocol rules. |
 | Two actual stock Knots processes | 6 passing regtest cases | Header commitment behavior, actual block acceptance, equal-work branches, and explicit local rejection/reconsideration. |
 

@@ -1,0 +1,171 @@
+{
+  "timestamp_utc": "2026-09-11T08:25:59.773727+00:00",
+  "success": true,
+  "scope": "Three Engine objects in one process; real loopback HTTP; signed fixtures and synthetic work",
+  "knots_integration": false,
+  "separate_processes": false,
+  "external_network": false,
+  "private_keys_transmitted": false,
+  "missing_dependency_policy": "Unresolved objects are uncredited and not retained; sender resends a complete bundle",
+  "cases": [
+    {
+      "name": "modified_receipt_signature_rejected",
+      "passed": true,
+      "http_status": 422,
+      "errors": [
+        "ValueError: invalid receipt authorization"
+      ]
+    },
+    {
+      "name": "reordered_missing_dependencies_remain_uncredited",
+      "passed": true,
+      "missing_counts": [
+        4,
+        2
+      ]
+    },
+    {
+      "name": "complete_retry_converges_and_accepts_correct_receipt",
+      "passed": true,
+      "state": {
+        "rules_root": "45aea85f6623bff90d79411322d635cc00365f4fb92ab908029313bc0a10d742",
+        "tip": "0e1a50efb6b7ac6a62e498d487480591f3d0cf350fbfa273e27fa068ff043dc3",
+        "height": 1,
+        "anchored_ledger_root": "90830fd12eb1090d0517e05263aaf7636cb3433486dc6d0fcd9cdd496d4e2959",
+        "verified_ledger_root": "7a79b96413171cc7cb920f79aaa9101cabf445fc462107f48b70322e9c798db6",
+        "verified_receipts": 1,
+        "registry_root": "ded652accd11c7eed080af40673d80482246cae64ce5a68774dd9c263faddf87",
+        "paid": [],
+        "pending": [
+          "62e157ec9479dcbcf449fbdf2164abc362fa9010aa384dc1a845b1a71f64c93f",
+          "c33d04ff68a07fe273a2bf0f35cfd0f391054887d498e4626aacb7b6ef501a0e"
+        ],
+        "claims": [
+          "62e157ec9479dcbcf449fbdf2164abc362fa9010aa384dc1a845b1a71f64c93f"
+        ],
+        "winners": [
+          "c33d04ff68a07fe273a2bf0f35cfd0f391054887d498e4626aacb7b6ef501a0e"
+        ],
+        "balances": [
+          [
+            "00204141414141414141414141414141414141414141414141414141414141414141",
+            100003
+          ]
+        ],
+        "object_counts": {
+          "changes": 2,
+          "jobs": 2,
+          "receipts": 1,
+          "blocks": 1
+        }
+      },
+      "old_snapshot_merkle_root": "54b6db9fd1cf2060943c515f0366a08bd224ad445b1cfbc5f6925fda6a1308f8",
+      "refreshed_snapshot_merkle_root": "e39cc3f3342315753da1944251856378a5e261a13da867be3de9897ece0e0aa4",
+      "old_sidechain_commitment": "bd6dce0617dc5f6e71967beb16a097145f6cc5193851976459395003d2500faa",
+      "refreshed_sidechain_commitment": "c80b0b5413201e66fd666d7ccf1c3e662eeb89f1ee703f482faa169d42cd7d4c"
+    },
+    {
+      "name": "signed_seal_and_next_job_settle_tail_once",
+      "passed": true,
+      "state": {
+        "rules_root": "45aea85f6623bff90d79411322d635cc00365f4fb92ab908029313bc0a10d742",
+        "tip": "0a839660e00fbf12a8fe905165af7ff809324e7eca030d6db79e4a86fd03e468",
+        "height": 2,
+        "anchored_ledger_root": "839f79c29b1baf747a1b1b6ac905a23f946d4ff80dd22d9cd846f1b97b2c01a8",
+        "verified_ledger_root": "839f79c29b1baf747a1b1b6ac905a23f946d4ff80dd22d9cd846f1b97b2c01a8",
+        "verified_receipts": 2,
+        "registry_root": "ded652accd11c7eed080af40673d80482246cae64ce5a68774dd9c263faddf87",
+        "paid": [
+          "62e157ec9479dcbcf449fbdf2164abc362fa9010aa384dc1a845b1a71f64c93f",
+          "c33d04ff68a07fe273a2bf0f35cfd0f391054887d498e4626aacb7b6ef501a0e"
+        ],
+        "pending": [
+          "68e403fd864a9eb76d0d03ca7e4e3209f87faf655190fea812bf0fe06096830a"
+        ],
+        "claims": [
+          "62e157ec9479dcbcf449fbdf2164abc362fa9010aa384dc1a845b1a71f64c93f"
+        ],
+        "winners": [
+          "68e403fd864a9eb76d0d03ca7e4e3209f87faf655190fea812bf0fe06096830a",
+          "c33d04ff68a07fe273a2bf0f35cfd0f391054887d498e4626aacb7b6ef501a0e"
+        ],
+        "balances": [
+          [
+            "00204141414141414141414141414141414141414141414141414141414141414141",
+            200006
+          ]
+        ],
+        "object_counts": {
+          "changes": 2,
+          "jobs": 3,
+          "receipts": 2,
+          "blocks": 2
+        }
+      }
+    },
+    {
+      "name": "duplicate_bundle_is_idempotent",
+      "passed": true,
+      "replays_per_replica": 2
+    },
+    {
+      "name": "later_payout_does_not_repay_old_claims",
+      "passed": true,
+      "state": {
+        "rules_root": "45aea85f6623bff90d79411322d635cc00365f4fb92ab908029313bc0a10d742",
+        "tip": "0e9c328bfc351cd5c240801e7e00335d0f211545adbc49b774bdcb2e9f3aa7d7",
+        "height": 3,
+        "anchored_ledger_root": "25db84c7323a0b249ecec30601b68a399df9b3894e340105b4724d92f79fe2a9",
+        "verified_ledger_root": "25db84c7323a0b249ecec30601b68a399df9b3894e340105b4724d92f79fe2a9",
+        "verified_receipts": 3,
+        "registry_root": "ded652accd11c7eed080af40673d80482246cae64ce5a68774dd9c263faddf87",
+        "paid": [
+          "62e157ec9479dcbcf449fbdf2164abc362fa9010aa384dc1a845b1a71f64c93f",
+          "68e403fd864a9eb76d0d03ca7e4e3209f87faf655190fea812bf0fe06096830a",
+          "c33d04ff68a07fe273a2bf0f35cfd0f391054887d498e4626aacb7b6ef501a0e"
+        ],
+        "pending": [
+          "d7a73a9f2ecbbd74b749bcad4515210f5d33007e1e8040c2d51c35fc8b329c0e"
+        ],
+        "claims": [
+          "62e157ec9479dcbcf449fbdf2164abc362fa9010aa384dc1a845b1a71f64c93f"
+        ],
+        "winners": [
+          "68e403fd864a9eb76d0d03ca7e4e3209f87faf655190fea812bf0fe06096830a",
+          "c33d04ff68a07fe273a2bf0f35cfd0f391054887d498e4626aacb7b6ef501a0e",
+          "d7a73a9f2ecbbd74b749bcad4515210f5d33007e1e8040c2d51c35fc8b329c0e"
+        ],
+        "balances": [
+          [
+            "00204141414141414141414141414141414141414141414141414141414141414141",
+            200006
+          ],
+          [
+            "00204242424242424242424242424242424242424242424242424242424242424242",
+            100003
+          ]
+        ],
+        "object_counts": {
+          "changes": 2,
+          "jobs": 4,
+          "receipts": 3,
+          "blocks": 3
+        }
+      }
+    }
+  ],
+  "rules": {
+    "coordinator_key": "039fd0aab832f3c92a64073871550ba4cd4a4e122780f8f70d8cf552fb30647862",
+    "pool_id": "706f6f6c2d41",
+    "reward": 100003,
+    "share_bits": 545259519,
+    "block_bits": 537919487,
+    "epoch_blocks": 8,
+    "window_seconds": 600,
+    "cap_hashes_per_second": 5000000000000,
+    "max_events": 128,
+    "inflight_policy": "credit-and-stop"
+  },
+  "listeners_closed": true,
+  "threads_joined": true
+}

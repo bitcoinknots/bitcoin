@@ -3,6 +3,9 @@
 Status: protocol draft with an executable settlement model and isolated stock
 Knots regtest checks. No production mining network, payout system, new RPC, or
 settlement consensus change is implemented. See the [test report](sharepool-test-report.md).
+The [continuous protocol reference](sharepool-live-protocol.md) now implements
+signed registries and reward jobs, verified-work commitment updates, parent seals,
+and branch-specific pending claims to handle the old-job winning race.
 
 Base: `bitcoinknots/bitcoin`, tag `v29.4.1.knots20260508`, commit
 `8c85b1585dac23f964e2dd32045624de7f02aa58`. Local branch:
@@ -103,8 +106,9 @@ credited work per identifier without establishing independent ownership.
 The [rule proposal](sharepool-rule-proposal.md) specifies the work formula, stable
 groups, time/withholding limitations, different tagged jobs for registered miners,
 and exact registry-version binding for payouts. The registry's accepted history
-and window still require consensus rules. Registry and full node integration
-remain future work.
+and window still require production consensus integration. Authenticated reference
+registries and immutable jobs are now implemented in the
+[continuous protocol](sharepool-live-protocol.md).
 
 ## What template-work evidence establishes
 
@@ -457,7 +461,8 @@ jobs remains unproved. A disclosed snapshot can omit extra work, so it cannot
 establish the pool's complete work history. Model balances are provisional
 accounting, not spendable payments. The current model applies a configurable
 absolute work budget using a nominal duration; the test report records that
-configuration. The authenticated registry remains specified in the rule proposal.
+configuration. The authenticated registry and live update path now have a separate
+[executable reference implementation](sharepool-live-protocol.md).
 
 The coordinator's role, pre-mining commitment timing, and intended enforcement
 scope and absolute work budget are now established. The observable objective is verified work attributed

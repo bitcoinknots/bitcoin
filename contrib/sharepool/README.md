@@ -5,13 +5,36 @@ snapshot settlement, and disagreement between nodes. It also includes a smoke
 test that ran two actual stock Knots nodes in isolated regtest.
 **The proposed settlement and absolute work-budget rules are not integrated into Knots consensus.**
 
+The new [continuous protocol](../../doc/sharepool-live-protocol.md) implements
+authenticated registry versions, signed reward jobs, live Merkle updates,
+race-safe gateway refreshes, old-job winners, and carried pending work. Its
+loopback smoke transfers signed objects between three validating replicas.
+
+```sh
+python3 -m unittest discover -s contrib/sharepool -p 'test_*.py' -v
+python3 contrib/sharepool/live_protocol_peer.py --run-smoke
+```
+
+| New reference component | Purpose |
+| --- | --- |
+| `signed_registry.py` | Authenticated miner registration, key rotation, and immutable payout versions. |
+| `live_protocol.py` | Signed ledger prefixes, snapshot inclusions, eligible reward shares, parent seals, and branch-specific pending/paid claims. |
+| `job_gateway.py` | Verify new work and automatically replace the active commitment; discard stale proposal responses. |
+| `live_protocol_peer.py` | Bounded loopback HTTP replication and replay tests. |
+
+The reference uses test-only cryptography, synthetic coinbase-only jobs, fixed
+rewards, and public XOR keys. Its explicit `credit-and-stop` in-flight policy
+keeps acknowledged work payable, reports budget excess, and stops future jobs
+for the affected group. A hard cap on credited submissions is a different policy.
+The gateway exposes assignments; it does not send ASIC/DATUM messages.
+
 Read the [test report](../../doc/sharepool-test-report.md) for measured behavior,
 design gaps, and the distinction between real nodes and model nodes. The
 [protocol draft](../../doc/sharepool-design.md) describes the proposed system.
 The [additional rule proposal](../../doc/sharepool-rule-proposal.md) specifies
 the absolute budget, registered miner tags, and registry-bound coinbase payouts.
 
-## Run the model tests
+## Earlier fixed-snapshot model
 
 From the repository root, with Python 3 and no third-party dependencies:
 
@@ -37,7 +60,7 @@ they are not submissions from live miners.
 | `run_settlement_scenarios.py` | Reproducible multi-node model scenarios, including disagreement and known design limitations. |
 | `regtest_commitment_smoke.py` | Actual stock-node commitment acceptance, competing blocks, and explicit administrative rejection/reconsideration. |
 
-The model checks one pool and a current-parent share window. Tags remain stable
+The earlier `settlement_sim.py` model checks one pool and a current-parent share window. Tags remain stable
 across refreshed jobs and extranonce changes. Non-coinbase transaction selections
 may be identical. Work credit uses the approved share target, separately from
 the base-chain target in header `nBits`; unexpectedly good hashes earn no extra
@@ -73,7 +96,13 @@ accepted arbitrary `m_mm_rhs` roots without receiving snapshots. The test's
 local rejection uses `invalidateblock` and `reconsiderblock`; it does not
 demonstrate automatic settlement validation.
 
-## Limits demonstrated by the tests
+## Earlier model limits and current reference scope
+
+The points below describe the earlier fixed-snapshot fixtures. The continuous
+reference adds signed registries, actual reward-job shares, live receipt updates,
+and carryover within its test model. Complete disclosure, production consensus,
+full transaction validation, and trustworthy physical hashrate remain unresolved;
+see [its implementation report](../../doc/sharepool-live-protocol.md).
 
 - A Merkle proof proves inclusion. It does not prove the committed set contains
   all eligible work: a coordinator can disclose a balanced sample of a
