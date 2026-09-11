@@ -433,13 +433,13 @@ void Chainstate::MaybeUpdateMempoolForReorg(
 
         // If the transaction spends any coinbase outputs, it must be mature.
         if (it->GetSpendsCoinbase()) {
+            const auto mempool_spend_height{m_chain.Tip()->nHeight + 1};
+            int ext_start, ext_expiry;
+            ExtendedCoinbaseMaturityBounds(m_chainman.GetConsensus(), *m_chain.Tip(), ext_start, ext_expiry);
             for (const CTxIn& txin : tx.vin) {
                 if (m_mempool->exists(GenTxid::Txid(txin.prevout.hash))) continue;
                 const Coin& coin{CoinsTip().AccessCoin(txin.prevout)};
                 assert(!coin.IsSpent());
-                const auto mempool_spend_height{m_chain.Tip()->nHeight + 1};
-                int ext_start, ext_expiry;
-                ExtendedCoinbaseMaturityBounds(m_chainman.GetConsensus(), *m_chain.Tip(), ext_start, ext_expiry);
                 if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < Consensus::RequiredCoinbaseMaturity(coin.nHeight, ext_start, ext_expiry)) {
                     return true;
                 }
@@ -2997,6 +2997,9 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
 
     const CheckTxInputsRules chk_input_rules{reduced_data_active ? CheckTxInputsRules::OutputSizeLimit : CheckTxInputsRules::None};
 
+    int ext_start, ext_expiry;
+    ExtendedCoinbaseMaturityBounds(params.GetConsensus(), *Assert(pindex->pprev), ext_start, ext_expiry);
+
     // Check generation tx output sizes if REDUCED_DATA is active
     if (chk_input_rules.test(CheckTxInputsRules::OutputSizeLimit)) {
         TxValidationState tx_state;
@@ -3024,8 +3027,6 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         {
             CAmount txfee = 0;
             TxValidationState tx_state;
-            int ext_start, ext_expiry;
-            ExtendedCoinbaseMaturityBounds(params.GetConsensus(), *Assert(pindex->pprev), ext_start, ext_expiry);
             if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, chk_input_rules, ext_start, ext_expiry)) {
                 // Any transaction validation failure in ConnectBlock is a block consensus failure
                 state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
@@ -7368,11 +7369,20 @@ int FirstHeightWithParentMtpAtLeast(const CBlockIndex& tip, int64_t time)
 {
     if (!tip.pprev) return std::numeric_limits<int>::max();
     if (tip.pprev->GetMedianTimePast() < time) return std::numeric_limits<int>::max();
-    const CBlockIndex* p = &tip;
-    while (p->pprev && p->pprev->GetMedianTimePast() >= time) {
-        p = p->pprev;
+    // Binary search: first height whose parent MTP >= time. Same answer as
+    // knots#402 MedianTimePastActivationHeight once the tip has reached `time`.
+    int lo{1};
+    int hi{tip.nHeight};
+    while (lo < hi) {
+        const int mid{lo + (hi - lo) / 2};
+        const CBlockIndex* anc{Assert(tip.GetAncestor(mid))};
+        if (anc->pprev->GetMedianTimePast() >= time) {
+            hi = mid;
+        } else {
+            lo = mid + 1;
+        }
     }
-    return p->nHeight;
+    return lo;
 }
 
 void ExtendedCoinbaseMaturityBounds(const Consensus::Params& params, const CBlockIndex& tip, int& start_height, int& expiry_height)

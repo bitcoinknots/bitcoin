@@ -147,7 +147,7 @@ public:
     //! Confirmations a coinbase created at coinbase_height still needs, plus
     //! the usual +1 wallet convention applied by the caller if desired.
     //! Returns the consensus maturity (100, 2016, 8064, or 26280).
-    virtual int coinbaseMaturity(int coinbase_height) { return 100; }
+    virtual int coinbaseMaturity(int coinbase_height) = 0;
 
     virtual bool pruneLockExists(const std::string& name) const = 0;
     virtual bool updatePruneLock(const std::string& name, const node::PruneLockInfo& lock_info, bool sync=false) = 0;

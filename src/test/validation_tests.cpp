@@ -432,8 +432,10 @@ BOOST_AUTO_TEST_CASE(batched_coinbase_maturity_schedule)
     BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(53, start, expiry), EXTENDED_COINBASE_MATURITY_MID);
     BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(54, start, expiry), EXTENDED_COINBASE_MATURITY_LONG);
     BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(151, start, expiry), COINBASE_MATURITY);
-    // lock sticks: a window coin evaluated with the same bounds after "now" is past expiry
+    // lock sticks: same bounds as a tip that has already crossed expiry
+    // still classify window coins as extended. height 151 is first post-expiry.
     BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(51, start, expiry), EXTENDED_COINBASE_MATURITY_SHORT);
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(54, start, expiry), EXTENDED_COINBASE_MATURITY_LONG);
 }
 
 BOOST_AUTO_TEST_CASE(extended_coinbase_maturity_bounds)
