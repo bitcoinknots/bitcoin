@@ -123,6 +123,19 @@ struct Params {
      * behaviour is unchanged on chains that do not set it.
      */
     int64_t RdtsExpiryTime{std::numeric_limits<int64_t>::min()};
+    /**
+     * Extra-work, a temporary soft fork: while it is active, a block must meet
+     * the target encoded by its nBits divided by a factor that rises when the
+     * recent hashrate departs upward from its trend (see ExtraWorkCache). It is
+     * active for a block when the parent's median-time-past has reached this
+     * start time and not yet the RDTS expiry (see ExtraWorkActiveAt): it
+     * expires with RDTS. It only ever requires more work than the header does,
+     * so a node that does not enforce it accepts every block that satisfies it.
+     *
+     * The default leaves the deployment unscheduled (the start follows every
+     * median-time-past).
+     */
+    int64_t ExtraWorkStartTime{std::numeric_limits<int64_t>::max()};
     /** Don't warn about unknown BIP 9 activations below this height.
      * This prevents us from warning about the CSV and segwit activations. */
     int MinBIP9WarningHeight;
@@ -194,6 +207,14 @@ struct Params {
     bool RdtsActiveAt(int height, int64_t mtp_prev) const
     {
         return IsBlake2bHeight(height) && mtp_prev < RdtsExpiryTime;
+    }
+
+    /** Whether the extra-work rule applies to a block whose parent has the
+     *  given median-time-past. It expires with RDTS, so it is never active on
+     *  a chain with no RDTS expiry. */
+    bool ExtraWorkActiveAt(int64_t mtp_prev) const
+    {
+        return mtp_prev >= ExtraWorkStartTime && mtp_prev < RdtsExpiryTime;
     }
 };
 
