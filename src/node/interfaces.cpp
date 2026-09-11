@@ -10,6 +10,7 @@
 #include <chainparamsbase.h>
 #include <common/args.h>
 #include <common/pcp.h>
+#include <consensus/consensus.h>
 #include <consensus/merkle.h>
 #include <consensus/validation.h>
 #include <deploymentstatus.h>
@@ -66,6 +67,7 @@
 
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
+#include <algorithm>
 #include <any>
 #include <memory>
 #include <optional>
@@ -580,6 +582,19 @@ public:
         LOCK(::cs_main);
         const CBlockIndex* block{chainman().ActiveChain()[height]};
         return block && ((block->nStatus & BLOCK_HAVE_DATA) != 0) && block->nTx > 0;
+    }
+    int extendedCoinbaseBlocksToMaturity(int coinbase_height) override
+    {
+        LOCK(::cs_main);
+        const Consensus::Params& params{chainman().GetConsensus()};
+        const CBlockIndex* tip{chainman().ActiveChain().Tip()};
+        if (!tip || !params.ExtendedCoinbaseMaturityActiveAt(tip->GetMedianTimePast())) return 0;
+        const CBlockIndex* coinbase_block{chainman().ActiveChain()[coinbase_height]};
+        if (!coinbase_block || !coinbase_block->pprev ||
+            !params.ExtendedCoinbaseMaturityActiveAt(coinbase_block->pprev->GetMedianTimePast())) return 0;
+        const int64_t remaining{coinbase_block->GetMedianTimePast() + EXTENDED_COINBASE_MATURITY_TIME - tip->GetMedianTimePast()};
+        if (remaining <= 0) return 0;
+        return std::max<int64_t>(1, (remaining + params.nPowTargetSpacing - 1) / params.nPowTargetSpacing);
     }
     bool pruneLockExists(const std::string& name) const override
     {

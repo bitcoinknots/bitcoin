@@ -4,6 +4,8 @@
 
 #include <chainparams.h>
 #include <consensus/amount.h>
+#include <coins.h>
+#include <consensus/consensus.h>
 #include <consensus/merkle.h>
 #include <core_io.h>
 #include <hash.h>
@@ -13,7 +15,9 @@
 #include <util/chaintype.h>
 #include <validation.h>
 
+#include <limits>
 #include <string>
+#include <vector>
 
 #include <test/util/setup_common.h>
 
@@ -396,6 +400,110 @@ BOOST_AUTO_TEST_CASE(block_malleation)
         }
         BOOST_CHECK(is_mutated(block, /*check_witness_root=*/true));
     }
+}
+
+//! A chain of `length` block indexes with skip pointers, block i stamped `times[i]`.
+static std::vector<CBlockIndex> MakeTimedChain(const std::vector<int64_t>& times)
+{
+    std::vector<CBlockIndex> chain(times.size());
+    for (size_t i = 0; i < times.size(); ++i) {
+        chain[i].nHeight = i;
+        chain[i].nTime = times[i];
+        chain[i].pprev = i == 0 ? nullptr : &chain[i - 1];
+        chain[i].BuildSkip();
+    }
+    return chain;
+}
+
+BOOST_AUTO_TEST_CASE(median_time_past_activation_height)
+{
+    // Consensus keeps median-time-past non-decreasing along a chain (a block's
+    // time must exceed its parent's median); non-decreasing times reproduce
+    // that here, with plateaus to exercise the "first block whose parent
+    // reached it" boundary.
+    std::vector<int64_t> times;
+    int64_t t{1000};
+    for (int i = 0; i < 300; ++i) {
+        times.push_back(t);
+        if (i % 7 == 0) t += 10; // plateaus of equal times, then a jump
+    }
+    const auto chain{MakeTimedChain(times)};
+    const CBlockIndex& tip{chain.back()};
+
+    // Brute force: the first height whose parent's median-time-past is >= start.
+    const auto expected = [&](int64_t start) {
+        for (int h = 1; h <= tip.nHeight; ++h) {
+            if (chain[h - 1].GetMedianTimePast() >= start) return h;
+        }
+        return tip.nHeight + 1;
+    };
+    for (int64_t start = times.front() - 5; start <= tip.GetMedianTimePast(); ++start) {
+        BOOST_CHECK_EQUAL(MedianTimePastActivationHeight(tip, start), expected(start));
+        // The same answer from any ancestor whose median-time-past has reached it.
+        for (int h : {tip.nHeight / 2, tip.nHeight - 1}) {
+            if (chain[h].GetMedianTimePast() >= start) {
+                BOOST_CHECK_EQUAL(MedianTimePastActivationHeight(chain[h], start), expected(start));
+            }
+        }
+    }
+    // A start the genesis block already satisfies activates at height 1.
+    BOOST_CHECK_EQUAL(MedianTimePastActivationHeight(tip, times.front()), 1);
+    BOOST_CHECK_EQUAL(MedianTimePastActivationHeight(chain[0], times.front()), 1);
+}
+
+BOOST_AUTO_TEST_CASE(coinbase_mature_for_extended_rule)
+{
+    // Ten-minute blocks, so median-time-past advances 600 s per block.
+    std::vector<int64_t> times;
+    for (int i = 0; i < 300; ++i) times.push_back(1'000'000 + 600 * i);
+    const auto chain{MakeTimedChain(times)};
+    const auto coinbase_at = [](int height) { return Coin{CTxOut{1, CScript{}}, height, /*fCoinBaseIn=*/true}; };
+    const Coin plain{CTxOut{1, CScript{}}, 60, /*fCoinBaseIn=*/false};
+
+    Consensus::Params params{};
+    // Unscheduled (defaults): every output passes, whatever the times.
+    BOOST_CHECK(CoinbaseMatureForExtendedRule(params, coinbase_at(60), chain[61]));
+    // A start without an RDTS expiry never activates (it expires with RDTS).
+    params.ExtendedCoinbaseMaturityStartTime = chain[50].GetMedianTimePast();
+    BOOST_CHECK(CoinbaseMatureForExtendedRule(params, coinbase_at(60), chain[61]));
+    params.RdtsExpiryTime = chain[250].GetMedianTimePast();
+    // Block 51 is the first whose parent (50) has reached the start; block
+    // 251 the first whose parent has reached the expiry.
+
+    // Non-coinbase outputs are never subject.
+    BOOST_CHECK(CoinbaseMatureForExtendedRule(params, plain, chain[100]));
+    // Outputs created before activation (block 50 and earlier) are never
+    // subject, however young.
+    BOOST_CHECK(CoinbaseMatureForExtendedRule(params, coinbase_at(50), chain[51]));
+    BOOST_CHECK(CoinbaseMatureForExtendedRule(params, coinbase_at(49), chain[200]));
+    // An in-window output waits until the parent's median-time-past is
+    // EXTENDED_COINBASE_MATURITY_TIME past its block's: from block 51's
+    // median-time-past that is 3888000 / 600 = 6480 blocks later, beyond
+    // this chain, so it stays locked throughout the window...
+    BOOST_CHECK(!CoinbaseMatureForExtendedRule(params, coinbase_at(51), chain[52]));
+    BOOST_CHECK(!CoinbaseMatureForExtendedRule(params, coinbase_at(51), chain[151]));
+    BOOST_CHECK(!CoinbaseMatureForExtendedRule(params, coinbase_at(51), chain[249]));
+    // ...and is released by the hard expiry (block 251's parent has reached it).
+    BOOST_CHECK(CoinbaseMatureForExtendedRule(params, coinbase_at(51), chain[250]));
+    BOOST_CHECK(CoinbaseMatureForExtendedRule(params, coinbase_at(51), chain[299]));
+
+    // The exact boundary, with a shorter maturity: build a chain whose
+    // median-time-past jumps by the maturity time between two blocks.
+    const int64_t maturity{EXTENDED_COINBASE_MATURITY_TIME};
+    std::vector<int64_t> jump_times;
+    for (int i = 0; i < 120; ++i) jump_times.push_back(1'000'000 + (i < 80 ? 600 * i : 600 * 80 + maturity + 600 * (i - 80)));
+    const auto jump{MakeTimedChain(jump_times)};
+    Consensus::Params jump_params{};
+    jump_params.ExtendedCoinbaseMaturityStartTime = jump[20].GetMedianTimePast();
+    jump_params.RdtsExpiryTime = std::numeric_limits<int64_t>::max() / 2;
+    const Coin cb{coinbase_at(60)};
+    const int64_t due{jump[60].GetMedianTimePast() + maturity};
+    for (int h = 61; h < 120; ++h) {
+        BOOST_CHECK_EQUAL(CoinbaseMatureForExtendedRule(jump_params, cb, jump[h]), jump[h].GetMedianTimePast() >= due);
+    }
+    // Sanity: the boundary is actually crossed inside this chain.
+    BOOST_CHECK(!CoinbaseMatureForExtendedRule(jump_params, cb, jump[80]));
+    BOOST_CHECK(CoinbaseMatureForExtendedRule(jump_params, cb, jump[119]));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -272,6 +272,45 @@ bool CheckSequenceLocksAtTip(CBlockIndex* tip,
     return EvaluateSequenceLocks(index, {lock_points.height, lock_points.time});
 }
 
+int MedianTimePastActivationHeight(const CBlockIndex& tip, int64_t start_time)
+{
+    assert(tip.GetMedianTimePast() >= start_time);
+    // Binary search over the ancestors for the lowest height whose
+    // median-time-past has reached start_time; the block after it is the first
+    // whose parent's has. Valid because a block's time must exceed its parent's
+    // median-time-past, which keeps median-time-past non-decreasing along a chain.
+    int lo{0};
+    int hi{tip.nHeight};
+    while (lo < hi) {
+        const int mid{lo + (hi - lo) / 2};
+        if (Assert(tip.GetAncestor(mid))->GetMedianTimePast() >= start_time) {
+            hi = mid;
+        } else {
+            lo = mid + 1;
+        }
+    }
+    return lo + 1;
+}
+
+bool CoinbaseMatureForExtendedRule(const Consensus::Params& params, const Coin& coin, const CBlockIndex& block_prev)
+{
+    if (!coin.IsCoinBase()) return true;
+    const int64_t mtp_prev{block_prev.GetMedianTimePast()};
+    if (!params.ExtendedCoinbaseMaturityActiveAt(mtp_prev)) return true;
+    const CBlockIndex* coinbase_block{Assert(block_prev.GetAncestor(coin.nHeight))};
+    // Only outputs created while the rule was active are subject to it
+    // (grandfathering). The spending block is inside the window, so the
+    // creating block, an ancestor, is past the expiry only if it is too.
+    if (coinbase_block->pprev == nullptr ||
+        !params.ExtendedCoinbaseMaturityActiveAt(coinbase_block->pprev->GetMedianTimePast())) {
+        return true;
+    }
+    // Both ends are median-time-past values, which never decrease along a
+    // chain, so the answer for the next block is knowable from the tip and
+    // holds unchanged until the tip changes.
+    return mtp_prev >= coinbase_block->GetMedianTimePast() + EXTENDED_COINBASE_MATURITY_TIME;
+}
+
 // Returns the script flags which should be checked for a given block
 static unsigned int GetBlockScriptFlags(const CBlockIndex& block_index, const ChainstateManager& chainman);
 
@@ -431,7 +470,10 @@ void Chainstate::MaybeUpdateMempoolForReorg(
             }
         }
 
-        // If the transaction spends any coinbase outputs, it must be mature.
+        // If the transaction spends any coinbase outputs, it must be mature,
+        // under the extended rule too: it may apply to the next block again
+        // after a reorg back across its expiry, and the new tip's
+        // median-time-past may be lower (see CoinbaseMatureForExtendedRule).
         if (it->GetSpendsCoinbase()) {
             for (const CTxIn& txin : tx.vin) {
                 if (m_mempool->exists(GenTxid::Txid(txin.prevout.hash))) continue;
@@ -439,6 +481,9 @@ void Chainstate::MaybeUpdateMempoolForReorg(
                 assert(!coin.IsSpent());
                 const auto mempool_spend_height{m_chain.Tip()->nHeight + 1};
                 if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < COINBASE_MATURITY) {
+                    return true;
+                }
+                if (!CoinbaseMatureForExtendedRule(m_chainman.GetConsensus(), coin, *m_chain.Tip())) {
                     return true;
                 }
             }
@@ -1017,6 +1062,16 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     const auto block_height_next = block_height_current + 1;
     if (!Consensus::CheckTxInputs(tx, state, m_view, block_height_next, ws.m_base_fees, CheckTxInputsRules::OutputSizeLimit)) {
         return false; // state filled in by CheckTxInputs
+    }
+
+    // The extended coinbase maturity rule (see CoinbaseMatureForExtendedRule)
+    // is likewise evaluated for the next block, whose parent is the tip.
+    for (const CTxIn& txin : tx.vin) {
+        const Coin& coin{m_view.AccessCoin(txin.prevout)};
+        if (!CoinbaseMatureForExtendedRule(m_active_chainstate.m_chainman.GetConsensus(), coin, *m_active_chainstate.m_chain.Tip())) {
+            return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, "bad-txns-premature-spend-of-coinbase",
+                                 strprintf("coinbase at height %d is not yet mature under the extended maturity rule", coin.nHeight));
+        }
     }
 
     if (m_pool.m_opts.minrelaymaturity) {
@@ -2993,6 +3048,14 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
 
     const CheckTxInputsRules chk_input_rules{reduced_data_active ? CheckTxInputsRules::OutputSizeLimit : CheckTxInputsRules::None};
 
+    // Extended coinbase maturity (see CoinbaseMatureForExtendedRule): a
+    // temporary soft fork that expires with RDTS. While it is active for this
+    // block, coinbase outputs created since its activation on this chain may
+    // only be spent once this block's parent has a median-time-past at least
+    // EXTENDED_COINBASE_MATURITY_TIME past the coinbase block's; the check is
+    // made per input below, alongside the BIP68 height lookup.
+    const bool extended_coinbase_maturity_active{params.GetConsensus().ExtendedCoinbaseMaturityActiveAt(pindex->pprev->GetMedianTimePast())};
+
     // Check generation tx output sizes if REDUCED_DATA is active
     if (chk_input_rules.test(CheckTxInputsRules::OutputSizeLimit)) {
         TxValidationState tx_state;
@@ -3040,12 +3103,19 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
             prevheights.resize(tx.vin.size());
             flags_per_input.clear();
             for (size_t j = 0; j < tx.vin.size(); j++) {
-                prevheights[j] = view.AccessCoin(tx.vin[j].prevout).nHeight;
+                const Coin& coin{view.AccessCoin(tx.vin[j].prevout)};
+                prevheights[j] = coin.nHeight;
                 if (prevheights[j] < reduced_data_start_height) {
                     flags_per_input.resize(tx.vin.size(), flags);
                     flags_per_input[j] = flags & ~REDUCED_DATA_MANDATORY_VERIFY_FLAGS;
                 }
+                if (extended_coinbase_maturity_active && !CoinbaseMatureForExtendedRule(params.GetConsensus(), coin, *pindex->pprev)) {
+                    state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-txns-premature-spend-of-coinbase",
+                                  strprintf("coinbase at height %d is not yet mature under the extended maturity rule, spent in transaction %s", coin.nHeight, tx.GetHash().ToString()));
+                    break;
+                }
             }
+            if (!state.IsValid()) break;
 
             if (!SequenceLocks(tx, nLockTimeFlags, prevheights, *pindex)) {
                 state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-txns-nonfinal",

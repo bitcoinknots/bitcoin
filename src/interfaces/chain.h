@@ -144,6 +144,14 @@ public:
     //! pruned), and contains transactions.
     virtual bool haveBlockOnDisk(int height) = 0;
 
+    //! Whether the temporary extended coinbase maturity soft fork still
+    //! holds back a coinbase output created at the given height of the
+    //! active chain from being spent in the block after the current tip,
+    //! and if so an estimate of the blocks until it no longer does (at
+    //! least 1). 0 when it does not (the COINBASE_MATURITY depth rule is
+    //! the caller's to apply).
+    virtual int extendedCoinbaseBlocksToMaturity(int coinbase_height) = 0;
+
     virtual bool pruneLockExists(const std::string& name) const = 0;
     virtual bool updatePruneLock(const std::string& name, const node::PruneLockInfo& lock_info, bool sync=false) = 0;
     virtual bool deletePruneLock(const std::string& name) = 0;

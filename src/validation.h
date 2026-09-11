@@ -347,6 +347,29 @@ std::optional<LockPoints> CalculateLockPointsAtTip(
 bool CheckSequenceLocksAtTip(CBlockIndex* tip,
                              const LockPoints& lock_points);
 
+/**
+ * The activation height, on the chain ending at `tip`, of a deployment
+ * scheduled by median-time-past: the height of the first block whose parent's
+ * median-time-past is at least `start_time`. Median-time-past never decreases
+ * along a chain, so the blocks it activates for form a suffix of the chain.
+ * Requires tip.GetMedianTimePast() >= start_time, so that the answer is at most
+ * tip.nHeight + 1 (the block built on `tip`).
+ */
+int MedianTimePastActivationHeight(const CBlockIndex& tip, int64_t start_time);
+
+/**
+ * Extended coinbase maturity (see Consensus::Params::ExtendedCoinbaseMaturityActiveAt):
+ * whether spending `coin` in the block built on `block_prev` satisfies the
+ * rule. True for any non-coinbase output, whenever the rule is not active for
+ * that block, and for a coinbase output created before the rule activated on
+ * that chain; otherwise the parent's median-time-past must be at least
+ * EXTENDED_COINBASE_MATURITY_TIME past the coinbase block's. The COINBASE_MATURITY
+ * depth requirement is separate (Consensus::CheckTxInputs) and always applies.
+ * `coin` must be an unspent output of that chain, so that its creating block is
+ * an ancestor of `block_prev`.
+ */
+bool CoinbaseMatureForExtendedRule(const Consensus::Params& params, const Coin& coin, const CBlockIndex& block_prev);
+
 void LimitMempoolSize(CTxMemPool&, CCoinsViewCache&);
 
 /**

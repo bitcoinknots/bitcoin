@@ -170,6 +170,11 @@ public:
         //! height until the parent block's median-time-past reaches this
         //! value (see -rdtsexpiry). Requires a blake2b activation height.
         std::optional<int64_t> rdts_expiry_time{};
+        //! If set, the extended coinbase maturity rule applies to blocks
+        //! whose parent's median-time-past has reached this value, until the
+        //! RDTS expiry (see -extendedcoinbasematurity). Requires
+        //! rdts_expiry_time, which it must precede.
+        std::optional<int64_t> extended_coinbase_maturity_start_time{};
         std::optional<std::vector<unsigned char>> blake2b_headline{};
     };
 

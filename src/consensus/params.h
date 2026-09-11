@@ -123,6 +123,23 @@ struct Params {
      * behaviour is unchanged on chains that do not set it.
      */
     int64_t RdtsExpiryTime{std::numeric_limits<int64_t>::min()};
+    /**
+     * Extended coinbase maturity, a temporary soft fork: while it is active,
+     * coinbase outputs created since it activated can only be spent once the
+     * spending block's parent has a median-time-past at least
+     * EXTENDED_COINBASE_MATURITY_TIME past the coinbase block's, on top of
+     * the usual COINBASE_MATURITY blocks. It is active for a block when the
+     * parent's median-time-past has reached this start time and not yet the
+     * RDTS expiry (see ExtendedCoinbaseMaturityActiveAt): it expires with
+     * RDTS, after which every coinbase output is again spendable at
+     * COINBASE_MATURITY. Outputs created before activation are never
+     * affected, so activating cannot lock an output that was already
+     * spendable.
+     *
+     * The default leaves the deployment unscheduled (the start follows every
+     * median-time-past).
+     */
+    int64_t ExtendedCoinbaseMaturityStartTime{std::numeric_limits<int64_t>::max()};
     /** Don't warn about unknown BIP 9 activations below this height.
      * This prevents us from warning about the CSV and segwit activations. */
     int MinBIP9WarningHeight;
@@ -194,6 +211,14 @@ struct Params {
     bool RdtsActiveAt(int height, int64_t mtp_prev) const
     {
         return IsBlake2bHeight(height) && mtp_prev < RdtsExpiryTime;
+    }
+
+    /** Whether the extended coinbase maturity rule applies to a block whose
+     *  parent has the given median-time-past. It expires with RDTS, so it is
+     *  never active on a chain with no RDTS expiry. */
+    bool ExtendedCoinbaseMaturityActiveAt(int64_t mtp_prev) const
+    {
+        return mtp_prev >= ExtendedCoinbaseMaturityStartTime && mtp_prev < RdtsExpiryTime;
     }
 };
 

@@ -329,7 +329,13 @@ QString TransactionDesc::toHTML(interfaces::Node& node, interfaces::Wallet& wall
 
     if (wtx.is_coinbase)
     {
-        quint32 numBlocksToMaturity = COINBASE_MATURITY +  1;
+        // While still maturing, the wallet's count reflects the maturity that
+        // actually applies (the temporary extended maturity soft fork may
+        // require more than COINBASE_MATURITY, as an estimate); once mature,
+        // show the default.
+        quint32 numBlocksToMaturity = status.blocks_to_maturity > 0 && status.is_in_main_chain
+            ? status.blocks_to_maturity + status.depth_in_main_chain
+            : COINBASE_MATURITY + 1;
         strHTML += "<br>" + tr("Generated coins must mature %1 blocks before they can be spent. When you generated this block, it was broadcast to the network to be added to the block chain. If it fails to get into the chain, its state will change to \"not accepted\" and it won't be spendable. This may occasionally happen if another node generates a block within a few seconds of yours.").arg(QString::number(numBlocksToMaturity)) + "<br>";
     }
 
