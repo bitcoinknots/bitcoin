@@ -9,6 +9,7 @@
 #include <chainparams.h>
 #include <coins.h>
 #include <common/args.h>
+#include <util/strencodings.h>
 #include <consensus/amount.h>
 #include <consensus/consensus.h>
 #include <consensus/merkle.h>
@@ -19,6 +20,8 @@
 #include <node/context.h>
 #include <policy/feerate.h>
 #include <policy/policy.h>
+#include <common/args.h>
+#include <decent.h>
 #include <pow.h>
 #include <primitives/transaction.h>
 #include <util/moneystr.h>
@@ -211,6 +214,23 @@ std::shared_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     coinbaseTx.vout[0].scriptPubKey = m_options.coinbase_output_script;
     coinbaseTx.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
     coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
+    if (IsDecentActive(nHeight, chainparams.GetConsensus())) {
+        // The miner names a payee; the elected authority decides whether it is
+        // paid. Escrow the reward for the authority sitting at this height.
+        const auto committee{ComputeDecentAuthority(pindexPrev, m_chainstate.m_blockman, chainparams.GetConsensus())};
+        if (committee.size() == 3) {
+            coinbaseTx.vout[0].scriptPubKey = DecentEscrowScript(m_options.coinbase_output_script, committee);
+        }
+        // Optionally cast this block's vote for the next authority.
+        if (const auto vote{gArgs.GetArg("-decentralvote")}) {
+            const auto bytes{TryParseHex<unsigned char>(*vote)};
+            if (bytes && CPubKey{*bytes}.IsFullyValid()) {
+                std::vector<unsigned char> payload(DECENT_VOTE_TAG.begin(), DECENT_VOTE_TAG.end());
+                payload.insert(payload.end(), bytes->begin(), bytes->end());
+                coinbaseTx.vout.emplace_back(0, CScript() << OP_RETURN << payload);
+            }
+        }
+    }
     if (nHeight == chainparams.GetConsensus().DeploymentHeight(Consensus::DEPLOYMENT_BLAKE2B)) {
         coinbaseTx.vin[0].scriptSig << chainparams.GetConsensus().Blake2bHeadline;
     }
