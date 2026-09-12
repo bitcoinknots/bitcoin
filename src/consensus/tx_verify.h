@@ -59,15 +59,17 @@ int CoinbaseHashMod6(const uint256& creating_block_hash);
  * the batched extended schedule after RDTS expiry. hash_mod6 is
  * CoinbaseHashMod6 of the creating block (0..5). Pass INT_MAX for both
  * bounds when the deployment is unscheduled. hash_mod6 is ignored outside
- * the window. Default 5 (long tranche) if the caller has no hash.
+ * the window. Default 5 is only for unit tests that pass the residue
+ * explicitly. CheckTxInputs Asserts a tip when the window is live.
  */
 int RequiredCoinbaseMaturity(int coinbase_height, int ext_start_height, int ext_expiry_height, int hash_mod6 = 5);
 
 /**
  * Check whether all inputs of this transaction are valid (no double spends and amounts)
  * This does not modify the UTXO set. This does not check scripts and sigs.
- * @param[in] hash_tip If set, creating-block hashes for coinbase inputs are
- *            taken from hash_tip->GetAncestor(coin.nHeight).
+ * @param[in] hash_tip Required when a coinbase input was created inside the
+ *            extended-maturity window. Creating-block hash is
+ *            hash_tip->GetAncestor(coin.nHeight)->GetBlockHash().
  * @param[out] txfee Set to the transaction fee if successful.
  * Preconditions: tx.IsCoinBase() is false.
  */

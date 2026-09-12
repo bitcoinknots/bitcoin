@@ -441,7 +441,8 @@ void Chainstate::MaybeUpdateMempoolForReorg(
                 const Coin& coin{CoinsTip().AccessCoin(txin.prevout)};
                 assert(!coin.IsSpent());
                 int hash_mod6 = 5;
-                if (const CBlockIndex* created{m_chain.Tip()->GetAncestor(coin.nHeight)}) {
+                if (coin.IsCoinBase() && coin.nHeight >= ext_start && coin.nHeight < ext_expiry) {
+                    const CBlockIndex* created{Assert(m_chain.Tip()->GetAncestor(coin.nHeight))};
                     hash_mod6 = Consensus::CoinbaseHashMod6(created->GetBlockHash());
                 }
                 if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < Consensus::RequiredCoinbaseMaturity(coin.nHeight, ext_start, ext_expiry, hash_mod6)) {

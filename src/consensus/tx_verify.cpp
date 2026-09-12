@@ -216,10 +216,11 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, 
         // If prev is coinbase, check that it's matured
         if (coin.IsCoinBase()) {
             int hash_mod6 = 5;
-            if (hash_tip) {
-                if (const CBlockIndex* created{hash_tip->GetAncestor(coin.nHeight)}) {
-                    hash_mod6 = CoinbaseHashMod6(created->GetBlockHash());
-                }
+            if (coin.nHeight >= ext_start_height && coin.nHeight < ext_expiry_height) {
+                // No silent "long tranche" fallback: a missing tip would
+                // reject spends that the rest of the network accepts.
+                const CBlockIndex* created{Assert(hash_tip)->GetAncestor(coin.nHeight)};
+                hash_mod6 = CoinbaseHashMod6(Assert(created)->GetBlockHash());
             }
             const int maturity = RequiredCoinbaseMaturity(coin.nHeight, ext_start_height, ext_expiry_height, hash_mod6);
             if (nSpendHeight - coin.nHeight < maturity) {
