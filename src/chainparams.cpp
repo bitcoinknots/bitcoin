@@ -90,6 +90,11 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         options.sharepool_height = height;
     }
 
+    options.sharepool_hash_only = args.GetBoolArg("-sharepoolhashonly", false);
+    if (options.sharepool_hash_only && !options.sharepool_height) {
+        throw std::runtime_error("-sharepoolhashonly requires an explicit -sharepoolheight on regtest.");
+    }
+
     if (const auto arg{args.GetArg("-rdtsexpiry", "")}; !arg.empty()) {
         // RDTS activates at the BLAKE2b fork height: one fork instant, as on
         // mainnet. Only the deployment's expiry is schedulable here; a
@@ -177,6 +182,9 @@ const CChainParams &Params() {
 
 std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, const ChainType chain)
 {
+    if (chain != ChainType::REGTEST && args.IsArgSet("-sharepoolhashonly")) {
+        throw std::runtime_error("-sharepoolhashonly is restricted to regtest; public-network activation is not supported.");
+    }
     if (chain != ChainType::REGTEST && args.IsArgSet("-sharepoolheight")) {
         throw std::runtime_error("-sharepoolheight is restricted to regtest; public-network activation is not supported.");
     }

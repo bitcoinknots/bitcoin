@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <sharepool/signer.h>
+#include <consensus/sharepool_hash.h>
 
 #include <kernel/chainparams.h>
 #include <random.h>
@@ -61,7 +62,10 @@ Signature SignOwner(const Policy& policy, const CKey& key, const Envelope& envel
 {
     CheckPolicy(policy);
     const auto genesis = CChainParams::RegTest({})->GetConsensus().hashGenesisBlock;
-    if (envelope.version != 1 || envelope.genesis != genesis || envelope.rules != RulesHash() ||
+    const bool hash_only = envelope.version == 2 && envelope.rules == hashonly::RulesHash() &&
+        envelope.shares_root.IsNull() && envelope.state_root.IsNull() && envelope.payouts_root.IsNull();
+    const bool legacy = envelope.version == 1 && envelope.rules == RulesHash();
+    if ((!hash_only && !legacy) || envelope.genesis != genesis ||
         envelope.height == 0 || envelope.height >= static_cast<uint32_t>(std::numeric_limits<int>::max()) ||
         envelope.native_parent.IsNull() || envelope.pool != policy.pool ||
         envelope.payout_script != policy.payout_script || envelope.owner != PublicKey(key)) {
@@ -70,7 +74,7 @@ Signature SignOwner(const Policy& policy, const CKey& key, const Envelope& envel
     uint256 auxiliary;
     GetStrongRandBytes(auxiliary);
     Signature signature{};
-    const auto message = OwnerHash(envelope);
+    const auto message = hash_only ? hashonly::OwnerHash(envelope) : OwnerHash(envelope);
     if (!key.SignSchnorr(message, signature, nullptr, auxiliary) ||
         !XOnlyPubKey{Span{envelope.owner}}.VerifySchnorr(message, signature)) {
         throw std::runtime_error("owner signature failed verification");

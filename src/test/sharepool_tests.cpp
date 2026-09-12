@@ -15,6 +15,7 @@
 #include <pow.h>
 #include <script/script.h>
 #include <test/util/setup_common.h>
+#include <univalue.h>
 #include <util/chaintype.h>
 #include <versionbits.h>
 
@@ -359,6 +360,9 @@ BOOST_AUTO_TEST_CASE(help_defaults_do_not_reinterpret_test_activation)
     SetupServerArgs(args);
     args.ForceSetArg("-sharepoolheight", "2");
     BOOST_CHECK_THROW(CreateChainParams(args, ChainType::MAIN), std::runtime_error);
+    // ClearArgs only removes option registrations, not forced settings. Do not
+    // leak this regtest-only override into the next fixture's MAIN setup.
+    args.ForceSetArgV("-sharepoolheight", {});
     args.ClearArgs();
     BOOST_CHECK_NO_THROW(SetupServerArgs(args));
 }

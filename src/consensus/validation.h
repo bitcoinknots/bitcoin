@@ -60,6 +60,7 @@ enum class BlockValidationResult {
     BLOCK_CACHED_INVALID,    //!< this block was cached as being invalid and we didn't store the reason why
     BLOCK_INVALID_HEADER,    //!< invalid proof of work or time too old
     BLOCK_MUTATED,           //!< the block's data didn't match the data committed to by the PoW
+    BLOCK_MISSING_SHAREPOOL_DATA, //!< Required hash-only snapshot data is not locally available; retryable, not invalid.
     BLOCK_MISSING_PREV,      //!< We don't have the previous block the checked one is built on
     BLOCK_INVALID_PREV,      //!< A block this one builds on is invalid
     BLOCK_TIME_FUTURE,       //!< block timestamp was > 2 hours in the future (or our clock is bad)
@@ -79,6 +80,7 @@ private:
     enum class ModeState {
         M_VALID,   //!< everything ok
         M_INVALID, //!< network rule violation (DoS value may be set)
+        M_PENDING, //!< required external consensus evidence is unavailable
         M_ERROR,   //!< run-time error
     } m_mode{ModeState::M_VALID};
     Result m_result{};
@@ -96,6 +98,15 @@ public:
         if (m_mode != ModeState::M_ERROR) m_mode = ModeState::M_INVALID;
         return false;
     }
+    bool Pending(Result result, const std::string& reject_reason)
+    {
+        if (m_mode == ModeState::M_ERROR || m_mode == ModeState::M_INVALID) return false;
+        m_result = result;
+        m_reject_reason = reject_reason;
+        m_mode = ModeState::M_PENDING;
+        return false;
+    }
+    bool IsPending() const { return m_mode == ModeState::M_PENDING; }
     bool Error(const std::string& reject_reason)
     {
         if (m_mode == ModeState::M_VALID)

@@ -1,5 +1,8 @@
 # Template-work evidence and replicated pool settlement on Knots
 
+The [hash-only version 2 profile](sharepool-hash-only.md) specifies the current
+off-block snapshot format and its separately enabled native regtest validation.
+
 Status: broader protocol proposal, with a newer
 [native enforcement profile](sharepool-native-enforcement.md) implementing a
 bounded subset on explicitly enabled regtest nodes. That profile adds native

@@ -164,6 +164,7 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   common/url.cpp
   compressor.cpp
   consensus/sharepool.cpp
+  consensus/sharepool_hash.cpp
   core_read.cpp
   core_write.cpp
   deploymentinfo.cpp
@@ -318,6 +319,7 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   rpc/txoutproof.cpp
   script/sigcache.cpp
   sharepool/relay.cpp
+  sharepool/hash_store.cpp
   signet.cpp
   stats/init.cpp
   stats/rpc_stats.cpp

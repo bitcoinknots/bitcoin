@@ -57,4 +57,33 @@ BOOST_AUTO_TEST_CASE(command_line_parser_rejects_ambiguous_or_invalid_schedule)
     BOOST_CHECK(!args.ParseParameters(2, argv, error));
 }
 
+BOOST_AUTO_TEST_CASE(hash_only_requires_explicit_regtest_native_schedule)
+{
+    ArgsManager args;
+    SetupChainParamsBaseOptions(args);
+    BOOST_CHECK(!CreateChainParams(args, ChainType::REGTEST)->GetConsensus().SharePoolHashOnly);
+    args.ForceSetArg("-sharepoolhashonly", "1");
+    BOOST_CHECK_THROW(CreateChainParams(args, ChainType::REGTEST), std::runtime_error);
+    args.ForceSetArg("-sharepoolheight", "2");
+    BOOST_CHECK_THROW(CreateChainParams(args, ChainType::REGTEST), std::runtime_error);
+    args.ForceSetArg("-testactivationheight", "blake2b@1");
+    const auto hash_only = CreateChainParams(args, ChainType::REGTEST);
+    BOOST_CHECK(hash_only->GetConsensus().SharePoolHashOnly);
+    BOOST_CHECK_EQUAL(hash_only->GetConsensus().SharePoolHeight, 2);
+    args.ForceSetArg("-sharepoolhashonly", "0");
+    BOOST_CHECK(!CreateChainParams(args, ChainType::REGTEST)->GetConsensus().SharePoolHashOnly);
+}
+
+BOOST_AUTO_TEST_CASE(public_network_factory_rejects_hash_only_option)
+{
+    for (const std::string value : {"0", "1"}) {
+        ArgsManager args;
+        SetupChainParamsBaseOptions(args);
+        args.ForceSetArg("-sharepoolhashonly", value);
+        for (const auto chain : {ChainType::MAIN, ChainType::TESTNET, ChainType::TESTNET4, ChainType::SIGNET}) {
+            BOOST_CHECK_THROW(CreateChainParams(args, chain), std::runtime_error);
+        }
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

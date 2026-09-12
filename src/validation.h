@@ -50,6 +50,7 @@
 class Chainstate;
 class CTxMemPool;
 class ChainstateManager;
+namespace sharepool { class HashSnapshotStore; namespace hashonly { struct Result; } }
 struct ChainTxData;
 class DisconnectedBlockTransactions;
 struct PrecomputedTransactionData;
@@ -424,6 +425,12 @@ bool TestBlockValidity(BlockValidationState& state,
  * Like a mining proposal, candidate PoW is not required; transaction validity,
  * merkle commitments, signatures, payouts and actual fees are checked.
  */
+sharepool::hashonly::Result ValidateSharePoolHashOrigin(ChainstateManager& chainman,
+    const CBlock& block, const CBlockIndex* parent) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+/** Verify body witness commitments before content-addressed template admission. */
+bool CheckWitnessMalleation(const CBlock& block, bool expect_witness_commitment, BlockValidationState& state);
+bool CheckConfiguredSharePool(const CBlock& block, BlockValidationState& state,
+    ChainstateManager& chainman, const CBlockIndex* previous, std::optional<CAmount> reward) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 bool TestSharePoolTemplateOnAncestor(BlockValidationState& state,
                                     const CChainParams& chainparams,
                                     Chainstate& chainstate,
@@ -1089,6 +1096,10 @@ public:
     //! A single BlockManager instance is shared across each constructed
     //! chainstate to avoid duplicating block metadata.
     node::BlockManager m_blockman;
+
+    std::unique_ptr<sharepool::HashSnapshotStore> m_sharepool_hash_store;
+    std::atomic<bool> m_retrying_hash_blocks{false};
+    void RetrySharePoolHashBlocks() LOCKS_EXCLUDED(cs_main);
 
     ValidationCache m_validation_cache;
 

@@ -272,6 +272,14 @@ inline constexpr const char* SPNINV{"spninv"};
 inline constexpr const char* SPNGET{"spnget"};
 /** Requested SPN1 evidence chunk. Complete objects undergo local native validation. */
 inline constexpr const char* SPNDATA{"spndata"};
+/** Hash-only regtest capability: transport version, genesis, v2 rules, activation. */
+inline constexpr const char* SPHHELLO{"sphhello"};
+/** Up to 256 snapshot hashes, strictly sorted in serialized uint256 order. */
+inline constexpr const char* SPHINV{"sphinv"};
+/** Request a snapshot hash and uint32 byte offset; independent of pool identity. */
+inline constexpr const char* SPHGET{"sphget"};
+/** Requested snapshot hash, offset, total bytes and bounded canonical chunk. */
+inline constexpr const char* SPHDATA{"sphdata"};
 }; // namespace NetMsgType
 
 /** All known message types (see above). Keep this in the same order as the list of messages above. */
@@ -315,6 +323,10 @@ inline const std::array ALL_NET_MESSAGE_TYPES{std::to_array<std::string>({
     NetMsgType::SPNINV,
     NetMsgType::SPNGET,
     NetMsgType::SPNDATA,
+    NetMsgType::SPHHELLO,
+    NetMsgType::SPHINV,
+    NetMsgType::SPHGET,
+    NetMsgType::SPHDATA,
 })};
 
 /** nServices flags */

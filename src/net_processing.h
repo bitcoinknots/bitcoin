@@ -123,7 +123,8 @@ public:
     /** Get peer manager info. */
     virtual PeerManagerInfo GetInfo() const = 0;
 
-    /** Explicitly configured, native-validated SPN1 evidence on existing P2P connections. */
+    /** Explicitly configured legacy SPN1 evidence. Hash-only block dependencies
+     * use ChainstateManager's all-pools snapshot store instead. */
     virtual sharepool::RelayStore& SharePoolRelay() EXCLUSIVE_LOCKS_REQUIRED(cs_main) = 0;
 
     /** Relay transaction to all peers. */

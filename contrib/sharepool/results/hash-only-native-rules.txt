@@ -1,0 +1,9 @@
+2026-09-12T18:35:02.345000Z TestFramework (INFO): PRNG seed is: 2938865586925143862
+2026-09-12T18:35:02.345000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-hash-rules-final
+2026-09-12T18:35:03.151000Z TestFramework (INFO): Complete proof attribution fixes the actual payout script
+2026-09-12T18:35:03.168000Z TestFramework (INFO): The snapshot and coinbase must allocate the exact native subsidy plus fees
+2026-09-12T18:35:03.188000Z TestFramework (INFO): Unavailable preimages are pending; available invalid encodings establish rejection
+2026-09-12T18:35:03.222000Z TestFramework (INFO): A complete consistent settlement is accepted after the refused examples
+2026-09-12T18:35:03.309000Z TestFramework (INFO): Stopping nodes
+2026-09-12T18:35:03.430000Z TestFramework (INFO): Cleaning up /private/tmp/sharepool-hash-rules-final on exit
+2026-09-12T18:35:03.430000Z TestFramework (INFO): Tests successful

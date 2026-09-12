@@ -1,0 +1,76 @@
+{
+  "profile": "hash-only-v2-regtest",
+  "nodes": 3,
+  "transport": "v2",
+  "cases": [
+    {
+      "case": "missing_snapshot_and_pending_restart",
+      "block": "49b7f620cded9649395914cb23c93a897d226c498cb7749f9a01897860c24a35",
+      "snapshot": "f56d8f15e4e274044ecd09f0c71b175b46b4d55d6f17a58439a34bfce103323c",
+      "result": "pending_without_consensus_rejection"
+    },
+    {
+      "case": "native_p2p_dependency_retry",
+      "result": "accepted",
+      "connections": [
+        1,
+        2,
+        1
+      ],
+      "peer_transports": [
+        [
+          "v2"
+        ],
+        [
+          "v2",
+          "v2"
+        ],
+        [
+          "v2"
+        ]
+      ],
+      "proof": "75b203d5bee401d415c326bd029918ad1c717d520eedafeffc16af8d026baa6c"
+    },
+    {
+      "case": "late_share_refresh",
+      "result": "accepted",
+      "original_snapshot": "f56d8f15e4e274044ecd09f0c71b175b46b4d55d6f17a58439a34bfce103323c",
+      "new_snapshot": "f09fc92248e540c1e79b0310797b5cfbe39f98e5bec57eda10569b62d30468b4",
+      "late_proof": "3f23f99d1233bf1b3773fab00286f469f59d78f31df673e3245e5f6d1b9f9e3e"
+    },
+    {
+      "case": "offline_reindex_chainstate",
+      "result": "restored",
+      "tip": "723661075fd5e476519c9b6c1a392a5f86e93c8c854d02e335e83d3e9fac2f17",
+      "height": 2
+    },
+    {
+      "case": "native_chainwork_reorganization",
+      "result": "accepted",
+      "orphan_tip": "4b07a24f738cf2f2f81848b2aac7631ddf833bbfe70cb664e12d73e4c5ed9a42",
+      "selected_tip": "6ee2f549987fe002f1342263f1c2a4d55be4f0f138d9d391b897d91f1fdb961d",
+      "height": 5
+    },
+    {
+      "case": "reorganized_history_reindex",
+      "result": "restored",
+      "tip": "6ee2f549987fe002f1342263f1c2a4d55be4f0f138d9d391b897d91f1fdb961d",
+      "height": 5
+    }
+  ],
+  "result": "passed",
+  "identities": [
+    {
+      "owner": "ecea909d2ae558679870bbf2ca19909e368db27103d06e8f744b85bc7b6e9327",
+      "payout_script": "00147171717171717171717171717171717171717171"
+    },
+    {
+      "owner": "cc568ae3385ab8fa56d2e06e1c17caa2deec90482861248fde617ca4cea514e7",
+      "payout_script": "00147272727272727272727272727272727272727272"
+    },
+    {
+      "owner": "b4ae273812245eb98d60879f2e5719e0da518c6c07ffbf07f1e674d7cb1b6664",
+      "payout_script": "00147373737373737373737373737373737373737373"
+    }
+  ]
+}

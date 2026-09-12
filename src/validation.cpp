@@ -15,6 +15,8 @@
 #include <consensus/consensus.h>
 #include <consensus/merkle.h>
 #include <consensus/sharepool.h>
+#include <consensus/sharepool_hash.h>
+#include <sharepool/hash_store.h>
 #include <consensus/tx_check.h>
 #include <consensus/tx_verify.h>
 #include <consensus/validation.h>
@@ -2764,6 +2766,22 @@ static bool ContextualCheckBlockHeaderVolatile(const CBlockHeader& block, BlockV
 /** Apply the effects of this block (with given index) on the UTXO set represented by coins.
  *  Validity checks that depend on the UTXO set are also done; ConnectBlock()
  *  can fail if those validity checks fail (among other reasons). */
+namespace {
+struct HashOnlyBodyScope {
+    static thread_local HashOnlyBodyScope* current;
+    HashOnlyBodyScope* previous{current};
+    std::optional<CAmount> reward;
+    HashOnlyBodyScope() { current = this; }
+    ~HashOnlyBodyScope() { current = previous; }
+};
+thread_local HashOnlyBodyScope* HashOnlyBodyScope::current{nullptr};
+}
+
+sharepool::hashonly::Result ValidateSharePoolHashOrigin(ChainstateManager& chainman,
+    const CBlock& block, const CBlockIndex* parent);
+bool CheckConfiguredSharePool(const CBlock& block, BlockValidationState& state,
+    ChainstateManager& chainman, const CBlockIndex* previous, std::optional<CAmount> reward = std::nullopt);
+
 bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, CBlockIndex* pindex,
                                CCoinsViewCache& view, bool fJustCheck)
 {
@@ -2772,7 +2790,11 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
 
     uint256 block_hash{block.GetHash()};
     assert(*pindex->phashBlock == block_hash);
-    const bool parallel_script_checks{m_chainman.m_script_check_queue_enabled && m_chainman.GetCheckQueue().HasThreads()};
+    // Origin checks can run inside an outer ConnectBlock during reindex. The
+    // outer call still owns the queue controller after Complete(); nested
+    // origins must execute the same script checks synchronously.
+    const bool parallel_script_checks{!HashOnlyBodyScope::current &&
+        m_chainman.m_script_check_queue_enabled && m_chainman.GetCheckQueue().HasThreads()};
 
     const auto time_start{SteadyClock::now()};
     const CChainParams& params{m_chainman.GetParams()};
@@ -2821,7 +2843,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
     }
 
     bool fScriptChecks = true;
-    if (!m_chainman.AssumedValidBlock().IsNull()) {
+    if (!HashOnlyBodyScope::current && !m_chainman.AssumedValidBlock().IsNull()) {
         // We've been configured with the hash of a block which has been externally verified to have a valid history.
         // A suitable default value is included with the software and updated from time to time.  Because validity
         //  relative to a piece of software is an objective fact these defaults can be easily reviewed.
@@ -3111,7 +3133,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
     // fees are known. ConnectBlock does not call ContextualCheckBlock, so this
     // must also run during reindex-chainstate, VerifyDB, and background validation.
     // It is deliberately independent of CBlock::fChecked and script caches.
-    if (!CheckSharePoolBlock(block, state, params.GetConsensus(), pindex->pprev, blockReward)) {
+    if (!CheckConfiguredSharePool(block, state, m_chainman, pindex->pprev, blockReward)) {
         return false;
     }
     const auto time_4{SteadyClock::now()};
@@ -4479,7 +4501,7 @@ static bool CheckMerkleRoot(const CBlock& block, BlockValidationState& state)
  * Note: If the witness commitment is expected (i.e. `expect_witness_commitment
  * = true`), then the block is required to have at least one transaction and the
  * first transaction needs to have at least one input. */
-static bool CheckWitnessMalleation(const CBlock& block, bool expect_witness_commitment, BlockValidationState& state)
+bool CheckWitnessMalleation(const CBlock& block, bool expect_witness_commitment, BlockValidationState& state)
 {
     if (expect_witness_commitment) {
         if (block.m_checked_witness_commitment) return true;
@@ -4821,7 +4843,7 @@ static bool ContextualCheckBlockHeaderVolatile(const CBlockHeader& block, BlockV
  *  in ConnectBlock().
  *  Note that -reindex-chainstate skips the validation that happens here!
  */
-static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& state, const ChainstateManager& chainman, const CBlockIndex* pindexPrev)
+static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& state, ChainstateManager& chainman, const CBlockIndex* pindexPrev) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
 {
     const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
 
@@ -4887,7 +4909,7 @@ static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& stat
 
     // This check uses only authenticated block data and its native ancestry.
     // ConnectBlock separately checks the exact subsidy plus validated fees.
-    if (!CheckSharePoolBlock(block, state, chainman.GetConsensus(), pindexPrev)) {
+    if (!CheckConfiguredSharePool(block, state, chainman, pindexPrev)) {
         return false;
     }
 
@@ -5186,6 +5208,10 @@ bool ChainstateManager::ProcessNewBlock(const std::shared_ptr<const CBlock>& blo
             ret = AcceptBlock(block, state, &pindex, force_processing, nullptr, new_block, min_pow_checked);
         }
         if (!ret) {
+            if (m_sharepool_hash_store) {
+                if (state.IsPending()) m_sharepool_hash_store->QueueBlock(block);
+                else if (state.IsInvalid()) m_sharepool_hash_store->RemoveBlock(block->GetHash());
+            }
             if (m_options.signals) {
                 m_options.signals->BlockChecked(*block, state);
             }
@@ -5194,6 +5220,10 @@ bool ChainstateManager::ProcessNewBlock(const std::shared_ptr<const CBlock>& blo
         }
     }
 
+    {
+        LOCK(cs_main);
+        if (m_sharepool_hash_store) m_sharepool_hash_store->RemoveBlock(block->GetHash());
+    }
     NotifyHeaderTip();
 
     BlockValidationState state; // Only used to report errors, not invalidity - ignore it
@@ -5306,6 +5336,91 @@ bool TestSharePoolTemplateOnAncestor(BlockValidationState& state,
     }
     return TestBlockValidityWithCoins(state, chainparams, chainstate, block, pindexPrev,
                                       viewNew, /*fCheckPOW=*/false, /*fCheckMerkleRoot=*/true);
+}
+
+sharepool::hashonly::Result ValidateSharePoolHashOrigin(ChainstateManager& chainman,
+    const CBlock& block, const CBlockIndex* parent)
+{
+    using sharepool::hashonly::Result;
+    AssertLockHeld(cs_main);
+    if (!parent || !chainman.m_sharepool_hash_store) return Result::Missing({}, "sharepool-hash-data-missing");
+    auto& store = *chainman.m_sharepool_hash_store;
+    if (block.hashPrevBlock != parent->GetBlockHash()) return Result::Invalid("bad-sharepool-hash-origin-parent");
+    // Cache exact canonical body bytes, including witness and every header field.
+    // A normalized header ID alone cannot authenticate a caller-supplied body.
+    HashWriter native_body;
+    native_body << TX_WITH_WITNESS(block);
+    const auto identity = native_body.GetHash();
+    if (auto reward = store.NativeValidated(identity)) return Result::Valid(*reward);
+    auto& chainstate = chainman.ActiveChainstate();
+    const auto* tip = chainstate.m_chain.Tip();
+    const auto* fork = chainstate.m_chain.FindFork(parent);
+    if (!tip || !fork) return Result::Missing({}, "sharepool-hash-native-ancestor-missing");
+    HashOnlyBodyScope body;
+    CCoinsViewCache view(&chainstate.CoinsTip());
+    for (const auto* index = tip; index != fork; index = index->pprev) {
+        CBlock previous_block;
+        if (!chainstate.m_blockman.ReadBlock(previous_block, *index) ||
+            chainstate.DisconnectBlock(previous_block, index, view) != DISCONNECT_OK) {
+            return Result::Missing({}, "sharepool-hash-undo-data-missing");
+        }
+    }
+    std::vector<const CBlockIndex*> connect;
+    for (const auto* index = parent; index != fork; index = index->pprev) connect.push_back(index);
+    for (auto it = connect.rbegin(); it != connect.rend(); ++it) {
+        CBlock intermediate;
+        BlockValidationState state;
+        if (!chainstate.m_blockman.ReadBlock(intermediate, **it)) return Result::Missing({}, "sharepool-hash-native-ancestor-missing");
+        if (!chainstate.ConnectBlock(intermediate, state, const_cast<CBlockIndex*>(*it), view, true)) {
+            return state.IsInvalid() ? Result::Invalid(state.GetRejectReason()) : Result::Missing({}, state.GetRejectReason());
+        }
+        view.SetBestBlock((*it)->GetBlockHash());
+    }
+    body.reward.reset();
+    BlockValidationState state;
+    if (!TestBlockValidityWithCoins(state, chainman.GetParams(), chainstate, block,
+            const_cast<CBlockIndex*>(parent), view, false, true)) {
+        return state.IsInvalid() ? Result::Invalid(state.GetRejectReason()) : Result::Missing({}, state.GetRejectReason());
+    }
+    if (!body.reward) return Result::Missing({}, "sharepool-hash-native-reward-unavailable");
+    store.SetNativeValidated(identity, *body.reward);
+    return Result::Valid(*body.reward);
+}
+
+bool CheckConfiguredSharePool(const CBlock& block, BlockValidationState& state,
+    ChainstateManager& chainman, const CBlockIndex* previous, std::optional<CAmount> reward)
+{
+    AssertLockHeld(cs_main);
+    const auto& consensus = chainman.GetConsensus();
+    if (!consensus.SharePoolHashOnly) return CheckSharePoolBlock(block, state, consensus, previous, reward);
+    if (!previous || previous->nHeight + 1 < consensus.SharePoolHeight) return true;
+    if (HashOnlyBodyScope::current) {
+        if (reward) HashOnlyBodyScope::current->reward = *reward;
+        return true;
+    }
+    auto& store = *Assert(chainman.m_sharepool_hash_store);
+    auto result = sharepool::hashonly::CheckSnapshot(block, previous, consensus,
+        [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.Lookup(hash); },
+        [&](const CBlock& origin, const CBlockIndex* parent) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return ValidateSharePoolHashOrigin(chainman, origin, parent); }, reward);
+    if (result.IsValid()) return true;
+    if (result.IsMissing()) {
+        store.Need(result.missing);
+        return state.Pending(BlockValidationResult::BLOCK_MISSING_SHAREPOOL_DATA, "sharepool-hash-data-missing");
+    }
+    return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, result.reason);
+}
+
+void ChainstateManager::RetrySharePoolHashBlocks()
+{
+    AssertLockNotHeld(cs_main);
+    if (!m_sharepool_hash_store || m_retrying_hash_blocks.exchange(true)) return;
+    struct Reset { std::atomic<bool>& flag; ~Reset() { flag = false; } } reset{m_retrying_hash_blocks};
+    // Copies of immutable pending blocks are bounded by the store's64MiB quota.
+    const auto blocks = WITH_LOCK(cs_main, return m_sharepool_hash_store->PendingBlocks());
+    for (const auto& block : blocks) {
+        if (m_interrupt) break;
+        ProcessNewBlock(block, true, true, nullptr);
+    }
 }
 
 /* This function is called from the RPC code for pruneblockchain */
@@ -7144,6 +7259,9 @@ ChainstateManager::ChainstateManager(const util::SignalInterrupt& interrupt, Opt
       m_blockman{interrupt, std::move(blockman_options)},
       m_validation_cache{m_options.script_execution_cache_bytes, m_options.signature_cache_bytes}
 {
+    if (GetConsensus().SharePoolHashOnly) {
+        m_sharepool_hash_store = std::make_unique<sharepool::HashSnapshotStore>(m_options.datadir / "sharepool-snapshots-v2");
+    }
 }
 
 ChainstateManager::~ChainstateManager()

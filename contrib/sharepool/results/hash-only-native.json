@@ -1,0 +1,37 @@
+{
+  "result": "passed",
+  "scope": "Disposable loopback regtest only; no hardware, public network, or mainnet activation.",
+  "native_unit_cases": 34,
+  "native_unit_command": "/private/tmp/sharepool-native-build/bin/test_bitcoin --run_test=sharepool_hash_tests,sharepool_tests,sharepool_signer_tests,sharepool_params_tests --log_level=message",
+  "lifecycle": {
+    "v1_report": "/private/tmp/sharepool-hash-lifecycle-20260912-c.json",
+    "v2_report": "/private/tmp/sharepool-hash-lifecycle-v2-20260912-b.json",
+    "v1_portseed": 721,
+    "v2_portseed": 761,
+    "actual_peer_transport_asserted": true,
+    "executed_bitcoind_sha256": "a0858e2bd5db85387239052c4fa23c993deeb9f2eeb3bb0334308f5c66808df8",
+    "executed_signer_sha256": "e9d92517d91d15cbf269e43d217a953deb43e70ab6188893fd3ba5dac0095e7a",
+    "note": "Both lifecycle runs passed before the final isolated known-empty-preimage rejection. Final rebuilt binaries and34 focused native cases include that additional check."
+  },
+  "verified_fix": "Offline reindex previously exposed recursive script queue control ownership; root changed nested native origin checks to synchronous script validation. Both full lifecycle variants then passed offline reindex, valid reorganization, and post-reorg reindex.",
+  "files": {
+    "/private/tmp/sharepool-native-build/bin/bitcoind": "2d54ee7d26d3310e450ffc1e02d832676b5b1170e4b39f4ff711560cd41933f2",
+    "/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer": "cd678dac1e5bf546476b9d9d772c0ee84e34f728494b8be126dfe0dce44d9d85",
+    "/private/tmp/sharepool-native-build/bin/test_bitcoin": "7f3c4d705de206b54bd75a46fd5fdb4af154172577c8b88404e2060f88694095",
+    "/private/tmp/sharepool-hash-all-native-results.log": "a930f91b4b59c0ff9d349aad07aca802f609a44c8bdd65f457e9ffa665b5d4d5",
+    "/private/tmp/sharepool-hash-final-unit-build.log": "e806788bd2136138c9ba2ac1b149129acc6bbe055575225b343b7683cc232eda",
+    "/private/tmp/sharepool-hash-final-signer-build.log": "b407c34f8dfe80b22bc9aab916ef81ddb9f4d1631d2f51562be31b54722a0013",
+    "/private/tmp/sharepool-hash-lifecycle-20260912-c.json": "8a1708cb7c1a3f729530fd44cda983c184198ddff0d2de98ec2dba4a342c2bae",
+    "/private/tmp/sharepool-hash-lifecycle-v2-20260912-b.json": "751d0d67f592bca14062f1e60f39195e0652d47480a4e0be22580290ac4c5f4c",
+    "/private/tmp/sharepool-hash-lifecycle-v1-final.log": "ffe86da89c33596f6258079ec656d5786795dcd82fdad755a3c5284aab1583d0",
+    "/private/tmp/sharepool-hash-lifecycle-v2-final.log": "120d04b776ad17ab11d69552364887faec0ea6c701e572a86e178817541431d0"
+  },
+  "source_sha256": {
+    "src/consensus/sharepool_hash.h": "73ca80d73e648a7dfc8d33c99a0adcd078a67aaa62ae32f02da3b8e2afefbc94",
+    "src/consensus/sharepool_hash.cpp": "d4e31fded12068334662fecb2f7b9b9cfe9baa1d14f758ecc977b578e637a9f5",
+    "src/test/sharepool_hash_tests.cpp": "12a13bd0d9248d75c922e4143086f7b468e8c56e67be043986aab99c4b7306f5",
+    "src/test/sharepool_params_tests.cpp": "7db59977bdfc3cd256a6550f5f50ba49b45c1b217d9670d591a4efc19aed3d5c",
+    "src/test/sharepool_tests.cpp": "206168cfe15d53191b49f3448f91d9c67b9a42d7200c9b63c2c68bdec33bd59c",
+    "test/functional/feature_sharepool_hash_lifecycle.py": "dcb0651a3ce8f2fd35762aaba349193b23a294ee8f33fe7ac777f448b44749ae"
+  }
+}

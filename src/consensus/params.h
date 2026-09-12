@@ -109,6 +109,7 @@ struct Params {
     int Blake2bHeight{std::numeric_limits<int>::max()};
     /** Opt-in native sharepool validation test profile. Never scheduled on public networks. */
     int SharePoolHeight{std::numeric_limits<int>::max()};
+    bool SharePoolHashOnly{false};
     std::vector<unsigned char> Blake2bHeadline;
     uint8_t Blake2bTargetShift{20};
     /**

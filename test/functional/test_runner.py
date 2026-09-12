@@ -83,6 +83,8 @@ TEST_FRAMEWORK_UNIT_TESTS = 'feature_framework_unit_tests.py'
 EXTENDED_SCRIPTS = [
     # These tests are not run by default.
     # Longest test should go first, to favor running tests in parallel
+    'feature_sharepool_hash_100_miners.py',
+    'feature_sharepool_100_miners.py',
     'feature_pruning.py',
     'feature_dbcrash.py',
     'feature_index_prune.py',
@@ -123,6 +125,9 @@ BASE_SCRIPTS = [
     'feature_sharepool_network.py',
     'feature_sharepool_ancestor.py',
     'feature_sharepool_peer.py',
+    'feature_sharepool_rule_cases.py',
+    'feature_sharepool_hash_lifecycle.py',
+    'feature_sharepool_hash_rules.py',
     'rpc_psbt.py --legacy-wallet',
     'rpc_psbt.py --descriptors',
     'wallet_fundrawtransaction.py --legacy-wallet',

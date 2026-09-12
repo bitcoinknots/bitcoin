@@ -1,0 +1,157 @@
+{
+  "command": [
+    "python3",
+    "-B",
+    "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_100_miners.py",
+    "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+    "--tmpdir=/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes",
+    "--portseed=711",
+    "--nocleanup",
+    "--results=/private/tmp/sharepool-hash-native100-results.json"
+  ],
+  "started_utc": "2026-09-12T18:21:45.528224+00:00",
+  "finished_utc": "2026-09-12T18:32:58.377127+00:00",
+  "exit_code": 0,
+  "wall_seconds": 672.811,
+  "base": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m",
+  "logs": [
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/console.log",
+      "sha256": "7ea66e31062c284316ceba118e10bac2c47e4b25fc8c8ba349d832d575d913d4",
+      "bytes": 3811
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node0/regtest/blocks/index/000003.log",
+      "sha256": "be6c6d687c67108093595707b55b1db2218a0ff52a11f43dfeff42104ec5a770",
+      "bytes": 22397
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node0/regtest/chainstate/000003.log",
+      "sha256": "2c720eed88368fbce4936e39c481078bd0dbe0f30982bd45213d75eee6d10b09",
+      "bytes": 35287
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node0/regtest/debug.log",
+      "sha256": "a5f17176507f10c9a3e875139cc175a18d2fe67ac77fdb1cd0978947fc5bd8e2",
+      "bytes": 108612154
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node0/regtest/sharepool-snapshots-v2/000022.log",
+      "sha256": "d8c78f6f98670c7e9c29067c0a915d1301f1c2bf2f7db15d8967b4a219bc4e6a",
+      "bytes": 575210
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node1/regtest/blocks/index/000003.log",
+      "sha256": "c9a90613c294b1d6f0fa4c0e63f98ee09f74f7e34d4972a2fbfc62c4360c1a09",
+      "bytes": 22397
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node1/regtest/chainstate/000003.log",
+      "sha256": "5cabc3ed22bc00aab191e2b84c6c11d2162c095d0dfacfc64fbcd11d97b34b1b",
+      "bytes": 35287
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node1/regtest/debug.log",
+      "sha256": "51748e6627018af105d5d091fb37669b8781955d1c001fee21a3aadbf712068a",
+      "bytes": 101453518
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node1/regtest/sharepool-snapshots-v2/000022.log",
+      "sha256": "c222591acc609ac1f5e222e3ecbe50c6e62f9aec3315f80fc36f3815adb6e317",
+      "bytes": 575210
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node2/regtest/blocks/index/000003.log",
+      "sha256": "022f979c84da9a709527c4a609b5e3490f1814b0485b384120babdb3527858c8",
+      "bytes": 22397
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node2/regtest/chainstate/000003.log",
+      "sha256": "c4cf594ad6b325243facbaa7977592cef7a14fe2b3ad263660dcc20d15042361",
+      "bytes": 35287
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node2/regtest/debug.log",
+      "sha256": "67e7873bd2a14dc865a1d9e39a33529736a7f8c32fd528b73d415b4f220df7e1",
+      "bytes": 53512101
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node2/regtest/sharepool-snapshots-v2/000022.log",
+      "sha256": "09390a403693b62b2a8b42c820ce376cd8d4a4894f712a6e32d967394b5f0fc3",
+      "bytes": 575573
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node3/regtest/blocks/index/000003.log",
+      "sha256": "e438f52655832d220cf3950558fda56bcaa5ecd47357f7e92ea43883c34bfdd9",
+      "bytes": 22397
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node3/regtest/chainstate/000003.log",
+      "sha256": "772cff2bc4118524d4369a576fd3c02e4cf061bdb4f21807f6446a5ad5e54300",
+      "bytes": 35287
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node3/regtest/debug.log",
+      "sha256": "2b78246f19944274e04a525de5cf54e2b6fa692666995461a2b4d77e90c1a337",
+      "bytes": 54744194
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node3/regtest/sharepool-snapshots-v2/000022.log",
+      "sha256": "2c8ae06e1b283d601262e0843a16c938113bf138ce94741641823c57cc329ebb",
+      "bytes": 575573
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node4/regtest/blocks/index/000003.log",
+      "sha256": "9c8bdc45480263980f0dfd94840aad6356df42239fe0296e3a1b9bb464510d5b",
+      "bytes": 22397
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node4/regtest/chainstate/000003.log",
+      "sha256": "d388c145e53f503b4075d03f28dc275fd31cf8c57ef6fc7a8b6e7828b0682987",
+      "bytes": 35287
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node4/regtest/debug.log",
+      "sha256": "6dd9c1000a7ea33d4c1f8af83d37fd4bbdbc0f7114bded44e0e9e6fc2fcd940b",
+      "bytes": 101464742
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node4/regtest/sharepool-snapshots-v2/000022.log",
+      "sha256": "20e9c356b0e0671c9f8ce9f336072dc160e65fc23f4022f2043d348ab49b4db7",
+      "bytes": 575573
+    },
+    {
+      "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/test_framework.log",
+      "sha256": "3ecb8b532bbfe4aae45a51822738933b58951a1f4f6af0c8937ee9a0ff25bf0b",
+      "bytes": 5592
+    }
+  ],
+  "remaining_key_files": [],
+  "cleanup_verification": {
+    "remaining_key_files": [],
+    "remaining_pid_files": [],
+    "node_shutdown_logged": [
+      {
+        "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node0/regtest/debug.log",
+        "shutdown": true
+      },
+      {
+        "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node1/regtest/debug.log",
+        "shutdown": true
+      },
+      {
+        "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node2/regtest/debug.log",
+        "shutdown": true
+      },
+      {
+        "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node3/regtest/debug.log",
+        "shutdown": true
+      },
+      {
+        "path": "/private/tmp/sharepool-hash-native100-711-m9ik3e1m/nodes/node4/regtest/debug.log",
+        "shutdown": true
+      }
+    ]
+  },
+  "gate_followup": "The native run imported the pre-followup gate. Subsequent SQL scalar/config/checkpoint length preflights changed read-side integrity only;25 focused tests cover the final gate."
+}

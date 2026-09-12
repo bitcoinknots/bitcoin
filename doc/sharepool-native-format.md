@@ -1,5 +1,8 @@
 # Native settlement test profile, version 1
 
+For the separately enabled format with a flat hash and full snapshots shared
+between nodes, see [hash-only version 2](sharepool-hash-only.md).
+
 Implementation contract for an opt-in, regtest-only native validator. All other
 networks and default regtest remain unchanged. This is a new, self-contained
 native profile, not native activation of the synthetic checkpoint reward ledger.

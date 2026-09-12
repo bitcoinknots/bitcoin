@@ -173,6 +173,7 @@ public:
         std::optional<std::vector<unsigned char>> blake2b_headline{};
         //! Regtest-only native sharepool validation, at or after BLAKE2b activation.
         std::optional<int> sharepool_height{};
+        bool sharepool_hash_only{false};
     };
 
     static std::unique_ptr<const CChainParams> RegTest(const RegTestOptions& options);

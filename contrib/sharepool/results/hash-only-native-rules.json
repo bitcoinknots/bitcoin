@@ -1,0 +1,17 @@
+{
+  "profile": "hash-only-v2-regtest",
+  "test": "feature_sharepool_hash_rules.py",
+  "exit_code": 0,
+  "command": [
+    "/usr/bin/python3",
+    "-B",
+    "test/functional/feature_sharepool_hash_rules.py",
+    "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+    "--portseed=771",
+    "--tmpdir=/private/tmp/sharepool-hash-rules-final",
+    "--timeout-factor=2"
+  ],
+  "native_binary_sha256": "2d54ee7d26d3310e450ffc1e02d832676b5b1170e4b39f4ff711560cd41933f2",
+  "log_sha256": "74cd26edf32b0f544e7bd33e99409426c86877fdb7a83b42d19ed58cb9a84f5b",
+  "source_sha256": "956d36a7d94b2539347d32b46147f208b88ecfcd1ebbfe7f8dd13a033948e1ff"
+}

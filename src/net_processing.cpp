@@ -13,6 +13,7 @@
 #include <common/args.h>
 #include <consensus/amount.h>
 #include <consensus/sharepool.h>
+#include <consensus/sharepool_hash.h>
 #include <consensus/validation.h>
 #include <deploymentstatus.h>
 #include <hash.h>
@@ -37,6 +38,7 @@
 #include <random.h>
 #include <scheduler.h>
 #include <sharepool/relay.h>
+#include <sharepool/hash_store.h>
 #include <streams.h>
 #include <sync.h>
 #include <tinyformat.h>
@@ -231,6 +233,59 @@ struct SharePoolPeer {
     }
 };
 
+/** Content-addressed block dependencies use their own all-pools relay state. */
+static constexpr size_t SPH_MAX_ITEMS{256};
+static constexpr size_t SPH_MAX_DOWNLOADS{4};
+static constexpr size_t SPH_CHUNK_BYTES{65536};
+static constexpr auto SPH_PROGRESS_TIMEOUT{30s};
+static constexpr auto SPH_WHOLE_TIMEOUT{180s};
+static_assert(SPH_MAX_DOWNLOADS * size_t{sharepool::hashonly::MAX_SNAPSHOT_BYTES} <= 64 * 1024 * 1024);
+
+struct SharePoolHashDownload {
+    uint256 hash;
+    SPNClock::time_point progress_deadline;
+    SPNClock::time_point whole_deadline;
+    uint32_t total{0};
+    std::vector<unsigned char> bytes;
+    bool requested{false};
+};
+
+struct SharePoolHashRequest {
+    uint256 hash;
+    uint32_t offset{0};
+    SPNClock::time_point deadline;
+};
+
+struct SharePoolHashPeer {
+    bool hello_sent{false};
+    bool hello_received{false};
+    SPNClock::time_point next_inventory{};
+    SPNClock::time_point next_admission{};
+    SPNClock::time_point bucket_time{SPNClock::now()};
+    size_t inventory_offset{0};
+    double control_tokens{8};
+    double request_tokens{32};
+    double outgoing_requests{32};
+    double inbound_bytes{8'000'000};
+    double outbound_bytes{8'000'000};
+    std::deque<uint256> pending;
+    std::optional<SharePoolHashDownload> download;
+    std::optional<SharePoolHashRequest> serve_request;
+    std::map<uint256, SPNClock::time_point> rejected_until;
+
+    void Refill()
+    {
+        const auto now = SPNClock::now();
+        const double elapsed = std::chrono::duration<double>(now - bucket_time).count();
+        bucket_time = now;
+        control_tokens = std::min(8.0, control_tokens + elapsed);
+        request_tokens = std::min(32.0, request_tokens + elapsed * 32);
+        outgoing_requests = std::min(32.0, outgoing_requests + elapsed * 32);
+        inbound_bytes = std::min(8'000'000.0, inbound_bytes + elapsed * 1'000'000);
+        outbound_bytes = std::min(8'000'000.0, outbound_bytes + elapsed * 1'000'000);
+    }
+};
+
 /**
  * Data structure for an individual peer. Members use their documented mutex;
  * the optional evidence transfer state is protected by cs_main.
@@ -269,6 +324,7 @@ struct Peer {
 
     /** Guarded by cs_main so disconnect cleanup cannot race a chunk admission. */
     SharePoolPeer m_sharepool GUARDED_BY(cs_main);
+    SharePoolHashPeer m_sharepool_hash GUARDED_BY(cs_main);
 
     /** Protects misbehavior data members */
     Mutex m_misbehavior_mutex;
@@ -591,6 +647,13 @@ private:
     void SendSharePoolMessages(CNode& node, Peer& peer) EXCLUSIVE_LOCKS_REQUIRED(cs_main, g_msgproc_mutex);
     void ProcessSharePoolMessage(CNode& node, Peer& peer, const std::string& type, DataStream& stream)
         EXCLUSIVE_LOCKS_REQUIRED(cs_main, g_msgproc_mutex);
+    bool SharePoolHashActive() const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    void ClearSharePoolHashDownload(Peer& peer) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    void DeferSharePoolHashDownload(Peer& peer) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    void RequestSharePoolHash(CNode& node, Peer& peer) EXCLUSIVE_LOCKS_REQUIRED(cs_main, g_msgproc_mutex);
+    void SendSharePoolHashMessages(CNode& node, Peer& peer) EXCLUSIVE_LOCKS_REQUIRED(cs_main, g_msgproc_mutex);
+    void ProcessSharePoolHashMessage(CNode& node, Peer& peer, const std::string& type, DataStream& stream)
+        EXCLUSIVE_LOCKS_REQUIRED(cs_main, g_msgproc_mutex);
 
     /** Consider evicting an outbound peer based on the amount of time they've been behind our tip */
     void ConsiderEviction(CNode& pto, Peer& peer, std::chrono::seconds time_in_seconds) EXCLUSIVE_LOCKS_REQUIRED(cs_main, g_msgproc_mutex);
@@ -799,6 +862,12 @@ private:
     std::set<NodeId> m_sharepool_download_peers GUARDED_BY(cs_main);
     SPNClock::time_point m_next_sharepool_admission GUARDED_BY(cs_main){};
     SPNClock::time_point m_next_sharepool_template_validation GUARDED_BY(cs_main){};
+    /** No duplicate global downloads: four peers reserve at most 64 MiB total. */
+    std::map<uint256, NodeId> m_sharepool_hash_downloads GUARDED_BY(cs_main);
+    std::optional<uint64_t> m_sharepool_hash_inventory_revision GUARDED_BY(cs_main);
+    std::vector<uint256> m_sharepool_hash_inventory GUARDED_BY(cs_main);
+    SPNClock::time_point m_next_sharepool_hash_admission GUARDED_BY(cs_main){};
+    bool m_sharepool_hash_retry GUARDED_BY(cs_main){false};
 
     /** Synchronizes tx download including TxRequestTracker, rejection filters, and TxOrphanage.
      * Lock invariants:
@@ -1666,6 +1735,7 @@ void PeerManagerImpl::FinalizeNode(const CNode& node)
         PeerRef peer = RemovePeer(nodeid);
         assert(peer != nullptr);
         ClearSharePoolDownload(*peer);
+        ClearSharePoolHashDownload(*peer);
         m_wtxid_relay_peers -= peer->m_wtxid_relay;
         assert(m_wtxid_relay_peers >= 0);
     }
@@ -1929,6 +1999,8 @@ void PeerManagerImpl::MaybePunishNodeForBlock(NodeId nodeid, const BlockValidati
         HandleDoSPunishment(m_connman, nodeid, 100, "block header");
         return;
     case BlockValidationResult::BLOCK_TIME_FUTURE:
+    case BlockValidationResult::BLOCK_MISSING_SHAREPOOL_DATA:
+        // Missing local snapshot evidence is pending validation, not peer fault.
         break;
     }
     if (message != "") {
@@ -3498,7 +3570,7 @@ void PeerManagerImpl::ProcessCompactBlockTxns(CNode& pfrom, Peer& peer, const Bl
 bool PeerManagerImpl::SharePoolActive() const
 {
     AssertLockHeld(cs_main);
-    return m_sharepool_relay.Active(m_chainman);
+    return !m_chainparams.GetConsensus().SharePoolHashOnly && m_sharepool_relay.Active(m_chainman);
 }
 
 void PeerManagerImpl::ClearSharePoolDownload(Peer& peer)
@@ -3639,6 +3711,7 @@ void PeerManagerImpl::ProcessSharePoolMessage(CNode& node, Peer& peer, const std
     // Disabled and legacy peers neither allocate an evidence cache nor change
     // their existing Bitcoin validity, address or transaction-relay behavior.
     if (m_chainparams.GetChainType() != ChainType::REGTEST ||
+        consensus.SharePoolHashOnly ||
         consensus.SharePoolHeight == std::numeric_limits<int>::max() ||
         node.IsFeelerConn() || node.IsAddrFetchConn() || node.IsBlockOnlyConn()) return;
     auto& relay = peer.m_sharepool;
@@ -3748,6 +3821,292 @@ void PeerManagerImpl::ProcessSharePoolMessage(CNode& node, Peer& peer, const std
         relay.pending.clear();
         relay.serve_request.reset();
         LogDebug(BCLog::NET, "Disconnecting malformed SPN1 evidence peer=%d\n", node.GetId());
+        node.fDisconnect = true;
+    }
+}
+
+bool PeerManagerImpl::SharePoolHashActive() const
+{
+    AssertLockHeld(cs_main);
+    const auto& consensus = m_chainparams.GetConsensus();
+    // Negotiate before activation as well: an activating block may already
+    // require data. This channel is independent of a local SPN1 pool filter.
+    return m_chainparams.GetChainType() == ChainType::REGTEST && consensus.SharePoolHashOnly &&
+           consensus.SharePoolHeight > 0 && consensus.SharePoolHeight < std::numeric_limits<int>::max() &&
+           m_chainman.m_sharepool_hash_store != nullptr;
+}
+
+void PeerManagerImpl::ClearSharePoolHashDownload(Peer& peer)
+{
+    AssertLockHeld(cs_main);
+    auto& relay = peer.m_sharepool_hash;
+    if (relay.download) m_sharepool_hash_downloads.erase(relay.download->hash);
+    relay.download.reset();
+}
+
+void PeerManagerImpl::DeferSharePoolHashDownload(Peer& peer)
+{
+    AssertLockHeld(cs_main);
+    auto& relay = peer.m_sharepool_hash;
+    if (relay.download) {
+        if (relay.rejected_until.size() >= SPH_MAX_ITEMS) relay.rejected_until.erase(relay.rejected_until.begin());
+        relay.rejected_until[relay.download->hash] = SPNClock::now() + 10s;
+    }
+    ClearSharePoolHashDownload(peer);
+}
+
+void PeerManagerImpl::RequestSharePoolHash(CNode& node, Peer& peer)
+{
+    AssertLockHeld(cs_main);
+    AssertLockHeld(g_msgproc_mutex);
+    auto& relay = peer.m_sharepool_hash;
+    if (!SharePoolHashActive() || !relay.hello_sent || !relay.hello_received ||
+        relay.download || node.fPauseSend || node.fDisconnect || relay.outgoing_requests < 1 ||
+        relay.inbound_bytes < SPH_CHUNK_BYTES + 45 ||
+        m_sharepool_hash_downloads.size() >= SPH_MAX_DOWNLOADS) return;
+    auto& store = *m_chainman.m_sharepool_hash_store;
+    const auto now = SPNClock::now();
+    // Pending blocks and their discovered origin dependencies take precedence
+    // over advertisements. Required hashes can be requested without an inv.
+    std::deque<uint256> prioritized;
+    std::set<uint256> seen;
+    const auto available = [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
+        const auto rejected = relay.rejected_until.find(hash);
+        return !store.Has(hash) && !m_sharepool_hash_downloads.contains(hash) &&
+            (rejected == relay.rejected_until.end() || rejected->second <= now);
+    };
+    for (const auto& hash : store.Needed()) {
+        if (prioritized.size() >= SPH_MAX_ITEMS) break;
+        if (available(hash) && seen.insert(hash).second) prioritized.push_back(hash);
+    }
+    for (const auto& hash : relay.pending) {
+        if (prioritized.size() >= SPH_MAX_ITEMS) break;
+        if (available(hash) && seen.insert(hash).second) prioritized.push_back(hash);
+    }
+    relay.pending = std::move(prioritized);
+    while (!relay.pending.empty()) {
+        const auto hash = relay.pending.front();
+        relay.pending.pop_front();
+        if (store.Has(hash) || m_sharepool_hash_downloads.contains(hash)) continue;
+        const auto rejected = relay.rejected_until.find(hash);
+        if (rejected != relay.rejected_until.end() && rejected->second > now) continue;
+        relay.download.emplace(SharePoolHashDownload{hash, now + SPH_PROGRESS_TIMEOUT,
+            now + SPH_WHOLE_TIMEOUT, 0, {}, true});
+        m_sharepool_hash_downloads.emplace(hash, node.GetId());
+        --relay.outgoing_requests;
+        MakeAndPushMessage(node, NetMsgType::SPHGET, hash, uint32_t{0});
+        break;
+    }
+}
+
+void PeerManagerImpl::SendSharePoolHashMessages(CNode& node, Peer& peer)
+{
+    AssertLockHeld(cs_main);
+    AssertLockHeld(g_msgproc_mutex);
+    auto& relay = peer.m_sharepool_hash;
+    relay.Refill();
+    const auto now = SPNClock::now();
+    // Block-only connections also carry mandatory block dependencies.
+    if (!SharePoolHashActive() || node.IsFeelerConn() || node.IsAddrFetchConn()) {
+        ClearSharePoolHashDownload(peer);
+        relay.pending.clear();
+        relay.serve_request.reset();
+        return;
+    }
+    for (auto it = relay.rejected_until.begin(); it != relay.rejected_until.end();) {
+        if (it->second <= now) it = relay.rejected_until.erase(it);
+        else ++it;
+    }
+    if (relay.download && (now >= relay.download->progress_deadline || now >= relay.download->whole_deadline)) {
+        DeferSharePoolHashDownload(peer);
+    }
+    if (node.fPauseSend || node.fDisconnect) return;
+    if (!relay.hello_sent) {
+        MakeAndPushMessage(node, NetMsgType::SPHHELLO, uint8_t{1},
+            m_chainparams.GetConsensus().hashGenesisBlock, sharepool::hashonly::RulesHash(),
+            uint32_t(m_chainparams.GetConsensus().SharePoolHeight));
+        relay.hello_sent = true;
+    }
+    if (!relay.hello_received) return;
+    auto& store = *m_chainman.m_sharepool_hash_store;
+    if (relay.serve_request) {
+        const auto request = *relay.serve_request;
+        if (request.deadline <= now) {
+            relay.serve_request.reset();
+        } else if (relay.outbound_bytes >= SPH_CHUNK_BYTES + 45) {
+            std::shared_ptr<const std::vector<unsigned char>> raw;
+            try {
+                raw = store.GetShared(request.hash);
+            } catch (const std::exception&) {
+                // Missing/unreadable local data is not evidence of peer fault.
+            }
+            if (!raw || raw->empty() || raw->size() > sharepool::hashonly::MAX_SNAPSHOT_BYTES ||
+                request.offset >= raw->size()) {
+                relay.outbound_bytes -= 45;
+                MakeAndPushMessage(node, NetMsgType::SPHDATA, request.hash, request.offset,
+                    uint32_t{0}, std::vector<unsigned char>{});
+            } else {
+                const size_t count = std::min(SPH_CHUNK_BYTES, raw->size() - request.offset);
+                relay.outbound_bytes -= count + 45;
+                const std::vector<unsigned char> chunk(raw->begin() + request.offset, raw->begin() + request.offset + count);
+                MakeAndPushMessage(node, NetMsgType::SPHDATA, request.hash, request.offset, uint32_t(raw->size()), chunk);
+            }
+            relay.serve_request.reset();
+        }
+    }
+    if (relay.download && !relay.download->requested && relay.download->bytes.size() < relay.download->total &&
+        relay.outgoing_requests >= 1 && relay.inbound_bytes >= SPH_CHUNK_BYTES + 45) {
+        --relay.outgoing_requests;
+        MakeAndPushMessage(node, NetMsgType::SPHGET, relay.download->hash, uint32_t(relay.download->bytes.size()));
+        relay.download->requested = true;
+    }
+    // Canonical decoding/hash verification/durable admission happen after the
+    // ordinary block/transaction scheduler. Every outcome consumes the budget.
+    if (relay.download && relay.download->total != 0 && relay.download->bytes.size() == relay.download->total &&
+        now >= relay.next_admission && now >= m_next_sharepool_hash_admission) {
+        const auto hash = relay.download->hash;
+        const auto started = SPNClock::now();
+        bool admitted{false};
+        const bool already_present = store.Has(hash);
+        try {
+            admitted = store.Put(relay.download->bytes, hash) == hash;
+        } catch (const std::exception&) {
+            // Wrong content for a requested hash, quota exhaustion or local
+            // storage failure never marks a pending Bitcoin block invalid.
+        }
+        const auto finished = SPNClock::now();
+        relay.next_admission = finished + 250ms;
+        m_next_sharepool_hash_admission = finished +
+            std::max(std::chrono::duration_cast<SPNClock::duration>(50ms), (finished - started) * 4);
+        if (admitted) {
+            if (!already_present) m_sharepool_hash_retry = true;
+            ClearSharePoolHashDownload(peer);
+        } else {
+            LogDebug(BCLog::NET, "Hash-only snapshot not admitted peer=%d hash=%s\n", node.GetId(), hash.ToString());
+            DeferSharePoolHashDownload(peer);
+        }
+    }
+    if (now >= relay.next_inventory) {
+        if (m_sharepool_hash_inventory_revision != store.Revision()) {
+            m_sharepool_hash_inventory = store.Inventory();
+            auto& inventory = m_sharepool_hash_inventory;
+            std::sort(inventory.begin(), inventory.end());
+            inventory.erase(std::unique(inventory.begin(), inventory.end()), inventory.end());
+            m_sharepool_hash_inventory_revision = store.Revision();
+        }
+        const auto& hashes = m_sharepool_hash_inventory;
+        if (relay.inventory_offset >= hashes.size()) relay.inventory_offset = 0;
+        const size_t end = std::min(hashes.size(), relay.inventory_offset + SPH_MAX_ITEMS);
+        const std::vector<uint256> page(hashes.begin() + relay.inventory_offset, hashes.begin() + end);
+        MakeAndPushMessage(node, NetMsgType::SPHINV, page);
+        relay.inventory_offset = end == hashes.size() ? 0 : end;
+        relay.next_inventory = now + 1s;
+    }
+    RequestSharePoolHash(node, peer);
+}
+
+void PeerManagerImpl::ProcessSharePoolHashMessage(CNode& node, Peer& peer, const std::string& type, DataStream& stream)
+{
+    AssertLockHeld(cs_main);
+    AssertLockHeld(g_msgproc_mutex);
+    if (!SharePoolHashActive() || node.IsFeelerConn() || node.IsAddrFetchConn()) return;
+    auto& relay = peer.m_sharepool_hash;
+    auto& store = *m_chainman.m_sharepool_hash_store;
+    relay.Refill();
+    const auto fail = [](bool condition) {
+        if (!condition) throw std::ios_base::failure("invalid hash-only snapshot message");
+    };
+    try {
+        if (type == NetMsgType::SPHHELLO) {
+            fail(stream.size() == 69 && relay.control_tokens >= 1);
+            --relay.control_tokens;
+            uint8_t version;
+            uint256 genesis, rules;
+            uint32_t activation;
+            stream >> version >> genesis >> rules >> activation;
+            const auto& consensus = m_chainparams.GetConsensus();
+            if (version != 1 || genesis != consensus.hashGenesisBlock || rules != sharepool::hashonly::RulesHash() ||
+                activation != uint32_t(consensus.SharePoolHeight)) return;
+            relay.hello_received = true;
+            return;
+        }
+        if (!relay.hello_sent || !relay.hello_received) return;
+        if (type == NetMsgType::SPHINV) {
+            fail(stream.size() <= 3 + 32 * SPH_MAX_ITEMS && relay.control_tokens >= 1);
+            --relay.control_tokens;
+            const auto count = ReadCompactSize(stream);
+            fail(count <= SPH_MAX_ITEMS && stream.size() == count * 32);
+            std::optional<uint256> previous;
+            std::set<uint256> queued(relay.pending.begin(), relay.pending.end());
+            for (size_t index{0}; index < count; ++index) {
+                uint256 hash;
+                stream >> hash;
+                fail(!previous || *previous < hash); // uint256 compares its serialized bytes.
+                previous = hash;
+                if (relay.pending.size() < SPH_MAX_ITEMS && !store.Has(hash) && queued.insert(hash).second) {
+                    relay.pending.push_back(hash);
+                }
+            }
+            RequestSharePoolHash(node, peer);
+            return;
+        }
+        if (type == NetMsgType::SPHGET) {
+            fail(stream.size() == 36 && relay.request_tokens >= 1);
+            --relay.request_tokens;
+            uint256 hash;
+            uint32_t offset;
+            stream >> hash >> offset;
+            fail(offset < sharepool::hashonly::MAX_SNAPSHOT_BYTES);
+            if (relay.serve_request) {
+                fail(relay.serve_request->hash == hash && relay.serve_request->offset == offset);
+                return; // An exact retry never extends the existing deadline.
+            }
+            relay.serve_request.emplace(SharePoolHashRequest{hash, offset, SPNClock::now() + SPH_PROGRESS_TIMEOUT});
+            return;
+        }
+        if (type == NetMsgType::SPHDATA) {
+            fail(stream.size() <= 45 + SPH_CHUNK_BYTES && stream.size() <= relay.inbound_bytes);
+            relay.inbound_bytes -= stream.size();
+            uint256 hash;
+            uint32_t offset, total;
+            stream >> hash >> offset >> total;
+            const auto size = ReadCompactSize(stream);
+            fail(size <= SPH_CHUNK_BYTES && stream.size() == size);
+            if (!relay.download || relay.download->hash != hash) return;
+            auto& download = *relay.download;
+            const auto now = SPNClock::now();
+            if (now >= download.progress_deadline || now >= download.whole_deadline) {
+                DeferSharePoolHashDownload(peer);
+                return;
+            }
+            fail(download.requested && offset == download.bytes.size());
+            if (total == 0) {
+                fail(size == 0);
+                DeferSharePoolHashDownload(peer);
+                return; // Peer has no data; other peers may still satisfy it.
+            }
+            fail(total <= sharepool::hashonly::MAX_SNAPSHOT_BYTES && offset < total &&
+                 size == std::min(SPH_CHUNK_BYTES, size_t(total - offset)));
+            if (download.total == 0) {
+                fail(offset == 0);
+                download.total = total;
+                download.bytes.reserve(total);
+            }
+            fail(download.total == total);
+            download.requested = false;
+            download.progress_deadline = now + SPH_PROGRESS_TIMEOUT;
+            const size_t old_size = download.bytes.size();
+            download.bytes.resize(old_size + size);
+            stream.read(AsWritableBytes(Span{download.bytes}).subspan(old_size, size));
+            // Completed bytes are admitted by SendMessages; no block validation
+            // or recursive fetch happens while handling this incoming message.
+            return;
+        }
+    } catch (const std::exception&) {
+        ClearSharePoolHashDownload(peer);
+        relay.pending.clear();
+        relay.serve_request.reset();
+        LogDebug(BCLog::NET, "Disconnecting malformed hash-only snapshot peer=%d\n", node.GetId());
         node.fDisconnect = true;
     }
 }
@@ -4181,6 +4540,13 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
 
     if (!pfrom.fSuccessfullyConnected) {
         LogDebug(BCLog::NET, "Unsupported message \"%s\" prior to verack from peer=%d\n", SanitizeString(msg_type), pfrom.GetId());
+        return;
+    }
+
+    if (msg_type == NetMsgType::SPHHELLO || msg_type == NetMsgType::SPHINV ||
+        msg_type == NetMsgType::SPHGET || msg_type == NetMsgType::SPHDATA) {
+        LOCK(cs_main);
+        ProcessSharePoolHashMessage(pfrom, *peer, msg_type, vRecv);
         return;
     }
 
@@ -5867,6 +6233,7 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
 
     MaybeSendSendHeaders(*pto, *peer);
 
+    bool retry_hash_blocks{false};
     {
         LOCK(cs_main);
 
@@ -6314,7 +6681,10 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
         if (!vGetData.empty())
             MakeAndPushMessage(*pto, NetMsgType::GETDATA, vGetData);
         SendSharePoolMessages(*pto, *peer);
+        SendSharePoolHashMessages(*pto, *peer);
+        retry_hash_blocks = std::exchange(m_sharepool_hash_retry, false);
     } // release cs_main
+    if (retry_hash_blocks) m_chainman.RetrySharePoolHashBlocks();
     MaybeSendFeefilter(*pto, *peer, current_time);
     return true;
 }
