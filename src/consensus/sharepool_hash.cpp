@@ -16,6 +16,8 @@
 #include <streams.h>
 #include <versionbits.h>
 
+#include <boost/multiprecision/cpp_int.hpp>
+
 #include <algorithm>
 #include <limits>
 #include <map>
@@ -51,7 +53,7 @@ uint256 DomainHash(const char (&domain)[N], const T&... values)
 template <typename Stream>
 void WriteSnapshot(Stream& stream, const Snapshot& snapshot)
 {
-    stream << snapshot.binding << snapshot.authorization;
+    stream << snapshot.binding << snapshot.authorization << snapshot.job_commitment;
     WriteCompactSize(stream, snapshot.templates.size());
     for (const auto& item : snapshot.templates) stream << item.id << item.block;
     stream << snapshot.shares << snapshot.post_state << snapshot.payouts;
@@ -197,10 +199,11 @@ CBlock ReadBlock(Span<const unsigned char> bytes, bool normalized)
 
 CBlock ReadTemplate(Span<const unsigned char> bytes) { return ReadBlock(bytes, true); }
 
-bool OwnerValid(const Envelope& binding, const Signature& signature)
+bool OwnerValid(const Snapshot& snapshot)
 {
-    const XOnlyPubKey owner{Span{binding.owner}};
-    return owner.IsFullyValid() && owner.VerifySchnorr(hashonly::OwnerHash(binding), signature);
+    const XOnlyPubKey owner{Span{snapshot.binding.owner}};
+    return !snapshot.job_commitment.IsNull() && owner.IsFullyValid() &&
+        owner.VerifySchnorr(hashonly::OwnerHash(snapshot), snapshot.authorization);
 }
 
 Result CheckBinding(const Envelope& binding, const Consensus::Params& consensus,
@@ -244,6 +247,15 @@ class Checker {
     std::map<uint256, std::shared_ptr<const Snapshot>> m_snapshots;
     size_t m_dependency_bytes{0};
     std::set<uint256> m_visiting;
+    std::set<const Snapshot*> m_authorized;
+
+    bool Authorized(const Snapshot& snapshot)
+    {
+        if (m_authorized.count(&snapshot)) return true;
+        if (!OwnerValid(snapshot)) return false;
+        m_authorized.insert(&snapshot);
+        return true;
+    }
     // Depth is part of the memo key: a short previously verified path must not
     // conceal a longer path that exceeds the recursive dependency bound.
     std::map<std::pair<uint256, uint32_t>, Result> m_checked_origins;
@@ -288,6 +300,10 @@ class Checker {
         std::shared_ptr<const Snapshot> snapshot;
         const auto available = Fetch(block.m_mm_rhs, snapshot);
         if (!available.IsValid()) return available;
+        const auto binding = CheckBinding(snapshot->binding, m_consensus, block.m_height, block.hashPrevBlock);
+        if (!binding.IsValid()) return binding;
+        if (!Authorized(*snapshot)) return Bad("owner");
+        if (snapshot->job_commitment != JobHash(block)) return Bad("job-commitment");
         Result native;
         try { native = m_validate_origin(block, parent); }
         catch (const std::exception&) { return Result::Missing({block.m_mm_rhs}, "bad-sharepool-hash-origin-unavailable"); }
@@ -325,12 +341,12 @@ public:
         if (!SearchFieldsZero(origin) || NormalizedHeader(share.header) != NormalizedHeader(origin)) return Bad("share-template");
         const auto binding = CheckBinding(share.origin, m_consensus, share.header.m_height, parent->GetBlockHash());
         if (!binding.IsValid()) return binding;
-        if (!OwnerValid(share.origin, share.authorization)) return Bad("share-authorization");
-        if (UintToArith256(share.header.GetHash()) > arith_uint256{}.SetCompact(SHARE_BITS)) return Bad("share-target");
+        if (UintToArith256(share.header.GetHash()) > UintToArith256(ShareTarget(share.header.nBits))) return Bad("share-target");
         std::shared_ptr<const Snapshot> snapshot;
         auto result = Fetch(origin.m_mm_rhs, snapshot);
         if (!result.IsValid()) return result;
         if (!SameBinding(snapshot->binding, share.origin)) return Bad("share-binding");
+        if (share.authorization != snapshot->authorization) return Bad("share-authorization");
         // The containing snapshot already visited every full body exactly once,
         // including any MissingData result. Avoid hashing a4MiB body again for
         // every small proof referring to it (which would amplify work by count).
@@ -354,7 +370,8 @@ public:
         if (!result.IsValid()) return result;
         result = CheckBinding(snapshot->binding, m_consensus, height, previous->GetBlockHash());
         if (!result.IsValid()) return result;
-        if (!OwnerValid(snapshot->binding, snapshot->authorization)) return Bad("owner");
+        if (!Authorized(*snapshot)) return Bad("owner");
+        if (snapshot->job_commitment != JobHash(block)) return Bad("job-commitment");
         if (!StateOrdered(snapshot->post_state)) return Bad("state-order");
         if (!PayoutsOrdered(snapshot->payouts)) return Bad("payout-order");
         for (size_t i{1}; i < snapshot->shares.size(); ++i) {
@@ -379,7 +396,7 @@ public:
             else if (!result.IsValid()) return result;
             else {
                 const auto context = CheckBinding(parent->binding, m_consensus, previous->nHeight, previous->pprev->GetBlockHash());
-                if (!context.IsValid() || !OwnerValid(parent->binding, parent->authorization) || !StateOrdered(parent->post_state)) return Bad("parent");
+                if (!context.IsValid() || !Authorized(*parent) || !StateOrdered(parent->post_state)) return Bad("parent");
                 for (const auto& entry : parent->post_state) {
                     if (entry.origin_height < std::max<int64_t>(m_consensus.SharePoolHeight, int64_t{previous->nHeight} - MAX_SHARE_AGE) ||
                         entry.origin_height > uint32_t(previous->nHeight)) return Bad("parent-state");
@@ -469,8 +486,8 @@ Snapshot DecodeSnapshot(Span<const unsigned char> bytes)
     if (bytes.empty() || bytes.size() > MAX_SNAPSHOT_BYTES) throw std::ios_base::failure("snapshot byte bound");
     SpanReader reader{bytes};
     Snapshot snapshot;
-    reader >> snapshot.binding >> snapshot.authorization;
-    if (!WireBinding(snapshot.binding)) throw std::ios_base::failure("invalid v2 binding");
+    reader >> snapshot.binding >> snapshot.authorization >> snapshot.job_commitment;
+    if (!WireBinding(snapshot.binding)) throw std::ios_base::failure("invalid v3 binding");
     const auto template_count = ReadCount(reader, MIN_TEMPLATE_RECORD_BYTES);
     snapshot.templates.reserve(template_count);
     for (size_t i{0}; i < template_count; ++i) {
@@ -512,7 +529,7 @@ Snapshot DecodeSnapshot(Span<const unsigned char> bytes)
 uint256 SnapshotHash(Span<const unsigned char> bytes)
 {
     if (bytes.size() > MAX_SNAPSHOT_BYTES) throw std::ios_base::failure("snapshot byte bound");
-    static constexpr char domain[]{"SharePool/snapshot/v2"};
+    static constexpr char domain[]{"SharePool/snapshot/v3"};
     HashWriter writer;
     writer.write(AsBytes(Span{domain}));
     writer.write(AsBytes(bytes));
@@ -522,7 +539,7 @@ uint256 SnapshotHash(Span<const unsigned char> bytes)
 uint256 SnapshotHash(const Snapshot& snapshot)
 {
     EncodedSize(snapshot);
-    static constexpr char domain[]{"SharePool/snapshot/v2"};
+    static constexpr char domain[]{"SharePool/snapshot/v3"};
     HashWriter writer;
     writer.write(AsBytes(Span{domain}));
     WriteSnapshot(writer, snapshot);
@@ -531,14 +548,58 @@ uint256 SnapshotHash(const Snapshot& snapshot)
 
 uint256 RulesHash()
 {
-    return DomainHash("SharePool/rules/v2", SHARE_BITS, MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES,
+    return DomainHash("SharePool/rules/v3", SHARE_BITS, SHARE_TARGET_SHIFT, MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES,
                       MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES);
 }
 
-uint256 OwnerHash(const Envelope& binding)
+uint256 SnapshotContentsHash(const Snapshot& snapshot)
 {
-    return DomainHash("SharePool/owner/v2", binding.genesis, binding.rules, binding.height,
-        binding.native_parent, binding.pool, binding.owner, binding.payout_script);
+    // Stream rather than copying a potentially 16 MiB snapshot.
+    EncodedSize(snapshot);
+    HashWriter writer;
+    static constexpr char domain[]{"SharePool/contents/v3"};
+    writer.write(AsBytes(Span{domain}));
+    writer << snapshot.binding << Signature{} << snapshot.job_commitment;
+    WriteCompactSize(writer, snapshot.templates.size());
+    for (const auto& item : snapshot.templates) writer << item.id << item.block;
+    writer << snapshot.shares << snapshot.post_state << snapshot.payouts;
+    return writer.GetHash();
+}
+
+uint256 OwnerHash(const Envelope& binding, const uint256& job, const uint256& contents)
+{
+    return DomainHash("SharePool/owner/v3", binding, job, contents);
+}
+
+uint256 OwnerHash(const Snapshot& snapshot)
+{
+    return OwnerHash(snapshot.binding, snapshot.job_commitment, SnapshotContentsHash(snapshot));
+}
+
+uint256 JobHash(const CBlock& block)
+{
+    CBlockHeader header{block};
+    header.m_mm_rhs.SetNull();
+    HashWriter writer;
+    static constexpr char domain[]{"SharePool/job/v3"};
+    writer.write(AsBytes(Span{domain}));
+    writer.write(AsBytes(Span{NormalizedHeader(header)}));
+    writer << TX_WITH_WITNESS(block.vtx);
+    return writer.GetHash();
+}
+
+uint256 ShareTarget(uint32_t native_bits)
+{
+    bool negative{false}, overflow{false};
+    arith_uint256 native;
+    native.SetCompact(native_bits, &negative, &overflow);
+    if (negative || overflow || native == 0 || native.GetCompact() != native_bits) {
+        throw std::invalid_argument("noncanonical native target");
+    }
+    const auto maximum = arith_uint256{}.SetCompact(SHARE_BITS);
+    if (native > (maximum >> SHARE_TARGET_SHIFT)) return ArithToUint256(maximum);
+    native <<= SHARE_TARGET_SHIFT;
+    return ArithToUint256(native);
 }
 
 std::vector<unsigned char> NormalizedHeader(const CBlockHeader& source)
@@ -564,27 +625,31 @@ uint256 TemplateId(const CBlockHeader& header)
 std::vector<CTxOut> CalculatePayouts(const Snapshot& snapshot, CAmount reward)
 {
     if (!MoneyRange(reward) || snapshot.shares.size() > MAX_SNAPSHOT_BYTES / MIN_SHARE_BYTES) throw std::invalid_argument("payout byte or reward bound");
-    std::map<std::vector<unsigned char>, uint64_t> counts;
+    // Exact integers: a 256-bit per-proof work value plus the byte-bounded
+    // proof count and monetary multiplication can exceed uint256/uint64.
+    using boost::multiprecision::cpp_int;
+    std::map<std::vector<unsigned char>, cpp_int> weights;
+    cpp_int total{0};
     for (const auto& share : snapshot.shares) {
         if (!IsPayoutScript(share.origin.payout_script)) throw std::invalid_argument("payout script shape");
-        ++counts[share.origin.payout_script];
+        const auto target = ShareTarget(share.header.nBits);
+        cpp_int numeric{0};
+        for (size_t i{target.size()}; i > 0; --i) { numeric <<= 8; numeric += target.begin()[i - 1]; }
+        const cpp_int work = (cpp_int{1} << 256) / (numeric + 1);
+        weights[share.origin.payout_script] += work;
+        total += work;
     }
-    if (counts.empty()) {
+    if (weights.empty()) {
         if (!IsPayoutScript(snapshot.binding.payout_script)) throw std::invalid_argument("empty snapshot owner payout script");
-        counts[snapshot.binding.payout_script] = 1;
+        weights[snapshot.binding.payout_script] = total = 1;
     }
-    const uint64_t total = snapshot.shares.empty() ? 1 : snapshot.shares.size();
-    struct Allocation { std::vector<unsigned char> script; CAmount amount; uint64_t remainder; };
+    struct Allocation { std::vector<unsigned char> script; CAmount amount; cpp_int remainder; };
     std::vector<Allocation> allocations;
     CAmount allocated{0};
-    for (const auto& [script, count] : counts) {
-        // Decompose before multiplication: reward*count can exceed uint64_t
-        // after removing the old32-share bound. Here remainder<total, and total
-        // is bounded by actual snapshot bytes, so this product is bounded too.
-        static_assert(uint64_t{MAX_SNAPSHOT_BYTES} * MAX_SNAPSHOT_BYTES < std::numeric_limits<uint64_t>::max());
-        const uint64_t tail = (uint64_t(reward) % total) * count;
-        const CAmount amount = static_cast<CAmount>((uint64_t(reward) / total) * count + tail / total);
-        allocations.push_back({script, amount, tail % total});
+    for (const auto& [script, weight] : weights) {
+        const cpp_int numerator = cpp_int{reward} * weight;
+        const CAmount amount = (numerator / total).convert_to<CAmount>();
+        allocations.push_back({script, amount, numerator % total});
         allocated += amount;
     }
     std::sort(allocations.begin(), allocations.end(), [](const auto& a, const auto& b) {

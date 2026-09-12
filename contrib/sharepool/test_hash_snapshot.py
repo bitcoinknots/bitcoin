@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Deterministic wire and flat commitment tests; native validity is separate."""
+from copy import deepcopy
 from dataclasses import replace
 import struct
 import unittest
 
 from hash_snapshot import (EnvelopeV2, Snapshot, TemplateRecord, RULES_HASH, MAX_SNAPSHOT_BYTES,
-    MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES, SHARE_BITS, candidate, solve_share, parse_share,
-    normalize_template, HashSigner)
+    MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES, SHARE_BITS, SHARE_TARGET_SHIFT, share_target, share_work, work_outputs, job_hash, candidate, solve_share, parse_share,
+    normalize_template, HashSigner, PHYSICAL_FIELDS, winner_share)
 from native_enforcement import compact_size, verify_schnorr
 from native_signer import REGTEST_GENESIS, SignerError
-from test_framework.messages import hash256, ser_uint256
+from test_framework.messages import CTxOut, hash256, ser_uint256, uint256_from_compact
 
 SCRIPT = b"\x00\x14" + b"a" * 20
 SECRET = (1).to_bytes(32, "big")
@@ -27,21 +28,134 @@ class HashSnapshotTests(unittest.TestCase):
         block, snapshot = fixture()
         raw = snapshot.serialize()
         self.assertEqual(Snapshot.deserialize(raw).serialize(), raw)
-        self.assertEqual(block.m_mm_rhs, int.from_bytes(hash256(b"SharePool/snapshot/v2\0" + raw), "little"))
-        self.assertEqual(RULES_HASH, int.from_bytes(hash256(b"SharePool/rules/v2\0" + struct.pack(
-            "<IIIIII", SHARE_BITS, 3, MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES)), "little"))
+        self.assertEqual(block.m_mm_rhs, int.from_bytes(hash256(b"SharePool/snapshot/v3\0" + raw), "little"))
+        self.assertEqual(RULES_HASH, int.from_bytes(hash256(b"SharePool/rules/v3\0" + struct.pack(
+            "<IIIIIII", SHARE_BITS, SHARE_TARGET_SHIFT, 3, MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES)), "little"))
         self.assertEqual(len(block.vtx[0].vout), 1)
         self.assertEqual(block.vtx[0].vout[0].serialize(), snapshot.payouts[0].serialize())
 
     def test_owner_domain_and_reserved_fields(self):
         unused, snapshot = fixture()
-        self.assertTrue(verify_schnorr(snapshot.envelope.public_key, snapshot.owner_signature, snapshot.envelope.owner_message))
+        self.assertTrue(verify_schnorr(snapshot.envelope.public_key, snapshot.owner_signature, snapshot.owner_message))
         with self.assertRaises(ValueError):
             replace(snapshot.envelope, shares_root=1).serialize()
         with self.assertRaises(ValueError):
             replace(snapshot.envelope, version=1).serialize()
         with self.assertRaises(ValueError):
             snapshot.envelope.root
+        with self.assertRaisesRegex(ValueError, "exact snapshot"):
+            snapshot.envelope.owner_message
+        for commitment in (-1, 1 << 256, True, 1.0, b"invalid"):
+            with self.subTest(commitment=commitment), self.assertRaisesRegex(ValueError, "256-bit"):
+                replace(snapshot, job_commitment=commitment).serialize()
+
+    def test_signature_attests_each_snapshot_component(self):
+        origin, opening = fixture()
+        proof = solve_share(origin, opening)
+        unused, snapshot = fixture(templates=[origin], shares=[proof])
+        changes = {
+            "round binding": replace(snapshot, envelope=replace(snapshot.envelope, height=2)),
+            "exact job": replace(snapshot, job_commitment=snapshot.job_commitment ^ 1),
+            "templates": replace(snapshot, templates=()),
+            "proofs": replace(snapshot, shares=()),
+            "paid state": replace(snapshot, post_state=()),
+            "payouts": replace(snapshot, payouts=(CTxOut(snapshot.payouts[0].nValue - 1, SCRIPT),)),
+        }
+        for field, changed in changes.items():
+            with self.subTest(field=field):
+                self.assertNotEqual(snapshot.contents_hash, changed.contents_hash)
+                self.assertFalse(verify_schnorr(snapshot.envelope.public_key, snapshot.owner_signature, changed.owner_message))
+        # Excluding only the current signature breaks the self-reference; the
+        # final snapshot hash still commits that signature's exact bytes.
+        changed = replace(snapshot, owner_signature=b"x" * 64)
+        self.assertEqual(changed.contents_hash, snapshot.contents_hash)
+        self.assertEqual(changed.owner_message, snapshot.owner_message)
+        self.assertNotEqual(changed.hash, snapshot.hash)
+
+    def test_job_signature_binds_template_but_allows_physical_search_fields(self):
+        block, snapshot = fixture(witness=True)
+        expected = snapshot.job_commitment
+        self.assertEqual(job_hash(block), expected)
+        for field in PHYSICAL_FIELDS:
+            changed = deepcopy(block)
+            setattr(changed, field, 1)
+            with self.subTest(search_field=field):
+                self.assertEqual(job_hash(changed), expected)
+                self.assertTrue(verify_schnorr(snapshot.envelope.public_key, snapshot.owner_signature,
+                    replace(snapshot, job_commitment=job_hash(changed)).owner_message))
+        for field in ("nTime", "nBits", "hashPrevBlock", "hashMerkleRoot", "m_height", "m_txcount"):
+            changed = deepcopy(block)
+            setattr(changed, field, getattr(changed, field) ^ 1)
+            with self.subTest(template_field=field):
+                changed_hash = job_hash(changed)
+                self.assertNotEqual(changed_hash, expected)
+                self.assertFalse(verify_schnorr(snapshot.envelope.public_key, snapshot.owner_signature,
+                    replace(snapshot, job_commitment=changed_hash).owner_message))
+        # Coinbase witness data is excluded from its txid, but included in the
+        # signed full job body. A header-only attestation would miss this edit.
+        changed = deepcopy(block)
+        changed.vtx[0].wit.vtxinwit[0].scriptWitness.stack[0] = b"x" * 32
+        self.assertEqual(changed.calc_merkle_root(), block.hashMerkleRoot)
+        self.assertNotEqual(job_hash(changed), expected)
+        # The final settlement hash is deliberately removed from the job hash
+        # and separately checked against the complete signed snapshot.
+        changed = deepcopy(block)
+        changed.m_mm_rhs ^= 1
+        self.assertEqual(job_hash(changed), expected)
+
+    def test_native_target_scales_share_difficulty_and_rejects_noncanonical_bits(self):
+        native_target = 0xffff << 208
+        expected_share_target = native_target << 10
+        self.assertEqual(share_target(0x1d00ffff), expected_share_target)
+        self.assertEqual(share_work(0x1d00ffff), (1 << 256) // (expected_share_target + 1))
+        self.assertGreater(share_work(0x1c00ffff), share_work(0x1d00ffff))
+        self.assertEqual(share_target(SHARE_BITS), uint256_from_compact(SHARE_BITS))
+        self.assertEqual(share_work(SHARE_BITS), 2)
+        for bits, target in ((0x01010000, 1), (0x02008000, 128), (0x03008000, 32768)):
+            with self.subTest(small_target=target):
+                self.assertEqual(share_target(bits), target << 10)
+        invalid = (0, -1, 1 << 32, True, 1.0, 0x1d80ffff, 0x23010000,
+                   0x01000000, 0x01010001, 0x02000100, 0x1d000001)
+        for bits in invalid:
+            with self.subTest(bits=bits), self.assertRaises(ValueError):
+                share_target(bits)
+
+    def test_mixed_difficulty_payouts_use_work_and_aggregate_payout_scripts(self):
+        # Accounting fixtures need no solved header: this test isolates payout
+        # arithmetic; actual proof and nBits validity is tested natively.
+        other_script = b"\x00\x14" + b"b" * 20
+        easy, easy_snapshot = fixture(native_bits=0x1d00ffff)
+        hard, hard_snapshot = fixture(native_bits=0x1c00ffff, payout_script=other_script)
+        another_easy = deepcopy(easy)
+        another_easy.nNonce = 1
+        proofs = [winner_share(easy, easy_snapshot), winner_share(another_easy, easy_snapshot),
+                  winner_share(hard, hard_snapshot)]
+        easy_weight = (1 << 256) // ((0xffff << 218) + 1)
+        hard_weight = (1 << 256) // ((0xffff << 210) + 1)
+        # One proof's higher difficulty has a larger weight than two easier
+        # proofs, and both easier proofs credit the same payout destination.
+        total_weight = 2 * easy_weight + hard_weight
+        payouts = work_outputs(proofs, total_weight, b"\x00\x14" + b"c" * 20)
+        self.assertEqual({bytes(output.scriptPubKey): output.nValue for output in payouts},
+                         {SCRIPT: 2 * easy_weight, other_script: hard_weight})
+        self.assertEqual(sum(output.nValue for output in payouts), total_weight)
+        self.assertEqual([bytes(output.scriptPubKey) for output in payouts], [SCRIPT, other_script])
+        rounded = work_outputs(proofs, 100, SCRIPT)
+        self.assertEqual([(bytes(output.scriptPubKey), output.nValue) for output in rounded],
+                         [(SCRIPT, 1), (other_script, 99)])
+
+    def test_payout_remainder_is_exact_and_ties_use_script_order(self):
+        other_script = b"\x00\x14" + b"b" * 20
+        left, left_snapshot = fixture()
+        right, right_snapshot = fixture(payout_script=other_script)
+        proofs = [winner_share(right, right_snapshot), winner_share(left, left_snapshot)]
+        for reward in (0, 1, 5, 21_000_000 * 100_000_000):
+            with self.subTest(reward=reward):
+                payouts = work_outputs(proofs, reward, SCRIPT)
+                self.assertEqual([(bytes(output.scriptPubKey), output.nValue) for output in payouts],
+                                 [(SCRIPT, (reward + 1) // 2), (other_script, reward // 2)])
+                self.assertEqual(sum(output.nValue for output in payouts), reward)
+        self.assertEqual(work_outputs([], 123, SCRIPT)[0].nValue, 123)
 
     def test_one_hundred_distinct_proofs_roundtrip_and_payout(self):
         origin, opening = fixture()
@@ -90,7 +204,7 @@ class HashSnapshotTests(unittest.TestCase):
 
     def test_huge_compact_sizes_and_truncation_fail_before_loops(self):
         unused, snapshot = fixture()
-        prefix = snapshot.envelope.serialize() + snapshot.owner_signature
+        prefix = snapshot.envelope.serialize() + snapshot.owner_signature + ser_uint256(snapshot.job_commitment)
         for value in (253, 2**32, 2**63):
             with self.subTest(count=value), self.assertRaises(ValueError):
                 Snapshot.deserialize(prefix + compact_size(value))
@@ -107,12 +221,16 @@ class HashSnapshotTests(unittest.TestCase):
         signer = HashSigner.__new__(HashSigner)
         signer.pool, signer.payout_script, signer.public_key = 3, SCRIPT, snapshot.envelope.public_key
         signer._invoke = lambda command, raw, size: snapshot.owner_signature
-        self.assertEqual(signer.sign_owner(snapshot.envelope), snapshot.owner_signature)
+        self.assertEqual(signer.sign_owner(snapshot), snapshot.owner_signature)
+        with self.assertRaisesRegex(SignerError, "complete snapshot"):
+            signer.sign_owner(snapshot.envelope)
+        with self.assertRaisesRegex(SignerError, "policy"):
+            signer.sign_owner(replace(snapshot, job_commitment=0))
         with self.assertRaises(SignerError):
-            signer.sign_owner(replace(snapshot.envelope, pool=4))
+            signer.sign_owner(replace(snapshot, envelope=replace(snapshot.envelope, pool=4)))
         signer._invoke = lambda command, raw, size: b"x" * 64
         with self.assertRaises(SignerError):
-            signer.sign_owner(snapshot.envelope)
+            signer.sign_owner(snapshot)
 
 
 if __name__ == "__main__":

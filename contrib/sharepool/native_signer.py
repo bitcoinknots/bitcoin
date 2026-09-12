@@ -61,7 +61,7 @@ class NativeSigner:
         return result
 
     def _invoke(self, command, payload, size):
-        if command not in ("init", "pubkey", "sign") or type(payload) is not bytes or len(payload) > 296:
+        if command not in ("init", "pubkey", "sign", "sign-job") or type(payload) is not bytes or len(payload) > (360 if command == "sign-job" else 296):
             raise SignerError("invalid local signer request")
         wire = payload.hex().encode("ascii") + (b"\n" if payload else b"")
         deadline = time.monotonic() + self.timeout

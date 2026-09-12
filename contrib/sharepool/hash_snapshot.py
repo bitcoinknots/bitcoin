@@ -2,19 +2,19 @@
 # Copyright (c) 2026 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Canonical flat-hash snapshots for the opt-in native regtest v2 profile.
+"""Canonical flat-hash snapshots for the opt-in native regtest v3 profile.
 
 This codec does not select consensus validity. Full native RPC validation is
 required before mining. The only Merkle construction used by candidate() is the
 ordinary Bitcoin transaction commitment, never the settlement commitment.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import struct
 
 from native_enforcement import (Envelope as _Envelope, Reader as _Reader,
     Share as _Share, StateEntry, SHARE_BITS, MAX_SHARE_AGE, compact_size, vector,
     h256, monetary_outputs, derive_state, is_payout_script, compute_xonly_pubkey,
-    verify_schnorr, create_coinbase, create_block, add_witness_commitment)
+    verify_schnorr, sign_schnorr, create_coinbase, create_block, add_witness_commitment)
 from native_mining_gate import parse_block, immutable_header, template_id
 from native_signer import NativeSigner, SignerError, REGTEST_GENESIS
 from test_framework.messages import CBlockHeader, CTxOut, hash256, ser_uint256, uint256_from_compact
@@ -24,7 +24,8 @@ MAX_SNAPSHOT_BYTES = 16 * 1024 * 1024
 MAX_TEMPLATE_BYTES = 4_000_000
 MAX_DEPENDENCY_DEPTH = 64
 MAX_DEPENDENCY_BYTES = 64 * 1024 * 1024
-RULES_HASH = h256(b"SharePool/rules/v2\0", struct.pack("<IIIIII", SHARE_BITS,
+SHARE_TARGET_SHIFT = 10
+RULES_HASH = h256(b"SharePool/rules/v3\0", struct.pack("<IIIIIII", SHARE_BITS, SHARE_TARGET_SHIFT,
     MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES))
 PHYSICAL_FIELDS = ("nNonce", "m_nonce2", "m_nonce3", "m_extranonce", "m_time_offset")
 
@@ -44,30 +45,27 @@ class Reader(_Reader):
 
 @dataclass(frozen=True)
 class EnvelopeV2(_Envelope):
-    version: int = 2
+    version: int = 3
 
     def serialize(self):
         integers = (self.genesis, self.rules, self.native_parent, self.pool,
                     self.shares_root, self.state_root, self.payouts_root)
         if (any(type(value) is not int or not 0 <= value < 1 << 256 for value in integers) or
-                self.version != 2 or self.rules != RULES_HASH or self.pool == 0 or
+                self.version != 3 or self.rules != RULES_HASH or self.pool == 0 or
                 type(self.height) is not int or not 0 < self.height <= 0xffffffff or
                 type(self.public_key) is not bytes or len(self.public_key) != 32 or
                 type(self.payout_script) is not bytes or not is_payout_script(self.payout_script) or
                 any((self.shares_root, self.state_root, self.payouts_root))):
-            raise ValueError("invalid v2 envelope or nonzero reserved roots")
+            raise ValueError("invalid v3 envelope or nonzero reserved roots")
         return super().serialize()
 
     @property
     def root(self):
-        raise ValueError("v2 header commits to the complete snapshot, not its envelope")
+        raise ValueError("v3 header commits to the complete snapshot, not its envelope")
 
     @property
     def owner_message(self):
-        self.serialize()
-        raw = (ser_uint256(self.genesis) + ser_uint256(self.rules) + struct.pack("<I", self.height) +
-               ser_uint256(self.native_parent) + ser_uint256(self.pool) + self.public_key + vector(self.payout_script))
-        return hash256(b"SharePool/owner/v2\0" + raw)
+        raise ValueError("v3 authorization requires the exact snapshot and job")
 
 
 @dataclass(frozen=True)
@@ -137,12 +135,15 @@ class Snapshot:
     shares: tuple = ()
     post_state: tuple = ()
     payouts: tuple = ()
+    job_commitment: int = 0
 
     def serialize(self):
         if not isinstance(self.envelope, EnvelopeV2) or any(not isinstance(share.envelope, EnvelopeV2) for share in self.shares):
-            raise ValueError("snapshot and proof origins require v2 envelopes")
+            raise ValueError("snapshot and proof origins require v3 envelopes")
         if type(self.owner_signature) is not bytes or len(self.owner_signature) != 64:
             raise ValueError("owner authorization must contain 64 bytes")
+        if type(self.job_commitment) is not int or not 0 <= self.job_commitment < 1 << 256:
+            raise ValueError("job commitment must be an unsigned 256-bit integer")
         template_ids = [ser_uint256(record.template_id) for record in self.templates]
         if template_ids != sorted(set(template_ids)):
             raise ValueError("templates must use unique serialized-uint256 byte order")
@@ -155,7 +156,7 @@ class Snapshot:
             raise ValueError("payouts must use unique script-byte order")
         if any(type(output.nValue) is not int or not 0 <= output.nValue <= 21_000_000 * 100_000_000 for output in self.payouts):
             raise ValueError("payout amount outside money range")
-        result = bytearray(self.envelope.serialize() + self.owner_signature)
+        result = bytearray(self.envelope.serialize() + self.owner_signature + ser_uint256(self.job_commitment))
         for values in (self.templates, self.shares, self.post_state, self.payouts):
             result.extend(compact_size(len(values)))
             for item in values:
@@ -172,12 +173,12 @@ class Snapshot:
         if type(raw) is not bytes or not 1 <= len(raw) <= MAX_SNAPSHOT_BYTES:
             raise ValueError("snapshot exceeds byte bound")
         reader = Reader(raw)
-        envelope, signature = EnvelopeV2.read(reader), reader.take(64)
+        envelope, signature, job = EnvelopeV2.read(reader), reader.take(64), reader.uint(32)
         templates = tuple(TemplateRecord.read(reader) for _ in range(reader.count(33)))
         shares = tuple(Share.read(reader) for _ in range(reader.count(512)))
         state = tuple(StateEntry.read(reader) for _ in range(reader.count(36)))
         payouts = tuple(CTxOut(reader.uint(8), CScript(reader.variable(34))) for _ in range(reader.count(31)))
-        result = cls(envelope, signature, templates, shares, state, payouts)
+        result = cls(envelope, signature, templates, shares, state, payouts, job)
         if reader.stream.read() or result.serialize() != raw:
             raise ValueError("trailing or noncanonical snapshot bytes")
         return result
@@ -185,29 +186,97 @@ class Snapshot:
     frombytes = deserialize
 
     @property
+    def contents_hash(self):
+        return h256(b"SharePool/contents/v3\0", replace(self, owner_signature=bytes(64)).serialize())
+
+    @property
+    def signing_payload(self):
+        return self.envelope.serialize() + ser_uint256(self.job_commitment) + ser_uint256(self.contents_hash)
+
+    @property
+    def owner_message(self):
+        return hash256(b"SharePool/owner/v3\0" + self.signing_payload)
+
+    @property
     def hash(self):
-        return h256(b"SharePool/snapshot/v2\0", self.serialize())
+        return h256(b"SharePool/snapshot/v3\0", self.serialize())
 
     @property
     def hash_hex(self):
         return f"{self.hash:064x}"
 
 
+def job_hash(block):
+    normalized = parse_block(normalize_template(block))
+    normalized.m_mm_rhs = 0
+    return h256(b"SharePool/job/v3\0", normalized.serialize())
+
+
+def share_target(native_bits):
+    if type(native_bits) is not int or not 0 < native_bits <= 0xffffffff or native_bits & 0x00800000:
+        raise ValueError("invalid native target")
+    exponent = native_bits >> 24
+    mantissa = native_bits & 0x007fffff
+    target = mantissa >> (8 * (3 - exponent)) if exponent <= 3 else mantissa << (8 * (exponent - 3))
+    size = (target.bit_length() + 7) // 8
+    compact = target << (8 * (3 - size)) if size <= 3 else target >> (8 * (size - 3))
+    if compact & 0x00800000:
+        compact >>= 8
+        size += 1
+    compact |= size << 24
+    if not 0 < target < 1 << 256 or compact != native_bits:
+        raise ValueError("noncanonical native target")
+    return min(target << SHARE_TARGET_SHIFT, uint256_from_compact(SHARE_BITS))
+
+
+def share_work(native_bits):
+    return (1 << 256) // (share_target(native_bits) + 1)
+
+
+def work_outputs(shares, reward, fallback_script):
+    weights = {}
+    for share in shares:
+        script = share.envelope.payout_script
+        weights[script] = weights.get(script, 0) + share_work(share.header.nBits)
+    if not weights:
+        weights[fallback_script] = 1
+    total = sum(weights.values())
+    values = [(script, *divmod(reward * weight, total)) for script, weight in weights.items()]
+    values.sort(key=lambda value: (-value[2], value[0]))
+    extra = reward - sum(value[1] for value in values)
+    return tuple(CTxOut(amount + (index < extra), CScript(script))
+                 for script, amount, index in sorted((script, amount, index)
+                     for index, (script, amount, _) in enumerate(values)))
+
+
+def attest(block, snapshot, *, secret=None, sign_owner=None):
+    snapshot = replace(snapshot, job_commitment=job_hash(block), owner_signature=bytes(64))
+    signature = sign_schnorr(secret, snapshot.owner_message) if secret is not None else sign_owner(snapshot)
+    if type(signature) is not bytes or len(signature) != 64 or not verify_schnorr(snapshot.envelope.public_key, signature, snapshot.owner_message):
+        raise ValueError("owner signer returned invalid v3 job authorization")
+    snapshot = replace(snapshot, owner_signature=signature)
+    block.m_mm_rhs = snapshot.hash
+    block.rehash()
+    return snapshot
+
+
 class HashSigner(NativeSigner):
-    """Native private-key adapter with an explicit v2 public signing policy."""
-    def sign_owner(self, envelope):
-        if (not isinstance(envelope, EnvelopeV2) or envelope.genesis != REGTEST_GENESIS or
-                envelope.pool != self.pool or envelope.payout_script != self.payout_script or
-                envelope.public_key != self.public_key or not 0 < envelope.height < 0x7fffffff or
-                envelope.native_parent == 0):
-            raise SignerError("envelope violates local v2 signer policy")
+    """Native private-key adapter signs a policy-bound exact-job statement."""
+    def sign_owner(self, snapshot):
+        if not isinstance(snapshot, Snapshot):
+            raise SignerError("v3 signer requires a complete snapshot")
+        envelope = snapshot.envelope
+        if (envelope.genesis != REGTEST_GENESIS or envelope.pool != self.pool or
+                envelope.payout_script != self.payout_script or envelope.public_key != self.public_key or
+                not 0 < envelope.height < 0x7fffffff or envelope.native_parent == 0 or not snapshot.job_commitment):
+            raise SignerError("snapshot violates local v3 signer policy")
         try:
-            raw = envelope.serialize()
+            payload = snapshot.signing_payload
         except ValueError as error:
             raise SignerError(str(error)) from None
-        signature = self._invoke("sign", raw, 64)
-        if not verify_schnorr(self.public_key, signature, envelope.owner_message):
-            raise SignerError("local v2 signer signature failed verification")
+        signature = self._invoke("sign-job", payload, 64)
+        if not verify_schnorr(self.public_key, signature, snapshot.owner_message):
+            raise SignerError("local v3 signer signature failed verification")
         return signature
 
 
@@ -223,10 +292,8 @@ def build_snapshot(*, genesis, height, native_parent, pool, payout_script, rewar
     records = tuple(record if isinstance(record, TemplateRecord) else TemplateRecord.from_block(record) for record in templates)
     records = tuple(sorted(records, key=lambda record: ser_uint256(record.template_id)))
     envelope = EnvelopeV2(genesis, RULES_HASH, height, native_parent, pool, public_key, payout_script)
-    signature = envelope.sign(secret) if secret is not None else sign_owner(envelope)
-    if type(signature) is not bytes or len(signature) != 64 or not verify_schnorr(public_key, signature, envelope.owner_message):
-        raise ValueError("owner signer returned invalid v2 authorization")
-    payouts = tuple(monetary_outputs(shares, reward=reward, fallback_script=payout_script))
+    signature = bytes(64)
+    payouts = work_outputs(shares, reward=reward, fallback_script=payout_script)
     result = Snapshot(envelope, signature, records, shares, derive_state(parent_state, shares, height), payouts)
     result.serialize()
     return result
@@ -234,7 +301,7 @@ def build_snapshot(*, genesis, height, native_parent, pool, payout_script, rewar
 
 def candidate(*, genesis, native_parent, height, ntime, pool, payout_script,
               secret=None, public_key=None, sign_owner=None, templates=(), shares=(),
-              parent_snapshot=None, parent_state=None, fees=0, transactions=(), witness=False, reward=None):
+              parent_snapshot=None, parent_state=None, fees=0, transactions=(), witness=False, reward=None, native_bits=SHARE_BITS):
     coinbase = create_coinbase(height, fees=fees)
     snapshot = build_snapshot(genesis=genesis, height=height, native_parent=native_parent,
         pool=pool, payout_script=payout_script, reward=coinbase.vout[0].nValue if reward is None else reward,
@@ -244,18 +311,18 @@ def candidate(*, genesis, native_parent, height, ntime, pool, payout_script,
     coinbase.rehash()
     block = create_block(native_parent, coinbase, ntime, version=0x20000000,
                          height=height, header_v2=True, txlist=transactions)
-    block.m_mm_rhs = snapshot.hash
+    block.nBits = native_bits
     if witness:
         add_witness_commitment(block)
     block.m_txcount = len(block.vtx)
     block.hashMerkleRoot = block.calc_merkle_root()
-    block.rehash()
+    snapshot = attest(block, snapshot, secret=secret, sign_owner=sign_owner)
     return block, snapshot
 
 
 def solve_share(block, snapshot, *, start_nonce=0, valid=True):
     header = CBlockHeader(block)
-    target = uint256_from_compact(SHARE_BITS)
+    target = share_target(header.nBits)
     for nonce in range(start_nonce, start_nonce + 100000):
         header.nNonce, header.m_nonce2 = nonce & 0xffffffff, nonce >> 32
         if (header.rehash() <= target) == valid:

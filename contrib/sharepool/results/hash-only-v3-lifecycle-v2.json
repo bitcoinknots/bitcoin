@@ -1,0 +1,83 @@
+{
+  "profile": "hash-only-v3-regtest",
+  "nodes": 3,
+  "transport": "v2",
+  "cases": [
+    {
+      "case": "missing_snapshot_and_pending_restart",
+      "block": "56e669a3f1c070013af5bb21eda787c23963305a64ab06b00b35183b729114e2",
+      "snapshot": "eaf869e793c36ba43a4b8c09dc0a945ef8ef7f762b65c4a9ccdb2632521be150",
+      "result": "pending_without_consensus_rejection"
+    },
+    {
+      "case": "native_p2p_dependency_retry",
+      "result": "accepted",
+      "connections": [
+        1,
+        2,
+        1
+      ],
+      "peer_transports": [
+        [
+          "v2"
+        ],
+        [
+          "v2",
+          "v2"
+        ],
+        [
+          "v2"
+        ]
+      ],
+      "proof": "3f7c4fe8bb7ec0a6b76b91754ffaaf74a7e57d69f6f83bd5117b855e496ffda0"
+    },
+    {
+      "case": "late_share_refresh",
+      "result": "accepted",
+      "original_snapshot": "eaf869e793c36ba43a4b8c09dc0a945ef8ef7f762b65c4a9ccdb2632521be150",
+      "new_snapshot": "77c0496158368dfffb9c15ad82c8a9d4c83acb9ff3c53a7c6eb20f06b0370d73",
+      "late_proof": "214a61606226b2f23029a63a717f3ee66a3241e527ff1bb193f42016f01f78fb"
+    },
+    {
+      "case": "offline_reindex_chainstate",
+      "result": "restored",
+      "tip": "204a00063a4253092dfadb0c7ae7270321f1bf85178b30ce165ff6d690391b19",
+      "height": 2
+    },
+    {
+      "case": "native_chainwork_reorganization",
+      "result": "accepted",
+      "orphan_tip": "6b4fb900ae7dcb7abcd551a2ce7c7eef7005f6e51d91016bbc736601867832fe",
+      "selected_tip": "160e55f3a46d7f19c8031715b41c15a63afb4cb3e6f2190097eec64c81c9e7b4",
+      "height": 5
+    },
+    {
+      "case": "reorganized_history_reindex",
+      "result": "restored",
+      "tip": "160e55f3a46d7f19c8031715b41c15a63afb4cb3e6f2190097eec64c81c9e7b4",
+      "height": 5
+    },
+    {
+      "case": "verifychain_level_four",
+      "result": "passed",
+      "nodes": 3,
+      "selected_tip": "160e55f3a46d7f19c8031715b41c15a63afb4cb3e6f2190097eec64c81c9e7b4",
+      "complete_chain": true
+    }
+  ],
+  "result": "passed",
+  "identities": [
+    {
+      "owner": "fa6751b19b5a1e77e2a7423c7959df542ca58a3ec8e0b5eeb0645467e24c2b04",
+      "payout_script": "00147171717171717171717171717171717171717171"
+    },
+    {
+      "owner": "422ee37b17a80a249f22d174050e3b7479104bd60e70dfec2352c4fa5451e71d",
+      "payout_script": "00147272727272727272727272727272727272727272"
+    },
+    {
+      "owner": "324eba917428c7a7e18c34328c17c05e02e05b171092d3ff32b894f7f6e781e7",
+      "payout_script": "00147373737373737373737373737373737373737373"
+    }
+  ]
+}

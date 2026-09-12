@@ -21,7 +21,7 @@ import struct
 
 import native_archive
 from hash_snapshot import (Snapshot, TemplateRecord, Share, RULES_HASH, MAX_SNAPSHOT_BYTES,
-    MAX_TEMPLATE_BYTES, MAX_SHARE_AGE, parse_share, candidate, normalize_template)
+    MAX_TEMPLATE_BYTES, MAX_SHARE_AGE, SHARE_BITS, parse_share, candidate, normalize_template)
 from native_mining_gate import (MiningAuthorization, JobOmission, parse_block, immutable_header,
     template_id, _process_lock, fcntl, REGTEST_GENESIS)
 from native_enforcement import is_payout_script
@@ -60,7 +60,7 @@ class HashMiningGate:
             raise ValueError("protected head must be separate from database")
         self.db, self._lock_fd, self._head_lock_fd, self._sealed_head = None, None, None, None
         self._context()
-        self.config = native_archive.canonical({"schema": 1, "profile": "hash-only-v2", "genesis": REGTEST_GENESIS,
+        self.config = native_archive.canonical({"schema": 1, "profile": "hash-only-v3", "genesis": REGTEST_GENESIS,
             "rules": f"{RULES_HASH:064x}", "pool": f"{pool:064x}", "public_key": public_key.hex(), "script": payout_script.hex()})
         self.binding = hashlib.sha256(self.config).hexdigest()
         self._lock_fd = _process_lock(Path(str(self.path) + ".owner.lock"))
@@ -99,9 +99,9 @@ class HashMiningGate:
         if (not isinstance(info, dict) or info.get("chain") != "regtest" or type(height) is not int or height < 0 or
                 self.rpc("getblockhash", 0) != REGTEST_GENESIS or not native_archive.is_hash(tip) or
                 self.rpc("getblockhash", height) != tip or not isinstance(profile, dict) or
-                profile.get("mode") != "hash-only-v2" or profile.get("rules") != f"{RULES_HASH:064x}" or
+                profile.get("mode") != "hash-only-v3" or profile.get("rules") != f"{RULES_HASH:064x}" or
                 profile.get("max_snapshot_bytes") != MAX_SNAPSHOT_BYTES):
-            raise ValueError("active native regtest hash-only v2 profile required")
+            raise ValueError("active native regtest hash-only v3 profile required")
         return height, tip
 
     def _stable(self, tip):
@@ -168,7 +168,7 @@ class HashMiningGate:
             raise ValueError("invalid bounded journal event")
         sequence, revision = head["events"] + 1, head["receipt_revision"] + int(kind == PROOF)
         digest = hashlib.sha256(raw).hexdigest()
-        root = hashlib.sha256(b"SharePool/hash-gate/event/v2\0" + bytes.fromhex(head["root"]) +
+        root = hashlib.sha256(b"SharePool/hash-gate/event/v3\0" + bytes.fromhex(head["root"]) +
             struct.pack("<QBQI", sequence, kind, revision, len(raw)) + bytes.fromhex(identity) + bytes.fromhex(digest)).hexdigest()
         result = dict(head, events=sequence, root=root, receipt_revision=revision, bytes=head["bytes"] + RECORD_OVERHEAD + len(raw))
         if result["bytes"] > self.quota or sequence > native_archive.MAX_EVENTS:
@@ -265,10 +265,15 @@ class HashMiningGate:
     def snapshot_bytes(self, identity):
         return self._read(SNAPSHOT, f"{identity:064x}" if type(identity) is int else identity)
 
-    def _snapshot(self, identity):
+    def _evidence(self, kind, identity, staged=None):
+        if staged is not None and (kind, identity) in staged:
+            return staged[kind, identity]
+        return self._read(kind, identity)
+
+    def _snapshot(self, identity, staged=None):
         identity = f"{identity:064x}" if type(identity) is int else identity
         try:
-            raw = self.snapshot_bytes(identity)
+            raw = self._evidence(SNAPSHOT, identity, staged)
         except KeyError:
             result = self.rpc("getsharepoolhashsnapshot", identity)
             if not isinstance(result, dict) or result.get("hash") != identity:
@@ -279,24 +284,32 @@ class HashMiningGate:
             raw = bytes.fromhex(encoded)
             if Snapshot.deserialize(raw).hash_hex != identity:
                 raise ValueError("native snapshot bytes do not match commitment")
-            self.register_snapshot(raw)
+            if staged is None:
+                self.register_snapshot(raw)
+            else:
+                staged[SNAPSHOT, identity] = raw
         return Snapshot.deserialize(raw)
 
-    def register_snapshot(self, raw):
-        """Store canonical content. Native 'stored' is never a validity assertion."""
-        self._check_seal()
+    def _submit_snapshot(self, raw):
         snapshot = Snapshot.deserialize(raw)
         result = self.rpc("submitsharepoolhashsnapshot", raw.hex())
         if (not isinstance(result, dict) or result.get("hash") != snapshot.hash_hex or
                 result.get("status") not in ("stored", "present") or type(result.get("missing")) is not list or
                 any(not native_archive.is_hash(value) for value in result["missing"])):
             raise ValueError("native snapshot storage response failed binding")
-        self._persist([(SNAPSHOT, raw)])
         return snapshot.hash_hex
 
-    def _native_template(self, raw, tip):
+    def register_snapshot(self, raw):
+        """Store canonical content. Native 'stored' is never a validity assertion."""
+        self._check_seal()
+        identity = self._submit_snapshot(raw)
+        self._persist([(SNAPSHOT, raw)])
+        return identity
+
+    def _native_template(self, raw, tip, snapshot_raw=None):
         block = parse_block(raw)
-        result = self.rpc("validatesharepoolhashtemplate", raw.hex())
+        arguments = (raw.hex(),) if snapshot_raw is None else (raw.hex(), snapshot_raw.hex())
+        result = self.rpc("validatesharepoolhashtemplate", *arguments)
         expected = {"valid": True, "native_tip": tip, "native_parent": f"{block.hashPrevBlock:064x}",
                     "origin_height": block.m_height, "commitment": f"{block.m_mm_rhs:064x}"}
         if not isinstance(result, dict) or result.get("valid") is not True or any(result.get(key) != value for key, value in expected.items()):
@@ -315,26 +328,29 @@ class HashMiningGate:
                 opening.envelope.height != block.m_height or opening.envelope.native_parent != block.hashPrevBlock or
                 not self._eligible(block.m_height, f"{block.hashPrevBlock:064x}", height)):
             raise ValueError("template is outside this pool or eligible native ancestry")
+        self._submit_snapshot(opening.serialize())
         self._native_template(record.data, tip)
         self._persist([(TEMPLATE, record.data)])
         return f"{record.template_id:064x}"
 
-    def _require_origin(self, share):
+    def _require_origin(self, share, staged=None):
         identity = template_id(share.header)
         try:
-            raw = self._read(TEMPLATE, identity)
-            opening = Snapshot.deserialize(self.snapshot_bytes(share.header.m_mm_rhs))
+            raw = self._evidence(TEMPLATE, identity, staged)
+            opening = Snapshot.deserialize(self._evidence(SNAPSHOT, f"{share.header.m_mm_rhs:064x}", staged))
         except KeyError:
             raise ValueError("proof requires its durably validated full origin and snapshot") from None
         if (immutable_header(parse_block(raw)) != immutable_header(share.header) or
-                share.envelope.serialize() != opening.envelope.serialize()):
+                share.envelope.serialize() != opening.envelope.serialize() or
+                share.owner_signature != opening.owner_signature):
             raise ValueError("proof does not bind its full origin snapshot")
 
-    def _native_share(self, share, tip):
-        self._require_origin(share)
+    def _native_share(self, share, tip, staged=None):
+        self._require_origin(share, staged)
         # Reestablish the original full-body validation after native restart or
         # a branch change; a local archived admission is not a native cache hit.
-        self._native_template(self._read(TEMPLATE, template_id(share.header)), tip)
+        self._submit_snapshot(self._evidence(SNAPSHOT, f"{share.header.m_mm_rhs:064x}", staged))
+        self._native_template(self._evidence(TEMPLATE, template_id(share.header), staged), tip)
         result = self.rpc("validatesharepoolhashshare", share.serialize().hex())
         expected = {"valid": True, "native_tip": tip, "proof_id": f"{share.proof_id:064x}",
                     "payout_script": share.envelope.payout_script.hex(), "pool": f"{self.pool:064x}",
@@ -368,7 +384,7 @@ class HashMiningGate:
         self._stable(tip)
         return tuple(sorted(result, key=lambda record: record.template_id.to_bytes(32, "little")))
 
-    def _parent_snapshot(self, height, tip):
+    def _parent_snapshot(self, height, tip, staged=None):
         if height == 0:
             return None
         encoded = self.rpc("getblockheader", tip, False)
@@ -380,7 +396,7 @@ class HashMiningGate:
         header.deserialize(stream)
         if stream.read() or header.serialize() != raw or f"{header.rehash():064x}" != tip or not header.m_header_v2:
             raise ValueError("native parent header failed binding")
-        opening = self._snapshot(header.m_mm_rhs)
+        opening = self._snapshot(header.m_mm_rhs, staged)
         if opening.envelope.height != height or opening.envelope.native_parent != header.hashPrevBlock:
             raise ValueError("native parent snapshot has wrong ancestry")
         self._stable(tip)
@@ -395,37 +411,50 @@ class HashMiningGate:
         self._stable(tip)
         return tuple(sorted((share for share in result if share.proof_id not in paid), key=lambda share: share.proof_id))
 
-    def make(self, *, ntime, sign_owner, fees=0, transactions=(), witness=False):
+    def make(self, *, ntime, sign_owner, fees=0, transactions=(), witness=False, native_bits=SHARE_BITS):
         height, tip = self._context()
         result = candidate(genesis=int(REGTEST_GENESIS, 16), native_parent=int(tip, 16), height=height + 1,
             ntime=ntime, pool=self.pool, payout_script=self.payout_script, public_key=self.public_key,
             sign_owner=sign_owner, templates=self.active_templates(), shares=self.eligible_shares(),
-            parent_snapshot=self._parent_snapshot(height, tip), fees=fees, transactions=transactions, witness=witness)
+            parent_snapshot=self._parent_snapshot(height, tip), fees=fees, transactions=transactions, witness=witness,
+            native_bits=native_bits)
         self._stable(tip)
         return result
 
     def authorize(self, raw, snapshot_raw=None):
+        """Validate a whole offer before acknowledging any of its evidence.
+
+        Native validation uses a temporary snapshot overlay. Only the final
+        single journal commit constitutes local admission; refusals cannot
+        invalidate a previously frozen job by advancing its evidence sequence.
+        Announce an accepted snapshot separately with register_snapshot().
+        """
         self._check_seal()
         height, tip = self._context()
         block = parse_block(raw)
         if block.hashPrevBlock != int(tip, 16) or block.m_height != height + 1:
             raise ValueError("new mining jobs require the current native parent")
+        staged = {}
         if snapshot_raw is not None:
             if Snapshot.deserialize(snapshot_raw).hash != block.m_mm_rhs:
                 raise ValueError("job and supplied snapshot commitments differ")
-            self.register_snapshot(snapshot_raw)
-        snapshot = self._snapshot(block.m_mm_rhs)
+            staged[SNAPSHOT, f"{block.m_mm_rhs:064x}"] = snapshot_raw
+        snapshot = self._snapshot(block.m_mm_rhs, staged)
         envelope = snapshot.envelope
         if (envelope.pool, envelope.public_key, envelope.payout_script) != (self.pool, self.public_key, self.payout_script):
             raise ValueError("job violates this miner's pool/key/payout policy")
-        # Introduced templates receive exactly the same full native validation.
+
+        # Check policy against the already acknowledged set. Introduced origins
+        # and dependencies are staged without changing that set or its revision.
         for record in snapshot.templates:
-            self.register_template(record.data)
-        self._native_template(raw, tip)
-        for share in snapshot.shares:
-            self._native_share(share, tip)
-        self._persist([(PROOF, share.serialize()) for share in snapshot.shares])
-        parent = self._parent_snapshot(height, tip)
+            origin = parse_block(record.data)
+            opening = self._snapshot(origin.m_mm_rhs, staged)
+            if (opening.envelope.pool != self.pool or opening.envelope.genesis != int(REGTEST_GENESIS, 16) or
+                    opening.envelope.height != origin.m_height or opening.envelope.native_parent != origin.hashPrevBlock or
+                    not self._eligible(origin.m_height, f"{origin.hashPrevBlock:064x}", height)):
+                raise ValueError("template is outside this pool or eligible native ancestry")
+            staged[TEMPLATE, f"{record.template_id:064x}"] = record.data
+        parent = self._parent_snapshot(height, tip, staged)
         paid = set() if parent is None else {entry.proof_id for entry in parent.post_state}
         included = {share.proof_id for share in snapshot.shares}
         missing = [identity for identity, body in self._active(PROOF, height)
@@ -435,10 +464,21 @@ class HashMiningGate:
         own_id = template_id(block)
         required = {identity for identity, body in self._active(TEMPLATE, height) if identity != own_id}
         supplied = {f"{record.template_id:064x}" for record in snapshot.templates}
-        if required != supplied:
+        if not required <= supplied or own_id in supplied:
             raise TemplateOmission(required - supplied)
+
+        # Preserve the complete local origin of every prospective receipt.
+        for share in snapshot.shares:
+            self._require_origin(share, staged)
+            staged[PROOF, f"{share.proof_id:064x}"] = share.serialize()
+        # This one full native check includes all supplied origins, proofs and
+        # exact payouts. The overlay neither stores the snapshot nor registers
+        # a native template, including when validation eventually rejects it.
+        # No RPC runs inside the write transaction.
+        self._native_template(raw, tip, snapshot.serialize())
         self._stable(tip)
-        self._persist([(TEMPLATE, normalize_template(raw))])
+        staged[TEMPLATE, own_id] = normalize_template(raw)
+        self._persist([(kind, body) for (kind, unused), body in staged.items()])
         head = self.archive_head()
         return HashMiningAuthorization(raw, tip, snapshot.hash_hex, head["receipt_revision"],
                                        snapshot.serialize(), head["events"])

@@ -1,6 +1,6 @@
 # Template-work evidence and replicated pool settlement on Knots
 
-The [hash-only version 2 profile](sharepool-hash-only.md) specifies the current
+The [hash-only version 3 profile](sharepool-hash-only.md) specifies the current
 off-block snapshot format and its separately enabled native regtest validation.
 
 Status: broader protocol proposal, with a newer
@@ -48,8 +48,8 @@ reference document defines the current executable subset and its limits.
 Different coinbase tags do make the full templates different, even when every
 non-coinbase transaction is identical. The protocol's primary evidence therefore
 retains and checks the tag; it must not discard tag differences merely because
-the transaction selections match. The user is asking to track work by this node
-identifier, not to require every node to select different non-coinbase transactions.
+the transaction selections match. Accountability tracks work by this node identifier; distinct non-coinbase
+transaction selections are not required.
 
 DATUM exposes a configurable secondary coinbase tag for pooled mining. Its
 [example configuration](https://github.com/OCEAN-xyz/datum_gateway/blob/master/doc/example_datum_gateway_config.json)

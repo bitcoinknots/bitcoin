@@ -39,6 +39,7 @@
 #include <scheduler.h>
 #include <sharepool/relay.h>
 #include <sharepool/hash_store.h>
+#include <sharepool/hash_relay.h>
 #include <streams.h>
 #include <sync.h>
 #include <tinyformat.h>
@@ -259,10 +260,9 @@ struct SharePoolHashRequest {
 struct SharePoolHashPeer {
     bool hello_sent{false};
     bool hello_received{false};
-    SPNClock::time_point next_inventory{};
+    sharepool::HashRelayInventory inventory;
     SPNClock::time_point next_admission{};
     SPNClock::time_point bucket_time{SPNClock::now()};
-    size_t inventory_offset{0};
     double control_tokens{8};
     double request_tokens{32};
     double outgoing_requests{32};
@@ -864,6 +864,10 @@ private:
     SPNClock::time_point m_next_sharepool_template_validation GUARDED_BY(cs_main){};
     /** No duplicate global downloads: four peers reserve at most 64 MiB total. */
     std::map<uint256, NodeId> m_sharepool_hash_downloads GUARDED_BY(cs_main);
+    // The underlying message loop already randomizes peer order. Explicit turns
+    // also prevent a ready connection from being repeatedly overtaken for a slot.
+    sharepool::HashRelayTurns m_sharepool_hash_download_turns GUARDED_BY(cs_main);
+    sharepool::HashRelayTurns m_sharepool_hash_admission_turns GUARDED_BY(cs_main);
     std::optional<uint64_t> m_sharepool_hash_inventory_revision GUARDED_BY(cs_main);
     std::vector<uint256> m_sharepool_hash_inventory GUARDED_BY(cs_main);
     SPNClock::time_point m_next_sharepool_hash_admission GUARDED_BY(cs_main){};
@@ -3842,6 +3846,8 @@ void PeerManagerImpl::ClearSharePoolHashDownload(Peer& peer)
     auto& relay = peer.m_sharepool_hash;
     if (relay.download) m_sharepool_hash_downloads.erase(relay.download->hash);
     relay.download.reset();
+    m_sharepool_hash_download_turns.Remove(peer.m_id);
+    m_sharepool_hash_admission_turns.Remove(peer.m_id);
 }
 
 void PeerManagerImpl::DeferSharePoolHashDownload(Peer& peer)
@@ -3862,8 +3868,10 @@ void PeerManagerImpl::RequestSharePoolHash(CNode& node, Peer& peer)
     auto& relay = peer.m_sharepool_hash;
     if (!SharePoolHashActive() || !relay.hello_sent || !relay.hello_received ||
         relay.download || node.fPauseSend || node.fDisconnect || relay.outgoing_requests < 1 ||
-        relay.inbound_bytes < SPH_CHUNK_BYTES + 45 ||
-        m_sharepool_hash_downloads.size() >= SPH_MAX_DOWNLOADS) return;
+        relay.inbound_bytes < SPH_CHUNK_BYTES + 45) {
+        m_sharepool_hash_download_turns.Remove(peer.m_id);
+        return;
+    }
     auto& store = *m_chainman.m_sharepool_hash_store;
     const auto now = SPNClock::now();
     // Pending blocks and their discovered origin dependencies take precedence
@@ -3879,11 +3887,19 @@ void PeerManagerImpl::RequestSharePoolHash(CNode& node, Peer& peer)
         if (prioritized.size() >= SPH_MAX_ITEMS) break;
         if (available(hash) && seen.insert(hash).second) prioritized.push_back(hash);
     }
+    const bool required = !prioritized.empty();
     for (const auto& hash : relay.pending) {
         if (prioritized.size() >= SPH_MAX_ITEMS) break;
         if (available(hash) && seen.insert(hash).second) prioritized.push_back(hash);
     }
     relay.pending = std::move(prioritized);
+    if (relay.pending.empty()) {
+        m_sharepool_hash_download_turns.Remove(peer.m_id);
+        return;
+    }
+    m_sharepool_hash_download_turns.Ready(peer.m_id, required);
+    if (m_sharepool_hash_downloads.size() >= SPH_MAX_DOWNLOADS ||
+        !m_sharepool_hash_download_turns.IsTurn(peer.m_id)) return;
     while (!relay.pending.empty()) {
         const auto hash = relay.pending.front();
         relay.pending.pop_front();
@@ -3893,6 +3909,7 @@ void PeerManagerImpl::RequestSharePoolHash(CNode& node, Peer& peer)
         relay.download.emplace(SharePoolHashDownload{hash, now + SPH_PROGRESS_TIMEOUT,
             now + SPH_WHOLE_TIMEOUT, 0, {}, true});
         m_sharepool_hash_downloads.emplace(hash, node.GetId());
+        m_sharepool_hash_download_turns.Remove(peer.m_id);
         --relay.outgoing_requests;
         MakeAndPushMessage(node, NetMsgType::SPHGET, hash, uint32_t{0});
         break;
@@ -3920,7 +3937,12 @@ void PeerManagerImpl::SendSharePoolHashMessages(CNode& node, Peer& peer)
     if (relay.download && (now >= relay.download->progress_deadline || now >= relay.download->whole_deadline)) {
         DeferSharePoolHashDownload(peer);
     }
-    if (node.fPauseSend || node.fDisconnect) return;
+    sharepool::ExpireHashRelayRequest(relay.serve_request, now);
+    if (node.fPauseSend || node.fDisconnect) {
+        m_sharepool_hash_download_turns.Remove(peer.m_id);
+        m_sharepool_hash_admission_turns.Remove(peer.m_id);
+        return;
+    }
     if (!relay.hello_sent) {
         MakeAndPushMessage(node, NetMsgType::SPHHELLO, uint8_t{1},
             m_chainparams.GetConsensus().hashGenesisBlock, sharepool::hashonly::RulesHash(),
@@ -3931,9 +3953,7 @@ void PeerManagerImpl::SendSharePoolHashMessages(CNode& node, Peer& peer)
     auto& store = *m_chainman.m_sharepool_hash_store;
     if (relay.serve_request) {
         const auto request = *relay.serve_request;
-        if (request.deadline <= now) {
-            relay.serve_request.reset();
-        } else if (relay.outbound_bytes >= SPH_CHUNK_BYTES + 45) {
+        if (relay.outbound_bytes >= SPH_CHUNK_BYTES + 45) {
             std::shared_ptr<const std::vector<unsigned char>> raw;
             try {
                 raw = store.GetShared(request.hash);
@@ -3962,8 +3982,17 @@ void PeerManagerImpl::SendSharePoolHashMessages(CNode& node, Peer& peer)
     }
     // Canonical decoding/hash verification/durable admission happen after the
     // ordinary block/transaction scheduler. Every outcome consumes the budget.
-    if (relay.download && relay.download->total != 0 && relay.download->bytes.size() == relay.download->total &&
-        now >= relay.next_admission && now >= m_next_sharepool_hash_admission) {
+    const bool admission_ready = relay.download && relay.download->total != 0 &&
+        relay.download->bytes.size() == relay.download->total && now >= relay.next_admission;
+    if (admission_ready) {
+        const auto needed = store.Needed();
+        m_sharepool_hash_admission_turns.Ready(peer.m_id,
+            std::find(needed.begin(), needed.end(), relay.download->hash) != needed.end());
+    } else {
+        m_sharepool_hash_admission_turns.Remove(peer.m_id);
+    }
+    if (admission_ready && now >= m_next_sharepool_hash_admission &&
+        m_sharepool_hash_admission_turns.IsTurn(peer.m_id)) {
         const auto hash = relay.download->hash;
         const auto started = SPNClock::now();
         bool admitted{false};
@@ -3986,21 +4015,17 @@ void PeerManagerImpl::SendSharePoolHashMessages(CNode& node, Peer& peer)
             DeferSharePoolHashDownload(peer);
         }
     }
-    if (now >= relay.next_inventory) {
-        if (m_sharepool_hash_inventory_revision != store.Revision()) {
-            m_sharepool_hash_inventory = store.Inventory();
-            auto& inventory = m_sharepool_hash_inventory;
-            std::sort(inventory.begin(), inventory.end());
-            inventory.erase(std::unique(inventory.begin(), inventory.end()), inventory.end());
-            m_sharepool_hash_inventory_revision = store.Revision();
-        }
-        const auto& hashes = m_sharepool_hash_inventory;
-        if (relay.inventory_offset >= hashes.size()) relay.inventory_offset = 0;
-        const size_t end = std::min(hashes.size(), relay.inventory_offset + SPH_MAX_ITEMS);
-        const std::vector<uint256> page(hashes.begin() + relay.inventory_offset, hashes.begin() + end);
+    if (m_sharepool_hash_inventory_revision != store.Revision()) {
+        m_sharepool_hash_inventory = store.Inventory();
+        auto& inventory = m_sharepool_hash_inventory;
+        std::sort(inventory.begin(), inventory.end());
+        inventory.erase(std::unique(inventory.begin(), inventory.end()), inventory.end());
+        m_sharepool_hash_inventory_revision = store.Revision();
+    }
+    const auto& hashes = m_sharepool_hash_inventory;
+    if (const auto range = relay.inventory.Next(store.Revision(), hashes.size(), SPH_MAX_ITEMS, now)) {
+        const std::vector<uint256> page(hashes.begin() + range->first, hashes.begin() + range->second);
         MakeAndPushMessage(node, NetMsgType::SPHINV, page);
-        relay.inventory_offset = end == hashes.size() ? 0 : end;
-        relay.next_inventory = now + 1s;
     }
     RequestSharePoolHash(node, peer);
 }
@@ -4057,11 +4082,13 @@ void PeerManagerImpl::ProcessSharePoolHashMessage(CNode& node, Peer& peer, const
             uint32_t offset;
             stream >> hash >> offset;
             fail(offset < sharepool::hashonly::MAX_SNAPSHOT_BYTES);
+            const auto now = SPNClock::now();
+            sharepool::ExpireHashRelayRequest(relay.serve_request, now);
             if (relay.serve_request) {
                 fail(relay.serve_request->hash == hash && relay.serve_request->offset == offset);
                 return; // An exact retry never extends the existing deadline.
             }
-            relay.serve_request.emplace(SharePoolHashRequest{hash, offset, SPNClock::now() + SPH_PROGRESS_TIMEOUT});
+            relay.serve_request.emplace(SharePoolHashRequest{hash, offset, now + SPH_PROGRESS_TIMEOUT});
             return;
         }
         if (type == NetMsgType::SPHDATA) {
@@ -4098,8 +4125,13 @@ void PeerManagerImpl::ProcessSharePoolHashMessage(CNode& node, Peer& peer, const
             const size_t old_size = download.bytes.size();
             download.bytes.resize(old_size + size);
             stream.read(AsWritableBytes(Span{download.bytes}).subspan(old_size, size));
-            // Completed bytes are admitted by SendMessages; no block validation
-            // or recursive fetch happens while handling this incoming message.
+            // Completed bytes join the admission queue once, in receive order.
+            // No block validation or recursive fetch happens in this handler.
+            if (download.bytes.size() == download.total && now >= relay.next_admission) {
+                const auto needed = store.Needed();
+                m_sharepool_hash_admission_turns.Ready(peer.m_id,
+                    std::find(needed.begin(), needed.end(), hash) != needed.end());
+            }
             return;
         }
     } catch (const std::exception&) {

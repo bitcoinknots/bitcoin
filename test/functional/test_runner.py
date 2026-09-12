@@ -128,6 +128,8 @@ BASE_SCRIPTS = [
     'feature_sharepool_rule_cases.py',
     'feature_sharepool_hash_lifecycle.py',
     'feature_sharepool_hash_rules.py',
+    'feature_sharepool_hash_relay.py',
+    'feature_sharepool_hash_attestation.py',
     'rpc_psbt.py --legacy-wallet',
     'rpc_psbt.py --descriptors',
     'wallet_fundrawtransaction.py --legacy-wallet',

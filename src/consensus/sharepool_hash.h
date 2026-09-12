@@ -13,7 +13,8 @@
 
 /** Separately versioned hash-only profile. No network access or legacy activation. */
 namespace sharepool::hashonly {
-inline constexpr uint32_t VERSION{2};
+inline constexpr uint32_t VERSION{3};
+inline constexpr uint32_t SHARE_TARGET_SHIFT{10}; // Expected ~1024 proofs per native block at unclamped difficulty.
 inline constexpr uint32_t MAX_SNAPSHOT_BYTES{16 * 1024 * 1024};
 inline constexpr uint32_t MAX_TEMPLATE_BYTES{4'000'000};
 inline constexpr uint32_t MAX_DEPENDENCY_DEPTH{64};
@@ -27,6 +28,7 @@ struct TemplateRecord {
 struct Snapshot {
     Envelope binding;
     Signature authorization{};
+    uint256 job_commitment; // Full normalized body with m_mm_rhs zero; no signature fixed point.
     std::vector<TemplateRecord> templates;
     std::vector<Share> shares;
     std::vector<StateEntry> post_state;
@@ -83,7 +85,12 @@ uint256 SnapshotHash(const Snapshot& snapshot);
 /** Hash exact bytes without decoding; callers must enforce canonical decoding. */
 uint256 SnapshotHash(Span<const unsigned char> bytes);
 uint256 RulesHash();
-uint256 OwnerHash(const Envelope& binding);
+uint256 SnapshotContentsHash(const Snapshot& snapshot);
+uint256 OwnerHash(const Envelope& binding, const uint256& job, const uint256& contents);
+uint256 OwnerHash(const Snapshot& snapshot);
+uint256 JobHash(const CBlock& block);
+/** Deterministic target derived from the contextual native nBits; throws on malformed compact. */
+uint256 ShareTarget(uint32_t native_bits);
 /** Identical normalization and single-SHA256 display convention to RelayTemplateId. */
 std::vector<unsigned char> NormalizedHeader(const CBlockHeader& header);
 uint256 TemplateId(const CBlockHeader& header);

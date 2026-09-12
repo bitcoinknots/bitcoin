@@ -1,7 +1,7 @@
 # Native settlement enforcement and miner admission
 
 This document describes version 1, with evidence in coinbase. The separately
-enabled [hash-only version 2](sharepool-hash-only.md) commits the complete
+enabled [hash-only version 3](sharepool-hash-only.md) commits the complete
 off-block snapshot and removes the independent 32-share limit.
 
 The new SPN1 profile adds actual native block rejection for incorrect committed

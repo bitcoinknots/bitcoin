@@ -157,15 +157,16 @@ CKey Create(const char* path, const sharepool::signer::Policy& policy)
 int main(int argc, char* argv[])
 {
     if (argc == 2 && std::string{argv[1]} == "--help") {
-        std::cout << "Usage: bitcoin-sharepool-signer {init|pubkey|sign} KEYFILE\n"
+        std::cout << "Usage: bitcoin-sharepool-signer {init|pubkey|sign|sign-job} KEYFILE\n"
                      "Regtest only. init reads canonical policy hex from stdin and creates a new mode-0600 key file.\n"
                      "pubkey reads no stdin. sign reads canonical SPN1 Envelope hex from stdin.\n"
+                     "sign-job reads a v3 binding followed by exact job/content hashes (360 bytes maximum).\n"
                      "Output is only the x-only public key (init/pubkey) or BIP340 signature (sign).\n"
                      "No private key import. The caller validates the current chain and complete template.\n";
         return EXIT_SUCCESS;
     }
-    if (argc != 3 || (std::string{argv[1]} != "init" && std::string{argv[1]} != "pubkey" && std::string{argv[1]} != "sign")) {
-        std::cerr << "error: expected {init|pubkey|sign} KEYFILE; see --help\n";
+    if (argc != 3 || (std::string{argv[1]} != "init" && std::string{argv[1]} != "pubkey" && std::string{argv[1]} != "sign" && std::string{argv[1]} != "sign-job")) {
+        std::cerr << "error: expected {init|pubkey|sign|sign-job} KEYFILE; see --help\n";
         return EXIT_FAILURE;
     }
     try {
@@ -184,6 +185,9 @@ int main(int argc, char* argv[])
             auto [policy, key] = Load(argv[2]);
             if (command == "pubkey") {
                 std::cout << HexStr(sharepool::signer::PublicKey(key)) << '\n';
+            } else if (command == "sign-job") {
+                const auto job = sharepool::signer::DecodeJob(Input(sharepool::signer::MAX_JOB_BYTES));
+                std::cout << HexStr(sharepool::signer::SignJob(policy, key, job)) << '\n';
             } else {
                 const auto envelope = sharepool::signer::DecodeEnvelope(Input(sharepool::signer::MAX_ENVELOPE_BYTES));
                 std::cout << HexStr(sharepool::signer::SignOwner(policy, key, envelope)) << '\n';

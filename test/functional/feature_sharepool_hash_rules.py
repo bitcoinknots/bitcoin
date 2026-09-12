@@ -9,7 +9,7 @@ import sys
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "contrib" / "sharepool"))
-from hash_snapshot import candidate, solve_share
+from hash_snapshot import candidate, solve_share, attest
 from native_enforcement import h256
 from test_framework.messages import CTxOut
 from test_framework.script import CScript
@@ -33,8 +33,7 @@ class SharePoolHashRulesTest(BitcoinTestFramework):
         block.vtx[0].vout = list(snapshot.payouts)
         block.vtx[0].rehash()
         block.hashMerkleRoot = block.calc_merkle_root()
-        block.m_mm_rhs = snapshot.hash
-        block.rehash()
+        snapshot = attest(block, snapshot, secret=(1).to_bytes(32, "big"))
         self.nodes[0].submitsharepoolhashsnapshot(snapshot.serialize().hex())
 
     def run_test(self):
@@ -67,7 +66,7 @@ class SharePoolHashRulesTest(BitcoinTestFramework):
         self.log.info("Unavailable preimages are pending; available invalid encodings establish rejection")
         block, unused = self.make()
         raw = b"\x02"
-        block.m_mm_rhs = h256(b"SharePool/snapshot/v2\0", raw)
+        block.m_mm_rhs = h256(b"SharePool/snapshot/v3\0", raw)
         block.solve()
         assert_equal(node.submitblock(block.serialize().hex()), "sharepool-hash-data-missing")
         assert_equal(node.getsharepoolhashstatus()["pending_blocks"], 1)
@@ -81,7 +80,7 @@ class SharePoolHashRulesTest(BitcoinTestFramework):
         # The empty preimage has a known commitment, so no network lookup is
         # needed to establish that it cannot encode a settlement snapshot.
         empty, unused = self.make()
-        empty.m_mm_rhs = h256(b"SharePool/snapshot/v2\0", b"")
+        empty.m_mm_rhs = h256(b"SharePool/snapshot/v3\0", b"")
         empty.solve()
         assert_equal(node.submitblock(empty.serialize().hex()), "bad-sharepool-hash-snapshot-encoding")
         assert_equal(node.getsharepoolhashstatus()["pending_blocks"], 0)

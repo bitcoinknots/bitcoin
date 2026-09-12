@@ -7260,7 +7260,7 @@ ChainstateManager::ChainstateManager(const util::SignalInterrupt& interrupt, Opt
       m_validation_cache{m_options.script_execution_cache_bytes, m_options.signature_cache_bytes}
 {
     if (GetConsensus().SharePoolHashOnly) {
-        m_sharepool_hash_store = std::make_unique<sharepool::HashSnapshotStore>(m_options.datadir / "sharepool-snapshots-v2");
+        m_sharepool_hash_store = std::make_unique<sharepool::HashSnapshotStore>(m_options.datadir / "sharepool-snapshots-v3");
     }
 }
 

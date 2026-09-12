@@ -62,10 +62,8 @@ Signature SignOwner(const Policy& policy, const CKey& key, const Envelope& envel
 {
     CheckPolicy(policy);
     const auto genesis = CChainParams::RegTest({})->GetConsensus().hashGenesisBlock;
-    const bool hash_only = envelope.version == 2 && envelope.rules == hashonly::RulesHash() &&
-        envelope.shares_root.IsNull() && envelope.state_root.IsNull() && envelope.payouts_root.IsNull();
     const bool legacy = envelope.version == 1 && envelope.rules == RulesHash();
-    if ((!hash_only && !legacy) || envelope.genesis != genesis ||
+    if (!legacy || envelope.genesis != genesis ||
         envelope.height == 0 || envelope.height >= static_cast<uint32_t>(std::numeric_limits<int>::max()) ||
         envelope.native_parent.IsNull() || envelope.pool != policy.pool ||
         envelope.payout_script != policy.payout_script || envelope.owner != PublicKey(key)) {
@@ -74,10 +72,37 @@ Signature SignOwner(const Policy& policy, const CKey& key, const Envelope& envel
     uint256 auxiliary;
     GetStrongRandBytes(auxiliary);
     Signature signature{};
-    const auto message = hash_only ? hashonly::OwnerHash(envelope) : OwnerHash(envelope);
+    const auto message = OwnerHash(envelope);
     if (!key.SignSchnorr(message, signature, nullptr, auxiliary) ||
         !XOnlyPubKey{Span{envelope.owner}}.VerifySchnorr(message, signature)) {
         throw std::runtime_error("owner signature failed verification");
+    }
+    return signature;
+}
+JobStatement DecodeJob(Span<const unsigned char> raw)
+{
+    return Decode<JobStatement>(raw, MAX_JOB_BYTES);
+}
+
+Signature SignJob(const Policy& policy, const CKey& key, const JobStatement& statement)
+{
+    CheckPolicy(policy);
+    const auto& binding = statement.binding;
+    const auto genesis = CChainParams::RegTest({})->GetConsensus().hashGenesisBlock;
+    if (binding.version != hashonly::VERSION || binding.rules != hashonly::RulesHash() ||
+        !binding.shares_root.IsNull() || !binding.state_root.IsNull() || !binding.payouts_root.IsNull() ||
+        binding.genesis != genesis || binding.height == 0 || binding.height >= uint32_t(std::numeric_limits<int>::max()) ||
+        binding.native_parent.IsNull() || binding.pool != policy.pool || binding.payout_script != policy.payout_script ||
+        binding.owner != PublicKey(key) || statement.job.IsNull() || statement.contents.IsNull()) {
+        throw std::invalid_argument("job violates local regtest signer policy");
+    }
+    uint256 auxiliary;
+    GetStrongRandBytes(auxiliary);
+    Signature signature{};
+    const auto message = hashonly::OwnerHash(binding, statement.job, statement.contents);
+    if (!key.SignSchnorr(message, signature, nullptr, auxiliary) ||
+        !XOnlyPubKey{Span{binding.owner}}.VerifySchnorr(message, signature)) {
+        throw std::runtime_error("job signature failed verification");
     }
     return signature;
 }

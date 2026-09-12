@@ -1,5 +1,8 @@
 # Hash-only v2 test results — 12 September 2026
 
+Historical v2 evidence. The current format is v3; see the
+[v3 hardening report](sharepool-v3-hardening-report.md) for current verification.
+
 The hash-only regtest profile successfully settled 100 miners' submitted proofs
 in one block across five native enforcing nodes. All 100 local mining gates
 validated complete origin templates and authorized their own settlement job.

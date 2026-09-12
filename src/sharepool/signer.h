@@ -11,6 +11,14 @@
 namespace sharepool::signer {
 inline constexpr size_t MAX_POLICY_BYTES{68};
 inline constexpr size_t MAX_ENVELOPE_BYTES{296};
+inline constexpr size_t MAX_JOB_BYTES{MAX_ENVELOPE_BYTES + 64};
+
+struct JobStatement {
+    Envelope binding;
+    uint256 job;
+    uint256 contents;
+    SERIALIZE_METHODS(JobStatement, obj) { READWRITE(obj.binding, obj.job, obj.contents); }
+};
 
 /** Immutable local signing policy. The only supported network is native regtest. */
 struct Policy {
@@ -28,6 +36,9 @@ struct Policy {
 
 Policy DecodePolicy(Span<const unsigned char> raw);
 Envelope DecodeEnvelope(Span<const unsigned char> raw);
+JobStatement DecodeJob(Span<const unsigned char> raw);
+/** Attests exact job/content digests; native UTXO and completeness validation remain caller-owned. */
+Signature SignJob(const Policy& policy, const CKey& key, const JobStatement& statement);
 std::array<unsigned char, 32> PublicKey(const CKey& key);
 /**
  * Signs only OwnerHash, after checking the exact compiled regtest domain and local

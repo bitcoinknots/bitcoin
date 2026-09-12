@@ -86,7 +86,7 @@ class SharePoolHashLifecycleTest(BitcoinTestFramework):
         self.snapshots = {}
         keys = [directory / f"owner-{index}.key" for index in range(3)]
         expected_transport = "v2" if self.options.v2transport else "v1"
-        report = {"profile": "hash-only-v2-regtest", "nodes": 3,
+        report = {"profile": "hash-only-v3-regtest", "nodes": 3,
                   "transport": expected_transport, "cases": []}
         try:
             self.signers = [HashSigner.create(self.signer_binary, key,
@@ -94,7 +94,7 @@ class SharePoolHashLifecycleTest(BitcoinTestFramework):
             assert_equal(len({signer.public_key for signer in self.signers}), 3)
             for node in self.nodes:
                 status = node.getsharepoolhashstatus()
-                assert_equal(status["mode"], "hash-only-v2")
+                assert_equal(status["mode"], "hash-only-v3")
                 assert_equal(status["pending_blocks"], 0)
                 assert_equal(node.getconnectioncount(), 0)
 
@@ -191,6 +191,12 @@ class SharePoolHashLifecycleTest(BitcoinTestFramework):
             self.available(self.nodes[1], branch_snapshot)
             report["cases"].append({"case": "reorganized_history_reindex", "result": "restored",
                 "tip": b5.hash, "height": 5})
+            self.log.info("Level-four native verification disconnects and reconnects the complete selected chain")
+            for node in self.nodes:
+                assert_equal(node.verifychain(4, 0), True)
+                assert_equal(node.getbestblockhash(), b5.hash)
+            report["cases"].append({"case": "verifychain_level_four", "result": "passed",
+                "nodes": 3, "selected_tip": b5.hash, "complete_chain": True})
             report["result"] = "passed"
             report["identities"] = [{"owner": signer.public_key.hex(), "payout_script": script.hex()}
                                     for signer, script in zip(self.signers, self.scripts)]

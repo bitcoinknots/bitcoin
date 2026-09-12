@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <sharepool/signer.h>
+#include <consensus/sharepool_hash.h>
 
 #include <kernel/chainparams.h>
 #include <streams.h>
@@ -32,6 +33,14 @@ struct SignerFixture : BasicTestingSetup {
         envelope.pool = policy.pool;
         envelope.owner = sharepool::signer::PublicKey(key);
         envelope.payout_script = policy.payout_script;
+    }
+
+    sharepool::signer::JobStatement Job() const
+    {
+        auto binding = envelope;
+        binding.version = sharepool::hashonly::VERSION;
+        binding.rules = sharepool::hashonly::RulesHash();
+        return {binding, uint256{uint8_t{7}}, uint256{uint8_t{8}}};
     }
 };
 
@@ -117,6 +126,84 @@ BOOST_AUTO_TEST_CASE(native_signer_canonical_bounded_decoding)
     policy.version = 1;
     policy.payout_script = {0x51};
     BOOST_CHECK_THROW(sharepool::signer::DecodePolicy(Encode(policy)), std::exception);
+}
+
+BOOST_AUTO_TEST_CASE(native_v3_job_signature_attests_exact_job_and_contents)
+{
+    const auto statement = Job();
+    const auto signature = sharepool::signer::SignJob(policy, key, statement);
+    const XOnlyPubKey owner{Span{statement.binding.owner}};
+    const auto message = sharepool::hashonly::OwnerHash(statement.binding, statement.job, statement.contents);
+    BOOST_CHECK(owner.VerifySchnorr(message, signature));
+    const std::vector<std::function<void(sharepool::signer::JobStatement&)>> changes{
+        [](auto& s) { s.job = uint256{uint8_t{9}}; },
+        [](auto& s) { s.contents = uint256{uint8_t{10}}; },
+        [](auto& s) { ++s.binding.height; },
+        [](auto& s) { s.binding.native_parent = uint256{uint8_t{11}}; },
+        [](auto& s) { s.binding.payout_script.back() ^= 1; },
+    };
+    for (const auto& change : changes) {
+        auto wrong = statement;
+        change(wrong);
+        BOOST_CHECK(!owner.VerifySchnorr(sharepool::hashonly::OwnerHash(wrong.binding, wrong.job, wrong.contents), signature));
+    }
+    // A v3 caller cannot accidentally obtain the weaker legacy policy-only
+    // signature by routing an exact-job envelope through SignOwner.
+    BOOST_CHECK_THROW(sharepool::signer::SignOwner(policy, key, statement.binding), std::invalid_argument);
+}
+
+BOOST_AUTO_TEST_CASE(native_v3_job_signer_enforces_policy_and_nonzero_digests)
+{
+    const auto statement = Job();
+    const std::vector<std::function<void(sharepool::signer::JobStatement&)>> changes{
+        [](auto& s) { s.binding.version = 2; },
+        [](auto& s) { s.binding.genesis = CChainParams::Main()->GetConsensus().hashGenesisBlock; },
+        [](auto& s) { s.binding.rules = sharepool::RulesHash(); },
+        [](auto& s) { s.binding.height = 0; },
+        [](auto& s) { s.binding.height = std::numeric_limits<int>::max(); },
+        [](auto& s) { s.binding.native_parent.SetNull(); },
+        [](auto& s) { s.binding.pool.SetNull(); },
+        [](auto& s) { s.binding.owner[0] ^= 1; },
+        [](auto& s) { s.binding.payout_script.back() ^= 1; },
+        [](auto& s) { s.binding.shares_root = uint256{uint8_t{1}}; },
+        [](auto& s) { s.binding.state_root = uint256{uint8_t{1}}; },
+        [](auto& s) { s.binding.payouts_root = uint256{uint8_t{1}}; },
+        [](auto& s) { s.job.SetNull(); },
+        [](auto& s) { s.contents.SetNull(); },
+    };
+    for (const auto& change : changes) {
+        auto wrong = statement;
+        change(wrong);
+        BOOST_CHECK_THROW(sharepool::signer::SignJob(policy, key, wrong), std::invalid_argument);
+    }
+    CKey empty;
+    BOOST_CHECK_THROW(sharepool::signer::SignJob(policy, empty, statement), std::invalid_argument);
+    auto wrong_policy = policy;
+    wrong_policy.version = 2;
+    BOOST_CHECK_THROW(sharepool::signer::SignJob(wrong_policy, key, statement), std::invalid_argument);
+}
+
+BOOST_AUTO_TEST_CASE(native_v3_job_signer_decoding_is_canonical_and_bounded)
+{
+    const auto statement = Job();
+    const auto raw = Encode(statement);
+    const auto decoded = sharepool::signer::DecodeJob(raw);
+    BOOST_CHECK_EQUAL(decoded.job, statement.job);
+    BOOST_CHECK_EQUAL(decoded.contents, statement.contents);
+    BOOST_CHECK_EQUAL(decoded.binding.rules, sharepool::hashonly::RulesHash());
+    auto trailing = raw;
+    trailing.push_back(0);
+    BOOST_CHECK_THROW(sharepool::signer::DecodeJob(trailing), std::exception);
+    for (const size_t length : {size_t{0}, raw.size() - 1, sharepool::signer::MAX_JOB_BYTES + 1}) {
+        auto wrong = raw;
+        wrong.resize(length);
+        BOOST_CHECK_THROW(sharepool::signer::DecodeJob(wrong), std::exception);
+    }
+    constexpr size_t SCRIPT_LENGTH_OFFSET{1 + 32 + 32 + 4 + 32 + 32 + 32};
+    auto noncanonical = raw;
+    noncanonical.erase(noncanonical.begin() + SCRIPT_LENGTH_OFFSET);
+    noncanonical.insert(noncanonical.begin() + SCRIPT_LENGTH_OFFSET, {0xfd, 22, 0});
+    BOOST_CHECK_THROW(sharepool::signer::DecodeJob(noncanonical), std::exception);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

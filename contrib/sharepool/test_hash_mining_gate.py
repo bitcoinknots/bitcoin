@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic v2 gate durability/policy tests with a native RPC double."""
+"""Deterministic v3 gate durability/policy tests with a native RPC double."""
 from dataclasses import replace
 import hashlib
 from pathlib import Path
@@ -9,8 +9,8 @@ import unittest
 from unittest.mock import patch
 
 from hash_snapshot import Snapshot, RULES_HASH, MAX_SNAPSHOT_BYTES, parse_share, solve_share
-from hash_mining_gate import HashMiningGate, TemplateOmission, PROOF, TEMPLATE
-from native_mining_gate import REGTEST_GENESIS, parse_block, JobOmission
+from hash_mining_gate import HashMiningGate, TemplateOmission, SNAPSHOT, PROOF, TEMPLATE
+from native_mining_gate import REGTEST_GENESIS, parse_block, JobOmission, template_id
 from test_framework.messages import CBlockHeader
 from test_hash_snapshot import fixture, SECRET, SCRIPT
 
@@ -43,7 +43,7 @@ class FakeRPC:
         if method == "getblockheader":
             return self.headers[args[0]]
         if method == "getsharepoolhashstatus":
-            return {"mode": "hash-only-v2", "rules": f"{RULES_HASH:064x}", "max_snapshot_bytes": MAX_SNAPSHOT_BYTES,
+            return {"mode": "hash-only-v3", "rules": f"{RULES_HASH:064x}", "max_snapshot_bytes": MAX_SNAPSHOT_BYTES,
                     "inventory": list(self.snapshots)}
         if method == "submitsharepoolhashsnapshot":
             snapshot = Snapshot.deserialize(bytes.fromhex(args[0]))
@@ -56,7 +56,13 @@ class FakeRPC:
             if self.template_error:
                 raise ValueError(self.template_error)
             block = parse_block(bytes.fromhex(args[0]))
-            if f"{block.m_mm_rhs:064x}" not in self.snapshots:
+            overlay = Snapshot.deserialize(bytes.fromhex(args[1])) if len(args) > 1 else None
+            if overlay is not None:
+                if overlay.hash != block.m_mm_rhs:
+                    raise ValueError("snapshot commitment mismatch")
+                if self.share_error and overlay.shares:
+                    raise ValueError(self.share_error)
+            elif f"{block.m_mm_rhs:064x}" not in self.snapshots:
                 raise ValueError("sharepool-hash-data-missing")
             result = {"valid": True, "native_tip": self.tip, "native_parent": f"{block.hashPrevBlock:064x}",
                       "origin_height": block.m_height, "commitment": f"{block.m_mm_rhs:064x}"}
@@ -98,6 +104,14 @@ class HashGateTests(unittest.TestCase):
     def job(self, shares=(), templates=None):
         return fixture(ntime=1700000002, shares=shares, templates=[self.origin] if templates is None else templates)
 
+    def assert_not_admitted(self, block, snapshot, proofs=()):
+        for kind, identity in ((SNAPSHOT, snapshot.hash_hex), (TEMPLATE, template_id(block))):
+            with self.assertRaises(KeyError):
+                self.gate._read(kind, identity)
+        for proof in proofs:
+            with self.assertRaises(KeyError):
+                self.gate._read(PROOF, f"{proof.proof_id:064x}")
+
     def test_one_hundred_acknowledgments_restart_and_frozen_authorization(self):
         proofs, nonce = [], 0
         for _ in range(100):
@@ -129,12 +143,129 @@ class HashGateTests(unittest.TestCase):
         proof = solve_share(self.origin, self.opening)
         self.gate.receive(proof)
         block, snapshot = self.job()
+        head = self.gate.archive_head()
         with self.assertRaises(JobOmission) as failure:
             self.gate.authorize(block.serialize(), snapshot.serialize())
         self.assertEqual(failure.exception.proof_ids, (f"{proof.proof_id:064x}",))
+        self.assertEqual(self.gate.archive_head(), head)
+        self.assert_not_admitted(block, snapshot)
         self.reopen()
         with self.assertRaises(JobOmission):
+            self.gate.authorize(block.serialize(), snapshot.serialize())
+        self.assertEqual(self.gate.archive_head(), head)
+
+    def test_omitted_work_cannot_admit_offered_proofs_or_refresh_frozen_job(self):
+        acknowledged = solve_share(self.origin, self.opening)
+        self.gate.receive(acknowledged)
+        accepted, accepted_snapshot = self.job(shares=[acknowledged])
+        frozen = self.gate.authorize(accepted.serialize(), accepted_snapshot.serialize())
+        offered, opening = fixture(ntime=1700000010, secret=(2).to_bytes(32, "big"))
+        # Peers have the dependency, but this gate has not admitted it.
+        self.rpc.snapshots[opening.hash_hex] = opening.serialize().hex()
+        proof = solve_share(offered, opening)
+        block, snapshot = fixture(ntime=1700000011, templates=[self.origin, accepted, offered], shares=[proof])
+        head = self.gate.archive_head()
+        with self.assertRaises(JobOmission):
+            self.gate.authorize(block.serialize(), snapshot.serialize())
+        self.assertEqual(self.gate.archive_head(), head)
+        self.assert_not_admitted(block, snapshot, [proof])
+        self.assert_not_admitted(offered, opening)
+        self.assertTrue(self.gate.ready_for_dispatch(frozen))
+        self.assertEqual([share.proof_id for share in self.gate.eligible_shares()], [acknowledged.proof_id])
+        self.reopen()
+        self.assertEqual(self.gate.archive_head(), head)
+        self.assertTrue(self.gate.ready_for_dispatch(frozen))
+
+    def test_template_omission_cannot_admit_offered_evidence(self):
+        offered, opening = fixture(ntime=1700000010, secret=(2).to_bytes(32, "big"))
+        self.rpc.snapshots[opening.hash_hex] = opening.serialize().hex()
+        proof = solve_share(offered, opening)
+        block, snapshot = self.job(shares=[proof], templates=[offered])
+        head = self.gate.archive_head()
+        with self.assertRaises(TemplateOmission):
+            self.gate.authorize(block.serialize(), snapshot.serialize())
+        self.assertEqual(self.gate.archive_head(), head)
+        self.assert_not_admitted(block, snapshot, [proof])
+        self.assert_not_admitted(offered, opening)
+
+    def test_bad_job_policy_does_not_admit_snapshot(self):
+        block, snapshot = fixture(pool=4, templates=[self.origin])
+        head = self.gate.archive_head()
+        with self.assertRaisesRegex(ValueError, "policy"):
+            self.gate.authorize(block.serialize(), snapshot.serialize())
+        self.assertEqual(self.gate.archive_head(), head)
+        self.assert_not_admitted(block, snapshot)
+
+    def test_failed_native_job_or_proof_does_not_admit_evidence(self):
+        offered, opening = fixture(ntime=1700000010, secret=(2).to_bytes(32, "big"))
+        self.rpc.snapshots[opening.hash_hex] = opening.serialize().hex()
+        proof = solve_share(offered, opening)
+        block, snapshot = self.job(shares=[proof], templates=[self.origin, offered])
+        head = self.gate.archive_head()
+        native_snapshots = dict(self.rpc.snapshots)
+        for failure in ("template_error", "share_error"):
+            with self.subTest(failure=failure):
+                setattr(self.rpc, failure, "native validation refused")
+                with self.assertRaisesRegex(ValueError, "native validation refused"):
+                    self.gate.authorize(block.serialize(), snapshot.serialize())
+                setattr(self.rpc, failure, None)
+                self.assertEqual(self.gate.archive_head(), head)
+                self.assert_not_admitted(block, snapshot, [proof])
+                self.assert_not_admitted(offered, opening)
+                self.assertEqual(self.rpc.snapshots, native_snapshots)
+
+    def test_authorization_admits_complete_offer_in_one_commit(self):
+        offered, opening = fixture(ntime=1700000010, secret=(2).to_bytes(32, "big"))
+        self.rpc.snapshots[opening.hash_hex] = opening.serialize().hex()
+        proof = solve_share(offered, opening)
+        block, snapshot = self.job(shares=[proof], templates=[self.origin, offered])
+        with patch.object(self.gate, "_persist", wraps=self.gate._persist) as persist:
+            authorization = self.gate.authorize(block.serialize(), snapshot.serialize())
+        self.assertEqual(persist.call_count, 1)
+        self.assertEqual(authorization.receipt_sequence, 1)
+        self.assertNotIn(snapshot.hash_hex, self.rpc.snapshots)
+        head = self.gate.archive_head()
+        self.assertTrue(self.gate.ready_for_dispatch(authorization))
+        self.reopen()
+        self.assertEqual(self.gate.archive_head(), head)
+        self.assertFalse(self.gate.receive(proof))
+        self.assertEqual(self.gate.snapshot_bytes(opening.hash_hex), opening.serialize())
+        # The just-issued job is excluded from its own coverage on retry.
+        self.gate.authorize(block.serialize(), snapshot.serialize())
+        self.assertEqual(self.gate.archive_head(), head)
+
+    def test_failed_job_does_not_admit_rpc_fetched_candidate_or_parent(self):
+        parent, parent_snapshot = self.job()
+        self.rpc.publish(parent, parent_snapshot)
+        block, snapshot = fixture(height=2, native_parent=int(self.rpc.tip, 16),
+            ntime=1700000010, parent_snapshot=parent_snapshot, templates=[self.origin])
+        self.rpc.snapshots[snapshot.hash_hex] = snapshot.serialize().hex()
+        head = self.gate.archive_head()
+        self.rpc.template_error = "native validation refused"
+        with self.assertRaisesRegex(ValueError, "native validation refused"):
             self.gate.authorize(block.serialize())
+        self.assertEqual(self.gate.archive_head(), head)
+        self.assert_not_admitted(block, snapshot)
+        self.assert_not_admitted(parent, parent_snapshot)
+        self.rpc.template_error = None
+        self.gate.authorize(block.serialize())
+        self.assertEqual(self.gate.snapshot_bytes(parent_snapshot.hash_hex), parent_snapshot.serialize())
+
+    def test_authorization_quota_failure_rolls_back_whole_offer(self):
+        offered, opening = fixture(ntime=1700000010, secret=(2).to_bytes(32, "big"))
+        self.rpc.snapshots[opening.hash_hex] = opening.serialize().hex()
+        proof = solve_share(offered, opening)
+        block, snapshot = self.job(shares=[proof], templates=[self.origin, offered])
+        head = self.gate.archive_head()
+        self.reopen(quota=max(4096, head["bytes"] + 1))
+        with self.assertRaisesRegex(ValueError, "quota"):
+            self.gate.authorize(block.serialize(), snapshot.serialize())
+        self.assertEqual(self.gate.archive_head(), head)
+        self.assert_not_admitted(block, snapshot, [proof])
+        self.assert_not_admitted(offered, opening)
+        self.reopen()
+        self.assertEqual(self.gate.archive_head(), head)
+        self.gate.authorize(block.serialize(), snapshot.serialize())
 
     def test_unworked_template_coverage_is_required(self):
         other, opening = fixture(ntime=1700000003)
@@ -166,11 +297,34 @@ class HashGateTests(unittest.TestCase):
             self.gate.receive(proof)
         self.assertEqual(self.gate.archive_head(), head)
 
+    def test_proof_must_retain_exact_origin_job_signature(self):
+        proof = solve_share(self.origin, self.opening)
+        head = self.gate.archive_head()
+        changed = replace(proof, owner_signature=b"x" * 64)
+        self.assertEqual(changed.proof_id, proof.proof_id)
+        with self.assertRaisesRegex(ValueError, "full origin snapshot"):
+            self.gate.receive(changed)
+        self.assertEqual(self.gate.archive_head(), head)
+        self.assertTrue(self.gate.receive(proof))
+
     def test_native_tip_race_refuses_authorization(self):
         block, snapshot = self.job()
+        head = self.gate.archive_head()
         self.rpc.race = True
         with self.assertRaisesRegex(ValueError, "tip changed"):
             self.gate.authorize(block.serialize(), snapshot.serialize())
+        self.assertEqual(self.gate.archive_head(), head)
+        self.assert_not_admitted(block, snapshot)
+
+    def test_final_tip_race_does_not_admit_previously_validated_evidence(self):
+        block, snapshot = self.job()
+        head = self.gate.archive_head()
+        # The full candidate check, then the final precommit tip check.
+        with patch.object(self.gate, "_stable", side_effect=[None, ValueError("native tip changed")]):
+            with self.assertRaisesRegex(ValueError, "tip changed"):
+                self.gate.authorize(block.serialize(), snapshot.serialize())
+        self.assertEqual(self.gate.archive_head(), head)
+        self.assert_not_admitted(block, snapshot)
 
     def test_seal_failure_returns_no_ack_and_restart_preserves_commit(self):
         proof = solve_share(self.origin, self.opening)
