@@ -20,6 +20,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -170,6 +171,9 @@ public:
         //! height until the parent block's median-time-past reaches this
         //! value (see -rdtsexpiry). Requires a blake2b activation height.
         std::optional<int64_t> rdts_expiry_time{};
+        //! If set, {start height, end height, depth} for the temporary
+        //! extended generation maturity (see -coinbasematuritylong).
+        std::optional<std::tuple<int, int, int>> coinbase_maturity_long{};
         std::optional<std::vector<unsigned char>> blake2b_headline{};
     };
 

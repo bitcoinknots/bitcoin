@@ -93,6 +93,18 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         options.rdts_expiry_time = expiry;
     }
 
+    if (const auto arg{args.GetArg("-coinbasematuritylong")}; arg) {
+        std::vector<std::string> fields{SplitString(*arg, ':')};
+        int start{}, end{}, depth{};
+        if (fields.size() != 3 || !ParseInt32(fields[0], &start) || !ParseInt32(fields[1], &end) || !ParseInt32(fields[2], &depth)) {
+            throw std::runtime_error(strprintf("Invalid format (%s) for -coinbasematuritylong=<start>:<end>:<depth>.", *arg));
+        }
+        if (start < 0 || end <= start || depth < COINBASE_MATURITY) {
+            throw std::runtime_error(strprintf("Invalid values (%s) for -coinbasematuritylong=<start>:<end>:<depth>: need 0 <= start < end and a depth of at least %d.", *arg, COINBASE_MATURITY));
+        }
+        options.coinbase_maturity_long.emplace(start, end, depth);
+    }
+
     if (const auto arg{args.GetArg("-blake2b_headline")}; arg) {
         if (!options.activation_heights.contains(Consensus::BuriedDeployment::DEPLOYMENT_BLAKE2B)) {
             throw std::runtime_error("-blake2b_headline requires -testactivationheight=blake2b@<height>");

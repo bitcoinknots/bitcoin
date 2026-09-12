@@ -653,6 +653,13 @@ public:
             }
         }
 
+        if (opts.coinbase_maturity_long) {
+            const auto& [start, end, depth] = *opts.coinbase_maturity_long;
+            consensus.CoinbaseMaturityLongStartHeight = start;
+            consensus.CoinbaseMaturityLongEndHeight = end;
+            consensus.CoinbaseMaturityLong = depth;
+        }
+
         if (opts.blake2b_headline) {
             consensus.Blake2bHeadline = *opts.blake2b_headline;
         }
