@@ -433,12 +433,13 @@ void Chainstate::MaybeUpdateMempoolForReorg(
 
         // If the transaction spends any coinbase outputs, it must be mature.
         if (it->GetSpendsCoinbase()) {
+            const auto mempool_spend_height{m_chain.Tip()->nHeight + 1};
+            const CoinbaseMaturity maturity{m_chainman.GetConsensus().CoinbaseMaturityInForce()};
             for (const CTxIn& txin : tx.vin) {
                 if (m_mempool->exists(GenTxid::Txid(txin.prevout.hash))) continue;
                 const Coin& coin{CoinsTip().AccessCoin(txin.prevout)};
                 assert(!coin.IsSpent());
-                const auto mempool_spend_height{m_chain.Tip()->nHeight + 1};
-                if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < COINBASE_MATURITY) {
+                if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < maturity.Required(coin.nHeight)) {
                     return true;
                 }
             }
@@ -1015,7 +1016,8 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     // The mempool holds txs for the next block, so pass height+1 to CheckTxInputs
     const auto block_height_current = m_active_chainstate.m_chain.Height();
     const auto block_height_next = block_height_current + 1;
-    if (!Consensus::CheckTxInputs(tx, state, m_view, block_height_next, ws.m_base_fees, CheckTxInputsRules::OutputSizeLimit)) {
+    if (!Consensus::CheckTxInputs(tx, state, m_view, block_height_next, ws.m_base_fees, CheckTxInputsRules::OutputSizeLimit,
+                                  m_active_chainstate.m_chainman.GetConsensus().CoinbaseMaturityInForce())) {
         return false; // state filled in by CheckTxInputs
     }
 
@@ -3020,7 +3022,8 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         {
             CAmount txfee = 0;
             TxValidationState tx_state;
-            if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, chk_input_rules)) {
+            if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, chk_input_rules,
+                                          params.GetConsensus().CoinbaseMaturityInForce())) {
                 // Any transaction validation failure in ConnectBlock is a block consensus failure
                 state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
                               tx_state.GetRejectReason(),
@@ -3873,7 +3876,7 @@ bool Chainstate::ActivateBestChainStep(BlockValidationState& state, CBlockIndex*
         // any disconnected transactions back to the mempool.
         MaybeUpdateMempoolForReorg(disconnectpool, true);
     }
-    if (m_mempool) m_mempool->check(this->CoinsTip(), this->m_chain.Height() + 1);
+    if (m_mempool) m_mempool->check(this->CoinsTip(), this->m_chain.Height() + 1, m_chainman.GetConsensus().CoinbaseMaturityInForce());
 
     CheckForkWarningConditions();
 
@@ -5208,7 +5211,7 @@ MempoolAcceptResult ChainstateManager::ProcessTransaction(const CTransactionRef&
         return MempoolAcceptResult::Failure(state);
     }
     auto result = AcceptToMemoryPool(active_chainstate, tx, GetTime(), ignore_rejects, test_accept);
-    active_chainstate.GetMempool()->check(active_chainstate.CoinsTip(), active_chainstate.m_chain.Height() + 1);
+    active_chainstate.GetMempool()->check(active_chainstate.CoinsTip(), active_chainstate.m_chain.Height() + 1, GetConsensus().CoinbaseMaturityInForce());
     return result;
 }
 

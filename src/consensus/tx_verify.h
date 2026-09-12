@@ -6,6 +6,7 @@
 #define BITCOIN_CONSENSUS_TX_VERIFY_H
 
 #include <consensus/amount.h>
+#include <consensus/consensus.h>
 
 #include <stdint.h>
 #include <vector>
@@ -55,7 +56,7 @@ bool CheckOutputSizes(const CTransaction& tx, TxValidationState& state);
  * @param[out] txfee Set to the transaction fee if successful.
  * Preconditions: tx.IsCoinBase() is false.
  */
-[[nodiscard]] bool CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, CheckTxInputsRules rules);
+[[nodiscard]] bool CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, CheckTxInputsRules rules, CoinbaseMaturity maturity);
 } // namespace Consensus
 
 /** Auxiliary functions for transaction validation (ideally should not be exposed) */

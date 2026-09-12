@@ -172,7 +172,7 @@ bool Consensus::CheckOutputSizes(const CTransaction& tx, TxValidationState& stat
     return true;
 }
 
-bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, const CheckTxInputsRules rules)
+bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, const CheckTxInputsRules rules, const CoinbaseMaturity maturity)
 {
     // are the actual inputs available?
     if (!inputs.HaveInputs(tx)) {
@@ -192,7 +192,7 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, 
         assert(!coin.IsSpent());
 
         // If prev is coinbase, check that it's matured
-        if (coin.IsCoinBase() && nSpendHeight - coin.nHeight < COINBASE_MATURITY) {
+        if (coin.IsCoinBase() && nSpendHeight - coin.nHeight < maturity.Required(coin.nHeight)) {
             return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, "bad-txns-premature-spend-of-coinbase",
                 strprintf("tried to spend coinbase at depth %d", nSpendHeight - coin.nHeight));
         }
