@@ -13,6 +13,11 @@
 #include <map>
 #include <vector>
 
+//! Far-future placeholder activation height for Proof of Decentralization on
+//! the public networks: present in the rules, dormant until the network's
+//! operators choose a real height. Roughly two centuries out at 10 min/block.
+static constexpr int DEFAULT_DECENT_ACTIVATION_HEIGHT{10'500'000};
+
 namespace Consensus {
 
 /**
@@ -161,6 +166,23 @@ struct Params {
      */
     bool signet_blocks{false};
     std::vector<uint8_t> signet_challenge;
+
+    /**
+     * Proof of Decentralization. From decent_activation_height, every coinbase output carrying
+     * value must be held in escrow, releasable only by a 2-of-3 signature from
+     * the current elected authority, to the payee named in it or to the
+     * authority's own timelocked address. See doc/proof-of-luke.md.
+     *
+     * Left far in the future on the public networks, as a placeholder for the
+     * network's operators to decide; dormant until then.
+     */
+    int decent_activation_height{DEFAULT_DECENT_ACTIVATION_HEIGHT};
+    /** Length of an authority term in blocks; the authority is re-elected each term. */
+    int decent_term_length{20000};
+    /** Blocks a claimed coinbase stays locked after the claim confirms. */
+    int decent_claim_maturity{10000};
+    /** The three compressed pubkeys that form the authority for the first term. */
+    std::vector<std::vector<unsigned char>> decent_bootstrap_authority;
 
     int DeploymentHeight(BuriedDeployment dep) const
     {
