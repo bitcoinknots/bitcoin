@@ -703,6 +703,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-uaspoof=<ua>", strprintf("Replace entire user agent string with custom identifier (should be formatted '%s' as specified in BIP 14)", BIP14_EXAMPLE_UA), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::CONNECTION);
 
     SetupChainParamsBaseOptions(argsman);
+    argsman.AddArg("-decentralvote=<pubkey>", "On a Proof of Decentralization network, cast this node's vote for the next authority by naming a compressed public key in each block it mines.", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
     argsman.AddArg("-consensusrules=<rules>", "Enforce the specified consensus rules (default: none).", ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
 
     argsman.AddArg("-acceptnonstddatacarrier",
