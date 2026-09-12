@@ -426,16 +426,16 @@ BOOST_AUTO_TEST_CASE(batched_coinbase_maturity_schedule)
     BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(10, inactive, inactive), COINBASE_MATURITY);
     const int start = 51;
     const int expiry = 151;
-    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(50, start, expiry), COINBASE_MATURITY);
-    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(51, start, expiry), EXTENDED_COINBASE_MATURITY_SHORT); // %6==0
-    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(52, start, expiry), EXTENDED_COINBASE_MATURITY_MID);
-    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(53, start, expiry), EXTENDED_COINBASE_MATURITY_MID);
-    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(54, start, expiry), EXTENDED_COINBASE_MATURITY_LONG);
-    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(151, start, expiry), COINBASE_MATURITY);
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(50, start, expiry, 0), COINBASE_MATURITY);
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(51, start, expiry, 0), EXTENDED_COINBASE_MATURITY_SHORT);
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(52, start, expiry, 1), EXTENDED_COINBASE_MATURITY_MID);
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(53, start, expiry, 2), EXTENDED_COINBASE_MATURITY_MID);
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(54, start, expiry, 3), EXTENDED_COINBASE_MATURITY_LONG);
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(151, start, expiry, 0), COINBASE_MATURITY);
     // lock sticks: same bounds as a tip that has already crossed expiry
     // still classify window coins as extended. height 151 is first post-expiry.
-    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(51, start, expiry), EXTENDED_COINBASE_MATURITY_SHORT);
-    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(54, start, expiry), EXTENDED_COINBASE_MATURITY_LONG);
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(51, start, expiry, 0), EXTENDED_COINBASE_MATURITY_SHORT);
+    BOOST_CHECK_EQUAL(Consensus::RequiredCoinbaseMaturity(54, start, expiry, 5), EXTENDED_COINBASE_MATURITY_LONG);
 }
 
 BOOST_AUTO_TEST_CASE(extended_coinbase_maturity_bounds)

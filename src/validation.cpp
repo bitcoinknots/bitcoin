@@ -440,7 +440,11 @@ void Chainstate::MaybeUpdateMempoolForReorg(
                 if (m_mempool->exists(GenTxid::Txid(txin.prevout.hash))) continue;
                 const Coin& coin{CoinsTip().AccessCoin(txin.prevout)};
                 assert(!coin.IsSpent());
-                if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < Consensus::RequiredCoinbaseMaturity(coin.nHeight, ext_start, ext_expiry)) {
+                int hash_mod6 = 5;
+                if (const CBlockIndex* created{m_chain.Tip()->GetAncestor(coin.nHeight)}) {
+                    hash_mod6 = Consensus::CoinbaseHashMod6(created->GetBlockHash());
+                }
+                if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < Consensus::RequiredCoinbaseMaturity(coin.nHeight, ext_start, ext_expiry, hash_mod6)) {
                     return true;
                 }
             }
@@ -1019,7 +1023,7 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     const auto block_height_next = block_height_current + 1;
     int ext_start, ext_expiry;
     ExtendedCoinbaseMaturityBounds(m_active_chainstate.m_chainman.GetConsensus(), *m_active_chainstate.m_chain.Tip(), ext_start, ext_expiry);
-    if (!Consensus::CheckTxInputs(tx, state, m_view, block_height_next, ws.m_base_fees, CheckTxInputsRules::OutputSizeLimit, ext_start, ext_expiry)) {
+    if (!Consensus::CheckTxInputs(tx, state, m_view, block_height_next, ws.m_base_fees, CheckTxInputsRules::OutputSizeLimit, ext_start, ext_expiry, m_active_chainstate.m_chain.Tip())) {
         return false; // state filled in by CheckTxInputs
     }
 
@@ -3027,7 +3031,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         {
             CAmount txfee = 0;
             TxValidationState tx_state;
-            if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, chk_input_rules, ext_start, ext_expiry)) {
+            if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, chk_input_rules, ext_start, ext_expiry, pindex)) {
                 // Any transaction validation failure in ConnectBlock is a block consensus failure
                 state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
                               tx_state.GetRejectReason(),

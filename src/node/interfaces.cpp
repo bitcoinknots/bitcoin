@@ -590,7 +590,11 @@ public:
         if (!tip) return COINBASE_MATURITY;
         int ext_start, ext_expiry;
         ExtendedCoinbaseMaturityBounds(chainman().GetConsensus(), *tip, ext_start, ext_expiry);
-        return Consensus::RequiredCoinbaseMaturity(coinbase_height, ext_start, ext_expiry);
+        int hash_mod6 = 5;
+        if (const CBlockIndex* created{chainman().ActiveChain()[coinbase_height]}) {
+            hash_mod6 = Consensus::CoinbaseHashMod6(created->GetBlockHash());
+        }
+        return Consensus::RequiredCoinbaseMaturity(coinbase_height, ext_start, ext_expiry, hash_mod6);
     }
     bool pruneLockExists(const std::string& name) const override
     {

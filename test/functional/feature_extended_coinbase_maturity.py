@@ -7,11 +7,12 @@
 Layout follows knots#402's feature_extended_coinbase_maturity.py so a
 human diff against that PR is mostly the two intended deltas:
 
-  1. Window coinbases use (height - activation) % 6
-       0        -> 2016 confirmations   (1/6 of blocks)
-       1 or 2   -> 4032 confirmations   (2/6)
-       3, 4, 5  -> 8064 confirmations  (1/2)
+  1. Window coinbases use creating-block hash % 6
+       0        -> 2016 confirmations   (~1/6 of blocks)
+       1 or 2   -> 4032 confirmations   (~2/6)
+       3, 4, 5  -> 8064 confirmations   (~1/2)
      instead of a single 26280-block lock. Coinbase size is unchanged.
+     Tranche is unknown until PoW, so miners cannot pick short heights.
   2. The lock is attached to the creating height. After RDTS expiry,
      *new* coinbases use COINBASE_MATURITY (100). Window-created
      coinbases keep their assigned lock. (#402 unlocked them at expiry.)
@@ -56,11 +57,14 @@ EXPIRY = START + 50_000
 REJECT = 'bad-txns-premature-spend-of-coinbase'
 
 
-def maturity_for(height, activation):
-    """Consensus schedule: pre-activation is 100; in-window is batched."""
-    if height < activation:
-        return COINBASE_MATURITY
-    batch = (height - activation) % 6
+def hash_mod6(blockhash_hex):
+    """Match Consensus::CoinbaseHashMod6: GetUint64(0) % 6."""
+    raw = bytes.fromhex(blockhash_hex)[::-1]
+    return int.from_bytes(raw[0:8], "little") % 6
+
+
+def maturity_for_hash(blockhash_hex):
+    batch = hash_mod6(blockhash_hex)
     if batch == 0:
         return EXTENDED_SHORT
     if batch in (1, 2):
@@ -102,6 +106,18 @@ class ExtendedCoinbaseMaturityTest(BitcoinTestFramework):
         node = self.nodes[0]
         txid = node.getblock(node.getblockhash(height))['tx'][0]
         return self.wallet.get_utxo(txid=txid)
+
+    def find_tranche(self, start_height, want_maturity):
+        """Return (height, utxo) of a window coinbase whose hash maps to want_maturity."""
+        node = self.nodes[0]
+        h = start_height
+        while True:
+            while h > node.getblockcount():
+                self.generate(self.wallet, 1, sync_fun=self.no_op)
+            bh = node.getblockhash(h)
+            if maturity_for_hash(bh) == want_maturity:
+                return h, self.coinbase_utxo(h)
+            h += 1
 
     def assert_spend_rejected(self, tx_hex):
         node = self.nodes[0]
@@ -169,9 +185,9 @@ class ExtendedCoinbaseMaturityTest(BitcoinTestFramework):
         self.generate(self.wallet, 1, sync_fun=self.no_op)  # block `activation`, the first in the window
         self.assert_deploymentinfo(active=True, height=activation)
         grandfathered = self.coinbase_utxo(activation - 1)
-        # First window block: (activation - activation) % 6 == 0 -> short tranche
-        locked = self.coinbase_utxo(activation)
-        assert_equal(maturity_for(activation, activation), EXTENDED_SHORT)
+        short_h, locked = self.find_tranche(activation, EXTENDED_SHORT)
+        self.log.info(f"  short-tranche window height {short_h} hash%6={hash_mod6(node.getblockhash(short_h))}")
+        assert_equal(maturity_for_hash(node.getblockhash(short_h)), EXTENDED_SHORT)
 
         self.log.info("Inside the window: pre-activation coinbases keep the 100-block rule")
         self.mine(COINBASE_MATURITY)  # tip = activation + 100
@@ -184,7 +200,7 @@ class ExtendedCoinbaseMaturityTest(BitcoinTestFramework):
         locked_spend = self.wallet.create_self_transfer(utxo_to_spend=locked)
         self.assert_spend_rejected(locked_spend['hex'])
         assert_equal(self.submit_block_with(locked_spend['hex']), REJECT)
-        assert_equal(node.getblockcount(), activation + 101)
+        assert_equal(node.getblockcount(), short_h + COINBASE_MATURITY + 1)
 
         if self.is_wallet_compiled():
             self.log.info("Wallet: an in-window reward stays immature past 100 confirmations")
@@ -214,8 +230,8 @@ class ExtendedCoinbaseMaturityTest(BitcoinTestFramework):
         self.assert_spend_rejected(locked_spend['hex'])
 
         self.log.info(f"Short tranche spendable at exactly {EXTENDED_SHORT} confirmations")
-        self.mine(activation + EXTENDED_SHORT - 2 - node.getblockcount())
-        assert_equal(node.getblockcount(), activation + EXTENDED_SHORT - 2)
+        self.mine(short_h + EXTENDED_SHORT - 2 - node.getblockcount())
+        assert_equal(node.getblockcount(), short_h + EXTENDED_SHORT - 2)
         self.assert_spend_rejected(locked_spend['hex'])
         self.mine(1)
         self.assert_deploymentinfo(active=True, height=activation)
@@ -223,7 +239,7 @@ class ExtendedCoinbaseMaturityTest(BitcoinTestFramework):
         assert_equal(node.getrawmempool(), [locked_spend['txid']])
         self.generate(node, 1, sync_fun=self.no_op)
         mature_block = node.getbestblockhash()
-        assert_equal(node.getblockcount(), activation + EXTENDED_SHORT)
+        assert_equal(node.getblockcount(), short_h + EXTENDED_SHORT)
         assert locked_spend['txid'] in node.getblock(mature_block)['tx']
 
         self.log.info("A reorg below the maturity boundary evicts the spend from the mempool")
@@ -237,11 +253,9 @@ class ExtendedCoinbaseMaturityTest(BitcoinTestFramework):
         assert_equal(node.getrawmempool(), [])
 
         self.log.info("Expiry: window coins stay locked; new coinbases use 100")
-        still_locked_height = activation + 3
-        if node.getblockcount() < still_locked_height:
-            self.mine(still_locked_height - node.getblockcount())
-        still_locked = self.coinbase_utxo(still_locked_height)
-        assert_equal(maturity_for(still_locked_height, activation), EXTENDED_LONG)
+        still_locked_height, still_locked = self.find_tranche(activation, EXTENDED_LONG)
+        assert_equal(maturity_for_hash(node.getblockhash(still_locked_height)), EXTENDED_LONG)
+        self.log.info(f"  long-tranche window height {still_locked_height}")
         still_locked_spend = self.wallet.create_self_transfer(utxo_to_spend=still_locked)
         self.assert_spend_rejected(still_locked_spend['hex'])
 
