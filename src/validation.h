@@ -1441,4 +1441,11 @@ bool IsBIP30Repeat(const CBlockIndex& block_index);
 /** Identifies blocks which coinbase output was subsequently overwritten in the UTXO set (see BIP30) */
 bool IsBIP30Unspendable(const CBlockIndex& block_index);
 
+/** First height on this chain whose parent MTP >= time, or INT_MAX if tip has not reached it. */
+int FirstHeightWithParentMtpAtLeast(const CBlockIndex& tip, int64_t time);
+
+/** Window bounds for the batched extended coinbase-maturity rule on this chain.
+ *  Coins with start <= height < expiry keep the extended schedule after expiry. */
+void ExtendedCoinbaseMaturityBounds(const Consensus::Params& params, const CBlockIndex& tip, int& start_height, int& expiry_height);
+
 #endif // BITCOIN_VALIDATION_H

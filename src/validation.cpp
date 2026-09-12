@@ -433,12 +433,14 @@ void Chainstate::MaybeUpdateMempoolForReorg(
 
         // If the transaction spends any coinbase outputs, it must be mature.
         if (it->GetSpendsCoinbase()) {
+            const auto mempool_spend_height{m_chain.Tip()->nHeight + 1};
+            int ext_start, ext_expiry;
+            ExtendedCoinbaseMaturityBounds(m_chainman.GetConsensus(), *m_chain.Tip(), ext_start, ext_expiry);
             for (const CTxIn& txin : tx.vin) {
                 if (m_mempool->exists(GenTxid::Txid(txin.prevout.hash))) continue;
                 const Coin& coin{CoinsTip().AccessCoin(txin.prevout)};
                 assert(!coin.IsSpent());
-                const auto mempool_spend_height{m_chain.Tip()->nHeight + 1};
-                if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < COINBASE_MATURITY) {
+                if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < Consensus::RequiredCoinbaseMaturity(coin.nHeight, ext_start, ext_expiry)) {
                     return true;
                 }
             }
@@ -1015,7 +1017,9 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     // The mempool holds txs for the next block, so pass height+1 to CheckTxInputs
     const auto block_height_current = m_active_chainstate.m_chain.Height();
     const auto block_height_next = block_height_current + 1;
-    if (!Consensus::CheckTxInputs(tx, state, m_view, block_height_next, ws.m_base_fees, CheckTxInputsRules::OutputSizeLimit)) {
+    int ext_start, ext_expiry;
+    ExtendedCoinbaseMaturityBounds(m_active_chainstate.m_chainman.GetConsensus(), *m_active_chainstate.m_chain.Tip(), ext_start, ext_expiry);
+    if (!Consensus::CheckTxInputs(tx, state, m_view, block_height_next, ws.m_base_fees, CheckTxInputsRules::OutputSizeLimit, ext_start, ext_expiry)) {
         return false; // state filled in by CheckTxInputs
     }
 
@@ -2993,6 +2997,9 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
 
     const CheckTxInputsRules chk_input_rules{reduced_data_active ? CheckTxInputsRules::OutputSizeLimit : CheckTxInputsRules::None};
 
+    int ext_start, ext_expiry;
+    ExtendedCoinbaseMaturityBounds(params.GetConsensus(), *Assert(pindex->pprev), ext_start, ext_expiry);
+
     // Check generation tx output sizes if REDUCED_DATA is active
     if (chk_input_rules.test(CheckTxInputsRules::OutputSizeLimit)) {
         TxValidationState tx_state;
@@ -3020,7 +3027,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         {
             CAmount txfee = 0;
             TxValidationState tx_state;
-            if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, chk_input_rules)) {
+            if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, chk_input_rules, ext_start, ext_expiry)) {
                 // Any transaction validation failure in ConnectBlock is a block consensus failure
                 state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
                               tx_state.GetRejectReason(),
@@ -7355,4 +7362,29 @@ std::pair<int, int> ChainstateManager::GetPruneRange(const Chainstate& chainstat
     int prune_end = std::min(last_height_can_prune, max_prune);
 
     return {prune_start, prune_end};
+}
+
+
+int FirstHeightWithParentMtpAtLeast(const CBlockIndex& tip, int64_t time)
+{
+    if (tip.GetMedianTimePast() < time) {
+        return std::numeric_limits<int>::max();
+    }
+    int lo{0};
+    int hi{tip.nHeight};
+    while (lo < hi) {
+        const int mid{lo + (hi - lo) / 2};
+        if (Assert(tip.GetAncestor(mid))->GetMedianTimePast() >= time) {
+            hi = mid;
+        } else {
+            lo = mid + 1;
+        }
+    }
+    return lo + 1;
+}
+
+void ExtendedCoinbaseMaturityBounds(const Consensus::Params& params, const CBlockIndex& tip, int& start_height, int& expiry_height)
+{
+    start_height = FirstHeightWithParentMtpAtLeast(tip, params.ExtendedCoinbaseMaturityStartTime);
+    expiry_height = FirstHeightWithParentMtpAtLeast(tip, params.RdtsExpiryTime);
 }

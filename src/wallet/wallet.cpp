@@ -3646,7 +3646,12 @@ int CWallet::GetTxBlocksToMaturity(const CWalletTx& wtx) const
     }
     int chain_depth = GetTxDepthInMainChain(wtx);
     assert(chain_depth >= 0); // coinbase tx should not be conflicted
-    return std::max(0, (COINBASE_MATURITY+1) - chain_depth);
+    int coinbase_height = 0;
+    if (auto* conf = wtx.state<TxStateConfirmed>()) {
+        coinbase_height = conf->confirmed_block_height;
+    }
+    const int maturity = chain().coinbaseMaturity(coinbase_height);
+    return std::max(0, (maturity + 1) - chain_depth);
 }
 
 bool CWallet::IsTxImmatureCoinBase(const CWalletTx& wtx) const
