@@ -6,7 +6,9 @@
 #ifndef BITCOIN_CONSENSUS_CONSENSUS_H
 #define BITCOIN_CONSENSUS_CONSENSUS_H
 
+#include <algorithm>
 #include <cstdlib>
+#include <limits>
 #include <stdint.h>
 
 /** The maximum allowed size for a serialized block, in bytes (only for buffer size limits) */
@@ -19,6 +21,24 @@ static const unsigned int REDUCED_DATA_MAX_BLOCK_WEIGHT = 800000;
 static const int64_t MAX_BLOCK_SIGOPS_COST = 80000;
 /** Coinbase transaction outputs can only be spent after this number of new blocks (network rule) */
 static const int COINBASE_MATURITY = 100;
+/** Coinbase maturity while the temporary extended maturity is in force: 45 days
+ *  at the target block spacing (network rule) */
+static const int COINBASE_MATURITY_LONG = 6480;
+
+/** The generation maturity in force; default-constructed it is the ordinary rule. */
+struct CoinbaseMaturity {
+    //! Depth required of outputs created in [from_height, to_height).
+    int depth{COINBASE_MATURITY};
+    int from_height{std::numeric_limits<int>::max()};
+    int to_height{std::numeric_limits<int>::max()};
+
+    //! Never below COINBASE_MATURITY.
+    int Required(int coin_height) const
+    {
+        return coin_height >= from_height && coin_height < to_height ? std::max(depth, COINBASE_MATURITY)
+                                                                     : COINBASE_MATURITY;
+    }
+};
 
 static const int WITNESS_SCALE_FACTOR = 4;
 

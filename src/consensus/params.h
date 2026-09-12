@@ -6,6 +6,7 @@
 #ifndef BITCOIN_CONSENSUS_PARAMS_H
 #define BITCOIN_CONSENSUS_PARAMS_H
 
+#include <consensus/consensus.h>
 #include <uint256.h>
 
 #include <chrono>
@@ -123,6 +124,19 @@ struct Params {
      * behaviour is unchanged on chains that do not set it.
      */
     int64_t RdtsExpiryTime{std::numeric_limits<int64_t>::min()};
+    /**
+     * Temporary extended generation maturity: a coinbase output created at a
+     * height in [CoinbaseMaturityLongStartHeight, CoinbaseMaturityLongEndHeight)
+     * must be CoinbaseMaturityLong blocks deep rather than COINBASE_MATURITY.
+     *
+     * Coverage is fixed when the output is created, so an output mined inside
+     * the window serves the full period even past the end height. Nothing
+     * already spendable is immobilized and nothing unlocks in a batch at the
+     * end. Unscheduled by default.
+     */
+    int CoinbaseMaturityLongStartHeight{std::numeric_limits<int>::max()};
+    int CoinbaseMaturityLongEndHeight{std::numeric_limits<int>::max()};
+    int CoinbaseMaturityLong{COINBASE_MATURITY_LONG};
     /** Don't warn about unknown BIP 9 activations below this height.
      * This prevents us from warning about the CSV and segwit activations. */
     int MinBIP9WarningHeight;
@@ -179,6 +193,12 @@ struct Params {
             return Blake2bHeight;
         } // no default case, so the compiler can warn about missing cases
         return std::numeric_limits<int>::max();
+    }
+
+    /** The maturity in force; coverage depends only on the height an output was created at. */
+    CoinbaseMaturity CoinbaseMaturityInForce() const
+    {
+        return {CoinbaseMaturityLong, CoinbaseMaturityLongStartHeight, CoinbaseMaturityLongEndHeight};
     }
 
     bool IsBlake2bHeight(int height) const
