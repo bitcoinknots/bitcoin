@@ -98,6 +98,7 @@ BASE_SCRIPTS = [
     'rpc_combinerawtransaction_unified.py --descriptors',
     'feature_taproot.py',
     'feature_reduced_data_temporary_deployment.py',
+    'feature_coinbase_maturity_long.py',
     'feature_bip9_max_activation_height.py',
     'feature_rdts.py',
     'feature_rdts_ignore_rejects.py',
