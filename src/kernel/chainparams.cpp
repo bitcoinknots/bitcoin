@@ -580,6 +580,80 @@ public:
 };
 
 /**
+ * Proof of Decentralization test chain. Blocks are mined instantly, as on
+ * regtest, so the escrow, election and claim rules can be exercised quickly.
+ * Every coinbase is escrowed from genesis (activation height 0).
+ */
+class CDecentralParams : public CChainParams
+{
+public:
+    explicit CDecentralParams(const DecentralOptions& options)
+    {
+        m_chain_type = ChainType::DECENTRAL;
+        consensus.signet_blocks = false;
+        consensus.signet_challenge.clear();
+        consensus.decent_activation_height = 0;
+        consensus.decent_term_length = options.term_length.value_or(20000);
+        consensus.decent_claim_maturity = options.claim_maturity.value_or(10000);
+        consensus.decent_bootstrap_authority = options.bootstrap;
+        consensus.nSubsidyHalvingInterval = 150;
+        consensus.BIP34Height = 1;
+        consensus.BIP34Hash = uint256();
+        consensus.BIP65Height = 1;
+        consensus.BIP66Height = 1;
+        consensus.CSVHeight = 1;
+        consensus.SegwitHeight = 0;
+        consensus.MinBIP9WarningHeight = 0;
+        consensus.powLimit = uint256{"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
+        consensus.nPowTargetTimespan = 24 * 60 * 60;
+        consensus.nPowTargetSpacing = 10 * 60;
+        consensus.fPowAllowMinDifficultyBlocks = true;
+        consensus.enforce_BIP94 = false;
+        consensus.fPowNoRetargeting = true;
+        consensus.nRuleChangeActivationThreshold = 108;
+        consensus.nMinerConfirmationWindow = 144;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].min_activation_height = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].bit = 2;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nStartTime = Consensus::BIP9Deployment::ALWAYS_ACTIVE;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0;
+        consensus.nMinimumChainWork = uint256{};
+        consensus.defaultAssumeValid = uint256{};
+
+        pchMessageStart[0] = 0x44; // "DECE"
+        pchMessageStart[1] = 0x45;
+        pchMessageStart[2] = 0x43;
+        pchMessageStart[3] = 0x45;
+        nDefaultPort = 28665;
+        nPruneAfterHeight = 1000;
+        m_assumed_blockchain_size = 0;
+        m_assumed_chain_state_size = 0;
+
+        genesis = CreateGenesisBlock(1296688602, 2, 0x207fffff, 1, 50 * COIN);
+        consensus.hashGenesisBlock = genesis.GetHash();
+        assert(consensus.hashGenesisBlock == uint256{"0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"});
+
+        vFixedSeeds.clear();
+        vSeeds.clear();
+        fDefaultConsistencyChecks = false;
+        m_is_mockable_chain = true;
+
+        checkpointData = {{{0, uint256{"0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"}}}};
+        chainTxData = ChainTxData{0, 0, 0};
+
+        base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
+        base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,196);
+        base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,239);
+        base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
+        base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
+        bech32_hrp = "dcrt";
+    }
+};
+
+/**
  * Regression test: intended for private networks only. Has minimal difficulty to ensure that
  * blocks can be found instantly.
  */
@@ -589,6 +663,8 @@ public:
     explicit CRegTestParams(const RegTestOptions& opts)
     {
         m_chain_type = ChainType::REGTEST;
+        // Proof of Decentralization is for the public networks; keep regtest clear of it.
+        consensus.decent_activation_height = std::numeric_limits<int>::max();
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
         consensus.nSubsidyHalvingInterval = 150;
@@ -740,6 +816,11 @@ std::unique_ptr<const CChainParams> CChainParams::SigNet(const SigNetOptions& op
     return std::make_unique<const SigNetParams>(options);
 }
 
+std::unique_ptr<const CChainParams> CChainParams::Decentral(const DecentralOptions& options)
+{
+    return std::make_unique<const CDecentralParams>(options);
+}
+
 std::unique_ptr<const CChainParams> CChainParams::RegTest(const RegTestOptions& options)
 {
     return std::make_unique<const CRegTestParams>(options);
@@ -778,6 +859,7 @@ std::optional<ChainType> GetNetworkForMagic(const MessageStartChars& message)
     const auto testnet4_msg = CChainParams::TestNet4()->MessageStart();
     const auto regtest_msg = CChainParams::RegTest({})->MessageStart();
     const auto signet_msg = CChainParams::SigNet({})->MessageStart();
+    const auto decentral_msg = CChainParams::Decentral({})->MessageStart();
 
     if (std::ranges::equal(message, mainnet_msg)) {
         return ChainType::MAIN;
@@ -789,6 +871,8 @@ std::optional<ChainType> GetNetworkForMagic(const MessageStartChars& message)
         return ChainType::REGTEST;
     } else if (std::ranges::equal(message, signet_msg)) {
         return ChainType::SIGNET;
+    } else if (std::ranges::equal(message, decentral_msg)) {
+        return ChainType::DECENTRAL;
     }
     return std::nullopt;
 }

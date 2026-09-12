@@ -449,6 +449,8 @@ private:
             return " signet";
         case ChainType::REGTEST:
             return " regtest";
+        case ChainType::DECENTRAL:
+            return " decentral";
         case ChainType::MAIN:
             return "";
         }
