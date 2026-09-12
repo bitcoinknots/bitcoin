@@ -13,16 +13,19 @@
 
 /** Separately versioned hash-only profile. No network access or legacy activation. */
 namespace sharepool::hashonly {
-inline constexpr uint32_t VERSION{3};
+inline constexpr uint32_t VERSION{4};
 inline constexpr uint32_t SHARE_TARGET_SHIFT{10}; // Expected ~1024 proofs per native block at unclamped difficulty.
 inline constexpr uint32_t MAX_SNAPSHOT_BYTES{16 * 1024 * 1024};
 inline constexpr uint32_t MAX_TEMPLATE_BYTES{4'000'000};
+inline constexpr uint32_t MAX_EXPANDED_TEMPLATE_BYTES{512 * 1024 * 1024};
+inline constexpr uint32_t MAX_TEMPLATE_TX_REFERENCES{2'000'000};
+inline constexpr uint32_t MAX_ORIGIN_CHECKS{2048};
 inline constexpr uint32_t MAX_DEPENDENCY_DEPTH{64};
 inline constexpr uint32_t MAX_DEPENDENCY_BYTES{64 * 1024 * 1024};
 
 struct TemplateRecord {
     uint256 id;
-    std::vector<unsigned char> block;
+    CBlock block; // Transactions share immutable references after canonical table decoding.
 };
 
 struct Snapshot {
@@ -81,6 +84,7 @@ Snapshot DecodeSnapshot(Span<const unsigned char> bytes);
 /** Bounded full native-body decoders; native UTXO/witness rules remain external. */
 CBlock DecodeTemplate(Span<const unsigned char> bytes);
 CBlock DecodeBlock(Span<const unsigned char> bytes);
+CTransactionRef DecodeTransaction(Span<const unsigned char> bytes);
 uint256 SnapshotHash(const Snapshot& snapshot);
 /** Hash exact bytes without decoding; callers must enforce canonical decoding. */
 uint256 SnapshotHash(Span<const unsigned char> bytes);
@@ -106,7 +110,7 @@ Result CheckSnapshot(const CBlock& block, const CBlockIndex* previous,
                      const Consensus::Params& consensus, const Lookup& lookup,
                      const ValidateOrigin& validate_origin,
                      std::optional<CAmount> expected_reward = std::nullopt,
-                     uint32_t depth = 0);
+                     uint32_t depth = 0, bool allow_unsigned = false);
 /** Standalone proof admission; paid-state/repeat-payment checks remain settlement rules. */
 Result CheckShareProof(const Share& share, const CBlock& full_origin,
                        const CBlockIndex* settlement_parent, uint32_t settlement_time,

@@ -1,4 +1,4 @@
-# Hash-only settlement test profile, version 3
+# Hash-only settlement test profile, version 4
 
 This separately enabled regtest profile places the flat hash of a complete
 canonical settlement snapshot in the native header's `m_mm_rhs` field. The
@@ -8,9 +8,9 @@ the Bitcoin block. Coinbase contains the actual payouts and, where applicable,
 the ordinary Bitcoin witness commitment; it contains no settlement carriers.
 
 The profile is an implementation for testing. Mainnet remains disabled. The
-version 1 self-contained profile and its durable gate remain separate. Version 3
-changes the wire format and rule hash from the earlier v2 experiment; start a
-fresh chain. Native snapshots use a separate `sharepool-snapshots-v3` database.
+version 1 self-contained profile and its durable gate remain separate. Version 4
+changes the transaction representation and rule hash from v3; start a
+fresh chain. Native snapshots use a separate `sharepool-snapshots-v4` database.
 
 ## Native activation and interfaces
 
@@ -25,8 +25,15 @@ Public networks reject this override. Without `-sharepoolhashonly=1`, an
 explicit `-sharepoolheight` continues to select the separate version 1 profile.
 Changing the profile of an existing chain is not a migration procedure.
 
-- `submitsharepoolhashsnapshot(hex)` durably stores a bounded preimage and retries
-  pending blocks. Its `stored`/`present` result does not certify validity.
+- `preparesharepoolhashjob(unsigned_snapshot)` uses the native mempool to construct
+  the complete job, derive paid state, calculate exact fees and reserve payout
+  space. It validates the unsigned job and all signed dependencies before
+  returning the exact statement for the external signer.
+- `finalizesharepoolhashjob(template, signed_snapshot)` inserts the signed flat
+  commitment and validates the complete current-tip job. Neither builder RPC
+  admits evidence or authorizes mining; the durable gate must still approve it.
+- `submitsharepoolhashsnapshot(hex)` durably stores a bounded preimage and signals
+  the dedicated worker to retry pending blocks. Its `stored`/`present` result does not certify validity.
 - `getsharepoolhashsnapshot(hash)` returns complete bytes; `getsharepoolhashstatus`
   reports the active profile, available objects and pending-block count.
 - `validatesharepoolhashtemplate(hex, snapshot_hex)` checks the full native
@@ -50,7 +57,10 @@ bound overtaking among continuously ready connections in each priority class.
 Required block data has priority. Fairness is per connection, not per operator.
 Requests expire even when send buffers are paused.
 Local snapshot storage retains up to 1 GiB and 65,536 objects; separately stored
-validated template bodies are bounded to 256 MiB and 65,536 objects. The pending
+validated templates use shared Wtxid-keyed transaction storage, bounded to
+256 MiB of encoded transactions/references, 65,536 template records and 262,144
+transaction records. The 64 MiB transaction cache also accounts serialized bytes,
+not complete allocator/RSS cost. The pending
 queue holds at most 16 blocks and 64 MiB. These are local resource limits, not
 proof that an unavailable committed snapshot violates consensus.
 
@@ -63,14 +73,16 @@ Domain strings include their terminating NUL.
 The rules commitment is:
 
 ```
-H("SharePool/rules/v3\0" ||
+H("SharePool/rules/v4\0" ||
   uint32(0x207fffff) || uint32(10) || uint32(3) || uint32(16*1024*1024) ||
-  uint32(4_000_000) || uint32(64) || uint32(64*1024*1024))
+  uint32(4_000_000) || uint32(64) || uint32(64*1024*1024) ||
+  uint32(512*1024*1024) || uint32(2_000_000) || uint32(2048))
 ```
 
 These fields specify the maximum share target, target scaling shift, maximum
 age, snapshot bytes, individual template bytes, dependency depth, and unique
-dependency bytes. Each proof's target is derived from its contextual native
+dependency bytes, summed expanded template bytes, transaction references and
+unique origin validations per walk. Each proof's target is derived from its contextual native
 header difficulty; a miner cannot select an easier target independently:
 
 ```
@@ -90,32 +102,45 @@ roughly targets 1024 shares per network block at an unclamped difficulty; a smal
 pool receives only its fraction of that rate. Operational share rates, variance,
 validation cost and admission policy need calibration before deployment. Regtest
 hits the easy-target clamp and does not benchmark production hashing.
+Matching a regular pool also requires a comparable miner share rate and payout
+window. The current one-time payment and network-height expiry are not a
+rolling PPLNS/TIDES window; see [the comparison](sharepool-difficulty-capacity.md).
 There is no independent 32-share snapshot ceiling. Consensus byte and dependency
 budgets remain necessary, and the actual payout outputs still consume block
 space. Removing a proof-count limit does not make resources unlimited.
 
 The complete snapshot serializes, in order:
 
-1. A version 3 envelope using the original envelope layout: genesis, rules,
+1. A version 4 envelope using the original envelope layout: genesis, rules,
    height, native parent, nonzero pool ID, x-only owner public key and payout
    script. All three former root fields are reserved and must be zero.
 2. The fixed 64-byte owner authorization.
 3. A uint256 exact-job commitment.
-4. A vector of template records, each containing its uint256 normalized
-   template ID and a byte vector of the full normalized native block body.
-5. A vector of shares, each containing its full native header, version 3 origin
+4. A vector of unique full transaction byte vectors, including witness, ordered
+   strictly by serialized Wtxid bytes.
+5. A vector of template records: uint256 normalized ID, complete normalized
+   native header, and CompactSize indexes into the transaction table in that
+   template's exact transaction order.
+6. A vector of shares, each containing its full native header, version 4 origin
    envelope and fixed 64-byte owner authorization.
-6. A vector of post-state entries: uint32 origin height and uint256 proof ID.
-7. A vector of actual monetary `CTxOut` payouts.
+7. A vector of post-state entries: uint32 origin height and uint256 proof ID.
+8. A vector of actual monetary `CTxOut` payouts.
 
 Template records are unique and sorted by their serialized uint256 ID bytes.
 Proofs and paid-state entries are unique and sorted by numeric proof ID.
 Payouts are unique and sorted by script bytes. Scripts are compared as exact
 bytes, not address strings. Reject trailing bytes and noncanonical encodings.
-Decoders bound counts by bytes remaining before allocating or looping.
+Decoders bound counts by bytes remaining before allocating or looping. Every
+table entry must be referenced. Out-of-range indexes, duplicate/unsorted Wtxids,
+unused transactions and expanded resource overflows are rejected. Each expanded
+body must have the claimed transaction count, template ID and ordinary native
+transaction root. Different witness bytes are distinct table entries even when
+their txids agree. C++ templates share immutable transaction references; the
+Python codec shares immutable serialized transaction bytes. This saves repeated
+transaction bodies without changing what the flat commitment attests.
 
 ```
-m_mm_rhs = H("SharePool/snapshot/v3\0" || complete_snapshot_bytes)
+m_mm_rhs = H("SharePool/snapshot/v4\0" || complete_snapshot_bytes)
 ```
 
 This is one flat digest of all those bytes. It does not construct a settlement
@@ -125,9 +150,9 @@ Bitcoin block validation.
 The signature binds both the exact job and every snapshot field:
 
 ```
-job = H("SharePool/job/v3\0" || full_normalized_block_with_m_mm_rhs_zero)
-contents = H("SharePool/contents/v3\0" || snapshot_with_64_zero_signature_bytes)
-message = H("SharePool/owner/v3\0" || envelope || job || contents)
+job = H("SharePool/job/v4\0" || full_normalized_block_with_m_mm_rhs_zero)
+contents = H("SharePool/contents/v4\0" || snapshot_with_64_zero_signature_bytes)
+message = H("SharePool/owner/v4\0" || envelope || job || contents)
 ```
 
 The snapshot includes `job` before calculating `contents`. The owner signs
@@ -195,16 +220,17 @@ before template admission or mining authorization, and again for each origin
 before proof admission. The separate native proof RPC authenticates work and
 attribution. Snapshot inventory never authorizes hash power.
 
-Before authorizing a new current-tip job, the gate stages and validates its
-templates and proofs without admitting them. The selected snapshot must include every locally known,
-currently eligible unpaid proof and every known eligible template, excluding
-the containing job itself. Newly supplied evidence receives the same validation
-as separately received evidence. Another miner's different receipt history does
-not alter native block validity. Failed native checks, omissions, tip races or
-quota refusals leave the gate's journal and evidence revision unchanged. On
-success, one journal transaction admits the offered evidence and freezes the
-job. Explicitly announce an accepted snapshot with `register_snapshot()`;
-authorization itself uses the native in-memory overlay.
+Before authorizing a new current-tip job, the gate stages and validates offered
+templates and proofs without admitting them. It selects a bounded prefix of
+eligible unpaid acknowledged work in `(origin height, numeric proof ID)` order.
+The snapshot contains the complete origins of those selected proofs. Unworked
+issued templates remain archived but are not mandatory settlement records.
+Different receipt histories affect local mining choices, never block consensus.
+Deferred receipts remain durable; actual canonical settlement determines payment.
+Missing historical data is reported as unknown, never as proof of payment.
+Failed checks, omitted selected work, tip races or storage refusals leave the
+journal and evidence revision unchanged. Explicitly announce an accepted
+snapshot with `register_snapshot()`; authorization uses a read-only native overlay.
 
 The return value freezes the complete job, snapshot and durable journal
 sequence. Check `ready_for_dispatch()` immediately before dispatch and watch
@@ -214,18 +240,19 @@ proof can only enter later eligible snapshots.
 
 The journal stores full snapshot, normalized template and proof bytes as a
 contiguous append-only hash chain. Each proof increments a monotonic receipt
-revision; pruning never resets it because this initial version 3 gate does not
-prune journal evidence. SQLite WAL/FULL commits precede an atomically written,
+revision; moving old bodies to immutable archive segments never resets it. SQLite WAL/FULL commits precede an atomically written,
 fsynced protected checkpoint and any positive acknowledgement. A crash after
 the database commit but before checkpoint completion returns no acknowledgement;
 startup verifies the full extension and conservatively preserves that work.
 
-The default logical journal quota is 512 MiB, configurable from 4096 bytes to
-4 GiB, with at most one million events. It counts encoded records, not all disk
-use. SQLite indexes, WAL, backups and filesystem overhead need additional disk
-space. Quota exhaustion refuses new admission before acknowledging it; it never
-evicts known work. This initial gate's finite, unpruned journal is a deployment
-limit, not an indefinite retention service.
+The resident journal quota is configurable. With an explicit archive directory,
+old bodies can be rotated into verified immutable segments before new admission.
+The journal retains their hash, sequence, receipt revision and segment location;
+reads verify the external frame and body. Rollover fsyncs the segment before an
+atomic database switch. Missing/corrupt cold data fails closed. Lifetime counters
+are bounded uint63 values, separate from resident quotas. Physical disk, SQLite
+metadata growth and startup history verification remain operational costs.
+Without configured cold storage, exhaustion refuses new work before ACK.
 
 Startup verifies schema, policy, bounded row lengths/counts, data hashes, event
 sequence/linkage, every retained proof's full origin, and the protected
@@ -237,9 +264,11 @@ ancestor hashes; retained old evidence is never silently lost.
 
 Keep the checkpoint independently protected and backed up. Restoring both the
 database and checkpoint to the same old state cannot be detected using those
-two files alone. The version 1 export/recovery API is not compatible with this
-new journal; an independently verified streaming export/import workflow for the
-version 3 journal is still required before operational deployment.
+two files alone. The separate hash-gate streaming archive supports full/incremental exports and
+restore into a fresh destination, with trusted checkpoint verification and native
+branch revalidation before publication. It does not reuse the version 1 format.
+See [local durability](sharepool-local-durability.md) for the checksum-protected
+signer key format, explicit migration, archive and recovery boundaries.
 
 ## Python integration
 
@@ -251,35 +280,54 @@ wire bytes and commitment. Fixture signing helpers are for tests.
 
 The gate exposes `register_snapshot(raw)`, `register_template(raw)`,
 `receive(share)`, `active_templates()`, `eligible_shares()`,
-`make(ntime=..., sign_owner=...)`, and
+`make_native(sign_owner=...)`, and
 `authorize(block_raw, snapshot_raw=None)`. All native dependencies must be
 available before template/proof validation. The caller manages native P2P
 snapshot publication and imports fetched template/proof records through the
 gate; merely storing a peer snapshot does not acknowledge its individual work.
 
 Deterministic Python tests cover a 100-proof snapshot and 100 durable
-acknowledgements, restart and omission policy, full template coverage, malformed
+acknowledgements, restart and omission policy, complete selected-proof origin coverage, malformed
 canonical data, missing-dependency refusal, frozen jobs, tip races, quota
 rollback, corruption, stale backups and checkpoint failure. These tests use RPC
 doubles for gate behavior. Real native integration tests provide separate
 consensus/P2P evidence; neither set establishes production readiness.
 
-## Remaining production work
+## Scheduling and remaining production work
 
-Native `getblocktemplate` advertises profile version 3 and the exact derived
-`share_target`, but returns a base job with `requires_completion=true`. Complete
-construction still uses the external helper. A native prepare/sign/finalize job
-builder has not been implemented. The local signer file also still lacks an
-explicit corruption checksum.
+Pending-block retry has a dedicated lifecycle worker with a coalesced notification
+and bounded duty cycle. Native scripts execute outside `cs_main` after their coin
+context is captured; a changed tip invalidates speculative results. During worker
+and RPC preparation, immutable snapshot decoding, hashing and signature checks
+also run outside the global lock. Initial P2P acceptance still checks its first
+snapshot graph under `cs_main` and the message-processing mutex before it defers
+uncached origins. Cold database reads and synchronous writes, native coins-view
+preparation, and ordinary native block connection still use `cs_main`. Final
+acceptance uses an authenticated complete-body result and checks actual reward
+again.
+Unpublished overlays and unsigned jobs never populate that settlement-success
+cache. A per-session origin map and LRU reward cache prevent repeated work from
+ordinary eviction. Controlled historical/reindex paths may still validate
+synchronously; worker telemetry exposes those fallbacks. This is not a hard
+latency guarantee on arbitrary hardware or deep reorganizations.
 
-FIFO scheduling and bounded bytes do not establish a latency guarantee. Native
-UTXO/script checks can hold `cs_main`; pending-block retry also runs on the
-network message thread. A lifecycle-managed validation worker and measured
-per-attempt limits remain needed. Moving retries onto the existing validation
-callback scheduler can deadlock and is not an acceptable shortcut.
+Only an explicitly enabled regtest `-sharepoolhashonly` profile raises the HTTP
+request-body ceiling to 48 MiB. This fits a maximum 16 MiB snapshot plus a
+4,000,000-byte template encoded as hexadecimal JSON. RPC field, snapshot and
+native block bounds still apply independently. Ordinary nodes and public
+networks retain the existing 32 MiB HTTP ceiling; P2P limits are unchanged.
 
-Exact inclusion of all locally known templates includes unworked issued jobs.
-Repeated refreshes therefore form dependency chains and can exhaust the depth
-budget. This liveness issue remains open. Finite retained evidence, archive
-recovery, data availability and deployment difficulty calibration remain
-production blockers. No public network activation is provided.
+Carry-forward currently preserves receipts and selects later batches only while
+the proofs remain eligible under the existing j through j+3 rule. At j+4 an
+unsettled receipt is explicitly `expired_unpaid`, not deleted or marked paid.
+Guaranteed indefinite carry needs an authenticated pending-credit checkpoint
+before expiry and reorg-safe spent-credit accounting. Simply accepting arbitrarily
+old headers would allow new work on obsolete, easier jobs. That protocol design
+is unresolved; the current batch API must not promise eventual payment.
+
+Native retained snapshot/template quotas, historical native evidence archival,
+production difficulty/variance calibration, adversarial WAN load, and an
+activation/data-availability policy remain deployment blockers. Full snapshots
+must stay retrievable; neither a flat hash nor a signature forces a withholding
+coordinator to provide bytes. No public network activation is provided. The
+[production gap register](sharepool-production-gaps.md) tracks these limits.

@@ -9,6 +9,7 @@ the native key/file tests; those tests generate only disposable random keys.
 """
 
 from dataclasses import replace
+import hashlib
 import os
 from pathlib import Path
 import stat
@@ -18,7 +19,7 @@ import tempfile
 import time
 import unittest
 
-from native_enforcement import Envelope, RULES_HASH, candidate, verify_schnorr
+from native_enforcement import Envelope, RULES_HASH, candidate, verify_schnorr, compute_xonly_pubkey
 from native_signer import NativeSigner, REGTEST_GENESIS, SignerError
 
 
@@ -49,6 +50,17 @@ class SignerAdapterTests(unittest.TestCase):
         signer = NativeSigner(binary, self.directory / "private key;literal", pool=POOL, payout_script=SCRIPT)
         self.assertEqual(signer.public_key, b"B" * 32)
         self.assertFalse((self.directory / "private key;literal").exists())
+
+    def test_migration_passes_trusted_public_statement_and_literal_paths(self):
+        binary = self.binary("import sys\nassert len(sys.argv) == 4\nassert sys.argv[1] == 'migrate'\n"
+            "raw = bytes.fromhex(sys.stdin.read().strip())\n"
+            "assert raw == bytes.fromhex(%r)\nprint('42' * 32)\n" %
+            (b"\x01" + POOL.to_bytes(32, "little") + bytes([len(SCRIPT)]) + SCRIPT + b"B" * 32).hex())
+        destination = self.directory / "new key;literal"
+        signer = NativeSigner.migrate(binary, self.directory / "old key;literal", destination,
+                                      expected_public_key=b"B" * 32, pool=POOL, payout_script=SCRIPT)
+        self.assertEqual(signer.public_key, b"B" * 32)
+        self.assertEqual(signer.key_file, str(destination))
 
     def test_rejects_oversized_stdout_and_stderr(self):
         for output in ("stdout", "stderr"):
@@ -114,7 +126,9 @@ class NativeSignerIntegrationTests(unittest.TestCase):
 
     def test_random_key_policy_file_and_valid_signature(self):
         self.assertEqual(stat.S_IMODE(self.key.stat().st_mode), 0o600)
-        self.assertLessEqual(self.key.stat().st_size, 108)
+        self.assertLessEqual(self.key.stat().st_size, 140)
+        with self.key.open("rb") as stream:
+            self.assertEqual(stream.read(8), b"SPKEY002")
         opened = NativeSigner(NATIVE_BINARY, self.key, pool=POOL, payout_script=SCRIPT)
         self.assertEqual(opened.public_key, self.signer.public_key)
         signature = self.signer.sign_owner(self.envelope())
@@ -211,12 +225,76 @@ class NativeSignerIntegrationTests(unittest.TestCase):
 
     def test_key_file_truncated_and_oversized_fail_closed(self):
         # Do not read the original private file, even from Python tests.
-        for size in (0, 7, 109, 10000):
+        for size in (0, 7, 141, 10000):
             corrupt = self.directory / ("invalid-%d.key" % size)
             corrupt.write_bytes(bytes(size))
             corrupt.chmod(0o600)
             with self.subTest(size=size), self.assertRaises(SignerError):
                 NativeSigner(NATIVE_BINARY, corrupt, pool=POOL, payout_script=SCRIPT)
+
+    def fixture_record(self, version=2):
+        # Explicit disposable known-secret fixtures exercise the file format;
+        # the randomly generated owner.key is never read by Python tests.
+        secret = (1).to_bytes(32, "big")
+        policy = b"\x01" + POOL.to_bytes(32, "little") + bytes([len(SCRIPT)]) + SCRIPT
+        raw = (b"SPKEY002" if version == 2 else b"SPKEY001") + policy + secret
+        if version == 2:
+            raw += hashlib.sha256(b"SharePool/signer-key/v2\0" + raw).digest()
+        return raw, compute_xonly_pubkey(secret)[0]
+
+    def test_checksummed_fixture_and_each_record_region_detect_corruption(self):
+        raw, public_key = self.fixture_record()
+        fixture = self.directory / "checksum-fixture.key"
+        fixture.write_bytes(raw)
+        fixture.chmod(0o600)
+        self.assertEqual(NativeSigner(NATIVE_BINARY, fixture, pool=POOL, payout_script=SCRIPT).public_key, public_key)
+        # Magic, syntactically valid pool/script bytes, a still-valid scalar,
+        # and the checksum itself must all fail before returning a public key.
+        for offset in (0, 9, 43, len(raw) - 34, len(raw) - 1):
+            changed = bytearray(raw)
+            changed[offset] ^= 1
+            fixture.write_bytes(changed)
+            with self.subTest(offset=offset), self.assertRaises(SignerError):
+                NativeSigner(NATIVE_BINARY, fixture, pool=POOL, payout_script=SCRIPT)
+        for length in (len(raw) - 1, len(raw) - 32):
+            fixture.write_bytes(raw[:length])
+            with self.subTest(length=length), self.assertRaises(SignerError):
+                NativeSigner(NATIVE_BINARY, fixture, pool=POOL, payout_script=SCRIPT)
+
+    def test_legacy_migration_preserves_key_and_source_without_overwrite(self):
+        raw, public_key = self.fixture_record(version=1)
+        source = self.directory / "legacy.key"
+        source.write_bytes(raw)
+        source.chmod(0o600)
+        with self.assertRaises(SignerError):
+            NativeSigner(NATIVE_BINARY, source, pool=POOL, payout_script=SCRIPT)
+        destination = self.directory / "migrated.key"
+        migrated = NativeSigner.migrate(NATIVE_BINARY, source, destination, expected_public_key=public_key,
+                                       pool=POOL, payout_script=SCRIPT)
+        self.assertEqual(migrated.public_key, public_key)
+        self.assertEqual(source.read_bytes(), raw)
+        envelope = replace(self.envelope(), public_key=public_key)
+        self.assertTrue(verify_schnorr(public_key, migrated.sign_owner(envelope), envelope.owner_message))
+        with self.assertRaises(SignerError):
+            NativeSigner.migrate(NATIVE_BINARY, source, destination, expected_public_key=public_key,
+                                 pool=POOL, payout_script=SCRIPT)
+        self.assertEqual(NativeSigner(NATIVE_BINARY, destination, pool=POOL, payout_script=SCRIPT).public_key, public_key)
+
+    def test_legacy_migration_requires_previously_trusted_identity(self):
+        raw, public_key = self.fixture_record(version=1)
+        source = self.directory / "legacy.key"
+        source.write_bytes(raw)
+        source.chmod(0o600)
+        destination = self.directory / "must-not-exist.key"
+        with self.assertRaises(SignerError):
+            NativeSigner.migrate(NATIVE_BINARY, source, destination, expected_public_key=b"x" * 32,
+                                 pool=POOL, payout_script=SCRIPT)
+        self.assertFalse(destination.exists())
+        with self.assertRaises(SignerError):
+            NativeSigner.migrate(NATIVE_BINARY, source, destination, expected_public_key=public_key,
+                                 pool=POOL + 1, payout_script=SCRIPT)
+        self.assertFalse(destination.exists())
+        self.assertEqual(source.read_bytes(), raw)
 
 
 if __name__ == "__main__":

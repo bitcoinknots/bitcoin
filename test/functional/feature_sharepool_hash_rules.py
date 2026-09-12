@@ -66,13 +66,13 @@ class SharePoolHashRulesTest(BitcoinTestFramework):
         self.log.info("Unavailable preimages are pending; available invalid encodings establish rejection")
         block, unused = self.make()
         raw = b"\x02"
-        block.m_mm_rhs = h256(b"SharePool/snapshot/v3\0", raw)
+        block.m_mm_rhs = h256(b"SharePool/snapshot/v4\0", raw)
         block.solve()
         assert_equal(node.submitblock(block.serialize().hex()), "sharepool-hash-data-missing")
         assert_equal(node.getsharepoolhashstatus()["pending_blocks"], 1)
         result = node.submitsharepoolhashsnapshot(raw.hex())
         assert_equal(result["hash"], f"{block.m_mm_rhs:064x}")
-        assert_equal(node.getsharepoolhashstatus()["pending_blocks"], 0)
+        self.wait_until(lambda: node.getsharepoolhashstatus()["pending_blocks"] == 0)
         assert_equal(node.getblockcount(), 0)
         assert_equal(node.submitblock(block.serialize().hex()), "duplicate-invalid")
         assert_equal(node.getsharepoolhashsnapshot(result["hash"])["data"], raw.hex())
@@ -80,7 +80,7 @@ class SharePoolHashRulesTest(BitcoinTestFramework):
         # The empty preimage has a known commitment, so no network lookup is
         # needed to establish that it cannot encode a settlement snapshot.
         empty, unused = self.make()
-        empty.m_mm_rhs = h256(b"SharePool/snapshot/v3\0", b"")
+        empty.m_mm_rhs = h256(b"SharePool/snapshot/v4\0", b"")
         empty.solve()
         assert_equal(node.submitblock(empty.serialize().hex()), "bad-sharepool-hash-snapshot-encoding")
         assert_equal(node.getsharepoolhashstatus()["pending_blocks"], 0)

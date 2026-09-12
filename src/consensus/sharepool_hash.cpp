@@ -29,7 +29,7 @@ namespace sharepool::hashonly {
 namespace {
 // These are minimum *wire byte* sizes, not independent consensus count quotas.
 constexpr size_t MIN_TEMPLATE_BYTES{164 + 1 + 60};
-constexpr size_t MIN_TEMPLATE_RECORD_BYTES{32 + 1 + MIN_TEMPLATE_BYTES};
+constexpr size_t MIN_TEMPLATE_RECORD_BYTES{32 + 164 + 1 + 1};
 constexpr size_t MIN_SHARE_BYTES{164 + 284 + 64};
 constexpr size_t MIN_STATE_BYTES{36};
 constexpr size_t MIN_PAYOUT_BYTES{8 + 1 + 22};
@@ -50,12 +50,49 @@ uint256 DomainHash(const char (&domain)[N], const T&... values)
     return writer.GetHash();
 }
 
+struct TransactionTable {
+    std::map<Wtxid, std::pair<CTransactionRef, uint32_t>> entries;
+    explicit TransactionTable(const Snapshot& snapshot)
+    {
+        size_t expanded{0}, references{0};
+        for (const auto& item : snapshot.templates) {
+            if (item.block.vtx.size() > MAX_TEMPLATE_TX_REFERENCES - references ||
+                std::any_of(item.block.vtx.begin(), item.block.vtx.end(), [](const auto& tx) { return !tx; })) {
+                throw std::ios_base::failure("template transaction reference budget");
+            }
+            const auto size = GetSerializeSize(TX_WITH_WITNESS(item.block));
+            if (size < MIN_TEMPLATE_BYTES || size > MAX_TEMPLATE_BYTES ||
+                size > MAX_EXPANDED_TEMPLATE_BYTES - expanded ||
+                item.block.vtx.size() > MAX_TEMPLATE_TX_REFERENCES - references) {
+                throw std::ios_base::failure("expanded template budget");
+            }
+            expanded += size;
+            references += item.block.vtx.size();
+            for (const auto& tx : item.block.vtx) {
+                entries.try_emplace(tx->GetWitnessHash(), tx, 0);
+            }
+        }
+        uint32_t index{0};
+        for (auto& [id, entry] : entries) entry.second = index++;
+    }
+};
+
 template <typename Stream>
-void WriteSnapshot(Stream& stream, const Snapshot& snapshot)
+void WriteSnapshot(Stream& stream, const Snapshot& snapshot, bool unsigned_contents = false)
 {
-    stream << snapshot.binding << snapshot.authorization << snapshot.job_commitment;
+    const TransactionTable table{snapshot};
+    stream << snapshot.binding << (unsigned_contents ? Signature{} : snapshot.authorization) << snapshot.job_commitment;
+    WriteCompactSize(stream, table.entries.size());
+    for (const auto& [id, entry] : table.entries) {
+        WriteCompactSize(stream, GetSerializeSize(TX_WITH_WITNESS(*entry.first)));
+        stream << TX_WITH_WITNESS(*entry.first);
+    }
     WriteCompactSize(stream, snapshot.templates.size());
-    for (const auto& item : snapshot.templates) stream << item.id << item.block;
+    for (const auto& item : snapshot.templates) {
+        stream << item.id << item.block.GetBlockHeader();
+        WriteCompactSize(stream, item.block.vtx.size());
+        for (const auto& tx : item.block.vtx) WriteCompactSize(stream, table.entries.at(tx->GetWitnessHash()).second);
+    }
     stream << snapshot.shares << snapshot.post_state << snapshot.payouts;
 }
 
@@ -67,11 +104,6 @@ size_t EncodedSize(const Snapshot& snapshot)
         snapshot.post_state.size() > MAX_SNAPSHOT_BYTES / MIN_STATE_BYTES ||
         snapshot.payouts.size() > MAX_SNAPSHOT_BYTES / MIN_PAYOUT_BYTES) {
         throw std::ios_base::failure("snapshot count exceeds byte bound");
-    }
-    for (const auto& item : snapshot.templates) {
-        if (item.block.size() < MIN_TEMPLATE_BYTES || item.block.size() > MAX_TEMPLATE_BYTES) {
-            throw std::ios_base::failure("template byte bound");
-        }
     }
     for (const auto& share : snapshot.shares) {
         if (share.origin.payout_script.size() > 34) throw std::ios_base::failure("share payout script byte bound");
@@ -137,6 +169,37 @@ void SkipBytes(SpanReader& reader, size_t count)
     reader.ignore(count);
 }
 
+void PreflightTransaction(SpanReader& reader)
+{
+    SkipBytes(reader, 4);
+    auto inputs = ReadCount(reader, 41);
+    uint8_t flags{0};
+    if (inputs == 0) {
+        reader >> flags;
+        if (flags > 1) throw std::ios_base::failure("unknown transaction flags");
+        if (flags) inputs = ReadCount(reader, 41);
+    }
+    for (size_t input{0}; input < inputs; ++input) {
+        SkipBytes(reader, 36);
+        SkipBytes(reader, ReadCount(reader, 1));
+        SkipBytes(reader, 4);
+    }
+    if (inputs || flags) {
+        const auto outputs = ReadCount(reader, 9);
+        for (size_t output{0}; output < outputs; ++output) {
+            SkipBytes(reader, 8);
+            SkipBytes(reader, ReadCount(reader, 1));
+        }
+    }
+    if (flags & 1) {
+        for (size_t input{0}; input < inputs; ++input) {
+            const auto items = ReadCount(reader, 1);
+            for (size_t item{0}; item < items; ++item) SkipBytes(reader, ReadCount(reader, 1));
+        }
+    }
+    SkipBytes(reader, 4);
+}
+
 /** Validate all nested allocation counts against bytes actually present before
  * invoking the ordinary native transaction decoder. This does not set separate
  * transaction/input/output/witness quotas or allocate attacker-sized vectors. */
@@ -147,35 +210,7 @@ void PreflightTemplate(Span<const unsigned char> bytes)
     reader >> header;
     if (!header.m_header_v2) throw std::ios_base::failure("v2 template required");
     const auto transactions = ReadCount(reader, 10);
-    for (size_t tx{0}; tx < transactions; ++tx) {
-        SkipBytes(reader, 4);
-        auto inputs = ReadCount(reader, 41);
-        uint8_t flags{0};
-        if (inputs == 0) {
-            reader >> flags;
-            if (flags > 1) throw std::ios_base::failure("unknown transaction flags");
-            if (flags) inputs = ReadCount(reader, 41);
-        }
-        for (size_t input{0}; input < inputs; ++input) {
-            SkipBytes(reader, 36);
-            SkipBytes(reader, ReadCount(reader, 1));
-            SkipBytes(reader, 4);
-        }
-        if (inputs || flags) {
-            const auto outputs = ReadCount(reader, 9);
-            for (size_t output{0}; output < outputs; ++output) {
-                SkipBytes(reader, 8);
-                SkipBytes(reader, ReadCount(reader, 1));
-            }
-        }
-        if (flags & 1) {
-            for (size_t input{0}; input < inputs; ++input) {
-                const auto items = ReadCount(reader, 1);
-                for (size_t item{0}; item < items; ++item) SkipBytes(reader, ReadCount(reader, 1));
-            }
-        }
-        SkipBytes(reader, 4);
-    }
+    for (size_t tx{0}; tx < transactions; ++tx) PreflightTransaction(reader);
     if (!reader.empty()) throw std::ios_base::failure("trailing template bytes");
 }
 
@@ -239,6 +274,24 @@ bool WitnessOutput(const CTxOut& output)
         std::equal(std::begin(prefix), std::end(prefix), output.scriptPubKey.begin());
 }
 
+/** Local memo identity, never a protocol commitment. Immutable Wtxids bind the
+ * exact canonical witness bytes without rehashing a multi-megabyte body for
+ * every dependency edge. The header and ordered vector also bind the claimed
+ * transaction root, count, native parent and snapshot commitment. */
+uint256 OriginMemoId(const CBlock& block)
+{
+    static constexpr char domain[]{"SharePool/origin-cache/v4"};
+    HashWriter writer;
+    writer.write(AsBytes(Span{domain}));
+    writer << block.GetBlockHeader();
+    WriteCompactSize(writer, block.vtx.size());
+    for (const auto& tx : block.vtx) {
+        if (!tx) throw std::ios_base::failure("null origin transaction");
+        writer << tx->GetWitnessHash();
+    }
+    return writer.GetHash();
+}
+
 /** One bounded local validation walk, with no network or consensus-global state. */
 class Checker {
     const Consensus::Params& m_consensus;
@@ -247,6 +300,7 @@ class Checker {
     std::map<uint256, std::shared_ptr<const Snapshot>> m_snapshots;
     size_t m_dependency_bytes{0};
     std::set<uint256> m_visiting;
+    std::set<uint256> m_unique_origins;
     std::set<const Snapshot*> m_authorized;
 
     bool Authorized(const Snapshot& snapshot)
@@ -256,9 +310,21 @@ class Checker {
         m_authorized.insert(&snapshot);
         return true;
     }
-    // Depth is part of the memo key: a short previously verified path must not
-    // conceal a longer path that exceeds the recursive dependency bound.
-    std::map<std::pair<uint256, uint32_t>, Result> m_checked_origins;
+    struct CheckedOrigin {
+        Result result;
+        uint32_t descendant_depth;
+    };
+    // Cache intrinsic subtree depth, not the depth at which it was visited.
+    // Reuse must still fit the remaining path budget. A dense DAG is therefore
+    // checked once per origin, without hiding a longer route through that DAG.
+    // The parent hash makes the native-context/reward dependency explicit.
+    std::map<std::pair<uint256, uint256>, CheckedOrigin> m_checked_origins;
+    uint32_t* m_descendant_depth{nullptr};
+
+    void IncludeChildDepth(uint32_t child_depth)
+    {
+        if (m_descendant_depth) *m_descendant_depth = std::max(*m_descendant_depth, child_depth + 1);
+    }
 
     Result Fetch(const uint256& hash, std::shared_ptr<const Snapshot>& result)
     {
@@ -289,12 +355,24 @@ class Checker {
     Result Origin(const CBlock& block, const CBlockIndex* parent, uint32_t depth)
     {
         if (depth > MAX_DEPENDENCY_DEPTH) return Bad("dependency-depth");
-        // Include witness bytes: the normalized header/txid Merkle root alone
-        // cannot distinguish a body with an altered witness from a valid one.
-        HashWriter body;
-        body << TX_WITH_WITNESS(block);
-        const auto id = std::make_pair(body.GetHash(), depth);
-        if (const auto found = m_checked_origins.find(id); found != m_checked_origins.end()) return found->second;
+        // Even unavailable children consume their already declared edge. A
+        // cached MissingData subtree must not hide that edge on a longer path.
+        IncludeChildDepth(0);
+        if (!parent || block.hashPrevBlock != parent->GetBlockHash() ||
+            int64_t{block.m_height} != int64_t{parent->nHeight} + 1) return Bad("origin-parent");
+        const auto identity = OriginMemoId(block);
+        if (m_unique_origins.insert(identity).second && m_unique_origins.size() > MAX_ORIGIN_CHECKS) return Bad("origin-budget");
+        const auto id = std::make_pair(identity, parent->GetBlockHash());
+        if (const auto found = m_checked_origins.find(id); found != m_checked_origins.end()) {
+            if (found->second.descendant_depth > MAX_DEPENDENCY_DEPTH - depth) return Bad("dependency-depth");
+            IncludeChildDepth(found->second.descendant_depth);
+            return found->second.result;
+        }
+        // Decoded records have already passed this check. Keep it for pure
+        // verifier callers constructing snapshots directly, but only once per
+        // exact body. Header or witness changes cannot reuse the memo above.
+        if (!block.m_header_v2 || !SearchFieldsZero(block) || block.vtx.empty() ||
+            block.m_txcount != block.vtx.size() || BlockMerkleRoot(block) != block.hashMerkleRoot) return Bad("template-encoding");
         // Do not spend native script-validation work before the origin's own
         // snapshot is locally available and authenticates its expected hash.
         std::shared_ptr<const Snapshot> snapshot;
@@ -310,8 +388,19 @@ class Checker {
         if (native.status == Status::Invalid) return Bad("origin-body: " + native.reason);
         if (native.IsMissing()) return native;
         if (!native.expected_reward || !MoneyRange(*native.expected_reward)) return Bad("origin-reward");
-        auto result = Check(block, parent, native.expected_reward, depth);
-        m_checked_origins.emplace(id, result);
+        uint32_t descendant_depth{0};
+        Result result;
+        {
+            struct DepthScope {
+                uint32_t*& current;
+                uint32_t* previous;
+                DepthScope(uint32_t*& value, uint32_t& local) : current{value}, previous{value} { current = &local; }
+                ~DepthScope() { current = previous; }
+            } scope{m_descendant_depth, descendant_depth};
+            result = Check(block, parent, native.expected_reward, depth);
+        }
+        m_checked_origins.emplace(id, CheckedOrigin{result, descendant_depth});
+        IncludeChildDepth(descendant_depth);
         return result;
     }
 
@@ -354,7 +443,7 @@ public:
         return Origin(origin, parent, depth);
     }
 
-    Result Check(const CBlock& block, const CBlockIndex* previous, std::optional<CAmount> expected_reward, uint32_t depth)
+    Result Check(const CBlock& block, const CBlockIndex* previous, std::optional<CAmount> expected_reward, uint32_t depth, bool allow_unsigned = false)
     {
         if (!m_consensus.SharePoolHashOnly || !previous || m_consensus.SharePoolHeight == std::numeric_limits<int>::max() ||
             int64_t{previous->nHeight} + 1 < m_consensus.SharePoolHeight) return Bad("inactive");
@@ -370,7 +459,8 @@ public:
         if (!result.IsValid()) return result;
         result = CheckBinding(snapshot->binding, m_consensus, height, previous->GetBlockHash());
         if (!result.IsValid()) return result;
-        if (!Authorized(*snapshot)) return Bad("owner");
+        if (!allow_unsigned && !Authorized(*snapshot)) return Bad("owner");
+        if (allow_unsigned && snapshot->authorization != Signature{}) return Bad("unsigned-authorization");
         if (snapshot->job_commitment != JobHash(block)) return Bad("job-commitment");
         if (!StateOrdered(snapshot->post_state)) return Bad("state-order");
         if (!PayoutsOrdered(snapshot->payouts)) return Bad("payout-order");
@@ -406,8 +496,9 @@ public:
             }
         }
 
-        // Parsed bodies are bounded by their containing snapshot's total bytes.
-        std::map<uint256, CBlock> origins;
+        // Immutable transaction refs are shared. The compact wire bytes and
+        // expanded body/reference budgets are checked before this walk.
+        std::map<uint256, const CBlock*> origins;
         const auto containing_id = TemplateId(block);
         const auto containing_proof = block.GetHash();
         uint256 last_template;
@@ -417,9 +508,7 @@ public:
             have_template = true;
             last_template = record.id;
             if (record.id == containing_id) return Bad("self-template");
-            CBlock origin;
-            try { origin = ReadTemplate(record.block); }
-            catch (const std::exception&) { return Bad("template-encoding"); }
+            const CBlock& origin = record.block;
             if (TemplateId(origin) != record.id) return Bad("template-id");
             const auto* parent = OriginParent(origin, previous, block.nTime);
             if (!parent) return Bad("template-context");
@@ -427,7 +516,7 @@ public:
             result = Origin(origin, parent, depth + 1);
             if (result.IsMissing()) collect_missing(result);
             else if (!result.IsValid()) return result;
-            origins.emplace(record.id, std::move(origin));
+            origins.emplace(record.id, &origin);
         }
         for (const auto& share : snapshot->shares) {
             if (share.origin.pool != snapshot->binding.pool) return Bad("share-pool");
@@ -436,7 +525,7 @@ public:
             if (!paid.insert(UintToArith256(id)).second) return Bad("repeat-payment");
             const auto found = origins.find(TemplateId(share.header));
             if (found == origins.end()) return Bad("share-template-missing");
-            result = ShareProof(share, found->second, previous, block.nTime, depth + 1, true);
+            result = ShareProof(share, *found->second, previous, block.nTime, depth + 1, true);
             if (result.IsMissing()) collect_missing(result);
             else if (!result.IsValid()) return result;
             next.push_back({uint32_t(share.header.m_height), id});
@@ -481,23 +570,79 @@ std::vector<unsigned char> EncodeSnapshot(const Snapshot& snapshot)
 CBlock DecodeTemplate(Span<const unsigned char> bytes) { return ReadTemplate(bytes); }
 CBlock DecodeBlock(Span<const unsigned char> bytes) { return ReadBlock(bytes, false); }
 
+CTransactionRef DecodeTransaction(Span<const unsigned char> bytes)
+{
+    if (bytes.size() < 10 || bytes.size() > MAX_TEMPLATE_BYTES) throw std::ios_base::failure("transaction byte bound");
+    SpanReader preflight{bytes};
+    PreflightTransaction(preflight);
+    if (!preflight.empty()) throw std::ios_base::failure("trailing transaction bytes");
+    SpanReader encoded{bytes};
+    CMutableTransaction decoded;
+    encoded >> TX_WITH_WITNESS(decoded);
+    auto tx = MakeTransactionRef(std::move(decoded));
+    DataStream canonical;
+    canonical << TX_WITH_WITNESS(*tx);
+    if (!encoded.empty() || canonical.size() != bytes.size() ||
+        !std::equal(bytes.begin(), bytes.end(), UCharCast(canonical.data()))) throw std::ios_base::failure("noncanonical transaction");
+    return tx;
+}
+
 Snapshot DecodeSnapshot(Span<const unsigned char> bytes)
 {
     if (bytes.empty() || bytes.size() > MAX_SNAPSHOT_BYTES) throw std::ios_base::failure("snapshot byte bound");
     SpanReader reader{bytes};
     Snapshot snapshot;
     reader >> snapshot.binding >> snapshot.authorization >> snapshot.job_commitment;
-    if (!WireBinding(snapshot.binding)) throw std::ios_base::failure("invalid v3 binding");
+    if (!WireBinding(snapshot.binding)) throw std::ios_base::failure("invalid v4 binding");
+    const auto transaction_count = ReadCount(reader, 11);
+    std::vector<CTransactionRef> transactions;
+    transactions.reserve(transaction_count);
+    std::vector<size_t> transaction_sizes;
+    transaction_sizes.reserve(transaction_count);
+    for (size_t i{0}; i < transaction_count; ++i) {
+        const auto raw = ReadBytes(reader, 10, MAX_TEMPLATE_BYTES);
+        auto tx = DecodeTransaction(raw);
+        if (i && !(transactions.back()->GetWitnessHash() < tx->GetWitnessHash())) {
+            throw std::ios_base::failure("transaction table order or encoding");
+        }
+        transactions.push_back(std::move(tx));
+        transaction_sizes.push_back(raw.size());
+    }
+    std::vector<bool> used(transactions.size(), false);
     const auto template_count = ReadCount(reader, MIN_TEMPLATE_RECORD_BYTES);
     snapshot.templates.reserve(template_count);
+    size_t expanded{0}, references{0};
     for (size_t i{0}; i < template_count; ++i) {
         TemplateRecord record;
-        reader >> record.id;
-        record.block = ReadBytes(reader, MIN_TEMPLATE_BYTES, MAX_TEMPLATE_BYTES);
+        CBlockHeader header;
+        reader >> record.id >> header;
+        record.block = CBlock{header};
+        if (!header.m_header_v2 || !SearchFieldsZero(header)) throw std::ios_base::failure("template header shape");
+        const auto count = ReadCount(reader, 1);
+        if (!count || count != header.m_txcount || count > MAX_TEMPLATE_TX_REFERENCES - references) {
+            throw std::ios_base::failure("template transaction reference budget");
+        }
+        references += count;
+        size_t body_bytes = GetSerializeSize(header) + GetSizeOfCompactSize(count);
+        record.block.vtx.reserve(count);
+        for (size_t j{0}; j < count; ++j) {
+            const auto index = ReadCompactSize(reader);
+            if (index >= transactions.size() || transaction_sizes[index] > MAX_TEMPLATE_BYTES - body_bytes) {
+                throw std::ios_base::failure("template transaction index or byte budget");
+            }
+            body_bytes += transaction_sizes[index];
+            used[index] = true;
+            record.block.vtx.push_back(transactions[index]);
+        }
+        if (body_bytes > MAX_EXPANDED_TEMPLATE_BYTES - expanded) throw std::ios_base::failure("expanded template budget");
+        expanded += body_bytes;
         if (i && !(snapshot.templates.back().id < record.id)) throw std::ios_base::failure("template order");
-        if (TemplateId(ReadTemplate(record.block)) != record.id) throw std::ios_base::failure("template id");
+        if (TemplateId(record.block) != record.id || BlockMerkleRoot(record.block) != record.block.hashMerkleRoot) {
+            throw std::ios_base::failure("template id or transaction root");
+        }
         snapshot.templates.push_back(std::move(record));
     }
+    if (std::find(used.begin(), used.end(), false) != used.end()) throw std::ios_base::failure("unused transaction table entry");
     const auto share_count = ReadCount(reader, MIN_SHARE_BYTES);
     snapshot.shares.reserve(share_count);
     for (size_t i{0}; i < share_count; ++i) {
@@ -529,7 +674,7 @@ Snapshot DecodeSnapshot(Span<const unsigned char> bytes)
 uint256 SnapshotHash(Span<const unsigned char> bytes)
 {
     if (bytes.size() > MAX_SNAPSHOT_BYTES) throw std::ios_base::failure("snapshot byte bound");
-    static constexpr char domain[]{"SharePool/snapshot/v3"};
+    static constexpr char domain[]{"SharePool/snapshot/v4"};
     HashWriter writer;
     writer.write(AsBytes(Span{domain}));
     writer.write(AsBytes(bytes));
@@ -539,7 +684,7 @@ uint256 SnapshotHash(Span<const unsigned char> bytes)
 uint256 SnapshotHash(const Snapshot& snapshot)
 {
     EncodedSize(snapshot);
-    static constexpr char domain[]{"SharePool/snapshot/v3"};
+    static constexpr char domain[]{"SharePool/snapshot/v4"};
     HashWriter writer;
     writer.write(AsBytes(Span{domain}));
     WriteSnapshot(writer, snapshot);
@@ -548,8 +693,9 @@ uint256 SnapshotHash(const Snapshot& snapshot)
 
 uint256 RulesHash()
 {
-    return DomainHash("SharePool/rules/v3", SHARE_BITS, SHARE_TARGET_SHIFT, MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES,
-                      MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES);
+    return DomainHash("SharePool/rules/v4", SHARE_BITS, SHARE_TARGET_SHIFT, MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES,
+                      MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES,
+                      MAX_EXPANDED_TEMPLATE_BYTES, MAX_TEMPLATE_TX_REFERENCES, MAX_ORIGIN_CHECKS);
 }
 
 uint256 SnapshotContentsHash(const Snapshot& snapshot)
@@ -557,18 +703,15 @@ uint256 SnapshotContentsHash(const Snapshot& snapshot)
     // Stream rather than copying a potentially 16 MiB snapshot.
     EncodedSize(snapshot);
     HashWriter writer;
-    static constexpr char domain[]{"SharePool/contents/v3"};
+    static constexpr char domain[]{"SharePool/contents/v4"};
     writer.write(AsBytes(Span{domain}));
-    writer << snapshot.binding << Signature{} << snapshot.job_commitment;
-    WriteCompactSize(writer, snapshot.templates.size());
-    for (const auto& item : snapshot.templates) writer << item.id << item.block;
-    writer << snapshot.shares << snapshot.post_state << snapshot.payouts;
+    WriteSnapshot(writer, snapshot, true);
     return writer.GetHash();
 }
 
 uint256 OwnerHash(const Envelope& binding, const uint256& job, const uint256& contents)
 {
-    return DomainHash("SharePool/owner/v3", binding, job, contents);
+    return DomainHash("SharePool/owner/v4", binding, job, contents);
 }
 
 uint256 OwnerHash(const Snapshot& snapshot)
@@ -581,7 +724,7 @@ uint256 JobHash(const CBlock& block)
     CBlockHeader header{block};
     header.m_mm_rhs.SetNull();
     HashWriter writer;
-    static constexpr char domain[]{"SharePool/job/v3"};
+    static constexpr char domain[]{"SharePool/job/v4"};
     writer.write(AsBytes(Span{domain}));
     writer.write(AsBytes(Span{NormalizedHeader(header)}));
     writer << TX_WITH_WITNESS(block.vtx);
@@ -664,9 +807,9 @@ std::vector<CTxOut> CalculatePayouts(const Snapshot& snapshot, CAmount reward)
 
 Result CheckSnapshot(const CBlock& block, const CBlockIndex* previous, const Consensus::Params& consensus,
                      const Lookup& lookup, const ValidateOrigin& validate_origin,
-                     std::optional<CAmount> expected_reward, uint32_t depth)
+                     std::optional<CAmount> expected_reward, uint32_t depth, bool allow_unsigned)
 {
-    try { return Checker{consensus, lookup, validate_origin}.Check(block, previous, expected_reward, depth); }
+    try { return Checker{consensus, lookup, validate_origin}.Check(block, previous, expected_reward, depth, allow_unsigned); }
     catch (const std::exception&) { return Bad("encoding"); }
 }
 

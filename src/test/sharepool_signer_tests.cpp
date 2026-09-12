@@ -128,7 +128,7 @@ BOOST_AUTO_TEST_CASE(native_signer_canonical_bounded_decoding)
     BOOST_CHECK_THROW(sharepool::signer::DecodePolicy(Encode(policy)), std::exception);
 }
 
-BOOST_AUTO_TEST_CASE(native_v3_job_signature_attests_exact_job_and_contents)
+BOOST_AUTO_TEST_CASE(native_v4_job_signature_attests_exact_job_and_contents)
 {
     const auto statement = Job();
     const auto signature = sharepool::signer::SignJob(policy, key, statement);
@@ -147,12 +147,12 @@ BOOST_AUTO_TEST_CASE(native_v3_job_signature_attests_exact_job_and_contents)
         change(wrong);
         BOOST_CHECK(!owner.VerifySchnorr(sharepool::hashonly::OwnerHash(wrong.binding, wrong.job, wrong.contents), signature));
     }
-    // A v3 caller cannot accidentally obtain the weaker legacy policy-only
+    // A v4 caller cannot accidentally obtain the weaker legacy policy-only
     // signature by routing an exact-job envelope through SignOwner.
     BOOST_CHECK_THROW(sharepool::signer::SignOwner(policy, key, statement.binding), std::invalid_argument);
 }
 
-BOOST_AUTO_TEST_CASE(native_v3_job_signer_enforces_policy_and_nonzero_digests)
+BOOST_AUTO_TEST_CASE(native_v4_job_signer_enforces_policy_and_nonzero_digests)
 {
     const auto statement = Job();
     const std::vector<std::function<void(sharepool::signer::JobStatement&)>> changes{
@@ -183,7 +183,7 @@ BOOST_AUTO_TEST_CASE(native_v3_job_signer_enforces_policy_and_nonzero_digests)
     BOOST_CHECK_THROW(sharepool::signer::SignJob(wrong_policy, key, statement), std::invalid_argument);
 }
 
-BOOST_AUTO_TEST_CASE(native_v3_job_signer_decoding_is_canonical_and_bounded)
+BOOST_AUTO_TEST_CASE(native_v4_job_signer_decoding_is_canonical_and_bounded)
 {
     const auto statement = Job();
     const auto raw = Encode(statement);

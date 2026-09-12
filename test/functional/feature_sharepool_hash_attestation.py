@@ -2,7 +2,7 @@
 # Copyright (c) 2026 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Exact v3 template signatures and native validation of signed origin bodies.
+"""Exact v4 template signatures and native validation of signed origin bodies.
 
 All keys and spends are public disposable regtest fixtures. The bad-origin cases
 are deliberately signed by their fixture owner so signature rejection cannot
@@ -41,6 +41,13 @@ class SharePoolHashAttestationTest(BitcoinTestFramework):
         return candidate(genesis=self.genesis, native_parent=int(self.tip, 16), height=102,
             ntime=self.ntime, pool=123, secret=self.SECRET, payout_script=self.script, **kwargs)
 
+    @staticmethod
+    def evidence_status(node):
+        # Asynchronous validation telemetry may advance during a read-only
+        # overlay call; evidence inventory and quotas must stay unchanged.
+        return {key: value for key, value in node.getsharepoolhashstatus().items()
+                if key != "validation_worker"}
+
     def store(self, snapshot):
         result = self.nodes[0].submitsharepoolhashsnapshot(snapshot.serialize().hex())
         assert_equal(result["hash"], snapshot.hash_hex)
@@ -78,12 +85,12 @@ class SharePoolHashAttestationTest(BitcoinTestFramework):
         funding_blocks = self.generatetoaddress(node, 101, script_to_p2wsh(redeem))
         self.tip = node.getbestblockhash()
         self.ntime = max(int(time.time()), node.getblockheader(self.tip)["time"] + 1)
-        self.log.info("GBT identifies the exact v3 share target and explicitly requires job completion")
+        self.log.info("GBT identifies the exact v4 share target and explicitly requires job completion")
         base = node.getblocktemplate({"rules": ["segwit", "blake2b", "sharepool"],
                                       "capabilities": ["skip_validity_test"]})
         metadata = base["sharepool"]
-        assert_equal(metadata["version"], 3)
-        assert_equal(metadata["mode"], "hash-only-v3")
+        assert_equal(metadata["version"], 4)
+        assert_equal(metadata["mode"], "hash-only-v4")
         assert_equal(metadata["activation_height"], 102)
         assert_equal(metadata["share_target"], f"{share_target(int(base['bits'], 16)):064x}")
         assert_equal(metadata["requires_completion"], True)
@@ -99,11 +106,11 @@ class SharePoolHashAttestationTest(BitcoinTestFramework):
         transaction.rehash()
         origin, opening = self.make(transactions=(transaction,), fees=self.FEE, witness=True)
         self.log.info("Valid and invalid snapshot overlays leave native evidence storage unchanged")
-        before = node.getsharepoolhashstatus()
+        before = self.evidence_status(node)
         assert_equal(before["stored_snapshots"], 0)
         assert_equal(before["inventory"], [])
         assert_equal(node.validatesharepoolhashtemplate(origin.serialize().hex(), opening.serialize().hex())["valid"], True)
-        assert_equal(node.getsharepoolhashstatus(), before)
+        assert_equal(self.evidence_status(node), before)
         assert_raises_rpc_error(-25, "sharepool-hash-data-missing", node.getsharepoolhashsnapshot, opening.hash_hex)
         bad_overlay = replace(opening, envelope=replace(opening.envelope, pool=124))
         bad_offer = deepcopy(origin)
@@ -111,7 +118,7 @@ class SharePoolHashAttestationTest(BitcoinTestFramework):
         bad_offer.rehash()
         assert_raises_rpc_error(-26, "bad-sharepool-hash-owner", node.validatesharepoolhashtemplate,
                                 bad_offer.serialize().hex(), bad_overlay.serialize().hex())
-        assert_equal(node.getsharepoolhashstatus(), before)
+        assert_equal(self.evidence_status(node), before)
         assert_raises_rpc_error(-25, "sharepool-hash-data-missing", node.getsharepoolhashsnapshot, bad_overlay.hash_hex)
         self.store(opening)
         assert_equal(node.getsharepoolhashstatus()["stored_snapshots"], 1)

@@ -86,7 +86,7 @@ class SharePoolHashLifecycleTest(BitcoinTestFramework):
         self.snapshots = {}
         keys = [directory / f"owner-{index}.key" for index in range(3)]
         expected_transport = "v2" if self.options.v2transport else "v1"
-        report = {"profile": "hash-only-v3-regtest", "nodes": 3,
+        report = {"profile": "hash-only-v4-regtest", "nodes": 3,
                   "transport": expected_transport, "cases": []}
         try:
             self.signers = [HashSigner.create(self.signer_binary, key,
@@ -94,7 +94,7 @@ class SharePoolHashLifecycleTest(BitcoinTestFramework):
             assert_equal(len({signer.public_key for signer in self.signers}), 3)
             for node in self.nodes:
                 status = node.getsharepoolhashstatus()
-                assert_equal(status["mode"], "hash-only-v3")
+                assert_equal(status["mode"], "hash-only-v4")
                 assert_equal(status["pending_blocks"], 0)
                 assert_equal(node.getconnectioncount(), 0)
 

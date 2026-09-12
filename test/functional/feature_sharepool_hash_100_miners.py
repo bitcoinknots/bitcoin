@@ -2,7 +2,7 @@
 # Copyright (c) 2026 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""100 honest v3 gates settle100 proofs, then carry late work and the winner.
+"""100 honest v4 gates settle100 proofs, then carry late work and the winner.
 
 Five isolated native nodes exchange complete flat-hash snapshots over their
 existing Bitcoin P2P connections. Fresh local signer keys and CPU proof search
@@ -175,7 +175,7 @@ class SharePoolHash100MinersTest(BitcoinTestFramework):
         self.keys = [self.directory / f"owner-{owner:03d}.key" for owner in range(self.MINERS)]
         self.redeems = [CScript([owner, OP_DROP, OP_TRUE]) for owner in range(self.MINERS)]
         self.scripts = [b"\x00\x20" + hashlib.sha256(bytes(script)).digest() for script in self.redeems]
-        self.report = {"schema": 3, "profile": "hash-only-v3", "started_utc": datetime.now(timezone.utc).isoformat(),
+        self.report = {"schema": 4, "profile": "hash-only-v4", "started_utc": datetime.now(timezone.utc).isoformat(),
             "result": "running", "network": "isolated native regtest", "public_testnet": False,
             "logical_miners": 100, "native_nodes": 5, "hashing_threads": 8, "physical_miners_used": 0,
             "independent_share_count_ceiling": None, "max_snapshot_bytes": MAX_SNAPSHOT_BYTES,
@@ -189,7 +189,7 @@ class SharePoolHash100MinersTest(BitcoinTestFramework):
         self.report["native_binary_sha256"] = hashlib.sha256(Path(self.options.bitcoind).read_bytes()).hexdigest()
         started = time.monotonic()
         try:
-            self.log.info("Create100 fresh v3 native signer keys and distinct payout scripts")
+            self.log.info("Create100 fresh v4 native signer keys and distinct payout scripts")
             self.signers = [HashSigner.create(self.signer_binary, path, pool=self.pool, payout_script=self.scripts[owner])
                             for owner, path in enumerate(self.keys)]
             assert_equal(len({signer.public_key for signer in self.signers}), 100)
@@ -270,9 +270,12 @@ class SharePoolHash100MinersTest(BitcoinTestFramework):
             self.log.info("Every informed miner authorizes one complete100-proof settlement")
             jobs, authorizations = [], []
             fees = sum(100 + owner for owner in range(100))
+            for transaction in self.transactions:
+                self.nodes[0].sendrawtransaction(transaction.serialize().hex())
+            self.sync_mempools(timeout=120)
             for owner in range(100):
-                block, snapshot = self.make(owner, templates=origins, shares=proofs,
-                    transactions=self.transactions, fees=fees)
+                block, snapshot = self.gates[owner].make_native(sign_owner=self.signers[owner].sign_owner)
+                assert_equal(len(block.vtx), 101)
                 assert_equal(len(snapshot.shares), 100)
                 authorization = self.gates[owner].authorize(block.serialize(), snapshot.serialize())
                 self.gates[owner].register_snapshot(authorization.snapshot_bytes)
@@ -316,9 +319,7 @@ class SharePoolHash100MinersTest(BitcoinTestFramework):
                 assert_equal({proof.proof_id for proof in gate.eligible_shares()}, {late.proof_id, winning.proof_id})
             carry_jobs = []
             for owner, gate in enumerate(self.gates):
-                parent = self.nodes[owner % 5].getblockheader(self.nodes[owner % 5].getbestblockhash())
-                next_block, next_snapshot = gate.make(ntime=max(self.start_time, parent["time"] + 1),
-                    sign_owner=self.signers[owner].sign_owner)
+                next_block, next_snapshot = gate.make_native(sign_owner=self.signers[owner].sign_owner)
                 authorization = gate.authorize(next_block.serialize(), next_snapshot.serialize())
                 gate.register_snapshot(authorization.snapshot_bytes)
                 assert gate.ready_for_dispatch(authorization)
@@ -337,6 +338,7 @@ class SharePoolHash100MinersTest(BitcoinTestFramework):
             self.report.update({"result": "passed", "honest_dispatch_pipeline_completed": True,
                 "all100_original_proofs_paid_in_one_snapshot": True, "late_proof_and_winner_paid_next_block": True,
                 "credited_proofs": 102, "gate_bypasses": 0, "solved_commitments_modified": False,
+                "settlements_constructed_by_native_builder": True,
                 "last_winner_durably_pending": True, "mainnet_activation_changed": False})
             self.log.info("100-miner hash-only pipeline passed:100 exact payouts, then late proof and winner paid")
         except BaseException as error:

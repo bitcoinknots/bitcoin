@@ -14,7 +14,7 @@
 #include <set>
 
 namespace sharepool {
-/** Content-addressed, fsynced v2 evidence. Storage is not validation/ACK.
+/** Content-addressed, fsynced evidence. Storage is not validation/ACK.
  * All pools and historical snapshots are retained independently of miner relay
  * membership. Finite local quotas leave blocks pending; they never change validity.
  */
@@ -30,18 +30,28 @@ class HashSnapshotStore {
     std::map<uint256, size_t> m_pending_sizes GUARDED_BY(cs_main);
     std::map<uint256, std::pair<uint256, uint32_t>> m_template_sources GUARDED_BY(cs_main);
     std::map<uint256, size_t> m_template_sizes GUARDED_BY(cs_main);
+    std::map<Wtxid, size_t> m_transaction_sizes GUARDED_BY(cs_main);
+    std::map<Wtxid, CTransactionRef> m_transactions GUARDED_BY(cs_main);
+    std::map<Wtxid, uint64_t> m_transaction_touched GUARDED_BY(cs_main);
+    std::set<Wtxid> m_quarantined_transactions GUARDED_BY(cs_main);
     std::set<uint256> m_quarantined_templates GUARDED_BY(cs_main);
     std::map<uint256, CAmount> m_native_validated GUARDED_BY(cs_main);
+    std::map<uint256, uint64_t> m_native_touched GUARDED_BY(cs_main);
     std::set<uint256> m_needed GUARDED_BY(cs_main);
     size_t m_bytes GUARDED_BY(cs_main){0};
     size_t m_cache_bytes GUARDED_BY(cs_main){0};
     size_t m_pending_bytes GUARDED_BY(cs_main){0};
     size_t m_template_bytes GUARDED_BY(cs_main){0};
+    size_t m_transaction_cache_bytes GUARDED_BY(cs_main){0};
     uint64_t m_revision GUARDED_BY(cs_main){0};
     uint64_t m_clock GUARDED_BY(cs_main){0};
     void Cache(const uint256& hash, std::shared_ptr<const std::vector<unsigned char>> bytes) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void Quarantine(const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void IndexTemplates(const uint256& hash, const hashonly::Snapshot& snapshot) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    CTransactionRef Transaction(const Wtxid& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    void CacheTransaction(const Wtxid& id, CTransactionRef tx) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    void QuarantineTransaction(const Wtxid& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    std::shared_ptr<const CBlock> LocalTemplate(const uint256& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
 public:
     explicit HashSnapshotStore(const fs::path& path, bool memory_only = false);
@@ -60,7 +70,7 @@ public:
     size_t TemplateCount() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_template_sizes.size() - m_quarantined_templates.size(); }
     void RememberTemplate(const CBlock& block) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::shared_ptr<const CBlock> Template(const uint256& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
-    std::optional<CAmount> NativeValidated(const uint256& id) const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    std::optional<CAmount> NativeValidated(const uint256& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void SetNativeValidated(const uint256& id, CAmount reward) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     bool QueueBlock(std::shared_ptr<const CBlock> block) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void RemoveBlock(const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main);

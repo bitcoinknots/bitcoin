@@ -5,6 +5,7 @@
 
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
+#include <arith_uint256.h>
 #include <chain.h>
 #include <chainparams.h>
 #include <chainparamsbase.h>
@@ -39,6 +40,7 @@
 #include <script/signingprovider.h>
 #include <sharepool/relay.h>
 #include <sharepool/hash_store.h>
+#include <sharepool/retry_worker.h>
 #include <streams.h>
 #include <txmempool.h>
 #include <univalue.h>
@@ -731,7 +733,7 @@ static RPCHelpMan getblocktemplate()
                     {RPCResult::Type::NUM, "max_share_age", "Maximum settlement height minus origin job height"},
                     {RPCResult::Type::NUM, "max_shares", /*optional=*/true, "Version 1 maximum proof count"},
                     {RPCResult::Type::NUM, "max_manifest_bytes", /*optional=*/true, "Version 1 in-block evidence byte limit"},
-                    {RPCResult::Type::STR, "mode", /*optional=*/true, "hash-only-v3 for version 3"},
+                    {RPCResult::Type::STR, "mode", /*optional=*/true, "hash-only-v4 for version 4"},
                     {RPCResult::Type::NUM, "max_snapshot_bytes", /*optional=*/true, "Version 3 complete off-block snapshot byte bound"},
                     {RPCResult::Type::NUM, "max_dependency_depth", /*optional=*/true, "Version 3 maximum origin dependency depth"},
                     {RPCResult::Type::NUM, "max_dependency_bytes", /*optional=*/true, "Version 3 maximum unique dependency bytes"},
@@ -1123,7 +1125,7 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
         settlement.pushKV("rules_root", (consensusParams.SharePoolHashOnly ? sharepool::hashonly::RulesHash() : sharepool::RulesHash()).GetHex());
         settlement.pushKV("max_share_age", sharepool::MAX_SHARE_AGE);
         if (consensusParams.SharePoolHashOnly) {
-            settlement.pushKV("mode", "hash-only-v3");
+            settlement.pushKV("mode", "hash-only-v4");
             settlement.pushKV("share_target", sharepool::hashonly::ShareTarget(block_header.nBits).GetHex());
             settlement.pushKV("max_snapshot_bytes", sharepool::hashonly::MAX_SNAPSHOT_BYTES);
             settlement.pushKV("max_dependency_depth", sharepool::hashonly::MAX_DEPENDENCY_DEPTH);
@@ -1572,7 +1574,7 @@ static sharepool::HashSnapshotStore& RequireHashSnapshotStore(ChainstateManager&
 {
     if (chainman.GetParams().GetChainType() != ChainType::REGTEST ||
         !chainman.GetConsensus().SharePoolHashOnly || !chainman.m_sharepool_hash_store) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Hash-only v3 requires the explicit regtest profile");
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Hash-only v4 requires the explicit regtest profile");
     }
     return *chainman.m_sharepool_hash_store;
 }
@@ -1588,10 +1590,180 @@ static void RequireHashValidation(sharepool::HashSnapshotStore& store,
     throw JSONRPCError(RPC_VERIFY_REJECTED, checked.reason);
 }
 
+static sharepool::hashonly::Snapshot ParseHashSnapshot(const UniValue& value)
+{
+    const auto encoded = value.get_str();
+    if (encoded.empty() || encoded.size() > 2 * sharepool::hashonly::MAX_SNAPSHOT_BYTES || !IsHex(encoded)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Snapshot exceeds byte bound or is not hexadecimal");
+    }
+    try { return sharepool::hashonly::DecodeSnapshot(ParseHex(encoded)); }
+    catch (const std::exception&) { throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Noncanonical or malformed snapshot"); }
+}
+
+static UniValue HashJobResult(const CBlock& block, const sharepool::hashonly::Snapshot& snapshot, CAmount reward)
+{
+    DataStream encoded;
+    encoded << TX_WITH_WITNESS(block);
+    UniValue result{UniValue::VOBJ};
+    result.pushKV("template", HexStr(encoded));
+    result.pushKV("snapshot", HexStr(sharepool::hashonly::EncodeSnapshot(snapshot)));
+    result.pushKV("commitment", block.m_mm_rhs.GetHex());
+    result.pushKV("job_commitment", snapshot.job_commitment.GetHex());
+    result.pushKV("native_parent", block.hashPrevBlock.GetHex());
+    result.pushKV("height", block.m_height);
+    result.pushKV("reward", reward);
+    return result;
+}
+
+static std::vector<RPCResult> HashJobResults()
+{
+    return {
+        {RPCResult::Type::STR_HEX, "template", "Full normalized native template"},
+        {RPCResult::Type::STR_HEX, "snapshot", "Complete canonical snapshot"},
+        {RPCResult::Type::STR_HEX, "commitment", "Flat snapshot hash in m_mm_rhs"},
+        {RPCResult::Type::STR_HEX, "job_commitment", "Exact job attestation digest"},
+        {RPCResult::Type::STR_HEX, "native_parent", "Native parent used for construction and validation"},
+        {RPCResult::Type::NUM, "height", "Native block height"},
+        {RPCResult::Type::NUM, "reward", "Exact subsidy plus transaction fees, in satoshis"},
+    };
+}
+
+static RPCHelpMan preparesharepoolhashjob()
+{
+    auto results = HashJobResults();
+    results.emplace_back(RPCResult::Type::STR_HEX, "signing_payload", "Binding, job and contents hashes for the external owner signer");
+    results.emplace_back(RPCResult::Type::STR_HEX, "signing_hash", "Owner signature message digest");
+    return RPCHelpMan{"preparesharepoolhashjob",
+        "Construct a native settlement job from a proposed unsigned snapshot using the local mempool.\n"
+        "The proposal must name the current tip. The node derives paid state, exact fees and coinbase payouts,\n"
+        "reserves their block space, and validates all transactions and dependencies before returning a signing payload.\n"
+        "The proposal's payouts and paid state are replaced. Authorization must be zero. Does not store evidence or authorize mining.\n",
+        {{"snapshot", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Canonical unsigned proposal containing binding, selected templates and proofs"}},
+        RPCResult{RPCResult::Type::OBJ, "", "Unsigned job requiring owner authorization", std::move(results)},
+        RPCExamples{HelpExampleCli("preparesharepoolhashjob", "\"snapshot_hex\"")},
+        [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
+            namespace ho = sharepool::hashonly;
+            auto snapshot = ParseHashSnapshot(request.params[0]);
+            if (snapshot.authorization != sharepool::Signature{}) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Proposal must have zero authorization");
+            }
+            auto& node = EnsureAnyNodeContext(request.context);
+            auto& chainman = EnsureAnyChainman(request.context);
+            CBlock block;
+            CAmount reward{0};
+            {
+                LOCK(cs_main);
+                auto& store = RequireHashSnapshotStore(chainman);
+                const auto* tip = chainman.ActiveChain().Tip();
+                const auto& consensus = chainman.GetConsensus();
+                if (!tip || tip->nHeight + 1 < consensus.SharePoolHeight ||
+                    snapshot.binding.height != uint32_t(tip->nHeight + 1) || snapshot.binding.native_parent != tip->GetBlockHash() ||
+                    snapshot.binding.genesis != consensus.hashGenesisBlock || snapshot.binding.rules != ho::RulesHash()) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Proposal must bind the current active tip and rules");
+                }
+                snapshot.post_state.clear();
+                if (snapshot.binding.height > uint32_t(consensus.SharePoolHeight)) {
+                    std::shared_ptr<const ho::Snapshot> parent;
+                    try { parent = store.Lookup(tip->m_mm_rhs); }
+                    catch (const ho::MalformedSnapshot&) { throw JSONRPCError(RPC_VERIFY_REJECTED, "Malformed native parent settlement"); }
+                    if (!parent) throw JSONRPCError(RPC_VERIFY_ERROR, "sharepool-hash-data-missing");
+                    const auto minimum = std::max<int64_t>(consensus.SharePoolHeight, int64_t{snapshot.binding.height} - sharepool::MAX_SHARE_AGE);
+                    for (const auto& entry : parent->post_state) if (entry.origin_height >= minimum) snapshot.post_state.push_back(entry);
+                }
+                for (const auto& share : snapshot.shares) snapshot.post_state.push_back({share.origin.height, share.header.GetHash()});
+                std::sort(snapshot.post_state.begin(), snapshot.post_state.end(), [](const auto& a, const auto& b) {
+                    return UintToArith256(a.proof_id) < UintToArith256(b.proof_id);
+                });
+                // Determine scripts before selecting transactions. Reserve a conservative
+                // full coinbase (100-byte scriptSig and witness commitment), v2 header
+                // and maximum CompactSize transaction counts. Final native validation
+                // enforces the actual contextual weight, size and sigop limits.
+                snapshot.payouts = ho::CalculatePayouts(snapshot, 0);
+                size_t output_bytes{0};
+                for (const auto& output : snapshot.payouts) output_bytes += GetSerializeSize(output);
+                const size_t base_bytes = 164 + 9 + 4 + 1 + 36 + 1 + 100 + 4 + 9 + output_bytes + 47 + 4;
+                const size_t reserved_weight = base_bytes * WITNESS_SCALE_FACTOR + 36;
+                if (base_bytes + 36 > MAX_BLOCK_SERIALIZED_SIZE || reserved_weight > MAX_BLOCK_WEIGHT) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Settlement payouts exceed native block capacity");
+                }
+                BlockAssembler::Options options;
+                node::ApplyArgsManOptions(*node.args, options);
+                options.test_block_validity = false; // Incomplete until exact reward and signature are bound.
+                options.coinbase_output_script = CScript{snapshot.binding.payout_script.begin(), snapshot.binding.payout_script.end()};
+                options.block_reserved_size = std::max(options.block_reserved_size, base_bytes + 36);
+                options.block_reserved_weight = std::max(options.block_reserved_weight, reserved_weight);
+                const auto assembled = BlockAssembler(chainman.ActiveChainstate(), node.mempool.get(), options, node).CreateNewBlock();
+                block = assembled->block;
+                reward = block.vtx.at(0)->GetValueOut();
+                snapshot.payouts = ho::CalculatePayouts(snapshot, reward);
+                CMutableTransaction coinbase{*block.vtx.at(0)};
+                coinbase.vout = snapshot.payouts;
+                block.vtx[0] = MakeTransactionRef(std::move(coinbase));
+                chainman.GenerateCoinbaseCommitment(block, tip);
+                block.hashMerkleRoot = BlockMerkleRoot(block);
+                snapshot.job_commitment = ho::JobHash(block);
+                block.m_mm_rhs = ho::SnapshotHash(snapshot);
+            }
+            const auto overlay = std::make_shared<const ho::Snapshot>(snapshot);
+            const auto checked = PrepareSharePoolHashOrigins(chainman, block, overlay, nullptr, true);
+            {
+                LOCK(cs_main);
+                RequireHashSnapshotStore(chainman);
+                if (checked.IsMissing()) throw JSONRPCError(RPC_VERIFY_ERROR, "sharepool-hash-data-missing");
+                if (!checked.IsValid()) throw JSONRPCError(RPC_VERIFY_REJECTED, checked.reason);
+                if (chainman.ActiveChain().Tip()->GetBlockHash() != block.hashPrevBlock) {
+                    throw JSONRPCError(RPC_VERIFY_ERROR, "Native tip changed; prepare a new job");
+                }
+            }
+            auto result = HashJobResult(block, snapshot, reward);
+            DataStream payload;
+            payload << snapshot.binding << snapshot.job_commitment << ho::SnapshotContentsHash(snapshot);
+            result.pushKV("signing_payload", HexStr(payload));
+            result.pushKV("signing_hash", ho::OwnerHash(snapshot).GetHex());
+            return result;
+        }};
+}
+
+static RPCHelpMan finalizesharepoolhashjob()
+{
+    return RPCHelpMan{"finalizesharepoolhashjob",
+        "Bind an externally signed complete snapshot to a prepared native template and fully validate it.\n"
+        "Changing any job body bytes requires new authorization. Does not store evidence, publish or dispatch mining work.\n",
+        {{"template", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Prepared normalized full template"},
+         {"snapshot", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Complete owner-signed snapshot"}},
+        RPCResult{RPCResult::Type::OBJ, "", "Fully verified job", HashJobResults()},
+        RPCExamples{HelpExampleCli("finalizesharepoolhashjob", "\"template_hex\" \"snapshot_hex\"")},
+        [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
+            namespace ho = sharepool::hashonly;
+            const auto value = request.params[0].get_str();
+            if (value.empty() || value.size() > 2 * ho::MAX_TEMPLATE_BYTES || !IsHex(value)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Template exceeds byte bound or is not hexadecimal");
+            }
+            CBlock block;
+            try { block = ho::DecodeTemplate(ParseHex(value)); }
+            catch (const std::exception&) { throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Noncanonical or malformed template"); }
+            const auto snapshot = std::make_shared<const ho::Snapshot>(ParseHashSnapshot(request.params[1]));
+            if (snapshot->job_commitment != ho::JobHash(block)) throw JSONRPCError(RPC_VERIFY_REJECTED, "bad-sharepool-hash-job-commitment");
+            block.m_mm_rhs = ho::SnapshotHash(*snapshot);
+            auto& chainman = EnsureAnyChainman(request.context);
+            { LOCK(cs_main); RequireHashSnapshotStore(chainman); }
+            const auto checked = PrepareSharePoolHashOrigins(chainman, block, snapshot);
+            {
+                LOCK(cs_main);
+                if (checked.IsMissing()) throw JSONRPCError(RPC_VERIFY_ERROR, "sharepool-hash-data-missing");
+                if (!checked.IsValid()) throw JSONRPCError(RPC_VERIFY_REJECTED, checked.reason);
+                if (!chainman.ActiveChain().Tip() || chainman.ActiveChain().Tip()->GetBlockHash() != block.hashPrevBlock) {
+                    throw JSONRPCError(RPC_VERIFY_ERROR, "Native tip changed; prepare a new job");
+                }
+            }
+            return HashJobResult(block, *snapshot, checked.expected_reward.value());
+        }};
+}
+
 static RPCHelpMan submitsharepoolhashsnapshot()
 {
     return RPCHelpMan{"submitsharepoolhashsnapshot",
-        "Durably store a bounded hash-only v3 snapshot preimage and retry dependent pending blocks.\n"
+        "Durably store a bounded hash-only v4 snapshot preimage and retry dependent pending blocks.\n"
         "Storage establishes content identity. Complete validation checks canonical encoding and rules.\n",
         {{"snapshot", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Complete snapshot preimage, at most 16777216 bytes"}},
         RPCResult{RPCResult::Type::OBJ, "", "Content-addressed storage result", {
@@ -1603,7 +1775,7 @@ static RPCHelpMan submitsharepoolhashsnapshot()
         [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
             const auto value = request.params[0].get_str();
             if (value.empty() || value.size() > 2 * sharepool::hashonly::MAX_SNAPSHOT_BYTES || !IsHex(value)) {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Snapshot exceeds the v3 byte bound or is not hexadecimal");
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Snapshot exceeds the v4 byte bound or is not hexadecimal");
             }
             const auto raw = ParseHex(value);
             auto& chainman = EnsureAnyChainman(request.context);
@@ -1618,7 +1790,7 @@ static RPCHelpMan submitsharepoolhashsnapshot()
                 result.pushKV("hash", hash.GetHex());
                 result.pushKV("status", present ? "present" : "stored");
             }
-            chainman.RetrySharePoolHashBlocks();
+            chainman.RequestSharePoolHashBlocks();
             {
                 LOCK(cs_main);
                 UniValue missing{UniValue::VARR};
@@ -1631,7 +1803,7 @@ static RPCHelpMan submitsharepoolhashsnapshot()
 
 static RPCHelpMan getsharepoolhashsnapshot()
 {
-    return RPCHelpMan{"getsharepoolhashsnapshot", "Read the complete locally stored v3 snapshot by hash.\n",
+    return RPCHelpMan{"getsharepoolhashsnapshot", "Read the complete locally stored v4 snapshot by hash.\n",
         {{"hash", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Snapshot hash"}},
         RPCResult{RPCResult::Type::OBJ, "", "Canonical snapshot", {
             {RPCResult::Type::STR_HEX, "hash", "Snapshot hash"},
@@ -1652,22 +1824,36 @@ static RPCHelpMan getsharepoolhashsnapshot()
 
 static RPCHelpMan getsharepoolhashstatus()
 {
-    return RPCHelpMan{"getsharepoolhashstatus", "Read local hash-only v3 snapshot availability. Stored objects are not mining authorizations.\n", {},
-        RPCResult{RPCResult::Type::OBJ, "", "Local v3 profile and storage", {
-            {RPCResult::Type::STR, "mode", "hash-only-v3"},
-            {RPCResult::Type::STR_HEX, "rules", "Canonical v3 rule hash"},
+    return RPCHelpMan{"getsharepoolhashstatus", "Read local hash-only v4 snapshot availability. Stored objects are not mining authorizations.\n", {},
+        RPCResult{RPCResult::Type::OBJ, "", "Local v4 profile and storage", {
+            {RPCResult::Type::STR, "mode", "hash-only-v4"},
+            {RPCResult::Type::STR_HEX, "rules", "Canonical v4 rule hash"},
             {RPCResult::Type::NUM, "max_snapshot_bytes", "Per-snapshot byte bound"},
             {RPCResult::Type::NUM, "pending_blocks", "Blocks awaiting evidence"},
             {RPCResult::Type::NUM, "stored_snapshots", "Stored snapshot count"},
             {RPCResult::Type::NUM, "stored_bytes", "Local retained evidence bytes"},
             {RPCResult::Type::ARR, "inventory", "Available snapshot hashes", {{RPCResult::Type::STR_HEX, "", "Hash"}}},
+            {RPCResult::Type::OBJ, "validation_worker", "Bounded asynchronous validation telemetry", {
+                {RPCResult::Type::BOOL, "started", "Worker lifecycle started"},
+                {RPCResult::Type::BOOL, "active", "A pending-block pass is running"},
+                {RPCResult::Type::BOOL, "pending", "One coalesced notification is waiting"},
+                {RPCResult::Type::BOOL, "stopping", "Shutdown requested"},
+                {RPCResult::Type::NUM, "requests", "Notification count"},
+                {RPCResult::Type::NUM, "passes", "Completed passes"},
+                {RPCResult::Type::NUM, "failures", "Local worker exceptions"},
+                {RPCResult::Type::NUM, "last_micros", "Last completed pass duration"},
+                {RPCResult::Type::NUM, "max_micros", "Longest completed pass duration"},
+                {RPCResult::Type::NUM, "outside_script_checks", "Origin input scripts executed without cs_main"},
+                {RPCResult::Type::NUM, "locked_fallbacks", "Historical/local-budget synchronous origin fallbacks"},
+                {RPCResult::Type::NUM, "context_retries", "Passes restarted because the native context changed"},
+            }},
         }}, RPCExamples{HelpExampleCli("getsharepoolhashstatus", "")},
         [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
             auto& chainman = EnsureAnyChainman(request.context);
             LOCK(cs_main);
             auto& store = RequireHashSnapshotStore(chainman);
             UniValue result{UniValue::VOBJ};
-            result.pushKV("mode", "hash-only-v3");
+            result.pushKV("mode", "hash-only-v4");
             result.pushKV("rules", sharepool::hashonly::RulesHash().GetHex());
             result.pushKV("max_snapshot_bytes", sharepool::hashonly::MAX_SNAPSHOT_BYTES);
             result.pushKV("pending_blocks", store.PendingBlocks().size());
@@ -1676,6 +1862,21 @@ static RPCHelpMan getsharepoolhashstatus()
             UniValue inventory{UniValue::VARR};
             for (const auto& hash : store.Inventory()) inventory.push_back(hash.GetHex());
             result.pushKV("inventory", std::move(inventory));
+            const auto stats = chainman.SharePoolHashWorkerStats();
+            UniValue worker{UniValue::VOBJ};
+            worker.pushKV("started", stats.started);
+            worker.pushKV("active", stats.active);
+            worker.pushKV("pending", stats.pending);
+            worker.pushKV("stopping", stats.stopping);
+            worker.pushKV("requests", stats.requests);
+            worker.pushKV("passes", stats.passes);
+            worker.pushKV("failures", stats.failures);
+            worker.pushKV("last_micros", stats.last_micros);
+            worker.pushKV("max_micros", stats.max_micros);
+            worker.pushKV("outside_script_checks", chainman.m_sharepool_hash_outside_script_checks.load());
+            worker.pushKV("locked_fallbacks", chainman.m_sharepool_hash_locked_fallbacks.load());
+            worker.pushKV("context_retries", chainman.m_sharepool_hash_context_retries.load());
+            result.pushKV("validation_worker", std::move(worker));
             return result;
         }};
 }
@@ -1683,7 +1884,7 @@ static RPCHelpMan getsharepoolhashstatus()
 static RPCHelpMan validatesharepoolhashtemplate()
 {
     return RPCHelpMan{"validatesharepoolhashtemplate",
-        "Validate a complete v3 settlement template, its native transactions and its full snapshot dependencies.\n"
+        "Validate a complete v4 settlement template, its native transactions and its full snapshot dependencies.\n"
         "Checks exact subsidy plus fees and payout scripts. Requires an eligible active-chain parent.\n"
         "Candidate proof of work is not required. Does not publish a block or authorize mining.\n",
         {{"template", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Canonical full template, at most 4000000 bytes"},
@@ -1698,14 +1899,14 @@ static RPCHelpMan validatesharepoolhashtemplate()
         [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
             const auto value = request.params[0].get_str();
             if (value.empty() || value.size() > 2 * sharepool::hashonly::MAX_TEMPLATE_BYTES || !IsHex(value)) {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Template exceeds the v3 byte bound or is not hexadecimal");
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Template exceeds the v4 byte bound or is not hexadecimal");
             }
             CBlock block;
             try {
                 const auto raw = ParseHex(value);
                 block = sharepool::hashonly::DecodeBlock(raw);
             } catch (const std::exception&) {
-                throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Noncanonical or malformed v3 template");
+                throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Noncanonical or malformed v4 template");
             }
             std::shared_ptr<const sharepool::hashonly::Snapshot> overlay;
             if (!request.params[1].isNull()) {
@@ -1724,11 +1925,19 @@ static RPCHelpMan validatesharepoolhashtemplate()
                 }
             }
             auto& chainman = EnsureAnyChainman(request.context);
+            uint256 captured_tip;
+            {
+                LOCK(cs_main);
+                RequireHashSnapshotStore(chainman);
+                if (const auto* tip = chainman.ActiveChain().Tip()) captured_tip = tip->GetBlockHash();
+            }
+            const auto checked = PrepareSharePoolHashOrigins(chainman, block, overlay);
             LOCK(cs_main);
             auto& store = RequireHashSnapshotStore(chainman);
             const auto& consensus = chainman.GetConsensus();
             const auto* tip = chainman.ActiveChain().Tip();
             const auto* parent = chainman.m_blockman.LookupBlockIndex(block.hashPrevBlock);
+            if (!tip || tip->GetBlockHash() != captured_tip) throw JSONRPCError(RPC_VERIFY_ERROR, "Native tip changed during validation");
             if (!tip || !parent || !chainman.ActiveChain().Contains(parent) ||
                 parent->nHeight + 1 < consensus.SharePoolHeight ||
                 tip->nHeight - parent->nHeight > int(sharepool::MAX_SHARE_AGE)) {
@@ -1739,12 +1948,6 @@ static RPCHelpMan validatesharepoolhashtemplate()
                 if (result.IsMissing()) throw JSONRPCError(RPC_VERIFY_ERROR, "sharepool-hash-data-missing");
                 if (!result.IsValid()) throw JSONRPCError(RPC_VERIFY_REJECTED, result.reason);
             };
-            const auto native = ValidateSharePoolHashOrigin(chainman, block, parent);
-            require(native);
-            const auto checked = sharepool::hashonly::CheckSnapshot(block, parent, consensus,
-                [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return overlay && hash == block.m_mm_rhs ? overlay : store.Lookup(hash); },
-                [&](const CBlock& origin, const CBlockIndex* ancestor) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return ValidateSharePoolHashOrigin(chainman, origin, ancestor); },
-                native.expected_reward);
             require(checked);
             if (!overlay) store.RememberTemplate(block);
             UniValue result{UniValue::VOBJ};
@@ -1760,7 +1963,7 @@ static RPCHelpMan validatesharepoolhashtemplate()
 static RPCHelpMan validatesharepoolhashshare()
 {
     return RPCHelpMan{"validatesharepoolhashshare",
-        "Verify a canonical v3 proof, owner signature, full origin and its snapshot dependencies.\n"
+        "Verify a canonical v4 proof, owner signature, full origin and its snapshot dependencies.\n"
         "Does not pay, acknowledge, or publish work. Settlement separately enforces no repeat payment.\n",
         {{"share", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Canonical share, at most 1024 bytes"}},
         RPCResult{RPCResult::Type::OBJ, "", "Verified proof and native context", {
@@ -1786,25 +1989,24 @@ static RPCHelpMan validatesharepoolhashshare()
                 canonical << share;
                 if (!stream.empty() || HexStr(canonical) != HexStr(raw)) throw std::runtime_error("noncanonical share");
             } catch (const std::exception&) {
-                throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Noncanonical or malformed v3 share");
+                throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Noncanonical or malformed v4 share");
             }
             auto& chainman = EnsureAnyChainman(request.context);
+            uint256 captured_tip;
+            {
+                LOCK(cs_main);
+                RequireHashSnapshotStore(chainman);
+                const auto* tip = chainman.ActiveChain().Tip();
+                if (!tip || tip->nHeight + 1 < chainman.GetConsensus().SharePoolHeight) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Hash-only v4 is not active at the current tip");
+                }
+                captured_tip = tip->GetBlockHash();
+            }
+            const auto checked = ValidateSharePoolHashProofUnlocked(chainman, share);
             LOCK(cs_main);
             auto& store = RequireHashSnapshotStore(chainman);
             const auto* tip = chainman.ActiveChain().Tip();
-            if (!tip || tip->nHeight + 1 < chainman.GetConsensus().SharePoolHeight) {
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Hash-only v3 is not active at the current tip");
-            }
-            const auto full_origin = store.Template(sharepool::hashonly::TemplateId(share.header));
-            if (!full_origin) throw JSONRPCError(RPC_VERIFY_ERROR, "sharepool-hash-data-missing");
-            const auto settlement_time = std::max<int64_t>(tip->GetMedianTimePast() + 1, GetTime());
-            if (settlement_time < 0 || settlement_time > std::numeric_limits<uint32_t>::max()) {
-                throw JSONRPCError(RPC_MISC_ERROR, "Native time is outside the header range");
-            }
-            const auto checked = sharepool::hashonly::CheckShareProof(share, *full_origin, tip,
-                static_cast<uint32_t>(settlement_time), chainman.GetConsensus(),
-                [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.Lookup(hash); },
-                [&](const CBlock& origin, const CBlockIndex* parent) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return ValidateSharePoolHashOrigin(chainman, origin, parent); });
+            if (!tip || tip->GetBlockHash() != captured_tip) throw JSONRPCError(RPC_VERIFY_ERROR, "Native tip changed during validation");
             RequireHashValidation(store, checked);
             UniValue result{UniValue::VOBJ};
             result.pushKV("valid", true);
@@ -1835,6 +2037,8 @@ void RegisterMiningRPCCommands(CRPCTable& t)
         {"mining", &getsharepoolinventory},
         {"mining", &getsharepoolobject},
         {"mining", &submitsharepoolhashsnapshot},
+        {"mining", &preparesharepoolhashjob},
+        {"mining", &finalizesharepoolhashjob},
         {"mining", &getsharepoolhashsnapshot},
         {"mining", &getsharepoolhashstatus},
         {"mining", &validatesharepoolhashtemplate},

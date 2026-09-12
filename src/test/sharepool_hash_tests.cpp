@@ -11,6 +11,7 @@
 #include <pow.h>
 #include <pubkey.h>
 #include <script/script.h>
+#include <sharepool/hash_store.h>
 #include <streams.h>
 #include <test/util/setup_common.h>
 #include <versionbits.h>
@@ -142,7 +143,7 @@ struct HashFixture : BasicTestingSetup {
     {
         ho::TemplateRecord record;
         record.id = ho::TemplateId(block);
-        VectorWriter{record.block, 0} << TX_WITH_WITNESS(block);
+        record.block = block;
         return record;
     }
 
@@ -216,15 +217,15 @@ BOOST_FIXTURE_TEST_SUITE(sharepool_hash_tests, HashFixture)
 BOOST_AUTO_TEST_CASE(independent_hash_and_wire_vectors)
 {
     // Independently generated with Python hashlib + struct, including each NUL.
-    BOOST_CHECK_EQUAL(ho::RulesHash().GetHex(), "82528ddba4f82f08bd0920bc71319acd3b49e5eb090bdd2f1ac3992245cb079b");
+    BOOST_CHECK_EQUAL(ho::RulesHash().GetHex(), "2d8343cd857f5ea23b189a5db0c52ddc7923a5b96bed09e3624391da04d8e9c0");
     auto snapshot = Empty();
     snapshot.binding.native_parent = uint256{uint8_t{2}};
     snapshot.authorization.fill(0);
     snapshot.payouts = ho::CalculatePayouts(snapshot, 5000000000);
-    BOOST_CHECK_EQUAL(ho::OwnerHash(snapshot).GetHex(), "addf08201f9b0d1f97159be6972fd2836267355ba27e5318b561280031bb6a5f");
+    BOOST_CHECK_EQUAL(ho::OwnerHash(snapshot).GetHex(), "4d63b169a940b811cb88e8021cf673d547296e9a11c280f121b2a4679c612dae");
     const auto bytes = ho::EncodeSnapshot(snapshot);
-    BOOST_CHECK_EQUAL(bytes.size(), 415);
-    BOOST_CHECK_EQUAL(ho::SnapshotHash(snapshot).GetHex(), "700eb539a54d028c203bb5dec3187a89fa8c0abdf9af1448f71f76778c341774");
+    BOOST_CHECK_EQUAL(bytes.size(), 416);
+    BOOST_CHECK_EQUAL(ho::SnapshotHash(snapshot).GetHex(), "cf9e974afc17c767b79ad846d59c77d8e0fa3667f1386577d9d62b1a513badef");
     BOOST_CHECK(ho::SnapshotHash(bytes) == ho::SnapshotHash(snapshot));
     BOOST_CHECK(ho::EncodeSnapshot(ho::DecodeSnapshot(bytes)) == bytes);
     snapshot.post_state.push_back({1, uint256{uint8_t{7}}});
@@ -257,6 +258,94 @@ BOOST_AUTO_TEST_CASE(one_hundred_proofs_and_nonce_normalization)
     BOOST_CHECK(ho::TemplateId(nonce) != ho::TemplateId(snapshot.shares.front().header));
 }
 
+BOOST_AUTO_TEST_CASE(deduplicated_large_templates_preserve_complete_transaction_bytes)
+{
+    // A wire fixture: script/UTXO validity is intentionally outside this codec
+    // test. Every full body is3.85MB;100 copies share immutable transaction refs.
+    auto opening = Empty();
+    auto origin = Block(opening);
+    CMutableTransaction transaction;
+    transaction.vin.resize(1);
+    transaction.vin[0].prevout = COutPoint{Txid::FromUint256(uint256{uint8_t{123}}), 0};
+    CScript large_script;
+    large_script.resize(3'850'000);
+    transaction.vout.emplace_back(1, large_script);
+    origin.vtx.push_back(MakeTransactionRef(std::move(transaction)));
+    origin.m_txcount = origin.vtx.size();
+    origin.hashMerkleRoot = BlockMerkleRoot(origin);
+    auto snapshot = Empty();
+    for (size_t i{0}; i < 100; ++i) {
+        ++origin.nTime;
+        snapshot.templates.push_back(Record(origin));
+    }
+    std::sort(snapshot.templates.begin(), snapshot.templates.end(), [](const auto& a, const auto& b) { return a.id < b.id; });
+    const auto bytes = ho::EncodeSnapshot(snapshot);
+    BOOST_CHECK_LT(bytes.size(), 3'900'000);
+    const auto decoded = ho::DecodeSnapshot(bytes);
+    BOOST_REQUIRE_EQUAL(decoded.templates.size(), 100);
+    for (const auto& record : decoded.templates) {
+        BOOST_CHECK(record.block.vtx[1] == decoded.templates[0].block.vtx[1]);
+        BOOST_CHECK_GT(GetSerializeSize(TX_WITH_WITNESS(record.block)), 3'850'000);
+        BOOST_CHECK(record.id == ho::TemplateId(record.block));
+        BOOST_CHECK(BlockMerkleRoot(record.block) == record.block.hashMerkleRoot);
+    }
+    BOOST_CHECK(ho::EncodeSnapshot(decoded) == bytes);
+    const auto database = m_path_root / "hash-template-dedup";
+    size_t stored_bytes{0};
+    {
+        HashSnapshotStore store{database};
+        LOCK(cs_main);
+        for (const auto& record : decoded.templates) store.RememberTemplate(record.block);
+        stored_bytes = store.TemplateBytes();
+        BOOST_CHECK_LT(stored_bytes, 3'900'000);
+        BOOST_CHECK_EQUAL(store.TemplateCount(), 100);
+        for (const auto& record : decoded.templates) store.RememberTemplate(record.block);
+        BOOST_CHECK_EQUAL(store.TemplateBytes(), stored_bytes); // Atomic idempotent records.
+    }
+    {
+        HashSnapshotStore restored{database};
+        LOCK(cs_main);
+        BOOST_CHECK_EQUAL(restored.TemplateBytes(), stored_bytes);
+        BOOST_CHECK_EQUAL(restored.TemplateCount(), 100);
+        const auto first = restored.Template(decoded.templates[0].id);
+        BOOST_REQUIRE(first);
+        for (const auto& record : decoded.templates) {
+            const auto full = restored.Template(record.id);
+            BOOST_REQUIRE(full);
+            BOOST_CHECK(ho::JobHash(*full) == ho::JobHash(record.block));
+            BOOST_CHECK(full->vtx[1] == first->vtx[1]);
+        }
+    }
+    for (size_t i{100}; i < 140; ++i) {
+        ++origin.nTime;
+        snapshot.templates.push_back(Record(origin));
+    }
+    BOOST_CHECK_THROW(ho::EncodeSnapshot(snapshot), std::ios_base::failure);
+    auto null_transaction = Empty();
+    origin.vtx[0].reset();
+    null_transaction.templates.push_back(Record(origin));
+    BOOST_CHECK_THROW(ho::EncodeSnapshot(null_transaction), std::ios_base::failure);
+}
+
+BOOST_AUTO_TEST_CASE(unsigned_preparation_never_exempts_nested_owner_authorizations)
+{
+    auto snapshot = Empty();
+    auto block = Block(snapshot);
+    snapshot.authorization.fill(0);
+    block.m_mm_rhs = ho::SnapshotHash(snapshot);
+    snapshots[block.m_mm_rhs] = std::make_shared<const ho::Snapshot>(snapshot);
+    Reason(Check(block), "owner");
+    const auto prepared = ho::CheckSnapshot(block, &indexes[0], consensus, Lookup(), Native(), REWARD, 0, true);
+    BOOST_CHECK_MESSAGE(prepared.IsValid(), prepared.reason);
+    auto child = Empty();
+    child.templates.push_back(Record(block));
+    auto child_block = Block(child);
+    child.authorization.fill(0);
+    child_block.m_mm_rhs = ho::SnapshotHash(child);
+    snapshots[child_block.m_mm_rhs] = std::make_shared<const ho::Snapshot>(child);
+    Reason(ho::CheckSnapshot(child_block, &indexes[0], consensus, Lookup(), Native(), REWARD, 0, true), "owner");
+}
+
 BOOST_AUTO_TEST_CASE(missing_data_is_distinct_from_invalidity)
 {
     auto snapshot = WithShares(2);
@@ -287,7 +376,7 @@ BOOST_AUTO_TEST_CASE(missing_data_is_distinct_from_invalidity)
 BOOST_AUTO_TEST_CASE(known_empty_preimage_is_invalid_without_requesting_data)
 {
     const auto hash = ho::SnapshotHash(Span<const unsigned char>{});
-    BOOST_CHECK_EQUAL(hash.GetHex(), "f874948b1af97a2479d91dea1cad7871b726f93d5cb978faedbab90ba63a0097");
+    BOOST_CHECK_EQUAL(hash.GetHex(), "4bce13ffe53d9519f745352981f2c4d6d3d2b748c5eb8beb2edd0a95b820fcda");
     BOOST_CHECK_THROW(ho::DecodeSnapshot(Span<const unsigned char>{}), std::ios_base::failure);
     auto block = Block(Empty());
     block.m_mm_rhs = hash;
@@ -376,7 +465,7 @@ BOOST_AUTO_TEST_CASE(origin_memo_includes_exact_witness_body)
     coinbase.vin[0].scriptWitness.stack[0][0] = 1;
     bad.vtx[0] = MakeTransactionRef(coinbase);
     BOOST_CHECK(ho::TemplateId(good) == ho::TemplateId(bad));
-    BOOST_CHECK(Record(good).block != Record(bad).block);
+    BOOST_CHECK(ho::JobHash(good) != ho::JobHash(bad));
     auto good_snapshot = Empty(1, 0x62);
     good_snapshot.templates.push_back(Record(good));
     const auto good_wrapper = Block(good_snapshot);
@@ -502,12 +591,12 @@ BOOST_AUTO_TEST_CASE(bounded_canonical_parser)
     auto bad = bytes;
     bad.push_back(0);
     BOOST_CHECK_THROW(ho::DecodeSnapshot(bad), std::ios_base::failure);
-    // Template count follows the 284-byte binding and 64-byte authorization and 32-byte job commitment.
+    // Transaction table count follows the 284-byte binding, 64-byte signature and 32-byte job.
     bad = bytes;
     bad[380] = 0xfd;
     bad.insert(bad.begin() + 381, {0, 0});
     BOOST_CHECK_THROW(ho::DecodeSnapshot(bad), std::ios_base::failure);
-    for (const size_t offset : {380, 381, 382, 383}) {
+    for (const size_t offset : {380, 381, 382, 383, 384}) {
         bad = bytes;
         bad[offset] = 0xfe;
         bad.insert(bad.begin() + offset + 1, {0xff, 0xff, 0xff, 0x01});
@@ -515,13 +604,14 @@ BOOST_AUTO_TEST_CASE(bounded_canonical_parser)
     }
     BOOST_CHECK_THROW(ho::DecodeSnapshot(std::vector<unsigned char>(ho::MAX_SNAPSHOT_BYTES + 1)), std::ios_base::failure);
     auto snapshot = WithShares(1);
-    snapshot.templates[0].block.resize(ho::MAX_TEMPLATE_BYTES + 1);
+    CMutableTransaction oversized{*snapshot.templates[0].block.vtx[0]};
+    oversized.vin[0].scriptSig.resize(ho::MAX_TEMPLATE_BYTES + 1);
+    snapshot.templates[0].block.vtx[0] = MakeTransactionRef(oversized);
     BOOST_CHECK_THROW(ho::EncodeSnapshot(snapshot), std::ios_base::failure);
     snapshot = WithShares(1);
-    // Nested native tx count requests must be rejected before vector allocation.
-    auto& raw = snapshot.templates[0].block;
-    raw[164] = 0xfe;
-    raw.insert(raw.begin() + 165, {0xff, 0xff, 0xff, 0x01});
+    // A body's transaction count remains exact after table expansion.
+    snapshot.templates[0].block.m_txcount++;
+    snapshot.templates[0].id = ho::TemplateId(snapshot.templates[0].block);
     BOOST_CHECK_THROW(ho::DecodeSnapshot(ho::EncodeSnapshot(snapshot)), std::ios_base::failure);
     Reason(Check(Block(snapshot)), "template-encoding");
 }
@@ -573,6 +663,61 @@ BOOST_AUTO_TEST_CASE(dependency_depth_cannot_be_bypassed_by_a_shorter_memoized_p
     auto snapshot = Empty(1, 0x62);
     snapshot.templates = {Record(short_path), Record(origin)};
     Reason(Check(Block(snapshot)), "dependency-depth");
+}
+
+BOOST_AUTO_TEST_CASE(dense_dependency_dag_checks_each_exact_origin_once)
+{
+    constexpr size_t ORIGINS{60};
+    std::vector<ho::TemplateRecord> records;
+    for (size_t i{0}; i < ORIGINS; ++i) {
+        auto snapshot = Empty();
+        snapshot.templates = records; // Every job includes all earlier jobs.
+        const auto block = Block(snapshot);
+        records.push_back(Record(block));
+        std::sort(records.begin(), records.end(), [](const auto& a, const auto& b) { return a.id < b.id; });
+    }
+    auto settlement = Empty(1, 0x62);
+    settlement.templates = records;
+    const auto block = Block(settlement);
+    // The previous (body, absolute depth) memo performed 1,830 native checks
+    // and 36,050 dependency-edge body hashes for this 60-origin graph.
+    const auto checked = Check(block);
+    BOOST_CHECK_MESSAGE(checked.IsValid(), checked.reason);
+    BOOST_CHECK_EQUAL(native_checks, ORIGINS);
+
+    // The longest route, not whichever route cached a node first, determines
+    // validity. Exactly 64 edges remains valid; one additional edge fails.
+    native_checks = 0;
+    const auto boundary = ho::CheckSnapshot(block, &indexes[0], consensus, Lookup(), Native(),
+                                           REWARD, ho::MAX_DEPENDENCY_DEPTH - ORIGINS);
+    BOOST_CHECK_MESSAGE(boundary.IsValid(), boundary.reason);
+    BOOST_CHECK_EQUAL(native_checks, ORIGINS);
+    Reason(ho::CheckSnapshot(block, &indexes[0], consensus, Lookup(), Native(),
+                            REWARD, ho::MAX_DEPENDENCY_DEPTH - ORIGINS + 1), "dependency-depth");
+}
+
+BOOST_AUTO_TEST_CASE(memoized_missing_origins_still_count_declared_dependency_edges)
+{
+    auto origin = Block(Empty());
+    const auto unavailable_id = ho::TemplateId(origin);
+    CBlock short_path;
+    for (uint32_t i{1}; i <= ho::MAX_DEPENDENCY_DEPTH; ++i) {
+        auto snapshot = Empty();
+        snapshot.templates.push_back(Record(origin));
+        origin = Block(snapshot);
+        if (i == 1) short_path = origin;
+    }
+    // Cache the short subtree with a temporarily unavailable native child.
+    // Its declared child still makes its intrinsic depth at least one.
+    while (!(ho::TemplateId(short_path) < ho::TemplateId(origin))) { ++origin.nTime; Reseal(origin); }
+    auto snapshot = Empty(1, 0x62);
+    snapshot.templates = {Record(short_path), Record(origin)};
+    const auto block = Block(snapshot);
+    Reason(ho::CheckSnapshot(block, &indexes[0], consensus, Lookup(),
+        [&](const CBlock& body, const CBlockIndex*) {
+            if (ho::TemplateId(body) == unavailable_id) return ho::Result::Missing({}, "fixture-native-pending");
+            return ho::Result::Valid(REWARD);
+        }, REWARD), "dependency-depth");
 }
 
 BOOST_AUTO_TEST_CASE(unique_dependency_bytes_are_bounded_across_recursion)

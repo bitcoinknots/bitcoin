@@ -5,6 +5,7 @@
 
 #include <consensus/merkle.h>
 #include <consensus/validation.h>
+#include <hash.h>
 #include <streams.h>
 #include <util/strencodings.h>
 #include <validation.h>
@@ -20,11 +21,43 @@ constexpr size_t MAX_PENDING_BYTES{64 * 1024 * 1024};
 constexpr size_t MAX_PENDING_BLOCKS{16};
 constexpr size_t MAX_TEMPLATE_INDEX{65536};
 constexpr size_t MAX_LOCAL_TEMPLATE_BYTES{256 * 1024 * 1024};
+constexpr size_t MAX_LOCAL_TRANSACTIONS{262144};
 struct BoundedBytes {
     std::vector<unsigned char> data;
     template <typename Stream> void Serialize(Stream& s) const { s << data; }
     template <typename Stream> void Unserialize(Stream& s) { ReadBoundedVector(s, data, hashonly::MAX_SNAPSHOT_BYTES); }
 };
+struct StoredTemplate {
+    CBlockHeader header;
+    std::vector<Wtxid> transactions;
+    uint256 body_hash;
+    template <typename Stream> void Serialize(Stream& s) const { s << header << transactions << body_hash; }
+    template <typename Stream> void Unserialize(Stream& s)
+    {
+        s >> header;
+        ReadBoundedVector(s, transactions, hashonly::MAX_TEMPLATE_BYTES / 10);
+        s >> body_hash;
+    }
+};
+/** Record its actual serialized storage size even if decoding fails. No
+ * content-derived length is trusted for quota accounting of quarantined data.
+ */
+template <typename Value> struct StoredValue {
+    Value value;
+    size_t size{0};
+    template <typename Stream> void Unserialize(Stream& s)
+    {
+        size = s.size();
+        s >> value;
+        if (!s.empty()) throw std::ios_base::failure("trailing local record bytes");
+    }
+};
+uint256 TemplateBodyHash(const CBlock& block)
+{
+    HashWriter writer;
+    writer << TX_WITH_WITNESS(block);
+    return writer.GetHash();
+}
 std::vector<unsigned char> EncodeBlock(const CBlock& block)
 {
     DataStream stream;
@@ -58,20 +91,46 @@ HashSnapshotStore::HashSnapshotStore(const fs::path& path, bool memory_only)
         try { IndexTemplates(key.second, hashonly::DecodeSnapshot(bytes.data)); }
         catch (const std::ios_base::failure&) { /* Retain the committed preimage for validation. */ }
     }
+    // Transaction bytes are atomically stored with referencing templates. The
+    // Wtxid includes witness; a body checksum also authenticates each exact
+    // ordered reference list. This is local storage, not a consensus root.
+    for (it->Seek(std::make_pair(uint8_t{'u'}, Wtxid{})); it->Valid(); it->Next()) {
+        std::pair<uint8_t, Wtxid> key;
+        if (!it->GetKey(key) || key.first != 'u') break;
+        StoredValue<BoundedBytes> stored;
+        const bool readable = it->GetValue(stored) && !stored.value.data.empty() &&
+            stored.value.data.size() <= hashonly::MAX_TEMPLATE_BYTES;
+        CTransactionRef tx;
+        if (readable) {
+            try { tx = hashonly::DecodeTransaction(stored.value.data); }
+            catch (const std::ios_base::failure&) { }
+        }
+        const bool sound = tx && tx->GetWitnessHash() == key.second;
+        // Sound transaction accounting excludes the vector prefix for backward
+        // compatibility. Unsound records conservatively retain every disk byte.
+        const auto size = sound ? stored.value.data.size() : std::max(size_t{1}, stored.size);
+        if (m_transaction_sizes.size() >= MAX_LOCAL_TRANSACTIONS ||
+            size > MAX_LOCAL_TEMPLATE_BYTES - m_template_bytes) {
+            throw std::runtime_error("stored local transaction quota exhausted");
+        }
+        m_transaction_sizes.emplace(key.second, size);
+        m_template_bytes += size;
+        if (!sound) QuarantineTransaction(key.second);
+        else CacheTransaction(key.second, tx);
+    }
     for (it->Seek(std::make_pair(uint8_t{'t'}, uint256{})); it->Valid(); it->Next()) {
         std::pair<uint8_t, uint256> key;
         if (!it->GetKey(key) || key.first != 't') break;
-        BoundedBytes bytes;
-        if (!it->GetValue(bytes) || bytes.data.size() > hashonly::MAX_TEMPLATE_BYTES ||
-            m_template_sizes.size() >= MAX_TEMPLATE_INDEX ||
-            m_template_bytes + bytes.data.size() > MAX_LOCAL_TEMPLATE_BYTES) {
-            throw std::runtime_error("stored local template exceeds quota or cannot be read");
+        StoredValue<StoredTemplate> stored;
+        const bool readable = it->GetValue(stored);
+        const auto size = std::max(size_t{1}, stored.size);
+        if (m_template_sizes.size() >= MAX_TEMPLATE_INDEX ||
+            size > MAX_LOCAL_TEMPLATE_BYTES - m_template_bytes) {
+            throw std::runtime_error("stored local template quota exhausted");
         }
-        m_template_sizes.emplace(key.second, bytes.data.size());
-        m_template_bytes += bytes.data.size();
-        auto block = DecodeBlock(bytes.data);
-        if (hashonly::TemplateId(*block) != key.second) throw std::runtime_error("stored local template identity mismatch");
-        m_template_sources.try_emplace(key.second, uint256{}, 0);
+        m_template_sizes.emplace(key.second, size);
+        m_template_bytes += size;
+        if (!readable || !LocalTemplate(key.second)) m_quarantined_templates.insert(key.second);
     }
     for (it->Seek(std::make_pair(uint8_t{'b'}, uint256{})); it->Valid(); it->Next()) {
         std::pair<uint8_t, uint256> key;
@@ -86,6 +145,55 @@ HashSnapshotStore::HashSnapshotStore(const fs::path& path, bool memory_only)
         m_pending_bytes += bytes.data.size();
         if (!Has(block->m_mm_rhs)) m_needed.insert(block->m_mm_rhs);
     }
+}
+
+void HashSnapshotStore::CacheTransaction(const Wtxid& id, CTransactionRef tx)
+{
+    AssertLockHeld(cs_main);
+    if (m_transactions.contains(id)) { m_transaction_touched[id] = ++m_clock; return; }
+    const auto size = m_transaction_sizes.at(id);
+    while (!m_transactions.empty() && size > MAX_CACHE_BYTES - m_transaction_cache_bytes) {
+        const auto oldest = std::min_element(m_transaction_touched.begin(), m_transaction_touched.end(),
+            [](const auto& a, const auto& b) { return a.second < b.second; });
+        m_transaction_cache_bytes -= m_transaction_sizes.at(oldest->first);
+        m_transactions.erase(oldest->first);
+        m_transaction_touched.erase(oldest);
+    }
+    m_transactions.emplace(id, std::move(tx));
+    m_transaction_touched[id] = ++m_clock;
+    m_transaction_cache_bytes += size;
+}
+
+CTransactionRef HashSnapshotStore::Transaction(const Wtxid& id)
+{
+    AssertLockHeld(cs_main);
+    if (const auto found = m_transactions.find(id); found != m_transactions.end()) {
+        m_transaction_touched[id] = ++m_clock;
+        return found->second;
+    }
+    if (!m_transaction_sizes.contains(id) || m_quarantined_transactions.contains(id)) return {};
+    StoredValue<BoundedBytes> stored;
+    if (!m_db.Read(std::make_pair(uint8_t{'u'}, id), stored) || stored.value.data.size() != m_transaction_sizes.at(id)) {
+        QuarantineTransaction(id);
+        return {};
+    }
+    try {
+        auto tx = hashonly::DecodeTransaction(stored.value.data);
+        if (tx->GetWitnessHash() == id) {
+            CacheTransaction(id, tx);
+            return tx;
+        }
+    } catch (const std::ios_base::failure&) { }
+    QuarantineTransaction(id);
+    return {};
+}
+
+void HashSnapshotStore::QuarantineTransaction(const Wtxid& id)
+{
+    AssertLockHeld(cs_main);
+    if (m_transaction_sizes.contains(id)) m_quarantined_transactions.insert(id);
+    if (m_transactions.erase(id)) m_transaction_cache_bytes -= m_transaction_sizes.at(id);
+    m_transaction_touched.erase(id);
 }
 
 void HashSnapshotStore::Cache(const uint256& hash, std::shared_ptr<const std::vector<unsigned char>> bytes)
@@ -110,7 +218,7 @@ void HashSnapshotStore::IndexTemplates(const uint256& hash, const hashonly::Snap
         const auto& record = snapshot.templates[i];
         if (m_template_sources.size() >= MAX_TEMPLATE_INDEX && !m_template_sources.contains(record.id)) continue;
         // Never let an arbitrary body with a copied header poison an ID lookup.
-        auto block = DecodeBlock(record.block);
+        auto block = std::make_shared<CBlock>(record.block);
         bool mutated{false};
         BlockValidationState state;
         if (block->vtx.empty() || block->m_txcount != block->vtx.size() ||
@@ -194,7 +302,7 @@ uint256 HashSnapshotStore::Put(Span<const unsigned char> raw, std::optional<uint
     m_needed.erase(hash);
     // Origin snapshot dependencies are discovered without trusting their contents.
     if (snapshot) for (const auto& record : snapshot->templates) {
-        auto block = DecodeBlock(record.block);
+        auto block = std::make_shared<CBlock>(record.block);
         if (!Has(block->m_mm_rhs) && m_needed.size() < 4096) m_needed.insert(block->m_mm_rhs);
     }
     ++m_revision;
@@ -227,47 +335,118 @@ void HashSnapshotStore::RememberTemplate(const CBlock& block)
     CBlock normalized{block};
     normalized.nNonce = normalized.m_nonce2 = normalized.m_nonce3 = normalized.m_time_offset = 0;
     normalized.m_extranonce.SetNull();
-    auto bytes = EncodeBlock(normalized);
     const auto existing = m_template_sizes.find(id);
-    if (existing != m_template_sizes.end()) return;
-    if (bytes.size() > hashonly::MAX_TEMPLATE_BYTES ||
-        m_template_sizes.size() >= MAX_TEMPLATE_INDEX || m_template_bytes + bytes.size() > MAX_LOCAL_TEMPLATE_BYTES) {
+    if (normalized.vtx.empty() || std::any_of(normalized.vtx.begin(), normalized.vtx.end(), [](const auto& tx) { return !tx; }) ||
+        GetSerializeSize(TX_WITH_WITNESS(normalized)) > hashonly::MAX_TEMPLATE_BYTES) throw std::runtime_error("local template byte bound");
+    StoredTemplate record{normalized.GetBlockHeader(), {}, TemplateBodyHash(normalized)};
+    // A known ID is insufficient: a prior local record or one of its deduped
+    // transactions may have been quarantined. Only exact sound bytes are an
+    // idempotent hit; validated reoffers can replace damaged records.
+    if (existing != m_template_sizes.end()) {
+        if (const auto known = LocalTemplate(id); known && TemplateBodyHash(*known) == record.body_hash) {
+            m_quarantined_templates.erase(id);
+            return;
+        }
+    }
+    std::map<Wtxid, CTransactionRef> replacements;
+    size_t replaced = existing == m_template_sizes.end() ? 0 : existing->second;
+    size_t added_transactions{0};
+    for (const auto& tx : normalized.vtx) {
+        const auto hash = tx->GetWitnessHash();
+        record.transactions.push_back(hash);
+        if (!Transaction(hash) && replacements.try_emplace(hash, tx).second) {
+            const auto found = m_transaction_sizes.find(hash);
+            if (found == m_transaction_sizes.end()) ++added_transactions;
+            else replaced += found->second;
+        }
+    }
+    size_t increment = GetSerializeSize(record);
+    for (const auto& [hash, tx] : replacements) increment += GetSerializeSize(TX_WITH_WITNESS(*tx));
+    if ((existing == m_template_sizes.end() && m_template_sizes.size() >= MAX_TEMPLATE_INDEX) ||
+        added_transactions > MAX_LOCAL_TRANSACTIONS - m_transaction_sizes.size() ||
+        increment > MAX_LOCAL_TEMPLATE_BYTES - (m_template_bytes - replaced)) {
         throw std::runtime_error("local hash-only template index quota exhausted");
     }
-    if (!m_db.Write(std::make_pair(uint8_t{'t'}, id), bytes, true)) throw std::runtime_error("cannot store validated full template");
-    m_template_sizes[id] = bytes.size();
-    m_template_bytes += bytes.size();
-    m_template_sources.try_emplace(id, uint256{}, 0);
+    CDBBatch batch{m_db};
+    for (const auto& [hash, tx] : replacements) {
+        DataStream encoded;
+        encoded << TX_WITH_WITNESS(*tx);
+        const std::vector<unsigned char> bytes{UCharCast(encoded.data()), UCharCast(encoded.data()) + encoded.size()};
+        batch.Write(std::make_pair(uint8_t{'u'}, hash), bytes);
+    }
+    batch.Write(std::make_pair(uint8_t{'t'}, id), record);
+    if (!m_db.WriteBatch(batch, true)) throw std::runtime_error("cannot atomically store validated template and transactions");
+    for (const auto& [hash, tx] : replacements) {
+        m_transaction_sizes[hash] = GetSerializeSize(TX_WITH_WITNESS(*tx));
+        m_quarantined_transactions.erase(hash);
+        CacheTransaction(hash, tx);
+    }
+    m_template_sizes[id] = GetSerializeSize(record);
+    m_template_bytes = m_template_bytes - replaced + increment;
+    m_quarantined_templates.erase(id);
+}
+
+std::shared_ptr<const CBlock> HashSnapshotStore::LocalTemplate(const uint256& id)
+{
+    AssertLockHeld(cs_main);
+    if (!m_template_sizes.contains(id)) return {};
+    StoredValue<StoredTemplate> stored;
+    if (m_db.Read(std::make_pair(uint8_t{'t'}, id), stored) && stored.size == m_template_sizes.at(id)) {
+        const auto& record = stored.value;
+        if (!record.header.m_header_v2 || record.header.m_txcount != record.transactions.size() || record.transactions.empty()) return {};
+        auto block = std::make_shared<CBlock>(record.header);
+        size_t size = GetSerializeSize(record.header) + GetSizeOfCompactSize(record.transactions.size());
+        for (const auto& hash : record.transactions) {
+            const auto tx = Transaction(hash);
+            if (!tx || m_transaction_sizes.at(hash) > hashonly::MAX_TEMPLATE_BYTES - size) return {};
+            size += m_transaction_sizes.at(hash);
+            block->vtx.push_back(tx);
+        }
+        if (hashonly::TemplateId(*block) != id || TemplateBodyHash(*block) != record.body_hash ||
+            block->nNonce || block->m_nonce2 || block->m_nonce3 || block->m_time_offset || !block->m_extranonce.IsNull() ||
+            BlockMerkleRoot(*block) != block->hashMerkleRoot) return {};
+        return block;
+    }
+    return {};
 }
 
 std::shared_ptr<const CBlock> HashSnapshotStore::Template(const uint256& id)
 {
     AssertLockHeld(cs_main);
-    BoundedBytes bytes;
-    if (m_db.Read(std::make_pair(uint8_t{'t'}, id), bytes)) {
-        auto block = DecodeBlock(bytes.data);
-        if (hashonly::TemplateId(*block) == id) return block;
-        return {};
+    if (const auto block = LocalTemplate(id)) {
+        m_quarantined_templates.erase(id);
+        return block;
     }
+    if (m_template_sizes.contains(id)) m_quarantined_templates.insert(id);
+    // An unsound local dedup record must not hide a full authenticated body
+    // indexed from a separately hash-verified snapshot.
     const auto found = m_template_sources.find(id);
     if (found == m_template_sources.end()) return {};
     const auto snapshot = Lookup(found->second.first);
     if (!snapshot || found->second.second >= snapshot->templates.size()) return {};
-    auto block = DecodeBlock(snapshot->templates[found->second.second].block);
+    auto block = std::make_shared<CBlock>(snapshot->templates[found->second.second].block);
     return hashonly::TemplateId(*block) == id ? block : nullptr;
 }
 
-std::optional<CAmount> HashSnapshotStore::NativeValidated(const uint256& id) const
+std::optional<CAmount> HashSnapshotStore::NativeValidated(const uint256& id)
 {
     AssertLockHeld(cs_main);
     const auto found = m_native_validated.find(id);
-    return found == m_native_validated.end() ? std::nullopt : std::optional<CAmount>{found->second};
+    if (found == m_native_validated.end()) return std::nullopt;
+    m_native_touched[id] = ++m_clock;
+    return found->second;
 }
 void HashSnapshotStore::SetNativeValidated(const uint256& id, CAmount reward)
 {
     AssertLockHeld(cs_main);
-    if (m_native_validated.size() >= 4096) m_native_validated.erase(m_native_validated.begin());
+    if (!m_native_validated.contains(id) && m_native_validated.size() >= 4096) {
+        const auto oldest = std::min_element(m_native_touched.begin(), m_native_touched.end(),
+            [](const auto& a, const auto& b) { return a.second < b.second; });
+        m_native_validated.erase(oldest->first);
+        m_native_touched.erase(oldest);
+    }
     m_native_validated[id] = reward;
+    m_native_touched[id] = ++m_clock;
 }
 
 bool HashSnapshotStore::QueueBlock(std::shared_ptr<const CBlock> block)

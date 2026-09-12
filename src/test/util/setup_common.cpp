@@ -268,6 +268,7 @@ ChainTestingSetup::ChainTestingSetup(const ChainType chainType, TestOpts opts)
 
 ChainTestingSetup::~ChainTestingSetup()
 {
+    if (m_node.chainman) m_node.chainman->StopSharePoolHashWorker();
     if (m_node.scheduler) m_node.scheduler->stop();
     if (m_node.validation_signals) m_node.validation_signals->FlushBackgroundCallbacks();
     m_node.connman.reset();

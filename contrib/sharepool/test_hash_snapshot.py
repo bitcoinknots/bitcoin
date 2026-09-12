@@ -5,12 +5,12 @@ from dataclasses import replace
 import struct
 import unittest
 
-from hash_snapshot import (EnvelopeV2, Snapshot, TemplateRecord, RULES_HASH, MAX_SNAPSHOT_BYTES,
-    MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES, SHARE_BITS, SHARE_TARGET_SHIFT, share_target, share_work, work_outputs, job_hash, candidate, solve_share, parse_share,
+from hash_snapshot import (EnvelopeV2, Snapshot, TemplateRecord, CompactTemplateRecord, Reader, RULES_HASH, MAX_SNAPSHOT_BYTES,
+    MAX_TEMPLATE_BYTES, MAX_EXPANDED_TEMPLATE_BYTES, MAX_TEMPLATE_TX_REFERENCES, MAX_ORIGIN_CHECKS, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES, SHARE_BITS, SHARE_TARGET_SHIFT, share_target, share_work, work_outputs, job_hash, candidate, solve_share, parse_share,
     normalize_template, HashSigner, PHYSICAL_FIELDS, winner_share)
 from native_enforcement import compact_size, verify_schnorr
 from native_signer import REGTEST_GENESIS, SignerError
-from test_framework.messages import CTxOut, hash256, ser_uint256, uint256_from_compact
+from test_framework.messages import CBlockHeader, CTransaction, CTxIn, COutPoint, CTxOut, hash256, ser_uint256, uint256_from_compact
 
 SCRIPT = b"\x00\x14" + b"a" * 20
 SECRET = (1).to_bytes(32, "big")
@@ -28,9 +28,9 @@ class HashSnapshotTests(unittest.TestCase):
         block, snapshot = fixture()
         raw = snapshot.serialize()
         self.assertEqual(Snapshot.deserialize(raw).serialize(), raw)
-        self.assertEqual(block.m_mm_rhs, int.from_bytes(hash256(b"SharePool/snapshot/v3\0" + raw), "little"))
-        self.assertEqual(RULES_HASH, int.from_bytes(hash256(b"SharePool/rules/v3\0" + struct.pack(
-            "<IIIIIII", SHARE_BITS, SHARE_TARGET_SHIFT, 3, MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES)), "little"))
+        self.assertEqual(block.m_mm_rhs, int.from_bytes(hash256(b"SharePool/snapshot/v4\0" + raw), "little"))
+        self.assertEqual(RULES_HASH, int.from_bytes(hash256(b"SharePool/rules/v4\0" + struct.pack(
+            "<10I", SHARE_BITS, SHARE_TARGET_SHIFT, 3, MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES, MAX_EXPANDED_TEMPLATE_BYTES, MAX_TEMPLATE_TX_REFERENCES, MAX_ORIGIN_CHECKS)), "little"))
         self.assertEqual(len(block.vtx[0].vout), 1)
         self.assertEqual(block.vtx[0].vout[0].serialize(), snapshot.payouts[0].serialize())
 
@@ -182,6 +182,64 @@ class HashSnapshotTests(unittest.TestCase):
         self.assertNotEqual(block.serialize(), record.data)
         with self.assertRaises(ValueError):
             replace(record, data=block.serialize()).serialize()
+
+    def test_hundred_large_templates_share_bytes_and_remain_distinct(self):
+        # Wire-capacity fixture, not a claim about transaction script validity.
+        # Each reconstructed template is close to4MB; one common transaction is
+        # encoded once. Header time distinguishes all100 exact template IDs.
+        block, snapshot = fixture()
+        transaction = CTransaction()
+        transaction.vin = [CTxIn(COutPoint(123, 0))]
+        transaction.vout = [CTxOut(1, b"x" * 3_850_000)]
+        block.vtx.append(transaction)
+        block.m_txcount = len(block.vtx)
+        block.hashMerkleRoot = block.calc_merkle_root()
+        base = CompactTemplateRecord.from_record(TemplateRecord.from_block(block))
+        with self.assertRaises(ValueError):
+            CompactTemplateRecord(base.template_id, bytearray(base.header_bytes), base.transactions)
+        records = []
+        for index in range(100):
+            header = CBlockHeader(block)
+            header.nTime += index
+            from native_mining_gate import template_id
+            records.append(CompactTemplateRecord(int(template_id(header), 16), header.serialize(), base.transactions))
+        records.sort(key=lambda value: ser_uint256(value.template_id))
+        encoded = replace(snapshot, templates=tuple(records)).serialize()
+        self.assertLess(len(encoded), 3_900_000)
+        decoded = Snapshot.deserialize(encoded)
+        self.assertEqual(len({record.template_id for record in decoded.templates}), 100)
+        self.assertGreater(sum(record.expanded_bytes for record in decoded.templates), 385_000_000)
+        self.assertTrue(all(record.transactions[1] is decoded.templates[0].transactions[1] for record in decoded.templates))
+        self.assertEqual(decoded.serialize(), encoded)
+        with self.assertRaises(AttributeError):
+            decoded.templates[0].transactions[1].raw = b"corrupted"
+        with self.assertRaises(AttributeError):
+            decoded.templates[0].header_bytes = b"corrupted"
+
+    def test_transaction_table_is_unique_ordered_and_fully_referenced(self):
+        origin, opening = fixture()
+        unused, snapshot = fixture(templates=[origin], shares=[solve_share(origin, opening)])
+        raw = snapshot.serialize()
+        reader = Reader(raw)
+        reader.take(len(snapshot.envelope.serialize()) + 64 + 32)
+        table_offset = reader.stream.tell()
+        self.assertEqual(reader.size(100), 1)
+        entry_offset = reader.stream.tell()
+        entry = reader.variable(MAX_TEMPLATE_BYTES)
+        template_offset = reader.stream.tell()
+        self.assertEqual(reader.size(100), 1)
+        reader.take(32 + 164)
+        self.assertEqual(reader.size(100), 1)
+        reference_offset = reader.stream.tell()
+        self.assertEqual(reader.size(100), 0)
+        cases = [
+            raw[:reference_offset] + b"\x01" + raw[reference_offset + 1:],
+            raw[:table_offset] + b"\x02" + raw[entry_offset:template_offset] * 2 + raw[template_offset:],
+            raw[:template_offset] + b"\x00" + raw[reader.stream.tell():],
+        ]
+        for altered in cases:
+            with self.subTest(size=len(altered)), self.assertRaises(ValueError):
+                Snapshot.deserialize(altered)
 
     def test_every_snapshot_component_is_committed(self):
         block, snapshot = fixture()

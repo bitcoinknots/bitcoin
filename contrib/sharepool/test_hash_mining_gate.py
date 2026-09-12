@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic v3 gate durability/policy tests with a native RPC double."""
+"""Deterministic v4 gate durability/policy tests with a native RPC double."""
 from dataclasses import replace
 import hashlib
 from pathlib import Path
@@ -43,7 +43,7 @@ class FakeRPC:
         if method == "getblockheader":
             return self.headers[args[0]]
         if method == "getsharepoolhashstatus":
-            return {"mode": "hash-only-v3", "rules": f"{RULES_HASH:064x}", "max_snapshot_bytes": MAX_SNAPSHOT_BYTES,
+            return {"mode": "hash-only-v4", "rules": f"{RULES_HASH:064x}", "max_snapshot_bytes": MAX_SNAPSHOT_BYTES,
                     "inventory": list(self.snapshots)}
         if method == "submitsharepoolhashsnapshot":
             snapshot = Snapshot.deserialize(bytes.fromhex(args[0]))
@@ -102,7 +102,7 @@ class HashGateTests(unittest.TestCase):
         self.gate = self.open_gate(**extra)
 
     def job(self, shares=(), templates=None):
-        return fixture(ntime=1700000002, shares=shares, templates=[self.origin] if templates is None else templates)
+        return fixture(ntime=1700000002, shares=shares, templates=([self.origin] if shares else []) if templates is None else templates)
 
     def assert_not_admitted(self, block, snapshot, proofs=()):
         for kind, identity in ((SNAPSHOT, snapshot.hash_hex), (TEMPLATE, template_id(block))):
@@ -179,7 +179,7 @@ class HashGateTests(unittest.TestCase):
     def test_template_omission_cannot_admit_offered_evidence(self):
         offered, opening = fixture(ntime=1700000010, secret=(2).to_bytes(32, "big"))
         self.rpc.snapshots[opening.hash_hex] = opening.serialize().hex()
-        proof = solve_share(offered, opening)
+        proof = solve_share(self.origin, self.opening)
         block, snapshot = self.job(shares=[proof], templates=[offered])
         head = self.gate.archive_head()
         with self.assertRaises(TemplateOmission):
@@ -218,7 +218,7 @@ class HashGateTests(unittest.TestCase):
         offered, opening = fixture(ntime=1700000010, secret=(2).to_bytes(32, "big"))
         self.rpc.snapshots[opening.hash_hex] = opening.serialize().hex()
         proof = solve_share(offered, opening)
-        block, snapshot = self.job(shares=[proof], templates=[self.origin, offered])
+        block, snapshot = self.job(shares=[proof], templates=[offered])
         with patch.object(self.gate, "_persist", wraps=self.gate._persist) as persist:
             authorization = self.gate.authorize(block.serialize(), snapshot.serialize())
         self.assertEqual(persist.call_count, 1)
@@ -238,7 +238,7 @@ class HashGateTests(unittest.TestCase):
         parent, parent_snapshot = self.job()
         self.rpc.publish(parent, parent_snapshot)
         block, snapshot = fixture(height=2, native_parent=int(self.rpc.tip, 16),
-            ntime=1700000010, parent_snapshot=parent_snapshot, templates=[self.origin])
+            ntime=1700000010, parent_snapshot=parent_snapshot)
         self.rpc.snapshots[snapshot.hash_hex] = snapshot.serialize().hex()
         head = self.gate.archive_head()
         self.rpc.template_error = "native validation refused"
@@ -255,7 +255,9 @@ class HashGateTests(unittest.TestCase):
         offered, opening = fixture(ntime=1700000010, secret=(2).to_bytes(32, "big"))
         self.rpc.snapshots[opening.hash_hex] = opening.serialize().hex()
         proof = solve_share(offered, opening)
-        block, snapshot = self.job(shares=[proof], templates=[self.origin, offered])
+        acknowledged = solve_share(self.origin, self.opening)
+        self.gate.receive(acknowledged)
+        block, snapshot = self.job(shares=[acknowledged, proof], templates=[self.origin, offered])
         head = self.gate.archive_head()
         self.reopen(quota=max(4096, head["bytes"] + 1))
         with self.assertRaisesRegex(ValueError, "quota"):
@@ -267,16 +269,14 @@ class HashGateTests(unittest.TestCase):
         self.assertEqual(self.gate.archive_head(), head)
         self.gate.authorize(block.serialize(), snapshot.serialize())
 
-    def test_unworked_template_coverage_is_required(self):
+    def test_unworked_inventory_is_retained_without_forcing_refresh_dependencies(self):
         other, opening = fixture(ntime=1700000003)
         self.gate.register_snapshot(opening.serialize())
-        identity = self.gate.register_template(other.serialize())
+        self.gate.register_template(other.serialize())
         block, snapshot = self.job()
-        with self.assertRaises(TemplateOmission) as failure:
-            self.gate.authorize(block.serialize(), snapshot.serialize())
-        self.assertIn(identity, failure.exception.template_ids)
-        block, snapshot = self.job(templates=[self.origin, other])
         self.gate.authorize(block.serialize(), snapshot.serialize())
+        self.assertEqual(snapshot.templates, ())
+        self.assertEqual(len(self.gate.active_templates()), 3)
 
     def test_successful_storage_never_authorizes_missing_dependency(self):
         block, snapshot = self.job()
@@ -328,7 +328,7 @@ class HashGateTests(unittest.TestCase):
 
     def test_seal_failure_returns_no_ack_and_restart_preserves_commit(self):
         proof = solve_share(self.origin, self.opening)
-        with patch("hash_mining_gate.native_archive.write_head", side_effect=OSError("simulated fsync failure")):
+        with patch("hash_mining_gate.hash_gate_archive.write_head", side_effect=OSError("simulated fsync failure")):
             with self.assertRaises(OSError):
                 self.gate.receive(proof)
         with self.assertRaisesRegex(ValueError, "restart"):

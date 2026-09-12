@@ -17,6 +17,7 @@
 #include <consensus/sharepool.h>
 #include <consensus/sharepool_hash.h>
 #include <sharepool/hash_store.h>
+#include <sharepool/retry_worker.h>
 #include <consensus/tx_check.h>
 #include <consensus/tx_verify.h>
 #include <consensus/validation.h>
@@ -69,6 +70,7 @@
 #include <util/strencodings.h>
 #include <util/string.h>
 #include <util/time.h>
+#include <util/threadnames.h>
 #include <util/trace.h>
 #include <util/translation.h>
 #include <validationinterface.h>
@@ -2767,14 +2769,55 @@ static bool ContextualCheckBlockHeaderVolatile(const CBlockHeader& block, BlockV
  *  Validity checks that depend on the UTXO set are also done; ConnectBlock()
  *  can fail if those validity checks fail (among other reasons). */
 namespace {
+struct DeferredOriginScripts {
+    struct BlockScripts {
+        // Script checks retain pointers into txdata and the transactions. Own
+        // both until every check has completed outside cs_main.
+        std::vector<CTransactionRef> transactions;
+        std::vector<PrecomputedTransactionData> txdata;
+        std::vector<CScriptCheck> checks;
+    };
+    std::vector<std::unique_ptr<BlockScripts>> blocks;
+    size_t bytes{0};
+
+    void Charge(size_t size)
+    {
+        if (size > sharepool::hashonly::MAX_DEPENDENCY_BYTES - bytes) {
+            throw std::length_error("local origin script preparation budget");
+        }
+        bytes += size;
+    }
+
+    BlockScripts& Add(const CBlock& block)
+    {
+        SizeComputer serialized;
+        serialized << TX_WITH_WITNESS(block);
+        Charge(serialized.size());
+        Charge(block.vtx.size() * (sizeof(CTransactionRef) + sizeof(PrecomputedTransactionData)));
+        auto prepared = std::make_unique<BlockScripts>();
+        prepared->transactions = block.vtx;
+        prepared->txdata.resize(block.vtx.size());
+        blocks.push_back(std::move(prepared));
+        return *blocks.back();
+    }
+};
+
 struct HashOnlyBodyScope {
     static thread_local HashOnlyBodyScope* current;
     HashOnlyBodyScope* previous{current};
     std::optional<CAmount> reward;
-    HashOnlyBodyScope() { current = this; }
+    DeferredOriginScripts* deferred;
+    explicit HashOnlyBodyScope(DeferredOriginScripts* scripts = nullptr) : deferred{scripts} { current = this; }
     ~HashOnlyBodyScope() { current = previous; }
 };
 thread_local HashOnlyBodyScope* HashOnlyBodyScope::current{nullptr};
+
+thread_local bool g_defer_hash_origins{false};
+struct DeferHashOriginScope {
+    const bool previous{g_defer_hash_origins};
+    explicit DeferHashOriginScope(bool defer) { g_defer_hash_origins = defer; }
+    ~DeferHashOriginScope() { g_defer_hash_origins = previous; }
+};
 }
 
 sharepool::hashonly::Result ValidateSharePoolHashOrigin(ChainstateManager& chainman,
@@ -2989,7 +3032,10 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
     // in multiple threads). Preallocate the vector size so a new allocation
     // doesn't invalidate pointers into the vector, and keep txsdata in scope
     // for as long as `control`.
-    std::vector<PrecomputedTransactionData> txsdata(block.vtx.size());
+    auto* collector = HashOnlyBodyScope::current ? HashOnlyBodyScope::current->deferred : nullptr;
+    auto* prepared = collector ? &collector->Add(block) : nullptr;
+    std::vector<PrecomputedTransactionData> local_txsdata(prepared ? 0 : block.vtx.size());
+    auto& txsdata = prepared ? prepared->txdata : local_txsdata;
     CCheckQueueControl<CScriptCheck> control(fScriptChecks && parallel_script_checks ? &m_chainman.GetCheckQueue() : nullptr);
 
     // RDTS (see RdtsActiveAt): active from the BLAKE2b fork height
@@ -3090,15 +3136,25 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         if (!tx.IsCoinBase())
         {
             std::vector<CScriptCheck> vChecks;
+            if (collector) {
+                for (const auto& input : tx.vin) {
+                    const auto& spent = view.AccessCoin(input.prevout).out;
+                    collector->Charge(sizeof(CScriptCheck) + 3 * (sizeof(CTxOut) + spent.scriptPubKey.size()));
+                }
+            }
             bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks (still consult the cache, though) */
             TxValidationState tx_state;
-            if (fScriptChecks && !CheckInputScripts(tx, tx_state, view, flags, fCacheResults, fCacheResults, txsdata[i], m_chainman.m_validation_cache, parallel_script_checks ? &vChecks : nullptr, flags_per_input)) {
+            if (fScriptChecks && !CheckInputScripts(tx, tx_state, view, flags, fCacheResults, fCacheResults, txsdata[i], m_chainman.m_validation_cache, (prepared || parallel_script_checks) ? &vChecks : nullptr, flags_per_input)) {
                 // Any transaction validation failure in ConnectBlock is a block consensus failure
                 state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
                               tx_state.GetRejectReason(), tx_state.GetDebugMessage());
                 break;
             }
-            control.Add(std::move(vChecks));
+            if (prepared) {
+                for (auto& check : vChecks) prepared->checks.push_back(std::move(check));
+            } else {
+                control.Add(std::move(vChecks));
+            }
         }
 
         CTxUndo undoDummy;
@@ -5184,7 +5240,7 @@ bool ChainstateManager::AcceptBlock(const std::shared_ptr<const CBlock>& pblock,
     return true;
 }
 
-bool ChainstateManager::ProcessNewBlock(const std::shared_ptr<const CBlock>& block, bool force_processing, bool min_pow_checked, bool* new_block)
+bool ChainstateManager::ProcessNewBlock(const std::shared_ptr<const CBlock>& block, bool force_processing, bool min_pow_checked, bool* new_block, bool defer_hash_origin_scripts)
 {
     AssertLockNotHeld(cs_main);
 
@@ -5196,6 +5252,7 @@ bool ChainstateManager::ProcessNewBlock(const std::shared_ptr<const CBlock>& blo
         // CheckBlock() does not support multi-threaded block validation because CBlock::fChecked can cause data race.
         // Therefore, the following critical section must include the CheckBlock() call as well.
         LOCK(cs_main);
+        DeferHashOriginScope defer_origins{defer_hash_origin_scripts};
 
         // Skipping AcceptBlock() for CheckBlock() failures means that we will never mark a block as invalid if
         // CheckBlock() fails.  This is protective against consensus failure if there are any unknown forms of block
@@ -5209,7 +5266,12 @@ bool ChainstateManager::ProcessNewBlock(const std::shared_ptr<const CBlock>& blo
         }
         if (!ret) {
             if (m_sharepool_hash_store) {
-                if (state.IsPending()) m_sharepool_hash_store->QueueBlock(block);
+                if (state.IsPending()) {
+                    m_sharepool_hash_store->QueueBlock(block);
+                    // Signal only; execution never occurs under either cs_main
+                    // or the network message-processing mutex held by callers.
+                    RequestSharePoolHashBlocks();
+                }
                 else if (state.IsInvalid()) m_sharepool_hash_store->RemoveBlock(block->GetHash());
             }
             if (m_options.signals) {
@@ -5338,25 +5400,33 @@ bool TestSharePoolTemplateOnAncestor(BlockValidationState& state,
                                       viewNew, /*fCheckPOW=*/false, /*fCheckMerkleRoot=*/true);
 }
 
-sharepool::hashonly::Result ValidateSharePoolHashOrigin(ChainstateManager& chainman,
-    const CBlock& block, const CBlockIndex* parent)
+namespace {
+uint256 HashPoolNativeBody(const CBlock& block)
+{
+    HashWriter writer;
+    writer << TX_WITH_WITNESS(block);
+    return writer.GetHash();
+}
+
+sharepool::hashonly::Result PrepareHashPoolNativeBody(ChainstateManager& chainman,
+    const CBlock& block, const CBlockIndex* parent, const uint256& identity,
+    DeferredOriginScripts* scripts) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
 {
     using sharepool::hashonly::Result;
     AssertLockHeld(cs_main);
     if (!parent || !chainman.m_sharepool_hash_store) return Result::Missing({}, "sharepool-hash-data-missing");
     auto& store = *chainman.m_sharepool_hash_store;
     if (block.hashPrevBlock != parent->GetBlockHash()) return Result::Invalid("bad-sharepool-hash-origin-parent");
-    // Cache exact canonical body bytes, including witness and every header field.
-    // A normalized header ID alone cannot authenticate a caller-supplied body.
-    HashWriter native_body;
-    native_body << TX_WITH_WITNESS(block);
-    const auto identity = native_body.GetHash();
     if (auto reward = store.NativeValidated(identity)) return Result::Valid(*reward);
+    const auto failed = chainman.m_sharepool_hash_script_failures.find(identity);
+    if (failed != chainman.m_sharepool_hash_script_failures.end()) return Result::Invalid(failed->second);
+    if (!scripts && g_defer_hash_origins) return Result::Missing({}, "sharepool-hash-validation-pending");
     auto& chainstate = chainman.ActiveChainstate();
     const auto* tip = chainstate.m_chain.Tip();
     const auto* fork = chainstate.m_chain.FindFork(parent);
     if (!tip || !fork) return Result::Missing({}, "sharepool-hash-native-ancestor-missing");
-    HashOnlyBodyScope body;
+    if (!scripts) ++chainman.m_sharepool_hash_locked_fallbacks;
+    HashOnlyBodyScope body{scripts};
     CCoinsViewCache view(&chainstate.CoinsTip());
     for (const auto* index = tip; index != fork; index = index->pprev) {
         CBlock previous_block;
@@ -5383,8 +5453,239 @@ sharepool::hashonly::Result ValidateSharePoolHashOrigin(ChainstateManager& chain
         return state.IsInvalid() ? Result::Invalid(state.GetRejectReason()) : Result::Missing({}, state.GetRejectReason());
     }
     if (!body.reward) return Result::Missing({}, "sharepool-hash-native-reward-unavailable");
-    store.SetNativeValidated(identity, *body.reward);
+    if (!scripts) store.SetNativeValidated(identity, *body.reward);
     return Result::Valid(*body.reward);
+}
+} // namespace
+
+sharepool::hashonly::Result ValidateSharePoolHashOrigin(ChainstateManager& chainman,
+    const CBlock& block, const CBlockIndex* parent)
+{
+    AssertLockHeld(cs_main);
+    return PrepareHashPoolNativeBody(chainman, block, parent, HashPoolNativeBody(block), nullptr);
+}
+
+sharepool::hashonly::Result ValidateSharePoolHashOriginUnlocked(ChainstateManager& chainman,
+    const CBlock& block, const uint256& parent_hash, const std::atomic<bool>* stop)
+{
+    using sharepool::hashonly::Result;
+    AssertLockNotHeld(cs_main);
+    if (chainman.m_interrupt || (stop && *stop)) return Result::Missing({}, "sharepool-hash-validation-interrupted");
+    // CBlock has mutable validation hints; own that header/container. Immutable
+    // transactions are shared and retained until every CScriptCheck is destroyed.
+    // Native CheckBlock may update mutable validation hints on a shared pending
+    // CBlock. Copy those hints under the same lock before using our own body.
+    const CBlock owned{WITH_LOCK(cs_main, return CBlock{block};)};
+    const auto identity = HashPoolNativeBody(owned);
+    DeferredOriginScripts scripts;
+    Result prepared;
+    Chainstate* captured_chainstate;
+    const CBlockIndex* captured_tip;
+    const CBlockIndex* parent;
+    {
+        LOCK(cs_main);
+        captured_chainstate = &chainman.ActiveChainstate();
+        captured_tip = captured_chainstate->m_chain.Tip();
+        parent = chainman.m_blockman.LookupBlockIndex(parent_hash);
+        try {
+            prepared = PrepareHashPoolNativeBody(chainman, owned, parent, identity, &scripts);
+        } catch (const std::length_error&) {
+            return Result::Missing({}, "sharepool-hash-native-preparation-budget");
+        }
+    }
+    if (!prepared.IsValid()) return prepared;
+    std::optional<std::string> failure;
+    for (const auto& body : scripts.blocks) {
+        for (auto& check : body->checks) {
+            if (chainman.m_interrupt || (stop && *stop)) return Result::Missing({}, "sharepool-hash-validation-interrupted");
+            AssertLockNotHeld(cs_main);
+            ++chainman.m_sharepool_hash_outside_script_checks;
+            if (const auto error = check()) {
+                failure = "mandatory-script-verify-flag-failed";
+                break;
+            }
+        }
+        if (failure) break;
+    }
+    {
+        LOCK(cs_main);
+        // Never publish a speculative result against a different coins view.
+        // The parent index lifetime belongs to chainman; it is checked again.
+        if (&chainman.ActiveChainstate() != captured_chainstate ||
+            chainman.ActiveChainstate().m_chain.Tip() != captured_tip ||
+            chainman.m_blockman.LookupBlockIndex(parent_hash) != parent) {
+            return Result::Missing({}, "sharepool-hash-validation-context-changed");
+        }
+        if (chainman.m_interrupt || (stop && *stop)) return Result::Missing({}, "sharepool-hash-validation-interrupted");
+        if (failure) {
+            auto& failed = chainman.m_sharepool_hash_script_failures;
+            if (failed.size() >= 4096) failed.erase(failed.begin());
+            failed[identity] = *failure;
+            return Result::Invalid(*failure);
+        }
+        if (!chainman.m_sharepool_hash_store || !prepared.expected_reward) return Result::Missing();
+        chainman.m_sharepool_hash_store->SetNativeValidated(identity, *prepared.expected_reward);
+    }
+    return prepared;
+}
+
+sharepool::hashonly::Result PrepareSharePoolHashOrigins(ChainstateManager& chainman,
+    const CBlock& supplied, std::shared_ptr<const sharepool::hashonly::Snapshot> overlay,
+    const std::atomic<bool>* stop, bool allow_unsigned)
+{
+    namespace hashonly = sharepool::hashonly;
+    using hashonly::Result;
+    AssertLockNotHeld(cs_main);
+    if (!chainman.GetConsensus().SharePoolHashOnly) return Result::Valid();
+    const CBlock block{WITH_LOCK(cs_main, return CBlock{supplied};)};
+    // The parent/header ancestry is immutable after insertion and its lifetime
+    // belongs to chainman. Shutdown joins the worker before freeing indices.
+    Chainstate* captured_chainstate;
+    const CBlockIndex* captured_tip;
+    const CBlockIndex* previous;
+    {
+        LOCK(cs_main);
+        captured_chainstate = &chainman.ActiveChainstate();
+        captured_tip = captured_chainstate->m_chain.Tip();
+        previous = chainman.m_blockman.LookupBlockIndex(block.hashPrevBlock);
+        if (!previous) return Result::Missing({}, "sharepool-hash-native-ancestor-missing");
+        if (previous->nHeight + 1 < chainman.GetConsensus().SharePoolHeight) return Result::Valid();
+    }
+    const auto current = ValidateSharePoolHashOriginUnlocked(chainman, block, block.hashPrevBlock, stop);
+    if (!current.IsValid()) return current;
+    const auto identity = HashPoolNativeBody(block);
+    const auto overlay_hash = overlay ? hashonly::SnapshotHash(*overlay) : uint256{};
+    // Per-session results prevent concurrent LRU eviction from repeating work.
+    // Decode/hash/signature work executes outside cs_main. Only owned byte
+    // references and small native cache lookups cross the mutex boundary.
+    std::map<uint256, Result> prepared;
+    struct LocalSnapshot {
+        std::shared_ptr<const hashonly::Snapshot> snapshot;
+        size_t bytes;
+        uint64_t touched;
+    };
+    std::map<uint256, LocalSnapshot> snapshots;
+    size_t snapshot_bytes{0};
+    uint64_t snapshot_clock{0};
+    const hashonly::Lookup lookup = [&](const uint256& hash) -> std::shared_ptr<const hashonly::Snapshot> {
+        if (overlay && hash == overlay_hash) return overlay;
+        if (const auto found = snapshots.find(hash); found != snapshots.end()) {
+            found->second.touched = ++snapshot_clock;
+            return found->second.snapshot;
+        }
+        const auto raw = WITH_LOCK(cs_main, return chainman.m_sharepool_hash_store->GetShared(hash));
+        if (!raw) return {};
+        std::shared_ptr<const hashonly::Snapshot> decoded;
+        try { decoded = std::make_shared<const hashonly::Snapshot>(hashonly::DecodeSnapshot(*raw)); }
+        catch (const std::ios_base::failure&) { throw hashonly::MalformedSnapshot("hash-verified snapshot encoding is invalid"); }
+        // Eviction is only a local optimization. Never hide an available
+        // preimage and thereby turn a consensus dependency budget failure into
+        // indefinitely missing data; the pure checker owns that rule.
+        while (!snapshots.empty() && raw->size() > hashonly::MAX_DEPENDENCY_BYTES - snapshot_bytes) {
+            const auto oldest = std::min_element(snapshots.begin(), snapshots.end(),
+                [](const auto& a, const auto& b) { return a.second.touched < b.second.touched; });
+            snapshot_bytes -= oldest->second.bytes;
+            snapshots.erase(oldest);
+        }
+        snapshot_bytes += raw->size();
+        snapshots.emplace(hash, LocalSnapshot{decoded, raw->size(), ++snapshot_clock});
+        return decoded;
+    };
+    for (uint32_t pass = 0; pass <= hashonly::MAX_ORIGIN_CHECKS; ++pass) {
+        if (chainman.m_interrupt || (stop && *stop)) return Result::Missing({}, "sharepool-hash-validation-interrupted");
+        std::map<uint256, std::pair<CBlock, uint256>> next;
+        size_t next_bytes{0};
+        auto result = hashonly::CheckSnapshot(block, previous, chainman.GetConsensus(), lookup,
+            [&](const CBlock& origin, const CBlockIndex* parent) {
+                const auto origin_id = HashPoolNativeBody(origin);
+                if (const auto found = prepared.find(origin_id); found != prepared.end()) return found->second;
+                Result cached;
+                {
+                    LOCK(cs_main);
+                    DeferHashOriginScope deferred{true};
+                    cached = PrepareHashPoolNativeBody(chainman, origin, parent, origin_id, nullptr);
+                }
+                const size_t retained = sizeof(CBlock) + origin.vtx.size() * sizeof(CTransactionRef);
+                if (cached.IsMissing() && cached.reason == "sharepool-hash-validation-pending" && parent &&
+                    !next.contains(origin_id) && next.size() < 64 && retained <= hashonly::MAX_SNAPSHOT_BYTES - next_bytes) {
+                    next.emplace(origin_id, std::make_pair(origin, parent->GetBlockHash()));
+                    next_bytes += retained;
+                }
+                return cached;
+            }, current.expected_reward, 0, allow_unsigned);
+        if (next.empty() || !result.IsMissing()) {
+            LOCK(cs_main);
+            if (&chainman.ActiveChainstate() != captured_chainstate ||
+                chainman.ActiveChainstate().m_chain.Tip() != captured_tip ||
+                chainman.m_blockman.LookupBlockIndex(block.hashPrevBlock) != previous) {
+                return Result::Missing({}, "sharepool-hash-validation-context-changed");
+            }
+            // An overlay is deliberately unpublished: it must not allow later
+            // block acceptance to bypass missing evidence through this cache.
+            if (result.IsValid() && !overlay && !allow_unsigned && current.expected_reward) {
+                auto& cache = chainman.m_sharepool_hash_verified;
+                if (!cache.contains(identity) && cache.size() >= 4096) {
+                    const auto oldest = std::min_element(cache.begin(), cache.end(),
+                        [](const auto& a, const auto& b) { return a.second.touched < b.second.touched; });
+                    cache.erase(oldest);
+                }
+                cache.insert_or_assign(identity, ChainstateManager::VerifiedHashSnapshot{
+                    hashonly::RulesHash(), previous, *current.expected_reward, ++chainman.m_sharepool_hash_verified_clock});
+            }
+            return result;
+        }
+        for (const auto& [origin_id, origin] : next) {
+            auto validated = ValidateSharePoolHashOriginUnlocked(chainman, origin.first, origin.second, stop);
+            if (validated.IsMissing()) return validated;
+            const bool invalid = !validated.IsValid();
+            prepared.emplace(origin_id, std::move(validated));
+            if (invalid) break; // Re-enter the verifier for the precise origin error.
+        }
+    }
+    return Result::Missing({}, "sharepool-hash-native-session-budget");
+}
+
+sharepool::hashonly::Result ValidateSharePoolHashProofUnlocked(ChainstateManager& chainman,
+    const sharepool::Share& share, const std::atomic<bool>* stop)
+{
+    namespace hashonly = sharepool::hashonly;
+    using hashonly::Result;
+    AssertLockNotHeld(cs_main);
+    Chainstate* captured_chainstate;
+    const CBlockIndex* tip;
+    std::shared_ptr<const CBlock> full_origin;
+    {
+        LOCK(cs_main);
+        captured_chainstate = &chainman.ActiveChainstate();
+        tip = captured_chainstate->m_chain.Tip();
+        if (!chainman.m_sharepool_hash_store || !tip || tip->nHeight + 1 < chainman.GetConsensus().SharePoolHeight) {
+            return Result::Invalid("bad-sharepool-hash-inactive");
+        }
+        full_origin = chainman.m_sharepool_hash_store->Template(hashonly::TemplateId(share.header));
+    }
+    if (!full_origin) return Result::Missing({}, "sharepool-hash-data-missing");
+    auto prepared = PrepareSharePoolHashOrigins(chainman, *full_origin, nullptr, stop);
+    if (!prepared.IsValid()) return prepared;
+    const auto time = std::max<int64_t>(tip->GetMedianTimePast() + 1, GetTime());
+    if (time < 0 || time > std::numeric_limits<uint32_t>::max()) return Result::Missing({}, "sharepool-hash-native-time-range");
+    const auto checked = hashonly::CheckShareProof(share, *full_origin, tip, static_cast<uint32_t>(time), chainman.GetConsensus(),
+        [&](const uint256& hash) -> std::shared_ptr<const hashonly::Snapshot> {
+            const auto raw = WITH_LOCK(cs_main, return chainman.m_sharepool_hash_store->GetShared(hash));
+            if (!raw) return {};
+            try { return std::make_shared<const hashonly::Snapshot>(hashonly::DecodeSnapshot(*raw)); }
+            catch (const std::ios_base::failure&) { throw hashonly::MalformedSnapshot("hash-verified snapshot encoding is invalid"); }
+        },
+        [&](const CBlock& origin, const CBlockIndex* parent) {
+            if (!parent) return Result::Missing({}, "sharepool-hash-native-ancestor-missing");
+            // Normally these are warm. Concurrent LRU eviction may require a
+            // fresh capture, but never forces scripts back under cs_main.
+            return ValidateSharePoolHashOriginUnlocked(chainman, origin, parent->GetBlockHash(), stop);
+        });
+    LOCK(cs_main);
+    if (&chainman.ActiveChainstate() != captured_chainstate || chainman.ActiveChainstate().m_chain.Tip() != tip) {
+        return Result::Missing({}, "sharepool-hash-validation-context-changed");
+    }
+    return checked;
 }
 
 bool CheckConfiguredSharePool(const CBlock& block, BlockValidationState& state,
@@ -5393,12 +5694,22 @@ bool CheckConfiguredSharePool(const CBlock& block, BlockValidationState& state,
     AssertLockHeld(cs_main);
     const auto& consensus = chainman.GetConsensus();
     if (!consensus.SharePoolHashOnly) return CheckSharePoolBlock(block, state, consensus, previous, reward);
-    if (!previous || previous->nHeight + 1 < consensus.SharePoolHeight) return true;
     if (HashOnlyBodyScope::current) {
         if (reward) HashOnlyBodyScope::current->reward = *reward;
         return true;
     }
+    if (!previous || previous->nHeight + 1 < consensus.SharePoolHeight) return true;
     auto& store = *Assert(chainman.m_sharepool_hash_store);
+    const auto identity = HashPoolNativeBody(block);
+    const auto cached = chainman.m_sharepool_hash_verified.find(identity);
+    if (cached != chainman.m_sharepool_hash_verified.end() &&
+        cached->second.parent == previous && cached->second.rules == sharepool::hashonly::RulesHash()) {
+        cached->second.touched = ++chainman.m_sharepool_hash_verified_clock;
+        if (reward && *reward != cached->second.reward) {
+            return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-sharepool-hash-reward");
+        }
+        return true;
+    }
     auto result = sharepool::hashonly::CheckSnapshot(block, previous, consensus,
         [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.Lookup(hash); },
         [&](const CBlock& origin, const CBlockIndex* parent) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return ValidateSharePoolHashOrigin(chainman, origin, parent); }, reward);
@@ -5410,16 +5721,60 @@ bool CheckConfiguredSharePool(const CBlock& block, BlockValidationState& state,
     return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, result.reason);
 }
 
-void ChainstateManager::RetrySharePoolHashBlocks()
+void ChainstateManager::RequestSharePoolHashBlocks()
+{
+    if (m_sharepool_hash_worker) m_sharepool_hash_worker->Request();
+}
+
+void ChainstateManager::StartSharePoolHashWorker()
 {
     AssertLockNotHeld(cs_main);
-    if (!m_sharepool_hash_store || m_retrying_hash_blocks.exchange(true)) return;
-    struct Reset { std::atomic<bool>& flag; ~Reset() { flag = false; } } reset{m_retrying_hash_blocks};
-    // Copies of immutable pending blocks are bounded by the store's64MiB quota.
+    if (!m_sharepool_hash_worker) return;
+    m_sharepool_hash_worker->Start();
+    // Pending blocks are durable; revisit them even if no fresh data arrives
+    // after restart. Missing data remains pending and is fetched by P2P.
+    m_sharepool_hash_worker->Request();
+}
+
+void ChainstateManager::StopSharePoolHashWorker()
+{
+    AssertLockNotHeld(cs_main);
+    if (m_sharepool_hash_worker) m_sharepool_hash_worker->Stop();
+}
+
+sharepool::RetryWorkerStats ChainstateManager::SharePoolHashWorkerStats() const
+{
+    return m_sharepool_hash_worker ? m_sharepool_hash_worker->Stats() : sharepool::RetryWorkerStats{};
+}
+
+void ChainstateManager::RetrySharePoolHashBlocks(const std::atomic<bool>& stop)
+{
+    AssertLockNotHeld(cs_main);
+    if (!m_sharepool_hash_store) return;
+    // Only this dedicated worker invokes retries. Its notification carries no
+    // data; immutable pending blocks remain bounded by the store's 64 MiB quota.
     const auto blocks = WITH_LOCK(cs_main, return m_sharepool_hash_store->PendingBlocks());
     for (const auto& block : blocks) {
-        if (m_interrupt) break;
-        ProcessNewBlock(block, true, true, nullptr);
+        if (m_interrupt || stop) break;
+        const auto prepared = PrepareSharePoolHashOrigins(*this, *block, nullptr, &stop);
+        if (prepared.IsMissing()) {
+            if (prepared.reason == "sharepool-hash-native-preparation-budget") {
+                // Large historical reconstructions retain the ordinary native
+                // synchronous path. This is measured and remains a latency
+                // limitation until coins/script preparation can be streamed.
+                ++m_sharepool_hash_locked_fallbacks;
+                ProcessNewBlock(block, true, true, nullptr);
+                continue;
+            }
+            LOCK(cs_main);
+            m_sharepool_hash_store->Need(prepared.missing);
+            if (prepared.reason == "sharepool-hash-validation-context-changed") {
+                ++m_sharepool_hash_context_retries;
+                RequestSharePoolHashBlocks();
+            }
+            continue;
+        }
+        ProcessNewBlock(block, true, true, nullptr, /*defer_hash_origin_scripts=*/true);
     }
 }
 
@@ -7260,12 +7615,25 @@ ChainstateManager::ChainstateManager(const util::SignalInterrupt& interrupt, Opt
       m_validation_cache{m_options.script_execution_cache_bytes, m_options.signature_cache_bytes}
 {
     if (GetConsensus().SharePoolHashOnly) {
-        m_sharepool_hash_store = std::make_unique<sharepool::HashSnapshotStore>(m_options.datadir / "sharepool-snapshots-v3");
+        m_sharepool_hash_store = std::make_unique<sharepool::HashSnapshotStore>(m_options.datadir / "sharepool-snapshots-v4");
+        m_sharepool_hash_worker = std::make_unique<sharepool::RetryWorker>(
+            [this](const std::atomic<bool>& stop) {
+                util::ThreadRename("sharepool-retry");
+                RetrySharePoolHashBlocks(stop);
+            },
+            [](std::exception_ptr error) {
+                try { std::rethrow_exception(error); }
+                catch (const std::exception& exception) { LogError("Hash-only retry worker failed: %s", exception.what()); }
+                catch (...) { LogError("Hash-only retry worker failed with an unknown exception"); }
+                // No error turns missing data into consensus invalidity. The
+                // durable pending queue remains available for a later retry.
+            });
     }
 }
 
 ChainstateManager::~ChainstateManager()
 {
+    StopSharePoolHashWorker();
     LOCK(::cs_main);
 
     m_versionbitscache.Clear();

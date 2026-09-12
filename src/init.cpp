@@ -334,6 +334,9 @@ void Shutdown(NodeContext& node)
     StopTorControl();
 
     if (node.background_init_thread.joinable()) node.background_init_thread.join();
+    // Retry work may wait for validation callbacks. Join it while the scheduler
+    // still services those callbacks, and without holding cs_main.
+    if (node.chainman) node.chainman->StopSharePoolHashWorker();
     // After everything has been shut down, but before things get flushed, stop the
     // the scheduler. After this point, SyncWithValidationInterfaceQueue() should not be called anymore
     // as this would prevent the shutdown from completing.
@@ -2215,6 +2218,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         ScheduleBatchPriority();
         // Import blocks and ActivateBestChain()
         ImportBlocks(chainman, vImportFiles);
+        chainman.StartSharePoolHashWorker();
         WITH_LOCK(::cs_main, chainman.UpdateIBDStatus());
         if (args.GetBoolArg("-stopafterblockimport", DEFAULT_STOPAFTERBLOCKIMPORT)) {
             LogPrintf("Stopping after block import\n");

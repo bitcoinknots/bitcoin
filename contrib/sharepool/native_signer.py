@@ -60,15 +60,38 @@ class NativeSigner:
         result.public_key = result._invoke("init", policy, 32)
         return result
 
-    def _invoke(self, command, payload, size):
-        if command not in ("init", "pubkey", "sign", "sign-job") or type(payload) is not bytes or len(payload) > (360 if command == "sign-job" else 296):
+    @classmethod
+    def migrate(cls, binary, legacy_file, destination, *, expected_public_key, pool, payout_script, timeout=5.0):
+        """Explicitly copy a legacy key to a new checksummed file, retaining it.
+
+        The expected public key must come from the owner's existing trusted
+        configuration, not a fresh reading of the unchecksummed source file.
+        """
+        if type(expected_public_key) is not bytes or len(expected_public_key) != 32:
+            raise ValueError("migration requires the previously trusted x-only public key")
+        result = cls.__new__(cls)
+        result._configure(binary, legacy_file, pool=pool, payout_script=payout_script, timeout=timeout)
+        policy = b"\x01" + pool.to_bytes(32, "little") + vector(payout_script)
+        result.public_key = result._invoke("migrate", policy + expected_public_key, 32, destination=destination)
+        if result.public_key != expected_public_key:
+            raise SignerError("migrated signer does not match the trusted public key")
+        result.key_file = str(Path(destination).absolute())
+        return result
+
+    def _invoke(self, command, payload, size, *, destination=None):
+        maximum = 360 if command == "sign-job" else (100 if command == "migrate" else 296)
+        if (command not in ("init", "pubkey", "sign", "sign-job", "migrate") or type(payload) is not bytes or
+                len(payload) > maximum or (command == "migrate") != (destination is not None)):
             raise SignerError("invalid local signer request")
         wire = payload.hex().encode("ascii") + (b"\n" if payload else b"")
         deadline = time.monotonic() + self.timeout
         process = None
         streams = {}
         try:
-            process = subprocess.Popen([self.binary, command, self.key_file], stdin=subprocess.PIPE,
+            arguments = [self.binary, command, self.key_file]
+            if destination is not None:
+                arguments.append(str(Path(destination).absolute()))
+            process = subprocess.Popen(arguments, stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True, start_new_session=True,
                 bufsize=0)
             with selectors.DefaultSelector() as ready:
