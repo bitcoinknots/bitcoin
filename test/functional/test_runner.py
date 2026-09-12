@@ -84,6 +84,7 @@ EXTENDED_SCRIPTS = [
     # These tests are not run by default.
     # Longest test should go first, to favor running tests in parallel
     'feature_sharepool_hash_100_miners.py',
+    'feature_sharepool_hash_ledger_100_miners.py',
     'feature_sharepool_100_miners.py',
     'feature_pruning.py',
     'feature_dbcrash.py',
@@ -133,6 +134,10 @@ BASE_SCRIPTS = [
     'feature_sharepool_hash_worker.py',
     'feature_sharepool_hash_http.py',
     'feature_sharepool_hash_builder.py',
+    'feature_sharepool_hash_ledger.py',
+    'feature_sharepool_hash_pending.py',
+    'feature_sharepool_hash_gate_provenance.py',
+    'feature_sharepool_hash_gate_ledger.py',
     'rpc_psbt.py --legacy-wallet',
     'rpc_psbt.py --descriptors',
     'wallet_fundrawtransaction.py --legacy-wallet',

@@ -5531,7 +5531,7 @@ sharepool::hashonly::Result ValidateSharePoolHashOriginUnlocked(ChainstateManage
 
 sharepool::hashonly::Result PrepareSharePoolHashOrigins(ChainstateManager& chainman,
     const CBlock& supplied, std::shared_ptr<const sharepool::hashonly::Snapshot> overlay,
-    const std::atomic<bool>* stop, bool allow_unsigned)
+    const std::atomic<bool>* stop, bool allow_unsigned, bool for_mining)
 {
     namespace hashonly = sharepool::hashonly;
     using hashonly::Result;
@@ -5595,8 +5595,7 @@ sharepool::hashonly::Result PrepareSharePoolHashOrigins(ChainstateManager& chain
         if (chainman.m_interrupt || (stop && *stop)) return Result::Missing({}, "sharepool-hash-validation-interrupted");
         std::map<uint256, std::pair<CBlock, uint256>> next;
         size_t next_bytes{0};
-        auto result = hashonly::CheckSnapshot(block, previous, chainman.GetConsensus(), lookup,
-            [&](const CBlock& origin, const CBlockIndex* parent) {
+        const hashonly::ValidateOrigin origin_validator = [&](const CBlock& origin, const CBlockIndex* parent) {
                 const auto origin_id = HashPoolNativeBody(origin);
                 if (const auto found = prepared.find(origin_id); found != prepared.end()) return found->second;
                 Result cached;
@@ -5612,7 +5611,10 @@ sharepool::hashonly::Result PrepareSharePoolHashOrigins(ChainstateManager& chain
                     next_bytes += retained;
                 }
                 return cached;
-            }, current.expected_reward, 0, allow_unsigned);
+            };
+        auto result = for_mining
+            ? hashonly::CheckMiningJob(block, previous, chainman.GetConsensus(), lookup, origin_validator, current.expected_reward, allow_unsigned)
+            : hashonly::CheckSnapshot(block, previous, chainman.GetConsensus(), lookup, origin_validator, current.expected_reward, 0, allow_unsigned);
         if (next.empty() || !result.IsMissing()) {
             LOCK(cs_main);
             if (&chainman.ActiveChainstate() != captured_chainstate ||
@@ -5630,7 +5632,7 @@ sharepool::hashonly::Result PrepareSharePoolHashOrigins(ChainstateManager& chain
                     cache.erase(oldest);
                 }
                 cache.insert_or_assign(identity, ChainstateManager::VerifiedHashSnapshot{
-                    hashonly::RulesHash(), previous, *current.expected_reward, ++chainman.m_sharepool_hash_verified_clock});
+                    hashonly::RulesHash(hashonly::ProfileVersion(chainman.GetConsensus())), previous, *current.expected_reward, ++chainman.m_sharepool_hash_verified_clock});
             }
             return result;
         }
@@ -5643,6 +5645,43 @@ sharepool::hashonly::Result PrepareSharePoolHashOrigins(ChainstateManager& chain
         }
     }
     return Result::Missing({}, "sharepool-hash-native-session-budget");
+}
+
+sharepool::hashonly::Result ValidateSharePoolHashHistoricalTemplateUnlocked(ChainstateManager& chainman,
+    const CBlock& supplied, std::shared_ptr<const sharepool::hashonly::Snapshot> overlay, const std::atomic<bool>* stop)
+{
+    namespace hashonly = sharepool::hashonly;
+    using hashonly::Result;
+    AssertLockNotHeld(cs_main);
+    const CBlock block{WITH_LOCK(cs_main, return CBlock{supplied};)};
+    Chainstate* captured_chainstate;
+    const CBlockIndex* tip;
+    {
+        LOCK(cs_main);
+        captured_chainstate = &chainman.ActiveChainstate();
+        tip = captured_chainstate->m_chain.Tip();
+        if (!chainman.m_sharepool_hash_store || !tip) return Result::Missing({}, "sharepool-hash-native-ancestor-missing");
+    }
+    const auto time = std::max<int64_t>(tip->GetMedianTimePast() + 1, GetTime());
+    if (time < 0 || time > std::numeric_limits<uint32_t>::max()) return Result::Missing({}, "sharepool-hash-native-time-range");
+    const auto overlay_hash = overlay ? hashonly::SnapshotHash(*overlay) : uint256{};
+    const auto checked = hashonly::CheckHistoricalTemplate(block, tip, static_cast<uint32_t>(time), chainman.GetConsensus(),
+        [&](const uint256& hash) -> std::shared_ptr<const hashonly::Snapshot> {
+            if (overlay && hash == overlay_hash) return overlay;
+            const auto raw = WITH_LOCK(cs_main, return chainman.m_sharepool_hash_store->GetShared(hash));
+            if (!raw) return {};
+            try { return std::make_shared<const hashonly::Snapshot>(hashonly::DecodeSnapshot(*raw)); }
+            catch (const std::ios_base::failure&) { throw hashonly::MalformedSnapshot("hash-verified snapshot encoding is invalid"); }
+        },
+        [&](const CBlock& origin, const CBlockIndex* parent) {
+            if (!parent) return Result::Missing({}, "sharepool-hash-native-ancestor-missing");
+            return ValidateSharePoolHashOriginUnlocked(chainman, origin, parent->GetBlockHash(), stop);
+        });
+    LOCK(cs_main);
+    if (&chainman.ActiveChainstate() != captured_chainstate || chainman.ActiveChainstate().m_chain.Tip() != tip) {
+        return Result::Missing({}, "sharepool-hash-validation-context-changed");
+    }
+    return checked;
 }
 
 sharepool::hashonly::Result ValidateSharePoolHashProofUnlocked(ChainstateManager& chainman,
@@ -5664,8 +5703,10 @@ sharepool::hashonly::Result ValidateSharePoolHashProofUnlocked(ChainstateManager
         full_origin = chainman.m_sharepool_hash_store->Template(hashonly::TemplateId(share.header));
     }
     if (!full_origin) return Result::Missing({}, "sharepool-hash-data-missing");
-    auto prepared = PrepareSharePoolHashOrigins(chainman, *full_origin, nullptr, stop);
-    if (!prepared.IsValid()) return prepared;
+    if (!chainman.GetConsensus().SharePoolAdmittedLedger) {
+        const auto prepared = PrepareSharePoolHashOrigins(chainman, *full_origin, nullptr, stop);
+        if (!prepared.IsValid()) return prepared;
+    }
     const auto time = std::max<int64_t>(tip->GetMedianTimePast() + 1, GetTime());
     if (time < 0 || time > std::numeric_limits<uint32_t>::max()) return Result::Missing({}, "sharepool-hash-native-time-range");
     const auto checked = hashonly::CheckShareProof(share, *full_origin, tip, static_cast<uint32_t>(time), chainman.GetConsensus(),
@@ -5703,7 +5744,7 @@ bool CheckConfiguredSharePool(const CBlock& block, BlockValidationState& state,
     const auto identity = HashPoolNativeBody(block);
     const auto cached = chainman.m_sharepool_hash_verified.find(identity);
     if (cached != chainman.m_sharepool_hash_verified.end() &&
-        cached->second.parent == previous && cached->second.rules == sharepool::hashonly::RulesHash()) {
+        cached->second.parent == previous && cached->second.rules == sharepool::hashonly::RulesHash(sharepool::hashonly::ProfileVersion(chainman.GetConsensus()))) {
         cached->second.touched = ++chainman.m_sharepool_hash_verified_clock;
         if (reward && *reward != cached->second.reward) {
             return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-sharepool-hash-reward");
@@ -5715,7 +5756,7 @@ bool CheckConfiguredSharePool(const CBlock& block, BlockValidationState& state,
         [&](const CBlock& origin, const CBlockIndex* parent) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return ValidateSharePoolHashOrigin(chainman, origin, parent); }, reward);
     if (result.IsValid()) return true;
     if (result.IsMissing()) {
-        store.Need(result.missing);
+        store.NeedForBlock(block.GetHash(), result.missing);
         return state.Pending(BlockValidationResult::BLOCK_MISSING_SHAREPOOL_DATA, "sharepool-hash-data-missing");
     }
     return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, result.reason);
@@ -5767,7 +5808,7 @@ void ChainstateManager::RetrySharePoolHashBlocks(const std::atomic<bool>& stop)
                 continue;
             }
             LOCK(cs_main);
-            m_sharepool_hash_store->Need(prepared.missing);
+            m_sharepool_hash_store->NeedForBlock(block->GetHash(), prepared.missing);
             if (prepared.reason == "sharepool-hash-validation-context-changed") {
                 ++m_sharepool_hash_context_retries;
                 RequestSharePoolHashBlocks();
@@ -7615,7 +7656,7 @@ ChainstateManager::ChainstateManager(const util::SignalInterrupt& interrupt, Opt
       m_validation_cache{m_options.script_execution_cache_bytes, m_options.signature_cache_bytes}
 {
     if (GetConsensus().SharePoolHashOnly) {
-        m_sharepool_hash_store = std::make_unique<sharepool::HashSnapshotStore>(m_options.datadir / "sharepool-snapshots-v4");
+        m_sharepool_hash_store = std::make_unique<sharepool::HashSnapshotStore>(m_options.datadir / (GetConsensus().SharePoolAdmittedLedger ? "sharepool-snapshots-v5" : "sharepool-snapshots-v4"));
         m_sharepool_hash_worker = std::make_unique<sharepool::RetryWorker>(
             [this](const std::atomic<bool>& stop) {
                 util::ThreadRename("sharepool-retry");

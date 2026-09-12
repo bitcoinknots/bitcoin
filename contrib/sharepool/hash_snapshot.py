@@ -33,6 +33,28 @@ MAX_ORIGIN_CHECKS = 2048
 RULES_HASH = h256(b"SharePool/rules/v4\0", struct.pack("<IIIIIIIIII", SHARE_BITS, SHARE_TARGET_SHIFT,
     MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES,
     MAX_EXPANDED_TEMPLATE_BYTES, MAX_TEMPLATE_TX_REFERENCES, MAX_ORIGIN_CHECKS))
+LEDGER_VERSION = 5
+MAX_LEDGER_BYTES = 4 * 1024 * 1024
+MAX_SETTLEMENT_BYTES = 1024 * 1024
+MAX_CERTIFICATE_BYTES = 4 * 1024 * 1024
+LEDGER_RULES_HASH = h256(b"SharePool/rules/v5\0", struct.pack("<IIIIIIIIIIIII", SHARE_BITS, SHARE_TARGET_SHIFT,
+    MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES,
+    MAX_EXPANDED_TEMPLATE_BYTES, MAX_TEMPLATE_TX_REFERENCES, MAX_ORIGIN_CHECKS,
+    MAX_LEDGER_BYTES, MAX_SETTLEMENT_BYTES, MAX_CERTIFICATE_BYTES))
+
+
+def rules_hash(version=4):
+    if version == 4:
+        return RULES_HASH
+    if version == LEDGER_VERSION:
+        return LEDGER_RULES_HASH
+    raise ValueError("unsupported hash-only profile")
+
+
+def _domain(name, version):
+    return f"SharePool/{name}/v{version}\0".encode("ascii")
+
+
 PHYSICAL_FIELDS = ("nNonce", "m_nonce2", "m_nonce3", "m_extranonce", "m_time_offset")
 
 
@@ -57,7 +79,7 @@ class EnvelopeV2(_Envelope):
         integers = (self.genesis, self.rules, self.native_parent, self.pool,
                     self.shares_root, self.state_root, self.payouts_root)
         if (any(type(value) is not int or not 0 <= value < 1 << 256 for value in integers) or
-                self.version != 4 or self.rules != RULES_HASH or self.pool == 0 or
+                self.version not in (4, LEDGER_VERSION) or self.rules != rules_hash(self.version) or self.pool == 0 or
                 type(self.height) is not int or not 0 < self.height <= 0xffffffff or
                 type(self.public_key) is not bytes or len(self.public_key) != 32 or
                 type(self.payout_script) is not bytes or not is_payout_script(self.payout_script) or
@@ -221,6 +243,122 @@ class CompactTemplateRecord:
 
 
 @dataclass(frozen=True)
+class LedgerCredit:
+    admitted_height: int
+    origin_height: int
+    proof_id: int
+    pool: int
+    native_bits: int
+    payout_script: bytes
+
+    @property
+    def order(self):
+        return self.admitted_height, self.proof_id
+
+    def serialize(self):
+        if (any(type(v) is not int or not 0 < v <= 0xffffffff for v in
+                (self.admitted_height, self.origin_height, self.native_bits)) or
+                self.origin_height > self.admitted_height or
+                any(type(v) is not int or not 0 <= v < 1 << 256 for v in (self.proof_id, self.pool)) or
+                not self.pool or type(self.payout_script) is not bytes or not is_payout_script(self.payout_script)):
+            raise ValueError("invalid confirmed credit")
+        share_target(self.native_bits)
+        return (struct.pack("<II", self.admitted_height, self.origin_height) + ser_uint256(self.proof_id) +
+                ser_uint256(self.pool) + struct.pack("<I", self.native_bits) + vector(self.payout_script))
+
+    @classmethod
+    def read(cls, reader):
+        return cls(reader.uint(4), reader.uint(4), reader.uint(32), reader.uint(32), reader.uint(4), reader.variable(34))
+
+
+@dataclass(frozen=True)
+class OriginCertificate:
+    origin_height: int
+    native_parent: int
+    identity: int
+    snapshot_hash: int
+
+    def serialize(self):
+        if (type(self.origin_height) is not int or not 0 < self.origin_height <= 0xffffffff or
+                any(type(v) is not int or not 0 <= v < 1 << 256 for v in
+                    (self.native_parent, self.identity, self.snapshot_hash))):
+            raise ValueError("invalid confirmed origin certificate")
+        return (struct.pack("<I", self.origin_height) + ser_uint256(self.native_parent) +
+                ser_uint256(self.identity) + ser_uint256(self.snapshot_hash))
+
+    @classmethod
+    def read(cls, reader):
+        return cls(reader.uint(4), reader.uint(32), reader.uint(32), reader.uint(32))
+
+
+def origin_certificate(record):
+    record = CompactTemplateRecord.from_record(record)
+    header = CBlockHeader()
+    header.deserialize(BytesIO(record.header_bytes))
+    identity = h256(b"SharePool/origin-certificate/v5\0", record.header_bytes +
+        compact_size(len(record.transactions)) + b"".join(tx.wtxid for tx in record.transactions))
+    return OriginCertificate(header.m_height, header.hashPrevBlock, identity, header.m_mm_rhs)
+
+
+def apply_ledger_state(snapshot, parent):
+    """Construction helper only. Native validation authenticates parent and proofs.
+
+    Selection depends only on the actual parent: fresh receipts cannot change the
+    current payout. Unselected confirmed credits remain payable without expiry.
+    """
+    if snapshot.envelope.version != LEDGER_VERSION:
+        raise ValueError("confirmed ledger requires v5")
+    if parent is not None and (parent.envelope.version != LEDGER_VERSION or
+            parent.envelope.height + 1 != snapshot.envelope.height):
+        raise ValueError("ledger parent profile or height")
+    height, pool = snapshot.envelope.height, snapshot.envelope.pool
+    prior = parent.pending if parent is not None else ()
+    selected, carried, size, full = [], [], 0, False
+    for credit in prior:
+        if credit.pool != pool:
+            carried.append(credit)
+            continue
+        cost = len(credit.serialize())
+        if full or len(compact_size(len(selected) + 1)) + size + cost > MAX_SETTLEMENT_BYTES:
+            full = True
+            carried.append(credit)
+        else:
+            selected.append(credit)
+            size += cost
+    minimum = max(1, height - MAX_SHARE_AGE)
+    state = [entry for entry in (parent.post_state if parent else ()) if entry.origin_height >= minimum]
+    seen = {entry.proof_id for entry in (parent.post_state if parent else ())} | {c.proof_id for c in prior}
+    certificates = {cert.identity: cert for cert in (parent.certificates if parent else ()) if cert.origin_height >= minimum}
+    records = {record.template_id: record for record in snapshot.templates}
+    for share in snapshot.shares:
+        if share.proof_id in seen:
+            raise ValueError("duplicate admitted proof")
+        seen.add(share.proof_id)
+        state.append(StateEntry(share.envelope.height, share.proof_id))
+        carried.append(LedgerCredit(height, share.envelope.height, share.proof_id,
+            share.envelope.pool, share.header.nBits, share.envelope.payout_script))
+        record = records.get(int(template_id(share.header), 16))
+        if record is None:
+            raise ValueError("admitted origin template missing")
+        certificate = origin_certificate(record)
+        certificates[certificate.identity] = certificate
+    pending = tuple(sorted(carried, key=lambda credit: credit.order))
+    certs = tuple(sorted(certificates.values(), key=lambda cert: ser_uint256(cert.identity)))
+    if (len(compact_size(len(pending))) + sum(len(c.serialize()) for c in pending) > MAX_LEDGER_BYTES or
+            len(compact_size(len(certs))) + sum(len(c.serialize()) for c in certs) > MAX_CERTIFICATE_BYTES):
+        raise ValueError("confirmed ledger capacity; carry provisional work to a later admission")
+    return replace(snapshot, pending=pending, settled=tuple(selected), certificates=certs,
+                   post_state=tuple(sorted(state, key=lambda entry: entry.proof_id)))
+
+
+def credit_outputs(credits, reward, fallback_script):
+    weights = {}
+    for credit in credits:
+        weights[credit.payout_script] = weights.get(credit.payout_script, 0) + share_work(credit.native_bits)
+    return weighted_outputs(weights, reward, fallback_script)
+
+
+@dataclass(frozen=True)
 class Snapshot:
     envelope: EnvelopeV2
     owner_signature: bytes
@@ -229,10 +367,17 @@ class Snapshot:
     post_state: tuple = ()
     payouts: tuple = ()
     job_commitment: int = 0
+    pending: tuple = ()
+    settled: tuple = ()
+    certificates: tuple = ()
 
     def serialize(self):
         if not isinstance(self.envelope, EnvelopeV2) or any(not isinstance(share.envelope, EnvelopeV2) for share in self.shares):
-            raise ValueError("snapshot and proof origins require v4 envelopes")
+            raise ValueError("snapshot and proof origins require hash-only envelopes")
+        if any(share.envelope.version != self.envelope.version for share in self.shares):
+            raise ValueError("proof profile differs from settlement")
+        if self.envelope.version == 4 and (self.pending or self.settled or self.certificates):
+            raise ValueError("v4 cannot carry confirmed ledger state")
         if type(self.owner_signature) is not bytes or len(self.owner_signature) != 64:
             raise ValueError("owner authorization must contain 64 bytes")
         if type(self.job_commitment) is not int or not 0 <= self.job_commitment < 1 << 256:
@@ -269,7 +414,17 @@ class Snapshot:
             append(ser_uint256(record.template_id) + record.header_bytes + compact_size(len(record.transactions)))
             for tx in record.transactions:
                 append(compact_size(indexes[tx.wtxid]))
-        for values in (self.shares, self.post_state, self.payouts):
+        collections = (self.shares, self.post_state, self.payouts)
+        if self.envelope.version == LEDGER_VERSION:
+            for credits, budget in ((self.pending, MAX_LEDGER_BYTES), (self.settled, MAX_SETTLEMENT_BYTES)):
+                keys = [credit.order for credit in credits]
+                if keys != sorted(set(keys)) or len(compact_size(len(credits))) + sum(len(c.serialize()) for c in credits) > budget:
+                    raise ValueError("credit order or byte budget")
+            identities = [ser_uint256(cert.identity) for cert in self.certificates]
+            if identities != sorted(set(identities)) or len(compact_size(len(self.certificates))) + sum(len(c.serialize()) for c in self.certificates) > MAX_CERTIFICATE_BYTES:
+                raise ValueError("certificate order or byte budget")
+            collections += (self.pending, self.settled, self.certificates)
+        for values in collections:
             append(compact_size(len(values)))
             for item in values:
                 append(item.serialize())
@@ -316,7 +471,12 @@ class Snapshot:
         shares = tuple(Share.read(reader) for _ in range(reader.count(512)))
         state = tuple(StateEntry.read(reader) for _ in range(reader.count(36)))
         payouts = tuple(CTxOut(reader.uint(8), CScript(reader.variable(34))) for _ in range(reader.count(31)))
-        result = cls(envelope, signature, templates, shares, state, payouts, job)
+        pending, settled, certificates = (), (), ()
+        if envelope.version == LEDGER_VERSION:
+            pending = tuple(LedgerCredit.read(reader) for _ in range(reader.count(99)))
+            settled = tuple(LedgerCredit.read(reader) for _ in range(reader.count(99)))
+            certificates = tuple(OriginCertificate.read(reader) for _ in range(reader.count(100)))
+        result = cls(envelope, signature, templates, shares, state, payouts, job, pending, settled, certificates)
         if reader.stream.read() or result.serialize() != raw:
             raise ValueError("trailing or noncanonical snapshot bytes")
         return result
@@ -325,7 +485,7 @@ class Snapshot:
 
     @property
     def contents_hash(self):
-        return h256(b"SharePool/contents/v4\0", replace(self, owner_signature=bytes(64)).serialize())
+        return h256(_domain("contents", self.envelope.version), replace(self, owner_signature=bytes(64)).serialize())
 
     @property
     def signing_payload(self):
@@ -333,11 +493,11 @@ class Snapshot:
 
     @property
     def owner_message(self):
-        return hash256(b"SharePool/owner/v4\0" + self.signing_payload)
+        return hash256(_domain("owner", self.envelope.version) + self.signing_payload)
 
     @property
     def hash(self):
-        return h256(b"SharePool/snapshot/v4\0", self.serialize())
+        return h256(_domain("snapshot", self.envelope.version), self.serialize())
 
     @property
     def hash_hex(self):
@@ -376,6 +536,11 @@ def work_outputs(shares, reward, fallback_script):
     for share in shares:
         script = share.envelope.payout_script
         weights[script] = weights.get(script, 0) + share_work(share.header.nBits)
+    return weighted_outputs(weights, reward, fallback_script)
+
+
+def weighted_outputs(weights, reward, fallback_script):
+    weights = dict(weights)
     if not weights:
         weights[fallback_script] = 1
     total = sum(weights.values())
@@ -419,7 +584,8 @@ class HashSigner(NativeSigner):
 
 
 def build_snapshot(*, genesis, height, native_parent, pool, payout_script, reward,
-                   secret=None, public_key=None, sign_owner=None, templates=(), shares=(), parent_state=()):
+                   secret=None, public_key=None, sign_owner=None, templates=(), shares=(), parent_state=(),
+                   version=4, parent_snapshot=None):
     if secret is not None:
         if public_key is not None or sign_owner is not None:
             raise ValueError("choose a fixture secret or external signer")
@@ -429,22 +595,26 @@ def build_snapshot(*, genesis, height, native_parent, pool, payout_script, rewar
     shares = tuple(sorted(shares, key=lambda share: share.proof_id))
     records = tuple(CompactTemplateRecord.from_record(record if isinstance(record, (TemplateRecord, CompactTemplateRecord)) else TemplateRecord.from_block(record)) for record in templates)
     records = tuple(sorted(records, key=lambda record: ser_uint256(record.template_id)))
-    envelope = EnvelopeV2(genesis, RULES_HASH, height, native_parent, pool, public_key, payout_script)
+    envelope = EnvelopeV2(genesis, rules_hash(version), height, native_parent, pool, public_key, payout_script, version=version)
     signature = bytes(64)
     payouts = work_outputs(shares, reward=reward, fallback_script=payout_script)
     result = Snapshot(envelope, signature, records, shares, derive_state(parent_state, shares, height), payouts)
+    if version == LEDGER_VERSION:
+        result = apply_ledger_state(result, parent_snapshot)
+        result = replace(result, payouts=credit_outputs(result.settled, reward, payout_script))
     result.serialize()
     return result
 
 
 def candidate(*, genesis, native_parent, height, ntime, pool, payout_script,
               secret=None, public_key=None, sign_owner=None, templates=(), shares=(),
-              parent_snapshot=None, parent_state=None, fees=0, transactions=(), witness=False, reward=None, native_bits=SHARE_BITS):
+              parent_snapshot=None, parent_state=None, fees=0, transactions=(), witness=False, reward=None, native_bits=SHARE_BITS, version=4):
     coinbase = create_coinbase(height, fees=fees)
     snapshot = build_snapshot(genesis=genesis, height=height, native_parent=native_parent,
         pool=pool, payout_script=payout_script, reward=coinbase.vout[0].nValue if reward is None else reward,
         secret=secret, public_key=public_key, sign_owner=sign_owner, templates=templates, shares=shares,
-        parent_state=(parent_snapshot.post_state if parent_snapshot is not None and parent_state is None else (parent_state or ())))
+        parent_state=(parent_snapshot.post_state if parent_snapshot is not None and parent_state is None else (parent_state or ())),
+        version=version, parent_snapshot=parent_snapshot)
     coinbase.vout = list(snapshot.payouts)
     coinbase.rehash()
     block = create_block(native_parent, coinbase, ntime, version=0x20000000,

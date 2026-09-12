@@ -1,5 +1,8 @@
 # Hash-only settlement test profile, version 4
 
+The optional [v5 confirmed-work ledger](sharepool-confirmed-ledger.md) adds a
+native-parent payout cutoff while preserving the v4 profile described here.
+
 This separately enabled regtest profile places the flat hash of a complete
 canonical settlement snapshot in the native header's `m_mm_rhs` field. The
 snapshot contains full normalized origin templates, submitted proofs, the next
@@ -36,11 +39,14 @@ Changing the profile of an existing chain is not a migration procedure.
   the dedicated worker to retry pending blocks. Its `stored`/`present` result does not certify validity.
 - `getsharepoolhashsnapshot(hash)` returns complete bytes; `getsharepoolhashstatus`
   reports the active profile, available objects and pending-block count.
-- `validatesharepoolhashtemplate(hex, snapshot_hex)` checks the full native
+- `validatesharepoolhashtemplate(hex, snapshot_hex, mining=true)` checks the full native
   template, required snapshots, exact payouts and actual fees without candidate
-  PoW. The optional snapshot is an in-memory overlay; this form does not admit
+  PoW; physical search fields are normalized before checking the underlying
+  job. The optional snapshot is an in-memory overlay; this form does not admit
   snapshot or template evidence. Dependencies must already be available. Without
-  the overlay, a successful call remembers the validated template.
+  the overlay, a successful call remembers the validated template. New jobs
+  reserve one future origin/depth slot; `mining=false` restores historical
+  evidence without claiming it is suitable for newly dispatched work.
 - `validatesharepoolhashshare(hex)` checks proof work, authorization, eligible
   native ancestry and the complete locally available origin evidence.
 
@@ -54,7 +60,10 @@ chunks. Inventory replays after a completed cycle plus 60 seconds so bounded
 queues can recover dropped advertisements; it does not repeat unchanged pages
 every second. Existing peer iteration is randomized. FIFO turns additionally
 bound overtaking among continuously ready connections in each priority class.
-Required block data has priority. Fairness is per connection, not per operator.
+Required block data starts first. When both classes stay ready, three required
+turns are followed by an ordinary turn. Dependency requirements belong to tracked
+pending blocks; unauthenticated hints cannot consume their reserved slots.
+Fairness is per connection, not per operator.
 Requests expire even when send buffers are paused.
 Local snapshot storage retains up to 1 GiB and 65,536 objects; separately stored
 validated templates use shared Wtxid-keyed transaction storage, bounded to

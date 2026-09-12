@@ -3,6 +3,11 @@
 These tools support the experimental, explicitly enabled native regtest profile.
 They do not activate sharepool rules on a public network.
 
+The optional [v5 ledger](sharepool-confirmed-ledger.md) distinguishes provisional
+local receipts from confirmed pending credits and actual settlements. The
+original v4 receipt/expiry behavior below remains available; choose the gate's
+`profile_version=5` only with a fresh native v5 regtest profile.
+
 ## Native job construction and deterministic carry
 
 Use `gate.make_native(sign_owner=signer.sign_owner)` for a real native mempool
@@ -46,7 +51,7 @@ Missing historical openings produce `unknown`, never a payment claim. A
 reorganization can reactivate retained work if its native ancestry and age are
 eligible again.
 
-The native three-block age rule remains unchanged. Local durability does not
+In version 4, the native three-block age rule remains unchanged. Local durability does not
 make an expired deferred receipt payable: accepting unlimited future work on old
 templates would not prove when that work was performed. Guaranteed indefinite
 carry therefore remains an unresolved protocol requirement; it needs an

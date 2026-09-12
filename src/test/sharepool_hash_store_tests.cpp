@@ -166,6 +166,48 @@ struct StoreFixture : BasicTestingSetup {
 
 BOOST_FIXTURE_TEST_SUITE(sharepool_hash_store_tests, StoreFixture)
 
+BOOST_AUTO_TEST_CASE(snapshot_dependencies_are_hints_and_pending_blocks_own_requirements)
+{
+    const auto path = m_path_root / "request-provenance";
+    auto pending = std::make_shared<CBlock>(block);
+    pending->m_mm_rhs = uint256{uint8_t{7}};
+    const auto block_id = pending->GetHash();
+    const auto child = uint256{uint8_t{8}};
+    {
+        sharepool::HashSnapshotStore store{path};
+        LOCK(cs_main);
+        // This unsigned structural snapshot is legitimate relay content, but
+        // it does not authenticate any pending-block requirement.
+        store.Put(ho::EncodeSnapshot(source));
+        BOOST_CHECK(store.Needed().empty());
+        BOOST_CHECK(store.Speculative() == std::vector<uint256>({block.m_mm_rhs}));
+        store.NeedForBlock(block_id, {child});
+        BOOST_CHECK(store.Needed().empty());
+        BOOST_CHECK(!store.HasPendingBlock(block_id));
+        BOOST_REQUIRE(store.QueueBlock(pending));
+        BOOST_CHECK(store.HasPendingBlock(block_id));
+        BOOST_CHECK(!store.HasPendingBlock(child));
+        store.NeedForBlock(block_id, {child});
+        BOOST_CHECK(store.Needed() == std::vector<uint256>({pending->m_mm_rhs, child}));
+    }
+    {
+        sharepool::HashSnapshotStore restored{path};
+        LOCK(cs_main);
+        // Restart reconstructs only durable pending roots. The worker will
+        // rediscover their authenticated descendants, never unrelated hints.
+        BOOST_CHECK(restored.Needed() == std::vector<uint256>({pending->m_mm_rhs}));
+        BOOST_CHECK(restored.HasPendingBlock(block_id));
+        BOOST_CHECK(restored.Speculative().empty());
+        restored.NeedForBlock(block_id, {});
+        BOOST_CHECK(restored.Needed() == std::vector<uint256>({pending->m_mm_rhs}));
+        restored.RemoveBlock(block_id);
+        BOOST_CHECK(!restored.HasPendingBlock(block_id));
+        BOOST_CHECK(restored.Needed().empty());
+        restored.NeedForBlock(block_id, {child});
+        BOOST_CHECK(restored.Needed().empty());
+    }
+}
+
 BOOST_AUTO_TEST_CASE(quarantine_and_validated_reoffer_repair_exact_local_records)
 {
     const std::array damages{Damage::TEMPLATE_CHECKSUM, Damage::TEMPLATE_TRUNCATED,

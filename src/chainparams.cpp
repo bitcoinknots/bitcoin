@@ -91,6 +91,10 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
     }
 
     options.sharepool_hash_only = args.GetBoolArg("-sharepoolhashonly", false);
+    options.sharepool_admitted_ledger = args.GetBoolArg("-sharepooladmittedledger", false);
+    if (options.sharepool_admitted_ledger && !options.sharepool_hash_only) {
+        throw std::runtime_error("-sharepooladmittedledger requires -sharepoolhashonly on a fresh regtest chain.");
+    }
     if (options.sharepool_hash_only && !options.sharepool_height) {
         throw std::runtime_error("-sharepoolhashonly requires an explicit -sharepoolheight on regtest.");
     }
@@ -182,6 +186,9 @@ const CChainParams &Params() {
 
 std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, const ChainType chain)
 {
+    if (chain != ChainType::REGTEST && args.IsArgSet("-sharepooladmittedledger")) {
+        throw std::runtime_error("-sharepooladmittedledger is restricted to regtest; public-network activation is not supported.");
+    }
     if (chain != ChainType::REGTEST && args.IsArgSet("-sharepoolhashonly")) {
         throw std::runtime_error("-sharepoolhashonly is restricted to regtest; public-network activation is not supported.");
     }

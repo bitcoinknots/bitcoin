@@ -56,7 +56,7 @@ class FakeRPC:
             if self.template_error:
                 raise ValueError(self.template_error)
             block = parse_block(bytes.fromhex(args[0]))
-            overlay = Snapshot.deserialize(bytes.fromhex(args[1])) if len(args) > 1 else None
+            overlay = Snapshot.deserialize(bytes.fromhex(args[1])) if len(args) > 1 and args[1] is not None else None
             if overlay is not None:
                 if overlay.hash != block.m_mm_rhs:
                     raise ValueError("snapshot commitment mismatch")

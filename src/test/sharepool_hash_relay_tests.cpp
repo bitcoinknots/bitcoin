@@ -3,12 +3,14 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <sharepool/hash_relay.h>
+#include <sharepool/hash_requests.h>
 
 #include <boost/test/unit_test.hpp>
 
 #include <array>
 #include <chrono>
 #include <optional>
+#include <set>
 
 using namespace std::chrono_literals;
 
@@ -51,6 +53,97 @@ BOOST_AUTO_TEST_CASE(required_data_priority_and_disconnected_turns)
     turns.Remove(1);
     BOOST_CHECK_EQUAL(turns.Size(), 0U);
     BOOST_CHECK(!turns.IsTurn(1));
+}
+
+BOOST_AUTO_TEST_CASE(ordinary_ready_data_gets_service_amid_required_work)
+{
+    sharepool::HashRelayTurns turns;
+    turns.Ready(1, true);
+    turns.Ready(2, false);
+    for (int cycle{0}; cycle < 3; ++cycle) {
+        for (int required{0}; required < 3; ++required) {
+            BOOST_CHECK(turns.IsTurn(1));
+            turns.Complete(1);
+            turns.Ready(1, true);
+        }
+        BOOST_CHECK(!turns.PreferRequired());
+        BOOST_CHECK(turns.IsTurn(2));
+        turns.Complete(2);
+        turns.Ready(2, false);
+        BOOST_CHECK(turns.PreferRequired());
+    }
+    // Disconnecting an ordinary peer cannot block the remaining required work.
+    for (int i{0}; i < 3; ++i) { turns.Complete(1); turns.Ready(1, true); }
+    turns.Remove(2);
+    BOOST_CHECK(turns.IsTurn(1));
+}
+
+BOOST_AUTO_TEST_CASE(block_request_reservations_displace_only_speculative_hints)
+{
+    // Two tracked blocks, three references each, six slots in total. These
+    // small policy bounds exercise full capacity with only a few items.
+    sharepool::HashRequestQueue<int> requests{2, 3, 6, 4};
+    const auto absent = [](int) { return false; };
+    requests.Hint({10, 11, 12, 13}, absent);
+    requests.Update(999, {14}, absent); // Untracked callers cannot pin data.
+    BOOST_CHECK(requests.Required().empty());
+    BOOST_REQUIRE(requests.Track(101, 1, absent));
+    requests.Update(101, {2, 3, 4}, absent);
+    BOOST_REQUIRE(requests.Track(102, 5, absent));
+    requests.Update(102, {6, 7}, absent);
+    BOOST_CHECK(requests.Hints().empty());
+    const auto needed = requests.Required();
+    BOOST_CHECK(std::set<int>(needed.begin(), needed.end()) == std::set<int>({1, 2, 3, 5, 6, 7}));
+    BOOST_CHECK_EQUAL(requests.Reservations(), 6U);
+    requests.Hint({20, 21}, absent);
+    BOOST_CHECK(requests.Hints().empty());
+    BOOST_CHECK(!requests.Track(103, 8, absent));
+    requests.Forget(101, absent);
+    requests.Hint({20, 21, 22}, absent);
+    BOOST_CHECK_EQUAL(requests.Hints().size(), 3U);
+    BOOST_CHECK_EQUAL(requests.Required().size(), 3U);
+}
+
+BOOST_AUTO_TEST_CASE(required_dependencies_refill_progressively_and_keep_their_root)
+{
+    sharepool::HashRequestQueue<int> requests{1, 3, 3, 1};
+    std::set<int> available;
+    const auto has = [&](int id) { return available.contains(id); };
+    BOOST_REQUIRE(requests.Track(100, 1, has));
+    requests.Update(100, {2, 3, 4, 5}, has);
+    BOOST_CHECK(requests.Required() == std::vector<int>({1, 2, 3}));
+    available.insert(2);
+    available.insert(3);
+    requests.Update(100, {2, 3, 4, 5}, has);
+    BOOST_CHECK(requests.Required() == std::vector<int>({1, 4, 5}));
+    requests.Update(100, {}, has);
+    BOOST_CHECK(requests.Required() == std::vector<int>({1}));
+    available.insert(1);
+    requests.Refresh(has);
+    BOOST_CHECK(requests.Required().empty());
+}
+
+BOOST_AUTO_TEST_CASE(request_rotation_and_shared_provenance_survive_refresh)
+{
+    sharepool::HashRequestQueue<int> requests{2, 3, 6, 2};
+    const auto absent = [](int) { return false; };
+    BOOST_REQUIRE(requests.Track(101, 1, absent));
+    requests.Update(101, {3}, absent);
+    BOOST_REQUIRE(requests.Track(102, 2, absent));
+    requests.Update(102, {3, 4}, absent);
+    BOOST_CHECK_EQUAL(requests.Required().front(), 2); // New root precedes children.
+    const auto initial = requests.Required();
+    for (const auto id : initial) {
+        BOOST_CHECK_EQUAL(requests.Required().front(), id);
+        requests.Requested(id);
+        requests.Refresh(absent); // No refresh may undo the issued turn.
+    }
+    BOOST_CHECK(requests.Required() == initial);
+    requests.Forget(101, absent);
+    const auto remaining = requests.Required();
+    BOOST_CHECK(std::set<int>(remaining.begin(), remaining.end()) == std::set<int>({2, 3, 4}));
+    requests.Forget(102, absent);
+    BOOST_CHECK(requests.Required().empty());
 }
 
 BOOST_AUTO_TEST_CASE(inventory_is_quiet_until_change_or_recovery_replay)

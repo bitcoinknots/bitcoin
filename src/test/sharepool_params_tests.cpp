@@ -86,4 +86,24 @@ BOOST_AUTO_TEST_CASE(public_network_factory_rejects_hash_only_option)
     }
 }
 
+BOOST_AUTO_TEST_CASE(confirmed_ledger_is_explicit_and_regtest_only)
+{
+    ArgsManager args;
+    SetupChainParamsBaseOptions(args);
+    BOOST_CHECK(!CreateChainParams(args, ChainType::REGTEST)->GetConsensus().SharePoolAdmittedLedger);
+    args.ForceSetArg("-sharepooladmittedledger", "1");
+    BOOST_CHECK_THROW(CreateChainParams(args, ChainType::REGTEST), std::runtime_error);
+    args.ForceSetArg("-sharepoolheight", "2");
+    args.ForceSetArg("-testactivationheight", "blake2b@1");
+    BOOST_CHECK_THROW(CreateChainParams(args, ChainType::REGTEST), std::runtime_error);
+    args.ForceSetArg("-sharepoolhashonly", "1");
+    BOOST_CHECK(CreateChainParams(args, ChainType::REGTEST)->GetConsensus().SharePoolAdmittedLedger);
+    for (const std::string value : {"0", "1"}) {
+        args.ForceSetArg("-sharepooladmittedledger", value);
+        for (const auto chain : {ChainType::MAIN, ChainType::TESTNET, ChainType::TESTNET4, ChainType::SIGNET}) {
+            BOOST_CHECK_THROW(CreateChainParams(args, chain), std::runtime_error);
+        }
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

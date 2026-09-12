@@ -33,6 +33,8 @@ constexpr size_t MIN_TEMPLATE_RECORD_BYTES{32 + 164 + 1 + 1};
 constexpr size_t MIN_SHARE_BYTES{164 + 284 + 64};
 constexpr size_t MIN_STATE_BYTES{36};
 constexpr size_t MIN_PAYOUT_BYTES{8 + 1 + 22};
+constexpr size_t MIN_CREDIT_BYTES{4 + 4 + 32 + 32 + 4 + 1 + 22};
+constexpr size_t CERTIFICATE_BYTES{4 + 32 + 32 + 32};
 
 Result Bad(const std::string& reason) { return Result::Invalid("bad-sharepool-hash-" + reason); }
 
@@ -94,10 +96,45 @@ void WriteSnapshot(Stream& stream, const Snapshot& snapshot, bool unsigned_conte
         for (const auto& tx : item.block.vtx) WriteCompactSize(stream, table.entries.at(tx->GetWitnessHash()).second);
     }
     stream << snapshot.shares << snapshot.post_state << snapshot.payouts;
+    if (snapshot.binding.version == LEDGER_VERSION) stream << snapshot.pending << snapshot.settled << snapshot.certificates;
+}
+
+bool CreditLess(const LedgerCredit& a, const LedgerCredit& b)
+{
+    return a.admitted_height != b.admitted_height ? a.admitted_height < b.admitted_height : LessProof(a.proof_id, b.proof_id);
+}
+
+void CreditBounds(const std::vector<LedgerCredit>& credits, size_t maximum)
+{
+    if (credits.size() > maximum / MIN_CREDIT_BYTES) throw std::ios_base::failure("ledger credit count bound");
+    for (const auto& credit : credits) {
+        if (!IsPayoutScript(credit.payout_script)) throw std::ios_base::failure("ledger payout script shape");
+    }
+    if (GetSerializeSize(credits) > maximum) throw std::ios_base::failure("ledger credit byte bound");
+}
+
+bool CreditsOrdered(const std::vector<LedgerCredit>& credits)
+{
+    for (size_t i{1}; i < credits.size(); ++i) if (!CreditLess(credits[i - 1], credits[i])) return false;
+    return true;
+}
+
+bool CertificatesOrdered(const std::vector<OriginCertificate>& certificates)
+{
+    for (size_t i{1}; i < certificates.size(); ++i) if (!(certificates[i - 1].identity < certificates[i].identity)) return false;
+    return true;
 }
 
 size_t EncodedSize(const Snapshot& snapshot)
 {
+    if (snapshot.binding.version == LEDGER_VERSION) {
+        CreditBounds(snapshot.pending, MAX_PENDING_BYTES);
+        CreditBounds(snapshot.settled, MAX_SETTLED_BYTES);
+        if (snapshot.certificates.size() > MAX_CERTIFICATE_BYTES / CERTIFICATE_BYTES ||
+            GetSerializeSize(snapshot.certificates) > MAX_CERTIFICATE_BYTES) throw std::ios_base::failure("certificate byte bound");
+    } else if (!snapshot.pending.empty() || !snapshot.settled.empty() || !snapshot.certificates.empty()) {
+        throw std::ios_base::failure("snapshot profile or ledger fields");
+    }
     if (snapshot.binding.payout_script.size() > 34 ||
         snapshot.templates.size() > MAX_SNAPSHOT_BYTES / MIN_TEMPLATE_RECORD_BYTES ||
         snapshot.shares.size() > MAX_SNAPSHOT_BYTES / MIN_SHARE_BYTES ||
@@ -140,7 +177,7 @@ bool ReservedZero(const Envelope& binding)
 
 bool WireBinding(const Envelope& binding)
 {
-    return binding.version == VERSION && ReservedZero(binding) && IsPayoutScript(binding.payout_script);
+    return (binding.version == VERSION || binding.version == LEDGER_VERSION) && ReservedZero(binding) && IsPayoutScript(binding.payout_script);
 }
 
 bool SameBinding(const Envelope& a, const Envelope& b)
@@ -244,9 +281,9 @@ bool OwnerValid(const Snapshot& snapshot)
 Result CheckBinding(const Envelope& binding, const Consensus::Params& consensus,
                     uint32_t height, const uint256& parent)
 {
-    if (binding.version != VERSION) return Bad("version");
+    if (binding.version != ProfileVersion(consensus)) return Bad("version");
     if (!ReservedZero(binding)) return Bad("reserved-roots");
-    if (binding.genesis != consensus.hashGenesisBlock || binding.rules != hashonly::RulesHash() ||
+    if (binding.genesis != consensus.hashGenesisBlock || binding.rules != hashonly::RulesHash(binding.version) ||
         binding.height != height || binding.native_parent != parent || binding.pool.IsNull() ||
         !IsPayoutScript(binding.payout_script) || !XOnlyPubKey{Span{binding.owner}}.IsFullyValid()) return Bad("binding");
     return Result::Valid();
@@ -302,6 +339,9 @@ class Checker {
     std::set<uint256> m_visiting;
     std::set<uint256> m_unique_origins;
     std::set<const Snapshot*> m_authorized;
+    bool m_certificates_initialized{false};
+    Result m_certificate_context{Result::Valid()};
+    std::map<uint256, OriginCertificate> m_parent_certificates;
 
     bool Authorized(const Snapshot& snapshot)
     {
@@ -345,11 +385,40 @@ class Checker {
         try {
             size = EncodedSize(*result);
             if (SnapshotHash(*result) != hash) return Result::Missing({hash});
-        } catch (const std::exception&) { return Bad("snapshot-encoding"); }
+        } catch (const std::ios_base::failure&) { return Bad("snapshot-encoding"); }
         if (size > MAX_DEPENDENCY_BYTES - m_dependency_bytes) return Bad("dependency-bytes");
         m_dependency_bytes += size;
         m_snapshots.emplace(hash, result);
         return Result::Valid();
+    }
+
+    Result PrepareCertificates(const CBlockIndex* previous)
+    {
+        if (!m_consensus.SharePoolAdmittedLedger) return Result::Valid();
+        // Freeze this context at the top caller's actual native parent. A
+        // recursive origin or proposed certificate can never replace it.
+        if (m_certificates_initialized) return m_certificate_context;
+        m_certificates_initialized = true;
+        const auto prepare = [&]() -> Result {
+            if (!previous || int64_t{previous->nHeight} + 1 < m_consensus.SharePoolHeight) return Bad("inactive");
+            if (int64_t{previous->nHeight} + 1 == m_consensus.SharePoolHeight) return Result::Valid();
+            if (!previous->pprev) return Bad("parent");
+            std::shared_ptr<const Snapshot> parent;
+            const auto available = Fetch(previous->m_mm_rhs, parent);
+            if (!available.IsValid()) return available;
+            if (!CheckBinding(parent->binding, m_consensus, previous->nHeight, previous->pprev->GetBlockHash()).IsValid() ||
+                !Authorized(*parent) || !CertificatesOrdered(parent->certificates)) return Bad("parent");
+            const int64_t parent_oldest = std::max<int64_t>(m_consensus.SharePoolHeight, int64_t{previous->nHeight} - MAX_SHARE_AGE);
+            const int64_t oldest = std::max<int64_t>(m_consensus.SharePoolHeight, int64_t{previous->nHeight} + 1 - MAX_SHARE_AGE);
+            for (const auto& certificate : parent->certificates) {
+                if (certificate.origin_height < parent_oldest || certificate.origin_height > uint32_t(previous->nHeight) ||
+                    certificate.identity.IsNull() || certificate.snapshot_hash.IsNull()) return Bad("parent-certificates");
+                if (certificate.origin_height >= oldest) m_parent_certificates.emplace(certificate.identity, certificate);
+            }
+            return Result::Valid();
+        };
+        m_certificate_context = prepare();
+        return m_certificate_context;
     }
 
     Result Origin(const CBlock& block, const CBlockIndex* parent, uint32_t depth)
@@ -382,6 +451,18 @@ class Checker {
         if (!binding.IsValid()) return binding;
         if (!Authorized(*snapshot)) return Bad("owner");
         if (snapshot->job_commitment != JobHash(block)) return Bad("job-commitment");
+        if (m_consensus.SharePoolAdmittedLedger) {
+            const auto certificate = m_parent_certificates.find(OriginCertificateId(block));
+            if (certificate != m_parent_certificates.end() && int64_t{certificate->second.origin_height} == block.m_height &&
+                certificate->second.native_parent == block.hashPrevBlock && certificate->second.snapshot_hash == block.m_mm_rhs) {
+                // The active native parent certified this exact witness body
+                // and recursive state. Direct owner/job binding above remains
+                // mandatory; standalone proof binding is checked separately.
+                const auto result = Result::Valid();
+                m_checked_origins.emplace(id, CheckedOrigin{result, 0});
+                return result;
+            }
+        }
         Result native;
         try { native = m_validate_origin(block, parent); }
         catch (const std::exception&) { return Result::Missing({block.m_mm_rhs}, "bad-sharepool-hash-origin-unavailable"); }
@@ -422,9 +503,30 @@ public:
     Checker(const Consensus::Params& consensus, const Lookup& lookup, const ValidateOrigin& validate_origin)
         : m_consensus{consensus}, m_lookup{lookup}, m_validate_origin{validate_origin} {}
 
+    Result MiningJob(const CBlock& block, const CBlockIndex* previous,
+                     std::optional<CAmount> expected_reward, bool allow_unsigned)
+    {
+        if (!SearchFieldsZero(block)) return Bad("job-search-fields");
+        // A future settlement must embed this body in addition to its children.
+        // Ordinary block validity deliberately keeps its unreserved depth zero.
+        m_unique_origins.insert(OriginMemoId(block));
+        return Check(block, previous, expected_reward, 1, allow_unsigned);
+    }
+
+    Result HistoricalTemplate(const CBlock& origin, const CBlockIndex* previous, uint32_t time)
+    {
+        const auto context = PrepareCertificates(previous);
+        if (!context.IsValid()) return context;
+        const auto* parent = OriginParent(origin, previous, time);
+        if (!parent) return Bad("template-context");
+        return Origin(origin, parent, 0);
+    }
+
     Result ShareProof(const Share& share, const CBlock& origin, const CBlockIndex* previous,
                       uint32_t time, uint32_t depth, bool origin_checked = false)
     {
+        const auto context = PrepareCertificates(previous);
+        if (!context.IsValid()) return context;
         const auto* parent = OriginParent(share.header, previous, time);
         if (!parent) return Bad("share-context");
         if (!SearchFieldsZero(origin) || NormalizedHeader(share.header) != NormalizedHeader(origin)) return Bad("share-template");
@@ -452,6 +554,8 @@ public:
         if (!HeaderShape(block) || block.m_height != height || block.hashPrevBlock != previous->GetBlockHash()) return Bad("context");
         if (block.vtx.empty() || !block.vtx[0]->IsCoinBase()) return Bad("coinbase");
         if (block.m_mm_rhs.IsNull()) return Bad("commitment");
+        const auto certificate_context = PrepareCertificates(previous);
+        if (!certificate_context.IsValid()) return certificate_context;
         if (!m_visiting.insert(block.m_mm_rhs).second) return Bad("dependency-cycle");
         struct Pop { std::set<uint256>& visiting; uint256 hash; ~Pop() { visiting.erase(hash); } } pop{m_visiting, block.m_mm_rhs};
         std::shared_ptr<const Snapshot> snapshot;
@@ -478,15 +582,20 @@ public:
         };
         std::vector<StateEntry> next;
         std::set<arith_uint256> paid;
+        std::shared_ptr<const Snapshot> native_parent;
         if (height != m_consensus.SharePoolHeight) {
             if (!previous->pprev) return Bad("parent");
-            std::shared_ptr<const Snapshot> parent;
+            auto& parent = native_parent;
             result = Fetch(previous->m_mm_rhs, parent);
             if (result.IsMissing()) collect_missing(result);
             else if (!result.IsValid()) return result;
             else {
                 const auto context = CheckBinding(parent->binding, m_consensus, previous->nHeight, previous->pprev->GetBlockHash());
                 if (!context.IsValid() || !Authorized(*parent) || !StateOrdered(parent->post_state)) return Bad("parent");
+                if (m_consensus.SharePoolAdmittedLedger) {
+                    if (!CreditsOrdered(parent->pending)) return Bad("parent-ledger");
+                    for (const auto& credit : parent->pending) paid.insert(UintToArith256(credit.proof_id));
+                }
                 for (const auto& entry : parent->post_state) {
                     if (entry.origin_height < std::max<int64_t>(m_consensus.SharePoolHeight, int64_t{previous->nHeight} - MAX_SHARE_AGE) ||
                         entry.origin_height > uint32_t(previous->nHeight)) return Bad("parent-state");
@@ -519,7 +628,7 @@ public:
             origins.emplace(record.id, &origin);
         }
         for (const auto& share : snapshot->shares) {
-            if (share.origin.pool != snapshot->binding.pool) return Bad("share-pool");
+            if (!m_consensus.SharePoolAdmittedLedger && share.origin.pool != snapshot->binding.pool) return Bad("share-pool");
             const auto id = share.header.GetHash();
             if (id == containing_proof) return Bad("self-proof");
             if (!paid.insert(UintToArith256(id)).second) return Bad("repeat-payment");
@@ -535,6 +644,15 @@ public:
         if (next.size() != snapshot->post_state.size()) return Bad("state");
         for (size_t i{0}; i < next.size(); ++i) {
             if (next[i].origin_height != snapshot->post_state[i].origin_height || next[i].proof_id != snapshot->post_state[i].proof_id) return Bad("state");
+        }
+        if (m_consensus.SharePoolAdmittedLedger) {
+            Snapshot expected{*snapshot};
+            try { ApplyLedgerState(expected, native_parent.get()); }
+            catch (const std::invalid_argument&) { return Bad("ledger-state"); }
+            catch (const std::ios_base::failure&) { return Bad("ledger-capacity"); }
+            if (snapshot->pending != expected.pending) return Bad("ledger-pending");
+            if (snapshot->settled != expected.settled) return Bad("ledger-settled");
+            if (snapshot->certificates != expected.certificates) return Bad("ledger-certificates");
         }
         std::vector<CTxOut> payouts;
         for (const auto& output : block.vtx[0]->vout) {
@@ -593,7 +711,7 @@ Snapshot DecodeSnapshot(Span<const unsigned char> bytes)
     SpanReader reader{bytes};
     Snapshot snapshot;
     reader >> snapshot.binding >> snapshot.authorization >> snapshot.job_commitment;
-    if (!WireBinding(snapshot.binding)) throw std::ios_base::failure("invalid v4 binding");
+    if (!WireBinding(snapshot.binding)) throw std::ios_base::failure("invalid hash profile binding");
     const auto transaction_count = ReadCount(reader, 11);
     std::vector<CTransactionRef> transactions;
     transactions.reserve(transaction_count);
@@ -665,6 +783,32 @@ Snapshot DecodeSnapshot(Span<const unsigned char> bytes)
         snapshot.payouts.emplace_back(amount, CScript{script.begin(), script.end()});
     }
     if (!PayoutsOrdered(snapshot.payouts)) throw std::ios_base::failure("payout order or shape");
+    if (snapshot.binding.version == LEDGER_VERSION) {
+        const auto read_credits = [&](std::vector<LedgerCredit>& credits, size_t maximum) {
+            const auto before = reader.size();
+            const auto count = ReadCount(reader, MIN_CREDIT_BYTES);
+            if (count > maximum / MIN_CREDIT_BYTES) throw std::ios_base::failure("ledger credit count bound");
+            credits.reserve(count);
+            for (size_t i{0}; i < count; ++i) {
+                LedgerCredit credit;
+                reader >> credit.admitted_height >> credit.origin_height >> credit.proof_id >> credit.pool >> credit.native_bits;
+                credit.payout_script = ReadBytes(reader, 22, 34);
+                if (!IsPayoutScript(credit.payout_script)) throw std::ios_base::failure("ledger payout script shape");
+                credits.push_back(std::move(credit));
+            }
+            if (before - reader.size() > maximum || !CreditsOrdered(credits)) throw std::ios_base::failure("ledger byte bound or order");
+        };
+        read_credits(snapshot.pending, MAX_PENDING_BYTES);
+        read_credits(snapshot.settled, MAX_SETTLED_BYTES);
+        const auto before = reader.size();
+        const auto count = ReadCount(reader, CERTIFICATE_BYTES);
+        if (count > MAX_CERTIFICATE_BYTES / CERTIFICATE_BYTES) throw std::ios_base::failure("certificate count bound");
+        snapshot.certificates.resize(count);
+        for (auto& certificate : snapshot.certificates) reader >> certificate;
+        if (before - reader.size() > MAX_CERTIFICATE_BYTES || !CertificatesOrdered(snapshot.certificates)) {
+            throw std::ios_base::failure("certificate byte bound or order");
+        }
+    }
     const auto canonical = EncodeSnapshot(snapshot);
     if (!reader.empty() || canonical.size() != bytes.size() ||
         !std::equal(canonical.begin(), canonical.end(), bytes.begin())) throw std::ios_base::failure("noncanonical snapshot");
@@ -674,9 +818,10 @@ Snapshot DecodeSnapshot(Span<const unsigned char> bytes)
 uint256 SnapshotHash(Span<const unsigned char> bytes)
 {
     if (bytes.size() > MAX_SNAPSHOT_BYTES) throw std::ios_base::failure("snapshot byte bound");
-    static constexpr char domain[]{"SharePool/snapshot/v4"};
+    static constexpr char old_domain[]{"SharePool/snapshot/v4"};
+    static constexpr char new_domain[]{"SharePool/snapshot/v5"};
     HashWriter writer;
-    writer.write(AsBytes(Span{domain}));
+    writer.write(AsBytes(!bytes.empty() && bytes[0] == LEDGER_VERSION ? Span{new_domain} : Span{old_domain}));
     writer.write(AsBytes(bytes));
     return writer.GetHash();
 }
@@ -684,15 +829,28 @@ uint256 SnapshotHash(Span<const unsigned char> bytes)
 uint256 SnapshotHash(const Snapshot& snapshot)
 {
     EncodedSize(snapshot);
-    static constexpr char domain[]{"SharePool/snapshot/v4"};
+    static constexpr char old_domain[]{"SharePool/snapshot/v4"};
+    static constexpr char new_domain[]{"SharePool/snapshot/v5"};
     HashWriter writer;
-    writer.write(AsBytes(Span{domain}));
+    writer.write(AsBytes(snapshot.binding.version == LEDGER_VERSION ? Span{new_domain} : Span{old_domain}));
     WriteSnapshot(writer, snapshot);
     return writer.GetHash();
 }
 
-uint256 RulesHash()
+uint32_t ProfileVersion(const Consensus::Params& consensus)
 {
+    return consensus.SharePoolAdmittedLedger ? LEDGER_VERSION : VERSION;
+}
+
+uint256 RulesHash(uint32_t version)
+{
+    if (version == LEDGER_VERSION) {
+        return DomainHash("SharePool/rules/v5", SHARE_BITS, SHARE_TARGET_SHIFT, MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES,
+                          MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES,
+                          MAX_EXPANDED_TEMPLATE_BYTES, MAX_TEMPLATE_TX_REFERENCES, MAX_ORIGIN_CHECKS,
+                          MAX_PENDING_BYTES, MAX_SETTLED_BYTES, MAX_CERTIFICATE_BYTES);
+    }
+    if (version != VERSION) throw std::invalid_argument("unknown hash profile version");
     return DomainHash("SharePool/rules/v4", SHARE_BITS, SHARE_TARGET_SHIFT, MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES,
                       MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES,
                       MAX_EXPANDED_TEMPLATE_BYTES, MAX_TEMPLATE_TX_REFERENCES, MAX_ORIGIN_CHECKS);
@@ -703,14 +861,16 @@ uint256 SnapshotContentsHash(const Snapshot& snapshot)
     // Stream rather than copying a potentially 16 MiB snapshot.
     EncodedSize(snapshot);
     HashWriter writer;
-    static constexpr char domain[]{"SharePool/contents/v4"};
-    writer.write(AsBytes(Span{domain}));
+    static constexpr char old_domain[]{"SharePool/contents/v4"};
+    static constexpr char new_domain[]{"SharePool/contents/v5"};
+    writer.write(AsBytes(snapshot.binding.version == LEDGER_VERSION ? Span{new_domain} : Span{old_domain}));
     WriteSnapshot(writer, snapshot, true);
     return writer.GetHash();
 }
 
 uint256 OwnerHash(const Envelope& binding, const uint256& job, const uint256& contents)
 {
+    if (binding.version == LEDGER_VERSION) return DomainHash("SharePool/owner/v5", binding, job, contents);
     return DomainHash("SharePool/owner/v4", binding, job, contents);
 }
 
@@ -728,6 +888,20 @@ uint256 JobHash(const CBlock& block)
     writer.write(AsBytes(Span{domain}));
     writer.write(AsBytes(Span{NormalizedHeader(header)}));
     writer << TX_WITH_WITNESS(block.vtx);
+    return writer.GetHash();
+}
+
+uint256 OriginCertificateId(const CBlock& block)
+{
+    HashWriter writer;
+    static constexpr char domain[]{"SharePool/origin-certificate/v5"};
+    writer.write(AsBytes(Span{domain}));
+    writer.write(AsBytes(Span{NormalizedHeader(block)}));
+    WriteCompactSize(writer, block.vtx.size());
+    for (const auto& tx : block.vtx) {
+        if (!tx) throw std::ios_base::failure("null certificate transaction");
+        writer << tx->GetWitnessHash();
+    }
     return writer.GetHash();
 }
 
@@ -765,6 +939,96 @@ uint256 TemplateId(const CBlockHeader& header)
     return result;
 }
 
+void ApplyLedgerState(Snapshot& snapshot, const Snapshot* parent)
+{
+    if (snapshot.binding.version != LEDGER_VERSION || snapshot.binding.height == 0 ||
+        snapshot.binding.pool.IsNull() || snapshot.binding.rules != RulesHash(LEDGER_VERSION)) {
+        throw std::invalid_argument("ledger profile or binding");
+    }
+    const uint32_t height = snapshot.binding.height;
+    const uint32_t oldest = height > MAX_SHARE_AGE ? height - MAX_SHARE_AGE : 0;
+    std::vector<LedgerCredit> pending, settled;
+    std::vector<StateEntry> state;
+    std::map<uint256, OriginCertificate> certificates;
+    std::set<uint256> admitted;
+    if (parent) {
+        if (parent->binding.version != LEDGER_VERSION || parent->binding.height != height - 1 ||
+            parent->binding.genesis != snapshot.binding.genesis || parent->binding.rules != snapshot.binding.rules ||
+            !CreditsOrdered(parent->pending) || !StateOrdered(parent->post_state) || !CertificatesOrdered(parent->certificates)) {
+            throw std::invalid_argument("ledger parent context or order");
+        }
+        CreditBounds(parent->pending, MAX_PENDING_BYTES);
+        if (GetSerializeSize(parent->certificates) > MAX_CERTIFICATE_BYTES) throw std::ios_base::failure("certificate byte bound");
+        size_t settlement_bytes{0};
+        bool prefix_full{false};
+        for (const auto& credit : parent->pending) {
+            if (!credit.admitted_height || credit.admitted_height > parent->binding.height ||
+                !credit.origin_height || credit.origin_height > credit.admitted_height ||
+                uint64_t{credit.admitted_height} - credit.origin_height > MAX_SHARE_AGE || credit.pool.IsNull() ||
+                !admitted.insert(credit.proof_id).second) throw std::invalid_argument("ledger parent credit");
+            ShareTarget(credit.native_bits);
+            if (credit.pool == snapshot.binding.pool && !prefix_full) {
+                const size_t bytes = GetSerializeSize(credit);
+                if (settlement_bytes + bytes + GetSizeOfCompactSize(settled.size() + 1) <= MAX_SETTLED_BYTES) {
+                    settlement_bytes += bytes;
+                    settled.push_back(credit);
+                    continue;
+                }
+                prefix_full = true;
+            }
+            pending.push_back(credit);
+        }
+        const uint32_t parent_oldest = parent->binding.height > MAX_SHARE_AGE ? parent->binding.height - MAX_SHARE_AGE : 0;
+        for (const auto& entry : parent->post_state) {
+            if (entry.origin_height < parent_oldest || entry.origin_height > parent->binding.height) {
+                throw std::invalid_argument("ledger parent admission state");
+            }
+            admitted.insert(entry.proof_id);
+            if (entry.origin_height >= oldest) state.push_back(entry);
+        }
+        for (const auto& certificate : parent->certificates) {
+            if (certificate.origin_height < parent_oldest || certificate.origin_height > parent->binding.height ||
+                certificate.identity.IsNull() || certificate.snapshot_hash.IsNull()) throw std::invalid_argument("ledger parent certificate");
+            if (certificate.origin_height >= oldest) certificates.emplace(certificate.identity, certificate);
+        }
+    }
+    std::map<uint256, const CBlock*> origins;
+    for (const auto& record : snapshot.templates) {
+        if (!origins.emplace(record.id, &record.block).second) throw std::invalid_argument("ledger duplicate origin");
+    }
+    for (const auto& share : snapshot.shares) {
+        const auto proof_id = share.header.GetHash();
+        if (!admitted.insert(proof_id).second) throw std::invalid_argument("ledger repeated admission");
+        if (share.header.m_height < int64_t{oldest} || share.header.m_height > int64_t{height} || share.header.m_height <= 0 ||
+            share.origin.version != LEDGER_VERSION || int64_t{share.origin.height} != share.header.m_height ||
+            share.origin.pool.IsNull() || !IsPayoutScript(share.origin.payout_script)) throw std::invalid_argument("ledger admission context");
+        ShareTarget(share.header.nBits);
+        const auto origin = origins.find(TemplateId(share.header));
+        if (origin == origins.end() || NormalizedHeader(*origin->second) != NormalizedHeader(share.header)) {
+            throw std::invalid_argument("ledger admission origin");
+        }
+        pending.push_back({height, uint32_t(share.header.m_height), proof_id, share.origin.pool,
+                           share.header.nBits, share.origin.payout_script});
+        state.push_back({uint32_t(share.header.m_height), proof_id});
+        OriginCertificate certificate{uint32_t(share.header.m_height), share.header.hashPrevBlock,
+                                      OriginCertificateId(*origin->second), share.header.m_mm_rhs};
+        const auto [found, inserted] = certificates.emplace(certificate.identity, certificate);
+        if (!inserted && found->second != certificate) throw std::invalid_argument("ledger certificate collision");
+    }
+    std::sort(pending.begin(), pending.end(), CreditLess);
+    std::sort(state.begin(), state.end(), [](const auto& a, const auto& b) { return LessProof(a.proof_id, b.proof_id); });
+    CreditBounds(pending, MAX_PENDING_BYTES);
+    CreditBounds(settled, MAX_SETTLED_BYTES);
+    std::vector<OriginCertificate> next_certificates;
+    next_certificates.reserve(certificates.size());
+    for (const auto& [identity, certificate] : certificates) next_certificates.push_back(certificate);
+    if (GetSerializeSize(next_certificates) > MAX_CERTIFICATE_BYTES) throw std::ios_base::failure("certificate byte bound");
+    snapshot.pending = std::move(pending);
+    snapshot.settled = std::move(settled);
+    snapshot.post_state = std::move(state);
+    snapshot.certificates = std::move(next_certificates);
+}
+
 std::vector<CTxOut> CalculatePayouts(const Snapshot& snapshot, CAmount reward)
 {
     if (!MoneyRange(reward) || snapshot.shares.size() > MAX_SNAPSHOT_BYTES / MIN_SHARE_BYTES) throw std::invalid_argument("payout byte or reward bound");
@@ -773,14 +1037,20 @@ std::vector<CTxOut> CalculatePayouts(const Snapshot& snapshot, CAmount reward)
     using boost::multiprecision::cpp_int;
     std::map<std::vector<unsigned char>, cpp_int> weights;
     cpp_int total{0};
-    for (const auto& share : snapshot.shares) {
-        if (!IsPayoutScript(share.origin.payout_script)) throw std::invalid_argument("payout script shape");
-        const auto target = ShareTarget(share.header.nBits);
+    const auto add_weight = [&](const std::vector<unsigned char>& script, uint32_t native_bits) {
+        if (!IsPayoutScript(script)) throw std::invalid_argument("payout script shape");
+        const auto target = ShareTarget(native_bits);
         cpp_int numeric{0};
         for (size_t i{target.size()}; i > 0; --i) { numeric <<= 8; numeric += target.begin()[i - 1]; }
         const cpp_int work = (cpp_int{1} << 256) / (numeric + 1);
-        weights[share.origin.payout_script] += work;
+        weights[script] += work;
         total += work;
+    };
+    if (snapshot.binding.version == LEDGER_VERSION) {
+        CreditBounds(snapshot.settled, MAX_SETTLED_BYTES);
+        for (const auto& credit : snapshot.settled) add_weight(credit.payout_script, credit.native_bits);
+    } else {
+        for (const auto& share : snapshot.shares) add_weight(share.origin.payout_script, share.header.nBits);
     }
     if (weights.empty()) {
         if (!IsPayoutScript(snapshot.binding.payout_script)) throw std::invalid_argument("empty snapshot owner payout script");
@@ -810,7 +1080,40 @@ Result CheckSnapshot(const CBlock& block, const CBlockIndex* previous, const Con
                      std::optional<CAmount> expected_reward, uint32_t depth, bool allow_unsigned)
 {
     try { return Checker{consensus, lookup, validate_origin}.Check(block, previous, expected_reward, depth, allow_unsigned); }
-    catch (const std::exception&) { return Bad("encoding"); }
+    catch (const std::ios_base::failure&) { return Bad("encoding"); }
+    catch (const std::invalid_argument&) { return Bad("encoding"); }
+    // Allocation failures and unrelated internal/local errors are not evidence
+    // that a block is invalid. Let the caller handle them without failed-block
+    // persistence, rather than converting all std::exception values to Invalid.
+}
+
+Result CheckMiningJob(const CBlock& block, const CBlockIndex* previous,
+                      const Consensus::Params& consensus, const Lookup& lookup,
+                      const ValidateOrigin& validate_origin,
+                      std::optional<CAmount> expected_reward, bool allow_unsigned)
+{
+    try { return Checker{consensus, lookup, validate_origin}.MiningJob(block, previous, expected_reward, allow_unsigned); }
+    catch (const std::ios_base::failure&) { return Bad("encoding"); }
+    catch (const std::invalid_argument&) { return Bad("encoding"); }
+}
+
+Result CheckHistoricalTemplate(const CBlock& full_origin, const CBlockIndex* previous, uint32_t time,
+                               const Consensus::Params& consensus, const Lookup& lookup,
+                               const ValidateOrigin& validate_origin)
+{
+    if (!consensus.SharePoolHashOnly || !previous || consensus.SharePoolHeight == std::numeric_limits<int>::max() ||
+        int64_t{previous->nHeight} + 1 < consensus.SharePoolHeight) return Bad("inactive");
+    try {
+        SizeComputer size;
+        size << TX_WITH_WITNESS(full_origin);
+        if (size.size() > MAX_TEMPLATE_BYTES) return Bad("template-encoding");
+        std::vector<unsigned char> raw;
+        raw.reserve(size.size());
+        VectorWriter{raw, 0} << TX_WITH_WITNESS(full_origin);
+        const auto canonical = ReadTemplate(raw);
+        return Checker{consensus, lookup, validate_origin}.HistoricalTemplate(canonical, previous, time);
+    } catch (const std::ios_base::failure&) { return Bad("template-encoding"); }
+    catch (const std::invalid_argument&) { return Bad("template-encoding"); }
 }
 
 Result CheckShareProof(const Share& share, const CBlock& full_origin, const CBlockIndex* previous,
@@ -828,7 +1131,8 @@ Result CheckShareProof(const Share& share, const CBlock& full_origin, const CBlo
         raw.reserve(size.size());
         VectorWriter{raw, 0} << TX_WITH_WITNESS(full_origin);
         const auto canonical = ReadTemplate(raw);
-        return Checker{consensus, lookup, validate_origin}.ShareProof(share, canonical, previous, time, 0);
-    } catch (const std::exception&) { return Bad("template-encoding"); }
+        return Checker{consensus, lookup, validate_origin}.ShareProof(share, canonical, previous, time, 1);
+    } catch (const std::ios_base::failure&) { return Bad("template-encoding"); }
+    catch (const std::invalid_argument&) { return Bad("template-encoding"); }
 }
 } // namespace sharepool::hashonly

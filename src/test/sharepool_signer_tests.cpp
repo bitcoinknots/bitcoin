@@ -206,4 +206,18 @@ BOOST_AUTO_TEST_CASE(native_v4_job_signer_decoding_is_canonical_and_bounded)
     BOOST_CHECK_THROW(sharepool::signer::DecodeJob(noncanonical), std::exception);
 }
 
+BOOST_AUTO_TEST_CASE(native_v5_job_signer_requires_matching_profile_and_binds_domain)
+{
+    auto statement = Job();
+    statement.binding.version = sharepool::hashonly::LEDGER_VERSION;
+    BOOST_CHECK_THROW(sharepool::signer::SignJob(policy, key, statement), std::invalid_argument);
+    statement.binding.rules = sharepool::hashonly::RulesHash(sharepool::hashonly::LEDGER_VERSION);
+    const auto signature = sharepool::signer::SignJob(policy, key, statement);
+    const XOnlyPubKey owner{Span{statement.binding.owner}};
+    BOOST_CHECK(owner.VerifySchnorr(sharepool::hashonly::OwnerHash(statement.binding, statement.job, statement.contents), signature));
+    statement.binding.version = sharepool::hashonly::VERSION;
+    statement.binding.rules = sharepool::hashonly::RulesHash();
+    BOOST_CHECK(!owner.VerifySchnorr(sharepool::hashonly::OwnerHash(statement.binding, statement.job, statement.contents), signature));
+}
+
 BOOST_AUTO_TEST_SUITE_END()

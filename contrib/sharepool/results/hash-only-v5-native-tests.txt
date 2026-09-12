@@ -1,0 +1,538 @@
+Running 73 test cases...
+Entering test module "Bitcoin Core Test Suite"
+test/addrman_tests.cpp:63: Test suite "addrman_tests" is skipped because disabled
+test/allocator_tests.cpp:16: Test suite "allocator_tests" is skipped because disabled
+test/amount_tests.cpp:12: Test suite "amount_tests" is skipped because disabled
+test/argsman_tests.cpp:25: Test suite "argsman_tests" is skipped because disabled
+test/arith_uint256_tests.cpp:19: Test suite "arith_uint256_tests" is skipped because disabled
+test/banman_tests.cpp:16: Test suite "banman_tests" is skipped because disabled
+test/base32_tests.cpp:14: Test suite "base32_tests" is skipped because disabled
+test/base58_tests.cpp:22: Test suite "base58_tests" is skipped because disabled
+test/base64_tests.cpp:14: Test suite "base64_tests" is skipped because disabled
+test/bech32_tests.cpp:13: Test suite "bech32_tests" is skipped because disabled
+test/bip32_tests.cpp:160: Test suite "bip32_tests" is skipped because disabled
+test/bip324_tests.cpp:164: Test suite "bip324_tests" is skipped because disabled
+test/blockchain_tests.cpp:54: Test suite "blockchain_tests" is skipped because disabled
+test/blockencodings_tests.cpp:19: Test suite "blockencodings_tests" is skipped because disabled
+test/block_header_tests.cpp:18: Test suite "block_header_tests" is skipped because disabled
+test/blockfilter_index_tests.cpp:25: Test suite "blockfilter_index_tests" is skipped because disabled
+test/blockfilter_tests.cpp:20: Test suite "blockfilter_tests" is skipped because disabled
+test/blockmanager_tests.cpp:26: Test suite "blockmanager_tests" is skipped because disabled
+test/bloom_tests.cpp:33: Test suite "bloom_tests" is skipped because disabled
+test/bswap_tests.cpp:9: Test suite "bswap_tests" is skipped because disabled
+test/caches_tests.cpp:25: Test suite "caches_tests" is skipped because disabled
+test/chainstate_write_tests.cpp:15: Test suite "chainstate_write_tests" is skipped because disabled
+test/checkqueue_tests.cpp:180: Test suite "checkqueue_tests" is skipped because disabled
+test/cluster_linearize_tests.cpp:15: Test suite "cluster_linearize_tests" is skipped because disabled
+test/codex32_tests.cpp:14: Test suite "codex32_tests" is skipped because disabled
+test/coins_tests.cpp:108: Test suite "coins_tests" is skipped because disabled
+test/coinscachepair_tests.cpp:11: Test suite "coinscachepair_tests" is skipped because disabled
+test/coinstatsindex_tests.cpp:16: Test suite "coinstatsindex_tests" is skipped because disabled
+test/common_url_tests.cpp:11: Test suite "common_url_tests" is skipped because disabled
+test/compilerbug_tests.cpp:7: Test suite "compilerbug_tests" is skipped because disabled
+test/compress_tests.cpp:26: Test suite "compress_tests" is skipped because disabled
+test/crypto_tests.cpp:377: Test suite "crypto_tests" is skipped because disabled
+test/cuckoocache_tests.cpp:32: Test suite "cuckoocache_tests" is skipped because disabled
+test/dbwrapper_tests.cpp:18: Test suite "dbwrapper_tests" is skipped because disabled
+test/denialofservice_tests.cpp:36: Test suite "denialofservice_tests" is skipped because disabled
+test/descriptor_tests.cpp:516: Test suite "descriptor_tests" is skipped because disabled
+test/disconnected_transactions.cpp:10: Test suite "disconnected_transactions" is skipped because disabled
+test/feefrac_tests.cpp:10: Test suite "feefrac_tests" is skipped because disabled
+test/flatfile_tests.cpp:13: Test suite "flatfile_tests" is skipped because disabled
+test/fs_tests.cpp:15: Test suite "fs_tests" is skipped because disabled
+test/getarg_tests.cpp:21: Test suite "getarg_tests" is skipped because disabled
+test/hash_tests.cpp:21: Test suite "hash_tests" is skipped because disabled
+test/headers_sync_chainwork_tests.cpp:58: Test suite "headers_sync_chainwork_tests" is skipped because disabled
+test/httpserver_tests.cpp:10: Test suite "httpserver_tests" is skipped because disabled
+test/i2p_tests.cpp:45: Test suite "i2p_tests" is skipped because disabled
+test/interfaces_tests.cpp:16: Test suite "interfaces_tests" is skipped because disabled
+test/key_io_tests.cpp:21: Test suite "key_io_tests" is skipped because disabled
+test/key_tests.cpp:38: Test suite "key_tests" is skipped because disabled
+test/logging_tests.cpp:32: Test suite "logging_tests" is skipped because disabled
+test/mempool_tests.cpp:16: Test suite "mempool_tests" is skipped because disabled
+test/merkle_tests.cpp:11: Test suite "merkle_tests" is skipped because disabled
+test/merkleblock_tests.cpp:14: Test suite "merkleblock_tests" is skipped because disabled
+test/miner_tests.cpp:69: Test suite "miner_tests" is skipped because disabled
+test/miniminer_tests.cpp:16: Test suite "miniminer_tests" is skipped because disabled
+test/miniscript_tests.cpp:523: Test suite "miniscript_tests" is skipped because disabled
+test/multisig_tests.cpp:20: Test suite "multisig_tests" is skipped because disabled
+test/net_peer_connection_tests.cpp:37: Test suite "net_peer_connection_tests" is skipped because disabled
+test/net_peer_eviction_tests.cpp:18: Test suite "net_peer_eviction_tests" is skipped because disabled
+test/net_tests.cpp:38: Test suite "net_tests" is skipped because disabled
+test/netbase_tests.cpp:23: Test suite "netbase_tests" is skipped because disabled
+test/node_warnings_tests.cpp:13: Test suite "node_warnings_tests" is skipped because disabled
+test/orphanage_tests.cpp:22: Test suite "orphanage_tests" is skipped because disabled
+test/pcp_tests.cpp:255: Test suite "pcp_tests" is skipped because disabled
+test/peerman_tests.cpp:14: Test suite "peerman_tests" is skipped because disabled
+test/psbt_tests.cpp:10: Test suite "psbt_tests" is skipped because disabled
+test/pmt_tests.cpp:32: Test suite "pmt_tests" is skipped because disabled
+test/policy_fee_tests.cpp:12: Test suite "policy_fee_tests" is skipped because disabled
+test/policyestimator_tests.cpp:18: Test suite "policyestimator_tests" is skipped because disabled
+test/pool_tests.cpp:18: Test suite "pool_tests" is skipped because disabled
+test/pow_tests.cpp:14: Test suite "pow_tests" is skipped because disabled
+test/prevector_tests.cpp:16: Test suite "prevector_tests" is skipped because disabled
+test/raii_event_tests.cpp:16: Test suite "raii_event_tests" is skipped because disabled
+test/random_tests.cpp:16: Test suite "random_tests" is skipped because disabled
+test/rbf_tests.cpp:17: Test suite "rbf_tests" is skipped because disabled
+test/rdts_params_tests.cpp:14: Test suite "rdts_params_tests" is skipped because disabled
+test/rest_tests.cpp:12: Test suite "rest_tests" is skipped because disabled
+test/result_tests.cpp:19: Test suite "result_tests" is skipped because disabled
+test/reverselock_tests.cpp:12: Test suite "reverselock_tests" is skipped because disabled
+test/rpc_tests.cpp:85: Test suite "rpc_tests" is skipped because disabled
+test/sanity_tests.cpp:12: Test suite "sanity_tests" is skipped because disabled
+test/scheduler_tests.cpp:16: Test suite "scheduler_tests" is skipped because disabled
+test/script_p2sh_tests.cpp:68: Test suite "script_p2sh_tests" is skipped because disabled
+test/script_parse_tests.cpp:12: Test suite "script_parse_tests" is skipped because disabled
+test/script_segwit_tests.cpp:10: Test suite "script_segwit_tests" is skipped because disabled
+test/script_standard_tests.cpp:21: Test suite "script_standard_tests" is skipped because disabled
+test/script_tests.cpp:455: Test suite "script_tests" is skipped because disabled
+test/scriptnum_tests.cpp:13: Test suite "scriptnum_tests" is skipped because disabled
+test/serfloat_tests.cpp:17: Test suite "serfloat_tests" is skipped because disabled
+test/serialize_tests.cpp:16: Test suite "serialize_tests" is skipped because disabled
+test/settings_tests.cpp:52: Test suite "settings_tests" is skipped because disabled
+test/sharepool_params_tests.cpp:18: Entering test suite "sharepool_params_tests"
+test/sharepool_params_tests.cpp:20: Entering test case "public_network_factory_rejects_test_override"
+test/sharepool_params_tests.cpp:20: Leaving test case "public_network_factory_rejects_test_override"; testing time: 14701us
+test/sharepool_params_tests.cpp:32: Entering test case "command_line_parser_rejects_ambiguous_or_invalid_schedule"
+test/sharepool_params_tests.cpp:32: Leaving test case "command_line_parser_rejects_ambiguous_or_invalid_schedule"; testing time: 3797us
+test/sharepool_params_tests.cpp:60: Entering test case "hash_only_requires_explicit_regtest_native_schedule"
+test/sharepool_params_tests.cpp:60: Leaving test case "hash_only_requires_explicit_regtest_native_schedule"; testing time: 4798us
+test/sharepool_params_tests.cpp:77: Entering test case "public_network_factory_rejects_hash_only_option"
+test/sharepool_params_tests.cpp:77: Leaving test case "public_network_factory_rejects_hash_only_option"; testing time: 2590us
+test/sharepool_params_tests.cpp:89: Entering test case "confirmed_ledger_is_explicit_and_regtest_only"
+test/sharepool_params_tests.cpp:89: Leaving test case "confirmed_ledger_is_explicit_and_regtest_only"; testing time: 2612us
+test/sharepool_params_tests.cpp:18: Leaving test suite "sharepool_params_tests"; testing time: 28580us
+test/sharepool_signer_tests.cpp:55: Entering test suite "sharepool_signer_tests"
+test/sharepool_signer_tests.cpp:57: Entering test case "native_random_key_owner_signature"
+test/sharepool_signer_tests.cpp:57: Leaving test case "native_random_key_owner_signature"; testing time: 2867us
+test/sharepool_signer_tests.cpp:66: Entering test case "native_policy_rejects_wrong_network_or_binding"
+test/sharepool_signer_tests.cpp:66: Leaving test case "native_policy_rejects_wrong_network_or_binding"; testing time: 5142us
+test/sharepool_signer_tests.cpp:91: Entering test case "native_owner_authorization_is_not_template_attestation"
+test/sharepool_signer_tests.cpp:91: Leaving test case "native_owner_authorization_is_not_template_attestation"; testing time: 3541us
+test/sharepool_signer_tests.cpp:106: Entering test case "native_signer_canonical_bounded_decoding"
+test/sharepool_signer_tests.cpp:106: Leaving test case "native_signer_canonical_bounded_decoding"; testing time: 2943us
+test/sharepool_signer_tests.cpp:131: Entering test case "native_v4_job_signature_attests_exact_job_and_contents"
+test/sharepool_signer_tests.cpp:131: Leaving test case "native_v4_job_signature_attests_exact_job_and_contents"; testing time: 3677us
+test/sharepool_signer_tests.cpp:155: Entering test case "native_v4_job_signer_enforces_policy_and_nonzero_digests"
+test/sharepool_signer_tests.cpp:155: Leaving test case "native_v4_job_signer_enforces_policy_and_nonzero_digests"; testing time: 3383us
+test/sharepool_signer_tests.cpp:186: Entering test case "native_v4_job_signer_decoding_is_canonical_and_bounded"
+test/sharepool_signer_tests.cpp:186: Leaving test case "native_v4_job_signer_decoding_is_canonical_and_bounded"; testing time: 2686us
+test/sharepool_signer_tests.cpp:209: Entering test case "native_v5_job_signer_requires_matching_profile_and_binds_domain"
+test/sharepool_signer_tests.cpp:209: Leaving test case "native_v5_job_signer_requires_matching_profile_and_binds_domain"; testing time: 2791us
+test/sharepool_signer_tests.cpp:55: Leaving test suite "sharepool_signer_tests"; testing time: 27235us
+test/sharepool_tests.cpp:178: Entering test suite "sharepool_tests"
+test/sharepool_tests.cpp:180: Entering test case "independent_wire_and_hash_vectors"
+test/sharepool_tests.cpp:180: Leaving test case "independent_wire_and_hash_vectors"; testing time: 3939us
+test/sharepool_tests.cpp:194: Entering test case "bounded_canonical_parser"
+test/sharepool_tests.cpp:194: Leaving test case "bounded_canonical_parser"; testing time: 4658us
+test/sharepool_tests.cpp:212: Entering test case "exact_payouts_and_current_authorization"
+test/sharepool_tests.cpp:212: Leaving test case "exact_payouts_and_current_authorization"; testing time: 3443us
+test/sharepool_tests.cpp:239: Entering test case "carrier_layout_is_exact"
+test/sharepool_tests.cpp:239: Leaving test case "carrier_layout_is_exact"; testing time: 2773us
+test/sharepool_tests.cpp:256: Entering test case "shares_use_native_pow_context_and_owner_binding"
+test/sharepool_tests.cpp:256: Leaving test case "shares_use_native_pow_context_and_owner_binding"; testing time: 4526us
+test/sharepool_tests.cpp:276: Entering test case "proportional_rounding_aggregates_scripts"
+test/sharepool_tests.cpp:276: Leaving test case "proportional_rounding_aggregates_scripts"; testing time: 4266us
+test/sharepool_tests.cpp:293: Entering test case "duplicates_and_parent_opening_are_consensus_bound"
+test/sharepool_tests.cpp:293: Leaving test case "duplicates_and_parent_opening_are_consensus_bound"; testing time: 4263us
+test/sharepool_tests.cpp:309: Entering test case "exact_age_and_nullifier_expiry"
+test/sharepool_tests.cpp:309: Leaving test case "exact_age_and_nullifier_expiry"; testing time: 3758us
+test/sharepool_tests.cpp:326: Entering test case "default_disabled_and_explicit_regtest_parameters"
+test/sharepool_tests.cpp:326: Leaving test case "default_disabled_and_explicit_regtest_parameters"; testing time: 3088us
+test/sharepool_tests.cpp:354: Entering test case "help_defaults_do_not_reinterpret_test_activation"
+test/sharepool_tests.cpp:354: Leaving test case "help_defaults_do_not_reinterpret_test_activation"; testing time: 4929us
+test/sharepool_tests.cpp:178: Leaving test suite "sharepool_tests"; testing time: 39896us
+test/sharepool_hash_tests.cpp:241: Entering test suite "sharepool_hash_tests"
+test/sharepool_hash_tests.cpp:243: Entering test case "independent_hash_and_wire_vectors"
+test/sharepool_hash_tests.cpp:243: Leaving test case "independent_hash_and_wire_vectors"; testing time: 2823us
+test/sharepool_hash_tests.cpp:264: Entering test case "one_hundred_proofs_and_nonce_normalization"
+test/sharepool_hash_tests.cpp:264: Leaving test case "one_hundred_proofs_and_nonce_normalization"; testing time: 53679us
+test/sharepool_hash_tests.cpp:287: Entering test case "deduplicated_large_templates_preserve_complete_transaction_bytes"
+test/sharepool_hash_tests.cpp:287: Leaving test case "deduplicated_large_templates_preserve_complete_transaction_bytes"; testing time: 13589349us
+test/sharepool_hash_tests.cpp:356: Entering test case "unsigned_preparation_never_exempts_nested_owner_authorizations"
+test/sharepool_hash_tests.cpp:356: Leaving test case "unsigned_preparation_never_exempts_nested_owner_authorizations"; testing time: 3085us
+test/sharepool_hash_tests.cpp:375: Entering test case "missing_data_is_distinct_from_invalidity"
+test/sharepool_hash_tests.cpp:375: Leaving test case "missing_data_is_distinct_from_invalidity"; testing time: 3334us
+test/sharepool_hash_tests.cpp:402: Entering test case "known_empty_preimage_is_invalid_without_requesting_data"
+test/sharepool_hash_tests.cpp:402: Leaving test case "known_empty_preimage_is_invalid_without_requesting_data"; testing time: 2419us
+test/sharepool_hash_tests.cpp:416: Entering test case "local_callback_failures_are_unavailable_not_invalid_encoding"
+test/sharepool_hash_tests.cpp:416: Leaving test case "local_callback_failures_are_unavailable_not_invalid_encoding"; testing time: 2995us
+test/sharepool_hash_tests.cpp:436: Entering test case "current_owner_reserved_roots_and_reward"
+test/sharepool_hash_tests.cpp:436: Leaving test case "current_owner_reserved_roots_and_reward"; testing time: 2791us
+test/sharepool_hash_tests.cpp:457: Entering test case "share_target_authorization_binding_and_full_origin"
+test/sharepool_hash_tests.cpp:457: Leaving test case "share_target_authorization_binding_and_full_origin"; testing time: 2850us
+test/sharepool_hash_tests.cpp:485: Entering test case "unused_full_templates_also_require_native_validation"
+test/sharepool_hash_tests.cpp:485: Leaving test case "unused_full_templates_also_require_native_validation"; testing time: 2791us
+test/sharepool_hash_tests.cpp:501: Entering test case "origin_memo_includes_exact_witness_body"
+test/sharepool_hash_tests.cpp:501: Leaving test case "origin_memo_includes_exact_witness_body"; testing time: 3941us
+test/sharepool_hash_tests.cpp:543: Entering test case "recommitting_does_not_authorize_wrong_payouts"
+test/sharepool_hash_tests.cpp:543: Leaving test case "recommitting_does_not_authorize_wrong_payouts"; testing time: 5538us
+test/sharepool_hash_tests.cpp:571: Entering test case "parent_state_repeat_payment_and_late_proof"
+test/sharepool_hash_tests.cpp:571: Leaving test case "parent_state_repeat_payment_and_late_proof"; testing time: 4511us
+test/sharepool_hash_tests.cpp:604: Entering test case "canonical_order_and_duplicate_proofs"
+test/sharepool_hash_tests.cpp:604: Leaving test case "canonical_order_and_duplicate_proofs"; testing time: 5673us
+test/sharepool_hash_tests.cpp:631: Entering test case "bounded_canonical_parser"
+test/sharepool_hash_tests.cpp:631: Leaving test case "bounded_canonical_parser"; testing time: 182225us
+test/sharepool_hash_tests.cpp:665: Entering test case "overflow_safe_payout_arithmetic_without_32_share_quota"
+test/sharepool_hash_tests.cpp:665: Leaving test case "overflow_safe_payout_arithmetic_without_32_share_quota"; testing time: 100432us
+test/sharepool_hash_tests.cpp:687: Entering test case "dependency_depth_is_a_distinct_bounded_failure"
+test/sharepool_hash_tests.cpp:687: Leaving test case "dependency_depth_is_a_distinct_bounded_failure"; testing time: 8924us
+test/sharepool_hash_tests.cpp:694: Entering test case "worked_refresh_admission_reserves_future_settlement_depth"
+test/sharepool_hash_tests.cpp:694: Leaving test case "worked_refresh_admission_reserves_future_settlement_depth"; testing time: 94207us
+test/sharepool_hash_tests.cpp:746: Entering test case "dependency_depth_cannot_be_bypassed_by_a_shorter_memoized_path"
+test/sharepool_hash_tests.cpp:746: Leaving test case "dependency_depth_cannot_be_bypassed_by_a_shorter_memoized_path"; testing time: 23750us
+test/sharepool_hash_tests.cpp:766: Entering test case "dense_dependency_dag_checks_each_exact_origin_once"
+test/sharepool_hash_tests.cpp:766: Leaving test case "dense_dependency_dag_checks_each_exact_origin_once"; testing time: 160257us
+test/sharepool_hash_tests.cpp:797: Entering test case "memoized_missing_origins_still_count_declared_dependency_edges"
+test/sharepool_hash_tests.cpp:797: Leaving test case "memoized_missing_origins_still_count_declared_dependency_edges"; testing time: 16508us
+test/sharepool_hash_tests.cpp:821: Entering test case "unique_dependency_bytes_are_bounded_across_recursion"
+test/sharepool_hash_tests.cpp:821: Leaving test case "unique_dependency_bytes_are_bounded_across_recursion"; testing time: 2463184us
+test/sharepool_hash_tests.cpp:839: Entering test case "deterministic_share_target_and_weighted_payouts"
+test/sharepool_hash_tests.cpp:839: Leaving test case "deterministic_share_target_and_weighted_payouts"; testing time: 8844us
+test/sharepool_hash_tests.cpp:862: Entering test case "owner_attests_job_and_snapshot_but_allows_search"
+test/sharepool_hash_tests.cpp:862: Leaving test case "owner_attests_job_and_snapshot_but_allows_search"; testing time: 5632us
+test/sharepool_hash_tests.cpp:885: Entering test case "v5_cross_pool_admissions_parent_cutoff_and_exact_credit_state"
+test/sharepool_hash_tests.cpp:885: Leaving test case "v5_cross_pool_admissions_parent_cutoff_and_exact_credit_state"; testing time: 9785us
+test/sharepool_hash_tests.cpp:986: Entering test case "v5_confirmed_work_outlives_fresh_proof_and_certificate_age"
+test/sharepool_hash_tests.cpp:986: Leaving test case "v5_confirmed_work_outlives_fresh_proof_and_certificate_age"; testing time: 4359us
+test/sharepool_hash_tests.cpp:1026: Entering test case "v5_certificates_bind_witness_body_owner_and_actual_parent"
+test/sharepool_hash_tests.cpp:1026: Leaving test case "v5_certificates_bind_witness_body_owner_and_actual_parent"; testing time: 4590us
+test/sharepool_hash_tests.cpp:1084: Entering test case "v5_byte_bounded_oldest_prefix_preserves_all_confirmed_credits"
+test/sharepool_hash_tests.cpp:1084: Leaving test case "v5_byte_bounded_oldest_prefix_preserves_all_confirmed_credits"; testing time: 157847us
+test/sharepool_hash_tests.cpp:1131: Entering test case "v5_parent_certificate_renews_worked_graph_depth_budget"
+test/sharepool_hash_tests.cpp:1131: Leaving test case "v5_parent_certificate_renews_worked_graph_depth_budget"; testing time: 58356us
+test/sharepool_hash_tests.cpp:241: Leaving test suite "sharepool_hash_tests"; testing time: 16988191us
+test/sharepool_hash_store_tests.cpp:167: Entering test suite "sharepool_hash_store_tests"
+test/sharepool_hash_store_tests.cpp:169: Entering test case "snapshot_dependencies_are_hints_and_pending_blocks_own_requirements"
+test/sharepool_hash_store_tests.cpp:169: Leaving test case "snapshot_dependencies_are_hints_and_pending_blocks_own_requirements"; testing time: 50724us
+test/sharepool_hash_store_tests.cpp:211: Entering test case "quarantine_and_validated_reoffer_repair_exact_local_records"
+test/sharepool_hash_store_tests.cpp:211: Leaving test case "quarantine_and_validated_reoffer_repair_exact_local_records"; testing time: 583542us
+test/sharepool_hash_store_tests.cpp:245: Entering test case "damaged_standalone_record_does_not_mask_authenticated_snapshot_source"
+test/sharepool_hash_store_tests.cpp:245: Leaving test case "damaged_standalone_record_does_not_mask_authenticated_snapshot_source"; testing time: 129328us
+test/sharepool_hash_store_tests.cpp:264: Entering test case "repaired_deduplicated_transaction_reactivates_other_sound_references"
+test/sharepool_hash_store_tests.cpp:264: Leaving test case "repaired_deduplicated_transaction_reactivates_other_sound_references"; testing time: 69073us
+test/sharepool_hash_store_tests.cpp:281: Entering test case "same_txid_witness_variants_remain_distinct_in_deduplicated_storage_after_restart"
+test/sharepool_hash_store_tests.cpp:281: Leaving test case "same_txid_witness_variants_remain_distinct_in_deduplicated_storage_after_restart"; testing time: 52895us
+test/sharepool_hash_store_tests.cpp:321: Entering test case "wrong_witness_under_same_txid_is_quarantined_and_repaired_without_cross_contamination"
+test/sharepool_hash_store_tests.cpp:321: Leaving test case "wrong_witness_under_same_txid_is_quarantined_and_repaired_without_cross_contamination"; testing time: 92966us
+test/sharepool_hash_store_tests.cpp:167: Leaving test suite "sharepool_hash_store_tests"; testing time: 980982us
+test/sharepool_hash_relay_tests.cpp:17: Entering test suite "sharepool_hash_relay_tests"
+test/sharepool_hash_relay_tests.cpp:19: Entering test case "ready_peers_cannot_overtake_each_other"
+test/sharepool_hash_relay_tests.cpp:19: Leaving test case "ready_peers_cannot_overtake_each_other"; testing time: 460us
+test/sharepool_hash_relay_tests.cpp:36: Entering test case "required_data_priority_and_disconnected_turns"
+test/sharepool_hash_relay_tests.cpp:36: Leaving test case "required_data_priority_and_disconnected_turns"; testing time: 36us
+test/sharepool_hash_relay_tests.cpp:58: Entering test case "ordinary_ready_data_gets_service_amid_required_work"
+test/sharepool_hash_relay_tests.cpp:58: Leaving test case "ordinary_ready_data_gets_service_amid_required_work"; testing time: 60us
+test/sharepool_hash_relay_tests.cpp:81: Entering test case "block_request_reservations_displace_only_speculative_hints"
+test/sharepool_hash_relay_tests.cpp:81: Leaving test case "block_request_reservations_displace_only_speculative_hints"; testing time: 92us
+test/sharepool_hash_relay_tests.cpp:107: Entering test case "required_dependencies_refill_progressively_and_keep_their_root"
+test/sharepool_hash_relay_tests.cpp:107: Leaving test case "required_dependencies_refill_progressively_and_keep_their_root"; testing time: 45us
+test/sharepool_hash_relay_tests.cpp:126: Entering test case "request_rotation_and_shared_provenance_survive_refresh"
+test/sharepool_hash_relay_tests.cpp:126: Leaving test case "request_rotation_and_shared_provenance_survive_refresh"; testing time: 73us
+test/sharepool_hash_relay_tests.cpp:149: Entering test case "inventory_is_quiet_until_change_or_recovery_replay"
+test/sharepool_hash_relay_tests.cpp:149: Leaving test case "inventory_is_quiet_until_change_or_recovery_replay"; testing time: 97us
+test/sharepool_hash_relay_tests.cpp:170: Entering test case "inventory_changes_during_pagination_get_a_full_followup"
+test/sharepool_hash_relay_tests.cpp:170: Leaving test case "inventory_changes_during_pagination_get_a_full_followup"; testing time: 33us
+test/sharepool_hash_relay_tests.cpp:195: Entering test case "empty_and_shrinking_inventory_does_not_emit_empty_messages"
+test/sharepool_hash_relay_tests.cpp:195: Leaving test case "empty_and_shrinking_inventory_does_not_emit_empty_messages"; testing time: 25us
+test/sharepool_hash_relay_tests.cpp:210: Entering test case "expired_serve_request_no_longer_conflicts_with_new_request"
+test/sharepool_hash_relay_tests.cpp:210: Leaving test case "expired_serve_request_no_longer_conflicts_with_new_request"; testing time: 24us
+test/sharepool_hash_relay_tests.cpp:17: Leaving test suite "sharepool_hash_relay_tests"; testing time: 1051us
+test/sharepool_retry_worker_tests.cpp:20: Entering test suite "sharepool_retry_worker_tests"
+test/sharepool_retry_worker_tests.cpp:22: Entering test case "signals_during_a_pass_are_coalesced_but_not_lost"
+test/sharepool_retry_worker_tests.cpp:22: Leaving test case "signals_during_a_pass_are_coalesced_but_not_lost"; testing time: 1203us
+test/sharepool_retry_worker_tests.cpp:59: Entering test case "shutdown_stops_active_work_and_discards_a_queued_notification"
+test/sharepool_retry_worker_tests.cpp:59: Leaving test case "shutdown_stops_active_work_and_discards_a_queued_notification"; testing time: 1590us
+test/sharepool_retry_worker_tests.cpp:84: Entering test case "shutdown_before_start_never_launches_work"
+test/sharepool_retry_worker_tests.cpp:84: Leaving test case "shutdown_before_start_never_launches_work"; testing time: 26us
+test/sharepool_retry_worker_tests.cpp:97: Entering test case "local_worker_failure_keeps_the_worker_available_for_a_later_signal"
+test/sharepool_retry_worker_tests.cpp:97: Leaving test case "local_worker_failure_keeps_the_worker_available_for_a_later_signal"; testing time: 64us
+test/sharepool_retry_worker_tests.cpp:122: Entering test case "native_reward_cache_retains_a_warmed_graph_under_eviction_pressure"
+test/sharepool_retry_worker_tests.cpp:122: Leaving test case "native_reward_cache_retains_a_warmed_graph_under_eviction_pressure"; testing time: 257733us
+test/sharepool_retry_worker_tests.cpp:20: Leaving test suite "sharepool_retry_worker_tests"; testing time: 260683us
+test/sighash_tests.cpp:129: Test suite "sighash_tests" is skipped because disabled
+test/sigopcount_tests.cpp:29: Test suite "sigopcount_tests" is skipped because disabled
+test/skiplist_tests.cpp:15: Test suite "skiplist_tests" is skipped because disabled
+test/sock_tests.cpp:18: Test suite "sock_tests" is skipped because disabled
+test/span_tests.cpp:47: Test suite "span_tests" is skipped because disabled
+test/streams_tests.cpp:19: Test suite "streams_tests" is skipped because disabled
+test/sync_tests.cpp:80: Test suite "sync_tests" is skipped because disabled
+test/system_ram_tests.cpp:13: Test suite "system_ram_tests" is skipped because disabled
+test/system_tests.cpp:17: Test suite "system_tests" is skipped because disabled
+test/timeoffsets_tests.cpp:24: Test suite "timeoffsets_tests" is skipped because disabled
+test/torcontrol_tests.cpp:17: Test suite "torcontrol_tests" is skipped because disabled
+test/transaction_tests.cpp:199: Test suite "transaction_tests" is skipped because disabled
+test/translation_tests.cpp:10: Test suite "translation_tests" is skipped because disabled
+test/txdownload_tests.cpp:19: Test suite "txdownload_tests" is skipped because disabled
+test/txindex_tests.cpp:15: Test suite "txindex_tests" is skipped because disabled
+test/txpackage_tests.cpp:50: Test suite "txpackage_tests" is skipped because disabled
+test/txreconciliation_tests.cpp:11: Test suite "txreconciliation_tests" is skipped because disabled
+test/txrequest_tests.cpp:747: Test suite "txrequest_tests" is skipped because disabled
+test/txvalidation_tests.cpp:22: Test suite "txvalidation_tests" is skipped because disabled
+test/txvalidationcache_tests.cpp:33: Test suite "txvalidationcache_tests" is skipped because disabled
+test/uint256_tests.cpp:19: Test suite "uint256_tests" is skipped because disabled
+test/util_string_tests.cpp:13: Test suite "util_string_tests" is skipped because disabled
+test/util_tests.cpp:71: Test suite "util_tests" is skipped because disabled
+test/util_threadnames_tests.cpp:18: Test suite "util_threadnames_tests" is skipped because disabled
+test/util_trace_tests.cpp:18: Test suite "util_trace_tests" is skipped because disabled
+test/validation_block_tests.cpp:34: Test suite "validation_block_tests" is skipped because disabled
+test/validation_chainstate_tests.cpp:24: Test suite "validation_chainstate_tests" is skipped because disabled
+test/validation_chainstatemanager_tests.cpp:35: Test suite "validation_chainstatemanager_tests" is skipped because disabled
+test/validation_flush_tests.cpp:13: Test suite "validation_flush_tests" is skipped because disabled
+test/validation_tests.cpp:22: Test suite "validation_tests" is skipped because disabled
+test/validationinterface_tests.cpp:16: Test suite "validationinterface_tests" is skipped because disabled
+test/versionbits_tests.cpp:191: Test suite "versionbits_tests" is skipped because disabled
+stats/test/stats_tests.cpp:12: Test suite "stats_tests" is skipped because disabled
+Leaving test module "Bitcoin Core Test Suite"; testing time: 18327485us
+
+Test module "Bitcoin Core Test Suite" has passed with:
+  73 test cases out of 768 passed
+  695 test cases out of 768 skipped
+  9308 assertions out of 9308 passed
+
+  Test suite "sharepool_params_tests" has passed with:
+    5 test cases out of 5 passed
+    48 assertions out of 48 passed
+
+    Test case "sharepool_params_tests/public_network_factory_rejects_test_override" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_params_tests/command_line_parser_rejects_ambiguous_or_invalid_schedule" has passed with:
+      17 assertions out of 17 passed
+
+    Test case "sharepool_params_tests/hash_only_requires_explicit_regtest_native_schedule" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_params_tests/public_network_factory_rejects_hash_only_option" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_params_tests/confirmed_ledger_is_explicit_and_regtest_only" has passed with:
+      12 assertions out of 12 passed
+
+  Test suite "sharepool_signer_tests" has passed with:
+    8 test cases out of 8 passed
+    58 assertions out of 58 passed
+
+    Test case "sharepool_signer_tests/native_random_key_owner_signature" has passed with:
+      2 assertions out of 2 passed
+
+    Test case "sharepool_signer_tests/native_policy_rejects_wrong_network_or_binding" has passed with:
+      11 assertions out of 11 passed
+
+    Test case "sharepool_signer_tests/native_owner_authorization_is_not_template_attestation" has passed with:
+      2 assertions out of 2 passed
+
+    Test case "sharepool_signer_tests/native_signer_canonical_bounded_decoding" has passed with:
+      9 assertions out of 9 passed
+
+    Test case "sharepool_signer_tests/native_v4_job_signature_attests_exact_job_and_contents" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_signer_tests/native_v4_job_signer_enforces_policy_and_nonzero_digests" has passed with:
+      16 assertions out of 16 passed
+
+    Test case "sharepool_signer_tests/native_v4_job_signer_decoding_is_canonical_and_bounded" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_signer_tests/native_v5_job_signer_requires_matching_profile_and_binds_domain" has passed with:
+      3 assertions out of 3 passed
+
+  Test suite "sharepool_tests" has passed with:
+    10 test cases out of 10 passed
+    68 assertions out of 68 passed
+
+    Test case "sharepool_tests/independent_wire_and_hash_vectors" has passed with:
+      9 assertions out of 9 passed
+
+    Test case "sharepool_tests/bounded_canonical_parser" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_tests/exact_payouts_and_current_authorization" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_tests/carrier_layout_is_exact" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_tests/shares_use_native_pow_context_and_owner_binding" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_tests/proportional_rounding_aggregates_scripts" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_tests/duplicates_and_parent_opening_are_consensus_bound" has passed with:
+      4 assertions out of 4 passed
+
+    Test case "sharepool_tests/exact_age_and_nullifier_expiry" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_tests/default_disabled_and_explicit_regtest_parameters" has passed with:
+      13 assertions out of 13 passed
+
+    Test case "sharepool_tests/help_defaults_do_not_reinterpret_test_activation" has passed with:
+      2 assertions out of 2 passed
+
+  Test suite "sharepool_hash_tests" has passed with:
+    29 test cases out of 29 passed
+    1403 assertions out of 1403 passed
+
+    Test case "sharepool_hash_tests/independent_hash_and_wire_vectors" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_hash_tests/one_hundred_proofs_and_nonce_normalization" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_hash_tests/deduplicated_large_templates_preserve_complete_transaction_bytes" has passed with:
+      711 assertions out of 711 passed
+
+    Test case "sharepool_hash_tests/unsigned_preparation_never_exempts_nested_owner_authorizations" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_hash_tests/missing_data_is_distinct_from_invalidity" has passed with:
+      10 assertions out of 10 passed
+
+    Test case "sharepool_hash_tests/known_empty_preimage_is_invalid_without_requesting_data" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_hash_tests/local_callback_failures_are_unavailable_not_invalid_encoding" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_hash_tests/current_owner_reserved_roots_and_reward" has passed with:
+      11 assertions out of 11 passed
+
+    Test case "sharepool_hash_tests/share_target_authorization_binding_and_full_origin" has passed with:
+      11 assertions out of 11 passed
+
+    Test case "sharepool_hash_tests/unused_full_templates_also_require_native_validation" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_hash_tests/origin_memo_includes_exact_witness_body" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_hash_tests/recommitting_does_not_authorize_wrong_payouts" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_hash_tests/parent_state_repeat_payment_and_late_proof" has passed with:
+      9 assertions out of 9 passed
+
+    Test case "sharepool_hash_tests/canonical_order_and_duplicate_proofs" has passed with:
+      15 assertions out of 15 passed
+
+    Test case "sharepool_hash_tests/bounded_canonical_parser" has passed with:
+      428 assertions out of 428 passed
+
+    Test case "sharepool_hash_tests/overflow_safe_payout_arithmetic_without_32_share_quota" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_hash_tests/dependency_depth_is_a_distinct_bounded_failure" has passed with:
+      3 assertions out of 3 passed
+
+    Test case "sharepool_hash_tests/worked_refresh_admission_reserves_future_settlement_depth" has passed with:
+      11 assertions out of 11 passed
+
+    Test case "sharepool_hash_tests/dependency_depth_cannot_be_bypassed_by_a_shorter_memoized_path" has passed with:
+      3 assertions out of 3 passed
+
+    Test case "sharepool_hash_tests/dense_dependency_dag_checks_each_exact_origin_once" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_hash_tests/memoized_missing_origins_still_count_declared_dependency_edges" has passed with:
+      2 assertions out of 2 passed
+
+    Test case "sharepool_hash_tests/unique_dependency_bytes_are_bounded_across_recursion" has passed with:
+      2 assertions out of 2 passed
+
+    Test case "sharepool_hash_tests/deterministic_share_target_and_weighted_payouts" has passed with:
+      10 assertions out of 10 passed
+
+    Test case "sharepool_hash_tests/owner_attests_job_and_snapshot_but_allows_search" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_hash_tests/v5_cross_pool_admissions_parent_cutoff_and_exact_credit_state" has passed with:
+      43 assertions out of 43 passed
+
+    Test case "sharepool_hash_tests/v5_confirmed_work_outlives_fresh_proof_and_certificate_age" has passed with:
+      29 assertions out of 29 passed
+
+    Test case "sharepool_hash_tests/v5_certificates_bind_witness_body_owner_and_actual_parent" has passed with:
+      15 assertions out of 15 passed
+
+    Test case "sharepool_hash_tests/v5_byte_bounded_oldest_prefix_preserves_all_confirmed_credits" has passed with:
+      11 assertions out of 11 passed
+
+    Test case "sharepool_hash_tests/v5_parent_certificate_renews_worked_graph_depth_budget" has passed with:
+      11 assertions out of 11 passed
+
+  Test suite "sharepool_hash_store_tests" has passed with:
+    6 test cases out of 6 passed
+    251 assertions out of 251 passed
+
+    Test case "sharepool_hash_store_tests/snapshot_dependencies_are_hints_and_pending_blocks_own_requirements" has passed with:
+      15 assertions out of 15 passed
+
+    Test case "sharepool_hash_store_tests/quarantine_and_validated_reoffer_repair_exact_local_records" has passed with:
+      121 assertions out of 121 passed
+
+    Test case "sharepool_hash_store_tests/damaged_standalone_record_does_not_mask_authenticated_snapshot_source" has passed with:
+      21 assertions out of 21 passed
+
+    Test case "sharepool_hash_store_tests/repaired_deduplicated_transaction_reactivates_other_sound_references" has passed with:
+      12 assertions out of 12 passed
+
+    Test case "sharepool_hash_store_tests/same_txid_witness_variants_remain_distinct_in_deduplicated_storage_after_restart" has passed with:
+      35 assertions out of 35 passed
+
+    Test case "sharepool_hash_store_tests/wrong_witness_under_same_txid_is_quarantined_and_repaired_without_cross_contamination" has passed with:
+      47 assertions out of 47 passed
+
+  Test suite "sharepool_hash_relay_tests" has passed with:
+    10 test cases out of 10 passed
+    304 assertions out of 304 passed
+
+    Test case "sharepool_hash_relay_tests/ready_peers_cannot_overtake_each_other" has passed with:
+      160 assertions out of 160 passed
+
+    Test case "sharepool_hash_relay_tests/required_data_priority_and_disconnected_turns" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_hash_relay_tests/ordinary_ready_data_gets_service_amid_required_work" has passed with:
+      19 assertions out of 19 passed
+
+    Test case "sharepool_hash_relay_tests/block_request_reservations_displace_only_speculative_hints" has passed with:
+      10 assertions out of 10 passed
+
+    Test case "sharepool_hash_relay_tests/required_dependencies_refill_progressively_and_keep_their_root" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_hash_relay_tests/request_rotation_and_shared_provenance_survive_refresh" has passed with:
+      10 assertions out of 10 passed
+
+    Test case "sharepool_hash_relay_tests/inventory_is_quiet_until_change_or_recovery_replay" has passed with:
+      67 assertions out of 67 passed
+
+    Test case "sharepool_hash_relay_tests/inventory_changes_during_pagination_get_a_full_followup" has passed with:
+      13 assertions out of 13 passed
+
+    Test case "sharepool_hash_relay_tests/empty_and_shrinking_inventory_does_not_emit_empty_messages" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_hash_relay_tests/expired_serve_request_no_longer_conflicts_with_new_request" has passed with:
+      6 assertions out of 6 passed
+
+  Test suite "sharepool_retry_worker_tests" has passed with:
+    5 test cases out of 5 passed
+    7176 assertions out of 7176 passed
+
+    Test case "sharepool_retry_worker_tests/signals_during_a_pass_are_coalesced_but_not_lost" has passed with:
+      1011 assertions out of 1011 passed
+
+    Test case "sharepool_retry_worker_tests/shutdown_stops_active_work_and_discards_a_queued_notification" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_retry_worker_tests/shutdown_before_start_never_launches_work" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_retry_worker_tests/local_worker_failure_keeps_the_worker_available_for_a_later_signal" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_retry_worker_tests/native_reward_cache_retains_a_warmed_graph_under_eviction_pressure" has passed with:
+      6145 assertions out of 6145 passed

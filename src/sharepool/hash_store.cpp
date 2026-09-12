@@ -18,7 +18,7 @@ constexpr size_t MAX_STORED_BYTES{1024ULL * 1024 * 1024};
 constexpr size_t MAX_STORED_OBJECTS{65536};
 constexpr size_t MAX_CACHE_BYTES{64 * 1024 * 1024};
 constexpr size_t MAX_PENDING_BYTES{64 * 1024 * 1024};
-constexpr size_t MAX_PENDING_BLOCKS{16};
+constexpr size_t MAX_PENDING_BLOCKS{HashRequestQueue<uint256>::MAX_BLOCKS};
 constexpr size_t MAX_TEMPLATE_INDEX{65536};
 constexpr size_t MAX_LOCAL_TEMPLATE_BYTES{256 * 1024 * 1024};
 constexpr size_t MAX_LOCAL_TRANSACTIONS{262144};
@@ -143,7 +143,7 @@ HashSnapshotStore::HashSnapshotStore(const fs::path& path, bool memory_only)
         m_pending.emplace(key.second, block);
         m_pending_sizes.emplace(key.second, bytes.data.size());
         m_pending_bytes += bytes.data.size();
-        if (!Has(block->m_mm_rhs)) m_needed.insert(block->m_mm_rhs);
+        m_requests.Track(key.second, block->m_mm_rhs, [this](const auto& hash) { LOCK(cs_main); return Has(hash); });
     }
 }
 
@@ -243,7 +243,9 @@ void HashSnapshotStore::Quarantine(const uint256& hash)
         m_cache.erase(found);
         m_touched.erase(hash);
     }
-    if (m_needed.size() < 4096) m_needed.insert(hash);
+    m_requests.Refresh([this](const auto& id) { LOCK(cs_main); return Has(id); });
+    // Local repair without a tracked dependent block is a speculative hint.
+    Need({hash});
     ++m_revision;
 }
 
@@ -286,7 +288,7 @@ uint256 HashSnapshotStore::Put(Span<const unsigned char> raw, std::optional<uint
     catch (const std::ios_base::failure&) { /* Hash-verified invalid encodings prove invalidity. */ }
     const auto hash = hashonly::SnapshotHash(raw);
     if (expected && *expected != hash) throw std::runtime_error("hash-only snapshot differs from requested hash");
-    if (Has(hash)) { m_needed.erase(hash); return hash; }
+    if (Has(hash)) return hash;
     const auto existing = m_sizes.find(hash);
     const size_t replaced = existing == m_sizes.end() ? 0 : existing->second;
     if ((existing == m_sizes.end() && m_sizes.size() >= MAX_STORED_OBJECTS) || m_bytes - replaced + raw.size() > MAX_STORED_BYTES) {
@@ -299,11 +301,17 @@ uint256 HashSnapshotStore::Put(Span<const unsigned char> raw, std::optional<uint
     m_quarantined.erase(hash);
     Cache(hash, std::make_shared<const std::vector<unsigned char>>(std::move(bytes)));
     if (snapshot) IndexTemplates(hash, *snapshot);
-    m_needed.erase(hash);
-    // Origin snapshot dependencies are discovered without trusting their contents.
-    if (snapshot) for (const auto& record : snapshot->templates) {
-        auto block = std::make_shared<CBlock>(record.block);
-        if (!Has(block->m_mm_rhs) && m_needed.size() < 4096) m_needed.insert(block->m_mm_rhs);
+    m_requests.Refresh([this](const auto& id) { LOCK(cs_main); return Has(id); });
+    // Unvalidated contents can suggest dependencies but cannot reserve block
+    // requirements. Only a tracked pending block's validator can do that.
+    if (snapshot) {
+        std::vector<uint256> hints;
+        hints.reserve(std::min(HashRequestQueue<uint256>::MAX_HINTS, snapshot->templates.size()));
+        for (const auto& record : snapshot->templates) {
+            if (hints.size() == HashRequestQueue<uint256>::MAX_HINTS) break;
+            hints.push_back(record.block.m_mm_rhs);
+        }
+        Need(hints);
     }
     ++m_revision;
     return hash;
@@ -320,12 +328,29 @@ std::vector<uint256> HashSnapshotStore::Inventory() const
 std::vector<uint256> HashSnapshotStore::Needed() const
 {
     AssertLockHeld(cs_main);
-    return {m_needed.begin(), m_needed.end()};
+    return m_requests.Required();
+}
+std::vector<uint256> HashSnapshotStore::Speculative() const
+{
+    AssertLockHeld(cs_main);
+    return m_requests.Hints();
 }
 void HashSnapshotStore::Need(const std::vector<uint256>& hashes)
 {
     AssertLockHeld(cs_main);
-    for (const auto& hash : hashes) if (!hash.IsNull() && !Has(hash) && m_needed.size() < 4096) m_needed.insert(hash);
+    // The generic queue invokes this predicate synchronously. Reenter the
+    // recursive mutex to make the callback's lock contract explicit.
+    m_requests.Hint(hashes, [this](const auto& hash) { LOCK(cs_main); return Has(hash); });
+}
+void HashSnapshotStore::NeedForBlock(const uint256& block, const std::vector<uint256>& hashes)
+{
+    AssertLockHeld(cs_main);
+    m_requests.Update(block, hashes, [this](const auto& hash) { LOCK(cs_main); return Has(hash); });
+}
+void HashSnapshotStore::Requested(const uint256& hash)
+{
+    AssertLockHeld(cs_main);
+    m_requests.Requested(hash);
 }
 
 void HashSnapshotStore::RememberTemplate(const CBlock& block)
@@ -460,9 +485,16 @@ bool HashSnapshotStore::QueueBlock(std::shared_ptr<const CBlock> block)
     m_pending_bytes += bytes.size();
     m_pending_sizes.emplace(hash, bytes.size());
     m_pending.emplace(hash, std::move(block));
+    m_requests.Track(hash, m_pending.at(hash)->m_mm_rhs, [this](const auto& id) { LOCK(cs_main); return Has(id); });
     ++m_revision;
     return true;
 }
+bool HashSnapshotStore::HasPendingBlock(const uint256& hash) const
+{
+    AssertLockHeld(cs_main);
+    return m_pending.contains(hash);
+}
+
 void HashSnapshotStore::RemoveBlock(const uint256& hash)
 {
     AssertLockHeld(cs_main);
@@ -471,6 +503,7 @@ void HashSnapshotStore::RemoveBlock(const uint256& hash)
     m_pending_bytes -= m_pending_sizes.at(hash);
     m_pending_sizes.erase(hash);
     m_pending.erase(hash);
+    m_requests.Forget(hash, [this](const auto& id) { LOCK(cs_main); return Has(id); });
     ++m_revision;
 }
 std::vector<std::shared_ptr<const CBlock>> HashSnapshotStore::PendingBlocks() const

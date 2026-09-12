@@ -1582,6 +1582,7 @@ void PeerManagerImpl::FindNextBlocks(std::vector<const CBlockIndex*>& vBlocks, c
     int nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
     bool is_limited_peer = IsLimitedPeer(peer);
     NodeId waitingfor = -1;
+    bool pending_local_validation{false};
     while (pindexWalk->nHeight < nMaxHeight) {
         // Read up to 128 (or more, if more blocks than that are needed) successors of pindexWalk (towards
         // pindexBestKnownBlock) into vToFetch. We fetch 128, because CBlockIndex::GetAncestor may be as expensive
@@ -1616,6 +1617,18 @@ void PeerManagerImpl::FindNextBlocks(std::vector<const CBlockIndex*>& vBlocks, c
                 continue;
             }
 
+            if (m_chainman.m_sharepool_hash_store &&
+                m_chainman.m_sharepool_hash_store->HasPendingBlock(pindex->GetBlockHash())) {
+                // The bounded durable queue already owns this exact body.
+                // Fetch its snapshot dependencies instead of downloading and
+                // revalidating the same block on every message-loop turn.
+                // Do not advance the common ancestor or set BLOCK_HAVE_DATA:
+                // missing evidence is still pending validation. Removing the
+                // retained body automatically restores ordinary download.
+                pending_local_validation = true;
+                continue;
+            }
+
             // Is block in-flight?
             if (IsBlockRequested(pindex->GetBlockHash())) {
                 if (waitingfor == -1) {
@@ -1628,7 +1641,7 @@ void PeerManagerImpl::FindNextBlocks(std::vector<const CBlockIndex*>& vBlocks, c
             // The block is not already downloaded, and not yet in flight.
             if (pindex->nHeight > nWindowEnd) {
                 // We reached the end of the window.
-                if (vBlocks.size() == 0 && waitingfor != peer.m_id) {
+                if (!pending_local_validation && vBlocks.size() == 0 && waitingfor != peer.m_id) {
                     // We aren't able to fetch anything, but we would be if the download window was one larger.
                     if (nodeStaller) *nodeStaller = waitingfor;
                 }
@@ -2905,6 +2918,8 @@ void PeerManagerImpl::HeadersDirectFetchBlocks(CNode& pfrom, const Peer& peer, c
         // Calculate all the blocks we'd need to switch to last_header, up to a limit.
         while (pindexWalk && !m_chainman.ActiveChain().Contains(pindexWalk) && vToFetch.size() <= MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
             if (!(pindexWalk->nStatus & BLOCK_HAVE_DATA) &&
+                    (!m_chainman.m_sharepool_hash_store ||
+                     !m_chainman.m_sharepool_hash_store->HasPendingBlock(pindexWalk->GetBlockHash())) &&
                     !IsBlockRequested(pindexWalk->GetBlockHash()) &&
                     (!DeploymentActiveAt(*pindexWalk, m_chainman, Consensus::DEPLOYMENT_SEGWIT) || CanServeWitnesses(peer))) {
                 // We don't have this block, and it's not yet in flight.
@@ -3874,46 +3889,44 @@ void PeerManagerImpl::RequestSharePoolHash(CNode& node, Peer& peer)
     }
     auto& store = *m_chainman.m_sharepool_hash_store;
     const auto now = SPNClock::now();
-    // Pending blocks and their discovered origin dependencies take precedence
-    // over advertisements. Required hashes can be requested without an inv.
-    std::deque<uint256> prioritized;
-    std::set<uint256> seen;
+    // Keep actual advertisements separate from speculative dependency hints.
+    // Block provenance reserves capacity, while weighted service also leaves
+    // ordinary advertisements a turn even while some blocks remain missing.
     const auto available = [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
         const auto rejected = relay.rejected_until.find(hash);
         return !store.Has(hash) && !m_sharepool_hash_downloads.contains(hash) &&
             (rejected == relay.rejected_until.end() || rejected->second <= now);
     };
-    for (const auto& hash : store.Needed()) {
-        if (prioritized.size() >= SPH_MAX_ITEMS) break;
-        if (available(hash) && seen.insert(hash).second) prioritized.push_back(hash);
-    }
-    const bool required = !prioritized.empty();
+    const auto needed = store.Needed();
+    const std::set<uint256> required_hashes(needed.begin(), needed.end());
+    const auto required_item = std::find_if(needed.begin(), needed.end(), available);
+    std::erase_if(relay.pending, [&](const auto& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.Has(hash); });
+    std::optional<uint256> ordinary_item;
     for (const auto& hash : relay.pending) {
-        if (prioritized.size() >= SPH_MAX_ITEMS) break;
-        if (available(hash) && seen.insert(hash).second) prioritized.push_back(hash);
+        if (!required_hashes.contains(hash) && available(hash)) { ordinary_item = hash; break; }
     }
-    relay.pending = std::move(prioritized);
-    if (relay.pending.empty()) {
+    // Hints never replace an actual advertisement in the bounded peer queue.
+    if (!ordinary_item) for (const auto& hash : store.Speculative()) {
+        if (!required_hashes.contains(hash) && available(hash)) { ordinary_item = hash; break; }
+    }
+    const bool have_required = required_item != needed.end();
+    if (!have_required && !ordinary_item) {
         m_sharepool_hash_download_turns.Remove(peer.m_id);
         return;
     }
+    const bool required = have_required && (!ordinary_item || m_sharepool_hash_download_turns.PreferRequired());
     m_sharepool_hash_download_turns.Ready(peer.m_id, required);
     if (m_sharepool_hash_downloads.size() >= SPH_MAX_DOWNLOADS ||
         !m_sharepool_hash_download_turns.IsTurn(peer.m_id)) return;
-    while (!relay.pending.empty()) {
-        const auto hash = relay.pending.front();
-        relay.pending.pop_front();
-        if (store.Has(hash) || m_sharepool_hash_downloads.contains(hash)) continue;
-        const auto rejected = relay.rejected_until.find(hash);
-        if (rejected != relay.rejected_until.end() && rejected->second > now) continue;
-        relay.download.emplace(SharePoolHashDownload{hash, now + SPH_PROGRESS_TIMEOUT,
-            now + SPH_WHOLE_TIMEOUT, 0, {}, true});
-        m_sharepool_hash_downloads.emplace(hash, node.GetId());
-        m_sharepool_hash_download_turns.Remove(peer.m_id);
-        --relay.outgoing_requests;
-        MakeAndPushMessage(node, NetMsgType::SPHGET, hash, uint32_t{0});
-        break;
-    }
+    const auto hash = required ? *required_item : *ordinary_item;
+    std::erase(relay.pending, hash);
+    relay.download.emplace(SharePoolHashDownload{hash, now + SPH_PROGRESS_TIMEOUT,
+        now + SPH_WHOLE_TIMEOUT, 0, {}, true});
+    m_sharepool_hash_downloads.emplace(hash, node.GetId());
+    m_sharepool_hash_download_turns.Complete(peer.m_id);
+    store.Requested(hash);
+    --relay.outgoing_requests;
+    MakeAndPushMessage(node, NetMsgType::SPHGET, hash, uint32_t{0});
 }
 
 void PeerManagerImpl::SendSharePoolHashMessages(CNode& node, Peer& peer)
@@ -3945,7 +3958,8 @@ void PeerManagerImpl::SendSharePoolHashMessages(CNode& node, Peer& peer)
     }
     if (!relay.hello_sent) {
         MakeAndPushMessage(node, NetMsgType::SPHHELLO, uint8_t{1},
-            m_chainparams.GetConsensus().hashGenesisBlock, sharepool::hashonly::RulesHash(),
+            m_chainparams.GetConsensus().hashGenesisBlock,
+            sharepool::hashonly::RulesHash(sharepool::hashonly::ProfileVersion(m_chainparams.GetConsensus())),
             uint32_t(m_chainparams.GetConsensus().SharePoolHeight));
         relay.hello_sent = true;
     }
@@ -4007,6 +4021,7 @@ void PeerManagerImpl::SendSharePoolHashMessages(CNode& node, Peer& peer)
         relay.next_admission = finished + 250ms;
         m_next_sharepool_hash_admission = finished +
             std::max(std::chrono::duration_cast<SPNClock::duration>(50ms), (finished - started) * 4);
+        m_sharepool_hash_admission_turns.Complete(peer.m_id);
         if (admitted) {
             if (!already_present) m_sharepool_hash_retry = true;
             ClearSharePoolHashDownload(peer);
@@ -4050,7 +4065,8 @@ void PeerManagerImpl::ProcessSharePoolHashMessage(CNode& node, Peer& peer, const
             uint32_t activation;
             stream >> version >> genesis >> rules >> activation;
             const auto& consensus = m_chainparams.GetConsensus();
-            if (version != 1 || genesis != consensus.hashGenesisBlock || rules != sharepool::hashonly::RulesHash() ||
+            if (version != 1 || genesis != consensus.hashGenesisBlock ||
+                rules != sharepool::hashonly::RulesHash(sharepool::hashonly::ProfileVersion(consensus)) ||
                 activation != uint32_t(consensus.SharePoolHeight)) return;
             relay.hello_received = true;
             return;

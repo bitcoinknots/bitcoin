@@ -24,9 +24,9 @@ import tempfile
 import native_archive
 import hash_gate_archive
 import hash_gate_batch
-from hash_snapshot import (Snapshot, TemplateRecord, CompactTemplateRecord, Share, RULES_HASH, MAX_SNAPSHOT_BYTES,
+from hash_snapshot import (Snapshot, TemplateRecord, CompactTemplateRecord, Share, MAX_SNAPSHOT_BYTES,
     MAX_TEMPLATE_BYTES, MAX_SHARE_AGE, SHARE_BITS, parse_share, candidate, normalize_template, build_snapshot,
-    job_hash, work_outputs)
+    job_hash, work_outputs, credit_outputs, rules_hash, LEDGER_VERSION)
 from native_mining_gate import (MiningAuthorization, JobOmission, parse_block, immutable_header,
     template_id, _process_lock, fcntl, REGTEST_GENESIS)
 from native_enforcement import is_payout_script, verify_schnorr
@@ -35,6 +35,8 @@ from test_framework.messages import CBlockHeader
 SNAPSHOT, TEMPLATE, PROOF = 0, 1, 2
 RECORD_OVERHEAD = hash_gate_archive.RECORD.size
 LIMITS = (MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES, 1024)
+RECEIPT_HISTORY_SNAPSHOTS = 64
+RECEIPT_HISTORY_BYTES = 64 * 1024 * 1024
 
 
 class TemplateOmission(ValueError):
@@ -52,8 +54,10 @@ class HashMiningAuthorization(MiningAuthorization):
 class HashMiningGate:
     def __init__(self, path, *, rpc, pool, public_key, payout_script,
                  quota=native_archive.DEFAULT_QUOTA, trusted_head_path=None, archive_directory=None,
-                 snapshot_budget=MAX_SNAPSHOT_BYTES):
-        if (type(pool) is not int or not 0 < pool < 1 << 256 or type(public_key) is not bytes or
+                 snapshot_budget=MAX_SNAPSHOT_BYTES, profile_version=4, activation_height=1):
+        if (type(activation_height) is not int or not 1 <= activation_height <= 0x7fffffff or
+                type(profile_version) is not int or profile_version not in (4, LEDGER_VERSION) or
+                type(pool) is not int or not 0 < pool < 1 << 256 or type(public_key) is not bytes or
                 len(public_key) != 32 or type(payout_script) is not bytes or not is_payout_script(payout_script) or
                 type(quota) is not int or not 4096 <= quota <= native_archive.MAX_QUOTA or
                 type(snapshot_budget) is not int or not 1024 <= snapshot_budget <= MAX_SNAPSHOT_BYTES):
@@ -63,6 +67,9 @@ class HashMiningGate:
         self.rpc, self.pool, self.public_key, self.payout_script = rpc, pool, public_key, payout_script
         self.path, self.quota = Path(path), quota
         self.snapshot_budget = snapshot_budget
+        self.profile_version, self.rules = profile_version, rules_hash(profile_version)
+        self.activation_height = activation_height
+        self.mode = "hash-only-v4" if profile_version == 4 else "hash-only-v5-confirmed-ledger"
         self.archive_directory = None if archive_directory is None else Path(archive_directory).absolute()
         if self.archive_directory is not None:
             self.archive_directory.mkdir(mode=0o700, exist_ok=True)
@@ -75,9 +82,12 @@ class HashMiningGate:
             raise ValueError("protected head must be separate from database")
         self.db, self._lock_fd, self._head_lock_fd, self._sealed_head = None, None, None, None
         self._context()
-        self.config = native_archive.canonical({"schema": 2, "profile": "hash-only-v4", "genesis": REGTEST_GENESIS,
-            "rules": f"{RULES_HASH:064x}", "pool": f"{pool:064x}", "public_key": public_key.hex(), "script": payout_script.hex(),
-            "batch_policy": "oldest-origin-proof-v1", "snapshot_budget": snapshot_budget})
+        config = {"schema": 2, "profile": self.mode, "genesis": REGTEST_GENESIS,
+            "rules": f"{self.rules:064x}", "pool": f"{pool:064x}", "public_key": public_key.hex(), "script": payout_script.hex(),
+            "batch_policy": "oldest-origin-proof-v1", "snapshot_budget": snapshot_budget}
+        if activation_height != 1:
+            config["activation_height"] = activation_height
+        self.config = native_archive.canonical(config)
         self.binding = hashlib.sha256(self.config).hexdigest()
         self._lock_fd = _process_lock(Path(str(self.path) + ".owner.lock"))
         try:
@@ -116,9 +126,11 @@ class HashMiningGate:
         if (not isinstance(info, dict) or info.get("chain") != "regtest" or type(height) is not int or height < 0 or
                 self.rpc("getblockhash", 0) != REGTEST_GENESIS or not native_archive.is_hash(tip) or
                 self.rpc("getblockhash", height) != tip or not isinstance(profile, dict) or
-                profile.get("mode") != "hash-only-v4" or profile.get("rules") != f"{RULES_HASH:064x}" or
+                profile.get("mode") != self.mode or profile.get("rules") != f"{self.rules:064x}" or
+                type(profile.get("activation_height", 1)) is not int or
+                profile.get("activation_height", 1) != self.activation_height or
                 profile.get("max_snapshot_bytes") != MAX_SNAPSHOT_BYTES):
-            raise ValueError("active native regtest hash-only v4 profile required")
+            raise ValueError(f"active native regtest hash-only v{self.profile_version} profile at activation height {self.activation_height} required")
         return height, tip
 
     def _stable(self, tip):
@@ -194,7 +206,7 @@ class HashMiningGate:
             raise ValueError("invalid bounded journal event")
         sequence, revision = head["events"] + 1, head["receipt_revision"] + int(kind == PROOF)
         digest = hashlib.sha256(raw).hexdigest()
-        root = hashlib.sha256(b"SharePool/hash-gate/event/v4\0" + bytes.fromhex(head["root"]) +
+        root = hashlib.sha256(f"SharePool/hash-gate/event/v{self.profile_version}\0".encode() + bytes.fromhex(head["root"]) +
             struct.pack("<QBQI", sequence, kind, revision, len(raw)) + bytes.fromhex(identity) + bytes.fromhex(digest)).hexdigest()
         result = dict(head, events=sequence, root=root, receipt_revision=revision, bytes=head["bytes"] + RECORD_OVERHEAD + len(raw))
         if result["bytes"] > hash_gate_archive.MAX_COUNTER or sequence > hash_gate_archive.MAX_COUNTER:
@@ -452,16 +464,16 @@ class HashMiningGate:
         active = {TEMPLATE: 0, PROOF: 0}
         unpaid = []
         parent = self._parent_snapshot(height, tip, {})
-        paid = set() if parent is None else {entry.proof_id for entry in parent.post_state}
+        paid = self._admitted_ids(parent)
         for kind in (TEMPLATE, PROOF):
             cursor = self.db.execute("SELECT identity,height,parent FROM journal WHERE kind=? AND height BETWEEN ? AND ? ORDER BY sequence",
-                                     (kind, max(1, height + 1 - MAX_SHARE_AGE), height + 1))
+                                     (kind, max(self.activation_height, height + 1 - MAX_SHARE_AGE), height + 1))
             for identity, origin, parent_hash in cursor:
                 if not self._eligible(origin, parent_hash, height):
                     continue
                 raw = self._read(kind, identity)
                 if kind == TEMPLATE:
-                    self._native_template(raw, tip)
+                    self._native_template(raw, tip, mining=False)
                 else:
                     share = parse_share(raw)
                     self._native_share(share, tip)
@@ -470,9 +482,21 @@ class HashMiningGate:
                 active[kind] += 1
         self._stable(tip)
         self._check_seal()
-        return {"native_tip": tip, "retained_receipts": self._sealed_head["receipt_revision"],
-                "active_templates": active[TEMPLATE], "active_receipts": active[PROOF],
-                "unsettled_proofs": tuple(sorted(unpaid))}
+        result = {"native_tip": tip, "retained_receipts": self._sealed_head["receipt_revision"],
+                  "active_templates": active[TEMPLATE], "active_receipts": active[PROOF],
+                  "unsettled_proofs": tuple(sorted(unpaid))}
+        if self.profile_version == LEDGER_VERSION:
+            # Confirmed credit is independent of the raw proof's admission age.
+            # Query only the bounded current ledger, never lifetime proof bodies.
+            def retained(credits):
+                return tuple(sorted(f"{credit.proof_id:064x}" for credit in credits
+                    if self.db.execute("SELECT 1 FROM journal WHERE kind=? AND identity=?",
+                        (PROOF, f"{credit.proof_id:064x}")).fetchone() is not None))
+            pending = retained(parent.pending) if parent is not None else ()
+            settled = retained(parent.settled) if parent is not None else ()
+            result.update(provisional_proofs=tuple(sorted(unpaid)), confirmed_pending_proofs=pending,
+                          current_block_settled_proofs=settled, unsettled_proofs=tuple(sorted(set(unpaid) | set(pending))))
+        return result
 
     @classmethod
     def restore_archive(cls, exports, destination, *, trusted_head, **kwargs):
@@ -549,16 +573,53 @@ class HashMiningGate:
                 self.register_snapshot(raw)
             else:
                 staged[SNAPSHOT, identity] = raw
-        return Snapshot.deserialize(raw)
+        snapshot = Snapshot.deserialize(raw)
+        if snapshot.envelope.version != self.profile_version:
+            raise ValueError("snapshot profile differs from gate policy")
+        return snapshot
 
     def _submit_snapshot(self, raw):
         snapshot = Snapshot.deserialize(raw)
+        if snapshot.envelope.version != self.profile_version:
+            raise ValueError("snapshot profile differs from gate policy")
         result = self.rpc("submitsharepoolhashsnapshot", raw.hex())
         if (not isinstance(result, dict) or result.get("hash") != snapshot.hash_hex or
                 result.get("status") not in ("stored", "present") or type(result.get("missing")) is not list or
                 any(not native_archive.is_hash(value) for value in result["missing"])):
             raise ValueError("native snapshot storage response failed binding")
         return snapshot.hash_hex
+
+    def _provenance(self, snapshot, staged, **context):
+        """Collect the complete bounded opening graph without admitting it.
+
+        An origin's native-parent paid state is required even when it is older
+        than the proposed job's parent. Only a successful complete traversal
+        exposes its collected bytes to the caller's final atomic admission.
+        """
+        fetched, complete = dict(staged), {}
+        resources = hash_gate_batch.check_graph(snapshot, activation_height=self.activation_height, **context,
+            lookup=lambda identity: self._snapshot(identity, fetched),
+            parent_snapshot=lambda identity, height: self._block_snapshot(height, f"{identity:064x}", fetched),
+            on_snapshot=lambda identity, raw: complete.__setitem__((SNAPSHOT, f"{identity:064x}"), raw))
+        staged.update(complete)
+        return resources
+
+    def _rehydrate_retained(self, staged):
+        """Re-publish only already durable openings after native cache loss.
+
+        Newly fetched openings already exist at the native RPC source. A
+        rejected offer cannot use this path to publish its unadmitted overlay.
+        """
+        for (kind, identity), raw in staged.items():
+            if kind != SNAPSHOT:
+                continue
+            try:
+                retained = self._read(SNAPSHOT, identity)
+            except KeyError:
+                continue
+            if retained != raw:
+                raise ValueError("offered snapshot conflicts with retained evidence")
+            self._submit_snapshot(retained)
 
     def register_snapshot(self, raw):
         """Store canonical content. Native 'stored' is never a validity assertion."""
@@ -567,9 +628,11 @@ class HashMiningGate:
         self._persist([(SNAPSHOT, raw)])
         return identity
 
-    def _native_template(self, raw, tip, snapshot_raw=None):
+    def _native_template(self, raw, tip, snapshot_raw=None, *, mining=True):
         block = parse_block(raw)
         arguments = (raw.hex(),) if snapshot_raw is None else (raw.hex(), snapshot_raw.hex())
+        if not mining:
+            arguments = (raw.hex(), None if snapshot_raw is None else snapshot_raw.hex(), False)
         result = self.rpc("validatesharepoolhashtemplate", *arguments)
         expected = {"valid": True, "native_tip": tip, "native_parent": f"{block.hashPrevBlock:064x}",
                     "origin_height": block.m_height, "commitment": f"{block.m_mm_rhs:064x}"}
@@ -584,14 +647,18 @@ class HashMiningGate:
         record = TemplateRecord.from_block(raw)
         record.serialize()
         block = parse_block(record.data)
-        opening = self._snapshot(block.m_mm_rhs)
+        staged = {}
+        opening = self._snapshot(block.m_mm_rhs, staged)
         if (opening.envelope.pool != self.pool or opening.envelope.genesis != int(REGTEST_GENESIS, 16) or
                 opening.envelope.height != block.m_height or opening.envelope.native_parent != block.hashPrevBlock or
                 not self._eligible(block.m_height, f"{block.hashPrevBlock:064x}", height)):
             raise ValueError("template is outside this pool or eligible native ancestry")
-        self._submit_snapshot(opening.serialize())
-        self._native_template(record.data, tip)
-        self._persist([(TEMPLATE, record.data)])
+        self._provenance(opening, staged, mining_job=True)
+        self._rehydrate_retained(staged)
+        self._native_template(record.data, tip, opening.serialize())
+        self._stable(tip)
+        staged[TEMPLATE, f"{record.template_id:064x}"] = record.data
+        self._persist([(kind, body) for (kind, unused), body in staged.items()])
         return f"{record.template_id:064x}"
 
     def _require_origin(self, share, staged=None):
@@ -611,7 +678,7 @@ class HashMiningGate:
         # Reestablish the original full-body validation after native restart or
         # a branch change; a local archived admission is not a native cache hit.
         self._submit_snapshot(self._evidence(SNAPSHOT, f"{share.header.m_mm_rhs:064x}", staged))
-        self._native_template(self._evidence(TEMPLATE, template_id(share.header), staged), tip)
+        self._native_template(self._evidence(TEMPLATE, template_id(share.header), staged), tip, mining=False)
         result = self.rpc("validatesharepoolhashshare", share.serialize().hex())
         expected = {"valid": True, "native_tip": tip, "proof_id": f"{share.proof_id:064x}",
                     "payout_script": share.envelope.payout_script.hex(), "pool": f"{self.pool:064x}",
@@ -626,16 +693,24 @@ class HashMiningGate:
         height, tip = self._context()
         if share.envelope.pool != self.pool or not self._eligible(share.envelope.height, f"{share.envelope.native_parent:064x}", height):
             raise ValueError("proof is outside this pool or eligible native ancestry")
-        self._native_share(share, tip)
-        return self._persist([(PROOF, share.serialize())])[0]
+        self._require_origin(share)
+        staged = {}
+        opening = self._snapshot(share.header.m_mm_rhs, staged)
+        parent = self._parent_snapshot(height, tip, staged) if self.profile_version == LEDGER_VERSION else None
+        self._provenance(opening, staged, trusted_parent=parent,
+            root_origin=TemplateRecord.from_block(self._evidence(TEMPLATE, template_id(share.header))), root_depth=1)
+        self._rehydrate_retained(staged)
+        self._native_share(share, tip, staged)
+        return self._persist([(kind, body) for (kind, unused), body in staged.items()] +
+                             [(PROOF, share.serialize())])[-1]
 
     def _eligible(self, height, parent, tip_height):
-        return max(1, tip_height + 1 - MAX_SHARE_AGE) <= height <= tip_height + 1 and self.rpc("getblockhash", height - 1) == parent
+        return max(self.activation_height, tip_height + 1 - MAX_SHARE_AGE) <= height <= tip_height + 1 and self.rpc("getblockhash", height - 1) == parent
 
     def _active(self, kind, height):
         # Fetch only scalar metadata before any RPC or full evidence read.
         rows = self.db.execute("SELECT identity,height,parent FROM journal WHERE kind=? AND height BETWEEN ? AND ?",
-            (kind, max(1, height + 1 - MAX_SHARE_AGE), height + 1)).fetchall()
+            (kind, max(self.activation_height, height + 1 - MAX_SHARE_AGE), height + 1)).fetchall()
         return [(identity, self._read(kind, identity)) for identity, origin, parent in rows if self._eligible(origin, parent, height)]
 
     def active_templates(self):
@@ -646,7 +721,7 @@ class HashMiningGate:
         return tuple(sorted(result, key=lambda record: record.template_id.to_bytes(32, "little")))
 
     def _block_snapshot(self, height, tip, staged=None):
-        if height == 0:
+        if height < self.activation_height:
             return None
         encoded = self.rpc("getblockheader", tip, False)
         if type(encoded) is not str or len(encoded) not in (160, 328):
@@ -667,11 +742,19 @@ class HashMiningGate:
         self._stable(tip)
         return opening
 
+    def _admitted_ids(self, parent):
+        if parent is None:
+            return set()
+        records = parent.post_state
+        if self.profile_version == LEDGER_VERSION:
+            records += parent.pending + parent.settled
+        return {entry.proof_id for entry in records}
+
     def eligible_shares(self):
         self._check_seal()
         height, tip = self._context()
         parent = self._parent_snapshot(height, tip)
-        paid = set() if parent is None else {entry.proof_id for entry in parent.post_state}
+        paid = self._admitted_ids(parent)
         result = tuple(parse_share(raw) for unused, raw in self._active(PROOF, height))
         self._stable(tip)
         return tuple(sorted((share for share in result if share.proof_id not in paid), key=lambda share: share.proof_id))
@@ -683,8 +766,8 @@ class HashMiningGate:
         IDs remain in the indexed journal; counting them streams scalar rows.
         """
         staged = {} if staged is None else staged
-        paid = set() if parent is None else {entry.proof_id for entry in parent.post_state}
-        floor = max(1, height + 1 - MAX_SHARE_AGE)
+        paid = self._admitted_ids(parent)
+        floor = max(self.activation_height, height + 1 - MAX_SHARE_AGE)
         ancestry = {origin: self.rpc("getblockhash", origin - 1) for origin in range(floor, height + 2)}
         offered = {f"{share.proof_id:064x}": share for share in offered}
         for share in offered.values():
@@ -725,13 +808,15 @@ class HashMiningGate:
                 snapshot = build_snapshot(genesis=int(REGTEST_GENESIS, 16), native_parent=int(tip, 16),
                     height=height + 1, pool=self.pool, payout_script=self.payout_script, public_key=self.public_key,
                     sign_owner=lambda unused: None, reward=0, templates=tuple(records.values()), shares=ordered[:count],
-                    parent_state=() if parent is None else parent.post_state)
+                    parent_state=() if parent is None else parent.post_state,
+                    version=self.profile_version, parent_snapshot=parent)
                 resources = hash_gate_batch.check_graph(snapshot, snapshot_budget=self.snapshot_budget,
+                    mining_job=True, activation_height=self.activation_height,
                     lookup=lambda identity: self._snapshot(identity, trial_staged),
                     parent_snapshot=lambda identity, origin_height: self._block_snapshot(origin_height, f"{identity:064x}", trial_staged))
                 return snapshot, resources
             except ValueError as error:
-                if isinstance(error, hash_gate_batch.BatchLimit) or "budget" in str(error) or "exceeds byte bound" in str(error):
+                if isinstance(error, hash_gate_batch.BatchLimit) or "budget" in str(error) or "exceeds byte bound" in str(error) or str(error).startswith("confirmed ledger capacity;"):
                     return None, str(error)
                 raise
 
@@ -764,12 +849,15 @@ class HashMiningGate:
     def receipt_status(self, *, after_revision=0, limit=128):
         """Page retained ACKs, checking actual canonical settlement snapshots.
 
-        A receipt can settle only in its original consensus age window. Missing
-        historical data yields unknown, never an invented payment or guarantee.
+        v4 settlement is limited to the original proof age. v5 admission is
+        limited to that age, while confirmed pending credits remain payable.
+        Missing history yields unknown, never an invented payment guarantee.
         """
         if (type(after_revision) is not int or not 0 <= after_revision <= hash_gate_archive.MAX_COUNTER or
                 type(limit) is not int or not 1 <= limit <= 256):
             raise ValueError("receipt status requires a bounded revision and page size")
+        if self.profile_version == LEDGER_VERSION:
+            return self._ledger_receipt_status(after_revision=after_revision, limit=limit)
         self._check_seal()
         height, tip = self._context()
         rows = self.db.execute("SELECT identity,height,parent,revision FROM journal WHERE kind=? AND revision>? ORDER BY revision LIMIT ?",
@@ -801,7 +889,7 @@ class HashMiningGate:
         for identity, origin, parent_hash, revision in rows:
             proof = int(identity, 16)
             current_branch = branch[origin] == parent_hash
-            eligible = current_branch and max(1, height + 1 - MAX_SHARE_AGE) <= origin <= height + 1
+            eligible = current_branch and max(self.activation_height, height + 1 - MAX_SHARE_AGE) <= origin <= height + 1
             if not current_branch:
                 status = "orphaned"
             elif proof in paid:
@@ -819,6 +907,118 @@ class HashMiningGate:
         return {"native_tip": tip, "receipts": tuple(result), "retained_receipts": self._head()["receipt_revision"],
                 "next_revision": rows[-1][3] if more else None}
 
+    def _ledger_receipt_status(self, *, after_revision, limit):
+        """Report chain-confirmed admission separately from eventual settlement.
+
+        Retained ACKs are provisional. Confirmed pending credits never age out.
+        Historical settlement discovery is bounded per page and reports unknown
+        if any required native opening is unavailable; it never infers payment
+        from the recent admitted tombstone set.
+        """
+        self._check_seal()
+        height, tip = self._context()
+        rows = self.db.execute("SELECT identity,height,parent,revision FROM journal WHERE kind=? AND revision>? ORDER BY revision LIMIT ?",
+                               (PROOF, after_revision, limit + 1)).fetchall()
+        more, rows = len(rows) > limit, rows[:limit]
+        staged = {}
+        parent = self._parent_snapshot(height, tip, staged)
+        selected, selection_checked = None, False
+        cache, history_bytes, history_limited = {}, 0, False
+        if parent is not None:
+            cache[height] = tip, parent
+            history_bytes = len(parent.serialize())
+
+        def at(block_height):
+            nonlocal history_bytes, history_limited
+            if block_height in cache:
+                return cache[block_height]
+            if len(cache) >= RECEIPT_HISTORY_SNAPSHOTS:
+                history_limited = True
+                raise ValueError("receipt history page budget")
+            block_hash = self.rpc("getblockhash", block_height)
+            value = self._block_snapshot(block_height, block_hash, {})
+            size = len(value.serialize())
+            if history_bytes + size > RECEIPT_HISTORY_BYTES:
+                history_limited = True
+                raise ValueError("receipt history page byte budget")
+            history_bytes += size
+            cache[block_height] = block_hash, value
+            return block_hash, value
+
+        def credit_in(records, proof):
+            for credit in records:
+                if credit.proof_id != proof.proof_id:
+                    continue
+                if (credit.origin_height, credit.pool, credit.native_bits, credit.payout_script) != (
+                        proof.envelope.height, proof.envelope.pool, proof.header.nBits, proof.envelope.payout_script):
+                    raise ValueError("confirmed credit differs from retained proof")
+                return credit
+            return None
+
+        result = []
+        branch = {}
+        for identity, origin, parent_hash, revision in rows:
+            proof = parse_share(self._read(PROOF, identity))
+            if origin not in branch:
+                branch[origin] = self.rpc("getblockhash", origin - 1) if origin <= height + 1 else None
+            current_branch = branch[origin] == parent_hash
+            eligible = current_branch and max(self.activation_height, height + 1 - MAX_SHARE_AGE) <= origin <= height + 1
+            status = "provisional" if eligible else "expired_unanchored"
+            admitted_in = settled_in = None
+            try:
+                pending = credit_in(parent.pending, proof) if parent is not None else None
+                settled = credit_in(parent.settled, proof) if parent is not None else None
+                if not current_branch:
+                    status = "orphaned"
+                elif pending is not None:
+                    status, eligible = "confirmed_pending", False
+                    admitted_in = self.rpc("getblockhash", pending.admitted_height)
+                elif settled is not None:
+                    status, eligible, settled_in = "settled", False, tip
+                    admitted_in = self.rpc("getblockhash", settled.admitted_height)
+                else:
+                    # Admission is constrained to the original j..j+3 window.
+                    # Once admitted, membership in pending only changes when
+                    # paid, permitting logarithmic discovery of a later payment.
+                    admission_height = None
+                    for possible in range(origin, min(height, origin + MAX_SHARE_AGE) + 1):
+                        block_hash, value = at(possible)
+                        credit = credit_in(value.pending, proof)
+                        if credit is not None:
+                            admission_height = credit.admitted_height
+                            admitted_in = self.rpc("getblockhash", admission_height)
+                            break
+                    if admission_height is not None:
+                        low, high = admission_height, height
+                        while high - low > 1:
+                            middle = (low + high) // 2
+                            unused, value = at(middle)
+                            if credit_in(value.pending, proof) is not None:
+                                low = middle
+                            else:
+                                high = middle
+                        block_hash, value = at(high)
+                        if credit_in(value.settled, proof) is None:
+                            raise ValueError("confirmed pending credit disappeared without settlement")
+                        status, eligible, settled_in = "settled", False, block_hash
+            except Exception:
+                status, eligible, settled_in = "unknown", False, None
+            if status == "provisional" and not selection_checked:
+                selection_checked = True
+                try:
+                    selected = {entry.proof_id for entry in self._batch(height, tip, parent, staged=staged)["snapshot"].shares}
+                except Exception:
+                    pass  # Admission selection is unavailable; this is still a provisional ACK.
+            chosen = (None if selected is None else proof.proof_id in selected) if status == "provisional" else False
+            result.append({"proof_id": identity, "origin_height": origin, "receipt_revision": revision,
+                "status": status, "consensus_eligible": eligible,
+                "selected_for_admission": chosen,
+                "admitted_in": admitted_in, "settled_in": settled_in})
+        self._stable(tip)
+        self._check_seal()
+        return {"native_tip": tip, "receipts": tuple(result), "retained_receipts": self._head()["receipt_revision"],
+                "next_revision": rows[-1][3] if more else None, "history_limited": history_limited}
+
     def make(self, *, ntime, sign_owner, fees=0, transactions=(), witness=False, native_bits=SHARE_BITS):
         """Explicit fixture helper; use make_native for native mempool jobs."""
         self._check_seal()
@@ -830,7 +1030,7 @@ class HashMiningGate:
             ntime=ntime, pool=self.pool, payout_script=self.payout_script, public_key=self.public_key,
             sign_owner=sign_owner, templates=batch.templates, shares=batch.shares,
             parent_snapshot=parent, fees=fees, transactions=transactions, witness=witness,
-            native_bits=native_bits)
+            native_bits=native_bits, version=self.profile_version)
         self._stable(tip)
         return result
 
@@ -872,7 +1072,8 @@ class HashMiningGate:
             # Native construction may change payout amounts to its actual fees;
             # every other proposed accounting byte remains fixed.
             expected = replace(proposal, job_commitment=snapshot.job_commitment,
-                payouts=work_outputs(proposal.shares, reward=reward, fallback_script=self.payout_script),
+                payouts=(credit_outputs(proposal.settled, reward, self.payout_script) if self.profile_version == LEDGER_VERSION else
+                         work_outputs(proposal.shares, reward=reward, fallback_script=self.payout_script)),
                 owner_signature=snapshot.owner_signature)
             if expected.serialize() != snapshot_raw:
                 raise ValueError("native job changed the proposed settlement evidence or payouts")
@@ -923,9 +1124,11 @@ class HashMiningGate:
             raise ValueError("job violates this miner's pool/key/payout policy")
         if len(snapshot.serialize()) > self.snapshot_budget:
             raise ValueError("job exceeds this miner's settlement byte budget")
-        # Native preflight bounds the entire dependency graph before the gate
-        # materializes and stages its complete provenance. It performs no
-        # snapshot/template admission in overlay mode.
+        # Bound and retain the complete candidate's provenance in a temporary
+        # map. Native overlay preflight then establishes validity; neither step
+        # admits an unsuccessful offer to the local journal.
+        self._provenance(snapshot, staged, mining_job=True)
+        self._rehydrate_retained(staged)
         self._native_template(raw, tip, snapshot.serialize())
 
         # Check policy against the already acknowledged set. Introduced origins

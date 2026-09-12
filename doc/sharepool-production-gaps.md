@@ -1,8 +1,26 @@
 # Production gap register
 
 This branch is an opt-in regtest implementation. Passing its tests does not
-authorize mainnet deployment. Version 4 changes the wire/rules and local database
-format; use a fresh test chain. Historical v3 reports describe the older code.
+authorize mainnet deployment. Versions 4 and 5 have separate wire/rules and local
+database profiles; use a fresh test chain. Historical reports describe their
+recorded source revisions.
+
+## Current follow-up
+
+The optional [v5 confirmed ledger](sharepool-confirmed-ledger.md) anchors
+admissions in native blocks and derives later payouts from the actual parent.
+It preserves confirmed pending credits beyond proof expiry. It remains a
+bounded regtest experiment: provisional ACK coverage, abandoned-pool capacity,
+pool continuation and rolling-window payout variance are unresolved.
+
+The v4 review's first three implementation issues are addressed in this
+revision: new work reserves a future dependency edge; ACK archives retain the
+complete transitive opening and native-parent closure; and required snapshot
+requests are isolated by pending-block provenance. Python DAG traversal and
+rejected registration retention were hardened alongside those fixes.
+Pending native block bodies are now retained without repeatedly downloading
+them while their separate snapshot data is missing. Retention does not confer
+validity or advance the common ancestor.
 
 ## Hardening implemented in version 4
 
@@ -17,8 +35,10 @@ format; use a fresh test chain. Historical v3 reports describe the older code.
 | Refresh-only chains | Unworked issued jobs remain local evidence but are not mandatory records in each settlement. Complete origins of selected proofs remain required. | Seventy unworked refreshes and dependency-budget batch cases. |
 | Signer corruption | Checksummed key/policy record; explicit legacy migration requires a previously trusted policy and public key. | Native signer tests. The checksum detects corruption, not an attacker able to rewrite both data and checksum. |
 
-The production entry point is `HashMiningGate.make_native()`, then `authorize()`
-and a final `ready_for_dispatch()` check. `candidate()` and `make()` remain
+The native integration entry point is `HashMiningGate.make_native()`, then
+`authorize()` and a final freshness check with `ready_for_dispatch()`.
+The last check alone is not a complete dispatch authorization (see below).
+`candidate()` and `make()` remain
 explicit fixture helpers. A stored snapshot, valid signature or constructed job
 alone is never a mining ACK.
 
@@ -31,7 +51,8 @@ age rule would permit fresh work on obsolete, easier jobs. An indefinite payment
 contract needs a pending-credit checkpoint anchored before expiry, explicit
 credit ownership, reorg-safe spent accounting, a bounded arrival/service policy,
 and rules for which rewards fund deferred credits. Local ACK timestamps cannot
-establish that global history. No such credit protocol is activated here.
+establish that global history. Version 4 does not provide that protocol. The separately enabled v5 ledger
+implements confirmed-credit accounting, with the limitations described above.
 Deterministic carry is the intended behavior; this revision implements bounded
 selection and durable retention, but does not complete that payment guarantee.
 
@@ -49,8 +70,9 @@ supported miner share rate, payout window, comparison horizon and measured
 validation/traffic budget. The requested objective is variance comparable to a
 regular pool at the same hashrate. Given direct coinbase payouts, the working
 reference is a rolling work window such as PPLNS/TIDES. Fixed-duration proof-count
-sampling variance alone does not establish miner payout variance. The current
-one-time settlement and network-height expiry are not that rolling window.
+sampling variance alone does not establish miner payout variance. Version 4 one-time settlement and network-height expiry are not that rolling
+window. Version 5 removes confirmed-credit expiry, but its one-time settlement
+is also not a rolling window.
 Payouts currently use only selected eligible proofs; an empty selection pays the
 snapshot owner. With sparse sampling, that fallback also needs explicit treatment
 in the payout policy and variance tests. Receipt expiry is not a percentage of
@@ -74,6 +96,22 @@ does not remove that assumption. Public activation requires a reviewed protocol,
 deployment/rollback plan and compatible consensus participants; these regtest
 flags are not a mainnet activation mechanism.
 
+**Recovery findings F7.** Startup still lacks bounded quarantine/restore for
+corrupt snapshot and pending-block records. The template index retains one
+snapshot source and does not search alternative retained copies if that source
+is unreadable. These are local data-fault availability findings, not demonstrated
+remote corruption. Runtime quarantine of other records does not close them.
+Final static review also found that rejection of an invalid alternate body with
+the same header hash can evict a retained pending body in `ProcessNewBlock()`.
+The duplicate-fetch fix does not cover this adversarial eviction path; a bounded
+reproduction and retention rule remain to be added.
+
+**Dispatch binding finding F8.** `ready_for_dispatch()` checks the active tip and
+receipt revision, but does not bind the supplied authorization to the issuing
+gate, policy or exact bytes. A caller must retain the exact authorization from
+the correct gate; this API must not be treated as a standalone approval of an
+arbitrary object. Issuer-bound authorization remains an integration requirement.
+
 **What is attested.** Distinct valid template headers, full authorized bodies,
 submitted PoW and exact coinbase allocations can be checked. They do not prove
 independent transaction selection, miner hardware identity, a precise physical
@@ -83,7 +121,8 @@ unobservable properties.
 
 ## Release evidence
 
-Use the v4 verification report and its binary/source hashes for the actual test
-revision. Model results, wire fixtures, mocked gate tests and native integration
+Use the [v5 verification report](sharepool-v5-hardening-report.md) and its per-run
+binary/source hashes for this revision. The v4 report remains historical.
+Model results, wire fixtures, mocked gate tests and native integration
 tests provide different evidence; none should be presented as ASIC testing,
 WAN throughput or mainnet consensus approval. Mainnet remains disabled.

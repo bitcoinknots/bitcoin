@@ -174,6 +174,7 @@ public:
         //! Regtest-only native sharepool validation, at or after BLAKE2b activation.
         std::optional<int> sharepool_height{};
         bool sharepool_hash_only{false};
+        bool sharepool_admitted_ledger{false};
     };
 
     static std::unique_ptr<const CChainParams> RegTest(const RegTestOptions& options);

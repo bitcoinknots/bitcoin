@@ -20,6 +20,7 @@
 #include <array>
 #include <map>
 #include <memory>
+#include <new>
 #include <stdexcept>
 #include <vector>
 
@@ -77,9 +78,9 @@ struct HashFixture : BasicTestingSetup {
     Envelope Owner(uint32_t height = 1, unsigned char script = 0x61)
     {
         Envelope envelope;
-        envelope.version = ho::VERSION;
+        envelope.version = ho::ProfileVersion(consensus);
         envelope.genesis = consensus.hashGenesisBlock;
-        envelope.rules = ho::RulesHash();
+        envelope.rules = ho::RulesHash(envelope.version);
         envelope.height = height;
         envelope.native_parent = hashes.at(height - 1);
         envelope.pool = uint256{uint8_t{3}};
@@ -202,6 +203,31 @@ struct HashFixture : BasicTestingSetup {
     ho::Result Check(const CBlock& block, std::optional<CAmount> reward = REWARD)
     {
         return ho::CheckSnapshot(block, &indexes.at(block.m_height - 1), consensus, Lookup(), Native(), reward);
+    }
+
+    void LedgerState(ho::Snapshot& snapshot)
+    {
+        const auto parent = snapshot.binding.height == uint32_t(consensus.SharePoolHeight) ? nullptr :
+            snapshots.at(indexes.at(snapshot.binding.height - 1).m_mm_rhs).get();
+        ho::ApplyLedgerState(snapshot, parent);
+        snapshot.payouts = ho::CalculatePayouts(snapshot, REWARD);
+    }
+
+    void Anchor(const CBlock& block)
+    {
+        auto& index = indexes.at(block.m_height);
+        hashes.at(block.m_height) = block.GetHash();
+        index.m_mm_rhs = block.m_mm_rhs;
+        index.nTime = block.nTime;
+        index.nBits = block.nBits;
+    }
+
+    static void SortEvidence(ho::Snapshot& snapshot)
+    {
+        std::sort(snapshot.templates.begin(), snapshot.templates.end(), [](const auto& a, const auto& b) { return a.id < b.id; });
+        std::sort(snapshot.shares.begin(), snapshot.shares.end(), [](const auto& a, const auto& b) {
+            return ProofLess(a.header.GetHash(), b.header.GetHash());
+        });
     }
 
     void Reason(const ho::Result& result, const std::string& suffix)
@@ -385,6 +411,26 @@ BOOST_AUTO_TEST_CASE(known_empty_preimage_is_invalid_without_requesting_data)
         [&](const uint256&) -> std::shared_ptr<const ho::Snapshot> { ++lookups; return nullptr; }, Native(), REWARD);
     Reason(result, "snapshot-encoding");
     BOOST_CHECK_EQUAL(lookups, 0);
+}
+
+BOOST_AUTO_TEST_CASE(local_callback_failures_are_unavailable_not_invalid_encoding)
+{
+    const auto block = Block(WithShares(1));
+    const ho::Lookup unavailable = [](const uint256&) -> std::shared_ptr<const ho::Snapshot> {
+        throw std::bad_alloc{};
+    };
+    BOOST_CHECK(ho::CheckSnapshot(block, &indexes[0], consensus, unavailable, Native(), REWARD).IsMissing());
+    BOOST_CHECK(ho::CheckMiningJob(block, &indexes[0], consensus, unavailable, Native(), REWARD).IsMissing());
+    const ho::ValidateOrigin native_failure = [](const CBlock&, const CBlockIndex*) -> ho::Result {
+        throw std::runtime_error("local native validation unavailable");
+    };
+    BOOST_CHECK(ho::CheckSnapshot(block, &indexes[0], consensus, Lookup(), native_failure, REWARD).IsMissing());
+    BOOST_CHECK(ho::CheckMiningJob(block, &indexes[0], consensus, Lookup(), native_failure, REWARD).IsMissing());
+    // Authenticated bad bytes are still an explicit consensus encoding failure.
+    const ho::Lookup malformed = [](const uint256&) -> std::shared_ptr<const ho::Snapshot> {
+        throw ho::MalformedSnapshot("authenticated malformed bytes");
+    };
+    Reason(ho::CheckSnapshot(block, &indexes[0], consensus, malformed, Native(), REWARD), "snapshot-encoding");
 }
 
 BOOST_AUTO_TEST_CASE(current_owner_reserved_roots_and_reward)
@@ -645,6 +691,58 @@ BOOST_AUTO_TEST_CASE(dependency_depth_is_a_distinct_bounded_failure)
     BOOST_CHECK(ho::CheckSnapshot(block, &indexes[0], consensus, Lookup(), Native(), REWARD, ho::MAX_DEPENDENCY_DEPTH).IsValid());
 }
 
+BOOST_AUTO_TEST_CASE(worked_refresh_admission_reserves_future_settlement_depth)
+{
+    auto opening = Empty();
+    auto origin = Block(opening);
+    // Each edge is needed by genuine solved work from the preceding signed
+    // template. Removing unworked inventory cannot shorten this chain.
+    for (uint32_t depth{1}; depth < ho::MAX_DEPENDENCY_DEPTH; ++depth) {
+        const auto proof = Proof(origin, opening, depth);
+        auto next = Empty();
+        next.templates = {Record(origin)};
+        next.shares = {proof};
+        next.post_state = {{proof.origin.height, proof.header.GetHash()}};
+        next.payouts = ho::CalculatePayouts(next, REWARD);
+        origin = Block(next);
+        opening = next;
+    }
+    // A depth63 job leaves one edge for the settlement of its future proof.
+    BOOST_REQUIRE(Check(origin).IsValid());
+    BOOST_REQUIRE(ho::CheckMiningJob(origin, &indexes[0], consensus, Lookup(), Native(), REWARD).IsValid());
+    const auto proof = Proof(origin, opening, 1000);
+    BOOST_REQUIRE(ho::CheckShareProof(proof, origin, &indexes[0], origin.nTime,
+                                      consensus, Lookup(), Native()).IsValid());
+    auto settlement = Empty();
+    settlement.templates = {Record(origin)};
+    settlement.shares = {proof};
+    settlement.post_state = {{proof.origin.height, proof.header.GetHash()}};
+    settlement.payouts = ho::CalculatePayouts(settlement, REWARD);
+    const auto boundary = Block(settlement);
+    // This depth64 block remains consensus-valid and can pay the admitted work.
+    // It must not be offered as a job that promises another payable proof.
+    BOOST_REQUIRE(Check(boundary).IsValid());
+    Reason(ho::CheckMiningJob(boundary, &indexes[0], consensus, Lookup(), Native(), REWARD), "dependency-depth");
+    const auto unpayable = Proof(boundary, settlement, 2000);
+    Reason(ho::CheckShareProof(unpayable, boundary, &indexes[0], boundary.nTime,
+                               consensus, Lookup(), Native()), "dependency-depth");
+
+    // Native preparation uses the same reservation while only its current
+    // owner signature is absent. Origin signatures remain mandatory.
+    auto unsigned_opening = opening;
+    unsigned_opening.authorization.fill(0);
+    auto unsigned_origin = origin;
+    unsigned_origin.m_mm_rhs = ho::SnapshotHash(unsigned_opening);
+    snapshots[unsigned_origin.m_mm_rhs] = std::make_shared<const ho::Snapshot>(unsigned_opening);
+    BOOST_CHECK(ho::CheckMiningJob(unsigned_origin, &indexes[0], consensus, Lookup(), Native(), REWARD, true).IsValid());
+    auto unsigned_settlement = settlement;
+    unsigned_settlement.authorization.fill(0);
+    auto unsigned_boundary = boundary;
+    unsigned_boundary.m_mm_rhs = ho::SnapshotHash(unsigned_settlement);
+    snapshots[unsigned_boundary.m_mm_rhs] = std::make_shared<const ho::Snapshot>(unsigned_settlement);
+    Reason(ho::CheckMiningJob(unsigned_boundary, &indexes[0], consensus, Lookup(), Native(), REWARD, true), "dependency-depth");
+}
+
 BOOST_AUTO_TEST_CASE(dependency_depth_cannot_be_bypassed_by_a_shorter_memoized_path)
 {
     auto origin = Block(Empty());
@@ -781,6 +879,309 @@ BOOST_AUTO_TEST_CASE(owner_attests_job_and_snapshot_but_allows_search)
     block.m_mm_rhs = ho::SnapshotHash(snapshot);
     snapshots[block.m_mm_rhs] = std::make_shared<const ho::Snapshot>(snapshot);
     Reason(Check(block), "owner");
+}
+
+
+BOOST_AUTO_TEST_CASE(v5_cross_pool_admissions_parent_cutoff_and_exact_credit_state)
+{
+    consensus.SharePoolAdmittedLedger = true;
+    auto owner_a = Empty(1, 0x61);
+    auto owner_b = Empty(1, 0x62);
+    owner_b.binding.pool = uint256{uint8_t{4}};
+    const auto origin_a = Block(owner_a);
+    const auto origin_b = Block(owner_b);
+    const auto proof_a = Proof(origin_a, owner_a, 1);
+    const auto proof_b = Proof(origin_b, owner_b, 1);
+    auto admitted = Empty(1, 0x63);
+    admitted.binding.pool = uint256{uint8_t{5}};
+    admitted.templates = {Record(origin_a), Record(origin_b)};
+    admitted.shares = {proof_a, proof_b};
+    SortEvidence(admitted);
+    LedgerState(admitted);
+    BOOST_REQUIRE_EQUAL(admitted.pending.size(), 2);
+    BOOST_CHECK(admitted.settled.empty());
+    BOOST_REQUIRE_EQUAL(admitted.certificates.size(), 2);
+    BOOST_CHECK(admitted.payouts.front().scriptPubKey == CScript(admitted.binding.payout_script.begin(), admitted.binding.payout_script.end()));
+    const auto anchor = Block(admitted);
+    const auto checked = Check(anchor);
+    BOOST_REQUIRE_MESSAGE(checked.IsValid(), checked.reason);
+    Anchor(anchor);
+    const auto encoded = ho::EncodeSnapshot(admitted);
+    BOOST_CHECK_EQUAL(encoded.front(), ho::LEDGER_VERSION);
+    BOOST_CHECK(ho::SnapshotHash(encoded) == ho::SnapshotHash(admitted));
+    BOOST_CHECK(ho::EncodeSnapshot(ho::DecodeSnapshot(encoded)) == encoded);
+    BOOST_CHECK(ho::RulesHash(ho::LEDGER_VERSION) != ho::RulesHash());
+
+    // The winning job pays only the actual parent's already confirmed A
+    // credit. A later proof can be admitted here but is first payable next block.
+    const auto late = Proof(origin_a, owner_a, proof_a.header.nNonce + 1);
+    auto payment = Empty(2, 0x65);
+    payment.templates = {Record(origin_a)};
+    payment.shares = {late};
+    LedgerState(payment);
+    BOOST_REQUIRE_EQUAL(payment.settled.size(), 1);
+    BOOST_CHECK(payment.settled.front().proof_id == proof_a.header.GetHash());
+    BOOST_REQUIRE_EQUAL(payment.pending.size(), 2);
+    BOOST_CHECK(payment.pending.back().proof_id == late.header.GetHash());
+    BOOST_REQUIRE_EQUAL(payment.payouts.size(), 1);
+    BOOST_CHECK(payment.payouts.front().scriptPubKey == CScript(owner_a.binding.payout_script.begin(), owner_a.binding.payout_script.end()));
+    BOOST_CHECK_EQUAL(payment.payouts.front().nValue, REWARD);
+    native_checks = 0;
+    const auto paid_block = Block(payment);
+    const auto paid_result = Check(paid_block);
+    BOOST_REQUIRE_MESSAGE(paid_result.IsValid(), paid_result.reason);
+    BOOST_CHECK_EQUAL(native_checks, 0); // Parent certified this exact origin.
+
+    auto omission = payment;
+    omission.pending.erase(omission.pending.begin());
+    Reason(Check(Block(omission)), "ledger-pending");
+    auto wrong_script = payment;
+    wrong_script.pending.front().payout_script = Payout(0x71);
+    Reason(Check(Block(wrong_script)), "ledger-pending");
+    auto wrong_work = payment;
+    wrong_work.pending.front().native_bits = 0x1d00ffff;
+    Reason(Check(Block(wrong_work)), "ledger-pending");
+    auto withheld_payment = payment;
+    withheld_payment.settled.clear();
+    withheld_payment.payouts = ho::CalculatePayouts(withheld_payment, REWARD);
+    Reason(Check(Block(withheld_payment)), "ledger-settled");
+    auto wrong_payee = payment;
+    wrong_payee.settled.front().payout_script = Payout(0x71);
+    wrong_payee.payouts = ho::CalculatePayouts(wrong_payee, REWARD);
+    Reason(Check(Block(wrong_payee)), "ledger-settled");
+    auto no_cert = payment;
+    no_cert.certificates.clear();
+    Reason(Check(Block(no_cert)), "ledger-certificates");
+    auto duplicate = payment;
+    duplicate.shares = {proof_a};
+    duplicate.post_state = admitted.post_state;
+    Reason(Check(Block(duplicate)), "repeat-payment");
+    auto wrong_amount = payment;
+    --wrong_amount.payouts.front().nValue;
+    Reason(Check(Block(wrong_amount)), "reward");
+
+    // Confirmation is branch-local. A competing C block retains both pools'
+    // credits; A's next block then pays exactly A, with B still pending.
+    auto competing = Empty(2, 0x63);
+    competing.binding.pool = admitted.binding.pool;
+    LedgerState(competing);
+    BOOST_CHECK(competing.pending == admitted.pending);
+    BOOST_CHECK(competing.settled.empty());
+    const auto competing_block = Block(competing);
+    BOOST_REQUIRE(Check(competing_block).IsValid());
+    Anchor(competing_block);
+    auto after_c = Empty(3);
+    LedgerState(after_c);
+    BOOST_REQUIRE_EQUAL(after_c.settled.size(), 1);
+    BOOST_CHECK(after_c.settled.front().proof_id == proof_a.header.GetHash());
+    BOOST_REQUIRE(Check(Block(after_c)).IsValid());
+    Anchor(paid_block);
+    auto after_a = Empty(3);
+    LedgerState(after_a);
+    BOOST_REQUIRE_EQUAL(after_a.settled.size(), 1);
+    BOOST_CHECK(after_a.settled.front().proof_id == late.header.GetHash());
+    BOOST_REQUIRE(Check(Block(after_a)).IsValid());
+}
+
+BOOST_AUTO_TEST_CASE(v5_confirmed_work_outlives_fresh_proof_and_certificate_age)
+{
+    consensus.SharePoolAdmittedLedger = true;
+    auto opening = Empty();
+    const auto origin = Block(opening);
+    const auto proof = Proof(origin, opening, 1);
+    auto admission = Empty(1, 0x62);
+    admission.binding.pool = uint256{uint8_t{4}};
+    admission.templates = {Record(origin)};
+    admission.shares = {proof};
+    LedgerState(admission);
+    auto block = Block(admission);
+    BOOST_REQUIRE(Check(block).IsValid());
+    Anchor(block);
+    for (uint32_t height{2}; height <= 5; ++height) {
+        auto carry = Empty(height, 0x62);
+        carry.binding.pool = admission.binding.pool;
+        LedgerState(carry);
+        BOOST_CHECK(carry.pending == admission.pending);
+        BOOST_CHECK(carry.settled.empty());
+        BOOST_CHECK_EQUAL(carry.certificates.empty(), height == 5);
+        BOOST_CHECK_EQUAL(carry.post_state.empty(), height == 5);
+        block = Block(carry);
+        const auto result = Check(block);
+        BOOST_REQUIRE_MESSAGE(result.IsValid(), result.reason);
+        Anchor(block);
+    }
+    const auto late = Proof(origin, opening, proof.header.nNonce + 1);
+    Reason(ho::CheckShareProof(late, origin, &indexes[5], indexes[5].nTime + 1,
+                               consensus, Lookup(), Native()), "share-context");
+    auto pay = Empty(6);
+    LedgerState(pay);
+    BOOST_CHECK(pay.pending.empty());
+    BOOST_REQUIRE_EQUAL(pay.settled.size(), 1);
+    BOOST_CHECK(pay.settled.front().proof_id == proof.header.GetHash());
+    BOOST_CHECK(pay.post_state.empty());
+    BOOST_CHECK(pay.certificates.empty());
+    BOOST_REQUIRE(Check(Block(pay)).IsValid());
+}
+
+BOOST_AUTO_TEST_CASE(v5_certificates_bind_witness_body_owner_and_actual_parent)
+{
+    consensus.SharePoolAdmittedLedger = true;
+    auto opening = Empty();
+    auto origin = Block(opening);
+    auto admission = Empty(1, 0x62);
+    admission.binding.pool = uint256{uint8_t{4}};
+    admission.templates = {Record(origin)};
+    admission.shares = {Proof(origin, opening, 1)};
+    LedgerState(admission);
+    const auto anchor = Block(admission);
+    BOOST_REQUIRE(Check(anchor).IsValid());
+    Anchor(anchor);
+    const auto refuse_native = [](const CBlock&, const CBlockIndex*) { return ho::Result::Invalid("fixture-native-refusal"); };
+    const auto fresh = Proof(origin, opening, admission.shares.front().header.nNonce + 1);
+    BOOST_CHECK(ho::CheckShareProof(fresh, origin, &indexes[1], anchor.nTime + 1,
+                                   consensus, Lookup(), refuse_native).IsValid());
+    BOOST_CHECK(ho::CheckHistoricalTemplate(origin, &indexes[1], anchor.nTime + 1,
+                                            consensus, Lookup(), refuse_native).IsValid());
+    // A different native parent snapshot has no certificate for this origin.
+    auto competing = Empty(1, 0x63);
+    LedgerState(competing);
+    const auto competing_block = Block(competing);
+    Anchor(competing_block);
+    Reason(ho::CheckShareProof(fresh, origin, &indexes[1], anchor.nTime + 1,
+                               consensus, Lookup(), refuse_native), "origin-body: fixture-native-refusal");
+    Anchor(anchor);
+
+    auto witness_changed = origin;
+    CMutableTransaction coinbase{*origin.vtx.front()};
+    coinbase.vin.front().scriptWitness.stack = {{0x01}};
+    witness_changed.vtx.front() = MakeTransactionRef(std::move(coinbase));
+    BOOST_CHECK(witness_changed.hashMerkleRoot == BlockMerkleRoot(witness_changed));
+    BOOST_CHECK(ho::TemplateId(witness_changed) == ho::TemplateId(origin));
+    BOOST_CHECK(ho::OriginCertificateId(witness_changed) != ho::OriginCertificateId(origin));
+    Reason(ho::CheckHistoricalTemplate(witness_changed, &indexes[1], anchor.nTime + 1,
+                                        consensus, Lookup(), refuse_native), "job-commitment");
+    // Even a newly valid owner signature for changed witness bytes cannot
+    // reuse the prior certificate: native verification is required again.
+    Reseal(witness_changed);
+    Reason(ho::CheckHistoricalTemplate(witness_changed, &indexes[1], anchor.nTime + 1,
+                                        consensus, Lookup(), refuse_native), "origin-body: fixture-native-refusal");
+    auto changed_opening = *snapshots.at(witness_changed.m_mm_rhs);
+    auto fabricated = Empty(2, 0x64);
+    fabricated.templates = {Record(witness_changed)};
+    fabricated.shares = {Proof(witness_changed, changed_opening, 1)};
+    LedgerState(fabricated); // Proposed current cert exists, but is not trusted.
+    const auto fabricated_block = Block(fabricated);
+    Reason(ho::CheckSnapshot(fabricated_block, &indexes[1], consensus, Lookup(), refuse_native, REWARD),
+           "origin-body: fixture-native-refusal");
+    const auto original_lookup = Lookup();
+    const auto unavailable_opening = [&](const uint256& hash) -> std::shared_ptr<const ho::Snapshot> {
+        return hash == origin.m_mm_rhs ? nullptr : original_lookup(hash);
+    };
+    BOOST_CHECK(ho::CheckHistoricalTemplate(origin, &indexes[1], anchor.nTime + 1,
+                                            consensus, unavailable_opening, refuse_native).IsMissing());
+}
+
+BOOST_AUTO_TEST_CASE(v5_byte_bounded_oldest_prefix_preserves_all_confirmed_credits)
+{
+    consensus.SharePoolAdmittedLedger = true;
+    auto parent = Empty();
+    // Synthetic metadata fixture for exact byte selection, not a PoW fixture.
+    for (uint32_t i{1}; i <= 12000; ++i) {
+        parent.pending.push_back({1, 1, ArithToUint256(arith_uint256{i}), parent.binding.pool,
+                                  SHARE_BITS, Payout(0x61)});
+    }
+    auto next = Empty(2);
+    ho::ApplyLedgerState(next, &parent);
+    BOOST_REQUIRE(!next.settled.empty());
+    BOOST_CHECK(GetSerializeSize(next.settled) <= ho::MAX_SETTLED_BYTES);
+    auto one_more = next.settled;
+    one_more.push_back(next.pending.front());
+    BOOST_CHECK(GetSerializeSize(one_more) > ho::MAX_SETTLED_BYTES);
+    std::vector<ho::LedgerCredit> reunited = next.settled;
+    reunited.insert(reunited.end(), next.pending.begin(), next.pending.end());
+    BOOST_CHECK(reunited == parent.pending);
+    BOOST_CHECK(next.settled.front().proof_id == parent.pending.front().proof_id);
+
+    // Fresh admissions cannot evict a confirmed credit when pending is full.
+    parent.pending.clear();
+    const size_t maximum = (ho::MAX_PENDING_BYTES - 3) / 99;
+    for (uint32_t i{1}; i <= maximum; ++i) {
+        parent.pending.push_back({1, 1, ArithToUint256(arith_uint256{i}), uint256{uint8_t{4}}, SHARE_BITS, Payout(0x61)});
+    }
+    auto opening = Empty();
+    const auto origin = Block(opening);
+    next = Empty(2);
+    next.templates = {Record(origin)};
+    next.shares = {Proof(origin, opening, 1)};
+    BOOST_CHECK_THROW(ho::ApplyLedgerState(next, &parent), std::ios_base::failure);
+    BOOST_CHECK(next.pending.empty()); // Exception leaves derived arrays intact.
+    BOOST_CHECK_EQUAL(parent.pending.size(), maximum);
+
+    auto weighted = Empty();
+    weighted.settled = {
+        {1, 1, uint256{uint8_t{1}}, weighted.binding.pool, 0x1d00ffff, Payout(0x61)},
+        {1, 1, uint256{uint8_t{2}}, weighted.binding.pool, 0x1c00ffff, Payout(0x62)},
+    };
+    const auto outputs = ho::CalculatePayouts(weighted, 257);
+    BOOST_REQUIRE_EQUAL(outputs.size(), 2);
+    BOOST_CHECK_EQUAL(outputs[0].nValue, 1);
+    BOOST_CHECK_EQUAL(outputs[1].nValue, 256);
+}
+
+BOOST_AUTO_TEST_CASE(v5_parent_certificate_renews_worked_graph_depth_budget)
+{
+    consensus.SharePoolAdmittedLedger = true;
+    auto opening = Empty();
+    LedgerState(opening);
+    auto origin = Block(opening);
+    // Every link records actual proved work in its own proposed admission
+    // state. No proposed state is trusted until a native block anchors it.
+    for (uint32_t i{0}; i < ho::MAX_DEPENDENCY_DEPTH - 1; ++i) {
+        auto next = Empty();
+        next.templates = {Record(origin)};
+        next.shares = {Proof(origin, opening, 1)};
+        LedgerState(next);
+        origin = Block(next);
+        opening = std::move(next);
+    }
+    BOOST_REQUIRE(ho::CheckMiningJob(origin, &indexes[0], consensus, Lookup(), Native(), REWARD).IsValid());
+    auto admission = Empty(1, 0x62);
+    admission.binding.pool = uint256{uint8_t{4}};
+    admission.templates = {Record(origin)};
+    admission.shares = {Proof(origin, opening, 1)};
+    LedgerState(admission);
+    const auto anchor = Block(admission);
+    BOOST_REQUIRE(Check(anchor).IsValid());
+    Reason(ho::CheckMiningJob(anchor, &indexes[0], consensus, Lookup(), Native(), REWARD), "dependency-depth");
+    Anchor(anchor);
+    // A fresh proof of that deeply worked origin can now use the exact
+    // certificate in the actual native parent instead of its old 63-edge DAG.
+    const auto fresh = Proof(origin, opening, admission.shares.front().header.nNonce + 1);
+    native_checks = 0;
+    BOOST_REQUIRE(ho::CheckShareProof(fresh, origin, &indexes[1], anchor.nTime + 1,
+                                     consensus, Lookup(), Native()).IsValid());
+    BOOST_CHECK_EQUAL(native_checks, 0);
+    auto next = Empty(2);
+    next.templates = {Record(origin)};
+    next.shares = {fresh};
+    LedgerState(next);
+    const auto next_block = Block(next);
+    BOOST_REQUIRE(ho::CheckMiningJob(next_block, &indexes[1], consensus, Lookup(), Native(), REWARD).IsValid());
+    BOOST_CHECK_EQUAL(native_checks, 0);
+    auto next_opening = next;
+    auto next_origin = next_block;
+    // Continue real worked jobs past the original total depth limit. Each
+    // validation walk still has its bounded depth from the current parent.
+    for (uint32_t i{0}; i < 3; ++i) {
+        auto refresh = Empty(2);
+        refresh.templates = {Record(next_origin)};
+        refresh.shares = {Proof(next_origin, next_opening, 1)};
+        LedgerState(refresh);
+        next_origin = Block(refresh);
+        next_opening = std::move(refresh);
+        const auto result = ho::CheckMiningJob(next_origin, &indexes[1], consensus, Lookup(), Native(), REWARD);
+        BOOST_REQUIRE_MESSAGE(result.IsValid(), result.reason);
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

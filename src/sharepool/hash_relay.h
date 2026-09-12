@@ -13,7 +13,9 @@
 #include <utility>
 
 namespace sharepool {
-/** FIFO turns among ready connections, with required block data first.
+/** FIFO turns among ready connections, with three required turns per ordinary
+ * turn when both classes are continuously ready. Required data starts first;
+ * ordinary advertisements cannot be starved by a permanently missing block.
  * A connection has at most one entry. Completing a turn removes it; more work
  * joins the tail. Callers remove disconnected, paused or otherwise unready
  * connections. This bounds overtaking among continuously ready connections;
@@ -22,6 +24,7 @@ namespace sharepool {
 class HashRelayTurns {
     std::deque<int64_t> m_required;
     std::deque<int64_t> m_advertised;
+    unsigned m_required_run{0};
 
 public:
     void Remove(int64_t peer)
@@ -40,8 +43,21 @@ public:
 
     bool IsTurn(int64_t peer) const
     {
-        const auto& queue = m_required.empty() ? m_advertised : m_required;
+        const auto& queue = m_required.empty() || (!m_advertised.empty() && !PreferRequired()) ? m_advertised : m_required;
         return !queue.empty() && queue.front() == peer;
+    }
+
+    bool PreferRequired() const { return m_required_run < 3; }
+
+    /** Charge a completed admission or issued request, never disconnection. */
+    void Complete(int64_t peer)
+    {
+        if (std::find(m_required.begin(), m_required.end(), peer) != m_required.end()) {
+            m_required_run = std::min(3U, m_required_run + 1);
+        } else if (std::find(m_advertised.begin(), m_advertised.end(), peer) != m_advertised.end()) {
+            m_required_run = 0;
+        }
+        Remove(peer);
     }
 
     size_t Size() const { return m_required.size() + m_advertised.size(); }

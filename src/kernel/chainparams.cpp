@@ -658,6 +658,9 @@ public:
             consensus.Blake2bHeadline = *opts.blake2b_headline;
         }
 
+        if (opts.sharepool_admitted_ledger && !opts.sharepool_hash_only) {
+            throw std::runtime_error("Confirmed-work ledger requires the explicit hash-only regtest profile.");
+        }
         if (opts.sharepool_hash_only && !opts.sharepool_height) {
             throw std::runtime_error("Hash-only sharepool requires an explicit regtest activation height.");
         }
@@ -668,6 +671,7 @@ public:
             }
             consensus.SharePoolHeight = *opts.sharepool_height;
             consensus.SharePoolHashOnly = opts.sharepool_hash_only;
+            consensus.SharePoolAdmittedLedger = opts.sharepool_admitted_ledger;
         }
 
         // Optionally schedule the RDTS deployment (see -rdtsexpiry). RDTS

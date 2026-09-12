@@ -7,10 +7,10 @@ import unittest
 from unittest.mock import patch
 
 from hash_mining_gate import HashMiningGate, PROOF
-from hash_gate_batch import check_graph
+from hash_gate_batch import check_graph, BatchLimit
 from hash_snapshot import Snapshot, solve_share, job_hash
 from native_enforcement import sign_schnorr
-from native_mining_gate import REGTEST_GENESIS, parse_block
+from native_mining_gate import REGTEST_GENESIS, parse_block, template_id
 from test_hash_mining_gate import FakeRPC
 from test_hash_snapshot import fixture, SCRIPT, SECRET
 
@@ -157,9 +157,10 @@ class HashGateBatchTests(unittest.TestCase):
         self.admit(self.proofs(3))
         head = self.gate.archive_head()
         for bound in ("MAX_ORIGIN_CHECKS", "MAX_DEPENDENCY_DEPTH", "MAX_DEPENDENCY_BYTES"):
-            # One origin must exceed zero origins/depth, while the empty
-            # current snapshot fits a 500-byte dependency budget.
-            value = 500 if bound == "MAX_DEPENDENCY_BYTES" else 0
+            # The empty current job reserves one future origin/depth, while
+            # the first receipt would require another. An empty snapshot fits
+            # the independent 500-byte dependency budget.
+            value = 500 if bound == "MAX_DEPENDENCY_BYTES" else 1
             with self.subTest(bound=bound), patch("hash_gate_batch." + bound, value):
                 batch = self.gate.batch_status()
                 self.assertEqual(batch["selected_proofs"], ())
@@ -181,16 +182,16 @@ class HashGateBatchTests(unittest.TestCase):
 
     def test_current_settlement_reserves_one_depth_above_its_acknowledged_origin(self):
         block, snapshot = self.origin, self.opening
-        for depth in range(1, 65):
+        for depth in range(1, 64):
             proof = solve_share(block, snapshot)
             block, snapshot = fixture(ntime=1700000100 + depth, templates=[block], shares=[proof])
             self.rpc.snapshots[snapshot.hash_hex] = snapshot.serialize().hex()
-        # This origin itself fits the native depth=64 graph limit. Settling its
-        # work would add a 65th edge, so its valid ACK must remain deferred.
+        # The standalone proof starts at depth one, so this 63-edge origin
+        # fits. A new mining job reserves another edge and must defer it.
         resources = check_graph(snapshot,
             lookup=lambda identity: Snapshot.deserialize(bytes.fromhex(self.rpc.snapshots[f"{identity:064x}"])),
             parent_snapshot=lambda *unused: None)
-        self.assertEqual(resources["origins"], 64)
+        self.assertEqual(resources["origins"], 63)
         self.gate.register_snapshot(snapshot.serialize())
         self.gate.register_template(block.serialize())
         receipt = solve_share(block, snapshot)
@@ -200,6 +201,68 @@ class HashGateBatchTests(unittest.TestCase):
         self.assertEqual(batch["deferred_count"], 1)
         self.assertEqual(batch["limit_reason"], "dependency depth")
         self.assertEqual(self.gate._read(PROOF, f"{receipt.proof_id:064x}"), receipt.serialize())
+
+    def test_dense_dag_loads_each_snapshot_once_and_preserves_intrinsic_depth(self):
+        blocks, proofs, snapshots = [], [], {}
+        for index in range(50):
+            block, snapshot = fixture(ntime=1700000001 + index, templates=blocks, shares=proofs)
+            snapshots[snapshot.hash] = snapshot
+            blocks.append(block)
+            proofs.append(solve_share(block, snapshot))
+        lookups, captured = [], []
+
+        def lookup(identity):
+            lookups.append(identity)
+            return snapshots[identity]
+
+        result = check_graph(snapshot, lookup=lookup, parent_snapshot=lambda *unused: None,
+                             on_snapshot=lambda identity, raw: captured.append((identity, raw)))
+        self.assertEqual(result["origins"], 49)
+        self.assertEqual(len(lookups), 49)
+        self.assertEqual(len(set(lookups)), 49)
+        self.assertEqual(len(captured), 50)
+        # A smaller configured depth catches a reused subtree even if it was
+        # first visited through a short path. Merely caching 'visited' is wrong.
+        with patch("hash_gate_batch.MAX_DEPENDENCY_DEPTH", 48), self.assertRaises(BatchLimit):
+            check_graph(snapshot, lookup=lookup, parent_snapshot=lambda *unused: None)
+        with patch("hash_gate_batch.MAX_DEPENDENCY_DEPTH", 49):
+            self.assertEqual(check_graph(snapshot, lookup=lookup,
+                parent_snapshot=lambda *unused: None)["origins"], 49)
+
+    def test_cached_subtree_still_rejects_a_later_longer_path_and_reserves_new_jobs(self):
+        snapshots = {}
+        shared, opening = fixture()
+        snapshots[opening.hash] = opening
+        for index in range(2):
+            shared, opening = fixture(ntime=1700000100 + index, templates=[shared],
+                                      shares=[solve_share(shared, opening)])
+            snapshots[opening.hash] = opening
+        shared_proof = solve_share(shared, opening)
+        shared_order = int(template_id(shared), 16).to_bytes(32, "little")
+        for offset in range(100):
+            wrapper, wrapper_snapshot = fixture(ntime=1700000200 + offset,
+                templates=[shared], shares=[shared_proof])
+            if shared_order < int(template_id(wrapper), 16).to_bytes(32, "little"):
+                break
+        else:
+            self.fail("could not construct the deterministic short-path-first fixture")
+        snapshots[wrapper_snapshot.hash] = wrapper_snapshot
+        unused, root = fixture(ntime=1700000400, templates=[shared, wrapper],
+            shares=[shared_proof, solve_share(wrapper, wrapper_snapshot)])
+        self.assertEqual(root.templates[0].template_id, int(template_id(shared), 16))
+        options = dict(lookup=lambda identity: snapshots[identity], parent_snapshot=lambda *unused: None)
+        with patch("hash_gate_batch.MAX_DEPENDENCY_DEPTH", 3), self.assertRaises(BatchLimit):
+            check_graph(root, **options)
+        with patch("hash_gate_batch.MAX_DEPENDENCY_DEPTH", 4):
+            self.assertEqual(check_graph(root, **options)["origins"], 4)
+            with self.assertRaises(BatchLimit):
+                check_graph(root, mining_job=True, **options)
+        # Historical origin accounting remains valid at its old boundary;
+        # a new job must leave a slot for validating its own future origin.
+        with patch("hash_gate_batch.MAX_ORIGIN_CHECKS", 4):
+            self.assertEqual(check_graph(root, **options)["origins"], 4)
+            with self.assertRaises(BatchLimit):
+                check_graph(root, mining_job=True, **options)
 
     def test_native_builder_binds_attestation_and_requires_separate_authorization(self):
         self.admit(self.proofs(4))

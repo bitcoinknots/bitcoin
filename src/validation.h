@@ -436,10 +436,18 @@ sharepool::hashonly::Result ValidateSharePoolHashOriginUnlocked(ChainstateManage
 /** Authenticate and prevalidate all available origins before entering ordinary
  * locked acceptance. An overlay is read-only, never admitted to evidence storage.
  * allow_unsigned is solely for preparing a job before its top owner signs it.
+ * for_mining reserves the current body and one depth edge for future proof
+ * settlement; historical origins and block acceptance leave it false.
  */
 sharepool::hashonly::Result PrepareSharePoolHashOrigins(ChainstateManager& chainman,
     const CBlock& block, std::shared_ptr<const sharepool::hashonly::Snapshot> overlay = nullptr,
-    const std::atomic<bool>* stop = nullptr, bool allow_unsigned = false) LOCKS_EXCLUDED(cs_main);
+    const std::atomic<bool>* stop = nullptr, bool allow_unsigned = false,
+    bool for_mining = false) LOCKS_EXCLUDED(cs_main);
+/** Restore historical v5 template evidence against the current active parent's
+ * confirmed origin certificates, rather than reopening superseded proof graphs. */
+sharepool::hashonly::Result ValidateSharePoolHashHistoricalTemplateUnlocked(ChainstateManager& chainman,
+    const CBlock& block, std::shared_ptr<const sharepool::hashonly::Snapshot> overlay = nullptr,
+    const std::atomic<bool>* stop = nullptr) LOCKS_EXCLUDED(cs_main);
 /** Verify standalone proof and its complete native origin graph outside cs_main.
  * The active tip must remain unchanged through the validation pass. */
 sharepool::hashonly::Result ValidateSharePoolHashProofUnlocked(ChainstateManager& chainman,
