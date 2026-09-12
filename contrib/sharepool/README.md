@@ -12,7 +12,17 @@ eligible work. Mainnet and public testnet activation are disabled. This native
 profile has its own [wire contract](../../doc/sharepool-native-format.md); it does
 not transplant the synthetic checkpoint ledger or its absolute work-budget policy.
 
-The latest [hardening pass](results/native-hardening.json) adds native owner
+The current [native P2P relay](../../doc/sharepool-native-p2p.md) exchanges full
+templates and shares over existing Bitcoin connections, with explicit SPN1
+negotiation and bounded downloads. [`NativeNodeRelay`](native_node_peer.py)
+connects that ephemeral cache to the durable miner gate. The
+[complete archive](../../doc/sharepool-archive-recovery.md) preserves acknowledged
+history through hot-cache pruning and supports verified deep-fork recovery
+against a separately protected checkpoint. Peer inventories and untrusted
+backups cannot clear local recovery requirements. See the
+[current results](results/native-p2p-recovery.json).
+
+The preceding [hardening pass](results/native-hardening.json) added native owner
 signing without Python private keys, full historical-origin validation through a
 temporary native UTXO view, 144-block retained gate evidence with a persistent
 recovery latch, and bounded read-only loopback peer exchange. The final combined
@@ -82,7 +92,9 @@ python3 contrib/sharepool/live_protocol_peer.py --run-smoke
 | `native_enforcement.py` | Independent SPN1 wire builder, deterministic public-key fixtures and an external owner-signing callback. |
 | `native_signer.py`, `../../src/bitcoin-sharepool-signer.cpp` | Bounded local adapter and native walletless regtest owner signer with immutable pool/payout policy. |
 | `native_mining_gate.py` | Full current/historical origin validation, durable proof admission, known-work inclusion policy, immutable jobs and bounded retained evidence with recovery latching. |
-| `native_peer.py` | Read-only loopback inventory/object exchange through independently validating miner gates, with transfer bounds and retry backoff. |
+| `native_archive.py` | Complete append-only evidence, protected checkpoint, streaming export/import and verified recovery. |
+| `native_node_peer.py`, `../../src/sharepool/relay.cpp` | Miner bridge and native evidence cache relayed over existing Bitcoin P2P connections. |
+| `native_peer.py` | Earlier standalone loopback test transport, retained for isolated fixtures. |
 | `native_fuzz_corpus.py`, `../../src/test/fuzz/sharepool.cpp` | Deterministic malformed/valid native corpus and sanitizer target for settlement and signer parsers. |
 | `native_hardware_capture.py`, `verify_native_hardware_capture.py` | Bounded isolated-regtest Sia transport through the native gate, durable proof/block capture and independent archive replay. |
 | `testnet_template.py` | Full GBT transaction/witness preservation and exact Sia ASIC-to-Knots header reconstruction. |

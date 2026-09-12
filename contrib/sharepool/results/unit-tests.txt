@@ -90,6 +90,25 @@ test_sibling_registry_histories_cannot_mix_claims_and_payouts (test_live_protoco
 test_signing_key_rotation_keeps_shared_payout_budget (test_live_protocol.LiveProtocolTests) ... ok
 test_winner_that_also_has_receipt_is_deduplicated (test_live_protocol.LiveProtocolTests) ... ok
 test_wrong_job_signatures_never_enter_job_cache (test_live_protocol.LiveProtocolTests) ... ok
+test_archive_gap_and_payload_corruption_fail_before_export_or_recovery (test_native_archive.NativeArchiveTests) ... ok
+test_changed_or_missing_live_checkpoint_prevents_new_acknowledgment (test_native_archive.NativeArchiveTests) ... ok
+test_complete_export_is_contiguous_and_matches_protected_checkpoint (test_native_archive.NativeArchiveTests) ... ok
+test_database_rollback_below_protected_high_water_is_detected (test_native_archive.NativeArchiveTests) ... ok
+test_future_height_acknowledged_work_rehydrates_as_chain_advances (test_native_archive.NativeArchiveTests) ... ok
+test_inplace_partial_validation_failure_preserves_hot_state_and_latch (test_native_archive.NativeArchiveTests) ... ok
+test_missing_initialized_seal_cannot_be_recreated_implicitly (test_native_archive.NativeArchiveTests) ... ok
+test_native_revalidation_failure_never_publishes_fresh_destination (test_native_archive.NativeArchiveTests) ... ok
+test_payload_bitflip_invalidates_archive_chain (test_native_archive.NativeArchiveTests) ... ok
+test_postcommit_seal_failure_never_acknowledges_and_restart_preserves_work (test_native_archive.NativeArchiveTests) ... ok
+test_prepruned_v2_cannot_claim_complete_archive_migration (test_native_archive.NativeArchiveTests) ... ok
+test_protected_head_refuses_writable_other_owner_symlink_and_hardlink (test_native_archive.NativeArchiveTests) ... ok
+test_pruning_does_not_delete_acknowledged_work_missing_from_archive (test_native_archive.NativeArchiveTests) ... ok
+test_pruning_does_not_discard_last_intact_copy_when_archive_is_corrupt (test_native_archive.NativeArchiveTests) ... ok
+test_pruning_preserves_full_archive_and_deep_recovery_restores_known_work (test_native_archive.NativeArchiveTests) ... ok
+test_quota_exhaustion_rolls_back_receipt_and_archive_before_ack (test_native_archive.NativeArchiveTests) ... ok
+test_recovery_only_opening_cannot_admit_without_verified_rebuild (test_native_archive.NativeArchiveTests) ... ok
+test_restore_requires_final_trusted_head_and_publishes_only_complete_store (test_native_archive.NativeArchiveTests) ... ok
+test_two_stores_cannot_overwrite_the_same_protected_checkpoint (test_native_archive.NativeArchiveTests) ... ok
 test_carrier_layout_roundtrip_and_rdts_bound (test_native_enforcement.NativeWireTests) ... ok
 test_different_signatures_never_change_proof_id (test_native_enforcement.NativeWireTests) ... ok
 test_fixed_cross_language_domain_vector_and_signature (test_native_enforcement.NativeWireTests) ... ok
@@ -134,6 +153,13 @@ test_truncated_blocks_fail_preflight_and_valid_witness_roundtrips (test_native_m
 test_unknown_or_corrupt_full_origin_templates_do_not_receive_credit (test_native_mining_gate.NativeGateTests) ... ok
 test_v1_migration_preserves_receipts_and_origin_integrity (test_native_mining_gate.NativeGateTests) ... ok
 test_wrong_miner_binding_and_native_payout_failure_never_authorize (test_native_mining_gate.NativeGateTests) ... ok
+test_bad_receipt_digest_keeps_valid_origin_progress (test_native_node_peer.NativeNodeRelayTests) ... ok
+test_bidirectional_ordering_and_idempotent_receipts (test_native_node_peer.NativeNodeRelayTests) ... ok
+test_local_publication_budget_never_forgets_acknowledged_work (test_native_node_peer.NativeNodeRelayTests) ... ok
+test_missing_full_origin_cannot_receive_durable_credit (test_native_node_peer.NativeNodeRelayTests) ... ok
+test_native_tip_change_and_local_recovery_stop_polling (test_native_node_peer.NativeNodeRelayTests) ... ok
+test_object_budget_defers_receipts_until_origins_are_admitted (test_native_node_peer.NativeNodeRelayTests) ... ok
+test_profile_duplicates_and_boolean_integer_fields_are_refused (test_native_node_peer.NativeNodeRelayTests) ... ok
 test_changed_digest_or_native_identity_is_never_admitted (test_native_peer.NativePeerTests) ... ok
 test_failed_peer_backoff_preserves_fair_polling (test_native_peer.NativePeerTests) ... ok
 test_http_duplicate_lengths_and_chunking_are_rejected (test_native_peer.NativePeerTests) ... ok
@@ -333,6 +359,6 @@ test_single_group_can_account_for_all_work_within_its_budget (test_work_rate_bud
 test_work_weights_not_equal_share_counts_control_budget (test_work_rate_budget.WorkRateBudgetTest) ... ok
 
 ----------------------------------------------------------------------
-Ran 333 tests in 29.482s
+Ran 359 tests in 30.344s
 
 OK

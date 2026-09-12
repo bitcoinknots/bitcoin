@@ -317,6 +317,7 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   rpc/signmessage.cpp
   rpc/txoutproof.cpp
   script/sigcache.cpp
+  sharepool/relay.cpp
   signet.cpp
   stats/init.cpp
   stats/rpc_stats.cpp

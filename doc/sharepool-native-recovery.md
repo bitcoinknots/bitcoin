@@ -1,7 +1,9 @@
 # Native SPN1 evidence transport and gate recovery
 
-The local regtest integration now combines a native owner signer, durable miner
-gates, public template/share exchange and independent native block validation.
+The current regtest integration combines native signing, durable miner gates,
+[evidence over existing Bitcoin P2P](sharepool-native-p2p.md) and
+[complete archive recovery](sharepool-archive-recovery.md). This guide also
+retains the earlier standalone loopback service's interface and test scope.
 [`feature_sharepool_peer.py`](../test/functional/feature_sharepool_peer.py) is the
 executable integration example. This is a testing component, not a public-network
 service or a mainnet activation mechanism.
@@ -45,7 +47,9 @@ lock on its `.owner.lock` sidecar. A second owner is refused. Keep this database
 and sidecar in a trusted local directory; do not delete the sidecar while the
 service is running. Unsupported locking platforms fail closed. Startup checks
 the schema, configured identity, bounded rows/blobs and stored content hashes.
-Creation and migration from schema v1 to v2 are explicit atomic transactions.
+Creation and supported migrations to schema v3 use explicit atomic transactions.
+Already-pruned v2 stores cannot recreate lost history and are refused; the
+complete-archive guide specifies the exact migration and checkpoint requirements.
 
 The permanent receipt revision is a signed 64-bit high-water mark. Pruning
 never resets it or reuses a deleted receipt's sequence. Exact duplicate proofs
@@ -57,8 +61,9 @@ while a supported reorganization could make it relevant again.
 | Native retention anchor | Monotonically advances to at most 144 blocks behind the active tip |
 | Pruning cutoff | Delete only origins with `origin_height <= saved_anchor_height - 3` |
 | Active inventory | At most 128 templates and 128 receipts |
-| Retained archive | At most 18,944 templates and 18,944 receipts |
-| Retained full-template bytes | At most 268,435,456 bytes |
+| Retained hot cache | At most 18,944 templates and 18,944 receipts |
+| Hot full-template bytes | At most 268,435,456 bytes |
+| Complete append-only archive | Default 512 MiB; quota up to 4 GiB and at most 1,000,000 events; refuses admission when full |
 | Job audit history | At most 64 jobs, each at most 4,000,000 bytes |
 | Native settlement snapshot | At most 32 shares under the unchanged SPN1 regtest rules |
 
@@ -71,14 +76,16 @@ the greatest removed receipt sequence, **not a native block height**.
 
 If the saved anchor disappears from the active chain, or the tip goes below it,
 the gate persistently latches `RecoveryRequired`. Admission stops across restart,
-even if the old chain later returns. There is deliberately no clear-latch API:
-this version has no verified deep-history recovery protocol. Preserve the
-database and restore/reconcile complete acknowledged evidence before resuming;
-deleting the database or resetting the latch would lose the completeness basis.
-An automated archive recovery procedure remains release work. The peer poller
-reports this as a local recovery requirement without penalizing a remote peer.
+even if the old chain returns. There is no blind clear-latch API. Explicit
+`recover_archive` verifies complete local history and its protected checkpoint,
+then revalidates eligible evidence against a stable native tip before atomic
+recovery. `restore_archive` requires a complete export and a checkpoint protected
+separately from that export. Missing or stale data remains a refusal. Future
+acknowledged work is rehydrated when its original ancestry becomes eligible
+again. Neither method trusts a peer's claim of completeness. See the
+[complete recovery guide](sharepool-archive-recovery.md).
 
-## Local evidence service
+## Earlier local evidence service
 
 [`native_peer.py`](../contrib/sharepool/native_peer.py) is a library used by the
 integration test. `NativePeerService(gate_factory)` runs the gate and its RPC
@@ -176,7 +183,9 @@ test exercises actual P2P competing branches and orphaned payout recovery.
 See [recorded hardening results](../contrib/sharepool/results/native-hardening.json),
 [signer results](../contrib/sharepool/results/native-signer.json) and
 [native adversarial results](../contrib/sharepool/results/native-adversarial.json).
-No physical miner was switched for this hardening run. Public-network transport,
-deep-history recovery, production difficulty/economics, protected key operations,
-multi-platform tests, sustained coverage-guided fuzzing and external independent
+The current P2P and archive changes have a
+[separate report](../contrib/sharepool/results/native-p2p-recovery.json). No
+physical miner was switched for these software runs. WAN deployment/load
+evidence, production difficulty/economics, protected key/checkpoint operations,
+additional platforms, sustained coverage-guided fuzzing and external independent
 review remain necessary before any mainnet deployment proposal.

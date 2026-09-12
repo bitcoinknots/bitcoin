@@ -1,0 +1,164 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-09-12T05:50:39.984981+00:00",
+  "scope": "Opt-in regtest evidence relay over existing Bitcoin P2P and verified local complete-history recovery. No mainnet readiness claim.",
+  "base_commit": "ecf94e2c5edab5f70b95d3e5da7df7f4cf08f220",
+  "platform": "macOS arm64; Apple clang 21.0.0; Debug native build",
+  "native_binary_sha256": "b762725b0645594372f6da174452d9fd6e73056cd9a3793202bc0f3f511b4666",
+  "test_binary_sha256": "4e5ab1307749d82bfa8ef5bda4861296b5da66ce7c06b08d5dabe0b8db7f65b8",
+  "python": {
+    "result": "passed",
+    "tests": 359,
+    "skipped": 0,
+    "seconds": 30.344,
+    "log": "unit-tests.txt",
+    "log_sha256": "47bde67512a3835d5128170dd157b7e30d2ced935280a47a5bdd6188cb81458d"
+  },
+  "native_unit": {
+    "result": "passed",
+    "selected_cases": 49,
+    "passed_assertions": 152157,
+    "other_cases_not_selected": 662,
+    "suites": [
+      "sharepool*",
+      "net_tests",
+      "net_peer_connection_tests",
+      "netbase_tests"
+    ],
+    "log_sha256": "710a1e46e9b01d416b7f093221cee6f4d0d6ca237c81248954980f06541b4de8"
+  },
+  "functional": [
+    {
+      "test": "feature_sharepool_node.py",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T05:45:47.569675+00:00",
+      "finished_utc": "2026-09-12T05:45:57.920832+00:00",
+      "log_sha256": "7a0213d4f441b635e5caed3db73d944bbd219bf9eae12559e61251dbc9a01555",
+      "result": "passed"
+    },
+    {
+      "test": "feature_sharepool_archive.py",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T05:45:47.570103+00:00",
+      "finished_utc": "2026-09-12T05:46:14.555095+00:00",
+      "log_sha256": "e846694602bd398e58b2abd2567204620ae309f14d2da0f3bd86ee1f190c2404",
+      "result": "passed"
+    },
+    {
+      "test": "feature_sharepool_enforcement.py",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T05:45:47.570164+00:00",
+      "finished_utc": "2026-09-12T05:45:53.492203+00:00",
+      "log_sha256": "a9aff523f611fc0c0fd458b55f1911347a15493c3464d8a2b9c199fa8939e8f0",
+      "result": "passed"
+    },
+    {
+      "test": "feature_sharepool_network.py",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T05:45:53.492509+00:00",
+      "finished_utc": "2026-09-12T05:45:59.773274+00:00",
+      "log_sha256": "8801f35d6b3cc5849d1c362df8a98290c445409e58e84c5b39fa452ca63e561f",
+      "result": "passed"
+    },
+    {
+      "test": "feature_sharepool_ancestor.py",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T05:45:57.921064+00:00",
+      "finished_utc": "2026-09-12T05:46:00.803279+00:00",
+      "log_sha256": "d74fc9f16585a9962de1d6d18fbe9c7dc782374738ca52844cd6605e48744df1",
+      "result": "passed"
+    },
+    {
+      "test": "feature_sharepool_peer.py",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T05:45:59.773472+00:00",
+      "finished_utc": "2026-09-12T05:46:32.589919+00:00",
+      "log_sha256": "61edfb0c02c12256566819a55d02eb00a96e4652f4d4c79c35e5ecdb6eecd03e",
+      "result": "passed"
+    },
+    {
+      "test": "mining_basic.py",
+      "exit_code": 0,
+      "started_utc": "2026-09-12T05:46:00.803478+00:00",
+      "finished_utc": "2026-09-12T05:46:39.234830+00:00",
+      "log_sha256": "b20a88db4ef94611311501e3811340fbf12f2977f9022a6fe34a64cd23a05ef7",
+      "result": "passed"
+    }
+  ],
+  "wire_results": "native-p2p-wire.json",
+  "native_connection_integration": {
+    "nodes": 3,
+    "owner_keys": 3,
+    "new_transport_listeners": 0,
+    "existing_peer_connection_ids_and_addresses_unchanged_during_initial_exchange": true,
+    "full_template_and_share_message_bytes_observed": true,
+    "native_blocks": 2,
+    "exact_payout_satoshis_per_owner_per_block": 2500000000,
+    "cold_native_peer_and_gate_recover_historical_origins": true,
+    "duplicate_receipts_recredited": false,
+    "late_proof_and_previous_winner_settle_once": true,
+    "last_winner_pending": true
+  },
+  "archive": {
+    "schema": 3,
+    "focused_archive_tests": 19,
+    "focused_gate_tests": 30,
+    "limits": {
+      "archive_quota_default_bytes": 536870912,
+      "archive_quota_max_bytes": 4294967296,
+      "archive_events_max": 1000000,
+      "active_receipts": 128,
+      "active_templates": 128,
+      "retained_receipts": 18944,
+      "retained_templates": 18944,
+      "hot_template_bytes": 268435456,
+      "retention_blocks": 144
+    },
+    "final_native_test": "feature_sharepool_archive.py",
+    "administrative_rollback_blocks": 162,
+    "previously_pruned_proofs_restored": 2,
+    "complete_protected_checkpoint_required": true,
+    "failed_partial_native_revalidation_preserves_latched_cache": true,
+    "exact_original_payout_scripts_preserved": true,
+    "future_height_evidence_rehydration_tested": true,
+    "database_commit_and_head_fsync_before_acknowledgment": true
+  },
+  "sources": {
+    "src/sharepool/relay.cpp": "29d9c50defe6f6a385babe9f606ec94bbe92fe99eb4c6c586225bbc5bfcd44a4",
+    "src/sharepool/relay.h": "3afa3e18c1130b1d48363c98db9bd40f27f82e5660bb3de1d3c5786e2879399f",
+    "src/consensus/sharepool.cpp": "bd4b502f3afee0792aee6b354e15f4925c02e55e8b9952a0c3b9790f2339de5b",
+    "src/consensus/sharepool.h": "9d55f46f01bf85ac6ba97d9d9b88af4eb3987653894a16f9031dde96e1a1314c",
+    "src/net_processing.cpp": "1ffe29fa34e9909d495051a652d54bc816906eb6a47eb98da9dc8bbbe24ca45f",
+    "src/net_processing.h": "81311bfe5155c0365186ee666dcc87e65c1376a8f4ad29f6bafb47cafcfcb9c9",
+    "src/protocol.h": "e511ae88f9c6b751d466933bafb84f4ed072f35e0b82281cbfde7fbfa24b278b",
+    "src/rpc/mining.cpp": "f93e96b8eb284be3c381c92bfdc3aa1b15e548d2a659684188d6d8ff57e93801",
+    "src/CMakeLists.txt": "5c2753f887f634b89b77af38073f48e7e670686dad95910284cb3680e9d9fef1",
+    "contrib/sharepool/native_archive.py": "406a0005e5c448437d781ab6acbfd7ee8d9d4e8f98550141bb64c714ea32a0ea",
+    "contrib/sharepool/native_mining_gate.py": "f05b0c8c2fdd0a26ae9b51dbaf6001568bf9011e27bc239ec95d7039a0f06c00",
+    "contrib/sharepool/native_node_peer.py": "28184472a2aa3a79b39b3bcca2a2b3ece362d672a595c709aaed32ad7755ef60",
+    "contrib/sharepool/test_native_archive.py": "a35b25b0b4f605489da456443819f093594f7c47316e58e146435a8eb0d8ac26",
+    "contrib/sharepool/test_native_node_peer.py": "9cf8db23dd45f6479bf2e24e4dfe2fbb759c23480d64ca56eeb7d6fb5caee39f",
+    "contrib/sharepool/test_native_mining_gate.py": "aed0615eda5d9ad5da31314b98de7be1898b70b5a8c891337a1ce4f0490b8269",
+    "test/functional/feature_sharepool_node.py": "b2e9209b0b9c6072bc88c8d907d3133e1f269dca3cfde6d90dec7e59aad5c640",
+    "test/functional/feature_sharepool_archive.py": "f917970b3b2434a5dc5dc1cb7598241d0b54dbcac3e0001eac5c31799b7a1c76",
+    "test/functional/feature_sharepool_relay.py": "0ea3819fe2f0d94085aca1a66a3c385079c2778a70e81fafb65befb22438eec1"
+  },
+  "physical_miner_rerouted": false,
+  "public_network_used": false,
+  "mainnet_activation_enabled": false,
+  "disposable_native_owner_key_files_removed": true,
+  "coverage_guided_fuzzing_run": false,
+  "external_security_audit_completed": false,
+  "limitations": [
+    "Existing Bitcoin transport reused, but only disposable loopback topology tested; no measured WAN capacity or production deployment",
+    "One explicitly configured pool per native relay node; no claim of global complete-disclosure agreement",
+    "Native template validation is synchronous under node locks; rate limits do not bound latency of an individual expensive template",
+    "No isolated forced send-queue backpressure-resume test or sustained-load fairness measurement",
+    "Archive is finite and refuses acknowledgment at quota; total filesystem use includes WAL, hot cache, export and staging overhead",
+    "Rollback of both database and trusted head is undetectable; protecting the latest checkpoint independently remains an operator requirement",
+    "Pre-pruned schema2 history cannot be manufactured during migration",
+    "No new coverage-guided fuzzing campaign or external independent audit; previous2685 deterministic sanitizer inputs predate this relay/archive",
+    "Fixed easy share target and32-share snapshots remain experimental; no physical TH/s cap or mandatory DATUM executable proof",
+    "Additional platforms, deployment/activation coordination, production economics and protected key/checkpoint operations remain open"
+  ]
+}

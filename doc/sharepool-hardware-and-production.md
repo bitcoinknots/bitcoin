@@ -11,13 +11,19 @@ not connect the earlier PoW checkpoint ledger to native block validity.
 
 The later SPN1 run produced [28 enforcing regtest blocks](../contrib/sharepool/results/native-hardware-regtest.json)
 from the Goldshell, with [independent native replay](../contrib/sharepool/results/native-hardware-replay.json)
-and verified restoration to Lazarus. The latest software-only
+and verified restoration to Lazarus. The preceding software-only
 [hardening pass](../contrib/sharepool/results/native-hardening.json) then added
 native owner signing, historical-template validation, bounded peer exchange and
 retained evidence recovery. It passed 333 Python tests and a 162-block native
 integration run. Those changes did not reroute the miner again. The physical
 measurements below remain the earlier Testnet4 results, not measurements of the
 later software pass.
+
+The current [native P2P and archive pass](../contrib/sharepool/results/native-p2p-recovery.json)
+then adds evidence exchange over existing Bitcoin connections and verified
+complete-history recovery. It passed 359 Python cases, 49 selected native cases,
+seven native integration/regression scripts and both legacy/v2 wire suites.
+These remain software tests; no new physical-miner measurement is claimed.
 
 ## Physical test and restoration
 
@@ -132,7 +138,7 @@ settlement consensus has been added by these adapters.
 ## Reproduction
 
 The combined suite recorded at this earlier hardware milestone passed 243 tests.
-The latest combined suite passed 333 with the built native signer enabled; see
+The current combined suite passed 359 with the built native signer enabled; see
 [current native reproduction](sharepool-native-enforcement.md#reproduction).
 The legacy capture/observer components can still be exercised with:
 
@@ -173,11 +179,11 @@ not make mainnet activation safe.
 | Gate | Current evidence and remaining requirement |
 | --- | --- |
 | Settlement canonicality and deployment | SPN1 derives paid state from the actual native parent and rechecks exact payouts in `ConnectBlock`. Activation remains regtest-only. Specify and review public deployment, nonparticipating blocks and composition with other `m_mm_rhs` users; unchanged peers otherwise disagree on validity. |
-| Data availability and omitted work | Loopback peers exchange bounded full origins and proofs; miners enforce their locally known work. External transport, censorship behavior and availability incentives remain. A commitment cannot prove disclosure of unseen shares. |
+| Data availability and omitted work | Existing Bitcoin connections now relay bounded full origins/proofs with negotiated support; miner gates enforce locally known work. WAN capacity, censorship behavior and availability incentives remain unverified. A commitment cannot prove disclosure of unseen shares. |
 | Difficulty and quota meaning | SPN1 uses an easy fixed target and no percentage or physical TH/s cap. Production difficulty, sampling, incentives and attack budgets need specification; the earlier synthetic checkpoint quotas are separate. |
 | Production authorization | The new local signer uses native libsecp256k1 and an exclusive mode-0600 key file with regtest/pool/payout policy. Secure provisioning/recovery, further platform support, independent review and a deployed DATUM/gateway authorization protocol remain. Legacy Sia username authorization is not cryptographic miner authentication. |
 | Origin and payout validation | Native consensus verifies contained header work, signatures and exact script/amount allocation; miner gates additionally validate full current or recent historical origins through a temporary UTXO view. Review that consensus/policy boundary and exercise many independently operated miners and pools. |
-| Resource and recovery behavior | Gates retain a bounded archive behind a 144-block anchor and latch deep-reorg recovery across restart. Queues, downloads and parser allocations are bounded. Sustained load, capacity planning, complete archive restoration and operational failure recovery still need validation. |
+| Resource and recovery behavior | Hot caches retain a 144-block horizon; complete append-only history and a protected checkpoint support tested deep-fork recovery and streaming restore. Finite quotas fail closed. Sustained load, capacity planning, protected checkpoint backup and disaster operations remain. One synchronous native template validation can still delay normal node work. |
 | Complete mining pipeline | Earlier hardware tests cover ASIC/native hash binding and 28 regtest settlements; the later native-signer/peer test covers 162 blocks including delayed proofs, halving, pruning and restart. A sustained deployed DATUM pipeline, the new service path on hardware and public-test-network activation remain untested. |
 | Independent security and deployment evidence | Native P2P partition/rejoin and historical UTXO cases pass, as does a 2,685-input deterministic address/undefined-behavior sanitizer corpus. Coverage-guided fuzzing, external review, additional platforms, reproducible builds and sustained adversarial campaigns remain. |
 

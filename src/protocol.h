@@ -264,6 +264,14 @@ inline constexpr const char* WTXIDRELAY{"wtxidrelay"};
  * txreconciliation, as described by BIP 330.
  */
 inline constexpr const char* SENDTXRCNCL{"sendtxrcncl"};
+/** Opt-in SPN1 regtest evidence capability: version, genesis, rules, pool. */
+inline constexpr const char* SPNHELLO{"spnhello"};
+/** Bounded SPN1 template-first evidence inventory; independent of block invs. */
+inline constexpr const char* SPNINV{"spninv"};
+/** Request one bounded chunk of previously announced public SPN1 evidence. */
+inline constexpr const char* SPNGET{"spnget"};
+/** Requested SPN1 evidence chunk. Complete objects undergo local native validation. */
+inline constexpr const char* SPNDATA{"spndata"};
 }; // namespace NetMsgType
 
 /** All known message types (see above). Keep this in the same order as the list of messages above. */
@@ -303,6 +311,10 @@ inline const std::array ALL_NET_MESSAGE_TYPES{std::to_array<std::string>({
     NetMsgType::CFCHECKPT,
     NetMsgType::WTXIDRELAY,
     NetMsgType::SENDTXRCNCL,
+    NetMsgType::SPNHELLO,
+    NetMsgType::SPNINV,
+    NetMsgType::SPNGET,
+    NetMsgType::SPNDATA,
 })};
 
 /** nServices flags */

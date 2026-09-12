@@ -22,6 +22,7 @@
 #include <interfaces/mining.h>
 #include <key_io.h>
 #include <net.h>
+#include <net_processing.h>
 #include <node/context.h>
 #include <node/miner.h>
 #include <node/warnings.h>
@@ -35,6 +36,7 @@
 #include <script/descriptor.h>
 #include <script/script.h>
 #include <script/signingprovider.h>
+#include <sharepool/relay.h>
 #include <streams.h>
 #include <txmempool.h>
 #include <univalue.h>
@@ -1411,6 +1413,145 @@ static RPCHelpMan validatesharepoolshare()
     };
 }
 
+static uint8_t SharePoolRelayKind(const UniValue& value)
+{
+    const auto kind = value.get_str();
+    if (kind == "template") return sharepool::RELAY_TEMPLATE;
+    if (kind == "receipt") return sharepool::RELAY_RECEIPT;
+    throw JSONRPCError(RPC_INVALID_PARAMETER, "Evidence kind must be template or receipt");
+}
+
+static UniValue SharePoolObjectMetadata(const sharepool::RelayObject& object)
+{
+    UniValue result{UniValue::VOBJ};
+    result.pushKV("kind", object.item.kind == sharepool::RELAY_TEMPLATE ? "template" : "receipt");
+    result.pushKV("id", object.item.id.GetHex());
+    result.pushKV("sha256", object.body_hash.GetHex());
+    result.pushKV("bytes", object.data.size());
+    result.pushKV("origin_height", object.origin_height);
+    result.pushKV("origin_parent", object.origin_parent.GetHex());
+    result.pushKV("template_id", object.template_id.GetHex());
+    return result;
+}
+
+static RPCHelpMan setsharepoolrelay()
+{
+    return RPCHelpMan{"setsharepoolrelay",
+        "Opt in to bounded SPN1 evidence relay on existing Bitcoin peer connections.\n"
+        "Requires active regtest SPN1. One nonzero pool may be selected until restart.\n"
+        "This cache is ephemeral; miner acknowledgment requires a separate durable gate.\n",
+        {{"pool", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Pool identifier (32 bytes)"}},
+        RPCResult{RPCResult::Type::BOOL, "", "True after local configuration"},
+        RPCExamples{HelpExampleCli("setsharepoolrelay", "\"pool_id\"")},
+        [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
+            auto& node = EnsureAnyNodeContext(request.context);
+            auto& chainman = EnsureChainman(node);
+            auto& peerman = EnsurePeerman(node);
+            const uint256 pool = ParseHashV(request.params[0], "pool");
+            LOCK(cs_main);
+            std::string error;
+            if (!peerman.SharePoolRelay().Configure(chainman, pool, error)) throw JSONRPCError(RPC_INVALID_PARAMETER, error);
+            return true;
+        },
+    };
+}
+
+static RPCHelpMan submitsharepoolevidence()
+{
+    return RPCHelpMan{"submitsharepoolevidence",
+        "Validate a full origin template or share and add it to the ephemeral native relay.\n"
+        "Full origins must precede their receipts. Native scripts, fees and payout checks\n"
+        "apply to templates; proof, owner and active-ancestry checks apply to receipts.\n"
+        "Success is not durable miner acknowledgment or mining-job authorization.\n",
+        {{"kind", RPCArg::Type::STR, RPCArg::Optional::NO, "template or receipt"},
+         {"data", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Canonical serialized object"}},
+        RPCResult{RPCResult::Type::OBJ, "", "Validated relay identity", {
+            {RPCResult::Type::STR, "kind", "Evidence type"},
+            {RPCResult::Type::STR_HEX, "id", "Native template or proof identifier"},
+        }},
+        RPCExamples{HelpExampleCli("submitsharepoolevidence", "\"template\" \"serialized_block_hex\"")},
+        [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
+            const uint8_t kind = SharePoolRelayKind(request.params[0]);
+            const auto text = request.params[1].get_str();
+            const auto maximum = kind == sharepool::RELAY_TEMPLATE ? sharepool::MAX_RELAY_TEMPLATE : sharepool::MAX_RELAY_RECEIPT;
+            if (text.empty() || text.size() > 2 * maximum || !IsHex(text)) throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid evidence byte encoding or bound");
+            const auto raw = ParseHex(text);
+            auto& node = EnsureAnyNodeContext(request.context);
+            auto& chainman = EnsureChainman(node);
+            auto& peerman = EnsurePeerman(node);
+            LOCK(cs_main);
+            std::string error;
+            auto result = peerman.SharePoolRelay().Add(chainman, kind, raw, error);
+            if (!result) throw JSONRPCError(RPC_VERIFY_REJECTED, error);
+            UniValue value{UniValue::VOBJ};
+            value.pushKV("kind", kind == sharepool::RELAY_TEMPLATE ? "template" : "receipt");
+            value.pushKV("id", result->id.GetHex());
+            return value;
+        },
+    };
+}
+
+static RPCHelpMan getsharepoolinventory()
+{
+    return RPCHelpMan{"getsharepoolinventory",
+        "Return bounded validated evidence currently eligible on the active native chain.\n"
+        "This inventory is not a complete-disclosure claim or a settlement checkpoint.\n",
+        {}, RPCResult{RPCResult::Type::OBJ_DYN, "", "Relay profile, native context and object descriptors", {
+            {RPCResult::Type::ANY, "field", "Profile/context fields or bounded items array"},
+        }}, RPCExamples{HelpExampleCli("getsharepoolinventory", "")},
+        [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
+            auto& node = EnsureAnyNodeContext(request.context);
+            auto& chainman = EnsureChainman(node);
+            auto& peerman = EnsurePeerman(node);
+            LOCK(cs_main);
+            auto& store = peerman.SharePoolRelay();
+            const auto items = store.Inventory(chainman);
+            const auto* tip = chainman.ActiveChain().Tip();
+            UniValue result{UniValue::VOBJ}, entries{UniValue::VARR};
+            result.pushKV("enabled", store.Active(chainman));
+            result.pushKV("pool", store.Pool().GetHex());
+            result.pushKV("genesis", chainman.GetParams().GetConsensus().hashGenesisBlock.GetHex());
+            result.pushKV("rules", sharepool::RulesHash().GetHex());
+            result.pushKV("activation_height", chainman.GetParams().GetConsensus().SharePoolHeight);
+            result.pushKV("tip", tip ? tip->GetBlockHash().GetHex() : uint256{}.GetHex());
+            result.pushKV("height", tip ? tip->nHeight : -1);
+            result.pushKV("revision", store.Revision());
+            for (const auto& item : items) {
+                const auto object = store.Get(chainman, item.kind, item.id);
+                if (object) entries.push_back(SharePoolObjectMetadata(*object));
+            }
+            result.pushKV("items", std::move(entries));
+            return result;
+        },
+    };
+}
+
+static RPCHelpMan getsharepoolobject()
+{
+    return RPCHelpMan{"getsharepoolobject",
+        "Read one locally validated active relay object. Expired or orphaned evidence\n"
+        "is not served; durable acknowledged history belongs to the miner archive.\n",
+        {{"kind", RPCArg::Type::STR, RPCArg::Optional::NO, "template or receipt"},
+         {"id", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Native template or proof identifier"}},
+        RPCResult{RPCResult::Type::OBJ_DYN, "", "Object descriptor and canonical data hex", {
+            {RPCResult::Type::ANY, "field", "Descriptor field or serialized data"},
+        }}, RPCExamples{HelpExampleCli("getsharepoolobject", "\"template\" \"identifier\"")},
+        [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
+            const uint8_t kind = SharePoolRelayKind(request.params[0]);
+            const uint256 id = ParseHashV(request.params[1], "id");
+            auto& node = EnsureAnyNodeContext(request.context);
+            auto& chainman = EnsureChainman(node);
+            auto& peerman = EnsurePeerman(node);
+            LOCK(cs_main);
+            const auto object = peerman.SharePoolRelay().Get(chainman, kind, id);
+            if (!object) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Unknown or ineligible relay object");
+            auto result = SharePoolObjectMetadata(*object);
+            result.pushKV("data", HexStr(object->data));
+            return result;
+        },
+    };
+}
+
 void RegisterMiningRPCCommands(CRPCTable& t)
 {
     static const CRPCCommand commands[]{
@@ -1423,6 +1564,10 @@ void RegisterMiningRPCCommands(CRPCTable& t)
         {"mining", &submitheader},
         {"mining", &validatesharepoolshare},
         {"mining", &validatesharepooltemplate},
+        {"mining", &setsharepoolrelay},
+        {"mining", &submitsharepoolevidence},
+        {"mining", &getsharepoolinventory},
+        {"mining", &getsharepoolobject},
 
         {"hidden", &generatetoaddress},
         {"hidden", &generatetodescriptor},

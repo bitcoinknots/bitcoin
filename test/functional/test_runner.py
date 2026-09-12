@@ -117,6 +117,9 @@ BASE_SCRIPTS = [
     'mempool_persist.py --descriptors',
     # vv Tests less than 60s vv
     'feature_sharepool_enforcement.py',
+    'feature_sharepool_archive.py',
+    'feature_sharepool_node.py',
+    'feature_sharepool_relay.py',
     'feature_sharepool_network.py',
     'feature_sharepool_ancestor.py',
     'feature_sharepool_peer.py',

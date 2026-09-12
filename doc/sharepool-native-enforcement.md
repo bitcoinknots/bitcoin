@@ -7,11 +7,11 @@ A separate bounded Goldshell run produced 28 blocks under this new profile on
 an isolated regtest chain; another enforcing node independently replayed them.
 The earlier public Testnet4 run used a different capture envelope.
 
-The latest hardening pass adds a local native owner signer, validation of recent
-historical origin templates, retained evidence with a persistent recovery latch,
-and bounded loopback peer exchange. Its final accelerated integration run reached 162 native
-blocks with three local miner gates and two enforcing nodes. These software
-checks did not reroute or reuse the physical miner.
+The current integration uses existing Bitcoin P2P connections for full origin
+templates and shares. Native signing, recent-ancestor validation and a complete
+acknowledged-work archive support miner admission and explicit deep-fork
+recovery. These software checks did not reroute the physical miner. The prior
+accelerated 162-block loopback run remains a separate recorded milestone.
 
 This is a testable native implementation, not a mainnet release. The wire
 contract and exact limits are in [the format specification](sharepool-native-format.md).
@@ -108,22 +108,24 @@ payout script. The Python adapter passes only public policy/envelope bytes and
 never reads the private key file. The signer is offline: it does not replace
 full-template validation or authorize signing requests received from peers.
 
-[`native_peer.py`](../contrib/sharepool/native_peer.py) publishes read-only
-inventories and public template/proof bytes on numeric loopback HTTP endpoints.
-Recipients validate full origins before admitting proofs through their own gate.
-One owning thread performs gate operations; request, byte, object, queue and time
-limits bound transfers. Partial progress is durable and exact retries are
-idempotent. Peer inventories are neither consensus checkpoints nor proof that
-all work has been disclosed. Successful polling reports bounded transfer
-progress, including any deferred objects.
+The [native P2P extension](sharepool-native-p2p.md) negotiates evidence support
+over ordinary Bitcoin connections. It bounds inventories, requests, chunks and
+admission rates, applies full native validation, and respects existing send-queue
+backpressure. [`native_node_peer.py`](../contrib/sharepool/native_node_peer.py)
+publishes local evidence and imports origins before proofs through the durable
+gate. Relay acceptance is ephemeral; it is not a miner acknowledgment. Inventory
+is neither a consensus checkpoint nor proof that all work was disclosed. The
+earlier standalone loopback service remains a separate test fixture.
 
-The gate retains historical evidence behind a 144-block native anchor, with
-separate active-object, archive-count and byte limits. It prunes old evidence
-only after checking the native anchor and retained data. Losing that anchor
-latches `RecoveryRequired` durably, including across restart; restoring the tip
-alone cannot clear it. This storage policy does not extend the three-block share
-eligibility window. See [retention and recovery](sharepool-native-recovery.md)
-for the operational limits and recovery requirements.
+The gate's hot cache retains evidence behind a 144-block native anchor. An
+append-only archive in the same SQLite transaction preserves complete
+acknowledged history before hot rows are pruned. A protected checkpoint is
+synchronized before acknowledgment. Losing the anchor still latches recovery;
+explicit recovery verifies complete history against that checkpoint and
+revalidates eligible bodies/proofs natively before atomically rebuilding the
+cache. Missing, stale or divergent history cannot clear the latch. Quota
+exhaustion refuses new work. The three-block eligibility window is unchanged;
+see [archive recovery](sharepool-archive-recovery.md).
 
 ## Reproduction
 
@@ -135,8 +137,12 @@ cmake --build build-sharepool --target bitcoind bitcoin-cli bitcoin-sharepool-si
 build-sharepool/bin/test_bitcoin --run_test='sharepool*'
 python3 -B test/functional/feature_sharepool_enforcement.py \
   --configfile=build-sharepool/test/config.ini
-python3 -B test/functional/feature_sharepool_peer.py \
+python3 -B test/functional/feature_sharepool_node.py \
   --configfile=build-sharepool/test/config.ini
+python3 -B test/functional/feature_sharepool_archive.py \
+  --configfile=build-sharepool/test/config.ini
+python3 -B test/functional/feature_sharepool_relay.py \
+  --configfile=build-sharepool/test/config.ini --v2transport
 SHAREPOOL_SIGNER_BINARY="$PWD/build-sharepool/bin/bitcoin-sharepool-signer" \
   python3 -B -m unittest discover -s contrib/sharepool -p 'test_*.py' -v
 ```
@@ -144,10 +150,12 @@ SHAREPOOL_SIGNER_BINARY="$PWD/build-sharepool/bin/bitcoin-sharepool-signer" \
 The first functional test creates two disposable wallet-disabled nodes, one enforcing
 and one deliberately not enforcing. It builds actual blocks and transactions,
 checks deliberate disagreement, exercises native forks, restarts and reindex,
-then stops both nodes. The peer functional test instead uses two enforcing nodes,
-three local gates and freshly generated native signer keys. It exercises direct
-payouts, delayed-work recovery, the regtest halving, pruning, restart and deep
-rollback. `feature_sharepool_ancestor.py` separately tests historical UTXO
+then stops both nodes. The node integration uses three enforcing nodes, three
+miner gates and fresh native signer keys to exchange evidence on existing P2P
+connections, recover a cold peer and verify direct payouts. The archive test
+checks a 162-block rollback and restoration of pruned acknowledged proofs.
+The wire test runs with legacy or BIP324 v2 transport, including actual transfer
+timeouts and malformed messages. `feature_sharepool_ancestor.py` tests historical UTXO
 validation; `feature_sharepool_network.py` tests three enforcing native P2P nodes
 through partition, rejoin and offline catch-up. These tests use no public mining
 network or physical miner. The signer executable currently requires POSIX.
@@ -169,7 +177,7 @@ recovery and DATUM/gateway deployment remain separate integration requirements.
 [The native build report](../contrib/sharepool/results/native-build.json) records
 compiled targets, their hashes, the native unit/regression cases and activation
 guard checks. The [functional report](../contrib/sharepool/results/native-enforcement.json)
-records the earlier complete-node scenarios. The latest
+records the earlier complete-node scenarios. The preceding
 [hardening report](../contrib/sharepool/results/native-hardening.json) records
 333 passing Python tests with no skips and the accelerated 162-block native peer
 integration. This is not a real-time endurance benchmark.
@@ -180,6 +188,11 @@ deterministic corpus inputs under address and undefined-behavior sanitizers.
 That corpus run is not a coverage-guided fuzzing campaign or an external audit.
 Python regression results remain in
 [unit-tests.txt](../contrib/sharepool/results/unit-tests.txt).
+The [current integration report](../contrib/sharepool/results/native-p2p-recovery.json)
+and [wire results](../contrib/sharepool/results/native-p2p-wire.json) record
+existing-connection propagation, complete archive restoration and both legacy
+and BIP324 v2 transport tests. Earlier reports retain their original scope; the
+deterministic sanitizer corpus predates this relay/archive implementation.
 
 The earlier [physical SPN1 report](../contrib/sharepool/results/native-hardware-regtest.json)
 records the local Goldshell SCLITE run with a 90-second capture limit: 28 accepted
@@ -229,9 +242,10 @@ incorrect payouts after acceptance. They do not establish production security:
   fixed regtest target. The gate permits at most 128 active receipts and 128
   active origin templates, with a separately bounded retained archive and a
   64-job audit cache. Reaching a bound refuses admission; it does not silently
-  drop eligible acknowledged work. The 144-block recovery policy and loopback
-  transfer limits have local tests. Production target adjustment, sampling,
-  external peer transport, recovery operations and large-pool load testing remain.
+  drop acknowledged work. Complete history has a separate quota and protected
+  checkpoint. Native P2P transfer and deep recovery have local tests. Production
+  target adjustment, sampling, WAN load/fairness, protected backup operations
+  and large-pool capacity testing remain.
 - **Quotas and identities:** there is no 10% rule and no claimed physical TH/s
   limit. This native profile does not transplant checkpoint-epoch work caps.
   Self-authorized key/script bindings are permissionless registrations, not a

@@ -18,6 +18,9 @@ import os
 from pathlib import Path
 import sqlite3
 import stat
+import tempfile
+
+import native_archive
 
 try:
     import fcntl
@@ -37,7 +40,7 @@ RETENTION_BLOCKS = 144
 MAX_ARCHIVE_RECEIPTS = MAX_RECEIPTS * (RETENTION_BLOCKS + MAX_SHARE_AGE + 1)
 MAX_ARCHIVE_TEMPLATES = MAX_TEMPLATES * (RETENTION_BLOCKS + MAX_SHARE_AGE + 1)
 MAX_TEMPLATE_BYTES = 256 * 1024 * 1024
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MAX_REVISION = (1 << 63) - 1
 
 
@@ -196,8 +199,26 @@ class MiningAuthorization:
         return block.serialize()
 
 
+def _process_lock(path):
+    descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NONBLOCK |
+                         getattr(os, "O_NOFOLLOW", 0), 0o600)
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise ValueError("gate process lock must be a regular file")
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise ValueError("gate store or protected checkpoint already has an owning process") from None
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
 class NativeMiningGate:
-    def __init__(self, path, *, rpc, pool, public_key, payout_script):
+    def __init__(self, path, *, rpc, pool, public_key, payout_script,
+                 archive_quota=native_archive.DEFAULT_QUOTA, trusted_head_path=None,
+                 _recovery_only=False):
         if (type(pool) is not int or not 0 < pool < 1 << 256 or
                 type(public_key) is not bytes or len(public_key) != 32 or
                 type(payout_script) is not bytes or not 1 <= len(payout_script) <= 34):
@@ -206,7 +227,13 @@ class NativeMiningGate:
         self.public_key, self.payout_script = public_key, payout_script
         self._check_network()
         self.path = Path(path)
-        self.db, self._lock_fd = None, None
+        self._recovery_only = bool(_recovery_only)
+        self.archive_quota = archive_quota
+        self.head_path = Path(trusted_head_path) if trusted_head_path is not None else self.path.with_name(self.path.name + ".archive-head.json")
+        if self.head_path.absolute() == self.path.absolute():
+            raise ValueError("protected archive checkpoint must be separate from database")
+        self._sealed_head = None
+        self.db, self._lock_fd, self._head_lock_fd = None, None, None
         if fcntl is None:
             raise ValueError("gate store requires a supported exclusive process lock")
         descriptor = os.open(self.path, os.O_RDWR | os.O_CREAT | os.O_NONBLOCK |
@@ -219,27 +246,30 @@ class NativeMiningGate:
         # A separate persistent lock inode avoids interfering with SQLite's own
         # platform-specific database locks (notably on macOS). Never unlink it.
         lock_path = self.path.with_name(self.path.name + ".owner.lock")
-        descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NONBLOCK |
-                             getattr(os, "O_NOFOLLOW", 0), 0o600)
+        self._lock_fd = _process_lock(lock_path)
         try:
-            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
-                raise ValueError("gate process lock must be a regular file")
-            try:
-                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                raise ValueError("gate store already has an owning process") from None
-            self._lock_fd = descriptor
+            self._head_lock_fd = _process_lock(self.head_path.with_name(self.head_path.name + ".owner.lock"))
         except BaseException:
-            os.close(descriptor)
+            os.close(self._lock_fd)
+            self._lock_fd = None
             raise
         try:
             self.db = sqlite3.connect(str(self.path))
             if self.db.execute("PRAGMA journal_mode=WAL").fetchone()[0].lower() != "wal":
                 raise ValueError("gate store requires WAL")
             self.db.execute("PRAGMA synchronous=FULL")
+            self.archive = native_archive.DurableArchive(self.db,
+                binding=hashlib.sha256(self._config(0).encode()).hexdigest(), quota=archive_quota)
+            # The archive quota bounds encoded append-only records. SQLite's
+            # main-file cap also reserves room for bounded hot caches/indexes;
+            # a transaction's WAL and export/staging files need extra disk space.
+            pages = (archive_quota + 2 * MAX_TEMPLATE_BYTES + 128 * 1024 * 1024) // self.db.execute("PRAGMA page_size").fetchone()[0]
+            self.db.execute("PRAGMA max_page_count=" + str(pages))
             self._initialize_store()
             self._validate_store()
-            self.maintenance()
+            self._initialize_archive_seal()
+            if not self._recovery_only:
+                self.maintenance()
         except BaseException:
             self.close()
             raise
@@ -262,36 +292,43 @@ class NativeMiningGate:
         # Refuse extra tables/triggers/views or altered columns, including stores
         # newer than this implementation. Never infer safety from a version alone.
         if (tables not in ({"config", "receipts", "jobs", "templates"},
-                           {"config", "receipts", "jobs", "templates", "state"}) or
+                           {"config", "receipts", "jobs", "templates", "state"},
+                           {"config", "receipts", "jobs", "templates", "state", "archive_events", "archive_state"}) or
                 self.db.execute("SELECT 1 FROM sqlite_master WHERE type IN ('trigger','view')").fetchone()):
             raise ValueError("gate store has an unsupported schema")
         saved = self.db.execute("SELECT value FROM config LIMIT 2").fetchall()
-        version = 1 if saved == [(self._config(1),)] else SCHEMA_VERSION
-        if saved != [(self._config(version),)]:
+        version = next((number for number in (1, 2, 3) if saved == [(self._config(number),)]), None)
+        if version is None:
             raise ValueError("gate store belongs to another miner, pool or network")
         columns = {"config": ["value"], "jobs": ["sequence", "job_id", "data"],
                    "receipts": ["sequence", "proof_id", "data"],
                    "templates": ["job_id", "body_hash", "data"]}
-        if version == SCHEMA_VERSION:
+        if version >= 2:
             columns["receipts"] += ["data_hash", "origin_height", "origin_parent"]
             columns["templates"] += ["origin_height", "origin_parent"]
             columns["state"] = ["singleton", "revision", "anchor_height", "anchor_hash", "pruned_through", "recovery"]
+        if version == 3:
+            columns["archive_events"] = ["sequence", "kind", "identity", "receipt_revision", "data_hash", "data", "previous_hash", "chain_hash", "origin_height", "origin_parent", "origin_template"]
+            columns["archive_state"] = ["singleton", "value", "initialized"]
         if set(columns) != tables or any(
                 [row[1] for row in self.db.execute("PRAGMA table_info(" + name + ")")] != wanted
                 for name, wanted in columns.items()):
             raise ValueError("gate store has an unsupported schema")
-        integer_columns = {"sequence", "origin_height", "singleton", "revision", "anchor_height", "pruned_through", "recovery"}
+        integer_columns = {"sequence", "origin_height", "singleton", "revision", "anchor_height", "pruned_through", "recovery", "kind", "receipt_revision", "initialized"}
         primary_keys = {"config": None, "receipts": "sequence", "jobs": "sequence",
-                        "templates": "job_id", "state": "singleton"}
+                        "templates": "job_id", "state": "singleton", "archive_events": "sequence", "archive_state": "singleton"}
         for table in columns:
             for unused_cid, name, sql_type, unused_null, default, primary in self.db.execute("PRAGMA table_info(" + table + ")"):
                 wanted_type = "INTEGER" if name in integer_columns else "BLOB" if name == "data" else "TEXT"
                 if sql_type != wanted_type or primary != int(name == primary_keys[table]) or default is not None:
                     raise ValueError("gate store has an unsupported schema")
-        for table, identity in (("receipts", "proof_id"), ("jobs", "job_id")):
+        uniqueness = [("receipts", ["proof_id"]), ("jobs", ["job_id"])]
+        if version == 3:
+            uniqueness.append(("archive_events", ["kind", "identity"]))
+        for table, identity in uniqueness:
             indexes = self.db.execute("PRAGMA index_list(" + table + ")").fetchall()
             if not any(unique and not partial and
-                       [row[2] for row in self.db.execute("PRAGMA index_info('" + name.replace("'", "''") + "')")] == [identity]
+                       [row[2] for row in self.db.execute("PRAGMA index_info('" + name.replace("'", "''") + "')")] == identity
                        for unused_seq, name, unique, unused_origin, partial in indexes):
                 raise ValueError("gate store lacks unique evidence identities")
         if version == 1:
@@ -319,10 +356,315 @@ class NativeMiningGate:
                 revision = self.db.execute("SELECT COALESCE(max(sequence),0) FROM receipts").fetchone()[0]
                 self.db.execute("CREATE TABLE state (singleton INTEGER PRIMARY KEY, revision INTEGER NOT NULL, anchor_height INTEGER NOT NULL, anchor_hash TEXT NOT NULL, pruned_through INTEGER NOT NULL, recovery INTEGER NOT NULL)")
                 self.db.execute("INSERT INTO state VALUES (1,?,0,?,0,0)", (revision, REGTEST_GENESIS))
-                self.db.execute("UPDATE config SET value=?", (self._config(SCHEMA_VERSION),))
+                self.db.execute("UPDATE config SET value=?", (self._config(2),))
                 self.db.execute("PRAGMA user_version=2")
-        elif self.db.execute("PRAGMA user_version").fetchone()[0] != SCHEMA_VERSION:
+            version = 2
+        if self.db.execute("PRAGMA user_version").fetchone()[0] != version:
             raise ValueError("gate store schema version mismatch")
+        if version == 2:
+            self._validate_store()
+            revision, anchor, pruned = self.db.execute("SELECT revision,anchor_height,pruned_through FROM state").fetchone()
+            count, first, last = self.db.execute("SELECT count(*),COALESCE(min(sequence),0),COALESCE(max(sequence),0) FROM receipts").fetchone()
+            if (anchor > MAX_SHARE_AGE or pruned or count != revision or last != revision or
+                    (revision and first != 1)):
+                raise RecoveryRequired("pre-pruned v2 evidence cannot be reconstructed; a complete independently protected archive is required")
+            with self.db:
+                self.db.execute("BEGIN IMMEDIATE")
+                self.archive.create()
+                for identity, raw, height, parent in self.db.execute("SELECT job_id,data,origin_height,origin_parent FROM templates ORDER BY job_id"):
+                    self.archive.append(0, identity, bytes(raw), origin_height=height, origin_parent=parent, origin_template=identity)
+                for revision, identity, raw in self.db.execute("SELECT sequence,proof_id,data FROM receipts ORDER BY sequence"):
+                    share = parse_share(bytes(raw))
+                    self.archive.append(1, identity, bytes(raw), receipt_revision=revision,
+                        origin_height=share.envelope.height, origin_parent=f"{share.envelope.native_parent:064x}", origin_template=template_id(share.header))
+                self.db.execute("UPDATE config SET value=?", (self._config(3),))
+                self.db.execute("PRAGMA user_version=3")
+
+    def _event_context(self, kind, identity, raw):
+        if kind == 0:
+            block = parse_block(raw)
+            origin = parse_coinbase(block.vtx[0])[0].envelope
+            if (template_id(block) != identity or origin.pool != self.pool or
+                    origin.genesis != int(REGTEST_GENESIS, 16) or origin.rules != RULES_HASH or
+                    origin.version != 1 or origin.height < 1 or origin.height != block.m_height or
+                    origin.native_parent != block.hashPrevBlock or origin.root != block.m_mm_rhs):
+                raise native_archive.ArchiveError("archived template binding failed")
+            return origin.height, f"{origin.native_parent:064x}", identity
+        share = self._receipt(identity, raw)
+        return share.envelope.height, f"{share.envelope.native_parent:064x}", template_id(share.header)
+
+    def _require_archived_copy(self, kind, identity, raw):
+        saved = self.db.execute("SELECT data_hash,length(data) FROM archive_events WHERE kind=? AND identity=?", (kind, identity)).fetchone()
+        expected = hashlib.sha256(raw).hexdigest()
+        if saved != (expected, len(raw)):
+            raise native_archive.ArchiveError("cannot prune evidence without its complete archived copy")
+        archived = self.db.execute("SELECT data FROM archive_events WHERE kind=? AND identity=?", (kind, identity)).fetchone()[0]
+        if type(archived) is not bytes or hashlib.sha256(archived).hexdigest() != expected:
+            raise native_archive.ArchiveError("cannot prune evidence with a corrupt archived copy")
+
+    def _validate_archive(self, prefix, *, check_hot=True):
+        for sequence, kind, identity, revision, unused_hash, raw, unused_previous, unused_root in self.archive.records(trusted_prefix=prefix):
+            context = self._event_context(kind, identity, raw)
+            saved = self.db.execute("SELECT origin_height,origin_parent,origin_template FROM archive_events WHERE sequence=?", (sequence,)).fetchone()
+            if saved != context:
+                raise native_archive.ArchiveError("archived origin index failed integrity validation")
+            if kind == 1:
+                source = self.db.execute("SELECT sequence,substr(data,1,164) FROM archive_events WHERE kind=0 AND identity=?", (context[2],)).fetchone()
+                if source is None or source[0] >= sequence:
+                    raise native_archive.ArchiveError("archived proof lacks its earlier complete origin")
+                header = CBlockHeader()
+                header.deserialize(_ExactBytesIO(bytes(source[1])))
+                if immutable_header(header) != immutable_header(parse_share(raw).header):
+                    raise native_archive.ArchiveError("archived proof does not match its complete origin")
+        head = self.archive.head()
+        if self.db.execute("SELECT revision FROM state WHERE singleton=1").fetchone()[0] != head["receipt_revision"]:
+            raise native_archive.ArchiveError("gate revision differs from complete archive high-water")
+        if check_hot:
+            if self.db.execute("SELECT 1 FROM receipts r LEFT JOIN archive_events a ON a.kind=1 AND a.identity=r.proof_id WHERE a.sequence IS NULL OR a.receipt_revision!=r.sequence OR a.data_hash!=r.data_hash LIMIT 1").fetchone():
+                raise native_archive.ArchiveError("hot receipt is not preserved by complete archive")
+            if self.db.execute("SELECT 1 FROM templates t LEFT JOIN archive_events a ON a.kind=0 AND a.identity=t.job_id WHERE a.sequence IS NULL OR a.data_hash!=t.body_hash LIMIT 1").fetchone():
+                raise native_archive.ArchiveError("hot template is not preserved by complete archive")
+        return head
+
+    def _initialize_archive_seal(self):
+        initialized = self.db.execute("SELECT initialized FROM archive_state WHERE singleton=1").fetchone()[0]
+        if type(initialized) is not int or initialized not in (0, 1):
+            raise native_archive.ArchiveError("archive initialization metadata is invalid")
+        if self.head_path.exists() or self.head_path.is_symlink():
+            prefix = native_archive.read_head(self.head_path)
+        elif initialized:
+            raise native_archive.ArchiveError("protected archive high-water is missing; explicit trusted recovery required")
+        else:
+            prefix = native_archive.initial_head(self.archive.binding)
+        self._validate_archive(prefix)
+        self._sealed_head = prefix
+        self._sync_archive_seal(force=not initialized)
+        if not initialized:
+            with self.db:
+                self.db.execute("UPDATE archive_state SET initialized=1 WHERE singleton=1")
+
+    def _sync_archive_seal(self, *, force=False):
+        head = self.archive.head()
+        if self._sealed_head is None:
+            raise native_archive.ArchiveError("protected archive high-water has not been verified")
+        if self.head_path.exists() or self.head_path.is_symlink():
+            if native_archive.read_head(self.head_path) != self._sealed_head:
+                raise native_archive.ArchiveError("protected archive checkpoint changed outside its owning gate")
+        elif not force:
+            raise native_archive.ArchiveError("protected archive high-water is missing; explicit trusted recovery required")
+        if head != self._sealed_head:
+            for unused in self.archive.extension_records(self._sealed_head):
+                pass
+        if head != self._sealed_head or force:
+            native_archive.write_head(self.head_path, head)
+            self._sealed_head = head
+        return dict(head)
+
+    def archive_head(self):
+        """Return the durable checkpoint to protect separately/off-host."""
+        return self._sync_archive_seal()
+
+    def export_archive(self, path):
+        """Export complete evidence even while ordinary mining is latched."""
+        self._sync_archive_seal()
+        self._validate_archive(self._sealed_head)
+        return self.archive.export(path, trusted_prefix=self._sealed_head)
+
+    @classmethod
+    def recover_archive(cls, path, **kwargs):
+        """Explicitly reopen a latched store and verify full deep-history recovery.
+
+        No ordinary gate method can admit work on the temporary recovery handle.
+        Failure closes it without changing hot rows, revision, or recovery latch.
+        """
+        if not Path(path).is_file():
+            raise native_archive.ArchiveError("existing complete gate archive is required")
+        gate = cls(path, _recovery_only=True, **kwargs)
+        try:
+            gate._recover_archive()
+            return gate
+        except BaseException:
+            gate.close()
+            raise
+
+    @classmethod
+    def restore_archive(cls, export_path, destination, *, trusted_head, **kwargs):
+        """Restore a fresh destination from an independently trusted checkpoint.
+
+        Verify and recover in a private staging database. Invalid/incomplete
+        exports or failed native revalidation never publish a partial database.
+        """
+        native_archive.check_head(trusted_head)
+        destination = Path(destination)
+        head_path = Path(kwargs.get("trusted_head_path") or destination.with_name(destination.name + ".archive-head.json"))
+        if destination.exists() or destination.is_symlink() or head_path.exists() or head_path.is_symlink():
+            raise native_archive.ArchiveError("archive restore requires a fresh destination and checkpoint path")
+        binding = hashlib.sha256(json.dumps({"version": 0, "genesis": REGTEST_GENESIS,
+            "pool": kwargs["pool"], "public_key": kwargs["public_key"].hex(),
+            "script": kwargs["payout_script"].hex()}, sort_keys=True).encode()).hexdigest()
+        quota = kwargs.get("archive_quota", native_archive.DEFAULT_QUOTA)
+        for unused in native_archive.export_records(export_path, trusted_head=trusted_head, binding=binding, quota=quota):
+            pass  # Full structural/checkpoint validation before staging creation.
+        descriptor, staging_name = tempfile.mkstemp(prefix=".sharepool-restore-", suffix=".sqlite", dir=destination.parent)
+        os.close(descriptor)
+        staging = Path(staging_name)
+        staging_head = staging.with_name(staging.name + ".archive-head.json")
+        gate, published_head = None, False
+        options = dict(kwargs, trusted_head_path=staging_head)
+        try:
+            gate = cls(staging, _recovery_only=True, **options)
+            with gate.db:
+                gate.db.execute("BEGIN IMMEDIATE")
+                for sequence, kind, identity, revision, data_hash, raw, previous, root in native_archive.export_records(
+                        export_path, trusted_head=trusted_head, binding=binding, quota=quota):
+                    height, parent, source = gate._event_context(kind, identity, raw)
+                    gate.archive.append(kind, identity, raw, receipt_revision=revision,
+                        origin_height=height, origin_parent=parent, origin_template=source)
+                if gate.archive.head() != trusted_head:
+                    raise native_archive.ArchiveError("restored archive does not match protected high-water")
+                gate.db.execute("UPDATE state SET revision=?,recovery=1 WHERE singleton=1", (trusted_head["receipt_revision"],))
+            gate._sync_archive_seal()
+            gate._validate_archive(trusted_head)
+            gate._recover_archive()
+            if gate.db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()[0] != 0:
+                raise native_archive.ArchiveError("restored archive could not be checkpointed")
+            gate.close()
+            gate = None
+            native_archive.write_head(head_path, trusted_head, exclusive=True)
+            published_head = True
+            os.link(staging, destination)  # Atomic no-overwrite publication.
+            directory = os.open(destination.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+            return cls(destination, **kwargs)
+        except BaseException:
+            if published_head and not destination.exists():
+                head_path.unlink(missing_ok=True)
+            raise
+        finally:
+            if gate is not None:
+                gate.close()
+            for suffix in ("", "-wal", "-shm", ".owner.lock", ".archive-head.json", ".archive-head.json.owner.lock"):
+                Path(str(staging) + suffix).unlink(missing_ok=True)
+
+    def _native_origin_check(self, raw, profile, tip):
+        block = parse_block(raw)
+        origin = parse_coinbase(block.vtx[0])[0].envelope
+        if (origin.pool != self.pool or
+                not max(profile["sharepool"]["activation_height"], profile["height"] - MAX_SHARE_AGE)
+                <= origin.height <= profile["height"]):
+            raise ValueError("template pool or eligible native height mismatch")
+        result = self.rpc("validatesharepooltemplate", raw.hex())
+        expected = {"valid": True, "native_tip": tip, "native_parent": f"{block.hashPrevBlock:064x}",
+                    "origin_height": origin.height, "commitment": f"{block.m_mm_rhs:064x}"}
+        if any(result.get(key) != value for key, value in expected.items()):
+            raise ValueError("native template response does not match complete origin")
+        return block
+
+    def _native_share_check(self, raw):
+        share = parse_share(raw)
+        result = self.rpc("validatesharepoolshare", raw.hex())
+        expected = {"valid": True, "proof_id": f"{share.proof_id:064x}", "pool": f"{self.pool:064x}",
+                    "origin_height": share.envelope.height, "owner": share.envelope.public_key.hex(),
+                    "payout_script": share.envelope.payout_script.hex(), "share_bits": f"{SHARE_BITS:08x}"}
+        if any(result.get(key) != value for key, value in expected.items()):
+            raise ValueError("native share response does not match received work")
+        return share
+
+    def _stage_eligible_archive(self, height, tip):
+        profile = self._native_profile()
+        if profile["height"] != height + 1 or self.rpc("getbestblockhash") != tip:
+            raise ValueError("native tip changed during archive recovery")
+        floor = max(profile["sharepool"]["activation_height"], height + 1 - MAX_SHARE_AGE)
+        ancestors = {origin: self.rpc("getblockhash", origin - 1) for origin in range(floor, height + 2)}
+        self.db.execute("CREATE TEMP TABLE recovery_templates AS SELECT * FROM templates WHERE 0")
+        self.db.execute("CREATE TEMP TABLE recovery_receipts AS SELECT * FROM receipts WHERE 0")
+        templates, receipts, size = 0, 0, 0
+        try:
+            for kind in (0, 1):
+                for identity, revision, raw, data_hash, origin, parent, source in self.db.execute(
+                        "SELECT identity,receipt_revision,data,data_hash,origin_height,origin_parent,origin_template FROM archive_events WHERE kind=? AND origin_height BETWEEN ? AND ? ORDER BY sequence", (kind, floor, height + 1)):
+                    if ancestors[origin] != parent:
+                        continue
+                    raw = bytes(raw)
+                    if hashlib.sha256(raw).hexdigest() != data_hash or self._event_context(kind, identity, raw) != (origin, parent, source):
+                        raise native_archive.ArchiveError("eligible archive evidence failed integrity validation")
+                    if kind == 0:
+                        templates, size = templates + 1, size + len(raw)
+                        if templates > MAX_TEMPLATES or size > MAX_TEMPLATE_BYTES:
+                            raise native_archive.ArchiveError("recovered eligible templates exceed admission limits")
+                        self._native_origin_check(raw, profile, tip)
+                        self.db.execute("INSERT INTO recovery_templates VALUES (?,?,?,?,?)", (identity, data_hash, raw, origin, parent))
+                    else:
+                        receipts += 1
+                        if receipts > MAX_RECEIPTS or not self.db.execute("SELECT 1 FROM recovery_templates WHERE job_id=?", (source,)).fetchone():
+                            raise native_archive.ArchiveError("recovered proof lacks a complete eligible origin or exceeds admission limits")
+                        self._native_share_check(raw)
+                        self.db.execute("INSERT INTO recovery_receipts VALUES (?,?,?,?,?,?)", (revision, identity, raw, data_hash, origin, parent))
+                    if self.rpc("getbestblockhash") != tip:
+                        raise ValueError("native tip changed during archive recovery")
+            self.db.commit()  # Only private TEMP tables changed during validation.
+        except BaseException:
+            self.db.rollback()
+            self._drop_recovery_tables()
+            raise
+
+    def _drop_recovery_tables(self):
+        self.db.execute("DROP TABLE IF EXISTS temp.recovery_receipts")
+        self.db.execute("DROP TABLE IF EXISTS temp.recovery_templates")
+
+    def _recover_archive(self):
+        height, tip = self._chain_snapshot()
+        self._validate_archive(self._sealed_head)
+        self._stage_eligible_archive(height, tip)
+        try:
+            anchor = max(0, height - RETENTION_BLOCKS)
+            anchor_hash = self.rpc("getblockhash", anchor)
+            if self.rpc("getbestblockhash") != tip:
+                raise ValueError("native tip changed during archive recovery")
+            with self.db:
+                self.db.execute("BEGIN IMMEDIATE")
+                self.db.execute("DELETE FROM receipts")
+                self.db.execute("DELETE FROM templates")
+                self.db.execute("DELETE FROM jobs")
+                self.db.execute("INSERT INTO templates SELECT * FROM recovery_templates")
+                self.db.execute("INSERT INTO receipts SELECT * FROM recovery_receipts")
+                self.db.execute("UPDATE state SET anchor_height=?,anchor_hash=?,recovery=0 WHERE singleton=1", (anchor, anchor_hash))
+                if self.rpc("getbestblockhash") != tip:
+                    raise ValueError("native tip changed before archive recovery commit")
+            self._recovery_only = False
+        finally:
+            self._drop_recovery_tables()
+
+    def _rehydrate_archive(self, height, tip):
+        if self.db.execute("SELECT 1 FROM receipts r LEFT JOIN archive_events a ON a.kind=1 AND a.identity=r.proof_id WHERE a.sequence IS NULL OR a.receipt_revision!=r.sequence OR a.data_hash!=r.data_hash LIMIT 1").fetchone():
+            raise ValueError("persisted receipt failed identity validation")
+        floor = max(1, height + 1 - MAX_SHARE_AGE)
+        missing = False
+        for origin in range(floor, height + 2):
+            parent = self.rpc("getblockhash", origin - 1)
+            if self.db.execute("SELECT 1 FROM archive_events a LEFT JOIN templates t ON a.kind=0 AND t.job_id=a.identity LEFT JOIN receipts r ON a.kind=1 AND r.proof_id=a.identity WHERE a.origin_height=? AND a.origin_parent=? AND ((a.kind=0 AND t.job_id IS NULL) OR (a.kind=1 AND r.proof_id IS NULL)) LIMIT 1", (origin, parent)).fetchone():
+                missing = True
+                break
+        if not missing:
+            return
+        self._stage_eligible_archive(height, tip)
+        try:
+            with self.db:
+                self.db.execute("BEGIN IMMEDIATE")
+                self.db.execute("INSERT INTO templates SELECT * FROM recovery_templates WHERE job_id NOT IN (SELECT job_id FROM templates)")
+                self.db.execute("INSERT INTO receipts SELECT * FROM recovery_receipts WHERE proof_id NOT IN (SELECT proof_id FROM receipts)")
+                self._bounded_table("templates", MAX_ARCHIVE_TEMPLATES, 4_000_000, MAX_TEMPLATE_BYTES)
+                self._bounded_table("receipts", MAX_ARCHIVE_RECEIPTS, 1024)
+                if (self.db.execute("SELECT count(*) FROM receipts WHERE origin_height>=?", (floor,)).fetchone()[0] > MAX_RECEIPTS or
+                        self.db.execute("SELECT count(*) FROM templates WHERE origin_height>=?", (floor,)).fetchone()[0] > MAX_TEMPLATES):
+                    raise native_archive.ArchiveError("rehydrated active evidence exceeds admission limits")
+                if self.rpc("getbestblockhash") != tip:
+                    raise ValueError("native tip changed before archive rehydration commit")
+        finally:
+            self._drop_recovery_tables()
 
     def _bounded_table(self, table, limit, max_bytes, total_bytes=None):
         count, oversized, size = self.db.execute(
@@ -411,6 +753,9 @@ class NativeMiningGate:
         Losing the anchor permanently latches recovery, even if the tip later
         returns. Restore a complete older evidence archive; never clear the latch.
         """
+        if self._recovery_only:
+            raise RecoveryRequired("only verified archive recovery is permitted on this handle")
+        self._sync_archive_seal()
         height, tip = self._chain_snapshot()
         revision, anchor_height, anchor_hash, pruned, recovery = self.db.execute(
             "SELECT revision,anchor_height,anchor_hash,pruned_through,recovery FROM state WHERE singleton=1").fetchone()
@@ -431,9 +776,12 @@ class NativeMiningGate:
         # receipts share it.
         retiring_origins = {}
         for identity, in self.db.execute("SELECT job_id FROM templates WHERE origin_height<=?", (cutoff,)):
-            retiring_origins[identity] = immutable_header(parse_block(self._template_bytes(identity)))
+            raw = self._template_bytes(identity)
+            self._require_archived_copy(0, identity, raw)
+            retiring_origins[identity] = immutable_header(parse_block(raw))
         for identity, in self.db.execute("SELECT proof_id FROM receipts WHERE origin_height<=?", (cutoff,)):
-            self._receipt_bytes(identity, origins=retiring_origins)
+            raw = self._receipt_bytes(identity, origins=retiring_origins)
+            self._require_archived_copy(1, identity, raw)
         if self.rpc("getbestblockhash") != tip:
             raise ValueError("native tip changed during archive maintenance")
         with self.db:
@@ -445,6 +793,7 @@ class NativeMiningGate:
             self.db.execute("DELETE FROM templates WHERE origin_height<=?", (cutoff,))
             self.db.execute("UPDATE state SET anchor_height=?,anchor_hash=?,pruned_through=? WHERE singleton=1",
                             (new_anchor, new_hash, max(pruned, dropped)))
+        self._rehydrate_archive(height, tip)
         return {"tip": tip, "height": height, "anchor_height": new_anchor,
                 "anchor_hash": new_hash, "revision": revision,
                 "pruned_through": max(pruned, dropped)}
@@ -457,6 +806,10 @@ class NativeMiningGate:
     def base_template(self):
         """Get an explicitly incomplete template; this never authorizes mining."""
         self.maintenance()
+        return self._native_profile()
+
+    def _native_profile(self):
+        self._check_network()
         result = self.rpc("getblocktemplate", {
             "rules": ["segwit", "blake2b", "sharepool"],
             "capabilities": ["skip_validity_test"],
@@ -493,7 +846,9 @@ class NativeMiningGate:
         self.maintenance()
         with self.db:
             self.db.execute("BEGIN IMMEDIATE")
-            return self._record_receipt(share)
+            acknowledged = self._record_receipt(share)
+        self._sync_archive_seal()
+        return acknowledged
 
     def _require_origin(self, share):
         identity = template_id(share.header)
@@ -524,6 +879,9 @@ class NativeMiningGate:
         self.db.execute("INSERT INTO receipts(sequence,proof_id,data,data_hash,origin_height,origin_parent) VALUES (?,?,?,?,?,?)",
                         (revision + 1, identity, raw, hashlib.sha256(raw).hexdigest(), share.envelope.height,
                          f"{share.envelope.native_parent:064x}"))
+        self.archive.append(1, identity, raw, receipt_revision=revision + 1,
+                            origin_height=share.envelope.height, origin_parent=f"{share.envelope.native_parent:064x}",
+                            origin_template=template_id(share.header))
         self.db.execute("UPDATE state SET revision=? WHERE singleton=1", (revision + 1,))
         return True
 
@@ -547,6 +905,12 @@ class NativeMiningGate:
 
     def _cache_template(self, raw, block):
         identity = template_id(block)
+        archived = self.db.execute("SELECT data FROM archive_events WHERE kind=0 AND identity=?", (identity,)).fetchone()
+        if archived is not None:
+            archived_raw = bytes(archived[0])
+            if immutable_header(parse_block(archived_raw)) != immutable_header(block):
+                raise native_archive.ArchiveError("origin differs from its complete archive")
+            raw = archived_raw
         saved = self.db.execute("SELECT 1 FROM templates WHERE job_id=?", (identity,)).fetchone()
         if not saved:
             active_floor = self.rpc("getblockchaininfo")["blocks"] + 1 - MAX_SHARE_AGE
@@ -557,6 +921,8 @@ class NativeMiningGate:
             self.db.execute("INSERT INTO templates VALUES (?,?,?,?,?)",
                             (identity, hashlib.sha256(raw).hexdigest(), raw, block.m_height,
                              f"{block.hashPrevBlock:064x}"))
+        self.archive.append(0, identity, raw, origin_height=block.m_height,
+                            origin_parent=f"{block.hashPrevBlock:064x}", origin_template=identity)
         return identity
 
     def register_template(self, raw):
@@ -585,7 +951,9 @@ class NativeMiningGate:
             raise ValueError("native tip changed during origin validation")
         self.maintenance()
         with self.db:
-            return self._cache_template(raw, block)
+            identity = self._cache_template(raw, block)
+        self._sync_archive_seal()
+        return identity
 
     def authorize(self, raw):
         block, manifest = self._validate_template(raw)
@@ -602,6 +970,7 @@ class NativeMiningGate:
             self.db.execute("BEGIN IMMEDIATE")
             for share in manifest.shares:
                 self._record_receipt(share)
+        self._sync_archive_seal()
         # Only now is the parent's paid-state opening authenticated by native
         # consensus. Unseen work is not a Bitcoin block-validity condition.
         paid = {entry.proof_id for entry in manifest.parent_state}
@@ -631,6 +1000,7 @@ class NativeMiningGate:
             self._cache_template(raw, block)
             self.db.execute("INSERT OR IGNORE INTO jobs(job_id,data) VALUES (?,?)", (authorization.job_id, raw))
             self.db.execute("DELETE FROM jobs WHERE sequence NOT IN (SELECT sequence FROM jobs ORDER BY sequence DESC LIMIT ?)", (MAX_JOBS,))
+        self._sync_archive_seal()
         return authorization
 
     def template_bytes(self, identity):
@@ -733,6 +1103,9 @@ class NativeMiningGate:
                 self.db.close()
                 self.db = None
         finally:
+            if self._head_lock_fd is not None:
+                os.close(self._head_lock_fd)
+                self._head_lock_fd = None
             if self._lock_fd is not None:
                 os.close(self._lock_fd)
                 self._lock_fd = None

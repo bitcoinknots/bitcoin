@@ -109,6 +109,11 @@ Manifest ExtractManifest(const CTransaction& coinbase, std::vector<CTxOut>& payo
 }
 } // namespace
 
+Manifest ParseCoinbaseManifest(const CTransaction& coinbase, std::vector<CTxOut>& payouts)
+{
+    return ExtractManifest(coinbase, payouts);
+}
+
 uint256 RulesHash()
 {
     return DomainHash("SharePool/rules/v1", SHARE_BITS, MAX_SHARE_AGE, MAX_SHARES);

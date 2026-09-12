@@ -127,8 +127,10 @@ receipt history cannot change native block validity. The new local peer
 transport exchanges bounded inventories, full templates and proofs through this
 gate. Inventories never select settlement ancestry or authorize signing.
 
-The gate's 144-block retained archive and persistent deep-reorganization
-recovery latch are operational storage rules, not additions to the wire format.
+The gate's 144-block hot cache, complete append-only archive and explicit
+recovery are operational rules, not additions to the settlement wire format.
+Recovery requires a protected checkpoint and full native revalidation of
+currently eligible evidence.
 The consensus eligibility window remains `j` through `j+3`; retaining older
 evidence cannot make it payable again. See [native enforcement](sharepool-native-enforcement.md)
 and [retention/recovery](sharepool-native-recovery.md) for implementation limits.
@@ -145,8 +147,12 @@ with native-parent state; it does not transplant checkpoint-based quotas or clai
 an absolute physical hash-rate cap. Registrations here are self-authorized
 key/script bindings per native round, not a global identity authority.
 
-The native signer, historical-origin RPC, miner gates and loopback evidence
-exchange are exercised together in the recorded 162-block integration test.
+The native signer, historical-origin RPC and earlier loopback exchange were
+exercised together in the recorded 162-block integration test. The current
+[P2P extension](sharepool-native-p2p.md) reuses existing Bitcoin connections;
+[complete recovery](sharepool-archive-recovery.md) preserves acknowledged work
+beyond hot-cache pruning. See the
+[current report](../contrib/sharepool/results/native-p2p-recovery.json).
 Separate native P2P/reorg/reindex cases and a deterministic sanitizer corpus
 provide additional evidence. These bounded tests do not establish large-pool
 performance, undisclosed-work detection, independent security review or mainnet

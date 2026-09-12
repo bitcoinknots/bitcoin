@@ -112,6 +112,8 @@ uint256 PayoutsRoot(const std::vector<CTxOut>& payouts);
 bool IsPayoutScript(Span<const unsigned char> script);
 std::vector<unsigned char> EncodeManifest(const Manifest& manifest);
 Manifest DecodeManifest(Span<const unsigned char> bytes);
+/** Decode the same canonical coinbase carrier used by native block validation. */
+Manifest ParseCoinbaseManifest(const CTransaction& coinbase, std::vector<CTxOut>& payouts);
 std::vector<CTxOut> CarrierOutputs(Span<const unsigned char> manifest);
 std::vector<CTxOut> CalculatePayouts(const Manifest& manifest, CAmount reward);
 /** Stateless native share admission; nullifier/pool-set checks remain block rules. */
