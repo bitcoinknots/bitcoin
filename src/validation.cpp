@@ -5272,7 +5272,14 @@ bool ChainstateManager::ProcessNewBlock(const std::shared_ptr<const CBlock>& blo
                     // or the network message-processing mutex held by callers.
                     RequestSharePoolHashBlocks();
                 }
-                else if (state.IsInvalid()) m_sharepool_hash_store->RemoveBlock(block->GetHash());
+                else if (state.IsInvalid() && m_sharepool_hash_store->MatchesPendingBlock(*block)) {
+                    // A header does not authenticate arbitrary alternate body
+                    // bytes (including witness). Rejecting such a body must
+                    // not evict a different, durably retained pending body.
+                    // The retry worker independently removes that original if
+                    // its own complete validation establishes invalidity.
+                    m_sharepool_hash_store->RemoveBlock(block->GetHash());
+                }
             }
             if (m_options.signals) {
                 m_options.signals->BlockChecked(*block, state);
@@ -5280,11 +5287,12 @@ bool ChainstateManager::ProcessNewBlock(const std::shared_ptr<const CBlock>& blo
             LogError("%s: AcceptBlock FAILED (%s)\n", __func__, state.ToString());
             return false;
         }
-    }
-
-    {
-        LOCK(cs_main);
-        if (m_sharepool_hash_store) m_sharepool_hash_store->RemoveBlock(block->GetHash());
+        // AcceptBlock also returns true when an unsolicited low-work or
+        // too-far-ahead block is ignored. Only an actually stored body replaces
+        // our pending copy; a successful no-op must not discard its evidence.
+        if (m_sharepool_hash_store && pindex && (pindex->nStatus & BLOCK_HAVE_DATA)) {
+            m_sharepool_hash_store->RemoveBlock(block->GetHash());
+        }
     }
     NotifyHeaderTip();
 

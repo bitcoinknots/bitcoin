@@ -10,9 +10,10 @@ resident or physical capacity stops admission before acknowledgment. Native
 RPC, not a local inventory or successful snapshot storage, establishes validity.
 One owner thread/process must use a gate. No RPC runs inside a write transaction.
 """
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from io import BytesIO
 import hashlib
+import hmac
 import json
 import os
 from pathlib import Path
@@ -49,6 +50,9 @@ class TemplateOmission(ValueError):
 class HashMiningAuthorization(MiningAuthorization):
     snapshot_bytes: bytes
     evidence_sequence: int
+    native_height: int = 0
+    policy_binding: str = ""
+    dispatch_seal: bytes = field(default=b"", repr=False)
 
 
 class HashMiningGate:
@@ -81,6 +85,9 @@ class HashMiningGate:
         if self.head_path.absolute() == self.path.absolute():
             raise ValueError("protected head must be separate from database")
         self.db, self._lock_fd, self._head_lock_fd, self._sealed_head = None, None, None, None
+        # Dispatch capabilities belong to this open instance, never to the
+        # persisted journal. Recovered evidence requires fresh native approval.
+        self._dispatch_key, self._dispatch_pid = None, os.getpid()
         self._context()
         config = {"schema": 2, "profile": self.mode, "genesis": REGTEST_GENESIS,
             "rules": f"{self.rules:064x}", "pool": f"{pool:064x}", "public_key": public_key.hex(), "script": payout_script.hex(),
@@ -114,6 +121,7 @@ class HashMiningGate:
             self._verify_store(prefix)
             self._sealed_head = prefix
             self._seal(initial=not initialized)
+            self._dispatch_key = os.urandom(32)
         except BaseException:
             self.close()
             raise
@@ -1164,18 +1172,77 @@ class HashMiningGate:
         staged[TEMPLATE, own_id] = normalize_template(raw)
         self._persist([(kind, body) for (kind, unused), body in staged.items()])
         head = self.archive_head()
-        return HashMiningAuthorization(raw, tip, snapshot.hash_hex, head["receipt_revision"],
-                                       snapshot.serialize(), head["events"])
+        authorization = HashMiningAuthorization(raw, tip, snapshot.hash_hex, head["receipt_revision"],
+            snapshot.serialize(), head["events"], height, self._dispatch_policy())
+        return replace(authorization, dispatch_seal=self._dispatch_mac(authorization))
+
+    def _dispatch_policy(self):
+        """Bind the journal policy and its currently configured runtime values."""
+        value = {"config": self.config.hex(), "binding": self.binding, "genesis": REGTEST_GENESIS,
+            "pool": self.pool, "public_key": self.public_key.hex(), "payout_script": self.payout_script.hex(),
+            "snapshot_budget": self.snapshot_budget, "profile_version": self.profile_version,
+            "rules": self.rules, "mode": self.mode, "activation_height": self.activation_height,
+            "quota": self.quota}
+        return hashlib.sha256(native_archive.canonical(value)).hexdigest()
+
+    def _dispatch_mac(self, authorization):
+        # Hash the exact immutable bytes, not only the job/snapshot identifiers.
+        # Incremental updates avoid copying the potentially large job together
+        # with its opening. Explicit lengths make the encoding unambiguous.
+        digest = hmac.new(self._dispatch_key, b"SharePool/hash-gate/dispatch/v1\0", hashlib.sha256)
+        digest.update(struct.pack("<QQQ", authorization.native_height,
+            authorization.receipt_sequence, authorization.evidence_sequence))
+        for value in (bytes.fromhex(authorization.policy_binding), bytes.fromhex(authorization.native_parent),
+                      bytes.fromhex(authorization.commitment), authorization.block_bytes, authorization.snapshot_bytes):
+            digest.update(struct.pack("<Q", len(value)))
+            digest.update(value)
+        return digest.digest()
+
+    def _issued_authorization(self, authorization):
+        if (self.db is None or self._dispatch_key is None or os.getpid() != self._dispatch_pid or
+                type(authorization) is not HashMiningAuthorization):
+            return False
+        try:
+            if (set(vars(authorization)) != HashMiningAuthorization.__dataclass_fields__.keys() or
+                    type(authorization.block_bytes) is not bytes or not 1 <= len(authorization.block_bytes) <= MAX_TEMPLATE_BYTES or
+                    type(authorization.snapshot_bytes) is not bytes or not 1 <= len(authorization.snapshot_bytes) <= MAX_SNAPSHOT_BYTES or
+                    type(authorization.dispatch_seal) is not bytes or len(authorization.dispatch_seal) != 32 or
+                    type(authorization.native_height) is not int or not 0 <= authorization.native_height < 0x7fffffff or
+                    any(type(value) is not int or not 0 <= value <= hash_gate_archive.MAX_COUNTER
+                        for value in (authorization.receipt_sequence, authorization.evidence_sequence)) or
+                    any(not native_archive.is_hash(value) for value in
+                        (authorization.native_parent, authorization.commitment, authorization.policy_binding)) or
+                    authorization.policy_binding != self._dispatch_policy()):
+                return False
+            return hmac.compare_digest(authorization.dispatch_seal, self._dispatch_mac(authorization))
+        except (AttributeError, TypeError, ValueError, OverflowError):
+            # Even exact frozen dataclasses can be fabricated with __new__ or
+            # altered with object.__setattr__. They are data, not authority.
+            return False
 
     def needs_refresh(self, authorization):
+        if not self._issued_authorization(authorization):
+            return True
         self._check_seal()
-        unused, tip = self._context()
-        return tip != authorization.native_parent or self._head()["receipt_revision"] != authorization.receipt_sequence
+        height, tip = self._context()
+        head = self._head()
+        self._stable(tip)
+        return (tip != authorization.native_parent or height != authorization.native_height or
+                head["receipt_revision"] != authorization.receipt_sequence or
+                head["events"] < authorization.evidence_sequence)
 
     def ready_for_dispatch(self, authorization):
+        """Fence initial dispatch of a job issued by this open gate instance.
+
+        An invalid or altered capability returns False; native/profile/journal
+        failures raise and also prohibit dispatch. The caller must dispatch the
+        returned immutable block_bytes, keep observing refresh signals, and
+        authorize again after restart. This is not an in-process sandbox.
+        """
         return not self.needs_refresh(authorization)
 
     def close(self):
+        self._dispatch_key = None
         try:
             if self.db is not None:
                 self.db.close()

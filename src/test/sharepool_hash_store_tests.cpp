@@ -12,9 +12,24 @@
 #include <test/util/setup_common.h>
 #include <versionbits.h>
 
+#include <algorithm>
 #include <array>
 
 #include <boost/test/unit_test.hpp>
+
+namespace sharepool {
+/** Fault injection into this fixture's open database, bypassing production
+ * admission only to reproduce post-startup disk damage before a cache miss.
+ */
+struct HashSnapshotStoreTest {
+    static uint256 DamageFirstSource(HashSnapshotStore& store, const uint256& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+    {
+        const auto hash = store.m_template_sources.at(id).front().first;
+        BOOST_REQUIRE(store.m_db.Write(std::make_pair(uint8_t{'s'}, hash), std::vector<unsigned char>{0}, true));
+        return hash;
+    }
+};
+} // namespace sharepool
 
 namespace {
 namespace ho = sharepool::hashonly;
@@ -38,6 +53,13 @@ std::vector<unsigned char> Bytes(const CTransaction& tx)
 {
     DataStream stream;
     stream << TX_WITH_WITNESS(tx);
+    return {UCharCast(stream.data()), UCharCast(stream.data()) + stream.size()};
+}
+
+std::vector<unsigned char> Bytes(const CBlock& block)
+{
+    DataStream stream;
+    stream << TX_WITH_WITNESS(block);
     return {UCharCast(stream.data()), UCharCast(stream.data()) + stream.size()};
 }
 
@@ -205,6 +227,298 @@ BOOST_AUTO_TEST_CASE(snapshot_dependencies_are_hints_and_pending_blocks_own_requ
         BOOST_CHECK(restored.Needed().empty());
         restored.NeedForBlock(block_id, {child});
         BOOST_CHECK(restored.Needed().empty());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(damaged_snapshot_records_are_quarantined_repaired_and_reopened)
+{
+    const auto original = ho::EncodeSnapshot(source);
+    const auto hash = ho::SnapshotHash(original);
+    for (size_t damage{0}; damage < 4; ++damage) {
+        const auto path = m_path_root / fs::PathFromString("snapshot-record-repair-" + std::to_string(damage));
+        auto pending = std::make_shared<CBlock>(block);
+        pending->m_mm_rhs = hash;
+        {
+            sharepool::HashSnapshotStore store{path};
+            LOCK(cs_main);
+            BOOST_CHECK(store.Put(original) == hash);
+            BOOST_REQUIRE(store.QueueBlock(pending));
+        }
+        size_t damaged_bytes{0};
+        {
+            CDBWrapper db{DBParams{.path = path, .cache_bytes = 1024 * 1024}};
+            const auto key = std::make_pair(uint8_t{'s'}, hash);
+            DataStream stream;
+            if (damage == 0) {
+                auto changed = source;
+                ++changed.binding.height;
+                stream << ho::EncodeSnapshot(changed); // Decodable, wrong content identity.
+            } else if (damage == 1) {
+                stream << original << uint8_t{0}; // Valid preimage, damaged local wrapper.
+            } else if (damage == 2) {
+                stream << std::vector<unsigned char>{0}; // Malformed snapshot at another hash's key.
+            } else {
+                stream << uint8_t{253}; // Truncated CompactSize local vector wrapper.
+            }
+            damaged_bytes = stream.size();
+            BOOST_REQUIRE(db.Write(key, RawRecord{{stream.begin(), stream.end()}}, true));
+        }
+        {
+            sharepool::HashSnapshotStore restored{path};
+            LOCK(cs_main);
+            BOOST_CHECK_EQUAL(restored.Count(), 0);
+            BOOST_CHECK_EQUAL(restored.Bytes(), damaged_bytes);
+            BOOST_CHECK(!restored.Has(hash));
+            BOOST_CHECK(!restored.Get(hash));
+            BOOST_CHECK(!restored.Lookup(hash));
+            BOOST_CHECK(restored.Inventory().empty());
+            BOOST_CHECK(restored.Needed() == std::vector<uint256>{hash});
+            BOOST_CHECK(restored.MatchesPendingBlock(*pending));
+            BOOST_CHECK(restored.Put(original, hash) == hash);
+            BOOST_CHECK_EQUAL(restored.Count(), 1);
+            BOOST_CHECK_EQUAL(restored.Bytes(), original.size());
+            BOOST_REQUIRE(restored.Get(hash));
+            BOOST_CHECK(*restored.Get(hash) == original);
+            BOOST_CHECK(restored.Needed().empty());
+            CheckBlock(restored.Template(ho::TemplateId(block)), block);
+        }
+        {
+            sharepool::HashSnapshotStore reopened{path};
+            LOCK(cs_main);
+            BOOST_CHECK_EQUAL(reopened.Count(), 1);
+            BOOST_CHECK_EQUAL(reopened.Bytes(), original.size());
+            BOOST_CHECK(reopened.Has(hash));
+            BOOST_CHECK(reopened.Needed().empty());
+            CheckBlock(reopened.Template(ho::TemplateId(block)), block);
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(hash_correct_malformed_snapshot_preimage_remains_consensus_evidence)
+{
+    const auto path = m_path_root / "malformed-committed-preimage";
+    const std::vector<unsigned char> malformed{0};
+    const auto hash = ho::SnapshotHash(malformed);
+    {
+        sharepool::HashSnapshotStore store{path};
+        LOCK(cs_main);
+        BOOST_CHECK(store.Put(malformed, hash) == hash);
+        BOOST_CHECK_THROW(store.Lookup(hash), ho::MalformedSnapshot);
+    }
+    {
+        sharepool::HashSnapshotStore reopened{path};
+        LOCK(cs_main);
+        BOOST_CHECK_EQUAL(reopened.Count(), 1);
+        BOOST_CHECK_EQUAL(reopened.Bytes(), malformed.size());
+        BOOST_CHECK(reopened.Has(hash));
+        BOOST_CHECK(reopened.Inventory() == std::vector<uint256>{hash});
+        BOOST_REQUIRE(reopened.Get(hash));
+        BOOST_CHECK(*reopened.Get(hash) == malformed);
+        BOOST_CHECK_THROW(reopened.Lookup(hash), ho::MalformedSnapshot);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(damaged_pending_records_do_not_suppress_downloads_and_accept_exact_repair)
+{
+    const auto hash = block.GetHash();
+    for (size_t damage{0}; damage < 7; ++damage) {
+        const auto path = m_path_root / fs::PathFromString("pending-record-repair-" + std::to_string(damage));
+        {
+            sharepool::HashSnapshotStore store{path};
+            LOCK(cs_main);
+            BOOST_REQUIRE(store.QueueBlock(std::make_shared<CBlock>(block)));
+        }
+        {
+            CDBWrapper db{DBParams{.path = path, .cache_bytes = 1024 * 1024}};
+            const auto key = std::make_pair(uint8_t{'b'}, hash);
+            DataStream stream;
+            if (damage == 0) {
+                CBlock changed{block};
+                ++changed.nTime;
+                stream << Bytes(changed); // Valid body at a different header key.
+            } else if (damage == 1) {
+                stream << Bytes(block) << uint8_t{0}; // Trailing local wrapper bytes.
+            } else if (damage == 2) {
+                stream << std::vector<unsigned char>{0}; // Malformed inner block.
+            } else if (damage == 3) {
+                auto trailing = Bytes(block);
+                trailing.push_back(0);
+                stream << trailing; // Trailing bytes inside the block encoding.
+            } else if (damage == 4) {
+                stream << uint8_t{253}; // Malformed local vector wrapper.
+            } else {
+                CBlock changed{block};
+                CMutableTransaction coinbase{*changed.vtx[0]};
+                if (damage == 5) --coinbase.vout[0].nValue; // Same header, changed txid/Merkle root.
+                else coinbase.vin[0].scriptWitness.stack = {{1}}; // Same header and txid, invalid witness.
+                changed.vtx[0] = MakeTransactionRef(std::move(coinbase));
+                BOOST_CHECK(changed.GetHash() == hash);
+                stream << Bytes(changed);
+            }
+            BOOST_REQUIRE(db.Write(key, RawRecord{{stream.begin(), stream.end()}}, true));
+        }
+        {
+            sharepool::HashSnapshotStore restored{path};
+            LOCK(cs_main);
+            BOOST_CHECK(!restored.HasPendingBlock(hash));
+            BOOST_CHECK(!restored.MatchesPendingBlock(block));
+            BOOST_CHECK(restored.PendingBlocks().empty());
+            BOOST_CHECK(restored.Needed().empty());
+            BOOST_REQUIRE(restored.QueueBlock(std::make_shared<CBlock>(block)));
+            BOOST_CHECK(restored.HasPendingBlock(hash));
+            BOOST_CHECK(restored.MatchesPendingBlock(block));
+            BOOST_CHECK(restored.Needed() == std::vector<uint256>{block.m_mm_rhs});
+        }
+        {
+            sharepool::HashSnapshotStore reopened{path};
+            LOCK(cs_main);
+            BOOST_CHECK(reopened.HasPendingBlock(hash));
+            BOOST_CHECK(reopened.MatchesPendingBlock(block));
+            BOOST_CHECK(reopened.Needed() == std::vector<uint256>{block.m_mm_rhs});
+            reopened.RemoveBlock(hash);
+            BOOST_CHECK(!reopened.HasPendingBlock(hash));
+            BOOST_CHECK(reopened.Needed().empty());
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(quarantined_pending_records_keep_count_quota_until_repaired_or_removed)
+{
+    const auto path = m_path_root / "pending-quarantine-quota";
+    std::vector<CBlock> blocks;
+    for (size_t i{0}; i < sharepool::HashRequestQueue<uint256>::MAX_BLOCKS + 1; ++i) {
+        blocks.push_back(block);
+        blocks.back().nTime += i;
+    }
+    {
+        sharepool::HashSnapshotStore store{path};
+        LOCK(cs_main);
+        for (size_t i{0}; i + 1 < blocks.size(); ++i) {
+            BOOST_REQUIRE(store.QueueBlock(std::make_shared<CBlock>(blocks[i])));
+        }
+        BOOST_CHECK(!store.QueueBlock(std::make_shared<CBlock>(blocks.back())));
+    }
+    {
+        CDBWrapper db{DBParams{.path = path, .cache_bytes = 1024 * 1024}};
+        for (size_t i{0}; i + 1 < blocks.size(); ++i) {
+            BOOST_REQUIRE(db.Write(std::make_pair(uint8_t{'b'}, blocks[i].GetHash()), std::vector<unsigned char>{0}, true));
+        }
+    }
+    {
+        sharepool::HashSnapshotStore restored{path};
+        LOCK(cs_main);
+        BOOST_CHECK(restored.PendingBlocks().empty());
+        BOOST_CHECK(!restored.QueueBlock(std::make_shared<CBlock>(blocks.back())));
+        BOOST_REQUIRE(restored.QueueBlock(std::make_shared<CBlock>(blocks.front())));
+        BOOST_CHECK(restored.MatchesPendingBlock(blocks.front()));
+        BOOST_CHECK(!restored.QueueBlock(std::make_shared<CBlock>(blocks.back())));
+        restored.RemoveBlock(blocks[1].GetHash());
+        BOOST_REQUIRE(restored.QueueBlock(std::make_shared<CBlock>(blocks.back())));
+    }
+    {
+        sharepool::HashSnapshotStore reopened{path};
+        LOCK(cs_main);
+        BOOST_CHECK_EQUAL(reopened.PendingBlocks().size(), 2);
+        BOOST_CHECK(reopened.MatchesPendingBlock(blocks.front()));
+        BOOST_CHECK(reopened.MatchesPendingBlock(blocks.back()));
+    }
+}
+
+BOOST_AUTO_TEST_CASE(pending_body_matching_includes_witness_bytes)
+{
+    const auto variants = WitnessVariants();
+    CBlock altered{variants[0]};
+    altered.vtx[1] = variants[1].vtx[1];
+    BOOST_CHECK(altered.GetHash() == variants[0].GetHash());
+    BOOST_CHECK(altered.hashMerkleRoot == BlockMerkleRoot(altered));
+    BOOST_CHECK(Bytes(altered) != Bytes(variants[0]));
+    sharepool::HashSnapshotStore store{m_path_root / "pending-exact-body"};
+    LOCK(cs_main);
+    BOOST_CHECK(!store.MatchesPendingBlock(variants[0]));
+    BOOST_REQUIRE(store.QueueBlock(std::make_shared<CBlock>(variants[0])));
+    BOOST_CHECK(store.MatchesPendingBlock(variants[0]));
+    BOOST_CHECK(store.HasPendingBlock(altered.GetHash()));
+    BOOST_CHECK(!store.MatchesPendingBlock(altered));
+    store.RemoveBlock(variants[0].GetHash());
+    BOOST_CHECK(!store.MatchesPendingBlock(variants[0]));
+}
+
+BOOST_AUTO_TEST_CASE(alternative_snapshot_sources_survive_a_damaged_source_and_exact_repair)
+{
+    const auto path = m_path_root / "alternative-snapshot-sources";
+    std::vector<std::vector<unsigned char>> snapshots;
+    for (uint8_t i{0}; i < 6; ++i) {
+        auto alternative = source;
+        alternative.binding.pool = uint256{static_cast<uint8_t>(10 + i)};
+        snapshots.push_back(ho::EncodeSnapshot(alternative));
+    }
+    std::sort(snapshots.begin(), snapshots.end(), [](const auto& a, const auto& b) {
+        return ho::SnapshotHash(a) < ho::SnapshotHash(b);
+    });
+    {
+        sharepool::HashSnapshotStore store{path};
+        LOCK(cs_main);
+        for (const auto& snapshot : snapshots) store.Put(snapshot);
+        CheckBlock(store.Template(ho::TemplateId(block)), block);
+    }
+    {
+        CDBWrapper db{DBParams{.path = path, .cache_bytes = 1024 * 1024}};
+        for (size_t i{0}; i < 5; ++i) {
+            BOOST_REQUIRE(db.Write(std::make_pair(uint8_t{'s'}, ho::SnapshotHash(snapshots[i])),
+                std::vector<unsigned char>{0}, true));
+        }
+    }
+    {
+        sharepool::HashSnapshotStore restored{path};
+        LOCK(cs_main);
+        BOOST_CHECK_EQUAL(restored.Count(), 1);
+        CheckBlock(restored.Template(ho::TemplateId(block)), block);
+        for (const auto& snapshot : snapshots) restored.Put(snapshot);
+        BOOST_CHECK_EQUAL(restored.Count(), snapshots.size());
+        CheckBlock(restored.Template(ho::TemplateId(block)), block);
+    }
+    {
+        sharepool::HashSnapshotStore reopened{path};
+        LOCK(cs_main);
+        BOOST_CHECK_EQUAL(reopened.Count(), snapshots.size());
+        CheckBlock(reopened.Template(ho::TemplateId(block)), block);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(template_lookup_tries_another_verified_source_after_runtime_disk_damage)
+{
+    const auto path = m_path_root / "runtime-snapshot-source-fallback";
+    const auto first = ho::EncodeSnapshot(source);
+    auto second_source = source;
+    ++second_source.binding.height;
+    const auto second = ho::EncodeSnapshot(second_source);
+    {
+        sharepool::HashSnapshotStore store{path};
+        LOCK(cs_main);
+        store.Put(first);
+        store.Put(second);
+    }
+    {
+        sharepool::HashSnapshotStore restored{path};
+        LOCK(cs_main);
+        const auto damaged = sharepool::HashSnapshotStoreTest::DamageFirstSource(restored, ho::TemplateId(block));
+        BOOST_CHECK(restored.Has(damaged)); // Integrity is checked at the next uncached read.
+        CheckBlock(restored.Template(ho::TemplateId(block)), block);
+        BOOST_CHECK(!restored.Has(damaged));
+        BOOST_CHECK_EQUAL(restored.Count(), 1);
+        const auto& sound = damaged == ho::SnapshotHash(first) ? second : first;
+        BOOST_CHECK_EQUAL(restored.Bytes(), sound.size() + GetSerializeSize(std::vector<unsigned char>{0}));
+        restored.Put(first);
+        restored.Put(second);
+        BOOST_CHECK_EQUAL(restored.Count(), 2);
+        BOOST_CHECK_EQUAL(restored.Bytes(), first.size() + second.size());
+        CheckBlock(restored.Template(ho::TemplateId(block)), block);
+    }
+    {
+        sharepool::HashSnapshotStore reopened{path};
+        LOCK(cs_main);
+        BOOST_CHECK_EQUAL(reopened.Count(), 2);
+        CheckBlock(reopened.Template(ho::TemplateId(block)), block);
     }
 }
 

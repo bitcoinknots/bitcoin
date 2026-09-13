@@ -247,6 +247,15 @@ sequence. Check `ready_for_dispatch()` immediately before dispatch and watch
 job. Already solved commitments cannot be rewritten. Later work and the winning
 proof can only enter later eligible snapshots.
 
+Dispatch authorization now includes a per-gate-lifetime seal over exact block
+and snapshot bytes, policy/profile, native context and receipt/evidence counters.
+Another gate's object, a modified object, a closed gate or an inherited process
+cannot authorize dispatch. After restarting a gate, call `authorize()` again;
+retained journal bytes and already-solved block submission are unaffected. Send
+the immutable bytes returned by that authorization. The seal is not a sandbox
+against code with access to the gate process, and a later tip change still
+requires job refresh.
+
 The journal stores full snapshot, normalized template and proof bytes as a
 contiguous append-only hash chain. Each proof increments a monotonic receipt
 revision; moving old bodies to immutable archive segments never resets it. SQLite WAL/FULL commits precede an atomically written,

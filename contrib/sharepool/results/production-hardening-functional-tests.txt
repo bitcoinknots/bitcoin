@@ -1,0 +1,260 @@
+RUN worker
+BINARY f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031
+COMMAND /Library/Developer/CommandLineTools/usr/bin/python3 -B test/functional/feature_sharepool_hash_worker.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-production-final-690 --portseed=690 --nocleanup
+2026-09-13T01:35:16.196000Z TestFramework (INFO): PRNG seed is: 6552819629168476777
+2026-09-13T01:35:16.196000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-final-690
+2026-09-13T01:35:24.259000Z TestFramework (INFO): A pending data notification survives shutdown and is accepted after restart
+2026-09-13T01:35:25.053000Z TestFramework (INFO): A local disconnect/reconnect revalidates the settled branch with retained evidence
+2026-09-13T01:35:25.775000Z TestFramework (INFO): A tip change during script execution discards the capture and retries the competing block
+2026-09-13T01:35:31.314000Z TestFramework (INFO): Worker measurement: {"active_rpc_samples": 130, "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031", "block_bytes": 2203, "context_change": {"competing_branch": "accepted_and_extended", "retry_count": 1}, "inputs_per_origin": 100, "maximum_active_rpc_seconds": 0.0026773330000002815, "origins": 64, "p2p_ping_seconds": 0.11267504100000014, "pending_restart": "accepted", "pipeline_seconds": 2.162805915999999, "platform": "macOS-26.6.2-arm64-arm-64bit", "protocol_version": 4, "reorganization_verifydb": "valid", "sha256_ops_per_input": 199, "snapshot_bytes": 135741, "test_sha256": "7c864a7835fb74d5e3e355ab66e6a2c8721112cca3a4e51ebd07771bb84b3de2", "worker": {"active": false, "context_retries": 0, "failures": 0, "last_micros": 2066788, "locked_fallbacks": 0, "max_micros": 2066788, "outside_script_checks": 6400, "passes": 26, "pending": false, "requests": 67, "started": true, "stopping": false}}
+2026-09-13T01:35:31.369000Z TestFramework (INFO): Stopping nodes
+2026-09-13T01:35:31.536000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-final-690
+2026-09-13T01:35:31.536000Z TestFramework (INFO): Tests successful
+
+RUN http
+BINARY f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031
+COMMAND /Library/Developer/CommandLineTools/usr/bin/python3 -B test/functional/feature_sharepool_hash_http.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-production-final-691 --portseed=691 --nocleanup
+2026-09-13T01:35:16.183000Z TestFramework (INFO): PRNG seed is: 7303411026554907537
+2026-09-13T01:35:16.184000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-final-691
+2026-09-13T01:35:17.521000Z TestFramework (INFO): Default HTTP rejects bodies above 32 MiB; the explicit profile has a 48 MiB cap
+2026-09-13T01:35:17.589000Z TestFramework (INFO): Maximum template-plus-snapshot JSON reaches field validation and is rejected there
+2026-09-13T01:35:18.119000Z TestFramework (INFO): Stopping nodes
+2026-09-13T01:35:18.241000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-final-691
+2026-09-13T01:35:18.241000Z TestFramework (INFO): Tests successful
+
+RUN lifecycle-v1
+BINARY f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031
+COMMAND /Library/Developer/CommandLineTools/usr/bin/python3 -B test/functional/feature_sharepool_hash_lifecycle.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-production-final-692 --portseed=692 --nocleanup
+2026-09-13T01:35:18.339000Z TestFramework (INFO): PRNG seed is: 2775007960379461705
+2026-09-13T01:35:18.340000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-final-692
+2026-09-13T01:35:19.207000Z TestFramework (INFO): A solved block waits for its full snapshot; pending data survives restart
+2026-09-13T01:35:19.928000Z TestFramework (INFO): Existing native peer connections deliver dependencies and automatically retry the block
+2026-09-13T01:35:30.284000Z TestFramework (INFO): Late work uses a new immutable snapshot and direct coinbase payout
+2026-09-13T01:35:30.539000Z TestFramework (INFO): An offline restart replays chainstate from the locally retained snapshot history
+2026-09-13T01:35:30.920000Z TestFramework (INFO): Valid competing branches reorganize by native chainwork after snapshots arrive
+2026-09-13T01:35:33.870000Z TestFramework (INFO): Level-four native verification disconnects and reconnects the complete selected chain
+2026-09-13T01:35:33.900000Z TestFramework (INFO): Hash-only native snapshot lifecycle passed
+2026-09-13T01:35:33.960000Z TestFramework (INFO): Stopping nodes
+2026-09-13T01:35:34.132000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-final-692
+2026-09-13T01:35:34.132000Z TestFramework (INFO): Tests successful
+
+RUN lifecycle-v2
+BINARY f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031
+COMMAND /Library/Developer/CommandLineTools/usr/bin/python3 -B test/functional/feature_sharepool_hash_lifecycle.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-production-final-693 --portseed=693 --nocleanup --v2transport
+2026-09-13T01:35:31.625000Z TestFramework (INFO): PRNG seed is: 7778209726283436166
+2026-09-13T01:35:31.626000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-final-693
+2026-09-13T01:35:32.473000Z TestFramework (INFO): A solved block waits for its full snapshot; pending data survives restart
+2026-09-13T01:35:33.121000Z TestFramework (INFO): Existing native peer connections deliver dependencies and automatically retry the block
+2026-09-13T01:35:43.489000Z TestFramework (INFO): Late work uses a new immutable snapshot and direct coinbase payout
+2026-09-13T01:35:43.745000Z TestFramework (INFO): An offline restart replays chainstate from the locally retained snapshot history
+2026-09-13T01:35:44.134000Z TestFramework (INFO): Valid competing branches reorganize by native chainwork after snapshots arrive
+2026-09-13T01:35:47.145000Z TestFramework (INFO): Level-four native verification disconnects and reconnects the complete selected chain
+2026-09-13T01:35:47.197000Z TestFramework (INFO): Hash-only native snapshot lifecycle passed
+2026-09-13T01:35:47.258000Z TestFramework (INFO): Stopping nodes
+2026-09-13T01:35:47.435000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-final-693
+2026-09-13T01:35:47.435000Z TestFramework (INFO): Tests successful
+
+RUN relay
+BINARY f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031
+COMMAND /Library/Developer/CommandLineTools/usr/bin/python3 -B test/functional/feature_sharepool_hash_relay.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-production-final-694 --portseed=694 --nocleanup
+2026-09-13T01:35:34.202000Z TestFramework (INFO): PRNG seed is: 472711866452142631
+2026-09-13T01:35:34.203000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-final-694
+2026-09-13T01:35:34.469000Z TestFramework (INFO): Empty inventory stays quiet; changes and new connections discover existing objects
+2026-09-13T01:35:38.281000Z TestFramework (INFO): Four active downloads cannot repeatedly overtake an already waiting fifth peer
+2026-09-13T01:35:39.786000Z TestFramework (INFO): Malformed inventory is refused before any download is scheduled
+2026-09-13T01:35:40.707000Z TestFramework (INFO): Stopping nodes
+2026-09-13T01:35:40.825000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-final-694
+2026-09-13T01:35:40.826000Z TestFramework (INFO): Tests successful
+
+RUN attestation
+BINARY f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031
+COMMAND /Library/Developer/CommandLineTools/usr/bin/python3 -B test/functional/feature_sharepool_hash_attestation.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-production-final-695 --portseed=695 --nocleanup
+2026-09-13T01:35:40.927000Z TestFramework (INFO): PRNG seed is: 8510865749094097311
+2026-09-13T01:35:40.927000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-final-695
+2026-09-13T01:35:41.631000Z TestFramework (INFO): GBT identifies the exact v4 share target and explicitly requires job completion
+2026-09-13T01:35:41.642000Z TestFramework (INFO): Valid and invalid snapshot overlays leave native evidence storage unchanged
+2026-09-13T01:35:41.654000Z TestFramework (INFO): Changing a valid transaction body requires a new exact-job signature
+2026-09-13T01:35:41.670000Z TestFramework (INFO): Witness bytes are signed even when the ordinary transaction ID is unchanged
+2026-09-13T01:35:41.688000Z TestFramework (INFO): The signature authenticates policy/context and the complete evidence snapshot
+2026-09-13T01:35:41.741000Z TestFramework (INFO): Search nonces can change; a newly authorized valid transaction can be mined
+2026-09-13T01:35:41.762000Z TestFramework (INFO): A legitimate owner cannot authorize a nonexistent UTXO into a valid origin
+2026-09-13T01:35:41.795000Z TestFramework (INFO): Native origin validation rejects two transactions spending the same input
+2026-09-13T01:35:41.828000Z TestFramework (INFO): A signed origin with correct witness commitment still must execute its scripts
+2026-09-13T01:35:41.858000Z TestFramework (INFO): The accepted settlement validates its real spend and pays the verified origin owner
+2026-09-13T01:35:42.100000Z TestFramework (INFO): Stopping nodes
+2026-09-13T01:35:42.221000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-final-695
+2026-09-13T01:35:42.221000Z TestFramework (INFO): Tests successful
+
+RUN builder
+BINARY f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031
+COMMAND /Library/Developer/CommandLineTools/usr/bin/python3 -B test/functional/feature_sharepool_hash_builder.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-production-final-696 --portseed=696 --nocleanup
+2026-09-13T01:35:42.317000Z TestFramework (INFO): PRNG seed is: 120860133799752057
+2026-09-13T01:35:42.318000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-final-696
+2026-09-13T01:35:43.640000Z TestFramework (INFO): Native construction creates distinct fully validated externally signed origins
+2026-09-13T01:35:43.895000Z TestFramework (INFO): The native mempool supplies a valid witness transaction and exact fee
+2026-09-13T01:35:44.020000Z TestFramework (INFO): A changed job or forged payout cannot reuse the exact owner authorization
+2026-09-13T01:35:44.140000Z TestFramework (INFO): Full snapshot relay permits the follower to verify and accept the winning block
+2026-09-13T01:35:45.555000Z TestFramework (INFO): Stopping nodes
+2026-09-13T01:35:45.736000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-final-696
+2026-09-13T01:35:45.736000Z TestFramework (INFO): Tests successful
+
+RUN rules
+BINARY f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031
+COMMAND /Library/Developer/CommandLineTools/usr/bin/python3 -B test/functional/feature_sharepool_hash_rules.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-production-final-697 --portseed=697 --nocleanup
+2026-09-13T01:35:45.836000Z TestFramework (INFO): PRNG seed is: 5214782660975511518
+2026-09-13T01:35:45.836000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-final-697
+2026-09-13T01:35:46.127000Z TestFramework (INFO): Complete proof attribution fixes the actual payout script
+2026-09-13T01:35:46.156000Z TestFramework (INFO): The snapshot and coinbase must allocate the exact native subsidy plus fees
+2026-09-13T01:35:46.186000Z TestFramework (INFO): Unavailable preimages are pending; available invalid encodings establish rejection
+2026-09-13T01:35:46.271000Z TestFramework (INFO): A complete consistent settlement is accepted after the refused examples
+2026-09-13T01:35:46.386000Z TestFramework (INFO): Stopping nodes
+2026-09-13T01:35:46.499000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-final-697
+2026-09-13T01:35:46.499000Z TestFramework (INFO): Tests successful
+
+RUN legacy-rules
+BINARY f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031
+COMMAND /Library/Developer/CommandLineTools/usr/bin/python3 -B test/functional/feature_sharepool_rule_cases.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-production-final-698 --portseed=698 --nocleanup
+2026-09-13T01:35:46.593000Z TestFramework (INFO): PRNG seed is: 2895527741218700589
+2026-09-13T01:35:46.593000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-final-698
+2026-09-13T01:35:49.246000Z TestFramework (INFO): Rule case: distinct_templates_and_nonce_only_identity
+2026-09-13T01:35:49.371000Z TestFramework (INFO): Rule case: origin_missing_input
+2026-09-13T01:35:49.377000Z TestFramework (INFO): Rule case: origin_invalid_owner_signature
+2026-09-13T01:35:49.378000Z TestFramework (INFO): Rule case: share_invalid_owner_signature
+2026-09-13T01:35:49.379000Z TestFramework (INFO): Rule case: share_insufficient_pow
+2026-09-13T01:35:49.380000Z TestFramework (INFO): Rule case: duplicate_proof_idempotent_admission
+2026-09-13T01:35:49.521000Z TestFramework (INFO): Rule case: duplicate_proof_in_snapshot
+2026-09-13T01:35:49.764000Z TestFramework (INFO): Rule case: payout_script_tampering_recommitted
+2026-09-13T01:35:49.782000Z TestFramework (INFO): Rule case: payout_amount_tampering_recommitted
+2026-09-13T01:35:49.920000Z TestFramework (INFO): Rule case: known_omission_is_local_not_consensus
+2026-09-13T01:35:50.088000Z TestFramework (INFO): Rule case: frozen_commitment_and_late_share_refresh
+2026-09-13T01:35:51.399000Z TestFramework (INFO): Rule case: repeated_payment_rejected
+2026-09-13T01:35:51.572000Z TestFramework (INFO): Rule case: late_omitted_and_winning_work_settle_next_block
+2026-09-13T01:35:51.602000Z TestFramework (INFO): All 13 identifiable rule cases passed
+2026-09-13T01:35:51.668000Z TestFramework (INFO): Stopping nodes
+2026-09-13T01:35:51.789000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-final-698
+2026-09-13T01:35:51.789000Z TestFramework (INFO): Tests successful
+
+RUN v5-ledger
+BINARY f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031
+COMMAND /Library/Developer/CommandLineTools/usr/bin/python3 -B test/functional/feature_sharepool_hash_ledger.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-production-final-699 --portseed=699 --nocleanup
+2026-09-13T01:35:47.521000Z TestFramework (INFO): PRNG seed is: 4133556037442363066
+2026-09-13T01:35:47.522000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-final-699
+2026-09-13T01:35:48.492000Z TestFramework (INFO): Pool C anchors fresh valid A/B receipts without paying those receipts in its own block
+2026-09-13T01:35:48.995000Z TestFramework (INFO): Missing committed data stays pending through restart, then ordinary P2P supplies the complete state
+2026-09-13T01:35:50.579000Z TestFramework (INFO): A pays its parent's two A credits; newly received work on the previous job is admitted for a later block
+2026-09-13T01:35:50.708000Z TestFramework (INFO): Even fresh valid owner signatures cannot omit credits, change their recipient/work, or choose a shorter payout prefix
+2026-09-13T01:35:51.493000Z TestFramework (INFO): Confirmed A/B credits survive unrelated-pool blocks beyond the fresh-proof age limit
+2026-09-13T01:35:53.049000Z TestFramework (INFO): A longer nonpaying branch restores credits removed by orphaned B/A payouts
+2026-09-13T01:35:54.563000Z TestFramework (INFO): Selected-branch credits pay their original recipients once after the reorganization
+2026-09-13T01:35:55.013000Z TestFramework (INFO): Offline chainstate reindex and level-four verification reconstruct the selected ledger history
+2026-09-13T01:35:55.677000Z TestFramework (INFO): Stopping nodes
+2026-09-13T01:35:55.856000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-final-699
+2026-09-13T01:35:55.856000Z TestFramework (INFO): Tests successful
+
+RUN pending-body
+BINARY f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031
+COMMAND /Library/Developer/CommandLineTools/usr/bin/python3 -B test/functional/feature_sharepool_hash_pending.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-production-final-700 --portseed=700 --nocleanup
+2026-09-13T01:35:51.882000Z TestFramework (INFO): PRNG seed is: 1607294785668656990
+2026-09-13T01:35:51.883000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-final-700
+2026-09-13T01:35:52.969000Z TestFramework (INFO): One fetched native body remains pending while its snapshot is withheld
+2026-09-13T01:35:55.712000Z TestFramework (INFO): Rejecting another body with the same header preserves the retained valid body
+2026-09-13T01:35:58.360000Z TestFramework (INFO): Restart retains the pending body; renewed announcements do not download it again
+2026-09-13T01:36:00.228000Z TestFramework (INFO): Supplying the opening triggers ordinary full validation and clears pending state
+2026-09-13T01:36:00.463000Z TestFramework (INFO): The exact retained body is still removed when its own opening establishes invalidity
+2026-09-13T01:36:00.722000Z TestFramework (INFO): Ignoring an unsolicited lower-work duplicate preserves pending fork evidence
+2026-09-13T01:36:02.487000Z TestFramework (INFO): Stopping nodes
+2026-09-13T01:36:02.662000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-final-700
+2026-09-13T01:36:02.662000Z TestFramework (INFO): Tests successful
+
+RUN gate-provenance
+BINARY f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031
+COMMAND /Library/Developer/CommandLineTools/usr/bin/python3 -B test/functional/feature_sharepool_hash_gate_provenance.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-production-final-701 --portseed=701 --nocleanup
+2026-09-13T01:35:55.961000Z TestFramework (INFO): PRNG seed is: 6974482395693554145
+2026-09-13T01:35:55.961000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-final-701
+2026-09-13T01:35:56.557000Z TestFramework (INFO): Native overlay validation admits a three-opening graph in one local receipt
+2026-09-13T01:35:56.596000Z TestFramework (INFO): An archive alone rehydrates a disconnected native node and revalidates the acknowledged work
+2026-09-13T01:35:56.673000Z TestFramework (INFO): The recovered evidence admits the actual solved settlement and native coinbase payment
+2026-09-13T01:35:56.753000Z TestFramework (INFO): Stopping nodes
+2026-09-13T01:35:56.875000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-final-701
+2026-09-13T01:35:56.875000Z TestFramework (INFO): Tests successful
+
+RUN gate-ledger-1
+BINARY f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031
+COMMAND /Library/Developer/CommandLineTools/usr/bin/python3 -B test/functional/feature_sharepool_hash_gate_ledger.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-production-final-702 --portseed=702 --nocleanup --activation-height=1
+2026-09-13T01:35:56.973000Z TestFramework (INFO): PRNG seed is: 3639882727982315949
+2026-09-13T01:35:56.974000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-final-702
+2026-09-13T01:35:57.864000Z TestFramework (INFO): Real native job and share become a durable provisional ACK, with no promise of payment
+2026-09-13T01:35:58.066000Z TestFramework (INFO): Exact native authorizations cannot cross gates, change bytes or survive reopening
+2026-09-13T01:35:58.238000Z TestFramework (INFO): The actual anchor confirms pending credit; its coinbase still pays its own fallback
+2026-09-13T01:35:59.543000Z TestFramework (INFO): Other pools carry confirmed credit beyond the original proof age without paying or dropping it
+2026-09-13T01:36:07.826000Z TestFramework (INFO): Canonical reorg status restores pending credit; reconsideration restores the actual payment
+2026-09-13T01:36:08.040000Z TestFramework (INFO): Stopping nodes
+2026-09-13T01:36:08.219000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-final-702
+2026-09-13T01:36:08.219000Z TestFramework (INFO): Tests successful
+
+RUN gate-ledger-102
+BINARY f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031
+COMMAND /Library/Developer/CommandLineTools/usr/bin/python3 -B test/functional/feature_sharepool_hash_gate_ledger.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-production-final-703 --portseed=703 --nocleanup --activation-height=102
+2026-09-13T01:36:02.770000Z TestFramework (INFO): PRNG seed is: 3936392481670303381
+2026-09-13T01:36:02.770000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-final-703
+2026-09-13T01:36:04.294000Z TestFramework (INFO): Real native job and share become a durable provisional ACK, with no promise of payment
+2026-09-13T01:36:04.494000Z TestFramework (INFO): Exact native authorizations cannot cross gates, change bytes or survive reopening
+2026-09-13T01:36:04.664000Z TestFramework (INFO): The actual anchor confirms pending credit; its coinbase still pays its own fallback
+2026-09-13T01:36:05.969000Z TestFramework (INFO): Other pools carry confirmed credit beyond the original proof age without paying or dropping it
+2026-09-13T01:36:14.279000Z TestFramework (INFO): Canonical reorg status restores pending credit; reconsideration restores the actual payment
+2026-09-13T01:36:14.784000Z TestFramework (INFO): Stopping nodes
+2026-09-13T01:36:14.957000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-final-703
+2026-09-13T01:36:14.957000Z TestFramework (INFO): Tests successful
+
+RUN v5-100-miners
+BINARY f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031
+COMMAND /Library/Developer/CommandLineTools/usr/bin/python3 -B test/functional/feature_sharepool_hash_ledger_100_miners.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-production-final-704 --portseed=704 --nocleanup
+2026-09-13T01:36:08.319000Z TestFramework (INFO): PRNG seed is: 3441348408734861155
+2026-09-13T01:36:08.319000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-final-704
+2026-09-13T01:36:08.862000Z TestFramework (INFO): Mature two native coinbases before ledger activation for real fee-paying witness transactions
+2026-09-13T01:36:21.305000Z TestFramework (INFO): Construct and validate 100 distinct native jobs and real shares with external owner signatures
+2026-09-13T01:36:24.492000Z TestFramework (INFO): Validated 25/100 miners
+2026-09-13T01:36:27.686000Z TestFramework (INFO): Validated 50/100 miners
+2026-09-13T01:36:30.958000Z TestFramework (INFO): Validated 75/100 miners
+2026-09-13T01:36:34.237000Z TestFramework (INFO): Validated 100/100 miners
+2026-09-13T01:36:34.239000Z TestFramework (INFO): A pool C block anchors all 100 A receipts; both native nodes obtain and validate the committed snapshot
+2026-09-13T01:36:55.049000Z TestFramework (INFO): A's next block derives 100 exact direct payouts; an extra late proof cannot change their fixed parent cutoff
+2026-09-13T01:36:55.670000Z TestFramework (INFO): The separately confirmed late receipt pays its original miner in the following A block
+2026-09-13T01:36:56.401000Z TestFramework (INFO): Stopping nodes
+2026-09-13T01:36:56.575000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-final-704
+2026-09-13T01:36:56.575000Z TestFramework (INFO): Tests successful
+
+RUN v4-100-miners
+BINARY f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031
+COMMAND /Library/Developer/CommandLineTools/usr/bin/python3 -B test/functional/feature_sharepool_hash_100_miners.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-production-final-705 --portseed=705 --nocleanup --results=/private/tmp/sharepool-production-v4-100-miners.json
+2026-09-13T01:36:15.052000Z TestFramework (INFO): PRNG seed is: 3419227519253737682
+2026-09-13T01:36:15.053000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-final-705
+2026-09-13T01:36:16.218000Z TestFramework (INFO): Create100 fresh v4 native signer keys and distinct payout scripts
+2026-09-13T01:36:26.837000Z TestFramework (INFO): Mature native funding and create100 independent UTXO spends
+2026-09-13T01:37:08.157000Z TestFramework (INFO): Authorize and dispatch100 distinct full transaction templates before disclosure
+2026-09-13T01:37:22.416000Z TestFramework (INFO): 100 origin snapshot dependencies: missing snapshots per native node [9, 8, 9, 8, 7]
+2026-09-13T01:37:39.339000Z TestFramework (INFO): 100 full origins and100 proofs in P2P snapshots: missing snapshots per native node [17, 15, 16, 16, 15]
+2026-09-13T01:38:16.970000Z TestFramework (INFO): 100-proof baseline: full native admission and durable evidence at20/100 gates
+2026-09-13T01:38:49.022000Z TestFramework (INFO): 100-proof baseline: full native admission and durable evidence at40/100 gates
+2026-09-13T01:39:20.895000Z TestFramework (INFO): 100-proof baseline: full native admission and durable evidence at60/100 gates
+2026-09-13T01:39:52.855000Z TestFramework (INFO): 100-proof baseline: full native admission and durable evidence at80/100 gates
+2026-09-13T01:40:24.886000Z TestFramework (INFO): 100-proof baseline: full native admission and durable evidence at100/100 gates
+2026-09-13T01:40:34.380000Z TestFramework (INFO): Every informed miner authorizes one complete100-proof settlement
+2026-09-13T01:42:25.424000Z TestFramework (INFO): Late work refreshes future dispatch while the solved100-proof block stays immutable
+2026-09-13T01:42:25.576000Z TestFramework (INFO): late proof after winning header was frozen: missing snapshots per native node [0, 1, 1, 1, 1]
+2026-09-13T01:42:28.986000Z TestFramework (INFO): late-proof refresh: full native admission and durable evidence at20/100 gates
+2026-09-13T01:42:29.344000Z TestFramework (INFO): late-proof refresh: full native admission and durable evidence at40/100 gates
+2026-09-13T01:42:29.727000Z TestFramework (INFO): late-proof refresh: full native admission and durable evidence at60/100 gates
+2026-09-13T01:42:30.095000Z TestFramework (INFO): late-proof refresh: full native admission and durable evidence at80/100 gates
+2026-09-13T01:42:30.466000Z TestFramework (INFO): late-proof refresh: full native admission and durable evidence at100/100 gates
+2026-09-13T01:42:40.756000Z TestFramework (INFO): Carry late work and the winning proof into a second honestly authorized settlement
+2026-09-13T01:42:40.923000Z TestFramework (INFO): winning full origin and proof: missing snapshots per native node [1, 0, 1, 1, 1]
+2026-09-13T01:42:54.354000Z TestFramework (INFO): winner carry: full native admission and durable evidence at20/100 gates
+2026-09-13T01:43:05.368000Z TestFramework (INFO): winner carry: full native admission and durable evidence at40/100 gates
+2026-09-13T01:43:16.363000Z TestFramework (INFO): winner carry: full native admission and durable evidence at60/100 gates
+2026-09-13T01:43:27.421000Z TestFramework (INFO): winner carry: full native admission and durable evidence at80/100 gates
+2026-09-13T01:43:38.444000Z TestFramework (INFO): winner carry: full native admission and durable evidence at100/100 gates
+2026-09-13T01:44:49.155000Z TestFramework (INFO): 100-miner hash-only pipeline passed:100 exact payouts, then late proof and winner paid
+2026-09-13T01:44:49.750000Z TestFramework (INFO): Stopping nodes
+2026-09-13T01:44:49.993000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-final-705
+2026-09-13T01:44:49.993000Z TestFramework (INFO): Tests successful

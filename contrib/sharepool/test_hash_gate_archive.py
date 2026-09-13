@@ -170,7 +170,9 @@ class HashGateArchiveTests(unittest.TestCase):
         self.assertEqual(self.gate.snapshot_bytes(self.opening.hash_hex), self.opening.serialize())
         self.reopen_source()
         self.assertFalse(self.gate.receive(proof))
-        self.assertTrue(self.gate.ready_for_dispatch(authorization))
+        self.assertFalse(self.gate.ready_for_dispatch(authorization))
+        renewed = self.gate.authorize(block.serialize(), snapshot.serialize())
+        self.assertTrue(self.gate.ready_for_dispatch(renewed))
         self.assertEqual(self.gate.archive_head(), head)
 
     def test_automatic_rollover_applies_quota_only_to_resident_evidence(self):

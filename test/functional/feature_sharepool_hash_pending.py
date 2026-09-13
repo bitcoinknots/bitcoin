@@ -3,14 +3,15 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Retained pending block bodies are not repeatedly downloaded for missing data."""
+from copy import deepcopy
 from pathlib import Path
 import time
 
 from feature_sharepool_hash_ledger import SharePoolHashLedgerTest
 from feature_sharepool_hash_relay import RelayPeer
-from hash_snapshot import HashSigner
+from hash_snapshot import HashSigner, h256
 from test_framework.address import ADDRESS_BCRT1_UNSPENDABLE
-from test_framework.messages import CBlockHeader, MSG_BLOCK, MSG_TYPE_MASK, msg_block, msg_headers
+from test_framework.messages import CBlockHeader, CTxInWitness, MSG_BLOCK, MSG_TYPE_MASK, msg_block, msg_headers
 from test_framework.p2p import P2PDataStore, p2p_lock
 from test_framework.util import assert_equal
 
@@ -62,6 +63,7 @@ class SharePoolHashPendingTest(SharePoolHashLedgerTest):
         self.sync_blocks()
         self.disconnect_nodes(0, 1)
         path = Path(self.options.tmpdir) / "pending-body-owner.key"
+        alternate_path = Path(self.options.tmpdir) / "pending-body-alternate.key"
         try:
             signer = HashSigner.create(self.signer_binary, path, pool=0x50454e44494e47,
                                        payout_script=b"\x00\x14" + bytes([7]) * 20)
@@ -74,6 +76,24 @@ class SharePoolHashPendingTest(SharePoolHashLedgerTest):
             assert_equal(follower.getblockcount(), 1)
             self.assert_no_refetch(peer, block, 1)
             peer.advertise(block)
+            self.assert_no_refetch(peer, block, 1)
+
+            self.log.info("Rejecting another body with the same header preserves the retained valid body")
+            malformed = deepcopy(block)
+            malformed.vtx[0].vout[0].nValue -= 1
+            malformed.vtx[0].rehash()
+            assert_equal(CBlockHeader(malformed).serialize(), CBlockHeader(block).serialize())
+            assert_equal(follower.submitblock(malformed.serialize().hex()), "bad-txnmrklroot")
+            assert_equal(follower.getsharepoolhashstatus()["pending_blocks"], 1)
+            self.assert_no_refetch(peer, block, 1)
+
+            witness_variant = deepcopy(block)
+            witness_variant.vtx[0].wit.vtxinwit = [CTxInWitness()]
+            witness_variant.vtx[0].wit.vtxinwit[0].scriptWitness.stack = [bytes(31)]
+            assert_equal(witness_variant.vtx[0].serialize_without_witness(), block.vtx[0].serialize_without_witness())
+            assert_equal(CBlockHeader(witness_variant).serialize(), CBlockHeader(block).serialize())
+            assert_equal(follower.submitblock(witness_variant.serialize().hex()), "bad-witness-nonce-size")
+            assert_equal(follower.getsharepoolhashstatus()["pending_blocks"], 1)
             self.assert_no_refetch(peer, block, 1)
 
             self.log.info("Restart retains the pending body; renewed announcements do not download it again")
@@ -95,8 +115,45 @@ class SharePoolHashPendingTest(SharePoolHashLedgerTest):
             self.publish(0, block, snapshot)
             self.connect_nodes(0, 1)
             self.wait_tip(block)
+
+            self.log.info("The exact retained body is still removed when its own opening establishes invalidity")
+            invalid, _, _ = self.construct(0, signer)
+            malformed_opening = b"\x05"
+            invalid.m_mm_rhs = h256(b"SharePool/snapshot/v5\0", malformed_opening)
+            invalid.solve()
+            assert_equal(follower.submitblock(invalid.serialize().hex()), "sharepool-hash-data-missing")
+            assert_equal(follower.getsharepoolhashstatus()["pending_blocks"], 1)
+            follower.submitsharepoolhashsnapshot(malformed_opening.hex())
+            self.wait_until(lambda: follower.getsharepoolhashstatus()["pending_blocks"] == 0)
+            assert_equal(follower.submitblock(invalid.serialize().hex()), "duplicate-invalid")
+            assert_equal(follower.getbestblockhash(), block.hash)
+            assert_equal(follower.verifychain(4, 0), True)
+
+            self.log.info("Ignoring an unsolicited lower-work duplicate preserves pending fork evidence")
+            fork, fork_snapshot, _ = self.construct(0, signer)
+            fork.solve()
+            assert_equal(follower.submitblock(fork.serialize().hex()), "sharepool-hash-data-missing")
+            assert_equal(follower.getsharepoolhashstatus()["pending_blocks"], 1)
+            alternate = HashSigner.create(self.signer_binary, alternate_path, pool=0x414c5445524e4154,
+                                         payout_script=b"\x00\x14" + bytes([8]) * 20)
+            self.mine(0, alternate)
+            tip, _ = self.mine(0, alternate)
+            self.sync_blocks()
+            assert_equal(follower.getbestblockhash(), tip.hash)
+            assert_equal(follower.getsharepoolhashstatus()["pending_blocks"], 1)
+            unsolicited = follower.add_p2p_connection(PendingBlockPeer())
+            unsolicited.send_and_ping(msg_block(fork))
+            assert_equal(unsolicited.requests(fork), 0)
+            assert_equal(follower.getsharepoolhashstatus()["pending_blocks"], 1)
+            self.store(1, fork_snapshot)
+            self.wait_until(lambda: follower.getsharepoolhashstatus()["pending_blocks"] == 0)
+            assert_equal(follower.getblock(fork.hash, 0), fork.serialize().hex())
+            assert_equal(follower.getbestblockhash(), tip.hash)
+            assert_equal(follower.verifychain(4, 0), True)
+            follower.disconnect_p2ps()
         finally:
             path.unlink(missing_ok=True)
+            alternate_path.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

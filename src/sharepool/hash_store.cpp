@@ -20,6 +20,7 @@ constexpr size_t MAX_CACHE_BYTES{64 * 1024 * 1024};
 constexpr size_t MAX_PENDING_BYTES{64 * 1024 * 1024};
 constexpr size_t MAX_PENDING_BLOCKS{HashRequestQueue<uint256>::MAX_BLOCKS};
 constexpr size_t MAX_TEMPLATE_INDEX{65536};
+constexpr size_t MAX_TEMPLATE_SOURCES{4};
 constexpr size_t MAX_LOCAL_TEMPLATE_BYTES{256 * 1024 * 1024};
 constexpr size_t MAX_LOCAL_TRANSACTIONS{262144};
 struct BoundedBytes {
@@ -79,16 +80,20 @@ HashSnapshotStore::HashSnapshotStore(const fs::path& path, bool memory_only)
     for (it->Seek(std::make_pair(uint8_t{'s'}, uint256{})); it->Valid(); it->Next()) {
         std::pair<uint8_t, uint256> key;
         if (!it->GetKey(key) || key.first != 's') break;
-        BoundedBytes bytes;
-        if (!it->GetValue(bytes) || hashonly::SnapshotHash(bytes.data) != key.second) {
-            throw std::runtime_error("stored hash-only snapshot failed integrity verification");
-        }
-        if (m_sizes.size() >= MAX_STORED_OBJECTS || m_bytes + bytes.data.size() > MAX_STORED_BYTES) {
+        StoredValue<BoundedBytes> stored;
+        const bool sound = it->GetValue(stored) && !stored.value.data.empty() &&
+            hashonly::SnapshotHash(stored.value.data) == key.second;
+        const auto size = sound ? stored.value.data.size() : std::max(size_t{1}, stored.size);
+        if (m_sizes.size() >= MAX_STORED_OBJECTS || size > MAX_STORED_BYTES - m_bytes) {
             throw std::runtime_error("stored hash-only snapshots exceed local quota");
         }
-        m_sizes.emplace(key.second, bytes.data.size());
-        m_bytes += bytes.data.size();
-        try { IndexTemplates(key.second, hashonly::DecodeSnapshot(bytes.data)); }
+        m_sizes.emplace(key.second, size);
+        m_bytes += size;
+        if (!sound) {
+            Quarantine(key.second);
+            continue;
+        }
+        try { IndexTemplates(key.second, hashonly::DecodeSnapshot(stored.value.data)); }
         catch (const std::ios_base::failure&) { /* Retain the committed preimage for validation. */ }
     }
     // Transaction bytes are atomically stored with referencing templates. The
@@ -135,14 +140,29 @@ HashSnapshotStore::HashSnapshotStore(const fs::path& path, bool memory_only)
     for (it->Seek(std::make_pair(uint8_t{'b'}, uint256{})); it->Valid(); it->Next()) {
         std::pair<uint8_t, uint256> key;
         if (!it->GetKey(key) || key.first != 'b') break;
-        BoundedBytes bytes;
-        if (!it->GetValue(bytes)) throw std::runtime_error("pending hash-only block failed decoding");
-        auto block = DecodeBlock(bytes.data);
-        if (block->GetHash() != key.second || m_pending.size() >= MAX_PENDING_BLOCKS ||
-            m_pending_bytes + bytes.data.size() > MAX_PENDING_BYTES) throw std::runtime_error("pending hash-only block bounds or identity failed");
+        StoredValue<BoundedBytes> stored;
+        const bool readable = it->GetValue(stored) && !stored.value.data.empty() &&
+            stored.value.data.size() <= hashonly::MAX_TEMPLATE_BYTES;
+        std::shared_ptr<CBlock> block;
+        if (readable) {
+            try { block = DecodeBlock(stored.value.data); }
+            catch (const std::ios_base::failure&) { }
+        }
+        bool mutated{false};
+        BlockValidationState state;
+        const bool sound = block && block->GetHash() == key.second && !block->vtx.empty() &&
+            block->m_txcount == block->vtx.size() && BlockMerkleRoot(*block, &mutated) == block->hashMerkleRoot &&
+            !mutated && CheckWitnessMalleation(*block, true, state);
+        const auto size = sound ? stored.value.data.size() : std::max(size_t{1}, stored.size);
+        if (m_pending_sizes.size() >= MAX_PENDING_BLOCKS || size > MAX_PENDING_BYTES - m_pending_bytes) {
+            throw std::runtime_error("pending hash-only blocks exceed local quota");
+        }
+        m_pending_sizes.emplace(key.second, size);
+        m_pending_bytes += size;
+        // A corrupted local body cannot suppress a fresh network download or
+        // reserve snapshot requests. Its key and disk quota remain repairable.
+        if (!sound) continue;
         m_pending.emplace(key.second, block);
-        m_pending_sizes.emplace(key.second, bytes.data.size());
-        m_pending_bytes += bytes.data.size();
         m_requests.Track(key.second, block->m_mm_rhs, [this](const auto& hash) { LOCK(cs_main); return Has(hash); });
     }
 }
@@ -224,7 +244,12 @@ void HashSnapshotStore::IndexTemplates(const uint256& hash, const hashonly::Snap
         if (block->vtx.empty() || block->m_txcount != block->vtx.size() ||
             BlockMerkleRoot(*block, &mutated) != block->hashMerkleRoot || mutated ||
             !CheckWitnessMalleation(*block, true, state)) continue;
-        m_template_sources.try_emplace(record.id, hash, static_cast<uint32_t>(i));
+        auto& sources = m_template_sources[record.id];
+        std::erase_if(sources, [this](const auto& source) { LOCK(cs_main); return !Has(source.first); });
+        const std::pair<uint256, uint32_t> source{hash, static_cast<uint32_t>(i)};
+        if (sources.size() < MAX_TEMPLATE_SOURCES && std::find(sources.begin(), sources.end(), source) == sources.end()) {
+            sources.push_back(source);
+        }
     }
 }
 
@@ -234,10 +259,16 @@ bool HashSnapshotStore::Has(const uint256& hash) const
     return m_sizes.contains(hash) && !m_quarantined.contains(hash);
 }
 
-void HashSnapshotStore::Quarantine(const uint256& hash)
+void HashSnapshotStore::Quarantine(const uint256& hash, std::optional<size_t> disk_size)
 {
     AssertLockHeld(cs_main);
-    if (m_sizes.contains(hash)) m_quarantined.insert(hash);
+    if (m_sizes.contains(hash)) {
+        if (disk_size) {
+            m_bytes = m_bytes - m_sizes.at(hash) + *disk_size;
+            m_sizes[hash] = *disk_size;
+        }
+        m_quarantined.insert(hash);
+    }
     if (const auto found = m_cache.find(hash); found != m_cache.end()) {
         m_cache_bytes -= found->second->size();
         m_cache.erase(found);
@@ -254,12 +285,13 @@ std::shared_ptr<const std::vector<unsigned char>> HashSnapshotStore::GetShared(c
     AssertLockHeld(cs_main);
     if (const auto found = m_cache.find(hash); found != m_cache.end()) { m_touched[hash] = ++m_clock; return found->second; }
     if (!Has(hash)) return {};
-    BoundedBytes value;
-    if (!m_db.Read(std::make_pair(uint8_t{'s'}, hash), value) || hashonly::SnapshotHash(value.data) != hash) {
-        Quarantine(hash);
+    StoredValue<BoundedBytes> stored;
+    if (!m_db.Read(std::make_pair(uint8_t{'s'}, hash), stored) || stored.value.data.size() != m_sizes.at(hash) ||
+        hashonly::SnapshotHash(stored.value.data) != hash) {
+        Quarantine(hash, std::max(size_t{1}, stored.size));
         return {};
     }
-    auto bytes = std::make_shared<const std::vector<unsigned char>>(std::move(value.data));
+    auto bytes = std::make_shared<const std::vector<unsigned char>>(std::move(stored.value.data));
     Cache(hash, bytes);
     return bytes;
 }
@@ -447,10 +479,13 @@ std::shared_ptr<const CBlock> HashSnapshotStore::Template(const uint256& id)
     // indexed from a separately hash-verified snapshot.
     const auto found = m_template_sources.find(id);
     if (found == m_template_sources.end()) return {};
-    const auto snapshot = Lookup(found->second.first);
-    if (!snapshot || found->second.second >= snapshot->templates.size()) return {};
-    auto block = std::make_shared<CBlock>(snapshot->templates[found->second.second].block);
-    return hashonly::TemplateId(*block) == id ? block : nullptr;
+    for (const auto& [hash, index] : found->second) {
+        const auto snapshot = Lookup(hash);
+        if (!snapshot || index >= snapshot->templates.size()) continue;
+        auto block = std::make_shared<CBlock>(snapshot->templates[index].block);
+        if (hashonly::TemplateId(*block) == id) return block;
+    }
+    return {};
 }
 
 std::optional<CAmount> HashSnapshotStore::NativeValidated(const uint256& id)
@@ -479,11 +514,15 @@ bool HashSnapshotStore::QueueBlock(std::shared_ptr<const CBlock> block)
     AssertLockHeld(cs_main);
     const auto hash = block->GetHash();
     if (m_pending.contains(hash)) return true;
+    if (GetSerializeSize(TX_WITH_WITNESS(*block)) > hashonly::MAX_TEMPLATE_BYTES) return false;
     const auto bytes = EncodeBlock(*block);
-    if (m_pending.size() >= MAX_PENDING_BLOCKS || m_pending_bytes + bytes.size() > MAX_PENDING_BYTES) return false;
+    const auto existing = m_pending_sizes.find(hash);
+    const size_t replaced = existing == m_pending_sizes.end() ? 0 : existing->second;
+    if ((existing == m_pending_sizes.end() && m_pending_sizes.size() >= MAX_PENDING_BLOCKS) ||
+        m_pending_bytes - replaced + bytes.size() > MAX_PENDING_BYTES) return false;
     if (!m_db.Write(std::make_pair(uint8_t{'b'}, hash), bytes, true)) return false;
-    m_pending_bytes += bytes.size();
-    m_pending_sizes.emplace(hash, bytes.size());
+    m_pending_bytes = m_pending_bytes - replaced + bytes.size();
+    m_pending_sizes[hash] = bytes.size();
     m_pending.emplace(hash, std::move(block));
     m_requests.Track(hash, m_pending.at(hash)->m_mm_rhs, [this](const auto& id) { LOCK(cs_main); return Has(id); });
     ++m_revision;
@@ -495,10 +534,17 @@ bool HashSnapshotStore::HasPendingBlock(const uint256& hash) const
     return m_pending.contains(hash);
 }
 
+bool HashSnapshotStore::MatchesPendingBlock(const CBlock& block) const
+{
+    AssertLockHeld(cs_main);
+    const auto found = m_pending.find(block.GetHash());
+    return found != m_pending.end() && TemplateBodyHash(*found->second) == TemplateBodyHash(block);
+}
+
 void HashSnapshotStore::RemoveBlock(const uint256& hash)
 {
     AssertLockHeld(cs_main);
-    if (!m_pending.contains(hash)) return;
+    if (!m_pending_sizes.contains(hash)) return;
     if (!m_db.Erase(std::make_pair(uint8_t{'b'}, hash), true)) throw std::runtime_error("cannot remove completed pending block");
     m_pending_bytes -= m_pending_sizes.at(hash);
     m_pending_sizes.erase(hash);

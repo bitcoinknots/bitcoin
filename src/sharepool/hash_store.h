@@ -20,6 +20,7 @@ namespace sharepool {
  * membership. Finite local quotas leave blocks pending; they never change validity.
  */
 class HashSnapshotStore {
+    friend struct HashSnapshotStoreTest;
     CDBWrapper m_db;
     // Quarantined records still consume their disk quota, but are neither
     // advertised nor considered available. A verified Put can replace them.
@@ -29,7 +30,8 @@ class HashSnapshotStore {
     std::map<uint256, uint64_t> m_touched GUARDED_BY(cs_main);
     std::map<uint256, std::shared_ptr<const CBlock>> m_pending GUARDED_BY(cs_main);
     std::map<uint256, size_t> m_pending_sizes GUARDED_BY(cs_main);
-    std::map<uint256, std::pair<uint256, uint32_t>> m_template_sources GUARDED_BY(cs_main);
+    // Independently authenticated fallback sources, bounded per template ID.
+    std::map<uint256, std::vector<std::pair<uint256, uint32_t>>> m_template_sources GUARDED_BY(cs_main);
     std::map<uint256, size_t> m_template_sizes GUARDED_BY(cs_main);
     std::map<Wtxid, size_t> m_transaction_sizes GUARDED_BY(cs_main);
     std::map<Wtxid, CTransactionRef> m_transactions GUARDED_BY(cs_main);
@@ -47,7 +49,7 @@ class HashSnapshotStore {
     uint64_t m_revision GUARDED_BY(cs_main){0};
     uint64_t m_clock GUARDED_BY(cs_main){0};
     void Cache(const uint256& hash, std::shared_ptr<const std::vector<unsigned char>> bytes) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
-    void Quarantine(const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    void Quarantine(const uint256& hash, std::optional<size_t> disk_size = std::nullopt) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void IndexTemplates(const uint256& hash, const hashonly::Snapshot& snapshot) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     CTransactionRef Transaction(const Wtxid& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void CacheTransaction(const Wtxid& id, CTransactionRef tx) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
@@ -80,6 +82,8 @@ public:
     bool QueueBlock(std::shared_ptr<const CBlock> block) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     /** Body retained for local validation; this does not imply block validity. */
     bool HasPendingBlock(const uint256& hash) const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    /** Exact witness-inclusive retained body, not merely its header identity. */
+    bool MatchesPendingBlock(const CBlock& block) const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void RemoveBlock(const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::vector<std::shared_ptr<const CBlock>> PendingBlocks() const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 };

@@ -174,7 +174,9 @@ class HashGateTests(unittest.TestCase):
         self.assertEqual([share.proof_id for share in self.gate.eligible_shares()], [acknowledged.proof_id])
         self.reopen()
         self.assertEqual(self.gate.archive_head(), head)
-        self.assertTrue(self.gate.ready_for_dispatch(frozen))
+        self.assertFalse(self.gate.ready_for_dispatch(frozen))
+        refreshed = self.gate.authorize(accepted.serialize(), accepted_snapshot.serialize())
+        self.assertTrue(self.gate.ready_for_dispatch(refreshed))
 
     def test_template_omission_cannot_admit_offered_evidence(self):
         offered, opening = fixture(ntime=1700000010, secret=(2).to_bytes(32, "big"))

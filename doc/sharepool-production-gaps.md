@@ -22,6 +22,12 @@ Pending native block bodies are now retained without repeatedly downloading
 them while their separate snapshot data is missing. Retention does not confer
 validity or advance the common ancestor.
 
+The next hardening pass fixes F7 bounded-record recovery, F8 dispatch binding,
+and two reproduced pending-body eviction paths. Its [verification report](sharepool-production-hardening-report.md)
+records the exact scope. The [accounting proposal and model](sharepool-production-protocol-plan.md)
+make the remaining funding, rolling-window and capacity choices concrete; they
+do not change the native v5 contract.
+
 ## Hardening implemented in version 4
 
 | Area | Implementation | Evidence to inspect |
@@ -36,8 +42,9 @@ validity or advance the common ancestor.
 | Signer corruption | Checksummed key/policy record; explicit legacy migration requires a previously trusted policy and public key. | Native signer tests. The checksum detects corruption, not an attacker able to rewrite both data and checksum. |
 
 The native integration entry point is `HashMiningGate.make_native()`, then
-`authorize()` and a final freshness check with `ready_for_dispatch()`.
-The last check alone is not a complete dispatch authorization (see below).
+`authorize()` and a final issuer-bound check with `ready_for_dispatch()`.
+The check authenticates the exact issued bytes and policy and verifies current
+tip/receipt freshness. Restart requires new authorization.
 `candidate()` and `make()` remain
 explicit fixture helpers. A stored snapshot, valid signature or constructed job
 alone is never a mining ACK.
@@ -96,21 +103,23 @@ does not remove that assumption. Public activation requires a reviewed protocol,
 deployment/rollback plan and compatible consensus participants; these regtest
 flags are not a mainnet activation mechanism.
 
-**Recovery findings F7.** Startup still lacks bounded quarantine/restore for
-corrupt snapshot and pending-block records. The template index retains one
-snapshot source and does not search alternative retained copies if that source
-is unreadable. These are local data-fault availability findings, not demonstrated
-remote corruption. Runtime quarantine of other records does not close them.
-Final static review also found that rejection of an invalid alternate body with
-the same header hash can evict a retained pending body in `ProcessNewBlock()`.
-The duplicate-fetch fix does not cover this adversarial eviction path; a bounded
-reproduction and retention rule remain to be added.
+**Recovery beyond F7.** Bounded damaged snapshot and pending-body records now
+quarantine without being advertised, still consume quota, and accept exact
+repairs. Template lookup tries up to four independently verified snapshot
+sources. Underlying LevelDB corruption, malformed keys, missing database files,
+quota exhaustion and loss of every available source still require operational
+restore. Local unavailability is never consensus invalidity. Rejected alternate
+bodies and successfully ignored unsolicited blocks no longer evict a good
+pending copy.
 
-**Dispatch binding finding F8.** `ready_for_dispatch()` checks the active tip and
-receipt revision, but does not bind the supplied authorization to the issuing
-gate, policy or exact bytes. A caller must retain the exact authorization from
-the correct gate; this API must not be treated as a standalone approval of an
-arbitrary object. Issuer-bound authorization remains an integration requirement.
+**Dispatch integration beyond F8.** A per-gate-lifetime seal now binds exact
+block/snapshot bytes, policy/profile, native context and receipt/evidence
+counters. Fabricated, cross-gate, altered, inherited-process and post-restart
+authorizations cannot pass dispatch checks. Callers must send the exact immutable
+authorized bytes and observe refresh signals; no synchronous check can prevent a
+tip change immediately after it returns. This is an integration boundary, not
+a sandbox against code controlling the gate process or a complete deployed
+Stratum authentication/transport protocol.
 
 **What is attested.** Distinct valid template headers, full authorized bodies,
 submitted PoW and exact coinbase allocations can be checked. They do not prove
@@ -121,8 +130,9 @@ unobservable properties.
 
 ## Release evidence
 
-Use the [v5 verification report](sharepool-v5-hardening-report.md) and its per-run
-binary/source hashes for this revision. The v4 report remains historical.
+Use the [current verification report](sharepool-production-hardening-report.md)
+and its per-run binary/source hashes for this revision. Prior v4/v5 reports
+remain historical.
 Model results, wire fixtures, mocked gate tests and native integration
 tests provide different evidence; none should be presented as ASIC testing,
 WAN throughput or mainnet consensus approval. Mainnet remains disabled.

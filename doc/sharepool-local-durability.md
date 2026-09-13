@@ -164,7 +164,7 @@ paths. An interrupted or refused restore can leave verified prefix segments in
 that explicitly selected archive directory, but never publishes a partially
 validated destination database.
 
-## Native standalone template recovery
+## Native evidence recovery
 
 The native template cache stores transaction bytes once per witness transaction
 ID and stores each template's normalized header, ordered transaction references
@@ -182,7 +182,20 @@ accounting after the durable batch succeeds. Shared transaction references can
 become readable again once their common transaction has been repaired.
 
 This handles bounded content damage in the native standalone template and
-transaction records. It does not repair LevelDB structural corruption, missing
-database files, damaged snapshot or pending-block records detected at startup,
-or exhausted local quota. Those remain explicit local availability/restore
-conditions, never evidence that a consensus-valid block is invalid.
+transaction records. Snapshot and pending-body records now also verify their
+complete local wrappers during startup. Damaged records are quarantined while
+retaining their byte and object quota, so exact data can repair them without
+advertising a corrupted body. Pending bodies also check transaction count,
+Merkle and witness integrity. A hash-correct malformed snapshot preimage remains
+available: it is evidence for consensus rejection, rather than local corruption.
+
+Each template can use up to four independently verified snapshot sources if its
+standalone record or an earlier source becomes unreadable. Rejection of an
+alternate body with the same header cannot evict a good pending body, nor can a
+successful no-op that ignores an unsolicited lower-work block. Actual acceptance
+or invalidity of the retained body still removes its pending entry.
+
+These changes do not repair LevelDB structural corruption, malformed keys,
+missing database files, exhausted local quota or loss of all retained sources.
+Those remain explicit local availability/restore conditions, never evidence
+that a consensus-valid block is invalid.

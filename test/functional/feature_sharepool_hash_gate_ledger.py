@@ -4,6 +4,7 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Native v5 gate: provisional ACK, archive recovery, anchor, late pay, reorg."""
 from contextlib import ExitStack
+from dataclasses import replace
 from pathlib import Path
 import sys
 from unittest import SkipTest
@@ -45,7 +46,8 @@ class SharePoolHashGateLedgerTest(BitcoinTestFramework):
 
     def publish(self, node, gate, signer):
         block, opening = gate.make_native(sign_owner=signer.sign_owner)
-        gate.authorize(block.serialize(), opening.serialize())
+        authorization = gate.authorize(block.serialize(), opening.serialize())
+        assert_equal(gate.ready_for_dispatch(authorization), True)
         gate.register_snapshot(opening.serialize())
         block.solve()
         assert_equal(node.submitblock(block.serialize().hex()), None)
@@ -94,6 +96,28 @@ class SharePoolHashGateLedgerTest(BitcoinTestFramework):
                 trusted_head=head, rpc=self.rpc(follower), **options(coordinator)))
             assert_equal(restored.receive(proof), False)
             assert_equal(self.status(restored)["status"], "provisional")
+
+            self.log.info("Exact native authorizations cannot cross gates, change bytes or survive reopening")
+            proposal, proposed_opening = main_gate.make_native(sign_owner=coordinator.sign_owner)
+            authorized = main_gate.authorize(proposal.serialize(), proposed_opening.serialize())
+            recovered_authorized = restored.authorize(proposal.serialize(), proposed_opening.serialize())
+            assert_equal(authorized.policy_binding, recovered_authorized.policy_binding)
+            assert_equal(main_gate.ready_for_dispatch(authorized), True)
+            assert_equal(restored.ready_for_dispatch(recovered_authorized), True)
+            assert_equal(main_gate.ready_for_dispatch(recovered_authorized), False)
+            assert_equal(restored.ready_for_dispatch(authorized), False)
+            assert_equal(main_gate.ready_for_dispatch(replace(authorized, snapshot_bytes=opening.serialize())), False)
+            assert_equal(main_gate.ready_for_dispatch(replace(authorized, block_bytes=origin.serialize())), False)
+            recovered_head = restored.archive_head()
+            restored.close()
+            assert_equal(restored.ready_for_dispatch(recovered_authorized), False)
+            restored = cleanup.enter_context(HashMiningGate(directory / "recovered.sqlite",
+                rpc=self.rpc(follower), **options(coordinator)))
+            assert_equal(restored.archive_head(), recovered_head)
+            assert_equal(restored.ready_for_dispatch(recovered_authorized), False)
+            renewed = restored.authorize(proposal.serialize(), proposed_opening.serialize())
+            assert_equal(restored.ready_for_dispatch(renewed), True)
+            assert_equal(restored.archive_head(), recovered_head)
 
             self.log.info("The actual anchor confirms pending credit; its coinbase still pays its own fallback")
             anchor, snapshot = self.publish(source, main_gate, coordinator)
