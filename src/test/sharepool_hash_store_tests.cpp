@@ -318,6 +318,89 @@ BOOST_AUTO_TEST_CASE(hash_correct_malformed_snapshot_preimage_remains_consensus_
     }
 }
 
+BOOST_AUTO_TEST_CASE(selected_profile_preserves_legacy_malformed_hashes_and_isolates_v6_storage)
+{
+    // Golden hashes use the original v4/v5 byte-selection rule, including
+    // malformed inputs advertising a future or unknown version. Extending
+    // raw-byte autodetection would silently change old consensus evidence.
+    const std::array<std::pair<unsigned char, const char*>, 5> malformed{{
+        {0, "b595ce5d265eac73f0e0ab5cfb84b966cc9e8b9fee1c5184a31b2efd98725dc2"},
+        {4, "5a0ff066f50423fd670ebd719c5b58e31eb2822c3ba7398ff4d14ab4896e0f8c"},
+        {5, "4f0f02b741c37771f10d38ccf2070cf35212dee95c840b291daa27dee5d8b745"},
+        {6, "07d92947d649986828d63bb73c6e0c9c2626f6e9b3f618818e35b4ec2a8cf9c9"},
+        {7, "f45032411af95fd472cc48fcc5c6cdb28daf055d0a1ddfddd63a29d6f9613cb1"},
+    }};
+    for (const uint32_t profile : {4U, 5U, 6U}) {
+        const auto path = m_path_root / fs::PathFromString("profile-evidence-v" + std::to_string(profile));
+        {
+            sharepool::HashSnapshotStore store{path, false, profile};
+            LOCK(cs_main);
+            for (const auto& [byte, golden] : malformed) {
+                const std::vector<unsigned char> raw{byte};
+                const auto legacy_hash = ho::SnapshotHash(raw);
+                BOOST_CHECK_EQUAL(legacy_hash.GetHex(), golden);
+                const auto selected_hash = ho::ProfileSnapshotHash(raw, profile);
+                const auto other_hash = ho::ProfileSnapshotHash(raw, profile == 6 ? 4 : 6);
+                BOOST_CHECK(selected_hash != other_hash);
+                BOOST_CHECK((selected_hash == legacy_hash) == (profile != 6));
+                BOOST_CHECK_THROW(store.Put(raw, other_hash), std::runtime_error);
+                BOOST_CHECK(!store.Has(other_hash));
+                BOOST_CHECK(store.Put(raw, selected_hash) == selected_hash);
+                BOOST_CHECK(store.Has(selected_hash));
+                BOOST_CHECK_THROW(store.Lookup(selected_hash), ho::MalformedSnapshot);
+            }
+            BOOST_CHECK_EQUAL(store.Count(), malformed.size());
+            BOOST_CHECK_EQUAL(store.Bytes(), malformed.size());
+        }
+        {
+            sharepool::HashSnapshotStore reopened{path, false, profile};
+            LOCK(cs_main);
+            BOOST_CHECK_EQUAL(reopened.Count(), malformed.size());
+            BOOST_CHECK_EQUAL(reopened.Bytes(), malformed.size());
+            for (const auto& [byte, golden] : malformed) {
+                const std::vector<unsigned char> raw{byte};
+                const auto selected_hash = ho::ProfileSnapshotHash(raw, profile);
+                const auto other_hash = ho::ProfileSnapshotHash(raw, profile == 6 ? 4 : 6);
+                BOOST_CHECK(reopened.Has(selected_hash));
+                BOOST_CHECK(!reopened.Has(other_hash));
+                BOOST_REQUIRE(reopened.Get(selected_hash));
+                BOOST_CHECK(*reopened.Get(selected_hash) == raw);
+                BOOST_CHECK_THROW(reopened.Lookup(selected_hash), ho::MalformedSnapshot);
+            }
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(v6_store_retains_wrong_version_preimage_for_profile_validation)
+{
+    const auto path = m_path_root / "v6-wrong-version-preimage";
+    const auto raw = ho::EncodeSnapshot(source);
+    const auto legacy_hash = ho::SnapshotHash(raw);
+    const auto hash = ho::ProfileSnapshotHash(raw, 6);
+    BOOST_CHECK(hash != legacy_hash);
+    {
+        sharepool::HashSnapshotStore store{path, false, 6};
+        LOCK(cs_main);
+        BOOST_CHECK(store.Put(raw, hash) == hash);
+        BOOST_CHECK(!store.Has(legacy_hash));
+    }
+    {
+        sharepool::HashSnapshotStore reopened{path, false, 6};
+        LOCK(cs_main);
+        const auto decoded = reopened.Lookup(hash);
+        BOOST_REQUIRE(decoded);
+        BOOST_CHECK_EQUAL(decoded->binding.version, 4);
+        // The selected profile authenticates these bytes before its validator
+        // rejects their version. They must never masquerade as unavailable.
+        BOOST_CHECK(ho::ProfileSnapshotHash(*decoded, 6) == hash);
+        BOOST_CHECK(ho::ProfileSnapshotHash(*decoded, 4) == legacy_hash);
+        BOOST_CHECK(ho::ProfileSnapshotHash(*decoded, 5) == legacy_hash);
+        BOOST_REQUIRE(reopened.Get(hash));
+        BOOST_CHECK(*reopened.Get(hash) == raw);
+    }
+    BOOST_CHECK_THROW((sharepool::HashSnapshotStore{m_path_root / "unknown-profile", false, 99}), std::invalid_argument);
+}
+
 BOOST_AUTO_TEST_CASE(damaged_pending_records_do_not_suppress_downloads_and_accept_exact_repair)
 {
     const auto hash = block.GetHash();

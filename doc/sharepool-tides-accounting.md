@@ -1,141 +1,131 @@
-# Separate pools with a TIDES reward window
+# Separate pools and the v6 TIDES-style native experiment
 
-**Selected on 2026-09-12:** each pool funds its own rewards, using a TIDES
-window. These two choices are settled. This document records the implementation
-boundary and the remaining native integration; it does not activate new rules.
+Version 6 is a fresh, opt-in **regtest-only** profile. It connects rolling payout
+accounting to native block validation, job construction, external signing and the
+mining gate. It does not activate these rules on mainnet or public testnets and
+does not convert v5 pending credits.
 
-## Selected reward contract
+## Recipients and separate pools
 
-Pool A's blocks reward work recorded for A; B's blocks reward B's work. Relaying
-and checking another pool's data does not make its miners beneficiaries of the
-relaying pool's blocks. A miner leaving A retains its original position in A's
-history. New work for B cannot relabel that old work. Rewards depend on the
-original pool continuing to find blocks; there is no fixed satoshi debt or
-promise that every share is rewarded.
+A payout script is a destination, not an exclusive identity. A miner can choose
+a recipient without proving possession of its spending key. The job signer
+attests the exact job and payout destination; its key need not be the recipient's
+key. There is no global ownership registration or pool-membership lock.
+
+Pool A's blocks reward recorded work for A. The same recipient can earn in B,
+but an old proof keeps its original pool and payout script. Leaving a pool does
+not erase or transfer its old work. That work can earn again while eligible if
+its original pool finds more blocks. This does not promise payment from an
+abandoned pool, identify operators, or enforce exclusive affiliation.
+
+## Window and native amounts
 
 The reference is [OCEAN's TIDES specification](https://ocean.xyz/docs/tides),
-read on 2026-09-12. Its relevant rules are:
+checked on 2026-09-13. V6 adopts its rolling work window, job-issuance cutoff,
+per-recipient aggregation and downward satoshi rounding. Its consensus admission
+ordering and bootstrap are explicit extensions; it is not a claim of identical
+pool behavior or measured payout variance.
 
-- Keep distinct proofs in order, weighted by their assigned difficulty.
-- Use a window containing eight times the winning block's network difficulty.
-- Freeze its top when issuing the winning job.
-- Aggregate work by payout address, include subsidy and transaction fees, and
-  round each address's reward down to satoshis.
-- Keep shares after a reward; retain older history for difficulty increases.
-- When history is shorter than the window, divide by the available work.
+For a canonical native target T, the window contains exactly
+`8 * 2^256 / (T + 1)` expected hashes. V6 assigns each share a positive
+power-of-two work weight W and verifies a share target of `2^256 / W - 1`.
+Thus its success probability is exactly `1/W`; an unusually low submitted hash
+never increases credit. W is the largest power of two at most
+`max(1, floor(2^256 / (T + 1)) >> 10)`. This experimental setting implies roughly
+1,024–2,048 shares per native block at unclamped difficulty. It has not been
+calibrated for production pool sizes, traffic or payout variance.
 
-This is eight blocks **worth of work**, not the last eight blocks, eight shares,
-or an eighty-minute timer. The [previous experiment](sharepool-production-protocol-plan.md)
-used different rounding and a confirmed-parent cutoff. Its published numbers
-remain historical; they are not TIDES variance measurements.
+The native calculation keeps the network-work boundary rational, clips only the
+oldest eligible contribution, aggregates equal scripts, then floors each amount
+using the full native subsidy plus actual transaction fees. Rounding residue is
+unclaimed. It is neither reassigned nor carried as a satoshi balance. Repeated
+blocks can reward the same proof. A later difficulty increase can bring older
+work back into the window, so old admissions must remain retrievable.
 
-## Accounting implemented in this change
+Only when the complete relevant history and current job contain no work does
+the bootstrap pay the job's recipient. Missing history never triggers bootstrap.
+An all-zero payout calculation is allowed; the native coinbase still has its
+required transaction shape and witness commitment. There is no operator fee,
+custodial balance or minimum-payout carry in this profile.
 
-The independent [C++ calculator](../src/sharepool/tides.cpp) and
-[Python reference](../contrib/sharepool/tides_accounting.py) implement the chosen
-window arithmetic. Shared [known-answer vectors](../src/test/data/sharepool_tides.json)
-check exact agreement for the zero-operator-fee contract. These modules are not
-called by `CheckSnapshot`, the native builder or the mining gate yet.
+## Frozen jobs and canonical admission
 
-Both use positive integer work in one common exact difficulty scale. The caller
-must establish that scale and verify the assigned share target; an observed
-low hash or a claimed hashrate is not a work weight. Converting native targets
-to this scale is still part of the new protocol design. In particular, the
-existing rounded expected-hash integers must not be advertised as identical to
-all TIDES difficulty conventions.
+The actual native parent fixes the historical branch. A job extends that branch
+with its own valid admission batch before calculating payouts. Its exact signed
+body commits the resulting recipients and amounts. Later receipts require a new
+job and a new snapshot hash; they cannot modify the job already being hashed.
+A winning proof cannot insert itself into the job it solved.
 
-The oldest contribution is clipped to the amount that fills the window; its
-original proof and full work remain in history. This is an explicit boundary
-convention, since the reference does not spell out that algorithm. The libraries
-aggregate equal scripts before rounding and return any leftover satoshis as
-unclaimed residue. They neither redistribute that residue nor carry it as a
-balance. No implicit recipient, minimum-payment account or operator fee is added
-by the C++ calculator. Python additionally models tagged fee buckets as an
-explicit extension; it is not native fee enforcement.
+Admission order is `(native admission height, numeric proof ID)`. This gives
+nodes one reproducible order. It differs from OCEAN's order of reception: nodes
+cannot independently prove a single global arrival order. Batch selection,
+withholding and proof-ID selection can affect which work crosses the oldest
+window boundary. Those fairness effects need adversarial and variance analysis;
+a deterministic ordering rule alone does not resolve them.
 
-For example, with network work 10, the window holds 80 units. If Alice's older
-proof represents 60 and Bob's newer proof represents 30, Alice contributes 50
-and Bob 30 to this window. At a reward of 101 satoshis, their floored amounts are
-63 and 37, leaving one satoshi unclaimed. Another block can reward this same
-history. If network work rises to 20, both full proofs return to eligibility;
-the available-history denominator is then 90.
+A locally durable ACK is provisional. Once a block admits a proof, its original
+pool/script position persists in branch history and can earn repeatedly. A proof
+not admitted before the existing origin-age limit can still expire unpaid.
+Deterministic queue carry preserves evidence; it cannot compel a producer to
+include an undisclosed receipt or guarantee service under unlimited arrivals.
 
-Empty history raises a distinct error: the calculator does not invent a full
-coordinator payout. Output budget exhaustion rejects the calculation without
-omitting a miner. A C++ history evaluation budget also fails explicitly; it is a
-caller resource limit, not a new consensus share-count cap. This full-prefix
-reference is intentionally not a scalable historical index.
+## Flat commitment, historical retrieval and forks
 
-## Cutoff and native integration
+The block's `m_mm_rhs` contains only a domain-separated hash of its complete
+canonical snapshot. Full template bodies and shares are exchanged outside the
+block using the existing peer connections. The settlement is not a Merkle root.
+The snapshot also contains a cumulative history hash binding the parent history
+and this block's admissions; it does not replace or duplicate the complete log.
 
-The chosen target is an **issued-job window**. Its inputs must be bound to the
-exact signed template before hashing: native parent, pool, complete history
-prefix, new admitted work, current difficulty, reward and resulting coinbase.
-Receiving more shares creates a new job with a new snapshot hash. It does not
-alter an existing job or insert a winning proof into the job that it solved.
+The history index walks the candidate's actual native ancestry and authenticates
+each required snapshot. Cached cursors retain hashes/heights, not block-index
+pointers across calls. Missing bytes and exhausted local resource budgets remain
+pending, never consensus-invalid or an invented empty window. Bounded scans can
+resume across retries. Derived caches are disposable; durable native snapshot
+evidence remains the source for restart, reindex and competing forks.
 
-Native implementation should extend the actual parent's confirmed per-pool log
-with the valid admissions committed by that particular job. The resulting
-cutoff can therefore include work verified since the parent block. The current
-v5 rule, which only pays from the parent's confirmed credits, has extra delay
-and is not silently renamed TIDES. The canonical order of new admissions must
-be explicit: different nodes' arrival times cannot define one objective order.
-A frozen prefix authenticates supplied work; it still cannot prove inclusion
-of undisclosed acknowledgments.
+Locally valid signatures or cached inactive-branch deltas do not activate a
+branch. Native validation must accept every ancestor before that branch becomes
+active. Nodes given the same valid history derive the same payouts; nodes with
+missing evidence wait. Nodes enforcing different consensus rules can fork.
 
-The Python job freezes its accounting inputs. The C++ API verifies a contiguous
-per-pool prefix ending at the supplied sequence/proof ID. **Neither is proof
-that the history was authorized.** A last proof ID does not authenticate earlier
-records. The native integration must verify the entire committed history,
-membership and evidence on the candidate's actual branch before calling either
-calculator.
+## Profile isolation and operation
 
-The remaining implementation work is concrete:
-
-1. A separate regtest profile with an explicitly scoped codec, signature and
-   snapshot hash. Preserve v4/v5 handling of even malformed hash preimages;
-   merely assigning a new version byte in their shared hash function can change
-   existing invalidity evidence. Start with a fresh chain, without converting
-   v5's confirmed pending credits into rolling positions.
-2. Native pool membership with actual proof of payout-script control. A first
-   arbitrary owner signature cannot register somebody else's address. Explicit
-   branch-confirmed switches govern new jobs; earlier work keeps its original
-   pool and payout. No permanent membership lock is introduced by this choice.
-3. An append-only historical work store with bounded admission deltas, exact
-   parent references and undo/reorg support. Repeating all history inside every
-   snapshot is not sustainable. Older data must remain retrievable when a
-   window expands. The full snapshot still has one flat hash in `m_mm_rhs`;
-   evidence remains outside the block on the existing P2P connections.
-4. Exact admission order, target units, empty-log bootstrap and coinbase output
-   limits, followed by native builder, gate, restart, reindex and competing-fork
-   tests. Keep provisional ACKs distinct from canonical admission and preserve
-   deterministic carry without claiming unlimited inclusion capacity.
-
-These are integration requirements, not requests to reconsider the selected
-funding and reward window. Production difficulty, archive capacity and payout
-variance still need measurements using the completed pipeline.
-
-## Verification
-
-Run the accounting tests from the repository root:
+Use a fresh datadir and blocks directory, for example:
 
 ```sh
-python3 -B -m unittest discover -s contrib/sharepool -p 'test_tides*.py' -v
+bitcoind -regtest -sharepoolheight=1 -testactivationheight=blake2b@1 \
+  -sharepoolhashonly=1 -sharepooltides=1
 ```
 
-Build `test_bitcoin` and run its `sharepool_tides_tests` suite for the native
-reference and embedded cross-language vectors. This revision passed:
+An fsynced profile marker pins the genesis, rules, SharePool/Blake2b activation
+heights, Blake2b headline and blocks path before block-index initialization. A
+v6 datadir cannot silently reopen as
+v4/v5/plain regtest or with a changed schedule, including through reindex. The
+v4/v5 hash mapping remains unchanged even for malformed preimages. V6 uses an
+explicitly selected domain in the store, RPCs and validator.
 
-- 92 C++ sharepool cases / 9,846 assertions, including 12 new TIDES cases and
-  all 80 existing sharepool cases.
-- 24 Python TIDES cases, including an independent interval calculation across
-  2,720 inputs and the 11 shared C++/Python known-answer vectors.
-- All 18 historical accounting-model regression cases.
+The native snapshot database still has finite local capacity. Configurable
+history-cache budgets do not provide archival funding, unlimited admission or
+an initial-sync solution. RPC callers may need to retry a yielded history scan.
+Mining gateways must dispatch the exact bytes returned by their final
+`ready_for_dispatch()` authorization and react to tip/receipt changes.
 
-Commands, source/binary hashes and test logs are recorded in the
-[accounting verification manifest](../contrib/sharepool/results/tides-accounting.json).
-These are library/unit checks, not new native block or network scenarios.
-Existing v4/v5 functional regression results
-remain in the [hardening report](sharepool-production-hardening-report.md).
-This change contains no hardware or public-network test and does not establish
-mainnet readiness.
+## Verification and remaining work
+
+The pure [C++ calculator](../src/sharepool/tides.cpp),
+[Python reference](../contrib/sharepool/tides_accounting.py) and their
+[historical accounting results](../contrib/sharepool/results/tides-accounting.json)
+remain useful independent arithmetic checks. Their integer-input API does not
+itself perform native rational-target conversion or validate chain history.
+The native profile is implemented in
+[consensus/sharepool_hash.cpp](../src/consensus/sharepool_hash.cpp) and
+[sharepool/tides_history.cpp](../src/sharepool/tides_history.cpp).
+
+The [v6 verification report](sharepool-v6-tides-report.md) records current native
+integration and hardware evidence separately from the earlier v4/v5 and
+arithmetic-library runs. Production release still
+needs archive scaling and recovery, difficulty/variance calibration, adversarial
+ordering analysis, realistic latency/backlog measurements, independent review,
+and a reviewed activation plan. These test results cannot establish mainnet
+readiness or prove that miners run a particular software implementation.

@@ -111,6 +111,7 @@ struct Params {
     int SharePoolHeight{std::numeric_limits<int>::max()};
     bool SharePoolHashOnly{false};
     bool SharePoolAdmittedLedger{false}; // Explicit v5 regtest profile; no public activation.
+    bool SharePoolTides{false}; // Explicit v6 regtest profile; no v5 migration or public activation.
     std::vector<unsigned char> Blake2bHeadline;
     uint8_t Blake2bTargetShift{20};
     /**

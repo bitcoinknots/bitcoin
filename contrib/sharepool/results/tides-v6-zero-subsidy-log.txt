@@ -1,0 +1,8 @@
+2026-09-13T06:41:47.669000Z TestFramework (INFO): PRNG seed is: 149559528191142156
+2026-09-13T06:41:47.669000Z TestFramework (INFO): Initializing test directory <TEST_TMPDIR>
+2026-09-13T06:41:48.332000Z TestFramework (INFO): Generate ordinary preactivation blocks to a 0-satoshi subsidy
+2026-09-13T06:43:35.514000Z TestFramework (INFO): Native builder and gate approve a witness-only coinbase with empty monetary payouts
+2026-09-13T06:43:36.189000Z TestFramework (INFO): Repeating the rolling window preserves the empty payout vector through restart/reindex
+2026-09-13T06:43:54.292000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:43:54.519000Z TestFramework (INFO): Cleaning up <TEST_TMPDIR> on exit
+2026-09-13T06:43:54.519000Z TestFramework (INFO): Tests successful

@@ -4,7 +4,7 @@ from io import BytesIO
 
 from hash_snapshot import (MAX_SNAPSHOT_BYTES, MAX_DEPENDENCY_BYTES, MAX_DEPENDENCY_DEPTH,
                            MAX_ORIGIN_CHECKS, MAX_SHARE_AGE, CompactTemplateRecord,
-                           LEDGER_VERSION, origin_certificate)
+                           LEDGER_VERSION, TIDES_VERSION, origin_certificate)
 from test_framework.messages import CBlockHeader
 
 
@@ -24,7 +24,7 @@ def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSH
     paid-state openings. Callers must discard collected data if this walk fails.
     New jobs reserve their own future origin edge and native origin check;
     historical graph validation leaves that reservation disabled.
-    v5 uses only certificates from the top actual native parent. A historical
+    v5/v6 use only certificates from the top actual native parent. A historical
     root_origin can supply its current settlement parent explicitly; even a
     certified origin still retains its own exact opening for authentication.
     """
@@ -73,11 +73,11 @@ def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSH
         return snapshots[parents[parent]]
 
     certificates = {}
-    if snapshot.envelope.version == LEDGER_VERSION:
+    if snapshot.envelope.version in (LEDGER_VERSION, TIDES_VERSION):
         if trusted_parent is None and root_origin is None and snapshot.envelope.height > activation_height:
             trusted_parent = load_parent((snapshot.envelope.native_parent, snapshot.envelope.height - 1))
         if trusted_parent is not None and trusted_parent.envelope.height >= activation_height:
-            if trusted_parent.envelope.version != LEDGER_VERSION:
+            if trusted_parent.envelope.version != snapshot.envelope.version:
                 raise ValueError("certificate parent profile mismatch")
             account(trusted_parent)
             oldest = max(activation_height, trusted_parent.envelope.height + 1 - MAX_SHARE_AGE)

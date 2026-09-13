@@ -15,6 +15,7 @@
 namespace sharepool::hashonly {
 inline constexpr uint32_t VERSION{4};
 inline constexpr uint32_t LEDGER_VERSION{5};
+inline constexpr uint32_t TIDES_VERSION{6};
 // Vector limits include their CompactSize count prefix. Confirmed credits are
 // never truncated: fresh admissions must stop when pending capacity is full.
 inline constexpr uint32_t MAX_PENDING_BYTES{4 * 1024 * 1024};
@@ -73,6 +74,9 @@ struct Snapshot {
     std::vector<LedgerCredit> pending;
     std::vector<LedgerCredit> settled;
     std::vector<OriginCertificate> certificates;
+    // v6 only: cumulative commitment to canonical admission deltas. Historical
+    // proofs stay in their original snapshots, not repeated pending arrays.
+    uint256 history_head;
 
     Snapshot() { binding.version = VERSION; }
 };
@@ -125,6 +129,9 @@ CTransactionRef DecodeTransaction(Span<const unsigned char> bytes);
 uint256 SnapshotHash(const Snapshot& snapshot);
 /** Hash exact bytes without decoding; callers must enforce canonical decoding. */
 uint256 SnapshotHash(Span<const unsigned char> bytes);
+/** Explicit profile for untrusted bytes. Legacy raw hashing stays frozen. */
+uint256 ProfileSnapshotHash(Span<const unsigned char> bytes, uint32_t version);
+uint256 ProfileSnapshotHash(const Snapshot& snapshot, uint32_t version);
 uint32_t ProfileVersion(const Consensus::Params& consensus);
 uint256 RulesHash(uint32_t version = VERSION);
 uint256 SnapshotContentsHash(const Snapshot& snapshot);
@@ -140,12 +147,24 @@ uint256 OriginCertificateId(const CBlock& block);
  * local allocation failures propagate. No confirmed pending credit expires.
  */
 void ApplyLedgerState(Snapshot& snapshot, const Snapshot* parent);
+void ApplyTidesState(Snapshot& snapshot, const Snapshot* parent);
 /** Deterministic target derived from the contextual native nBits; throws on malformed compact. */
-uint256 ShareTarget(uint32_t native_bits);
+uint256 ShareTarget(uint32_t native_bits, uint32_t version = VERSION);
+/** v6 assigned proof work is an exact power of two in expected-hash units. */
+uint256 TidesShareWork(uint32_t native_bits);
 /** Identical normalization and single-SHA256 display convention to RelayTemplateId. */
 std::vector<unsigned char> NormalizedHeader(const CBlockHeader& header);
 uint256 TemplateId(const CBlockHeader& header);
 std::vector<CTxOut> CalculatePayouts(const Snapshot& snapshot, CAmount reward);
+/** Current job admissions extend actual-parent history. Full native reward is
+ * required: flooring residue is unclaimed, never inferred from coinbase totals.
+ * reserve_scripts returns zero-valued slots for every eligible script so the
+ * native builder can reserve space before selecting fee-paying transactions.
+ */
+Result CalculateTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previous,
+                            uint32_t native_bits, const Consensus::Params& consensus,
+                            const Lookup& lookup, CAmount reward,
+                            std::vector<CTxOut>& payouts, bool reserve_scripts = false);
 
 /** Does not check the containing block's ordinary native PoW/UTXO/script rules.
  * The caller supplies those checks and, when known, its actual reward.

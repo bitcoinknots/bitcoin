@@ -1,5 +1,16 @@
 # Share-pool settlement experiments
 
+The latest [v6 native experiment](../../doc/sharepool-tides-accounting.md) adds
+separate-pool rolling payouts, exact job signatures and full-snapshot hashes on
+fresh regtest chains. It permits the same recipient script in different pools
+while keeping each old proof's original pool and destination. See the
+[current verification report](../../doc/sharepool-v6-tides-report.md) for native
+fork/reindex tests, the 100-miner pipeline and the bounded Goldshell capture with
+restoration to Lazarus. Mainnet and public-testnet activation remain disabled.
+
+The profiles and results below are earlier experiments and retain their original
+scope and revision-specific limitations.
+
 This directory contains executable tests of commitments, tagged share proofs,
 snapshot settlement, and disagreement between nodes. It also includes a smoke
 test that ran two actual stock Knots nodes in isolated regtest.

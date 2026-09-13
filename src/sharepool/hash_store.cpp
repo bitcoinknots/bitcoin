@@ -72,17 +72,21 @@ std::shared_ptr<CBlock> DecodeBlock(Span<const unsigned char> bytes)
 }
 }
 
-HashSnapshotStore::HashSnapshotStore(const fs::path& path, bool memory_only)
-    : m_db(DBParams{.path = path, .cache_bytes = 8 * 1024 * 1024, .memory_only = memory_only})
+HashSnapshotStore::HashSnapshotStore(const fs::path& path, bool memory_only, uint32_t profile_version)
+    : m_profile_version{profile_version},
+      m_db(DBParams{.path = path, .cache_bytes = 8 * 1024 * 1024, .memory_only = memory_only})
 {
     LOCK(cs_main);
+    // Reject an unknown selected profile even when this store is empty. The
+    // selector is local configuration, never inferred from untrusted bytes.
+    (void)hashonly::ProfileSnapshotHash(Span<const unsigned char>{}, m_profile_version);
     std::unique_ptr<CDBIterator> it{m_db.NewIterator()};
     for (it->Seek(std::make_pair(uint8_t{'s'}, uint256{})); it->Valid(); it->Next()) {
         std::pair<uint8_t, uint256> key;
         if (!it->GetKey(key) || key.first != 's') break;
         StoredValue<BoundedBytes> stored;
         const bool sound = it->GetValue(stored) && !stored.value.data.empty() &&
-            hashonly::SnapshotHash(stored.value.data) == key.second;
+            hashonly::ProfileSnapshotHash(stored.value.data, m_profile_version) == key.second;
         const auto size = sound ? stored.value.data.size() : std::max(size_t{1}, stored.size);
         if (m_sizes.size() >= MAX_STORED_OBJECTS || size > MAX_STORED_BYTES - m_bytes) {
             throw std::runtime_error("stored hash-only snapshots exceed local quota");
@@ -287,7 +291,7 @@ std::shared_ptr<const std::vector<unsigned char>> HashSnapshotStore::GetShared(c
     if (!Has(hash)) return {};
     StoredValue<BoundedBytes> stored;
     if (!m_db.Read(std::make_pair(uint8_t{'s'}, hash), stored) || stored.value.data.size() != m_sizes.at(hash) ||
-        hashonly::SnapshotHash(stored.value.data) != hash) {
+        hashonly::ProfileSnapshotHash(stored.value.data, m_profile_version) != hash) {
         Quarantine(hash, std::max(size_t{1}, stored.size));
         return {};
     }
@@ -318,7 +322,7 @@ uint256 HashSnapshotStore::Put(Span<const unsigned char> raw, std::optional<uint
     std::optional<hashonly::Snapshot> snapshot;
     try { snapshot = hashonly::DecodeSnapshot(raw); }
     catch (const std::ios_base::failure&) { /* Hash-verified invalid encodings prove invalidity. */ }
-    const auto hash = hashonly::SnapshotHash(raw);
+    const auto hash = hashonly::ProfileSnapshotHash(raw, m_profile_version);
     if (expected && *expected != hash) throw std::runtime_error("hash-only snapshot differs from requested hash");
     if (Has(hash)) return hash;
     const auto existing = m_sizes.find(hash);

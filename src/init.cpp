@@ -74,6 +74,7 @@
 #include <rpc/util.h>
 #include <scheduler.h>
 #include <script/sigcache.h>
+#include <sharepool/tides_history.h>
 #include <stats/stats.h>
 #include <sync.h>
 #include <torcontrol.h>
@@ -524,6 +525,8 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-datadir=<dir>", "Specify data directory", ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION, OptionsCategory::OPTIONS);
     argsman.AddArg("-dbbatchsize", strprintf("Maximum database write batch size in bytes (default: %u)", nDefaultDbBatchSize), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::OPTIONS);
     argsman.AddArg("-dbcache=<n>", strprintf("Maximum database cache size <n> MiB (minimum %s, default is platform dependent, between %s and %s). Make sure you have enough RAM. In addition, unused memory allocated to the mempool is shared with this cache (see -maxmempool).", MIN_DBCACHE_BYTES / 1_MiB, MIN_DEFAULT_DBCACHE / 1_MiB, MAX_DEFAULT_DBCACHE / 1_MiB), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-sharepooltideshistorycachemib=<n>", "Local TIDES v6 history delta cache budget per validation/RPC thread, in positive whole MiB (default: 64). Does not change consensus rules; requires -sharepooltides.", ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION | ArgsManager::DISALLOW_ELISION, OptionsCategory::DEBUG_TEST);
+    argsman.AddArg("-sharepooltideshistoryquerymib=<n>", "Local TIDES v6 retained history query budget per validation/RPC thread, in positive whole MiB (default: 64). Increase and restart if a valid window remains pending at the query budget. Physical RAM and additional decoding/output memory are required; this is not a process memory limit. Requires -sharepooltides.", ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION | ArgsManager::DISALLOW_ELISION, OptionsCategory::DEBUG_TEST);
     argsman.AddArg("-dbfilesize",
                    strprintf("Target size of files within databases, in MiB (%u to %u, default: %u).",
                              1, 1024,
@@ -1075,6 +1078,19 @@ bool AppInitParameterInteraction(const ArgsManager& args)
 
     if (!errors.empty()) {
         return InitError(errors);
+    }
+
+    for (const char* option : {"-sharepooltideshistorycachemib", "-sharepooltideshistoryquerymib"}) {
+        if (args.GetArgs(option).size() > 1) return InitError(Untranslated(std::string{option} + " may be specified only once"));
+        if (args.IsArgSet(option) && !chainparams.GetConsensus().SharePoolTides) {
+            return InitError(Untranslated(std::string{option} + " requires the opt-in regtest TIDES profile"));
+        }
+    }
+    try {
+        sharepool::tides::ConfigureHistoryCache(sharepool::tides::HistoryCacheBudgetFromMiB(
+            args.GetArg("-sharepooltideshistorycachemib", "64"), args.GetArg("-sharepooltideshistoryquerymib", "64")));
+    } catch (const std::invalid_argument& error) {
+        return InitError(Untranslated(error.what()));
     }
 
     // Testnet3 deprecation warning

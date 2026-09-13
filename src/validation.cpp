@@ -65,6 +65,7 @@
 #include <util/moneystr.h>
 #include <util/overflow.h>
 #include <util/rbf.h>
+#include <util/readwritefile.h>
 #include <util/result.h>
 #include <util/signalinterrupt.h>
 #include <util/strencodings.h>
@@ -4963,8 +4964,9 @@ static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& stat
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-weight-reduced_data", strprintf("%s : RDTS weight limit failed", __func__));
     }
 
-    // This check uses only authenticated block data and its native ancestry.
-    // ConnectBlock separately checks the exact subsidy plus validated fees.
+    // The v6 accounting path needs the full native reward even before the
+    // outer ConnectBlock supplies it; its guarded native-body check obtains
+    // subsidy plus fees without inferring reward from a rounded coinbase.
     if (!CheckConfiguredSharePool(block, state, chainman, pindexPrev)) {
         return false;
     }
@@ -5562,7 +5564,7 @@ sharepool::hashonly::Result PrepareSharePoolHashOrigins(ChainstateManager& chain
     const auto current = ValidateSharePoolHashOriginUnlocked(chainman, block, block.hashPrevBlock, stop);
     if (!current.IsValid()) return current;
     const auto identity = HashPoolNativeBody(block);
-    const auto overlay_hash = overlay ? hashonly::SnapshotHash(*overlay) : uint256{};
+    const auto overlay_hash = overlay ? hashonly::ProfileSnapshotHash(*overlay, hashonly::ProfileVersion(chainman.GetConsensus())) : uint256{};
     // Per-session results prevent concurrent LRU eviction from repeating work.
     // Decode/hash/signature work executes outside cs_main. Only owned byte
     // references and small native cache lookups cross the mutex boundary.
@@ -5672,7 +5674,7 @@ sharepool::hashonly::Result ValidateSharePoolHashHistoricalTemplateUnlocked(Chai
     }
     const auto time = std::max<int64_t>(tip->GetMedianTimePast() + 1, GetTime());
     if (time < 0 || time > std::numeric_limits<uint32_t>::max()) return Result::Missing({}, "sharepool-hash-native-time-range");
-    const auto overlay_hash = overlay ? hashonly::SnapshotHash(*overlay) : uint256{};
+    const auto overlay_hash = overlay ? hashonly::ProfileSnapshotHash(*overlay, hashonly::ProfileVersion(chainman.GetConsensus())) : uint256{};
     const auto checked = hashonly::CheckHistoricalTemplate(block, tip, static_cast<uint32_t>(time), chainman.GetConsensus(),
         [&](const uint256& hash) -> std::shared_ptr<const hashonly::Snapshot> {
             if (overlay && hash == overlay_hash) return overlay;
@@ -5711,7 +5713,7 @@ sharepool::hashonly::Result ValidateSharePoolHashProofUnlocked(ChainstateManager
         full_origin = chainman.m_sharepool_hash_store->Template(hashonly::TemplateId(share.header));
     }
     if (!full_origin) return Result::Missing({}, "sharepool-hash-data-missing");
-    if (!chainman.GetConsensus().SharePoolAdmittedLedger) {
+    if (!chainman.GetConsensus().SharePoolAdmittedLedger && !chainman.GetConsensus().SharePoolTides) {
         const auto prepared = PrepareSharePoolHashOrigins(chainman, *full_origin, nullptr, stop);
         if (!prepared.IsValid()) return prepared;
     }
@@ -5759,9 +5761,24 @@ bool CheckConfiguredSharePool(const CBlock& block, BlockValidationState& state,
         }
         return true;
     }
-    auto result = sharepool::hashonly::CheckSnapshot(block, previous, consensus,
-        [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.Lookup(hash); },
-        [&](const CBlock& origin, const CBlockIndex* parent) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return ValidateSharePoolHashOrigin(chainman, origin, parent); }, reward);
+    auto result = sharepool::hashonly::Result::Valid();
+    if (consensus.SharePoolTides && !reward) {
+        // ContextualCheckBlock also runs before ConnectBlock supplies fees.
+        // A floored v6 coinbase can claim less than the full native reward;
+        // its output total cannot reconstruct the accounting denominator.
+        // Native body validation enters HashOnlyBodyScope, so its nested
+        // contextual checks skip settlement and cannot recurse here.
+        result = ValidateSharePoolHashOrigin(chainman, block, previous);
+        if (result.IsValid()) {
+            reward = result.expected_reward;
+            if (!reward) result = sharepool::hashonly::Result::Missing({}, "sharepool-hash-native-reward-unavailable");
+        }
+    }
+    if (result.IsValid()) {
+        result = sharepool::hashonly::CheckSnapshot(block, previous, consensus,
+            [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.Lookup(hash); },
+            [&](const CBlock& origin, const CBlockIndex* parent) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return ValidateSharePoolHashOrigin(chainman, origin, parent); }, reward);
+    }
     if (result.IsValid()) return true;
     if (result.IsMissing()) {
         store.NeedForBlock(block.GetHash(), result.missing);
@@ -5819,6 +5836,13 @@ void ChainstateManager::RetrySharePoolHashBlocks(const std::atomic<bool>& stop)
             m_sharepool_hash_store->NeedForBlock(block->GetHash(), prepared.missing);
             if (prepared.reason == "sharepool-hash-validation-context-changed") {
                 ++m_sharepool_hash_context_retries;
+                RequestSharePoolHashBlocks();
+            } else if (prepared.reason.starts_with("bad-sharepool-hash-tides-history-") &&
+                       prepared.reason.ends_with("-progress")) {
+                // The history reader retained forward progress before its
+                // per-pass budget ended. Coalesce another pass through the
+                // existing minimum pause and elapsed-time backoff. A hard
+                // limit with no progress never requests its own retry.
                 RequestSharePoolHashBlocks();
             }
             continue;
@@ -7656,15 +7680,78 @@ static ChainstateManager::Options&& Flatten(ChainstateManager::Options&& opts)
     return std::move(opts);
 }
 
+namespace {
+/** Check before BlockManager can open, reindex or prune existing block data.
+ * The experiment has no migration path: only a freshly selected v6 datadir
+ * receives a marker, and that marker also prevents downgrading it silently.
+ */
+BlockManager::Options CheckSharePoolProfileDirectory(const ChainstateManager::Options& options,
+                                                    BlockManager::Options block_options)
+{
+    if (block_options.block_tree_db_params.memory_only) return block_options;
+    const auto& consensus = options.chainparams.GetConsensus();
+    const auto marker = options.datadir / "sharepool-profile-v6";
+    const auto expected = strprintf("SharePool profile v6\n%s\n%s\nheight=%d\nblake2b=%d\nheadline=%s\nblocks=%s\n",
+        consensus.hashGenesisBlock.GetHex(),
+        consensus.SharePoolTides ? sharepool::hashonly::RulesHash(6).GetHex() : std::string{},
+        consensus.SharePoolHeight, consensus.Blake2bHeight, HexStr(consensus.Blake2bHeadline),
+        fs::PathToString(fs::weakly_canonical(block_options.blocks_dir)));
+    if (fs::exists(marker)) {
+        const auto [readable, contents] = ReadBinaryFile(marker, expected.size() + 1);
+        if (!consensus.SharePoolTides || !readable || contents != expected) {
+            throw std::runtime_error("TIDES datadir profile, activation schedule or blocks directory mismatch; use the original configuration or a fresh datadir.");
+        }
+        return block_options;
+    }
+    if (!consensus.SharePoolTides) return block_options;
+    bool existing_history = fs::exists(block_options.block_tree_db_params.path) ||
+        fs::exists(block_options.blocks_dir / "index") ||
+        fs::exists(options.datadir / "sharepool-snapshots-v4") ||
+        fs::exists(options.datadir / "sharepool-snapshots-v5") ||
+        fs::exists(options.datadir / "sharepool-snapshots-v6");
+    if (fs::exists(options.datadir)) {
+        for (const auto& entry : fs::directory_iterator(options.datadir)) {
+            if (fs::PathToString(entry.path().filename()).starts_with("chainstate")) existing_history = true;
+        }
+    }
+    if (fs::exists(block_options.blocks_dir)) {
+        for (const auto& entry : fs::directory_iterator(block_options.blocks_dir)) {
+            const auto filename = fs::PathToString(entry.path().filename());
+            if ((filename.starts_with("blk") || filename.starts_with("rev")) && filename.ends_with(".dat")) existing_history = true;
+        }
+    }
+    if (existing_history) {
+        throw std::runtime_error("TIDES requires a fresh datadir and blocks directory; existing history cannot be migrated implicitly.");
+    }
+    TryCreateDirectories(options.datadir);
+    FILE* raw = fsbridge::fopen(marker, "wbx");
+    if (!raw) throw std::runtime_error("Cannot create the TIDES datadir profile marker.");
+    AutoFile file{raw};
+    try {
+        fs::permissions(marker, fs::perms::owner_read | fs::perms::owner_write);
+        file.write(AsBytes(Span{expected}));
+        if (!FileCommit(raw)) throw std::runtime_error("Cannot durably write the TIDES datadir profile marker.");
+        if (file.fclose() != 0) throw std::runtime_error("Cannot close the TIDES datadir profile marker.");
+        DirectoryCommit(options.datadir);
+    } catch (...) {
+        file.fclose();
+        throw;
+    }
+    return block_options;
+}
+} // namespace
+
 ChainstateManager::ChainstateManager(const util::SignalInterrupt& interrupt, Options options, node::BlockManager::Options blockman_options)
     : m_script_check_queue{/*batch_size=*/128, std::clamp(options.worker_threads_num, 0, MAX_SCRIPTCHECK_THREADS)},
       m_interrupt{interrupt},
       m_options{Flatten(std::move(options))},
-      m_blockman{interrupt, std::move(blockman_options)},
+      m_blockman{interrupt, CheckSharePoolProfileDirectory(m_options, std::move(blockman_options))},
       m_validation_cache{m_options.script_execution_cache_bytes, m_options.signature_cache_bytes}
 {
     if (GetConsensus().SharePoolHashOnly) {
-        m_sharepool_hash_store = std::make_unique<sharepool::HashSnapshotStore>(m_options.datadir / (GetConsensus().SharePoolAdmittedLedger ? "sharepool-snapshots-v5" : "sharepool-snapshots-v4"));
+        const auto profile = sharepool::hashonly::ProfileVersion(GetConsensus());
+        m_sharepool_hash_store = std::make_unique<sharepool::HashSnapshotStore>(
+            m_options.datadir / fs::PathFromString("sharepool-snapshots-v" + std::to_string(profile)), false, profile);
         m_sharepool_hash_worker = std::make_unique<sharepool::RetryWorker>(
             [this](const std::atomic<bool>& stop) {
                 util::ThreadRename("sharepool-retry");

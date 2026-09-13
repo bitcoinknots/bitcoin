@@ -27,7 +27,7 @@ import hash_gate_archive
 import hash_gate_batch
 from hash_snapshot import (Snapshot, TemplateRecord, CompactTemplateRecord, Share, MAX_SNAPSHOT_BYTES,
     MAX_TEMPLATE_BYTES, MAX_SHARE_AGE, SHARE_BITS, parse_share, candidate, normalize_template, build_snapshot,
-    job_hash, work_outputs, credit_outputs, rules_hash, LEDGER_VERSION)
+    job_hash, work_outputs, credit_outputs, rules_hash, LEDGER_VERSION, TIDES_VERSION)
 from native_mining_gate import (MiningAuthorization, JobOmission, parse_block, immutable_header,
     template_id, _process_lock, fcntl, REGTEST_GENESIS)
 from native_enforcement import is_payout_script, verify_schnorr
@@ -60,7 +60,7 @@ class HashMiningGate:
                  quota=native_archive.DEFAULT_QUOTA, trusted_head_path=None, archive_directory=None,
                  snapshot_budget=MAX_SNAPSHOT_BYTES, profile_version=4, activation_height=1):
         if (type(activation_height) is not int or not 1 <= activation_height <= 0x7fffffff or
-                type(profile_version) is not int or profile_version not in (4, LEDGER_VERSION) or
+                type(profile_version) is not int or profile_version not in (4, LEDGER_VERSION, TIDES_VERSION) or
                 type(pool) is not int or not 0 < pool < 1 << 256 or type(public_key) is not bytes or
                 len(public_key) != 32 or type(payout_script) is not bytes or not is_payout_script(payout_script) or
                 type(quota) is not int or not 4096 <= quota <= native_archive.MAX_QUOTA or
@@ -73,7 +73,8 @@ class HashMiningGate:
         self.snapshot_budget = snapshot_budget
         self.profile_version, self.rules = profile_version, rules_hash(profile_version)
         self.activation_height = activation_height
-        self.mode = "hash-only-v4" if profile_version == 4 else "hash-only-v5-confirmed-ledger"
+        self.mode = {4: "hash-only-v4", LEDGER_VERSION: "hash-only-v5-confirmed-ledger",
+                     TIDES_VERSION: "hash-only-v6-tides"}[profile_version]
         self.archive_directory = None if archive_directory is None else Path(archive_directory).absolute()
         if self.archive_directory is not None:
             self.archive_directory.mkdir(mode=0o700, exist_ok=True)
@@ -504,6 +505,11 @@ class HashMiningGate:
             settled = retained(parent.settled) if parent is not None else ()
             result.update(provisional_proofs=tuple(sorted(unpaid)), confirmed_pending_proofs=pending,
                           current_block_settled_proofs=settled, unsettled_proofs=tuple(sorted(set(unpaid) | set(pending))))
+        elif self.profile_version == TIDES_VERSION:
+            # Recent anti-replay IDs prove admission, never one-time payment or
+            # present rolling-window membership. Full reward history is separate.
+            result.update(provisional_proofs=tuple(sorted(unpaid)), payout_policy="rolling-tides",
+                          reward_history_verified=False)
         return result
 
     @classmethod
@@ -704,7 +710,7 @@ class HashMiningGate:
         self._require_origin(share)
         staged = {}
         opening = self._snapshot(share.header.m_mm_rhs, staged)
-        parent = self._parent_snapshot(height, tip, staged) if self.profile_version == LEDGER_VERSION else None
+        parent = self._parent_snapshot(height, tip, staged) if self.profile_version in (LEDGER_VERSION, TIDES_VERSION) else None
         self._provenance(opening, staged, trusted_parent=parent,
             root_origin=TemplateRecord.from_block(self._evidence(TEMPLATE, template_id(share.header))), root_depth=1)
         self._rehydrate_retained(staged)
@@ -824,7 +830,8 @@ class HashMiningGate:
                     parent_snapshot=lambda identity, origin_height: self._block_snapshot(origin_height, f"{identity:064x}", trial_staged))
                 return snapshot, resources
             except ValueError as error:
-                if isinstance(error, hash_gate_batch.BatchLimit) or "budget" in str(error) or "exceeds byte bound" in str(error) or str(error).startswith("confirmed ledger capacity;"):
+                if (isinstance(error, hash_gate_batch.BatchLimit) or "budget" in str(error) or "exceeds byte bound" in str(error) or
+                        str(error).startswith(("confirmed ledger capacity;", "TIDES certificate capacity;"))):
                     return None, str(error)
                 raise
 
@@ -866,6 +873,8 @@ class HashMiningGate:
             raise ValueError("receipt status requires a bounded revision and page size")
         if self.profile_version == LEDGER_VERSION:
             return self._ledger_receipt_status(after_revision=after_revision, limit=limit)
+        if self.profile_version == TIDES_VERSION:
+            return self._tides_receipt_status(after_revision=after_revision, limit=limit)
         self._check_seal()
         height, tip = self._context()
         rows = self.db.execute("SELECT identity,height,parent,revision FROM journal WHERE kind=? AND revision>? ORDER BY revision LIMIT ?",
@@ -1027,8 +1036,93 @@ class HashMiningGate:
         return {"native_tip": tip, "receipts": tuple(result), "retained_receipts": self._head()["receipt_revision"],
                 "next_revision": rows[-1][3] if more else None, "history_limited": history_limited}
 
+    def _tides_receipt_status(self, *, after_revision, limit):
+        """Bounded confirmation lookup; admission is not an assertion of payment.
+
+        A proof may participate in many later rewards, or leave its rolling
+        window unpaid. This endpoint does not invent a paid-once status or infer
+        current window eligibility from recent anti-replay tombstones.
+        """
+        self._check_seal()
+        height, tip = self._context()
+        rows = self.db.execute("SELECT identity,height,parent,revision FROM journal WHERE kind=? AND revision>? ORDER BY revision LIMIT ?",
+                               (PROOF, after_revision, limit + 1)).fetchall()
+        more, rows = len(rows) > limit, rows[:limit]
+        cache, history_bytes, history_limited = {}, 0, False
+        parent, selected, selection_checked = None, None, False
+        try:
+            parent = self._parent_snapshot(height, tip, {})
+            if parent is not None:
+                cache[height] = tip, parent
+                history_bytes = len(parent.serialize())
+        except Exception:
+            history_limited = True
+
+        def at(block_height):
+            nonlocal history_bytes, history_limited
+            if block_height in cache:
+                return cache[block_height]
+            if len(cache) >= RECEIPT_HISTORY_SNAPSHOTS:
+                history_limited = True
+                raise ValueError("receipt history page budget")
+            block_hash = self.rpc("getblockhash", block_height)
+            value = self._block_snapshot(block_height, block_hash, {})
+            if value is None:
+                raise ValueError("receipt predates the TIDES profile")
+            size = len(value.serialize())
+            if history_bytes + size > RECEIPT_HISTORY_BYTES:
+                history_limited = True
+                raise ValueError("receipt history page byte budget")
+            history_bytes += size
+            cache[block_height] = block_hash, value
+            return block_hash, value
+
+        result, branch = [], {}
+        for identity, origin, parent_hash, revision in rows:
+            proof = parse_share(self._read(PROOF, identity))
+            if origin not in branch:
+                branch[origin] = self.rpc("getblockhash", origin - 1) if origin <= height + 1 else None
+            current_branch = branch[origin] == parent_hash
+            eligible = current_branch and max(self.activation_height, height + 1 - MAX_SHARE_AGE) <= origin <= height + 1
+            status = "provisional" if eligible else "expired_unanchored"
+            admitted_in = None
+            if not current_branch:
+                status = "orphaned"
+            else:
+                try:
+                    for possible in range(max(self.activation_height, origin), min(height, origin + MAX_SHARE_AGE) + 1):
+                        block_hash, opening = at(possible)
+                        admitted = next((value for value in opening.shares if value.proof_id == proof.proof_id), None)
+                        if admitted is not None:
+                            if admitted.serialize() != proof.serialize():
+                                raise ValueError("confirmed admission differs from retained proof")
+                            status, eligible, admitted_in = "confirmed_admitted", False, block_hash
+                            break
+                except Exception:
+                    status, eligible = "unknown", False
+            if status == "provisional" and not selection_checked:
+                selection_checked = True
+                try:
+                    if parent is None and height >= self.activation_height:
+                        raise ValueError("native parent unavailable")
+                    selected = {value.proof_id for value in self._batch(height, tip, parent, staged={})["snapshot"].shares}
+                except Exception:
+                    pass
+            chosen = (None if selected is None else proof.proof_id in selected) if status == "provisional" else False
+            result.append({"proof_id": identity, "origin_height": origin, "receipt_revision": revision,
+                "status": status, "consensus_eligible": eligible, "selected_for_admission": chosen,
+                "admitted_in": admitted_in, "reward_window_eligible": None,
+                "reward_history_verified": False})
+        self._stable(tip)
+        self._check_seal()
+        return {"native_tip": tip, "receipts": tuple(result), "retained_receipts": self._head()["receipt_revision"],
+                "next_revision": rows[-1][3] if more else None, "history_limited": history_limited,
+                "payout_policy": "rolling-tides"}
+
     def make(self, *, ntime, sign_owner, fees=0, transactions=(), witness=False, native_bits=SHARE_BITS):
         """Explicit fixture helper; use make_native for native mempool jobs."""
+        if self.profile_version == TIDES_VERSION:
+            raise ValueError("TIDES jobs require make_native and full native history validation")
         self._check_seal()
         height, tip = self._context()
         staged = {}
@@ -1079,9 +1173,12 @@ class HashMiningGate:
                 raise ValueError("native job response failed policy, template or commitment binding")
             # Native construction may change payout amounts to its actual fees;
             # every other proposed accounting byte remains fixed.
-            expected = replace(proposal, job_commitment=snapshot.job_commitment,
-                payouts=(credit_outputs(proposal.settled, reward, self.payout_script) if self.profile_version == LEDGER_VERSION else
-                         work_outputs(proposal.shares, reward=reward, fallback_script=self.payout_script)),
+            # v6 payouts require the full authenticated history at the native
+            # node. Never substitute the v4 one-batch or v5 one-time formula.
+            payouts = (snapshot.payouts if self.profile_version == TIDES_VERSION else
+                       credit_outputs(proposal.settled, reward, self.payout_script) if self.profile_version == LEDGER_VERSION else
+                       work_outputs(proposal.shares, reward=reward, fallback_script=self.payout_script))
+            expected = replace(proposal, job_commitment=snapshot.job_commitment, payouts=payouts,
                 owner_signature=snapshot.owner_signature)
             if expected.serialize() != snapshot_raw:
                 raise ValueError("native job changed the proposed settlement evidence or payouts")
@@ -1105,6 +1202,8 @@ class HashMiningGate:
         if (final_snapshot.serialize() != signed.serialize() or final_reward != reward or
                 job_hash(final_block) != job_hash(block)):
             raise ValueError("native finalization changed the signed job")
+        if self.profile_version == TIDES_VERSION:
+            self._native_template(final_block.serialize(), tip, final_snapshot.serialize())
         self._check_seal()
         return final_block, final_snapshot
 

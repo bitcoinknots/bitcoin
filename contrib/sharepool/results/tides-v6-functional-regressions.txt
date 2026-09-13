@@ -1,0 +1,283 @@
+RUN v4-100-miners
+METADATA {"name": "v4-100-miners", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_100_miners.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/v4-100-miners", "--portseed=900", "--nocleanup", "--results=/private/tmp/sharepool-tides-final-regressions-1/v4-100-miners-result.json"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "41f5e98a0c26bfa7478511e8bc2234d36d632444e700a089ddb8bc90ece9ae71", "started": 1789281978.148028}
+2026-09-13T06:46:18.254000Z TestFramework (INFO): PRNG seed is: 2223764764349153939
+2026-09-13T06:46:18.255000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/v4-100-miners
+2026-09-13T06:46:19.854000Z TestFramework (INFO): Create100 fresh v4 native signer keys and distinct payout scripts
+2026-09-13T06:46:30.550000Z TestFramework (INFO): Mature native funding and create100 independent UTXO spends
+2026-09-13T06:47:12.181000Z TestFramework (INFO): Authorize and dispatch100 distinct full transaction templates before disclosure
+2026-09-13T06:47:26.708000Z TestFramework (INFO): 100 origin snapshot dependencies: missing snapshots per native node [9, 8, 9, 8, 7]
+2026-09-13T06:47:43.533000Z TestFramework (INFO): 100 full origins and100 proofs in P2P snapshots: missing snapshots per native node [16, 17, 16, 16, 15]
+2026-09-13T06:48:22.607000Z TestFramework (INFO): 100-proof baseline: full native admission and durable evidence at20/100 gates
+2026-09-13T06:48:56.155000Z TestFramework (INFO): 100-proof baseline: full native admission and durable evidence at40/100 gates
+2026-09-13T06:49:30.852000Z TestFramework (INFO): 100-proof baseline: full native admission and durable evidence at60/100 gates
+2026-09-13T06:50:03.342000Z TestFramework (INFO): 100-proof baseline: full native admission and durable evidence at80/100 gates
+2026-09-13T06:50:35.920000Z TestFramework (INFO): 100-proof baseline: full native admission and durable evidence at100/100 gates
+2026-09-13T06:50:45.971000Z TestFramework (INFO): Every informed miner authorizes one complete100-proof settlement
+2026-09-13T06:52:41.746000Z TestFramework (INFO): Late work refreshes future dispatch while the solved100-proof block stays immutable
+2026-09-13T06:52:41.903000Z TestFramework (INFO): late proof after winning header was frozen: missing snapshots per native node [0, 1, 1, 1, 1]
+2026-09-13T06:52:44.459000Z TestFramework (INFO): late-proof refresh: full native admission and durable evidence at20/100 gates
+2026-09-13T06:52:44.851000Z TestFramework (INFO): late-proof refresh: full native admission and durable evidence at40/100 gates
+2026-09-13T06:52:45.228000Z TestFramework (INFO): late-proof refresh: full native admission and durable evidence at60/100 gates
+2026-09-13T06:52:45.590000Z TestFramework (INFO): late-proof refresh: full native admission and durable evidence at80/100 gates
+2026-09-13T06:52:45.952000Z TestFramework (INFO): late-proof refresh: full native admission and durable evidence at100/100 gates
+2026-09-13T06:52:56.309000Z TestFramework (INFO): Carry late work and the winning proof into a second honestly authorized settlement
+2026-09-13T06:52:56.486000Z TestFramework (INFO): winning full origin and proof: missing snapshots per native node [1, 0, 1, 1, 1]
+2026-09-13T06:53:07.966000Z TestFramework (INFO): winner carry: full native admission and durable evidence at20/100 gates
+2026-09-13T06:53:19.138000Z TestFramework (INFO): winner carry: full native admission and durable evidence at40/100 gates
+2026-09-13T06:53:30.303000Z TestFramework (INFO): winner carry: full native admission and durable evidence at60/100 gates
+2026-09-13T06:53:41.515000Z TestFramework (INFO): winner carry: full native admission and durable evidence at80/100 gates
+2026-09-13T06:53:52.673000Z TestFramework (INFO): winner carry: full native admission and durable evidence at100/100 gates
+2026-09-13T06:55:05.518000Z TestFramework (INFO): 100-miner hash-only pipeline passed:100 exact payouts, then late proof and winner paid
+2026-09-13T06:55:06.081000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:55:06.321000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/v4-100-miners
+2026-09-13T06:55:06.321000Z TestFramework (INFO): Tests successful
+
+RUN worker
+METADATA {"name": "worker", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_worker.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/worker", "--portseed=901", "--nocleanup"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "7c864a7835fb74d5e3e355ab66e6a2c8721112cca3a4e51ebd07771bb84b3de2", "started": 1789281978.1480792}
+2026-09-13T06:46:18.249000Z TestFramework (INFO): PRNG seed is: 7396928084459410230
+2026-09-13T06:46:18.249000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/worker
+2026-09-13T06:46:24.638000Z TestFramework (INFO): A pending data notification survives shutdown and is accepted after restart
+2026-09-13T06:46:25.426000Z TestFramework (INFO): A local disconnect/reconnect revalidates the settled branch with retained evidence
+2026-09-13T06:46:26.151000Z TestFramework (INFO): A tip change during script execution discards the capture and retries the competing block
+2026-09-13T06:46:31.623000Z TestFramework (INFO): Worker measurement: {"active_rpc_samples": 131, "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "block_bytes": 2203, "context_change": {"competing_branch": "accepted_and_extended", "retry_count": 1}, "inputs_per_origin": 100, "maximum_active_rpc_seconds": 0.0006342089999993306, "origins": 64, "p2p_ping_seconds": 0.11481425000000023, "pending_restart": "accepted", "pipeline_seconds": 2.1573871250000005, "platform": "macOS-26.6.2-arm64-arm-64bit", "protocol_version": 4, "reorganization_verifydb": "valid", "sha256_ops_per_input": 199, "snapshot_bytes": 135741, "test_sha256": "7c864a7835fb74d5e3e355ab66e6a2c8721112cca3a4e51ebd07771bb84b3de2", "worker": {"active": false, "context_retries": 0, "failures": 0, "last_micros": 2059179, "locked_fallbacks": 0, "max_micros": 2059179, "outside_script_checks": 6400, "passes": 26, "pending": false, "requests": 67, "started": true, "stopping": false}}
+2026-09-13T06:46:31.677000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:46:31.845000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/worker
+2026-09-13T06:46:31.845000Z TestFramework (INFO): Tests successful
+
+RUN http
+METADATA {"name": "http", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_http.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/http", "--portseed=902", "--nocleanup"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "b018c2c16326d39dbc799e3a4572dc9eeddc908d7b2c1e723f0f514e98ca63b2", "started": 1789281991.856653}
+2026-09-13T06:46:31.945000Z TestFramework (INFO): PRNG seed is: 7270178890868343766
+2026-09-13T06:46:31.945000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/http
+2026-09-13T06:46:32.467000Z TestFramework (INFO): Default HTTP rejects bodies above 32 MiB; the explicit profile has a 48 MiB cap
+2026-09-13T06:46:32.546000Z TestFramework (INFO): Maximum template-plus-snapshot JSON reaches field validation and is rejected there
+2026-09-13T06:46:33.070000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:46:33.244000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/http
+2026-09-13T06:46:33.244000Z TestFramework (INFO): Tests successful
+
+RUN lifecycle-v1
+METADATA {"name": "lifecycle-v1", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_lifecycle.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/lifecycle-v1", "--portseed=903", "--nocleanup"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "465f17e1f139517880f911b3e52b6b50dbb22c986f0e8072c5e741644eb20672", "started": 1789281993.255382}
+2026-09-13T06:46:33.364000Z TestFramework (INFO): PRNG seed is: 8501676244248809145
+2026-09-13T06:46:33.365000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/lifecycle-v1
+2026-09-13T06:46:34.229000Z TestFramework (INFO): A solved block waits for its full snapshot; pending data survives restart
+2026-09-13T06:46:34.877000Z TestFramework (INFO): Existing native peer connections deliver dependencies and automatically retry the block
+2026-09-13T06:46:45.221000Z TestFramework (INFO): Late work uses a new immutable snapshot and direct coinbase payout
+2026-09-13T06:46:45.543000Z TestFramework (INFO): An offline restart replays chainstate from the locally retained snapshot history
+2026-09-13T06:46:46.036000Z TestFramework (INFO): Valid competing branches reorganize by native chainwork after snapshots arrive
+2026-09-13T06:46:48.706000Z TestFramework (INFO): Level-four native verification disconnects and reconnects the complete selected chain
+2026-09-13T06:46:48.742000Z TestFramework (INFO): Hash-only native snapshot lifecycle passed
+2026-09-13T06:46:48.802000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:46:48.922000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/lifecycle-v1
+2026-09-13T06:46:48.922000Z TestFramework (INFO): Tests successful
+
+RUN lifecycle-v2
+METADATA {"name": "lifecycle-v2", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_lifecycle.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/lifecycle-v2", "--portseed=904", "--nocleanup", "--v2transport"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "465f17e1f139517880f911b3e52b6b50dbb22c986f0e8072c5e741644eb20672", "started": 1789282008.93358}
+2026-09-13T06:46:49.038000Z TestFramework (INFO): PRNG seed is: 4946391981112098485
+2026-09-13T06:46:49.039000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/lifecycle-v2
+2026-09-13T06:46:49.893000Z TestFramework (INFO): A solved block waits for its full snapshot; pending data survives restart
+2026-09-13T06:46:50.604000Z TestFramework (INFO): Existing native peer connections deliver dependencies and automatically retry the block
+2026-09-13T06:47:01.037000Z TestFramework (INFO): Late work uses a new immutable snapshot and direct coinbase payout
+2026-09-13T06:47:01.357000Z TestFramework (INFO): An offline restart replays chainstate from the locally retained snapshot history
+2026-09-13T06:47:01.808000Z TestFramework (INFO): Valid competing branches reorganize by native chainwork after snapshots arrive
+2026-09-13T06:47:04.746000Z TestFramework (INFO): Level-four native verification disconnects and reconnects the complete selected chain
+2026-09-13T06:47:04.802000Z TestFramework (INFO): Hash-only native snapshot lifecycle passed
+2026-09-13T06:47:04.860000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:47:05.042000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/lifecycle-v2
+2026-09-13T06:47:05.042000Z TestFramework (INFO): Tests successful
+
+RUN relay
+METADATA {"name": "relay", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_relay.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/relay", "--portseed=905", "--nocleanup"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "63743be8456a43f4e645dc3e807eb1a6ef7f87cb85320edc2f3d7cb8f189a3da", "started": 1789282025.0565782}
+2026-09-13T06:47:05.148000Z TestFramework (INFO): PRNG seed is: 5238285328911156691
+2026-09-13T06:47:05.148000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/relay
+2026-09-13T06:47:05.415000Z TestFramework (INFO): Empty inventory stays quiet; changes and new connections discover existing objects
+2026-09-13T06:47:09.205000Z TestFramework (INFO): Four active downloads cannot repeatedly overtake an already waiting fifth peer
+2026-09-13T06:47:10.787000Z TestFramework (INFO): Malformed inventory is refused before any download is scheduled
+2026-09-13T06:47:11.615000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:47:11.789000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/relay
+2026-09-13T06:47:11.789000Z TestFramework (INFO): Tests successful
+
+RUN attestation
+METADATA {"name": "attestation", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_attestation.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/attestation", "--portseed=906", "--nocleanup"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "0ca5b1b0b6866f1f4f480351cc537f42acc2b6180529091e92f3b8d25c4d9d30", "started": 1789282031.7962618}
+2026-09-13T06:47:11.901000Z TestFramework (INFO): PRNG seed is: 3237692773125379689
+2026-09-13T06:47:11.902000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/attestation
+2026-09-13T06:47:12.659000Z TestFramework (INFO): GBT identifies the exact v4 share target and explicitly requires job completion
+2026-09-13T06:47:12.671000Z TestFramework (INFO): Valid and invalid snapshot overlays leave native evidence storage unchanged
+2026-09-13T06:47:12.685000Z TestFramework (INFO): Changing a valid transaction body requires a new exact-job signature
+2026-09-13T06:47:12.702000Z TestFramework (INFO): Witness bytes are signed even when the ordinary transaction ID is unchanged
+2026-09-13T06:47:12.720000Z TestFramework (INFO): The signature authenticates policy/context and the complete evidence snapshot
+2026-09-13T06:47:12.778000Z TestFramework (INFO): Search nonces can change; a newly authorized valid transaction can be mined
+2026-09-13T06:47:12.799000Z TestFramework (INFO): A legitimate owner cannot authorize a nonexistent UTXO into a valid origin
+2026-09-13T06:47:12.832000Z TestFramework (INFO): Native origin validation rejects two transactions spending the same input
+2026-09-13T06:47:12.867000Z TestFramework (INFO): A signed origin with correct witness commitment still must execute its scripts
+2026-09-13T06:47:12.902000Z TestFramework (INFO): The accepted settlement validates its real spend and pays the verified origin owner
+2026-09-13T06:47:13.147000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:47:13.327000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/attestation
+2026-09-13T06:47:13.327000Z TestFramework (INFO): Tests successful
+
+RUN builder
+METADATA {"name": "builder", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_builder.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/builder", "--portseed=907", "--nocleanup"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "71b4189f1017609be1844ebb232fb269af5e5f8fbb49c04247a95f828ac2aedc", "started": 1789282033.334999}
+2026-09-13T06:47:13.436000Z TestFramework (INFO): PRNG seed is: 8155855671793376853
+2026-09-13T06:47:13.436000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/builder
+2026-09-13T06:47:14.849000Z TestFramework (INFO): Native construction creates distinct fully validated externally signed origins
+2026-09-13T06:47:15.115000Z TestFramework (INFO): The native mempool supplies a valid witness transaction and exact fee
+2026-09-13T06:47:15.241000Z TestFramework (INFO): A changed job or forged payout cannot reuse the exact owner authorization
+2026-09-13T06:47:15.359000Z TestFramework (INFO): Full snapshot relay permits the follower to verify and accept the winning block
+2026-09-13T06:47:16.789000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:47:16.970000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/builder
+2026-09-13T06:47:16.970000Z TestFramework (INFO): Tests successful
+
+RUN rules
+METADATA {"name": "rules", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_rules.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/rules", "--portseed=908", "--nocleanup"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "d39c7c0bc2a6b3e47e51015b2605220a412f5babf98a4ac4ea89056f1f63adf5", "started": 1789282036.978297}
+2026-09-13T06:47:17.079000Z TestFramework (INFO): PRNG seed is: 1083827361366770758
+2026-09-13T06:47:17.079000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/rules
+2026-09-13T06:47:17.361000Z TestFramework (INFO): Complete proof attribution fixes the actual payout script
+2026-09-13T06:47:17.390000Z TestFramework (INFO): The snapshot and coinbase must allocate the exact native subsidy plus fees
+2026-09-13T06:47:17.429000Z TestFramework (INFO): Unavailable preimages are pending; available invalid encodings establish rejection
+2026-09-13T06:47:17.515000Z TestFramework (INFO): A complete consistent settlement is accepted after the refused examples
+2026-09-13T06:47:17.623000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:47:17.736000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/rules
+2026-09-13T06:47:17.736000Z TestFramework (INFO): Tests successful
+
+RUN legacy-rules
+METADATA {"name": "legacy-rules", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_rule_cases.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/legacy-rules", "--portseed=909", "--nocleanup"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "b87436433d2834292885852d38fde87b4b7b792a33d753b54432bc22a4b269cd", "started": 1789282037.743807}
+2026-09-13T06:47:17.844000Z TestFramework (INFO): PRNG seed is: 6894359293937587606
+2026-09-13T06:47:17.844000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/legacy-rules
+2026-09-13T06:47:20.175000Z TestFramework (INFO): Rule case: distinct_templates_and_nonce_only_identity
+2026-09-13T06:47:20.301000Z TestFramework (INFO): Rule case: origin_missing_input
+2026-09-13T06:47:20.304000Z TestFramework (INFO): Rule case: origin_invalid_owner_signature
+2026-09-13T06:47:20.306000Z TestFramework (INFO): Rule case: share_invalid_owner_signature
+2026-09-13T06:47:20.307000Z TestFramework (INFO): Rule case: share_insufficient_pow
+2026-09-13T06:47:20.308000Z TestFramework (INFO): Rule case: duplicate_proof_idempotent_admission
+2026-09-13T06:47:20.451000Z TestFramework (INFO): Rule case: duplicate_proof_in_snapshot
+2026-09-13T06:47:20.734000Z TestFramework (INFO): Rule case: payout_script_tampering_recommitted
+2026-09-13T06:47:20.753000Z TestFramework (INFO): Rule case: payout_amount_tampering_recommitted
+2026-09-13T06:47:20.894000Z TestFramework (INFO): Rule case: known_omission_is_local_not_consensus
+2026-09-13T06:47:21.079000Z TestFramework (INFO): Rule case: frozen_commitment_and_late_share_refresh
+2026-09-13T06:47:22.416000Z TestFramework (INFO): Rule case: repeated_payment_rejected
+2026-09-13T06:47:22.575000Z TestFramework (INFO): Rule case: late_omitted_and_winning_work_settle_next_block
+2026-09-13T06:47:22.621000Z TestFramework (INFO): All 13 identifiable rule cases passed
+2026-09-13T06:47:22.685000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:47:22.797000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/legacy-rules
+2026-09-13T06:47:22.797000Z TestFramework (INFO): Tests successful
+
+RUN v5-ledger
+METADATA {"name": "v5-ledger", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_ledger.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/v5-ledger", "--portseed=910", "--nocleanup"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "da43f90a01a25c2a0b750dac4e681d982959c1d3275603fd64831f990187e162", "started": 1789282042.804634}
+2026-09-13T06:47:22.911000Z TestFramework (INFO): PRNG seed is: 6260739072340332918
+2026-09-13T06:47:22.912000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/v5-ledger
+2026-09-13T06:47:23.875000Z TestFramework (INFO): Pool C anchors fresh valid A/B receipts without paying those receipts in its own block
+2026-09-13T06:47:24.415000Z TestFramework (INFO): Missing committed data stays pending through restart, then ordinary P2P supplies the complete state
+2026-09-13T06:47:25.930000Z TestFramework (INFO): A pays its parent's two A credits; newly received work on the previous job is admitted for a later block
+2026-09-13T06:47:26.052000Z TestFramework (INFO): Even fresh valid owner signatures cannot omit credits, change their recipient/work, or choose a shorter payout prefix
+2026-09-13T06:47:26.854000Z TestFramework (INFO): Confirmed A/B credits survive unrelated-pool blocks beyond the fresh-proof age limit
+2026-09-13T06:47:28.340000Z TestFramework (INFO): A longer nonpaying branch restores credits removed by orphaned B/A payouts
+2026-09-13T06:47:29.826000Z TestFramework (INFO): Selected-branch credits pay their original recipients once after the reorganization
+2026-09-13T06:47:30.274000Z TestFramework (INFO): Offline chainstate reindex and level-four verification reconstruct the selected ledger history
+2026-09-13T06:47:30.822000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:47:31.000000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/v5-ledger
+2026-09-13T06:47:31.000000Z TestFramework (INFO): Tests successful
+
+RUN pending-body
+METADATA {"name": "pending-body", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_pending.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/pending-body", "--portseed=911", "--nocleanup"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "b32625528bfc6812a0153f077813459d3066c003bd9895bc4a35535f65900218", "started": 1789282051.009143}
+2026-09-13T06:47:31.114000Z TestFramework (INFO): PRNG seed is: 8366380031493667958
+2026-09-13T06:47:31.114000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/pending-body
+2026-09-13T06:47:32.184000Z TestFramework (INFO): One fetched native body remains pending while its snapshot is withheld
+2026-09-13T06:47:34.947000Z TestFramework (INFO): Rejecting another body with the same header preserves the retained valid body
+2026-09-13T06:47:37.603000Z TestFramework (INFO): Restart retains the pending body; renewed announcements do not download it again
+2026-09-13T06:47:39.502000Z TestFramework (INFO): Supplying the opening triggers ordinary full validation and clears pending state
+2026-09-13T06:47:39.718000Z TestFramework (INFO): The exact retained body is still removed when its own opening establishes invalidity
+2026-09-13T06:47:39.914000Z TestFramework (INFO): Ignoring an unsolicited lower-work duplicate preserves pending fork evidence
+2026-09-13T06:47:41.687000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:47:41.865000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/pending-body
+2026-09-13T06:47:41.865000Z TestFramework (INFO): Tests successful
+
+RUN gate-provenance
+METADATA {"name": "gate-provenance", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_gate_provenance.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/gate-provenance", "--portseed=912", "--nocleanup"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "86bfd53fed9dc75dfe3d0e6407253690c2ffd7c50a59b72be847383176b8a5e0", "started": 1789282061.8736289}
+2026-09-13T06:47:41.982000Z TestFramework (INFO): PRNG seed is: 4107417461555777298
+2026-09-13T06:47:41.982000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/gate-provenance
+2026-09-13T06:47:42.548000Z TestFramework (INFO): Native overlay validation admits a three-opening graph in one local receipt
+2026-09-13T06:47:42.592000Z TestFramework (INFO): An archive alone rehydrates a disconnected native node and revalidates the acknowledged work
+2026-09-13T06:47:42.667000Z TestFramework (INFO): The recovered evidence admits the actual solved settlement and native coinbase payment
+2026-09-13T06:47:42.749000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:47:42.870000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/gate-provenance
+2026-09-13T06:47:42.870000Z TestFramework (INFO): Tests successful
+
+RUN gate-ledger-1
+METADATA {"name": "gate-ledger-1", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_gate_ledger.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/gate-ledger-1", "--portseed=913", "--nocleanup", "--activation-height=1"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "cc3cd50581a3c9d2b744d98134cab878722772611d38c88b57959c459e2ca81a", "started": 1789282062.878004}
+2026-09-13T06:47:42.986000Z TestFramework (INFO): PRNG seed is: 1407003773789597169
+2026-09-13T06:47:42.989000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/gate-ledger-1
+2026-09-13T06:47:43.846000Z TestFramework (INFO): Real native job and share become a durable provisional ACK, with no promise of payment
+2026-09-13T06:47:44.054000Z TestFramework (INFO): Exact native authorizations cannot cross gates, change bytes or survive reopening
+2026-09-13T06:47:44.241000Z TestFramework (INFO): The actual anchor confirms pending credit; its coinbase still pays its own fallback
+2026-09-13T06:47:45.546000Z TestFramework (INFO): Other pools carry confirmed credit beyond the original proof age without paying or dropping it
+2026-09-13T06:47:53.813000Z TestFramework (INFO): Canonical reorg status restores pending credit; reconsideration restores the actual payment
+2026-09-13T06:47:54.019000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:47:54.200000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/gate-ledger-1
+2026-09-13T06:47:54.200000Z TestFramework (INFO): Tests successful
+
+RUN gate-ledger-102
+METADATA {"name": "gate-ledger-102", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_gate_ledger.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/gate-ledger-102", "--portseed=914", "--nocleanup", "--activation-height=102"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "cc3cd50581a3c9d2b744d98134cab878722772611d38c88b57959c459e2ca81a", "started": 1789282074.2085838}
+2026-09-13T06:47:54.321000Z TestFramework (INFO): PRNG seed is: 4900509579361720604
+2026-09-13T06:47:54.321000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/gate-ledger-102
+2026-09-13T06:47:55.959000Z TestFramework (INFO): Real native job and share become a durable provisional ACK, with no promise of payment
+2026-09-13T06:47:56.174000Z TestFramework (INFO): Exact native authorizations cannot cross gates, change bytes or survive reopening
+2026-09-13T06:47:56.352000Z TestFramework (INFO): The actual anchor confirms pending credit; its coinbase still pays its own fallback
+2026-09-13T06:47:57.648000Z TestFramework (INFO): Other pools carry confirmed credit beyond the original proof age without paying or dropping it
+2026-09-13T06:48:05.868000Z TestFramework (INFO): Canonical reorg status restores pending credit; reconsideration restores the actual payment
+2026-09-13T06:48:06.380000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:48:06.561000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/gate-ledger-102
+2026-09-13T06:48:06.561000Z TestFramework (INFO): Tests successful
+
+RUN v5-100-miners
+METADATA {"name": "v5-100-miners", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_ledger_100_miners.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/v5-100-miners", "--portseed=915", "--nocleanup"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "fe2eaf73cebef7fe3d0a380865676ba8316a417d08d594a2810cad19156385ea", "started": 1789282086.5695412}
+2026-09-13T06:48:06.677000Z TestFramework (INFO): PRNG seed is: 259391883126192444
+2026-09-13T06:48:06.677000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/v5-100-miners
+2026-09-13T06:48:07.204000Z TestFramework (INFO): Mature two native coinbases before ledger activation for real fee-paying witness transactions
+2026-09-13T06:48:19.616000Z TestFramework (INFO): Construct and validate 100 distinct native jobs and real shares with external owner signatures
+2026-09-13T06:48:22.889000Z TestFramework (INFO): Validated 25/100 miners
+2026-09-13T06:48:26.148000Z TestFramework (INFO): Validated 50/100 miners
+2026-09-13T06:48:29.435000Z TestFramework (INFO): Validated 75/100 miners
+2026-09-13T06:48:32.711000Z TestFramework (INFO): Validated 100/100 miners
+2026-09-13T06:48:32.714000Z TestFramework (INFO): A pool C block anchors all 100 A receipts; both native nodes obtain and validate the committed snapshot
+2026-09-13T06:48:52.999000Z TestFramework (INFO): A's next block derives 100 exact direct payouts; an extra late proof cannot change their fixed parent cutoff
+2026-09-13T06:48:53.621000Z TestFramework (INFO): The separately confirmed late receipt pays its original miner in the following A block
+2026-09-13T06:48:54.362000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:48:54.531000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/v5-100-miners
+2026-09-13T06:48:54.531000Z TestFramework (INFO): Tests successful
+
+RUN tides-1
+METADATA {"name": "tides-1", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_tides.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/tides-1", "--portseed=916", "--nocleanup", "--activation-height=1"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "a5c177582d00ee5abcdf395e6494d41ba614e91facdf0efd1498897a05c02201", "started": 1789282134.53882}
+2026-09-13T06:48:54.644000Z TestFramework (INFO): PRNG seed is: 1725079454217731755
+2026-09-13T06:48:54.644000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/tides-1
+2026-09-13T06:48:55.501000Z TestFramework (INFO): Empty-pool bootstrap jobs need only a recipient script and a separate owner signer
+2026-09-13T06:48:57.155000Z TestFramework (INFO): Paid shares remain in the rolling history; late submissions cannot change an issued job
+2026-09-13T06:48:57.707000Z TestFramework (INFO): Missing older history leaves a known native tip pending until its exact opening is restored
+2026-09-13T06:48:59.990000Z TestFramework (INFO): Competing native forks select their own admitted history and recurring payout ratios
+2026-09-13T06:49:01.989000Z TestFramework (INFO): New work fills the finite TIDES work window without deleting older historical snapshots
+2026-09-13T06:49:02.915000Z TestFramework (INFO): Offline reindex reconstructs the selected history; profile changes cannot overwrite its block database
+2026-09-13T06:49:05.269000Z TestFramework (INFO): Local history budgets reject invalid settings and can change without changing the chain profile
+2026-09-13T06:49:06.443000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:49:06.609000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/tides-1
+2026-09-13T06:49:06.609000Z TestFramework (INFO): Tests successful
+
+RUN tides-102
+METADATA {"name": "tides-102", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_tides.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/tides-102", "--portseed=917", "--nocleanup", "--activation-height=102"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "a5c177582d00ee5abcdf395e6494d41ba614e91facdf0efd1498897a05c02201", "started": 1789282146.617716}
+2026-09-13T06:49:06.724000Z TestFramework (INFO): PRNG seed is: 209919082762971331
+2026-09-13T06:49:06.724000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/tides-102
+2026-09-13T06:49:08.301000Z TestFramework (INFO): Empty-pool bootstrap jobs need only a recipient script and a separate owner signer
+2026-09-13T06:49:09.956000Z TestFramework (INFO): Paid shares remain in the rolling history; late submissions cannot change an issued job
+2026-09-13T06:49:10.500000Z TestFramework (INFO): Missing older history leaves a known native tip pending until its exact opening is restored
+2026-09-13T06:49:12.798000Z TestFramework (INFO): Competing native forks select their own admitted history and recurring payout ratios
+2026-09-13T06:49:14.738000Z TestFramework (INFO): New work fills the finite TIDES work window without deleting older historical snapshots
+2026-09-13T06:49:15.711000Z TestFramework (INFO): Offline reindex reconstructs the selected history; profile changes cannot overwrite its block database
+2026-09-13T06:49:19.179000Z TestFramework (INFO): Local history budgets reject invalid settings and can change without changing the chain profile
+2026-09-13T06:49:20.573000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:49:20.690000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/tides-102
+2026-09-13T06:49:20.690000Z TestFramework (INFO): Tests successful
+
+RUN tides-cpu
+METADATA {"name": "tides-cpu", "command": ["/Library/Developer/CommandLineTools/usr/bin/python3", "-B", "test/functional/feature_sharepool_hash_tides.py", "--configfile=/private/tmp/sharepool-native-build/test/config.ini", "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/tides-cpu", "--portseed=918", "--nocleanup", "--cpu-capture"], "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7", "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f", "test_sha256": "a5c177582d00ee5abcdf395e6494d41ba614e91facdf0efd1498897a05c02201", "started": 1789282160.698716}
+2026-09-13T06:49:20.804000Z TestFramework (INFO): PRNG seed is: 6136209356813229708
+2026-09-13T06:49:20.804000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-tides-final-regressions-1/tides-cpu
+2026-09-13T06:49:22.655000Z TestFramework (INFO): Native Sia CPU preflight and independent replay: {'capture': {'profile': 'v6-tides', 'jobs': 4, 'proofs': 3, 'blocks': 2, 'native_replay': True, 'physical_provenance_verified': False, 'last_native_tip': '15d8272f06be73bc0319ef1af8db6368660d19cea075c23801191d787c8e694b'}, 'fake_guard_restored': True, 'physical_device_used': False}
+2026-09-13T06:49:22.716000Z TestFramework (INFO): Stopping nodes
+2026-09-13T06:49:22.894000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-tides-final-regressions-1/tides-cpu
+2026-09-13T06:49:22.894000Z TestFramework (INFO): Tests successful

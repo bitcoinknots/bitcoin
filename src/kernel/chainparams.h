@@ -175,6 +175,7 @@ public:
         std::optional<int> sharepool_height{};
         bool sharepool_hash_only{false};
         bool sharepool_admitted_ledger{false};
+        bool sharepool_tides{false};
     };
 
     static std::unique_ptr<const CChainParams> RegTest(const RegTestOptions& options);

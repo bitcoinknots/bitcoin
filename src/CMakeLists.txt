@@ -197,6 +197,7 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   script/solver.cpp
   sharepool/signer.cpp
   sharepool/tides.cpp
+  sharepool/tides_history.cpp
 )
 target_link_libraries(bitcoin_common
   PRIVATE

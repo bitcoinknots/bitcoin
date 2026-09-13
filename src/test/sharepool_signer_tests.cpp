@@ -220,4 +220,24 @@ BOOST_AUTO_TEST_CASE(native_v5_job_signer_requires_matching_profile_and_binds_do
     BOOST_CHECK(!owner.VerifySchnorr(sharepool::hashonly::OwnerHash(statement.binding, statement.job, statement.contents), signature));
 }
 
+BOOST_AUTO_TEST_CASE(native_v6_job_signer_binds_profile_and_exact_history_contents)
+{
+    auto statement = Job();
+    statement.binding.version = sharepool::hashonly::TIDES_VERSION;
+    BOOST_CHECK_THROW(sharepool::signer::SignJob(policy, key, statement), std::invalid_argument);
+    statement.binding.rules = sharepool::hashonly::RulesHash(sharepool::hashonly::TIDES_VERSION);
+    const auto signature = sharepool::signer::SignJob(policy, key, statement);
+    const XOnlyPubKey owner{Span{statement.binding.owner}};
+    BOOST_CHECK(owner.VerifySchnorr(sharepool::hashonly::OwnerHash(statement.binding, statement.job, statement.contents), signature));
+    auto changed = statement;
+    changed.contents = uint256{uint8_t{77}};
+    BOOST_CHECK(!owner.VerifySchnorr(sharepool::hashonly::OwnerHash(changed.binding, changed.job, changed.contents), signature));
+    for (const auto version : {sharepool::hashonly::VERSION, sharepool::hashonly::LEDGER_VERSION}) {
+        changed = statement;
+        changed.binding.version = version;
+        changed.binding.rules = sharepool::hashonly::RulesHash(version);
+        BOOST_CHECK(!owner.VerifySchnorr(sharepool::hashonly::OwnerHash(changed.binding, changed.job, changed.contents), signature));
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

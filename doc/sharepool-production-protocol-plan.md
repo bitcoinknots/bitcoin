@@ -1,7 +1,13 @@
 # Production accounting decisions and executable model
 
-**Decision update, 2026-09-12:** separate pool rewards and the TIDES window are
-selected. See the [selected contract and new accounting references](sharepool-tides-accounting.md).
+**Decision update, 2026-09-13:** separate pool rewards and a TIDES-style window are
+selected. See the [v6 native experiment](sharepool-tides-accounting.md).
+Payout scripts are recipients, not exclusive identities: v6 requires neither
+proof of spending-key control nor a global pool-membership registry. A miner may
+direct new work to another pool; old work keeps its original pool and recipient.
+The membership locking and registration proposals below are superseded, as is
+the confirmed-parent-only payout cutoff. They remain here as historical model
+assumptions, not current requirements.
 The experiment below is preserved with its original assumptions and results;
 its largest-remainder allocation and confirmed-parent cutoff are not the newly
 selected TIDES implementation.

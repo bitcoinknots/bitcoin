@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "profile": "hash-only-v6-tides",
+  "result": "passed",
+  "started_utc": "2026-09-13T06:43:04.463336+00:00",
+  "network": "isolated native regtest",
+  "logical_miners": 100,
+  "native_nodes": 2,
+  "physical_miners_used": 0,
+  "transport": "v1",
+  "rewards": [
+    {
+      "height": 102,
+      "commitment": "ad48fe2ac6d1a819295ccd90eecda497e3fc134f3868f0dd1d263e20dde37889",
+      "new_admissions": 100,
+      "eligible_proofs": 17,
+      "payout_scripts": 17,
+      "reward_satoshis": 5000100000,
+      "unclaimed_rounding_satoshis": 12,
+      "exact_rational_window_and_coinbase_verified": true
+    },
+    {
+      "height": 103,
+      "commitment": "bfdbaace9d3227abfe4c740056ed1d01af8d9229af7a3ac73a5c97846d7fe36c",
+      "new_admissions": 2,
+      "eligible_proofs": 17,
+      "payout_scripts": 16,
+      "reward_satoshis": 5000000000,
+      "unclaimed_rounding_satoshis": 11,
+      "exact_rational_window_and_coinbase_verified": true
+    },
+    {
+      "height": 104,
+      "commitment": "3d656e223c418b7c3e42fdfb27fcf09327177d81397abf6ac68c1aedcd04adea",
+      "new_admissions": 0,
+      "eligible_proofs": 17,
+      "payout_scripts": 16,
+      "reward_satoshis": 5000000000,
+      "unclaimed_rounding_satoshis": 11,
+      "exact_rational_window_and_coinbase_verified": true
+    }
+  ],
+  "native_binary_sha256": "08411d5c044f41264321761598e90f848585dff9c32bc3a10ea5656b4e2b0a17",
+  "limitations": [
+    "100 logical gates use one validating node; a second node validates through P2P",
+    "The coordinator collects all proofs; full 100-by-100 gate replication is not simulated",
+    "Regtest proves protocol behavior, not mainnet capacity, sampling variance or WAN performance",
+    "Proof target is deliberately easy; the TIDES window contains approximately 16 unit-work shares",
+    "Only acknowledged work admitted into canonical history becomes recurring reward-eligible"
+  ],
+  "distinct_valid_native_templates": 100,
+  "independent_valid_transactions": 100,
+  "authorized_initial_jobs": 100,
+  "initial_shares_admitted": 100,
+  "carried_late_and_winning_shares": 2,
+  "proof_binding_rejections": 2,
+  "invalid_payout_rejections": 1,
+  "frozen_late_work_verified": true,
+  "same_address_separate_pool_accepted": true,
+  "native_and_gate_restart_verified": true,
+  "full_snapshot_p2p_follower_verified": true,
+  "seconds": 60.223
+}

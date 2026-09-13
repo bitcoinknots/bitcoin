@@ -1,0 +1,13 @@
+{
+  "capture": {
+    "profile": "v6-tides",
+    "jobs": 4,
+    "proofs": 3,
+    "blocks": 2,
+    "native_replay": true,
+    "physical_provenance_verified": false,
+    "last_native_tip": "15d8272f06be73bc0319ef1af8db6368660d19cea075c23801191d787c8e694b"
+  },
+  "fake_guard_restored": true,
+  "physical_device_used": false
+}

@@ -2,7 +2,7 @@
 # Copyright (c) 2026 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Canonical flat-hash snapshots for the opt-in native regtest v4 profile.
+"""Canonical flat-hash snapshots for opt-in native regtest profiles.
 
 This codec does not select consensus validity. Full native RPC validation is
 required before mining. The only Merkle construction used by candidate() is the
@@ -34,6 +34,7 @@ RULES_HASH = h256(b"SharePool/rules/v4\0", struct.pack("<IIIIIIIIII", SHARE_BITS
     MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES,
     MAX_EXPANDED_TEMPLATE_BYTES, MAX_TEMPLATE_TX_REFERENCES, MAX_ORIGIN_CHECKS))
 LEDGER_VERSION = 5
+TIDES_VERSION = 6
 MAX_LEDGER_BYTES = 4 * 1024 * 1024
 MAX_SETTLEMENT_BYTES = 1024 * 1024
 MAX_CERTIFICATE_BYTES = 4 * 1024 * 1024
@@ -41,6 +42,10 @@ LEDGER_RULES_HASH = h256(b"SharePool/rules/v5\0", struct.pack("<IIIIIIIIIIIII", 
     MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES,
     MAX_EXPANDED_TEMPLATE_BYTES, MAX_TEMPLATE_TX_REFERENCES, MAX_ORIGIN_CHECKS,
     MAX_LEDGER_BYTES, MAX_SETTLEMENT_BYTES, MAX_CERTIFICATE_BYTES))
+TIDES_RULES_HASH = h256(b"SharePool/rules/v6\0", struct.pack("<13I", SHARE_BITS, SHARE_TARGET_SHIFT,
+    MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES,
+    MAX_EXPANDED_TEMPLATE_BYTES, MAX_TEMPLATE_TX_REFERENCES, MAX_ORIGIN_CHECKS,
+    MAX_CERTIFICATE_BYTES, 8, 1))
 
 
 def rules_hash(version=4):
@@ -48,11 +53,28 @@ def rules_hash(version=4):
         return RULES_HASH
     if version == LEDGER_VERSION:
         return LEDGER_RULES_HASH
+    if version == TIDES_VERSION:
+        return TIDES_RULES_HASH
     raise ValueError("unsupported hash-only profile")
 
 
 def _domain(name, version):
     return f"SharePool/{name}/v{version}\0".encode("ascii")
+
+
+def snapshot_hash(raw):
+    """Historical raw-preimage selection, including malformed v4/v5 inputs."""
+    if type(raw) is not bytes:
+        raise ValueError("snapshot hash requires exact bytes")
+    return h256(_domain("snapshot", LEDGER_VERSION if raw[:1] == b"\x05" else 4), raw)
+
+
+def profile_snapshot_hash(raw, version):
+    """v6 hashes every preimage in its configured domain, before decoding."""
+    rules_hash(version)
+    if type(raw) is not bytes:
+        raise ValueError("snapshot hash requires exact bytes")
+    return h256(_domain("snapshot", TIDES_VERSION), raw) if version == TIDES_VERSION else snapshot_hash(raw)
 
 
 PHYSICAL_FIELDS = ("nNonce", "m_nonce2", "m_nonce3", "m_extranonce", "m_time_offset")
@@ -79,7 +101,7 @@ class EnvelopeV2(_Envelope):
         integers = (self.genesis, self.rules, self.native_parent, self.pool,
                     self.shares_root, self.state_root, self.payouts_root)
         if (any(type(value) is not int or not 0 <= value < 1 << 256 for value in integers) or
-                self.version not in (4, LEDGER_VERSION) or self.rules != rules_hash(self.version) or self.pool == 0 or
+                self.version not in (4, LEDGER_VERSION, TIDES_VERSION) or self.rules != rules_hash(self.version) or self.pool == 0 or
                 type(self.height) is not int or not 0 < self.height <= 0xffffffff or
                 type(self.public_key) is not bytes or len(self.public_key) != 32 or
                 type(self.payout_script) is not bytes or not is_payout_script(self.payout_script) or
@@ -351,6 +373,71 @@ def apply_ledger_state(snapshot, parent):
                    post_state=tuple(sorted(state, key=lambda entry: entry.proof_id)))
 
 
+def apply_tides_state(snapshot, parent):
+    """Derive the v6 admission checkpoint; native validation remains mandatory.
+
+    This only constructs recent anti-replay state, origin certificates and the
+    chained flat history hash. It does not derive rewards from historical work.
+    Original job pool and payout script remain immutable; no address registry or
+    ownership assertion is introduced.
+    """
+    if snapshot.envelope.version != TIDES_VERSION:
+        raise ValueError("TIDES history requires v6")
+    if parent is not None and (parent.envelope.version != TIDES_VERSION or
+            parent.envelope.height + 1 != snapshot.envelope.height or
+            parent.envelope.genesis != snapshot.envelope.genesis or parent.envelope.rules != snapshot.envelope.rules or
+            not parent.history_head or parent.pending or parent.settled):
+        raise ValueError("TIDES parent profile or height")
+    if snapshot.pending or snapshot.settled:
+        raise ValueError("TIDES cannot carry v5 pending or settled credits")
+    height = snapshot.envelope.height
+    minimum = max(1, height - MAX_SHARE_AGE)
+    if parent is not None:
+        parent.serialize()
+        parent_minimum = max(1, parent.envelope.height - MAX_SHARE_AGE)
+        if (any(not parent_minimum <= entry.origin_height <= parent.envelope.height for entry in parent.post_state) or
+                any(not parent_minimum <= cert.origin_height <= parent.envelope.height or not cert.identity or not cert.snapshot_hash
+                    for cert in parent.certificates)):
+            raise ValueError("TIDES parent admission or certificate age")
+    state = [entry for entry in (parent.post_state if parent else ()) if entry.origin_height >= minimum]
+    seen = {entry.proof_id for entry in (parent.post_state if parent else ())}
+    certificates = {cert.identity: cert for cert in (parent.certificates if parent else ()) if cert.origin_height >= minimum}
+    records = {record.template_id: record for record in snapshot.templates}
+    if len(records) != len(snapshot.templates):
+        raise ValueError("TIDES duplicate template")
+    records = {identity: CompactTemplateRecord.from_record(record) for identity, record in records.items()}
+    origin_certificates = {}
+    admissions = []
+    for share in sorted(snapshot.shares, key=lambda value: value.proof_id):
+        if (share.envelope.version != TIDES_VERSION or
+                not minimum <= share.envelope.height <= height or share.header.m_height != share.envelope.height):
+            raise ValueError("TIDES admission profile or age")
+        share_target(share.header.nBits, TIDES_VERSION)
+        if share.proof_id in seen:
+            raise ValueError("duplicate admitted proof")
+        seen.add(share.proof_id)
+        state.append(StateEntry(share.envelope.height, share.proof_id))
+        admissions.append(LedgerCredit(height, share.envelope.height, share.proof_id,
+            share.envelope.pool, share.header.nBits, share.envelope.payout_script))
+        record = records.get(int(template_id(share.header), 16))
+        if record is None:
+            raise ValueError("admitted origin template missing")
+        if record.header_bytes != immutable_header(share.header):
+            raise ValueError("TIDES admission template differs from proof")
+        if record.template_id not in origin_certificates:
+            origin_certificates[record.template_id] = origin_certificate(record)
+        certificate = origin_certificates[record.template_id]
+        certificates[certificate.identity] = certificate
+    certs = tuple(sorted(certificates.values(), key=lambda cert: ser_uint256(cert.identity)))
+    if len(compact_size(len(certs))) + sum(len(cert.serialize()) for cert in certs) > MAX_CERTIFICATE_BYTES:
+        raise ValueError("TIDES certificate capacity; carry provisional work to a later admission")
+    history = (ser_uint256(snapshot.envelope.genesis) + ser_uint256(snapshot.envelope.native_parent) +
+               struct.pack("<I", height) + ser_uint256(parent.history_head if parent else 0) +
+               compact_size(len(admissions)) + b"".join(credit.serialize() for credit in admissions))
+    return replace(snapshot, certificates=certs, history_head=h256(_domain("history", TIDES_VERSION), history),
+                   post_state=tuple(sorted(state, key=lambda entry: entry.proof_id)))
+
+
 def credit_outputs(credits, reward, fallback_script):
     weights = {}
     for credit in credits:
@@ -370,6 +457,7 @@ class Snapshot:
     pending: tuple = ()
     settled: tuple = ()
     certificates: tuple = ()
+    history_head: int = 0
 
     def serialize(self):
         if not isinstance(self.envelope, EnvelopeV2) or any(not isinstance(share.envelope, EnvelopeV2) for share in self.shares):
@@ -378,6 +466,12 @@ class Snapshot:
             raise ValueError("proof profile differs from settlement")
         if self.envelope.version == 4 and (self.pending or self.settled or self.certificates):
             raise ValueError("v4 cannot carry confirmed ledger state")
+        if type(self.history_head) is not int or not 0 <= self.history_head < 1 << 256:
+            raise ValueError("history head must be an unsigned 256-bit integer")
+        if self.envelope.version != TIDES_VERSION and self.history_head:
+            raise ValueError("legacy snapshots cannot carry a TIDES history head")
+        if self.envelope.version == TIDES_VERSION and (self.pending or self.settled):
+            raise ValueError("TIDES cannot carry v5 pending or settled credits")
         if type(self.owner_signature) is not bytes or len(self.owner_signature) != 64:
             raise ValueError("owner authorization must contain 64 bytes")
         if type(self.job_commitment) is not int or not 0 <= self.job_commitment < 1 << 256:
@@ -390,7 +484,8 @@ class Snapshot:
             if ids != sorted(set(ids)):
                 raise ValueError("proofs and state must use unique numeric proof order")
         scripts = [bytes(output.scriptPubKey) for output in self.payouts]
-        if scripts != sorted(set(scripts)) or not scripts or any(not is_payout_script(script) for script in scripts):
+        if (scripts != sorted(set(scripts)) or (not scripts and self.envelope.version != TIDES_VERSION) or
+                any(not is_payout_script(script) for script in scripts)):
             raise ValueError("payouts must use unique script-byte order")
         if any(type(output.nValue) is not int or not 0 <= output.nValue <= 21_000_000 * 100_000_000 for output in self.payouts):
             raise ValueError("payout amount outside money range")
@@ -420,14 +515,18 @@ class Snapshot:
                 keys = [credit.order for credit in credits]
                 if keys != sorted(set(keys)) or len(compact_size(len(credits))) + sum(len(c.serialize()) for c in credits) > budget:
                     raise ValueError("credit order or byte budget")
+            collections += (self.pending, self.settled)
+        if self.envelope.version in (LEDGER_VERSION, TIDES_VERSION):
             identities = [ser_uint256(cert.identity) for cert in self.certificates]
             if identities != sorted(set(identities)) or len(compact_size(len(self.certificates))) + sum(len(c.serialize()) for c in self.certificates) > MAX_CERTIFICATE_BYTES:
                 raise ValueError("certificate order or byte budget")
-            collections += (self.pending, self.settled, self.certificates)
+            collections += (self.certificates,)
         for values in collections:
             append(compact_size(len(values)))
             for item in values:
                 append(item.serialize())
+        if self.envelope.version == TIDES_VERSION:
+            append(ser_uint256(self.history_head))
         return bytes(result)
 
     @classmethod
@@ -471,12 +570,15 @@ class Snapshot:
         shares = tuple(Share.read(reader) for _ in range(reader.count(512)))
         state = tuple(StateEntry.read(reader) for _ in range(reader.count(36)))
         payouts = tuple(CTxOut(reader.uint(8), CScript(reader.variable(34))) for _ in range(reader.count(31)))
-        pending, settled, certificates = (), (), ()
+        pending, settled, certificates, history_head = (), (), (), 0
         if envelope.version == LEDGER_VERSION:
             pending = tuple(LedgerCredit.read(reader) for _ in range(reader.count(99)))
             settled = tuple(LedgerCredit.read(reader) for _ in range(reader.count(99)))
+        if envelope.version in (LEDGER_VERSION, TIDES_VERSION):
             certificates = tuple(OriginCertificate.read(reader) for _ in range(reader.count(100)))
-        result = cls(envelope, signature, templates, shares, state, payouts, job, pending, settled, certificates)
+        if envelope.version == TIDES_VERSION:
+            history_head = reader.uint(32)
+        result = cls(envelope, signature, templates, shares, state, payouts, job, pending, settled, certificates, history_head)
         if reader.stream.read() or result.serialize() != raw:
             raise ValueError("trailing or noncanonical snapshot bytes")
         return result
@@ -497,7 +599,7 @@ class Snapshot:
 
     @property
     def hash(self):
-        return h256(_domain("snapshot", self.envelope.version), self.serialize())
+        return profile_snapshot_hash(self.serialize(), self.envelope.version)
 
     @property
     def hash_hex(self):
@@ -510,7 +612,8 @@ def job_hash(block):
     return h256(b"SharePool/job/v4\0", normalized.serialize())
 
 
-def share_target(native_bits):
+def share_target(native_bits, version=4):
+    rules_hash(version)
     if type(native_bits) is not int or not 0 < native_bits <= 0xffffffff or native_bits & 0x00800000:
         raise ValueError("invalid native target")
     exponent = native_bits >> 24
@@ -524,11 +627,15 @@ def share_target(native_bits):
     compact |= size << 24
     if not 0 < target < 1 << 256 or compact != native_bits:
         raise ValueError("noncanonical native target")
+    if version == TIDES_VERSION:
+        desired = max(1, ((1 << 256) // (target + 1)) >> SHARE_TARGET_SHIFT)
+        work = 1 << (desired.bit_length() - 1)
+        return (1 << 256) // work - 1
     return min(target << SHARE_TARGET_SHIFT, uint256_from_compact(SHARE_BITS))
 
 
-def share_work(native_bits):
-    return (1 << 256) // (share_target(native_bits) + 1)
+def share_work(native_bits, version=4):
+    return (1 << 256) // (share_target(native_bits, version) + 1)
 
 
 def work_outputs(shares, reward, fallback_script):
@@ -556,7 +663,7 @@ def attest(block, snapshot, *, secret=None, sign_owner=None):
     snapshot = replace(snapshot, job_commitment=job_hash(block), owner_signature=bytes(64))
     signature = sign_schnorr(secret, snapshot.owner_message) if secret is not None else sign_owner(snapshot)
     if type(signature) is not bytes or len(signature) != 64 or not verify_schnorr(snapshot.envelope.public_key, signature, snapshot.owner_message):
-        raise ValueError("owner signer returned invalid v4 job authorization")
+        raise ValueError("owner signer returned invalid hash-only job authorization")
     snapshot = replace(snapshot, owner_signature=signature)
     block.m_mm_rhs = snapshot.hash
     block.rehash()
@@ -567,19 +674,19 @@ class HashSigner(NativeSigner):
     """Native private-key adapter signs a policy-bound exact-job statement."""
     def sign_owner(self, snapshot):
         if not isinstance(snapshot, Snapshot):
-            raise SignerError("v4 signer requires a complete snapshot")
+            raise SignerError("hash-only signer requires a complete snapshot")
         envelope = snapshot.envelope
         if (envelope.genesis != REGTEST_GENESIS or envelope.pool != self.pool or
                 envelope.payout_script != self.payout_script or envelope.public_key != self.public_key or
                 not 0 < envelope.height < 0x7fffffff or envelope.native_parent == 0 or not snapshot.job_commitment):
-            raise SignerError("snapshot violates local v4 signer policy")
+            raise SignerError("snapshot violates local hash-only signer policy")
         try:
             payload = snapshot.signing_payload
         except ValueError as error:
             raise SignerError(str(error)) from None
         signature = self._invoke("sign-job", payload, 64)
         if not verify_schnorr(self.public_key, signature, snapshot.owner_message):
-            raise SignerError("local v4 signer signature failed verification")
+            raise SignerError("local hash-only signer signature failed verification")
         return signature
 
 
@@ -597,11 +704,16 @@ def build_snapshot(*, genesis, height, native_parent, pool, payout_script, rewar
     records = tuple(sorted(records, key=lambda record: ser_uint256(record.template_id)))
     envelope = EnvelopeV2(genesis, rules_hash(version), height, native_parent, pool, public_key, payout_script, version=version)
     signature = bytes(64)
-    payouts = work_outputs(shares, reward=reward, fallback_script=payout_script)
+    # A v6 proposal does not claim an allocation from its own admissions. Only
+    # native history-aware construction derives the actual reward and payouts.
+    payouts = ((CTxOut(0, CScript(payout_script)),) if version == TIDES_VERSION else
+               work_outputs(shares, reward=reward, fallback_script=payout_script))
     result = Snapshot(envelope, signature, records, shares, derive_state(parent_state, shares, height), payouts)
     if version == LEDGER_VERSION:
         result = apply_ledger_state(result, parent_snapshot)
         result = replace(result, payouts=credit_outputs(result.settled, reward, payout_script))
+    elif version == TIDES_VERSION:
+        result = apply_tides_state(result, parent_snapshot)
     result.serialize()
     return result
 
@@ -609,6 +721,8 @@ def build_snapshot(*, genesis, height, native_parent, pool, payout_script, rewar
 def candidate(*, genesis, native_parent, height, ntime, pool, payout_script,
               secret=None, public_key=None, sign_owner=None, templates=(), shares=(),
               parent_snapshot=None, parent_state=None, fees=0, transactions=(), witness=False, reward=None, native_bits=SHARE_BITS, version=4):
+    if version == TIDES_VERSION:
+        raise ValueError("TIDES jobs require the native history-aware builder")
     coinbase = create_coinbase(height, fees=fees)
     snapshot = build_snapshot(genesis=genesis, height=height, native_parent=native_parent,
         pool=pool, payout_script=payout_script, reward=coinbase.vout[0].nValue if reward is None else reward,
@@ -630,7 +744,7 @@ def candidate(*, genesis, native_parent, height, ntime, pool, payout_script,
 
 def solve_share(block, snapshot, *, start_nonce=0, valid=True):
     header = CBlockHeader(block)
-    target = share_target(header.nBits)
+    target = share_target(header.nBits, snapshot.envelope.version)
     for nonce in range(start_nonce, start_nonce + 100000):
         header.nNonce, header.m_nonce2 = nonce & 0xffffffff, nonce >> 32
         if (header.rehash() <= target) == valid:

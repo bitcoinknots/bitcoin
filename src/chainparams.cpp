@@ -92,6 +92,13 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
 
     options.sharepool_hash_only = args.GetBoolArg("-sharepoolhashonly", false);
     options.sharepool_admitted_ledger = args.GetBoolArg("-sharepooladmittedledger", false);
+    options.sharepool_tides = args.GetBoolArg("-sharepooltides", false);
+    if (options.sharepool_tides && options.sharepool_admitted_ledger) {
+        throw std::runtime_error("-sharepooltides and -sharepooladmittedledger are mutually exclusive; use a fresh regtest chain for each profile.");
+    }
+    if (options.sharepool_tides && !options.sharepool_hash_only) {
+        throw std::runtime_error("-sharepooltides requires -sharepoolhashonly on a fresh regtest chain.");
+    }
     if (options.sharepool_admitted_ledger && !options.sharepool_hash_only) {
         throw std::runtime_error("-sharepooladmittedledger requires -sharepoolhashonly on a fresh regtest chain.");
     }
@@ -186,6 +193,9 @@ const CChainParams &Params() {
 
 std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, const ChainType chain)
 {
+    if (chain != ChainType::REGTEST && args.IsArgSet("-sharepooltides")) {
+        throw std::runtime_error("-sharepooltides is restricted to regtest; public-network activation is not supported.");
+    }
     if (chain != ChainType::REGTEST && args.IsArgSet("-sharepooladmittedledger")) {
         throw std::runtime_error("-sharepooladmittedledger is restricted to regtest; public-network activation is not supported.");
     }

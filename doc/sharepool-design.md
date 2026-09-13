@@ -1,7 +1,14 @@
 # Template-work evidence and replicated pool settlement on Knots
 
-The [hash-only version 3 profile](sharepool-hash-only.md) specifies the current
-off-block snapshot format and its separately enabled native regtest validation.
+**Current native experiment:** [v6 separate-pool TIDES-style accounting](sharepool-tides-accounting.md)
+binds the complete off-block snapshot to a flat `m_mm_rhs` hash and validates
+rolling direct coinbase payouts. Payout scripts are recipients, not exclusive
+identities; no global membership lock or address-control proof is required.
+See the [v6 verification report](sharepool-v6-tides-report.md).
+
+The broader proposal and older profiles below remain historical design context.
+Their registry, absolute-work-budget and one-time-settlement language does not
+describe v6's selected reward contract. Public activation remains disabled.
 
 Status: broader protocol proposal, with a newer
 [native enforcement profile](sharepool-native-enforcement.md) implementing a

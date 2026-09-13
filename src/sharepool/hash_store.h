@@ -21,6 +21,7 @@ namespace sharepool {
  */
 class HashSnapshotStore {
     friend struct HashSnapshotStoreTest;
+    const uint32_t m_profile_version;
     CDBWrapper m_db;
     // Quarantined records still consume their disk quota, but are neither
     // advertised nor considered available. A verified Put can replace them.
@@ -57,7 +58,8 @@ class HashSnapshotStore {
     std::shared_ptr<const CBlock> LocalTemplate(const uint256& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
 public:
-    explicit HashSnapshotStore(const fs::path& path, bool memory_only = false);
+    explicit HashSnapshotStore(const fs::path& path, bool memory_only = false,
+                               uint32_t profile_version = hashonly::VERSION);
     bool Has(const uint256& hash) const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::optional<std::vector<unsigned char>> Get(const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::shared_ptr<const std::vector<unsigned char>> GetShared(const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main);

@@ -1,7 +1,7 @@
 # Production gap register
 
 This branch is an opt-in regtest implementation. Passing its tests does not
-authorize mainnet deployment. Versions 4 and 5 have separate wire/rules and local
+authorize mainnet deployment. Versions 4, 5 and 6 have separate wire/rules and local
 database profiles; use a fresh test chain. Historical reports describe their
 recorded source revisions.
 
@@ -25,11 +25,13 @@ validity or advance the common ancestor.
 The next hardening pass fixes F7 bounded-record recovery, F8 dispatch binding,
 and two reproduced pending-body eviction paths. Its [verification report](sharepool-production-hardening-report.md)
 records the exact scope. The [accounting proposal and model](sharepool-production-protocol-plan.md)
-made the funding and rolling-window choices concrete. **Separate pools and
-TIDES are now selected**; the [new accounting references](sharepool-tides-accounting.md)
-implement and test that arithmetic. Native membership, historical storage and
-issued-job cutoff integration remain. Neither model changes the native v5
-contract.
+made the funding and rolling-window choices concrete. The separate-pool
+[v6 TIDES-style profile](sharepool-tides-accounting.md) now integrates the native
+historical window, exact rational payout calculation, issued-job cutoff, builder,
+external signer and gate. It starts with fresh state and preserves v4/v5 rules.
+Payout scripts are recipients, not exclusive identities: no spending-key proof
+or global pool-membership lock is required. Same-script work in another pool
+does not transfer or relabel old proofs.
 
 ## Hardening implemented in version 4
 
@@ -63,6 +65,9 @@ credit ownership, reorg-safe spent accounting, a bounded arrival/service policy,
 and rules for which rewards fund deferred credits. Local ACK timestamps cannot
 establish that global history. Version 4 does not provide that protocol. The separately enabled v5 ledger
 implements confirmed-credit accounting, with the limitations described above.
+V6 retains confirmed admissions in rolling branch history, where they may earn
+several times or leave the current window without earning. It does not make a
+provisional ACK an unconditional payment guarantee.
 Deterministic carry is the intended behavior; this revision implements bounded
 selection and durable retention, but does not complete that payment guarantee.
 
@@ -82,9 +87,12 @@ regular pool at the same hashrate. Given direct coinbase payouts, the working
 reference is a rolling work window such as PPLNS/TIDES. Fixed-duration proof-count
 sampling variance alone does not establish miner payout variance. Version 4 one-time settlement and network-height expiry are not that rolling
 window. Version 5 removes confirmed-credit expiry, but its one-time settlement
-is also not a rolling window.
-Payouts currently use only selected eligible proofs; an empty selection pays the
-snapshot owner. With sparse sampling, that fallback also needs explicit treatment
+is also not a rolling window. Version 6 supplies a rolling window but still needs
+production difficulty and variance measurements. Its assigned share work is
+exact; its shift 10 remains experimental.
+In v4/v5 an empty selection pays the snapshot owner. In v6 only fully known empty
+pool history plus an empty current admission batch triggers bootstrap; missing
+history never does. With sparse sampling, bootstrap needs explicit treatment
 in the payout policy and variance tests. Receipt expiry is not a percentage of
 pool revenue lost: every found block still distributes its complete reward.
 See [difficulty and payout comparison](sharepool-difficulty-capacity.md).
@@ -131,11 +139,26 @@ hashrate from arrival times, or that a particular software implementation was
 used. Production claims must describe enforced behavior, not those stronger
 unobservable properties.
 
+**Admission-order fairness.** V6 orders each confirmed batch by numeric proof ID
+after admission height. This is reproducible across nodes, but differs from
+OCEAN's arrival-ordered TIDES log. Selective publication, batch composition and
+proof-ID selection can affect the window boundary. The 100-miner low-difficulty
+test makes this visible; it does not establish fair production ordering or equal
+variance. A frozen job authenticates its selected batch, not universal inclusion.
+
+**Local history capacity.** The v6 history index resumes bounded scans and has
+[configurable per-thread retained-history budgets](sharepool-tides-local-limits.md).
+Exhaustion is pending, with no shortened payout window. Raising a limit can
+restore progress but requires real RAM; cached-payload accounting is not a hard
+RSS limit. Native archival quotas and long-run history growth remain separate
+production requirements.
+
 ## Release evidence
 
-Use the [current verification report](sharepool-production-hardening-report.md)
-and its per-run binary/source hashes for this revision. Prior v4/v5 reports
-remain historical.
+Use the [v6 verification report](sharepool-v6-tides-report.md)
+and its per-run binary/source hashes for this revision. The
+[earlier recovery report](sharepool-production-hardening-report.md) and prior
+v4/v5 reports retain their historical scope.
 Model results, wire fixtures, mocked gate tests and native integration
 tests provide different evidence; none should be presented as ASIC testing,
 WAN throughput or mainnet consensus approval. Mainnet remains disabled.
