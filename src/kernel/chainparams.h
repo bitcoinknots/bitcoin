@@ -170,6 +170,7 @@ public:
         //! height until the parent block's median-time-past reaches this
         //! value (see -rdtsexpiry). Requires a blake2b activation height.
         std::optional<int64_t> rdts_expiry_time{};
+        std::optional<int> austerity_height{};
         std::optional<std::vector<unsigned char>> blake2b_headline{};
     };
 

@@ -1,80 +1,49 @@
-Bitcoin Knots
-=============
+Austerity Mode
+==============
 
-https://bitcoinknots.org
+A fork of [Bitcoin Knots](https://github.com/bitcoinknots/bitcoin) that removes
+the block subsidy from a configured height onward. Miners are paid only by
+transaction fees from that point forward. Proof of work, block validity, and
+everything else about the chain are unchanged.
 
-For an immediately usable, binary version of the Bitcoin Knots software, see
-the website.
+Why
+---
 
-What is Bitcoin Knots?
-----------------------
+The block subsidy pays miners regardless of whether they have any stake in the
+network's future. A chain secured only by rented hashpower has no claim on that
+hashpower's loyalty. Fee revenue already covers security on a network with real
+transaction volume; the subsidy is a legacy bootstrap mechanism, not a
+permanent entitlement.
 
-Bitcoin Knots connects to the Bitcoin peer-to-peer network to download and fully
-validate blocks and transactions. It also includes a wallet and graphical user
-interface, which can be optionally built.
+This fork proposes cutting it off outright, on a schedule the community sets.
 
-Further information about Bitcoin Knots is available in the [doc folder](/doc).
+How it works
+------------
 
-License
--------
+One consensus parameter, `austerity_height`, controls the change:
 
-Bitcoin Knots is released under the terms of the MIT license. See [COPYING](COPYING) for more
-information or see https://opensource.org/licenses/MIT.
+- Below it: the subsidy follows the ordinary halving schedule.
+- From it: `GetBlockSubsidy` returns zero, and a coinbase may claim only the
+  fees collected in its own block. A coinbase that still pays itself the
+  subsidy is invalid (`bad-cb-amount`).
 
-Development Process
--------------------
+The parameter defaults to unset ("never") on every network. It is exercised on
+regtest for testing:
 
-Development generally takes place as part of [Bitcoin Core](https://github.com/bitcoin/bitcoin), and is merged into
-Knots for each release.
+    bitcoind -regtest -austerityheight=<height>
 
-Even if your pull request to Core is closed, or if your feature is not
-suitable for Core (eg, because it builds on a feature not supported in Core;
-relies on centralised services; etc), it may still be eligible for inclusion
-in Bitcoin Knots. In this case, a pull request may be opened on the
-[Knots GitHub](https://github.com/bitcoinknots/bitcoin) for review and consideration.
-When accepted, you are expected to maintain the submitted branch in your own
-repository, and it will be automatically merged into new releases of Knots.
-
-Developer IRC can be found on Freenode at #bitcoin-dev.
+Activating it on a live network is a single deliberate choice by that network's
+operators: set `austerity_height` in chain params to a real value. This build
+does not make that choice for mainnet, testnet, testnet4, or signet.
 
 Testing
 -------
 
-Testing and code review is the bottleneck for development; we get more pull
-requests than we can review and test on short notice. Please be patient and help out by testing
-other people's pull requests, and remember this is a security-critical project where any mistake might cost people
-lots of money.
+`test/functional/feature_austerity.py` mines across the activation height and
+confirms the subsidy drops to zero and that a block still claiming it is
+rejected by consensus.
 
-### Automated Testing
+License
+-------
 
-Developers are strongly encouraged to write [unit tests](src/test/README.md) for new code, and to
-submit new unit tests for old code. Unit tests can be compiled and run
-(assuming they weren't disabled during the generation of the build system) with: `ctest`. Further details on running
-and extending unit tests can be found in [/src/test/README.md](/src/test/README.md).
-
-There are also [regression and integration tests](/test), written
-in Python.
-These tests can be run (if the [test dependencies](/test) are installed) with: `build/test/functional/test_runner.py`
-(assuming `build` is your build directory).
-
-The CI (Continuous Integration) systems make sure that every pull request is built for Windows, Linux, and macOS,
-and that unit/sanity tests are run automatically.
-
-### Manual Quality Assurance (QA) Testing
-
-Changes should be tested by somebody other than the developer who wrote the
-code. This is especially important for large or high-risk changes. It is useful
-to add a test plan to the pull request description if testing the changes is
-not straightforward.
-
-Translations
-------------
-
-Changes to translations as well as new translations can be submitted to
-[Bitcoin Core's Transifex page](https://explore.transifex.com/bitcoin/bitcoin/).
-
-Translations are periodically pulled from Transifex and merged into the git repository. See the
-[translation process](doc/translation_process.md) for details on how this works.
-
-**Important**: We do not accept translation changes as GitHub pull requests because the next
-pull from Transifex would automatically overwrite them again.
+MIT. See [COPYING](COPYING).
