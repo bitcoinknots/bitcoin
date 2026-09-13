@@ -83,6 +83,7 @@ from test_framework.blocktools import create_block, create_coinbase
 from test_framework.messages import CInv
 from test_framework.p2p import (
     CBlockHeader,
+    NODE_BLAKE2B,
     NODE_WITNESS,
     P2PInterface,
     p2p_lock,
@@ -226,7 +227,8 @@ class SendHeadersTest(BitcoinTestFramework):
         inv_node = self.nodes[0].add_p2p_connection(BaseNode())
         # Make sure NODE_NETWORK is not set for test_node, so no block download
         # will occur outside of direct fetching
-        test_node = self.nodes[0].add_p2p_connection(BaseNode(), services=NODE_WITNESS)
+        # NODE_BLAKE2B is kept so the peer is not dropped as a pre-fork peer once IBD ends.
+        test_node = self.nodes[0].add_p2p_connection(BaseNode(), services=NODE_WITNESS | NODE_BLAKE2B)
 
         self.test_null_locators(test_node, inv_node)
         self.test_nonnull_locators(test_node, inv_node)

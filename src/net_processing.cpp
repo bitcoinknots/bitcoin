@@ -496,7 +496,7 @@ public:
     bool ProcessMessages(CNode* pfrom, std::atomic<bool>& interrupt) override
         EXCLUSIVE_LOCKS_REQUIRED(!m_peer_mutex, !m_most_recent_block_mutex, !m_headers_presync_mutex, g_msgproc_mutex, !m_tx_download_mutex);
     bool SendMessages(CNode* pto) override
-        EXCLUSIVE_LOCKS_REQUIRED(!m_peer_mutex, !m_most_recent_block_mutex, g_msgproc_mutex, !m_tx_download_mutex);
+        EXCLUSIVE_LOCKS_REQUIRED(!m_peer_mutex, !m_most_recent_block_mutex, g_msgproc_mutex, !m_tx_download_mutex, !m_headers_presync_mutex);
 
     /** Implement PeerManager */
     void StartScheduledTasks(CScheduler& scheduler) override;
@@ -670,8 +670,61 @@ private:
     /** Request further headers from this peer with a given locator.
      * We don't issue a getheaders message if we have a recent one outstanding.
      * This returns true if a getheaders is actually sent, and false otherwise.
+     *
+     * Pass continuing_started_sync=true when this getheaders continues a header
+     * sync that has already been started with this peer. The sync-source policy
+     * (see MayHeaderSyncFrom) was applied when that sync started and its slot is
+     * already spent; re-applying it mid-sync would only strand the sync state
+     * without freeing anything. It also keeps the Assume() at that call site
+     * sound if the policy flips underneath an in-flight sync -- which it now
+     * can, because MayHeaderSyncFrom()'s bootstrap fallback turns off the moment
+     * a fork-aware peer connects.
+     *
+     * That last case opens a narrow, self-closing race: if a fork-aware peer
+     * connects in between two SendMessages ticks for this pre-fork peer, this
+     * bypass can let one more getheaders through here before the slot-release
+     * logic in SendMessages (below) tears down the sync state on the following
+     * tick. The extra round-trip is harmless -- the pre-fork peer's headers are
+     * still validated normally regardless of who sent them -- and the window
+     * closes itself on the very next tick, so it is accepted as-is rather than
+     * closed with extra synchronization.
      */
-    bool MaybeSendGetHeaders(CNode& pfrom, const CBlockLocator& locator, Peer& peer) EXCLUSIVE_LOCKS_REQUIRED(g_msgproc_mutex);
+    bool MaybeSendGetHeaders(CNode& pfrom, const CBlockLocator& locator, Peer& peer, bool continuing_started_sync = false) EXCLUSIVE_LOCKS_REQUIRED(g_msgproc_mutex);
+
+    /** Whether we are willing to run header sync against this peer.
+     *
+     * A peer lacking NODE_BLAKE2B is normally excluded. That exclusion is a
+     * sync-slot allocation policy, not a safety or correctness mechanism:
+     * headers are validated against the consensus rules for their height no
+     * matter who sends them, so accepting a pre-fork peer's headers is not a
+     * risk. The point is that such a peer dead-ends at the fork height, and we
+     * only ever run one initial header sync at a time -- spending that slot on
+     * a peer that cannot follow us past the fork wastes it.
+     *
+     * Bootstrap fallback: if we currently have no fork-aware peer connected at
+     * all, we sync headers from whoever we do have. Most of the network is
+     * still pre-fork, so a node whose only peers are pre-fork must be able to
+     * make progress rather than sit at zero headers indefinitely waiting for a
+     * fork-aware peer to show up. As soon as one connects the exclusion is back
+     * in force.
+     *
+     * Note the asymmetry with the live counter: the fast-path check below tests
+     * the bare NODE_BLAKE2B bit, while m_fork_aware_header_sync_peers counts the
+     * stricter IsForkAwareHeaderSyncSource() (the bit plus CanServeBlocks()).
+     * This is intentional, not an oversight to fix on a future edit: it
+     * preserves the original rule-1 behavior for a peer that already has the
+     * bit, and the gap is closed downstream -- TryLowWorkHeadersSync(), the only
+     * site that actually starts a sync, additionally requires CanServeBlocks()
+     * before calling here, so a peer that fails that check never gets to start
+     * anything even though this predicate alone would allow it.
+     *
+     * All header-sync gates call this one predicate instead of re-deriving the
+     * condition. They must not drift apart: in particular the
+     * Assume(sent_getheaders) in IsContinuationOfLowWorkHeadersSync() only
+     * holds if the gate in TryLowWorkHeadersSync() and the gate in
+     * MaybeSendGetHeaders() answer identically for the same peer.
+     */
+    bool MayHeaderSyncFrom(const Peer& peer) const;
     /** Potentially fetch blocks from this peer upon receipt of a new headers tip */
     void HeadersDirectFetchBlocks(CNode& pfrom, const Peer& peer, const CBlockIndex& last_header);
     /** Update peer state based on received headers message */
@@ -804,6 +857,22 @@ private:
 
     /** Number of preferable block download peers. */
     int m_num_preferred_download_peers GUARDED_BY(cs_main){0};
+
+    /** Number of currently connected peers that have completed the version
+     *  handshake and are usable header-sync sources under the BLAKE2b hardfork
+     *  rules, i.e. that satisfy IsForkAwareHeaderSyncSource(). Maintained in the
+     *  VERSION handler (the sole assignment to Peer::m_their_services) and in
+     *  FinalizeNode(), following the maintained-counter pattern of
+     *  m_num_preferred_download_peers / m_wtxid_relay_peers.
+     *
+     *  Deliberately atomic and NOT GUARDED_BY(cs_main): MayHeaderSyncFrom()
+     *  reads it from MaybeSendGetHeaders(), which is reachable from
+     *  IsContinuationOfLowWorkHeadersSync() while Peer::m_headers_sync_mutex is
+     *  held and without cs_main. Counting connected peers on demand instead is
+     *  not an option there either: that would mean taking m_peer_mutex while a
+     *  Peer-internal mutex is held, which the lock-order rule documented on
+     *  m_peer_mutex forbids. */
+    std::atomic<int> m_fork_aware_header_sync_peers{0};
 
     /** Stalling timeout for blocks in IBD */
     std::atomic<std::chrono::seconds> m_block_stalling_timeout{BLOCK_STALLING_TIMEOUT_DEFAULT};
@@ -1103,6 +1172,22 @@ static void AddKnownTx(Peer& peer, const uint256& hash)
 static bool CanServeBlocks(const Peer& peer)
 {
     return peer.m_their_services & (NODE_NETWORK|NODE_NETWORK_LIMITED);
+}
+
+/** Whether a peer advertising these services is a usable header-sync source
+ *  under the BLAKE2b hardfork rules.
+ *
+ *  It is not enough for the peer to set NODE_BLAKE2B: it must also be able to
+ *  serve us blocks at all (the CanServeBlocks() condition, spelled out here
+ *  because this runs on raw service flags before a Peer exists). A peer with
+ *  the bare fork bit and no block-serving capability would otherwise count
+ *  towards PeerManagerImpl::m_fork_aware_header_sync_peers and switch off the
+ *  bootstrap fallback in MayHeaderSyncFrom() without being able to take over
+ *  the header sync the fallback was keeping alive -- i.e. exactly the stall
+ *  that fallback exists to prevent, in a narrower form. */
+static bool IsForkAwareHeaderSyncSource(ServiceFlags services)
+{
+    return (services & NODE_BLAKE2B) && (services & (NODE_NETWORK | NODE_NETWORK_LIMITED));
 }
 
 /** Whether this peer can only serve limited recent blocks (e.g. because
@@ -1594,6 +1679,14 @@ void PeerManagerImpl::FinalizeNode(const CNode& node)
         assert(peer != nullptr);
         m_wtxid_relay_peers -= peer->m_wtxid_relay;
         assert(m_wtxid_relay_peers >= 0);
+        // Mirror the VERSION handler: only peers that were counted there are
+        // uncounted here. Read the atomic service flags once so the increment
+        // and decrement cannot see different values.
+        const ServiceFlags their_services{peer->m_their_services};
+        if (IsForkAwareHeaderSyncSource(their_services)) {
+            --m_fork_aware_header_sync_peers;
+        }
+        assert(m_fork_aware_header_sync_peers >= 0);
     }
     CNodeState *state = State(nodeid);
     assert(state != nullptr);
@@ -1632,6 +1725,7 @@ void PeerManagerImpl::FinalizeNode(const CNode& node)
         assert(m_peers_downloading_from == 0);
         assert(m_outbound_peers_with_protect_from_disconnect == 0);
         assert(m_wtxid_relay_peers == 0);
+        assert(m_fork_aware_header_sync_peers == 0);
         WITH_LOCK(m_tx_download_mutex, m_txdownloadman.CheckIsEmpty());
     }
     } // cs_main
@@ -2600,7 +2694,11 @@ bool PeerManagerImpl::IsContinuationOfLowWorkHeadersSync(Peer& peer, CNode& pfro
             if (!locator.vHave.empty()) {
                 // It should be impossible for the getheaders request to fail,
                 // because we just cleared the last getheaders timestamp.
-                bool sent_getheaders = MaybeSendGetHeaders(pfrom, locator, peer);
+                // This sync is already under way, so the sync-source policy does
+                // not apply again here -- see MaybeSendGetHeaders(). Without
+                // that, a fork-aware peer connecting mid-sync would flip the
+                // policy against this peer and break the Assume() below.
+                bool sent_getheaders = MaybeSendGetHeaders(pfrom, locator, peer, /*continuing_started_sync=*/true);
                 Assume(sent_getheaders);
                 LogDebug(BCLog::NET, "more getheaders (from %s) to peer=%d\n",
                     locator.vHave.front().ToString(), pfrom.GetId());
@@ -2682,7 +2780,18 @@ bool PeerManagerImpl::TryLowWorkHeadersSync(Peer& peer, CNode& pfrom, const CBlo
         // Only try to sync with this peer if their headers message was full;
         // otherwise they don't have more headers after this so no point in
         // trying to sync their too-little-work chain.
-        if (headers.size() == m_opts.max_headers_result) {
+        //
+        // A peer we are not willing to header-sync from is excluded: we would
+        // never send it the getheaders this sync depends on (see
+        // MaybeSendGetHeaders), so starting one would allocate presync state for
+        // a sync that can never progress.
+        //
+        // This must use exactly the same predicate as MaybeSendGetHeaders(), not
+        // a parallel copy of the condition: the Assume(sent_getheaders) in
+        // IsContinuationOfLowWorkHeadersSync() is only sound while the two
+        // answer identically for the same peer. Hence the shared
+        // MayHeaderSyncFrom(), including its bootstrap fallback.
+        if (headers.size() == m_opts.max_headers_result && MayHeaderSyncFrom(peer)) {
             // Note: we could advance to the last header in this set that is
             // known to us, rather than starting at the first header (which we
             // may already have); however this is unlikely to matter much since
@@ -2725,8 +2834,42 @@ bool PeerManagerImpl::IsAncestorOfBestHeaderOrTip(const CBlockIndex* header)
     return false;
 }
 
-bool PeerManagerImpl::MaybeSendGetHeaders(CNode& pfrom, const CBlockLocator& locator, Peer& peer)
+bool PeerManagerImpl::MayHeaderSyncFrom(const Peer& peer) const
 {
+    if (peer.m_their_services & NODE_BLAKE2B) return true;
+    // Bootstrap fallback: no fork-aware peer is connected, so this pre-fork peer
+    // is the best header source we have. See the declaration for the rationale.
+    return m_fork_aware_header_sync_peers.load(std::memory_order_relaxed) == 0;
+}
+
+bool PeerManagerImpl::MaybeSendGetHeaders(CNode& pfrom, const CBlockLocator& locator, Peer& peer, bool continuing_started_sync)
+{
+    // Do not request headers from a peer we are not willing to header-sync from,
+    // i.e. a peer lacking NODE_BLAKE2B while some fork-aware peer is connected.
+    // See MayHeaderSyncFrom(): this is about not wasting the single header-sync
+    // slot on a peer that dead-ends at the fork height. It is *not* a safety
+    // check -- pre-fork headers are validated against the consensus rules for
+    // their height regardless of who sent them -- which is why the bootstrap
+    // fallback below can safely relax it to nothing when we have no fork-aware
+    // peer at all.
+    //
+    // The gate lives here, in the single choke point every getheaders goes
+    // through, rather than only at the call sites that start header sync. Three
+    // other call sites are reachable unilaterally by any peer, in or out of our
+    // IBD, and would otherwise leak a getheaders to a pre-fork peer:
+    //   - HandleUnconnectingHeaders(), from a headers message whose first header
+    //     does not connect. CheckHeadersPoW() only validates each header's
+    //     self-declared target, not the difficulty the chain actually requires,
+    //     so this costs an attacker nothing.
+    //   - the "headers message had its maximum size" continuation below.
+    //   - the compact block handler, when the block does not connect.
+    // Gating the choke point makes the rule an invariant instead of a checklist
+    // a future caller can be added without.
+    //
+    // This is beyond the literal design spec, which named only the header-sync
+    // trigger; it is a self-contained hunk and can be reverted on its own.
+    if (!continuing_started_sync && !MayHeaderSyncFrom(peer)) return false;
+
     const auto current_time = NodeClock::now();
 
     // Only allow a new getheaders message to go out if we don't have a recent
@@ -3549,6 +3692,13 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
             }
         }
         peer->m_their_services = nServices;
+        // Maintain the live count of fork-aware header-sync sources. This is the
+        // only assignment to m_their_services, and a duplicate VERSION message is
+        // rejected above, so this runs at most once per peer; FinalizeNode()
+        // uncounts it under the same predicate.
+        if (IsForkAwareHeaderSyncSource(nServices)) {
+            ++m_fork_aware_header_sync_peers;
+        }
         pfrom.SetAddrLocal(addrMe);
         peer->m_starting_height = starting_height;
 
@@ -4022,7 +4172,22 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
             // our initial peer is unresponsive (but less bandwidth than we'd
             // use if we turned on sync with all peers).
             CNodeState& state{*Assert(State(pfrom.GetId()))};
-            if (state.fSyncStarted || (!peer->m_inv_triggered_getheaders_before_sync && *best_block != m_last_block_inv_triggering_headers_sync)) {
+            // As above, only header-sync from a peer the sync-source policy allows
+            // (see MayHeaderSyncFrom) -- an unsolicited block inv must not let a
+            // pre-fork peer pull us into header sync it could not otherwise start.
+            // The policy's bootstrap fallback applies here too: with no fork-aware
+            // peer connected, an inv from a pre-fork peer may start header sync,
+            // because otherwise nothing could.
+            //
+            // Unlike the equivalent belt-and-suspenders check in SendMessages, this one
+            // is load-bearing: MaybeSendGetHeaders() alone would suppress the getheaders,
+            // but the "if (!state.fSyncStarted)" below would still run, marking
+            // m_inv_triggered_getheaders_before_sync and consuming this block's one
+            // new-peer slot in m_last_block_inv_triggering_headers_sync -- letting a
+            // pre-fork peer's inv silently starve a legitimate peer's turn. So this
+            // gate must stay; only its condition gains the fallback.
+            if (MayHeaderSyncFrom(*peer)
+                && (state.fSyncStarted || (!peer->m_inv_triggered_getheaders_before_sync && *best_block != m_last_block_inv_triggering_headers_sync))) {
                 if (MaybeSendGetHeaders(pfrom, GetLocator(m_chainman.m_best_header), *peer)) {
                     LogDebug(BCLog::NET, "getheaders (%d) %s to peer=%d\n",
                             m_chainman.m_best_header->nHeight, best_block->ToString(),
@@ -5529,6 +5694,39 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
 
     MaybeSendSendHeaders(*pto, *peer);
 
+    // Release the header-sync slot when the bootstrap fallback ends.
+    //
+    // This peer may have been allowed to start header sync only because we had
+    // no fork-aware peer at the time (see MayHeaderSyncFrom). If one has since
+    // connected, the policy now excludes this peer -- but it is still holding
+    // nSyncStarted, and we only run one initial header sync at a time. Left
+    // alone, the fork-aware peer that can actually follow us past the fork would
+    // have to wait out the headers-sync timeout before it could take over. Hand
+    // the slot back now instead, and tear down the presync state that went with
+    // it.
+    //
+    // The predicate is deliberately the same MayHeaderSyncFrom() the gates use,
+    // so this can never fire for a peer those gates would still allow.
+    if (!MayHeaderSyncFrom(*peer)) {
+        bool released{false};
+        {
+            LOCK(cs_main);
+            CNodeState& state = *Assert(State(pto->GetId()));
+            if (state.fSyncStarted) {
+                state.fSyncStarted = false;
+                nSyncStarted--;
+                released = true;
+            }
+        }
+        if (released) {
+            LogDebug(BCLog::NET, "releasing header sync slot held by pre-fork peer=%d, a fork-aware peer is now connected\n", pto->GetId());
+            peer->m_headers_sync_timeout = 0us;
+            WITH_LOCK(peer->m_headers_sync_mutex, peer->m_headers_sync.reset(nullptr));
+            LOCK(m_headers_presync_mutex);
+            m_headers_presync_stats.erase(pto->GetId());
+        }
+    }
+
     {
         LOCK(cs_main);
 
@@ -5560,7 +5758,23 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
             }
         }
 
-        if (!state.fSyncStarted && CanServeBlocks(*peer) && !m_chainman.m_blockman.LoadingBlocks()) {
+        // Only start header sync with a peer the sync-source policy allows (see
+        // MayHeaderSyncFrom). This is the one site that starts initial header
+        // sync, so it is where the policy -- and its bootstrap fallback for the
+        // case where we have no fork-aware peer at all -- actually decides
+        // whether this node makes progress. Peers excluded here remain valid
+        // sources of (immutable) pre-fork block data, so the block download paths
+        // below are deliberately left ungated. The exclusion applies both during
+        // and after our own IBD, and is not exempted for manually-added peers.
+        //
+        // Belt-and-suspenders: MaybeSendGetHeaders() applies the same predicate and
+        // would no-op the call below on its own, so this check changes no observable
+        // behavior -- but only for as long as the two keep sharing MayHeaderSyncFrom()
+        // rather than spelling the condition out separately. It is here because it
+        // saves computing pindexStart and re-entering MaybeSendGetHeaders on every
+        // SendMessages tick for a peer that can never succeed.
+        if (!state.fSyncStarted && CanServeBlocks(*peer) && !m_chainman.m_blockman.LoadingBlocks()
+            && MayHeaderSyncFrom(*peer)) {
             // Only actively request headers from a single peer, unless we're close to today.
             if ((nSyncStarted == 0 && sync_blocks_and_headers_from_peer) || m_chainman.m_best_header->Time() > NodeClock::now() - 24h) {
                 const CBlockIndex* pindexStart = m_chainman.m_best_header;

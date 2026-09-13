@@ -28,6 +28,7 @@ from test_framework.messages import (
     MSG_WITNESS_FLAG,
     MSG_WITNESS_TX,
     MSG_WTX,
+    NODE_BLAKE2B,
     NODE_NETWORK,
     NODE_WITNESS,
     WITNESS_SCALE_FACTOR,
@@ -245,8 +246,9 @@ class SegWitTest(BitcoinTestFramework):
         # Setup the p2p connections
         # self.test_node sets P2P_SERVICES, i.e. NODE_WITNESS | NODE_NETWORK
         self.test_node = self.nodes[0].add_p2p_connection(TestP2PConn(), services=P2P_SERVICES)
-        # self.old_node sets only NODE_NETWORK
-        self.old_node = self.nodes[0].add_p2p_connection(TestP2PConn(), services=NODE_NETWORK)
+        # self.old_node sets only NODE_NETWORK (plus NODE_BLAKE2B, without which it
+        # would be disconnected as a pre-fork peer once we are out of IBD)
+        self.old_node = self.nodes[0].add_p2p_connection(TestP2PConn(), services=NODE_NETWORK | NODE_BLAKE2B)
         # self.std_node is for testing node1 (requires standard txs)
         self.std_node = self.nodes[1].add_p2p_connection(TestP2PConn(), services=P2P_SERVICES)
         # self.std_wtx_node is for testing node1 with wtxid relay

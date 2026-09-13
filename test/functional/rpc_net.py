@@ -283,11 +283,12 @@ class NetTest(BitcoinTestFramework):
 
     def test_service_flags(self):
         self.log.info("Test service flags")
-        self.nodes[0].add_p2p_connection(P2PInterface(), services=(1 << 4) | (1 << 63))
+        # NODE_BLAKE2B is included so the peer is not disconnected as a pre-fork peer.
+        self.nodes[0].add_p2p_connection(P2PInterface(), services=(1 << 4) | NODE_BLAKE2B | (1 << 63))
         if self.options.v2transport:
-            assert_equal(['UNKNOWN[2^4]', 'P2P_V2', 'UNKNOWN[2^63]'], self.nodes[0].getpeerinfo()[-1]['servicesnames'])
+            assert_equal(['UNKNOWN[2^4]', 'P2P_V2', 'BLAKE2B?', 'UNKNOWN[2^63]'], self.nodes[0].getpeerinfo()[-1]['servicesnames'])
         else:
-            assert_equal(['UNKNOWN[2^4]', 'UNKNOWN[2^63]'], self.nodes[0].getpeerinfo()[-1]['servicesnames'])
+            assert_equal(['UNKNOWN[2^4]', 'BLAKE2B?', 'UNKNOWN[2^63]'], self.nodes[0].getpeerinfo()[-1]['servicesnames'])
         self.nodes[0].disconnect_p2ps()
 
     def test_getnodeaddresses(self):
