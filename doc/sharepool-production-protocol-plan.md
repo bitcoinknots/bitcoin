@@ -1,5 +1,11 @@
 # Production accounting decisions and executable model
 
+**Decision update, 2026-09-12:** separate pool rewards and the TIDES window are
+selected. See the [selected contract and new accounting references](sharepool-tides-accounting.md).
+The experiment below is preserved with its original assumptions and results;
+its largest-remainder allocation and confirmed-parent cutoff are not the newly
+selected TIDES implementation.
+
 This is a **proposal and finite executable model**, not a new consensus profile.
 It follows the [v5 experiment](sharepool-confirmed-ledger.md). The model changes
 neither native validation nor public-network activation. Its default assumption
@@ -279,15 +285,16 @@ separate from native consensus and networking tests. No node, GPU, ASIC, network
 latency, real signatures, storage budget, output-count limit, censorship,
 stale-job race, fee process or fork is exercised by this model.
 
-## What is ready to decide next
+## Next implementation after the selected choices
 
 The engineering evidence supports retaining exact payout verification and
 implementing additional accounting in a separately versioned regtest profile.
 It does not justify activating it on a public network.
 
-Before that profile is concrete, confirm the funding scope, membership exit and
-shutdown contract, admission promise, rolling window/startup/minimum-payout
-rules, and capacity reservation policy. Then implement the selected rules with
+Separate pool funding and TIDES rolling rewards have now been selected. The
+[follow-up specification](sharepool-tides-accounting.md) records the accounting
+implementation and remaining membership, admission, bootstrap, output and
+archive requirements. Implement the new profile with
 native state-transition, restart/reorg and adversarial network tests. Only after
 those definitions should a production share target be calibrated against
 sustained WAN, disk, validation and real miner measurements.

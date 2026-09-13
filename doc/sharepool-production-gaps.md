@@ -25,8 +25,11 @@ validity or advance the common ancestor.
 The next hardening pass fixes F7 bounded-record recovery, F8 dispatch binding,
 and two reproduced pending-body eviction paths. Its [verification report](sharepool-production-hardening-report.md)
 records the exact scope. The [accounting proposal and model](sharepool-production-protocol-plan.md)
-make the remaining funding, rolling-window and capacity choices concrete; they
-do not change the native v5 contract.
+made the funding and rolling-window choices concrete. **Separate pools and
+TIDES are now selected**; the [new accounting references](sharepool-tides-accounting.md)
+implement and test that arithmetic. Native membership, historical storage and
+issued-job cutoff integration remain. Neither model changes the native v5
+contract.
 
 ## Hardening implemented in version 4
 
