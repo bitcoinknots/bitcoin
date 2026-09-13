@@ -564,6 +564,14 @@ private:
      */
     bool MaybeDiscourageAndDisconnect(CNode& pnode, Peer& peer);
 
+    /** Check if we are good to disconnect SpamCoin peers. Pure check, callers log and disconnect.
+     *
+     * @param[in]   node      The node to check.
+     * @param[in]   services  The services the peer advertised in its version message.
+     * @return                True if peer lacks NODE_BLAKE2B bit AND pre-fork history is complete AND peer is not manually added.
+     */
+    bool CanDisconnectSpamCoinPeer(const CNode& node, ServiceFlags services) const;
+
     /** Handle a transaction whose result was not MempoolAcceptResult::ResultType::VALID.
      * @param[in]   first_time_failure            Whether we should consider inserting into vExtraTxnForCompact, adding
      *                                            a new orphan to resolve, or looking for a package to submit.
@@ -3470,6 +3478,12 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
             return;
         }
 
+        if (CanDisconnectSpamCoinPeer(pfrom, nServices)) {
+            LogDebug(BCLog::NET, "node lacks NODE_BLAKE2B, %s\n", pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
         if (nVersion < MIN_PEER_PROTO_VERSION) {
             // disconnect from peers older than this proto version
             LogDebug(BCLog::NET, "peer using obsolete version %i, %s\n", nVersion, pfrom.DisconnectMsg(fLogIPs));
@@ -4954,6 +4968,16 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
     return;
 }
 
+bool PeerManagerImpl::CanDisconnectSpamCoinPeer(const CNode& node, ServiceFlags services) const
+{
+    // Past the shared pre-fork history, a peer lacking NODE_BLAKE2B is no longer useful
+    bool weArePastSharedHistory = m_chainparams.GetConsensus().IsBlake2bHeight(m_best_height + 1);
+    bool peerLacksBlakeBit = !(services & NODE_BLAKE2B);
+    bool peerIsNotManuallyAdded = !node.IsManualConn();
+
+    return weArePastSharedHistory && peerLacksBlakeBit && peerIsNotManuallyAdded;
+}
+
 bool PeerManagerImpl::MaybeDiscourageAndDisconnect(CNode& pnode, Peer& peer)
 {
     {
@@ -5516,6 +5540,13 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
 
     if (pto->IsAddrFetchConn() && current_time - pto->m_connected > 10 * AVG_ADDRESS_BROADCAST_INTERVAL) {
         LogDebug(BCLog::NET, "addrfetch connection timeout, %s\n", pto->DisconnectMsg(fLogIPs));
+        pto->fDisconnect = true;
+        return true;
+    }
+
+    // Peers that connected before shared history was completed are dropped once shared history is synced.
+    if (CanDisconnectSpamCoinPeer(*pto, peer->m_their_services)) {
+        LogDebug(BCLog::NET, "existing node lacking NODE_BLAKE2B is no longer useful, %s\n", pto->DisconnectMsg(fLogIPs));
         pto->fDisconnect = true;
         return true;
     }
