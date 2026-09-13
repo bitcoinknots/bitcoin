@@ -1,0 +1,17 @@
+2026-09-13T07:54:37.805000Z TestFramework (INFO): PRNG seed is: 3051012541176079767
+2026-09-13T07:54:37.806000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v6-r2-100-miners-963
+2026-09-13T07:54:39.451000Z TestFramework (INFO): 100 separate native builders/signers/gates validate and dispatch distinct transaction sets
+2026-09-13T07:54:46.066000Z TestFramework (INFO): 20/100 distinct native jobs dispatched and shares durably acknowledged
+2026-09-13T07:54:53.536000Z TestFramework (INFO): 40/100 distinct native jobs dispatched and shares durably acknowledged
+2026-09-13T07:55:01.804000Z TestFramework (INFO): 60/100 distinct native jobs dispatched and shares durably acknowledged
+2026-09-13T07:55:11.311000Z TestFramework (INFO): 80/100 distinct native jobs dispatched and shares durably acknowledged
+2026-09-13T07:55:21.263000Z TestFramework (INFO): 100/100 distinct native jobs dispatched and shares durably acknowledged
+2026-09-13T07:55:21.511000Z TestFramework (INFO): Reject altered payout/pool proof bindings before acknowledgement
+2026-09-13T07:55:21.523000Z TestFramework (INFO): Collect and admit all 100 proofs with full origins; apply the exact rolling window
+2026-09-13T07:55:37.921000Z TestFramework (INFO): A forged payout is refused; late work cannot rewrite a dispatched snapshot
+2026-09-13T07:55:41.143000Z TestFramework (INFO): The next native job carries late/winning work and rewards the rolling history again
+2026-09-13T07:55:45.248000Z TestFramework (INFO): The same recipient may join a different pool; previous pool work is not borrowed
+2026-09-13T07:55:45.652000Z TestFramework (INFO): Native and gate restarts preserve recurring history and invalidate old dispatch capabilities
+2026-09-13T07:55:49.958000Z TestFramework (INFO): Stopping nodes
+2026-09-13T07:55:50.126000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v6-r2-100-miners-963
+2026-09-13T07:55:50.126000Z TestFramework (INFO): Tests successful

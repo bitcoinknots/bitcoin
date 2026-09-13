@@ -119,6 +119,49 @@ BOOST_AUTO_TEST_CASE(chronological_exact_work_suffix_retains_full_boundary_share
     BOOST_CHECK_EQUAL(reward.payouts[0].nValue, 80);
 }
 
+BOOST_AUTO_TEST_CASE(boundary_native_height_retains_every_pool_member_without_reading_older_history)
+{
+    auto* first = Add(nodes.front().get(), {Admit(1, 1, 100)});
+    auto entries = std::vector{Admit(2, 2), Admit(3, 3, 8, 2), Admit(4, 4), Admit(5, 5)};
+    // Incoming summary height is never an ordering authority. It is derived
+    // from the containing native ancestor after exact anchor verification.
+    for (auto& entry : entries) entry.admission_height = 999;
+    auto* tip = Add(first, std::move(entries));
+    tides::HistoryIndex history;
+    const auto result = Read(history, tip, 1);
+    BOOST_REQUIRE(result.status == tides::HistoryStatus::Ready);
+    BOOST_REQUIRE_EQUAL(result.entries.size(), 3);
+    BOOST_CHECK(!result.complete_to_activation);
+    BOOST_CHECK_EQUAL(reads[first->hash], 0);
+    BOOST_CHECK(result.entries[0].proof_id == Number(2));
+    BOOST_CHECK(result.entries[1].proof_id == Number(4));
+    BOOST_CHECK(result.entries[2].proof_id == Number(5));
+    for (const auto& entry : result.entries) {
+        BOOST_CHECK_EQUAL(entry.admission_height, 2);
+        BOOST_CHECK(entry.work == Number(8));
+    }
+    const auto other_pool = Read(history, tip, 1, 2);
+    BOOST_REQUIRE_EQUAL(other_pool.entries.size(), 1);
+    BOOST_CHECK(other_pool.entries[0].proof_id == Number(3));
+}
+
+BOOST_AUTO_TEST_CASE(boundary_cohort_never_returns_only_the_affordable_members)
+{
+    auto* tip = Add(nodes.front().get(), {Admit(1, 1), Admit(2, 2), Admit(3, 3)});
+    const size_t entry_bytes = sizeof(tides::Admission) + Script(1).size();
+    tides::HistoryIndex history{{0, 0, 1, 2 * entry_bytes}};
+    const auto limited = Read(history, tip, 1);
+    BOOST_REQUIRE(limited.status == tides::HistoryStatus::ResourceLimit);
+    BOOST_CHECK_EQUAL(limited.reason, "tides-history-query-budget");
+    BOOST_CHECK(limited.entries.empty());
+    BOOST_CHECK_EQUAL(limited.scanned_blocks, 0);
+    history.SetCacheBudget({0, 0, 1, 3 * entry_bytes});
+    const auto ready = Read(history, tip, 1);
+    BOOST_REQUIRE(ready.status == tides::HistoryStatus::Ready);
+    BOOST_REQUIRE_EQUAL(ready.entries.size(), 3);
+    for (const auto& entry : ready.entries) BOOST_CHECK_EQUAL(entry.admission_height, 1);
+}
+
 BOOST_AUTO_TEST_CASE(startup_and_absent_pool_require_complete_scan_to_activation)
 {
     auto* first = Add(nodes.front().get(), {Admit(1, 1, 3)});

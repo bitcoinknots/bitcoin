@@ -2,11 +2,14 @@
 
 The latest [v6 native experiment](../../doc/sharepool-tides-accounting.md) adds
 separate-pool rolling payouts, exact job signatures and full-snapshot hashes on
-fresh regtest chains. It permits the same recipient script in different pools
-while keeping each old proof's original pool and destination. See the
-[current verification report](../../doc/sharepool-v6-tides-report.md) for native
-fork/reindex tests, the 100-miner pipeline and the bounded Goldshell capture with
-restoration to Lazarus. Mainnet and public-testnet activation remain disabled.
+fresh regtest chains. **Rules revision 2** shares the oldest native-height batch
+proportionally, carries local ACKs in durable order, relays foreign-pool work
+without relabeling it, and adds paged native archives with authenticated restore.
+See the [current verification report](../../doc/sharepool-v6-r2-report.md) and
+[coupled variance calibration](../../doc/sharepool-tides-calibration.md). The
+[revision 1 report](../../doc/sharepool-v6-tides-report.md) retains the earlier
+Goldshell capture and restoration to Lazarus; that capture is not revision 2
+hardware evidence. Mainnet and public-testnet activation remain disabled.
 
 The profiles and results below are earlier experiments and retain their original
 scope and revision-specific limitations.

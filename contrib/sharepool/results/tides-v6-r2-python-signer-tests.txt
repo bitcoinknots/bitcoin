@@ -1,0 +1,27 @@
+test_checksummed_fixture_and_each_record_region_detect_corruption (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_fifo_and_directory_rejected_without_blocking (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_group_readable_and_wrong_modes_rejected (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_init_never_overwrites_existing_key (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_key_file_truncated_and_oversized_fail_closed (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_legacy_migration_preserves_key_and_source_without_overwrite (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_legacy_migration_requires_previously_trusted_identity (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_macos_extended_acl_rejected_and_inheritance_cleared (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_native_init_policy_rejections_do_not_create_keys (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_native_stdin_strict_bounds_and_canonical_encoding (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_policy_and_network_checks_are_native (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_random_key_policy_file_and_valid_signature (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_secretless_builder_and_owner_signature (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_symlink_and_hardlink_rejected (test_native_signer.NativeSignerIntegrationTests) ... ok
+test_bad_policy_and_timeout_rejected_before_launch (test_native_signer.SignerAdapterTests) ... ok
+test_exact_output_and_command_paths (test_native_signer.SignerAdapterTests) ... ok
+test_external_builder_signature_and_identity_requirements (test_native_signer.SignerAdapterTests) ... ok
+test_migration_passes_trusted_public_statement_and_literal_paths (test_native_signer.SignerAdapterTests) ... ok
+test_rejects_failure_or_ambiguous_output (test_native_signer.SignerAdapterTests) ... ok
+test_rejects_oversized_stdout_and_stderr (test_native_signer.SignerAdapterTests) ... ok
+test_sign_timeout_is_bounded_even_when_child_does_not_read (test_native_signer.SignerAdapterTests) ... ok
+test_timeout_kills_silent_process (test_native_signer.SignerAdapterTests) ... ok
+
+----------------------------------------------------------------------
+Ran 22 tests in 9.474s
+
+OK

@@ -122,6 +122,7 @@ BASE_SCRIPTS = [
     # vv Tests less than 60s vv
     'feature_sharepool_enforcement.py',
     'feature_sharepool_archive.py',
+    'feature_sharepool_hash_archive.py',
     'feature_sharepool_node.py',
     'feature_sharepool_relay.py',
     'feature_sharepool_network.py',
@@ -136,6 +137,7 @@ BASE_SCRIPTS = [
     'feature_sharepool_hash_http.py',
     'feature_sharepool_hash_builder.py',
     'feature_sharepool_hash_ledger.py',
+    'feature_sharepool_hash_tides_cross_pool.py',
     'feature_sharepool_hash_tides.py',
     'feature_sharepool_hash_tides.py --activation-height=1',
     'feature_sharepool_hash_tides_zero_reward.py',

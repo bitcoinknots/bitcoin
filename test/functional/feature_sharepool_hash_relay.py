@@ -61,14 +61,26 @@ def no_data(identity):
 
 
 class RelayPeer(P2PInterface):
+    def __init__(self):
+        super().__init__()
+        self._inventory_payloads = []
+
     def on_sphhello(self, message): pass
-    def on_sphinv(self, message): pass
+    def on_sphinv(self, message):
+        self._inventory_payloads.append(message.payload)
     def on_sphget(self, message): pass
     def on_sphdata(self, message): pass
 
     def count(self, command):
         with p2p_lock:
             return self.message_count[command]
+
+    def inventory_payloads(self):
+        with p2p_lock:
+            return list(self._inventory_payloads)
+
+    def wait_inventory_count(self, count):
+        self.wait_until(lambda: self.message_count["sphinv"] >= count)
 
     def wait_payload(self, command, payload):
         self.wait_until(lambda: command in self.last_message and
@@ -101,16 +113,28 @@ class SharePoolHashRelayTest(BitcoinTestFramework):
         # Authenticated but malformed preimages are retained so they can prove
         # invalid encoding. Storage/relay itself never claims consensus validity.
         first = int(node.submitsharepoolhashsnapshot("0301")["hash"], 16)
-        peer.wait_payload("sphinv", inventory(first).payload)
+        # Recent and archival discovery each announce this one object. Drain
+        # both bounded lanes before checking quietness; their common cadence
+        # must not cause continuing announcements once both cursors catch up.
+        peer.wait_inventory_count(2)
+        assert_equal(peer.inventory_payloads(), [inventory(first).payload] * 2)
         count = peer.count("sphinv")
         time.sleep(2.2)
         peer.sync_with_ping()
         assert_equal(peer.count("sphinv"), count)
         second = int(node.submitsharepoolhashsnapshot("0302")["hash"], 16)
         hashes = sorted((first, second), key=ser_uint256)
-        peer.wait_payload("sphinv", inventory(*hashes).payload)
+        peer.wait_inventory_count(count + 2)
+        assert_equal(sorted(peer.inventory_payloads()[count:]),
+                     sorted((inventory(second).payload, inventory(*hashes).payload)))
+        # Archive replay includes the existing first object while the recent
+        # lane promptly discovers only the new insertion.
         newcomer = self.peer()
-        newcomer.wait_payload("sphinv", inventory(*hashes).payload)
+        newcomer.wait_inventory_count(2)
+        assert_equal(newcomer.inventory_payloads(), [inventory(*hashes).payload] * 2)
+        time.sleep(2.2)
+        newcomer.sync_with_ping()
+        assert_equal(newcomer.count("sphinv"), 2)
         node.disconnect_p2ps()
 
         self.log.info("Four active downloads cannot repeatedly overtake an already waiting fifth peer")

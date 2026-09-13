@@ -7,11 +7,13 @@
 Two disposable native nodes exchange the complete flat-hash openings over P2P.
 The 100 logical miners each have their own signer and durable gate. One gate
 collects all proofs; this does not simulate 100 native nodes or WAN performance.
-The exact easy-regtest TIDES window intentionally pays fewer than 100 scripts.
+The boundary native-height cohort is clipped proportionally, so all 100 miners
+in the initial admission cohort remain eligible even at easy regtest difficulty.
 """
 from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
+from fractions import Fraction
 import json
 from pathlib import Path
 import sys
@@ -68,29 +70,36 @@ class SharePoolHashTides100MinersTest(SharePoolHashTidesTest):
         return block, snapshot, authorization
 
     def check_payouts(self, block, snapshot, history, *, reward):
-        """Independent integer oracle for the exact rational native-work window.
+        """Independent Fraction oracle for the exact native-height cohort window.
 
-        History is chronological by admission block, then numeric proof ID.
-        Scaling by target+1 keeps the boundary fraction exact without floats
-        or floor-rounded native chainwork. No remainder redistribution occurs.
+        Entries explicitly retain their admission height, distinct from a proof's
+        origin height. Every member of the boundary cohort receives the same
+        proportional clipping fraction. Proof ID never determines entitlement.
         """
-        remaining = 8 << 256
-        denominator = uint256_from_compact(block.nBits) + 1
+        remaining = Fraction(8 << 256, uint256_from_compact(block.nBits) + 1)
         weights, selected = {}, []
-        for proof in reversed(history):
+        cohorts = {}
+        for admitted_height, proof in history:
             if proof.envelope.pool != snapshot.envelope.pool:
                 continue
-            contribution = min(remaining, share_work(proof.header.nBits, TIDES_VERSION) * denominator)
-            if contribution == 0:
+            cohorts.setdefault(admitted_height, []).append(proof)
+        for admitted_height in sorted(cohorts, reverse=True):
+            if remaining == 0:
                 break
-            script = proof.envelope.payout_script
-            weights[script] = weights.get(script, 0) + contribution
-            selected.append(proof.proof_id)
-            remaining -= contribution
+            cohort = cohorts[admitted_height]
+            total_work = sum(share_work(proof.header.nBits, TIDES_VERSION) for proof in cohort)
+            included = min(remaining, Fraction(total_work))
+            fraction = included / total_work
+            for proof in cohort:
+                script = proof.envelope.payout_script
+                contribution = share_work(proof.header.nBits, TIDES_VERSION) * fraction
+                weights[script] = weights.get(script, Fraction(0)) + contribution
+                selected.append(proof.proof_id)
+            remaining -= included
         assert weights  # Bootstrap is tested separately, never hidden here.
         total = sum(weights.values())
-        expected = {script: reward * work // total for script, work in weights.items()
-                    if reward * work // total}
+        expected = {script: int(reward * work / total) for script, work in weights.items()
+                    if int(reward * work / total)}
         assert_equal(self.payouts(block), expected)
         assert_equal({bytes(output.scriptPubKey): output.nValue for output in snapshot.payouts}, expected)
         assert_equal([output.serialize() for output in block.vtx[0].vout[:len(snapshot.payouts)]],
@@ -106,6 +115,7 @@ class SharePoolHashTides100MinersTest(SharePoolHashTidesTest):
                   "new_admissions": len(snapshot.shares), "eligible_proofs": len(selected),
                   "payout_scripts": len(expected), "reward_satoshis": reward,
                   "unclaimed_rounding_satoshis": reward - sum(expected.values()),
+                  "whole_admission_height_cohorts_verified": True,
                   "exact_rational_window_and_coinbase_verified": True}
         self.report["rewards"].append(record)
         return selected
@@ -122,7 +132,7 @@ class SharePoolHashTides100MinersTest(SharePoolHashTidesTest):
         self.directory = Path(self.options.tmpdir) / "tides-logical-miners"
         self.directory.mkdir(mode=0o700)
         self.gates, keys = [], []
-        self.report = {"schema": 1, "profile": "hash-only-v6-tides", "result": "running",
+        self.report = {"schema": 2, "profile": "hash-only-v6-tides", "rules_revision": 2, "result": "running",
             "started_utc": datetime.now(timezone.utc).isoformat(), "network": "isolated native regtest",
             "logical_miners": self.MINERS, "native_nodes": 2, "physical_miners_used": 0,
             "transport": "v2" if self.options.v2transport else "v1", "rewards": [],
@@ -130,7 +140,7 @@ class SharePoolHashTides100MinersTest(SharePoolHashTidesTest):
             "limitations": ["100 logical gates use one validating node; a second node validates through P2P",
                 "The coordinator collects all proofs; full 100-by-100 gate replication is not simulated",
                 "Regtest proves protocol behavior, not mainnet capacity, sampling variance or WAN performance",
-                "Proof target is deliberately easy; the TIDES window contains approximately 16 unit-work shares",
+                "Proof target is deliberately easy; approximately 16 units of work are proportionally drawn from complete admission-height cohorts",
                 "Only acknowledged work admitted into canonical history becomes recurring reward-eligible"]}
         started = time.monotonic()
         try:
@@ -208,11 +218,11 @@ class SharePoolHashTides100MinersTest(SharePoolHashTidesTest):
             assert_equal(len(first_state.templates), self.MINERS)
             assert_equal(len(first_state.shares), self.MINERS)
             assert_equal(len(first_state.certificates), self.MINERS)
-            history = sorted(proofs, key=lambda proof: proof.proof_id)
+            history = [(first.m_height, proof) for proof in proofs]
             selected = self.check_payouts(first, first_state, history,
                                          reward=5_000_000_000 + self.MINERS * self.FEE)
-            assert_equal(len(selected), 17)
-            assert_equal(len(first_state.payouts), 17)
+            assert_equal(len(selected), self.MINERS)
+            assert_equal(len(first_state.payouts), self.MINERS)
             assert_equal(len(first.vtx) - 1, self.MINERS)
             assert collector.ready_for_dispatch(authorization)
 
@@ -246,7 +256,8 @@ class SharePoolHashTides100MinersTest(SharePoolHashTidesTest):
             assert_equal((batch["eligible_count"], batch["deferred_count"]), (2, 0))
             second, second_state, next_authorization = self.admitted_job(collector, signer)
             assert_equal({proof.proof_id for proof in second_state.shares}, {late.proof_id, winner.proof_id})
-            history.extend(sorted((late, winner), key=lambda proof: proof.proof_id))
+            history.extend((second.m_height, proof) for proof in (late, winner))
+            assert all(admitted_height > proof.envelope.height for admitted_height, proof in history[-2:])
             self.check_payouts(second, second_state, history, reward=5_000_000_000)
             assert collector.ready_for_dispatch(next_authorization)
             second.solve()

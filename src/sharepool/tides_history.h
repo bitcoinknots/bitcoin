@@ -24,6 +24,7 @@ struct Admission {
     uint256 pool;
     std::vector<unsigned char> payout_script;
     uint256 work;
+    uint32_t admission_height{0}; // Derived from the verified containing native block.
 };
 
 /** The fetch callback must authenticate the exact snapshot commitment, native
@@ -99,7 +100,8 @@ struct HistoryWindow {
  * height/hash from the caller's newly supplied parent. Clear discards all local
  * derived state when explicitly resetting/reindexing the surrounding profile.
  *
- * ReadPool returns enough newest pool work, or explicitly reaches activation.
+ * ReadPool returns enough newest pool work including every proof in the oldest
+ * selected native-height batch, or explicitly reaches activation.
  * It never confuses missing/budget-limited history with an empty pool. A bounded
  * query cursor retains progress across identical calls, including missing-data
  * retries and long scans through blocks with no admissions for the pool.

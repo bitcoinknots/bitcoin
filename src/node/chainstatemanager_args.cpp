@@ -5,6 +5,7 @@
 #include <node/chainstatemanager_args.h>
 
 #include <arith_uint256.h>
+#include <chainparams.h>
 #include <common/args.h>
 #include <common/system.h>
 #include <logging.h>
@@ -19,11 +20,27 @@
 
 #include <algorithm>
 #include <chrono>
+#include <charconv>
+#include <limits>
 #include <string>
 
 namespace node {
 util::Result<void> ApplyArgsManOptions(const ArgsManager& args, ChainstateManager::Options& opts)
 {
+    if (args.IsArgSet("-sharepoolarchivemib")) {
+        if (args.GetArgs("-sharepoolarchivemib").size() != 1 || !opts.chainparams.GetConsensus().SharePoolHashOnly) {
+            return util::Error{Untranslated("-sharepoolarchivemib requires one value and the explicit regtest hash-only profile")};
+        }
+        const auto text = args.GetArg("-sharepoolarchivemib", "");
+        uint64_t value{0};
+        const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+        constexpr uint64_t MIB{1024 * 1024};
+        if (error != std::errc{} || end != text.data() + text.size() || value == 0 ||
+            value > std::numeric_limits<size_t>::max() / MIB) {
+            return util::Error{Untranslated("-sharepoolarchivemib must be a positive whole MiB value that fits the platform byte size")};
+        }
+        opts.sharepool_archive_bytes = value * MIB;
+    }
     if (auto value{args.GetIntArg("-checkblockindex")}) {
         // Interpret bare -checkblockindex argument as 1 instead of 0.
         opts.check_block_index = args.GetArg("-checkblockindex")->empty() ? 1 : *value;

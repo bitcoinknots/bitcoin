@@ -1,4 +1,7 @@
-# V6 native TIDES-style accounting verification
+# V6 revision 1 native TIDES-style accounting verification
+
+Historical report for commit `590cfe6`. See the [revision 2 report](sharepool-v6-r2-report.md)
+for current boundary, archive and relay changes. The results below retain their original scope.
 
 This change wires separate-pool rolling rewards into the native validator,
 builder, external signer and miner gate. It is an opt-in fresh-regtest profile,

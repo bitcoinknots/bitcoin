@@ -11,8 +11,19 @@
 #include <deque>
 #include <optional>
 #include <utility>
+#include <vector>
+#include <uint256.h>
 
 namespace sharepool {
+/** Sequence-ordered live events may repeat a repaired hash. SPHINV itself
+ * requires unique hashes in uint256 order, independently of cursor order. */
+inline std::vector<uint256> CanonicalHashInventory(std::vector<uint256> hashes)
+{
+    std::sort(hashes.begin(), hashes.end());
+    hashes.erase(std::unique(hashes.begin(), hashes.end()), hashes.end());
+    return hashes;
+}
+
 /** FIFO turns among ready connections, with three required turns per ordinary
  * turn when both classes are continuously ready. Required data starts first;
  * ordinary advertisements cannot be starved by a permanently missing block.
@@ -98,6 +109,91 @@ public:
         }
         if (begin == end) return std::nullopt;
         return std::pair{begin, end};
+    }
+};
+
+/** Disk-index cursor: constant per-peer memory, regardless of archive length.
+ * Finish an in-flight traversal before restarting for a changed revision, so
+ * continual insertions cannot repeatedly starve the tail of the archive.
+ */
+class HashRelayArchiveCursor {
+    using Clock = std::chrono::steady_clock;
+    std::optional<uint64_t> m_completed_revision;
+    std::optional<uint64_t> m_cycle_revision;
+    std::optional<uint256> m_after;
+    Clock::time_point m_next_page{};
+    Clock::time_point m_next_replay{};
+
+public:
+    bool Ready(uint64_t revision, Clock::time_point now)
+    {
+        if (now < m_next_page) return false;
+        if (!m_cycle_revision) {
+            if (m_completed_revision == revision && now < m_next_replay) return false;
+            m_cycle_revision = revision;
+            m_after.reset();
+        }
+        return true;
+    }
+    std::optional<uint256> After() const { return m_after; }
+    void Advance(std::optional<uint256> next, bool complete, Clock::time_point now)
+    {
+        using namespace std::chrono_literals;
+        m_after = next;
+        m_next_page = now + 1s;
+        if (complete) {
+            m_completed_revision = m_cycle_revision;
+            m_cycle_revision.reset();
+            m_next_replay = now + 60s;
+        }
+    }
+};
+
+/** Fair bounded live/archive announcements. Newly inserted lower-hash work
+ * does not wait for an entire historical traversal, and continuous arrivals
+ * cannot prevent the archive cursor from advancing. Both lanes share one
+ * one-second page cadence, matching the receiver's control-message budget;
+ * per-peer state is independent of archive length.
+ */
+class HashRelayInventoryLanes {
+    using Clock = std::chrono::steady_clock;
+    HashRelayArchiveCursor m_archive;
+    uint64_t m_recent_after{0};
+    Clock::time_point m_next_recent{};
+    Clock::time_point m_next_inventory{};
+    bool m_last_recent{false};
+
+public:
+    enum class Lane { None, Recent, Archive };
+    Lane Next(uint64_t revision, uint64_t recent_latest, Clock::time_point now)
+    {
+        if (now < m_next_inventory) return Lane::None;
+        const bool recent = recent_latest != m_recent_after && now >= m_next_recent;
+        const bool archive = m_archive.Ready(revision, now);
+        if (recent && (!archive || !m_last_recent)) {
+            m_last_recent = true;
+            return Lane::Recent;
+        }
+        if (archive) {
+            m_last_recent = false;
+            return Lane::Archive;
+        }
+        return Lane::None;
+    }
+    uint64_t RecentAfter() const { return m_recent_after; }
+    std::optional<uint256> ArchiveAfter() const { return m_archive.After(); }
+    void AdvanceRecent(uint64_t next, Clock::time_point now)
+    {
+        using namespace std::chrono_literals;
+        m_recent_after = next;
+        m_next_recent = now + 1s;
+        m_next_inventory = now + 1s;
+    }
+    void AdvanceArchive(std::optional<uint256> next, bool complete, Clock::time_point now)
+    {
+        using namespace std::chrono_literals;
+        m_archive.Advance(next, complete, now);
+        m_next_inventory = now + 1s;
     }
 };
 

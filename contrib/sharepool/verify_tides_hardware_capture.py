@@ -7,6 +7,10 @@
 Offline checks establish byte consistency, authorization and reference payout
 arithmetic. A caller-provided fresh isolated native node establishes consensus
 acceptance. Neither mode proves that physical hardware produced a nonce.
+
+Historical v6-r1 captures must use this tool and its complete dependency tree
+from commit 590cfe6. This revision validates v6-r2 admission-height cohorts; it
+does not reinterpret old hardware evidence under the new consensus rules.
 """
 import argparse
 from fractions import Fraction
@@ -21,9 +25,12 @@ from test_framework.messages import CBlockHeader, uint256_from_compact
 from verify_native_hardware_capture import require, wire, number
 
 FORMAT = "sharepool-tides-sia-capture-v6-1"
+HISTORICAL_R1_RULES = "765159ddb40e9c07a55450bb129e9771676bdc45e7ff841efa8de4a140ed3faf"
 
 
 def verify_capture(report, *, native_rpc=None):
+    require(not (type(report) is dict and report.get("rules") == HISTORICAL_R1_RULES),
+            "historical v6-r1 capture: replay with the complete tool tree from commit 590cfe6; current v6-r2 native rules are incompatible")
     require(type(report) is dict and report.get("format") == FORMAT and report.get("network") == "regtest" and
             report.get("genesis") == REGTEST_GENESIS and report.get("rules") == f"{TIDES_RULES_HASH:064x}" and
             report.get("failure") is None, "successful isolated v6 capture required")
@@ -109,7 +116,7 @@ def verify_capture(report, *, native_rpc=None):
         require(height in range(1, len(chain) + 2) and f"{block.hashPrevBlock:064x}" == ancestry[height - 1], "job ancestry mismatch")
         derived = apply_tides_state(opening, parents.get(height - 1))
         require(derived.serialize() == opening.serialize(), "history commitment, replay state or certificates differ")
-        contributions, seen = [], set()
+        cohorts, seen = {}, set()
         for snapshot in [parents[h] for h in range(1, height)] + [opening]:
             for share in snapshot.shares:
                 identity = f"{share.proof_id:064x}"
@@ -117,17 +124,22 @@ def verify_capture(report, *, native_rpc=None):
                 require(identity not in seen, "duplicate historical admission")
                 seen.add(identity)
                 if share.envelope.pool == pool:
-                    contributions.append((share.envelope.payout_script, share_work(share.header.nBits, 6)))
+                    cohorts.setdefault(snapshot.envelope.height, []).append(
+                        (share.envelope.payout_script, share_work(share.header.nBits, 6)))
         reward = 5_000_000_000 >> (height // 150) if height // 150 < 64 else 0
-        if contributions:
+        if cohorts:
             # Native target work is rational. Floor neither its denominator
-            # nor the oldest partial share before calculating satoshis.
+            # nor the oldest partial admission-height cohort before calculating
+            # satoshis. Origin height and numeric proof ID are not payout order.
             remaining = Fraction(8 * (1 << 256), uint256_from_compact(block.nBits) + 1)
             counted, by_script = Fraction(0), {}
-            for recipient, work in reversed(contributions):
-                included = min(remaining, work)
+            for admitted_height in sorted(cohorts, reverse=True):
+                cohort = cohorts[admitted_height]
+                total_work = sum(work for _, work in cohort)
+                included = min(remaining, Fraction(total_work))
                 counted += included
-                by_script[recipient] = by_script.get(recipient, Fraction(0)) + included
+                for recipient, work in cohort:
+                    by_script[recipient] = by_script.get(recipient, Fraction(0)) + included * work / total_work
                 remaining -= included
                 if not remaining:
                     break
@@ -162,7 +174,7 @@ def verify_capture(report, *, native_rpc=None):
                 require(native_rpc("submitblock", candidates[chain[height - 1]]["block"]) is None, "native block replay rejected")
                 require(native_rpc("getbestblockhash") == chain[height - 1], "native replay tip mismatch")
         require(native_rpc("verifychain", 4, 0) is True, "native replay chain verification failed")
-    return {"profile": "v6-tides", "jobs": len(jobs), "proofs": len(rows), "blocks": len(chain),
+    return {"profile": "v6-tides", "rules_revision": 2, "jobs": len(jobs), "proofs": len(rows), "blocks": len(chain),
             "native_replay": native_rpc is not None, "physical_provenance_verified": False,
             "last_native_tip": ancestry[len(chain)]}
 

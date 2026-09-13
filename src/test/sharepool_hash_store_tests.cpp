@@ -22,6 +22,16 @@ namespace sharepool {
  * admission only to reproduce post-startup disk damage before a cache miss.
  */
 struct HashSnapshotStoreTest {
+    static void ClearSources(HashSnapshotStore& store) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { store.m_template_sources.clear(); }
+    static size_t CacheCount(const HashSnapshotStore& store) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.m_cache.size(); }
+    static void DamageMetadata(HashSnapshotStore& store, const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+    {
+        BOOST_REQUIRE(store.m_db.Write(std::make_pair(uint8_t{'m'}, hash), std::vector<unsigned char>{0}, true));
+    }
+    static void DamageSnapshot(HashSnapshotStore& store, const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+    {
+        BOOST_REQUIRE(store.m_db.Write(std::make_pair(uint8_t{'s'}, hash), std::vector<unsigned char>{0}, true));
+    }
     static uint256 DamageFirstSource(HashSnapshotStore& store, const uint256& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
     {
         const auto hash = store.m_template_sources.at(id).front().first;
@@ -765,6 +775,387 @@ BOOST_AUTO_TEST_CASE(wrong_witness_under_same_txid_is_quarantined_and_repaired_w
         CheckBlock(repaired.Template(ho::TemplateId(variants[0])), variants[0]);
         CheckBlock(repaired.Template(ho::TemplateId(shared)), shared);
         CheckBlock(repaired.Template(ho::TemplateId(variants[1])), variants[1]);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(recent_inventory_bounds_live_events_and_reports_overrun)
+{
+    sharepool::HashSnapshotStore store{m_path_root / "recent-inventory", true, ho::TIDES_VERSION};
+    LOCK(cs_main);
+    const auto empty = store.RecentInventory();
+    BOOST_CHECK(empty.entries.empty());
+    BOOST_CHECK_EQUAL(empty.latest, 0U);
+    BOOST_CHECK(!empty.epoch.IsNull());
+    std::vector<unsigned char> first{6, 0, 0};
+    const auto first_hash = store.Put(first);
+    BOOST_CHECK_EQUAL(store.RecentSequence(), 1U);
+    store.Put(first);
+    BOOST_CHECK_EQUAL(store.RecentSequence(), 1U); // Sound duplicate does not churn the ring.
+    for (size_t i{1}; i <= sharepool::HashSnapshotStore::MAX_RECENT_INVENTORY; ++i) {
+        store.Put(std::vector<unsigned char>{6, static_cast<unsigned char>(i), static_cast<unsigned char>(i >> 8)});
+    }
+    const auto page = store.RecentInventory(0, 2);
+    BOOST_CHECK(page.gap);
+    BOOST_REQUIRE_EQUAL(page.entries.size(), 2U);
+    BOOST_CHECK_EQUAL(page.entries.front().sequence, 2U);
+    BOOST_CHECK_EQUAL(page.next, 3U);
+    BOOST_CHECK_EQUAL(page.latest, sharepool::HashSnapshotStore::MAX_RECENT_INVENTORY + 1);
+    BOOST_CHECK(page.epoch == empty.epoch);
+    const auto resumed = store.RecentInventory(page.next, 2);
+    BOOST_CHECK(!resumed.gap);
+    BOOST_CHECK_EQUAL(resumed.entries.front().sequence, 4U);
+    sharepool::HashSnapshotStoreTest::DamageSnapshot(store, first_hash);
+    const auto previous = store.RecentSequence();
+    store.Put(first); // Authenticated repair becomes newly available live work.
+    BOOST_CHECK_EQUAL(store.RecentSequence(), previous + 1);
+    const auto repaired = store.RecentInventory(previous, 1);
+    BOOST_REQUIRE_EQUAL(repaired.entries.size(), 1U);
+    BOOST_CHECK(repaired.entries.front().hash == first_hash);
+    BOOST_CHECK_THROW(store.RecentInventory(0, 0), std::invalid_argument);
+    BOOST_CHECK_THROW(store.RecentInventory(0, 1025), std::invalid_argument);
+}
+
+BOOST_AUTO_TEST_CASE(recent_inventory_restart_epoch_cannot_skip_new_low_sequences)
+{
+    const auto path = m_path_root / "recent-restart";
+    uint256 epoch;
+    {
+        sharepool::HashSnapshotStore store{path, false, ho::TIDES_VERSION};
+        LOCK(cs_main);
+        store.Put(std::vector<unsigned char>{6, 1});
+        epoch = store.RecentInventory().epoch;
+        BOOST_CHECK_EQUAL(store.RecentSequence(), 1U);
+    }
+    sharepool::HashSnapshotStore store{path, false, ho::TIDES_VERSION};
+    LOCK(cs_main);
+    BOOST_CHECK_EQUAL(store.RecentSequence(), 0U);
+    const auto restarted = store.RecentInventory(1);
+    BOOST_CHECK(restarted.gap);
+    BOOST_CHECK(restarted.epoch != epoch);
+    BOOST_CHECK(restarted.entries.empty());
+    store.Put(std::vector<unsigned char>{6, 2});
+    store.Put(std::vector<unsigned char>{6, 3});
+    const auto ambiguous_count = store.RecentInventory(1);
+    BOOST_CHECK_EQUAL(ambiguous_count.latest, 2U);
+    BOOST_CHECK(!ambiguous_count.gap); // Epoch, rather than sequence alone, detects this restart.
+    BOOST_CHECK(ambiguous_count.epoch != epoch);
+    BOOST_CHECK_EQUAL(store.RecentInventory(0).entries.size(), 2U);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_FIXTURE_TEST_SUITE(sharepool_archive_tests, StoreFixture)
+
+BOOST_AUTO_TEST_CASE(disk_index_exceeds_old_object_ceiling_with_bounded_inventory_and_cache)
+{
+    const auto path = m_path_root / "large-archive";
+    constexpr uint32_t records{65540};
+    {
+        // Seed disk in one batch so this tests the store's complete restart
+        // verification/indexing, rather than timing 65540 fsync syscalls.
+        CDBWrapper db{DBParams{.path = path, .cache_bytes = 1024 * 1024}};
+        CDBBatch batch{db};
+        for (uint32_t i{0}; i < records; ++i) {
+            DataStream encoded;
+            encoded << uint8_t{ho::TIDES_VERSION} << i;
+            const std::vector<unsigned char> raw{UCharCast(encoded.data()), UCharCast(encoded.data()) + encoded.size()};
+            batch.Write(std::make_pair(uint8_t{'s'}, ho::ProfileSnapshotHash(raw, ho::TIDES_VERSION)), raw);
+        }
+        BOOST_REQUIRE(db.WriteBatch(batch, true));
+    }
+    {
+        sharepool::HashSnapshotStore store{path, false, ho::TIDES_VERSION};
+        LOCK(cs_main);
+        BOOST_CHECK_EQUAL(store.Count(), records);
+        BOOST_CHECK_EQUAL(store.Bytes(), 5 * records);
+        BOOST_CHECK_EQUAL(store.Inventory().size(), sharepool::HashSnapshotStore::MAX_INVENTORY_PAGE);
+        std::optional<uint256> cursor;
+        size_t total{0};
+        bool complete{false};
+        while (!complete) {
+            const auto page = store.InventoryPage(cursor, 997);
+            BOOST_CHECK_LE(page.hashes.size(), 997);
+            for (const auto& hash : page.hashes) {
+                if (cursor) BOOST_CHECK(*cursor < hash);
+                BOOST_REQUIRE(store.GetShared(hash));
+                ++total;
+            }
+            cursor = page.next;
+            complete = page.complete;
+        }
+        BOOST_CHECK_EQUAL(total, records);
+        BOOST_CHECK_LE(sharepool::HashSnapshotStoreTest::CacheCount(store), 4096);
+        const std::vector<unsigned char> extra{ho::TIDES_VERSION, 255, 255, 255, 255};
+        store.Put(extra);
+        BOOST_CHECK_EQUAL(store.Count(), records + 1);
+        BOOST_CHECK_THROW(store.InventoryPage(std::nullopt, 0), std::invalid_argument);
+        BOOST_CHECK_THROW(store.InventoryPage(std::nullopt, 1025), std::invalid_argument);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(local_quota_is_finite_configurable_and_never_evicts_history)
+{
+    const auto path = m_path_root / "finite-quota";
+    const std::vector<unsigned char> first{6, 1, 2, 3}, second{6, 4, 5, 6};
+    uint256 first_hash;
+    {
+        sharepool::HashSnapshotStore store{path, false, ho::TIDES_VERSION, {.max_bytes = first.size() + 128}};
+        LOCK(cs_main);
+        first_hash = store.Put(first);
+        BOOST_CHECK_THROW(store.Put(second), std::runtime_error);
+        BOOST_CHECK_EQUAL(store.Count(), 1);
+        BOOST_CHECK_EQUAL(store.ChargedBytes(), first.size() + 128);
+        BOOST_CHECK(store.Get(first_hash) == first);
+    }
+    {
+        sharepool::HashSnapshotStore raised{path, false, ho::TIDES_VERSION, {.max_bytes = first.size() + second.size() + 256}};
+        LOCK(cs_main);
+        raised.Put(second);
+        BOOST_CHECK_EQUAL(raised.Count(), 2);
+        BOOST_CHECK(raised.Get(first_hash) == first);
+    }
+    BOOST_CHECK_THROW((sharepool::HashSnapshotStore{path, false, ho::TIDES_VERSION, {.max_bytes = first.size() + 128}}), std::runtime_error);
+    BOOST_CHECK_THROW((sharepool::HashSnapshotStore{m_path_root / "zero-quota", true, ho::TIDES_VERSION, {.max_bytes = 0}}), std::invalid_argument);
+}
+
+BOOST_AUTO_TEST_CASE(template_source_index_allowance_is_charged_before_durable_admission_and_recovers)
+{
+    const auto path = m_path_root / "source-index-quota";
+    source.binding.version = ho::TIDES_VERSION;
+    source.binding.rules = ho::RulesHash(ho::TIDES_VERSION);
+    for (uint32_t i{1}; i < 32; ++i) {
+        CBlock next{block};
+        next.nTime += i;
+        source.templates.push_back({ho::TemplateId(next), next});
+    }
+    std::sort(source.templates.begin(), source.templates.end(), [](const auto& a, const auto& b) { return a.id < b.id; });
+    const auto raw = ho::EncodeSnapshot(source);
+    const auto hash = ho::SnapshotHash(source);
+    const uint64_t charge = raw.size() + 128 + 192 * source.templates.size();
+    {
+        sharepool::HashSnapshotStore too_small{path, false, ho::TIDES_VERSION, {.max_bytes = charge - 1}};
+        LOCK(cs_main);
+        BOOST_CHECK_THROW(too_small.Put(raw), std::runtime_error);
+        BOOST_CHECK_EQUAL(too_small.Count(), 0);
+        BOOST_CHECK_EQUAL(too_small.ChargedBytes(), 0);
+        BOOST_CHECK(!too_small.Has(hash));
+    }
+    {
+        sharepool::HashSnapshotStore store{path, false, ho::TIDES_VERSION, {.max_bytes = charge}};
+        LOCK(cs_main);
+        store.Put(raw);
+        BOOST_CHECK_EQUAL(store.ChargedBytes(), charge);
+        sharepool::HashSnapshotStoreTest::DamageSnapshot(store, hash);
+        // A repair retains its charge exactly, including all source indexes.
+        store.Put(raw, hash);
+        BOOST_CHECK_EQUAL(store.ChargedBytes(), charge);
+        for (const auto& item : source.templates) BOOST_REQUIRE(store.Template(item.id));
+    }
+    {
+        sharepool::HashSnapshotStore reopened{path, false, ho::TIDES_VERSION, {.max_bytes = charge}};
+        LOCK(cs_main);
+        BOOST_CHECK_EQUAL(reopened.ChargedBytes(), charge);
+        for (const auto& item : source.templates) BOOST_REQUIRE(reopened.Template(item.id));
+    }
+    BOOST_CHECK_THROW((sharepool::HashSnapshotStore{path, false, ho::TIDES_VERSION, {.max_bytes = charge - 1}}), std::runtime_error);
+}
+
+BOOST_AUTO_TEST_CASE(archived_v6_templates_release_duplicate_storage_with_shared_transaction_safety)
+{
+    const auto path = m_path_root / "archived-template-release";
+    source.binding.version = ho::TIDES_VERSION;
+    source.binding.rules = ho::RulesHash(ho::TIDES_VERSION);
+    CBlock second{block};
+    ++second.nTime;
+    {
+        sharepool::HashSnapshotStore store{path, false, ho::TIDES_VERSION};
+        LOCK(cs_main);
+        store.RememberTemplate(block);
+        store.RememberTemplate(second);
+        store.Put(ho::EncodeSnapshot(source));
+        BOOST_CHECK_EQUAL(store.TemplateCount(), 1);
+        CheckBlock(store.Template(ho::TemplateId(second)), second);
+        sharepool::HashSnapshotStoreTest::ClearSources(store);
+        CheckBlock(store.Template(ho::TemplateId(block)), block);
+        auto next = source;
+        next.templates = {{ho::TemplateId(second), second}};
+        store.Put(ho::EncodeSnapshot(next));
+        BOOST_CHECK_EQUAL(store.TemplateCount(), 0);
+        BOOST_CHECK_EQUAL(store.TemplateBytes(), 0);
+        store.RememberTemplate(block);
+        BOOST_CHECK_EQUAL(store.TemplateBytes(), 0);
+    }
+    {
+        sharepool::HashSnapshotStore reopened{path, false, ho::TIDES_VERSION};
+        LOCK(cs_main);
+        CheckBlock(reopened.Template(ho::TemplateId(block)), block);
+        CheckBlock(reopened.Template(ho::TemplateId(second)), second);
+        BOOST_CHECK_EQUAL(reopened.TemplateBytes(), 0);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(disposable_metadata_damage_and_stale_keys_rebuild_from_authenticated_preimages)
+{
+    const auto path = m_path_root / "metadata-recovery";
+    const std::vector<unsigned char> raw{6, 1, 2, 3};
+    uint256 hash;
+    {
+        sharepool::HashSnapshotStore store{path, false, ho::TIDES_VERSION};
+        LOCK(cs_main);
+        hash = store.Put(raw);
+        sharepool::HashSnapshotStoreTest::DamageMetadata(store, hash);
+        BOOST_CHECK_THROW(store.Has(hash), std::runtime_error);
+        BOOST_CHECK_THROW(store.InventoryPage(), std::runtime_error);
+    }
+    {
+        sharepool::HashSnapshotStore repaired{path, false, ho::TIDES_VERSION};
+        LOCK(cs_main);
+        BOOST_CHECK_EQUAL(repaired.Count(), 1);
+        BOOST_CHECK(repaired.Get(hash) == raw);
+    }
+    {
+        CDBWrapper db{DBParams{.path = path, .cache_bytes = 1024 * 1024}};
+        BOOST_REQUIRE(db.Erase(std::make_pair(uint8_t{'s'}, hash), true));
+    }
+    {
+        sharepool::HashSnapshotStore repaired{path, false, ho::TIDES_VERSION};
+        LOCK(cs_main);
+        BOOST_CHECK_EQUAL(repaired.Count(), 0);
+        BOOST_CHECK_EQUAL(repaired.Bytes(), 0);
+        BOOST_CHECK_EQUAL(repaired.ChargedBytes(), 0);
+        BOOST_CHECK(repaired.Inventory().empty());
+        repaired.Put(raw, hash);
+        BOOST_CHECK_EQUAL(repaired.Count(), 1);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(reoffering_cached_bytes_repairs_the_durable_record)
+{
+    const auto path = m_path_root / "cached-record-repair";
+    const std::vector<unsigned char> raw{6, 1, 2, 3};
+    uint256 hash;
+    {
+        sharepool::HashSnapshotStore store{path, false, ho::TIDES_VERSION};
+        LOCK(cs_main);
+        hash = store.Put(raw);
+        sharepool::HashSnapshotStoreTest::DamageSnapshot(store, hash);
+        BOOST_CHECK(store.Get(hash) == raw); // Cache remains sound.
+        BOOST_CHECK(store.Put(raw, hash) == hash);
+        BOOST_CHECK_EQUAL(store.Count(), 1);
+        BOOST_CHECK_EQUAL(store.Bytes(), raw.size());
+        BOOST_CHECK_EQUAL(store.ChargedBytes(), raw.size() + 128);
+    }
+    {
+        sharepool::HashSnapshotStore reopened{path, false, ho::TIDES_VERSION};
+        LOCK(cs_main);
+        BOOST_CHECK_EQUAL(reopened.Count(), 1);
+        BOOST_CHECK(reopened.Get(hash) == raw);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(streaming_archive_chunks_resume_and_authenticate_selected_profile)
+{
+    sharepool::HashSnapshotStore store{m_path_root / "export-source", true, ho::TIDES_VERSION};
+    sharepool::HashSnapshotStore restored{m_path_root / "import-target", false, ho::TIDES_VERSION};
+    LOCK(cs_main);
+    for (unsigned char i{0}; i < 17; ++i) store.Put(std::vector<unsigned char>{6, i, 42});
+    const auto archive_path = m_path_root / "chunk.spha";
+    std::optional<uint256> cursor;
+    uint64_t total{0};
+    bool complete{false};
+    while (!complete) {
+        sharepool::HashSnapshotStore::ArchiveResult exported;
+        {
+            AutoFile file{fsbridge::fopen(archive_path, "wb")};
+            exported = store.ExportArchive(file, cursor, 5, 12);
+            BOOST_REQUIRE(file.Commit());
+            BOOST_REQUIRE_EQUAL(file.fclose(), 0);
+        }
+        BOOST_CHECK_LE(exported.records, 4);
+        {
+            AutoFile file{fsbridge::fopen(archive_path, "rb")};
+            const auto imported = restored.ImportArchive(file, 5, 12);
+            BOOST_CHECK_EQUAL(imported.records, exported.records);
+            BOOST_CHECK_EQUAL(imported.bytes, exported.bytes);
+            BOOST_CHECK(imported.next == exported.next);
+            BOOST_CHECK_EQUAL(imported.complete, exported.complete);
+        }
+        total += exported.records;
+        cursor = exported.next;
+        complete = exported.complete;
+    }
+    BOOST_CHECK_EQUAL(total, 17);
+    BOOST_CHECK_EQUAL(restored.Count(), 17);
+    BOOST_CHECK(restored.Inventory() == store.Inventory());
+    {
+        sharepool::HashSnapshotStore wrong_profile{m_path_root / "wrong-profile", true, ho::VERSION};
+        AutoFile file{fsbridge::fopen(archive_path, "rb")};
+        BOOST_CHECK_THROW(wrong_profile.ImportArchive(file), std::runtime_error);
+        BOOST_CHECK_EQUAL(wrong_profile.Count(), 0);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(archive_streams_operate_without_a_caller_chain_mutex)
+{
+    sharepool::HashSnapshotStore store{m_path_root / "unlocked-export", true, ho::TIDES_VERSION};
+    sharepool::HashSnapshotStore restored{m_path_root / "unlocked-import", true, ho::TIDES_VERSION};
+    {
+        LOCK(cs_main);
+        store.Put(std::vector<unsigned char>{6, 1, 2, 3});
+    }
+    const auto path = m_path_root / "unlocked.spha";
+    {
+        AutoFile file{fsbridge::fopen(path, "wb")};
+        const auto exported = store.ExportArchive(file);
+        BOOST_CHECK_EQUAL(exported.records, 1);
+        BOOST_REQUIRE_EQUAL(file.fclose(), 0);
+    }
+    {
+        AutoFile file{fsbridge::fopen(path, "rb")};
+        const auto imported = restored.ImportArchive(file);
+        BOOST_CHECK_EQUAL(imported.records, 1);
+    }
+    {
+        LOCK(cs_main);
+        BOOST_CHECK_EQUAL(restored.Count(), 1);
+        BOOST_CHECK(restored.Inventory() == store.Inventory());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(streaming_archive_rejects_corruption_truncation_trailing_data_and_resource_excess)
+{
+    const auto archive_path = m_path_root / "damaged.spha";
+    sharepool::HashSnapshotStore source_store{m_path_root / "damage-export", true, ho::TIDES_VERSION};
+    LOCK(cs_main);
+    source_store.Put(std::vector<unsigned char>{6, 1, 2, 3});
+    source_store.Put(std::vector<unsigned char>{6, 4, 5, 6});
+    const auto save = [&]() EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
+        AutoFile file{fsbridge::fopen(archive_path, "wb")};
+        source_store.ExportArchive(file);
+        BOOST_REQUIRE_EQUAL(file.fclose(), 0);
+    };
+    for (int mutation{0}; mutation < 5; ++mutation) {
+        save();
+        {
+            AutoFile file{fsbridge::fopen(archive_path, "r+b")};
+            if (mutation == 0) {
+                file.seek(12 + 4 + 1 + 32 + 4 + 32, SEEK_SET); // First payload byte.
+                file << uint8_t{255};
+            } else if (mutation == 1) {
+                file.seek(-1, SEEK_END);
+                BOOST_REQUIRE(file.Truncate(file.tell()));
+            } else if (mutation == 2) {
+                file.seek(0, SEEK_END);
+                file << uint8_t{1};
+            }
+            BOOST_REQUIRE_EQUAL(file.fclose(), 0);
+        }
+        sharepool::HashSnapshotStore target{m_path_root / fs::PathFromString("damaged-target-" + std::to_string(mutation)), true, ho::TIDES_VERSION};
+        AutoFile file{fsbridge::fopen(archive_path, "rb")};
+        BOOST_CHECK_THROW(target.ImportArchive(file, mutation == 3 ? 1 : 1024, mutation == 4 ? 3 : 1024), std::exception);
+        if (mutation == 0 || mutation == 4) BOOST_CHECK_EQUAL(target.Count(), 0);
+        // Failed imports retain only individually hash-verified records.
+        for (const auto& hash : target.Inventory()) BOOST_CHECK(target.Get(hash) == source_store.Get(hash));
     }
 }
 

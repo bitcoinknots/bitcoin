@@ -1,0 +1,3060 @@
+{
+  "analytic_profiles": [
+    {
+      "assigned_expected_hash_work": "295147905179352825856",
+      "exact_proofs_per_expected_native_block": [
+        "392318858461667547739736838950479151006397215279002157056",
+        "312072983117630369221114618645075196904111619969122305"
+      ],
+      "full_window_proofs": 10057.105348688001,
+      "minimum_unique_proof_bytes_per_day": 92686282.89350861,
+      "native_bits_hex": "17034219",
+      "network_proofs_per_second": 2.0952302809766667,
+      "one_native_template_validation_per_unique_job_example": {
+        "all_shares_have_distinct_jobs_max_origins_2048_fraction_of_mean_load": 1.629096984863281,
+        "all_shares_have_distinct_jobs_validations_per_second": 2.0952302809766667,
+        "note": "Operation counts, not measured native CPU time; cache/transactions change cost."
+      },
+      "p2tr_unique_proof_bytes_per_day": 94858617.64882523,
+      "proof_only_bytes_per_expected_native_block": 643654.7423160321,
+      "proofs_per_expected_native_block": 1257.1381685860001,
+      "shift": 10,
+      "stationary_allocation_rsd_sampling_only": {
+        "0.0001": 0.9971023721829412,
+        "0.001": 0.31516951935397647,
+        "0.01": 0.09921539427686286
+      }
+    },
+    {
+      "assigned_expected_hash_work": "73786976294838206464",
+      "exact_proofs_per_expected_native_block": [
+        "1569275433846670190958947355801916604025588861116008628224",
+        "312072983117630369221114618645075196904111619969122305"
+      ],
+      "full_window_proofs": 40228.421394752004,
+      "minimum_unique_proof_bytes_per_day": 370745131.57403445,
+      "native_bits_hex": "17034219",
+      "network_proofs_per_second": 8.380921123906667,
+      "one_native_template_validation_per_unique_job_example": {
+        "all_shares_have_distinct_jobs_max_origins_2048_fraction_of_mean_load": 0.40727424621582026,
+        "all_shares_have_distinct_jobs_validations_per_second": 8.380921123906667,
+        "note": "Operation counts, not measured native CPU time; cache/transactions change cost."
+      },
+      "p2tr_unique_proof_bytes_per_day": 379434470.5953009,
+      "proof_only_bytes_per_expected_native_block": 2574618.9692641282,
+      "proofs_per_expected_native_block": 5028.5526743440005,
+      "shift": 12,
+      "stationary_allocation_rsd_sampling_only": {
+        "0.0001": 0.4985520113499335,
+        "0.001": 0.15758502052915382,
+        "0.01": 0.04960777925471765
+      }
+    },
+    {
+      "assigned_expected_hash_work": "18446744073709551616",
+      "exact_proofs_per_expected_native_block": [
+        "6277101735386680763835789423207666416102355444464034512896",
+        "312072983117630369221114618645075196904111619969122305"
+      ],
+      "full_window_proofs": 160913.68557900802,
+      "minimum_unique_proof_bytes_per_day": 1482980526.2961378,
+      "native_bits_hex": "17034219",
+      "network_proofs_per_second": 33.52368449562667,
+      "one_native_template_validation_per_unique_job_example": {
+        "all_shares_have_distinct_jobs_max_origins_2048_fraction_of_mean_load": 0.10181856155395506,
+        "all_shares_have_distinct_jobs_validations_per_second": 33.52368449562667,
+        "note": "Operation counts, not measured native CPU time; cache/transactions change cost."
+      },
+      "p2tr_unique_proof_bytes_per_day": 1517737882.3812037,
+      "proof_only_bytes_per_expected_native_block": 10298475.877056513,
+      "proofs_per_expected_native_block": 20114.210697376002,
+      "shift": 14,
+      "stationary_allocation_rsd_sampling_only": {
+        "0.0001": 0.24927659413328987,
+        "0.001": 0.07879269626767152,
+        "0.01": 0.024803948181150462
+      }
+    },
+    {
+      "assigned_expected_hash_work": "4611686018427387904",
+      "exact_proofs_per_expected_native_block": [
+        "25108406941546723055343157692830665664409421777856138051584",
+        "312072983117630369221114618645075196904111619969122305"
+      ],
+      "full_window_proofs": 643654.7423160321,
+      "minimum_unique_proof_bytes_per_day": 5931922105.184551,
+      "native_bits_hex": "17034219",
+      "network_proofs_per_second": 134.09473798250667,
+      "one_native_template_validation_per_unique_job_example": {
+        "all_shares_have_distinct_jobs_max_origins_2048_fraction_of_mean_load": 0.025454640388488766,
+        "all_shares_have_distinct_jobs_validations_per_second": 134.09473798250667,
+        "note": "Operation counts, not measured native CPU time; cache/transactions change cost."
+      },
+      "p2tr_unique_proof_bytes_per_day": 6070951529.524815,
+      "proof_only_bytes_per_expected_native_block": 41193903.50822605,
+      "proofs_per_expected_native_block": 80456.84278950401,
+      "shift": 16,
+      "stationary_allocation_rsd_sampling_only": {
+        "0.0001": 0.1246383620294622,
+        "0.001": 0.03939636866763495,
+        "0.01": 0.012401980554617146
+      }
+    },
+    {
+      "assigned_expected_hash_work": "1152921504606846976",
+      "exact_proofs_per_expected_native_block": [
+        "100433627766186892221372630771322662657637687111424552206336",
+        "312072983117630369221114618645075196904111619969122305"
+      ],
+      "full_window_proofs": 2574618.9692641282,
+      "minimum_unique_proof_bytes_per_day": 23727688420.738205,
+      "native_bits_hex": "17034219",
+      "network_proofs_per_second": 536.3789519300267,
+      "one_native_template_validation_per_unique_job_example": {
+        "all_shares_have_distinct_jobs_max_origins_2048_fraction_of_mean_load": 0.0063636600971221915,
+        "all_shares_have_distinct_jobs_validations_per_second": 536.3789519300267,
+        "note": "Operation counts, not measured native CPU time; cache/transactions change cost."
+      },
+      "p2tr_unique_proof_bytes_per_day": 24283806118.09926,
+      "proof_only_bytes_per_expected_native_block": 164775614.0329042,
+      "proofs_per_expected_native_block": 321827.37115801603,
+      "shift": 18,
+      "stationary_allocation_rsd_sampling_only": {
+        "0.0001": 0.062319189914268054,
+        "0.001": 0.019698187146831327,
+        "0.01": 0.0062009911628455976
+      }
+    },
+    {
+      "assigned_expected_hash_work": "576460752303423488",
+      "exact_proofs_per_expected_native_block": [
+        "200867255532373784442745261542645325315275374222849104412672",
+        "312072983117630369221114618645075196904111619969122305"
+      ],
+      "full_window_proofs": 5149237.9385282565,
+      "minimum_unique_proof_bytes_per_day": 47455376841.47641,
+      "native_bits_hex": "17034219",
+      "network_proofs_per_second": 1072.7579038600534,
+      "one_native_template_validation_per_unique_job_example": {
+        "all_shares_have_distinct_jobs_max_origins_2048_fraction_of_mean_load": 0.0031818300485610958,
+        "all_shares_have_distinct_jobs_validations_per_second": 1072.7579038600534,
+        "note": "Operation counts, not measured native CPU time; cache/transactions change cost."
+      },
+      "p2tr_unique_proof_bytes_per_day": 48567612236.19852,
+      "proof_only_bytes_per_expected_native_block": 329551228.0658084,
+      "proofs_per_expected_native_block": 643654.7423160321,
+      "shift": 19,
+      "stationary_allocation_rsd_sampling_only": {
+        "0.0001": 0.044066321794515764,
+        "0.001": 0.013928721711161525,
+        "0.01": 0.004384762902130418
+      }
+    }
+  ],
+  "fixed_day_ideal_block_luck_rsd": {
+    "0.0001": 8.333333333333332,
+    "0.001": 2.6352313834736494,
+    "0.01": 0.8333333333333334,
+    "0.1": 0.26352313834736496
+  },
+  "historical_negative_control": "numeric (v6 rules revision 1)",
+  "illustrative_5_percent_per_block_allocation_sampling_rsd_targets": [
+    {
+      "miner_pool_fraction": 0.01,
+      "minimum_shift_at_illustrative_bits": 12
+    },
+    {
+      "miner_pool_fraction": 0.001,
+      "minimum_shift_at_illustrative_bits": 16
+    },
+    {
+      "miner_pool_fraction": 0.0001,
+      "minimum_shift_at_illustrative_bits": 19
+    }
+  ],
+  "independent_runs_per_scenario": 32,
+  "interpretation_limits": [
+    "Proportional is v6-r2 within-height clipping; numeric is the historical v6-r1 negative control. Both retain the exact eight-work window.",
+    "An arrival-ordered TIDES pool at the same target is matched exactly in event work and issuance cutoff, not claimed to represent every regular pool.",
+    "The denser benchmark uses shift 14 (16 times as many shares as shift 10 at these bits); this is an explicit benchmark, not a measured commercial pool setting.",
+    "All-native scenario assumes every native producer relays this pool's verified work; producer censorship and data withholding can defeat that assumption.",
+    "The simulation bounds this pool's proof count per batch. It does not simulate competing pools' template or transaction bandwidth; analytical whole-network traffic exposes that missing resource cost.",
+    "Bounded carry uses each producer's stable local ACK arrival order. This does not manufacture a provable global receipt order or compel a producer to acknowledge work.",
+    "Every tracked pool native solution is one of the same integer hash-marked share events; its own work enters only a later frozen job.",
+    "Outside-pool native blocks are valid independent tip extensions; propagation/stale-job delay is applied to the tracked pool, not simulated throughout the external network.",
+    "Regular-pool comparators retain received work without the native three-height admission expiry; the negative control intentionally quantifies this economic difference.",
+    "No difficulty retarget, changing hashrate, withholding adversary, transaction validation, network partition, proof forgery or real device is modeled.",
+    "Exact work describes the PoW threshold. The model omits the negligible protocol exclusion of a zero proof ID (one hash value out of 2^256).",
+    "The horizon is fixed wall time expressed in expected pool blocks, not stopping after an observed block count. Warmup starts with empty history and is excluded from measured payouts.",
+    "Mean intervals use a normal approximation; variance-ratio intervals bootstrap complete independent runs. Finite samples cannot certify a universal variance tolerance.",
+    "Sampling-only per-block allocation RSD, overlapping-window payout variation and native block luck are distinct quantities. Variance ratios use total wall-time rewards with their covariance intact.",
+    "Difficulty profile changes alter consensus rules; this tool never changes or activates a node's target.",
+    "Native CPU cost, realistic full-template traffic, archival write throughput and peer replication need separate measured benchmarks."
+  ],
+  "kind": "v6-r2 exact-work analytics and coupled CPU Monte Carlo; not native validation or a GPU test",
+  "primary_payout_policy": "proportional (v6 rules revision 2)",
+  "proof_layout_bytes": {
+    "22": {
+      "genesis": 32,
+      "native_header": 164,
+      "native_parent": 32,
+      "origin_height": 4,
+      "pool": 32,
+      "reserved": 96,
+      "rules": 32,
+      "script": 22,
+      "script_length": 1,
+      "signature": 64,
+      "signer": 32,
+      "version": 1
+    },
+    "34": {
+      "genesis": 32,
+      "native_header": 164,
+      "native_parent": 32,
+      "origin_height": 4,
+      "pool": 32,
+      "reserved": 96,
+      "rules": 32,
+      "script": 34,
+      "script_length": 1,
+      "signature": 64,
+      "signer": 32,
+      "version": 1
+    }
+  },
+  "scenarios": [
+    {
+      "configuration": {
+        "admission": "all-native",
+        "batch_limit": 2048,
+        "bits": 386089497,
+        "measured_pool_blocks": 24,
+        "pool_fraction": 0.1,
+        "propagation_seconds": 0.2,
+        "reference_shift": 14,
+        "refresh_seconds": 1.0,
+        "share_shift": 10,
+        "submission_seconds": 0.2,
+        "warmup_pool_blocks": 16
+      },
+      "counts_sum": {
+        "admitted_current_proofs": 1602238,
+        "dense_hash_success_events": 25736374,
+        "eligible_current_proofs": 1605977,
+        "measured_pool_blocks": 748,
+        "native_blocks": 12671,
+        "pool_native_solutions": 1270,
+        "remaining_current_proofs": 3739,
+        "stale_current_proofs": 1859,
+        "stale_dense_proofs": 29582,
+        "stale_pool_native_solutions": 1
+      },
+      "measured_seconds_per_run": 144000.0,
+      "miners": [
+        {
+          "normalization_expected_satoshis": 75000000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.016095484633440883,
+                  0.018511886300107562
+                ],
+                "mean": 0.0012082008333333394,
+                "standard_error": 0.008828410952435828
+              },
+              "sample_total_reward_variance_ratio": 1.2090560120016236,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                0.9977221671542951,
+                1.4696744293924933
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.016204151237339936,
+                  0.018404544570673264
+                ],
+                "mean": 0.001100196666666664,
+                "standard_error": 0.008828748930615613
+              },
+              "sample_total_reward_variance_ratio": 1.2098451214196428,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                0.99952364911201,
+                1.475782909588563
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.01578039331336441,
+                  0.018724192480031102
+                ],
+                "mean": 0.0014718995833333456,
+                "standard_error": 0.008802190253417223
+              },
+              "sample_total_reward_variance_ratio": 1.2122446895837395,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.002514501809597,
+                1.4757592311073424
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.9150504339100473,
+                1.0351910935899526
+              ],
+              "mean": 0.97512076375,
+              "relative_standard_deviation": 0.17779540397367924,
+              "sample_variance_of_normalized_total_reward": 0.0300578469561076,
+              "standard_error": 0.030648127469363642,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.00017133714875992813,
+                "fixed_split_block_luck_variance": 0.030101926523297493,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.0300578469561076,
+                "twice_block_luck_allocation_covariance": -0.0002154167159498246
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.9138439733257456,
+                1.034072693340921
+              ],
+              "mean": 0.9739583333333334,
+              "relative_standard_deviation": 0.17813808029567824,
+              "sample_variance_of_normalized_total_reward": 0.030101926523297493,
+              "standard_error": 0.030670591840605985,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.030101926523297493,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.030101926523297493,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.9102773820932726,
+                1.042380547073394
+              ],
+              "mean": 0.9763289645833333,
+              "relative_standard_deviation": 0.19525671175072204,
+              "sample_variance_of_normalized_total_reward": 0.03634162057010659,
+              "standard_error": 0.03369978698472486,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.002527350467059996,
+                "fixed_split_block_luck_variance": 0.030101926523297493,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.03634162057010659,
+                "twice_block_luck_allocation_covariance": 0.0037123435797491024
+              },
+              "zero_payout_runs": 0
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.9101478266405091,
+                1.0422940941928243
+              ],
+              "mean": 0.9762209604166666,
+              "relative_standard_deviation": 0.19534202930579167,
+              "sample_variance_of_normalized_total_reward": 0.03636533950022504,
+              "standard_error": 0.033710782538855906,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.002521766861336148,
+                "fixed_split_block_luck_variance": 0.030101926523297493,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.03636533950022504,
+                "twice_block_luck_allocation_covariance": 0.0037416461155913966
+              },
+              "zero_payout_runs": 0
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.9104540383430064,
+                1.0427312883236604
+              ],
+              "mean": 0.9765926633333334,
+              "relative_standard_deviation": 0.1954612276967295,
+              "sample_variance_of_normalized_total_reward": 0.03643746535286221,
+              "standard_error": 0.03374419642363623,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0025090187578801207,
+                "fixed_split_block_luck_variance": 0.030101926523297493,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.03643746535286221,
+                "twice_block_luck_allocation_covariance": 0.003826520071684589
+              },
+              "zero_payout_runs": 0
+            }
+          },
+          "pool_hashrate_fraction": 0.01
+        },
+        {
+          "normalization_expected_satoshis": 7500000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.08567829488890584,
+                  0.01701661155557256
+                ],
+                "mean": -0.03433084166666664,
+                "standard_error": 0.026197680215428162
+              },
+              "sample_total_reward_variance_ratio": 1.591940833386371,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.0792330085693684,
+                2.3783299252937744
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.08706244068980287,
+                  0.015314174023136222
+                ],
+                "mean": -0.03587413333333332,
+                "standard_error": 0.026116483345137522
+              },
+              "sample_total_reward_variance_ratio": 1.5764548665768576,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.067775230272705,
+                2.3419991894285213
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.08715389945311275,
+                  0.015930116119779444
+                ],
+                "mean": -0.03561189166666665,
+                "standard_error": 0.026296942748186784
+              },
+              "sample_total_reward_variance_ratio": 1.593201621137852,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.0779793867548277,
+                2.3839986474596286
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.9160224435175947,
+                1.0421069481490721
+              ],
+              "mean": 0.9790646958333333,
+              "relative_standard_deviation": 0.18584002193131777,
+              "sample_variance_of_normalized_total_reward": 0.03310558581458779,
+              "standard_error": 0.03216441444680547,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0018277355009677218,
+                "fixed_split_block_luck_variance": 0.030101926523297493,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.03310558581458779,
+                "twice_block_luck_allocation_covariance": 0.0011759237903225753
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.9138439733257456,
+                1.034072693340921
+              ],
+              "mean": 0.9739583333333334,
+              "relative_standard_deviation": 0.17813808029567824,
+              "sample_variance_of_normalized_total_reward": 0.030101926523297493,
+              "standard_error": 0.030670591840605985,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.030101926523297493,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.030101926523297493,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.8651920967604851,
+                1.0242756115728482
+              ],
+              "mean": 0.9447338541666667,
+              "relative_standard_deviation": 0.24299907561308046,
+              "sample_variance_of_normalized_total_reward": 0.05270213387141891,
+              "standard_error": 0.040582529288868144,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.02179920085170564,
+                "fixed_split_block_luck_variance": 0.030101926523297493,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.05270213387141891,
+                "twice_block_luck_allocation_covariance": 0.0008010064964157675
+              },
+              "zero_payout_runs": 0
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.8640366308396739,
+                1.0223444941603261
+              ],
+              "mean": 0.9431905625,
+              "relative_standard_deviation": 0.24220994040863822,
+              "sample_variance_of_normalized_total_reward": 0.05218946186828471,
+              "standard_error": 0.04038465901037047,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.02172044847222736,
+                "fixed_split_block_luck_variance": 0.030101926523297493,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.05218946186828471,
+                "twice_block_luck_allocation_covariance": 0.0003670868727598559
+              },
+              "zero_payout_runs": 0
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.863879555192707,
+                1.0230260531406263
+              ],
+              "mean": 0.9434528041666667,
+              "relative_standard_deviation": 0.2434253644071667,
+              "sample_variance_of_normalized_total_reward": 0.05274387298851955,
+              "standard_error": 0.040598596415285536,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.02211145448493532,
+                "fixed_split_block_luck_variance": 0.030101926523297493,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.05274387298851955,
+                "twice_block_luck_allocation_covariance": 0.0005304919802867314
+              },
+              "zero_payout_runs": 0
+            }
+          },
+          "pool_hashrate_fraction": 0.001
+        },
+        {
+          "normalization_expected_satoshis": 750000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.030979717978701304,
+                  0.29446521797870134
+                ],
+                "mean": 0.13174275000000002,
+                "standard_error": 0.08302166733607211
+              },
+              "sample_total_reward_variance_ratio": 6.7534858285820265,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                4.085370931059373,
+                11.969154897704655
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.030841744546314276,
+                  0.2968203278796476
+                ],
+                "mean": 0.13298929166666668,
+                "standard_error": 0.08358726337396988
+              },
+              "sample_total_reward_variance_ratio": 6.81508743356501,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                4.070994063630648,
+                12.44364783263179
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.028987018759969535,
+                  0.3002406854266362
+                ],
+                "mean": 0.13562683333333334,
+                "standard_error": 0.08398665923127697
+              },
+              "sample_total_reward_variance_ratio": 6.868218026293391,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                4.093056008988977,
+                12.525842087315928
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.8844599627791909,
+                1.0297047038874758
+              ],
+              "mean": 0.9570823333333334,
+              "relative_standard_deviation": 0.21899794481535778,
+              "sample_variance_of_normalized_total_reward": 0.043931767637677414,
+              "standard_error": 0.03705222987456246,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.02773543968068817,
+                "fixed_split_block_luck_variance": 0.030101926523297493,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.043931767637677414,
+                "twice_block_luck_allocation_covariance": -0.013905598566308252
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.9138439733257456,
+                1.034072693340921
+              ],
+              "mean": 0.9739583333333334,
+              "relative_standard_deviation": 0.17813808029567824,
+              "sample_variance_of_normalized_total_reward": 0.030101926523297493,
+              "standard_error": 0.030670591840605985,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.030101926523297493,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.030101926523297493,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.9000979176989662,
+                1.2775522489677003
+              ],
+              "mean": 1.0888250833333333,
+              "relative_standard_deviation": 0.5002593542863301,
+              "sample_variance_of_normalized_total_reward": 0.2966925701656129,
+              "standard_error": 0.09628937022161586,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.26636221980718994,
+                "fixed_split_block_luck_variance": 0.030101926523297493,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.2966925701656129,
+                "twice_block_luck_allocation_covariance": 0.00022842383512543967
+              },
+              "zero_payout_runs": 1
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.90048568024328,
+                1.27965756975672
+              ],
+              "mean": 1.090071625,
+              "relative_standard_deviation": 0.5019610510386301,
+              "sample_variance_of_normalized_total_reward": 0.29939883756183333,
+              "standard_error": 0.09672752283506122,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.26928289894176166,
+                "fixed_split_block_luck_variance": 0.030101926523297493,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.29939883756183333,
+                "twice_block_luck_allocation_covariance": 1.4012096774187753e-05
+              },
+              "zero_payout_runs": 1
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.9023856482622292,
+                1.283032685071104
+              ],
+              "mean": 1.0927091666666666,
+              "relative_standard_deviation": 0.5026975737242992,
+              "sample_variance_of_normalized_total_reward": 0.30173295841602865,
+              "standard_error": 0.09710383592063133,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.2715279010683584,
+                "fixed_split_block_luck_variance": 0.030101926523297493,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.30173295841602865,
+                "twice_block_luck_allocation_covariance": 0.00010313082437274961
+              },
+              "zero_payout_runs": 1
+            }
+          },
+          "pool_hashrate_fraction": 0.0001
+        }
+      ],
+      "peak_pending_proofs_across_runs": 4,
+      "runs": 32,
+      "warmup_seconds_per_run": 96000.0
+    },
+    {
+      "configuration": {
+        "admission": "all-native",
+        "batch_limit": 2048,
+        "bits": 386089497,
+        "measured_pool_blocks": 24,
+        "pool_fraction": 0.01,
+        "propagation_seconds": 0.2,
+        "reference_shift": 14,
+        "refresh_seconds": 1.0,
+        "share_shift": 10,
+        "submission_seconds": 0.2,
+        "warmup_pool_blocks": 16
+      },
+      "counts_sum": {
+        "admitted_current_proofs": 1606866,
+        "dense_hash_success_events": 25739373,
+        "eligible_current_proofs": 1607332,
+        "measured_pool_blocks": 756,
+        "native_blocks": 128241,
+        "pool_native_solutions": 1272,
+        "remaining_current_proofs": 466,
+        "stale_current_proofs": 1899,
+        "stale_dense_proofs": 30175,
+        "stale_pool_native_solutions": 1
+      },
+      "measured_seconds_per_run": 1440000.0,
+      "miners": [
+        {
+          "normalization_expected_satoshis": 75000000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.014445397443386583,
+                  0.015841544943386632
+                ],
+                "mean": 0.0006980737500000243,
+                "standard_error": 0.007726260812952351
+              },
+              "sample_total_reward_variance_ratio": 1.237470288396392,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.0640125258182396,
+                1.4559865723414174
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.01438328683974353,
+                  0.01599082850641022
+                ],
+                "mean": 0.0008037708333333456,
+                "standard_error": 0.007748498812794324
+              },
+              "sample_total_reward_variance_ratio": 1.2373703319507858,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.0629276334841664,
+                1.455632267033479
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.014334865815297871,
+                  0.01614258081529788
+                ],
+                "mean": 0.0009038575000000042,
+                "standard_error": 0.007774858834335651
+              },
+              "sample_total_reward_variance_ratio": 1.2378415661226718,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.0621834657798817,
+                1.4572504186246142
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.9237931569229784,
+                1.047318263910355
+              ],
+              "mean": 0.9855557104166667,
+              "relative_standard_deviation": 0.18086851889106054,
+              "sample_variance_of_normalized_total_reward": 0.03177520211629083,
+              "standard_error": 0.031511506884534864,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0001314649702334761,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.03177520211629083,
+                "twice_block_luck_allocation_covariance": -0.0013703757571684532
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.9214199028748882,
+                1.0473300971251118
+              ],
+              "mean": 0.984375,
+              "relative_standard_deviation": 0.18458195462229693,
+              "sample_variance_of_normalized_total_reward": 0.033014112903225805,
+              "standard_error": 0.032119947512812136,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.033014112903225805,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.917548105604918,
+                1.0549594627284153
+              ],
+              "mean": 0.9862537841666666,
+              "relative_standard_deviation": 0.20105869920106356,
+              "sample_variance_of_normalized_total_reward": 0.039320868526700054,
+              "standard_error": 0.035053917633545276,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.001937739539244851,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.039320868526700054,
+                "twice_block_luck_allocation_covariance": 0.004369016084229397
+              },
+              "zero_payout_runs": 0
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.9176565775888584,
+                1.0550623849111416
+              ],
+              "mean": 0.98635948125,
+              "relative_standard_deviation": 0.2010290344607926,
+              "sample_variance_of_normalized_total_reward": 0.03931769239043809,
+              "standard_error": 0.035052501867929346,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0019493123859578058,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.03931769239043809,
+                "twice_block_luck_allocation_covariance": 0.004354267101254485
+              },
+              "zero_payout_runs": 0
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.9177435832589698,
+                1.0551755525743636
+              ],
+              "mean": 0.9864595679166667,
+              "relative_standard_deviation": 0.20104690989581755,
+              "sample_variance_of_normalized_total_reward": 0.03933266595149387,
+              "standard_error": 0.035059175845763735,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0019616572373361636,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.03933266595149387,
+                "twice_block_luck_allocation_covariance": 0.004356895810931905
+              },
+              "zero_payout_runs": 0
+            }
+          },
+          "pool_hashrate_fraction": 0.01
+        },
+        {
+          "normalization_expected_satoshis": 7500000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.07753257653034802,
+                  0.022545934863681356
+                ],
+                "mean": -0.02749332083333333,
+                "standard_error": 0.02553023249847688
+              },
+              "sample_total_reward_variance_ratio": 1.4670302333995169,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                0.8885192871405596,
+                2.179686464330862
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.07810266784862455,
+                  0.022123501181957887
+                ],
+                "mean": -0.027989583333333328,
+                "standard_error": 0.025567900262903683
+              },
+              "sample_total_reward_variance_ratio": 1.469908992380419,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                0.892824376418978,
+                2.1833035109492265
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.07771983933149676,
+                  0.022474264331496775
+                ],
+                "mean": -0.027622787499999996,
+                "standard_error": 0.02555972032219223
+              },
+              "sample_total_reward_variance_ratio": 1.4688600147068338,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                0.8905888185835824,
+                2.1836625761753483
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.9222836520971252,
+                1.0560914729028748
+              ],
+              "mean": 0.9891875625,
+              "relative_standard_deviation": 0.19520537544727945,
+              "sample_variance_of_normalized_total_reward": 0.03728557457056141,
+              "standard_error": 0.03413464816473204,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.002050801586690447,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.03728557457056141,
+                "twice_block_luck_allocation_covariance": 0.00222066008064516
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.9214199028748882,
+                1.0473300971251118
+              ],
+              "mean": 0.984375,
+              "relative_standard_deviation": 0.18458195462229693,
+              "sample_variance_of_normalized_total_reward": 0.033014112903225805,
+              "standard_error": 0.032119947512812136,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.033014112903225805,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.8806595406243322,
+                1.0427289427090012
+              ],
+              "mean": 0.9616942416666666,
+              "relative_standard_deviation": 0.243194045046045,
+              "sample_variance_of_normalized_total_reward": 0.0546990651646858,
+              "standard_error": 0.04134423522568087,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.01963765342633455,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.0546990651646858,
+                "twice_block_luck_allocation_covariance": 0.0020472988351254487
+              },
+              "zero_payout_runs": 0
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.8800838097401846,
+                1.0423121485931488
+              ],
+              "mean": 0.9611979791666667,
+              "relative_standard_deviation": 0.2435582216042461,
+              "sample_variance_of_normalized_total_reward": 0.0548064013473389,
+              "standard_error": 0.0413847803196337,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.019679424958450018,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.0548064013473389,
+                "twice_block_luck_allocation_covariance": 0.002112863485663079
+              },
+              "zero_payout_runs": 0
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.8804795536712726,
+                1.0426499963287275
+              ],
+              "mean": 0.961564775,
+              "relative_standard_deviation": 0.24337842643976756,
+              "sample_variance_of_normalized_total_reward": 0.05476728961206759,
+              "standard_error": 0.04137001088200379,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.019698916224970817,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.05476728961206759,
+                "twice_block_luck_allocation_covariance": 0.0020542604838709702
+              },
+              "zero_payout_runs": 0
+            }
+          },
+          "pool_hashrate_fraction": 0.001
+        },
+        {
+          "normalization_expected_satoshis": 750000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.0018453035091854642,
+                  0.3138807201758522
+                ],
+                "mean": 0.15601770833333337,
+                "standard_error": 0.08054235298087696
+              },
+              "sample_total_reward_variance_ratio": 5.553079473906009,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                3.078852081822893,
+                10.397376816707895
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.0018453035091854642,
+                  0.3138807201758522
+                ],
+                "mean": 0.15601770833333337,
+                "standard_error": 0.08054235298087696
+              },
+              "sample_total_reward_variance_ratio": 5.553079473906009,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                3.078852081822893,
+                10.397376816707895
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.0018453035091854642,
+                  0.3138807201758522
+                ],
+                "mean": 0.15601770833333337,
+                "standard_error": 0.08054235298087696
+              },
+              "sample_total_reward_variance_ratio": 5.553079473906009,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                3.078852081822893,
+                10.397376816707895
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.8897235281532462,
+                1.0406244718467539
+              ],
+              "mean": 0.965174,
+              "relative_standard_deviation": 0.22561878886579248,
+              "sample_variance_of_normalized_total_reward": 0.047420022506437266,
+              "standard_error": 0.038495138697323385,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.02559873756020071,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.047420022506437266,
+                "twice_block_luck_allocation_covariance": -0.011192827956989247
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.9214199028748882,
+                1.0473300971251118
+              ],
+              "mean": 0.984375,
+              "relative_standard_deviation": 0.18458195462229693,
+              "sample_variance_of_normalized_total_reward": 0.033014112903225805,
+              "standard_error": 0.032119947512812136,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.033014112903225805,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.943392875959213,
+                1.2989905407074538
+              ],
+              "mean": 1.1211917083333334,
+              "relative_standard_deviation": 0.45768633399167086,
+              "sample_variance_of_normalized_total_reward": 0.26332715363265774,
+              "standard_error": 0.09071368998679612,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.22397853400900178,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.26332715363265774,
+                "twice_block_luck_allocation_covariance": 0.006334506720430112
+              },
+              "zero_payout_runs": 1
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.943392875959213,
+                1.2989905407074538
+              ],
+              "mean": 1.1211917083333334,
+              "relative_standard_deviation": 0.45768633399167086,
+              "sample_variance_of_normalized_total_reward": 0.26332715363265774,
+              "standard_error": 0.09071368998679612,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.22397853400900178,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.26332715363265774,
+                "twice_block_luck_allocation_covariance": 0.006334506720430112
+              },
+              "zero_payout_runs": 1
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.943392875959213,
+                1.2989905407074538
+              ],
+              "mean": 1.1211917083333334,
+              "relative_standard_deviation": 0.45768633399167086,
+              "sample_variance_of_normalized_total_reward": 0.26332715363265774,
+              "standard_error": 0.09071368998679612,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.22397853400900178,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.26332715363265774,
+                "twice_block_luck_allocation_covariance": 0.006334506720430112
+              },
+              "zero_payout_runs": 1
+            }
+          },
+          "pool_hashrate_fraction": 0.0001
+        }
+      ],
+      "peak_pending_proofs_across_runs": 2,
+      "runs": 32,
+      "warmup_seconds_per_run": 960000.0
+    },
+    {
+      "configuration": {
+        "admission": "all-native",
+        "batch_limit": 2048,
+        "bits": 386089497,
+        "measured_pool_blocks": 24,
+        "pool_fraction": 0.001,
+        "propagation_seconds": 0.2,
+        "reference_shift": 14,
+        "refresh_seconds": 1.0,
+        "share_shift": 10,
+        "submission_seconds": 0.2,
+        "warmup_pool_blocks": 16
+      },
+      "counts_sum": {
+        "admitted_current_proofs": 1607202,
+        "dense_hash_success_events": 25744466,
+        "eligible_current_proofs": 1607238,
+        "measured_pool_blocks": 755,
+        "native_blocks": 1278420,
+        "pool_native_solutions": 1285,
+        "remaining_current_proofs": 36,
+        "stale_current_proofs": 1884,
+        "stale_dense_proofs": 29876,
+        "stale_pool_native_solutions": 1
+      },
+      "measured_seconds_per_run": 14400000.0,
+      "miners": [
+        {
+          "normalization_expected_satoshis": 75000000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.019859859022936445,
+                  0.019694673189603107
+                ],
+                "mean": -8.259291666666904e-05,
+                "standard_error": 0.010090441890953967
+              },
+              "sample_total_reward_variance_ratio": 1.1597714015510783,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.0178786058428009,
+                1.3563858342151451
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.019855956580701755,
+                  0.019681342414035106
+                ],
+                "mean": -8.730708333332463e-05,
+                "standard_error": 0.01008604566192267
+              },
+              "sample_total_reward_variance_ratio": 1.159713167991165,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.018120953741949,
+                1.3562545479378159
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.01986981166443092,
+                  0.019681458331097572
+                ],
+                "mean": -9.417666666667462e-05,
+                "standard_error": 0.01008960969273686
+              },
+              "sample_total_reward_variance_ratio": 1.1601869933755693,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.0184116124434421,
+                1.3567318847485
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.912673745750106,
+                1.0537503934165606
+              ],
+              "mean": 0.9832120695833333,
+              "relative_standard_deviation": 0.2070603063248711,
+              "sample_variance_of_normalized_total_reward": 0.041446523358610945,
+              "standard_error": 0.03598894073123842,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.00024140798338693033,
+                "fixed_split_block_luck_variance": 0.04221095150089605,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.041446523358610945,
+                "twice_block_luck_allocation_covariance": -0.001005836125672038
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.9118870702666795,
+                1.0542587630666538
+              ],
+              "mean": 0.9830729166666666,
+              "relative_standard_deviation": 0.20899064165591041,
+              "sample_variance_of_normalized_total_reward": 0.04221095150089605,
+              "standard_error": 0.03631930938774857,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.04221095150089605,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.04221095150089605,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.9071648630440822,
+                1.059094090289251
+              ],
+              "mean": 0.9831294766666666,
+              "relative_standard_deviation": 0.2230075330666215,
+              "sample_variance_of_normalized_total_reward": 0.04806849248503572,
+              "standard_error": 0.03875745592989001,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0038235751776880527,
+                "fixed_split_block_luck_variance": 0.04221095150089605,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.04806849248503572,
+                "twice_block_luck_allocation_covariance": 0.002033965806451617
+              },
+              "zero_payout_runs": 0
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.9071620560400702,
+                1.05908746895993
+              ],
+              "mean": 0.9831247625,
+              "relative_standard_deviation": 0.2230030035671832,
+              "sample_variance_of_normalized_total_reward": 0.04806607890643452,
+              "standard_error": 0.038756482887719296,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.00382120616225889,
+                "fixed_split_block_luck_variance": 0.04221095150089605,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.04806607890643452,
+                "twice_block_luck_allocation_covariance": 0.00203392124327958
+              },
+              "zero_payout_runs": 0
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.9071396699549408,
+                1.0590961158783925
+              ],
+              "mean": 0.9831178929166666,
+              "relative_standard_deviation": 0.22305011377815986,
+              "sample_variance_of_normalized_total_reward": 0.048085717321297135,
+              "standard_error": 0.038764399470268274,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.00382326855001578,
+                "fixed_split_block_luck_variance": 0.04221095150089605,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.048085717321297135,
+                "twice_block_luck_allocation_covariance": 0.002051497270385307
+              },
+              "zero_payout_runs": 0
+            }
+          },
+          "pool_hashrate_fraction": 0.01
+        },
+        {
+          "normalization_expected_satoshis": 7500000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.07590991308488848,
+                  0.04419537975155516
+                ],
+                "mean": -0.01585726666666666,
+                "standard_error": 0.030639105315419295
+              },
+              "sample_total_reward_variance_ratio": 1.9786985030363828,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.3080013149304002,
+                2.714106333443769
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.07604207966573795,
+                  0.04422534633240463
+                ],
+                "mean": -0.015908366666666663,
+                "standard_error": 0.0306804658158527
+              },
+              "sample_total_reward_variance_ratio": 1.9802959732988836,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.308180484873422,
+                2.7169068950482185
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.07590991308488848,
+                  0.04419537975155516
+                ],
+                "mean": -0.01585726666666666,
+                "standard_error": 0.030639105315419295
+              },
+              "sample_total_reward_variance_ratio": 1.9786985030363828,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.3080013149304002,
+                2.714106333443769
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.9057149846946099,
+                1.0442092236387235
+              ],
+              "mean": 0.9749621041666666,
+              "relative_standard_deviation": 0.20499010353813513,
+              "sample_variance_of_normalized_total_reward": 0.03994305335424658,
+              "standard_error": 0.03533016299594732,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0021344334729741774,
+                "fixed_split_block_luck_variance": 0.04221095150089605,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.03994305335424658,
+                "twice_block_luck_allocation_covariance": -0.004402331619623649
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.9118870702666795,
+                1.0542587630666538
+              ],
+              "mean": 0.9830729166666666,
+              "relative_standard_deviation": 0.20899064165591041,
+              "sample_variance_of_normalized_total_reward": 0.04221095150089605,
+              "standard_error": 0.03631930938774857,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.04221095150089605,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.04221095150089605,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.8616975331104217,
+                1.0565121418895782
+              ],
+              "mean": 0.9591048375,
+              "relative_standard_deviation": 0.2931192638918942,
+              "sample_variance_of_normalized_total_reward": 0.07903525987875008,
+              "standard_error": 0.04969760428039705,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.030941017954466937,
+                "fixed_split_block_luck_variance": 0.04221095150089605,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.07903525987875008,
+                "twice_block_luck_allocation_covariance": 0.005883290423387094
+              },
+              "zero_payout_runs": 0
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.8616071209367392,
+                1.0565003540632607
+              ],
+              "mean": 0.9590537375,
+              "relative_standard_deviation": 0.29325318676236617,
+              "sample_variance_of_normalized_total_reward": 0.07909906771867697,
+              "standard_error": 0.049717661511867746,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.031021266744214605,
+                "fixed_split_block_luck_variance": 0.04221095150089605,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.07909906771867697,
+                "twice_block_luck_allocation_covariance": 0.005866849473566308
+              },
+              "zero_payout_runs": 0
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.8616975331104217,
+                1.0565121418895782
+              ],
+              "mean": 0.9591048375,
+              "relative_standard_deviation": 0.2931192638918942,
+              "sample_variance_of_normalized_total_reward": 0.07903525987875008,
+              "standard_error": 0.04969760428039705,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.030941017954466937,
+                "fixed_split_block_luck_variance": 0.04221095150089605,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.07903525987875008,
+                "twice_block_luck_allocation_covariance": 0.005883290423387094
+              },
+              "zero_payout_runs": 0
+            }
+          },
+          "pool_hashrate_fraction": 0.001
+        },
+        {
+          "normalization_expected_satoshis": 750000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.11857301150932267,
+                  0.21617876150932266
+                ],
+                "mean": 0.048802874999999996,
+                "standard_error": 0.08539586046394014
+              },
+              "sample_total_reward_variance_ratio": 4.958782791480009,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                3.11943828984845,
+                8.851825018917717
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.11857301150932267,
+                  0.21617876150932266
+                ],
+                "mean": 0.048802874999999996,
+                "standard_error": 0.08539586046394014
+              },
+              "sample_total_reward_variance_ratio": 4.958782791480009,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                3.11943828984845,
+                8.851825018917717
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.11857301150932267,
+                  0.21617876150932266
+                ],
+                "mean": 0.048802874999999996,
+                "standard_error": 0.08539586046394014
+              },
+              "sample_total_reward_variance_ratio": 4.958782791480009,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                3.11943828984845,
+                8.851825018917717
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.8897111429919925,
+                1.0789913570080076
+              ],
+              "mean": 0.98435125,
+              "relative_standard_deviation": 0.2774878955942733,
+              "sample_variance_of_normalized_total_reward": 0.0746084952477061,
+              "standard_error": 0.0482857688816365,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.021062619911684597,
+                "fixed_split_block_luck_variance": 0.04221095150089605,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.0746084952477061,
+                "twice_block_luck_allocation_covariance": 0.011334923835125457
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.9118870702666795,
+                1.0542587630666538
+              ],
+              "mean": 0.9830729166666666,
+              "relative_standard_deviation": 0.20899064165591041,
+              "sample_variance_of_normalized_total_reward": 0.04221095150089605,
+              "standard_error": 0.03631930938774857,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.04221095150089605,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.04221095150089605,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.8224064629820744,
+                1.2439017870179256
+              ],
+              "mean": 1.033154125,
+              "relative_standard_deviation": 0.5887305454639052,
+              "sample_variance_of_normalized_total_reward": 0.36996732233254304,
+              "standard_error": 0.10752431735608446,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.26035947197412007,
+                "fixed_split_block_luck_variance": 0.04221095150089605,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.36996732233254304,
+                "twice_block_luck_allocation_covariance": 0.0673968988575269
+              },
+              "zero_payout_runs": 3
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.8224064629820744,
+                1.2439017870179256
+              ],
+              "mean": 1.033154125,
+              "relative_standard_deviation": 0.5887305454639052,
+              "sample_variance_of_normalized_total_reward": 0.36996732233254304,
+              "standard_error": 0.10752431735608446,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.26035947197412007,
+                "fixed_split_block_luck_variance": 0.04221095150089605,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.36996732233254304,
+                "twice_block_luck_allocation_covariance": 0.0673968988575269
+              },
+              "zero_payout_runs": 3
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.8224064629820744,
+                1.2439017870179256
+              ],
+              "mean": 1.033154125,
+              "relative_standard_deviation": 0.5887305454639052,
+              "sample_variance_of_normalized_total_reward": 0.36996732233254304,
+              "standard_error": 0.10752431735608446,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.26035947197412007,
+                "fixed_split_block_luck_variance": 0.04221095150089605,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.36996732233254304,
+                "twice_block_luck_allocation_covariance": 0.0673968988575269
+              },
+              "zero_payout_runs": 3
+            }
+          },
+          "pool_hashrate_fraction": 0.0001
+        }
+      ],
+      "peak_pending_proofs_across_runs": 2,
+      "runs": 32,
+      "warmup_seconds_per_run": 9600000.0
+    },
+    {
+      "configuration": {
+        "admission": "pool-only",
+        "batch_limit": 2048,
+        "bits": 386089497,
+        "measured_pool_blocks": 24,
+        "pool_fraction": 0.01,
+        "propagation_seconds": 0.2,
+        "reference_shift": 14,
+        "refresh_seconds": 1.0,
+        "share_shift": 10,
+        "submission_seconds": 0.2,
+        "warmup_pool_blocks": 16
+      },
+      "counts_sum": {
+        "admitted_current_proofs": 63413,
+        "deferred_proof_block_opportunities": 6260225,
+        "dense_hash_success_events": 25739373,
+        "eligible_current_proofs": 1607332,
+        "expired_current_proofs": 1541871,
+        "measured_pool_blocks": 756,
+        "native_blocks": 128241,
+        "pool_native_solutions": 1272,
+        "remaining_current_proofs": 2048,
+        "stale_current_proofs": 1899,
+        "stale_dense_proofs": 30175,
+        "stale_pool_native_solutions": 1
+      },
+      "measured_seconds_per_run": 1440000.0,
+      "miners": [
+        {
+          "normalization_expected_satoshis": 75000000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.11824786366082876,
+                  0.028199908660828832
+                ],
+                "mean": -0.045023977499999965,
+                "standard_error": 0.03735912559225959
+              },
+              "sample_total_reward_variance_ratio": 2.2658064793111587,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.0926872651316146,
+                4.046982617944423
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.11824786366082876,
+                  0.028199908660828832
+                ],
+                "mean": -0.045023977499999965,
+                "standard_error": 0.03735912559225959
+              },
+              "sample_total_reward_variance_ratio": 2.2658064793111587,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.0926872651316146,
+                4.046982617944423
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.014334865815297871,
+                  0.01614258081529788
+                ],
+                "mean": 0.0009038575000000042,
+                "standard_error": 0.007774858834335651
+              },
+              "sample_total_reward_variance_ratio": 1.2378415661226718,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.0621834657798817,
+                1.4572504186246142
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.9237931569229784,
+                1.047318263910355
+              ],
+              "mean": 0.9855557104166667,
+              "relative_standard_deviation": 0.18086851889106054,
+              "sample_variance_of_normalized_total_reward": 0.03177520211629083,
+              "standard_error": 0.031511506884534864,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0001314649702334761,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.03177520211629083,
+                "twice_block_luck_allocation_covariance": -0.0013703757571684532
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.9214199028748882,
+                1.0473300971251118
+              ],
+              "mean": 0.984375,
+              "relative_standard_deviation": 0.18458195462229693,
+              "sample_variance_of_normalized_total_reward": 0.033014112903225805,
+              "standard_error": 0.032119947512812136,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.033014112903225805,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.8475630560231913,
+                1.0335004098101421
+              ],
+              "mean": 0.9405317329166667,
+              "relative_standard_deviation": 0.28528708735662583,
+              "sample_variance_of_normalized_total_reward": 0.0719964588365134,
+              "standard_error": 0.04743299841503848,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.04450881085712272,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.0719964588365134,
+                "twice_block_luck_allocation_covariance": -0.005526464923835123
+              },
+              "zero_payout_runs": 0
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.8475630560231913,
+                1.0335004098101421
+              ],
+              "mean": 0.9405317329166667,
+              "relative_standard_deviation": 0.28528708735662583,
+              "sample_variance_of_normalized_total_reward": 0.0719964588365134,
+              "standard_error": 0.04743299841503848,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.04450881085712272,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.0719964588365134,
+                "twice_block_luck_allocation_covariance": -0.005526464923835123
+              },
+              "zero_payout_runs": 0
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.9177435832589698,
+                1.0551755525743636
+              ],
+              "mean": 0.9864595679166667,
+              "relative_standard_deviation": 0.20104690989581755,
+              "sample_variance_of_normalized_total_reward": 0.03933266595149387,
+              "standard_error": 0.035059175845763735,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0019616572373361636,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.03933266595149387,
+                "twice_block_luck_allocation_covariance": 0.004356895810931905
+              },
+              "zero_payout_runs": 0
+            }
+          },
+          "pool_hashrate_fraction": 0.01
+        },
+        {
+          "normalization_expected_satoshis": 7500000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.2729976161005134,
+                  0.27272443276718
+                ],
+                "mean": -0.00013659166666666125,
+                "standard_error": 0.13921480838461567
+              },
+              "sample_total_reward_variance_ratio": 15.970001946808269,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                8.004714150372795,
+                33.29393504707726
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.2729976161005134,
+                  0.27272443276718
+                ],
+                "mean": -0.00013659166666666125,
+                "standard_error": 0.13921480838461567
+              },
+              "sample_total_reward_variance_ratio": 15.970001946808269,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                8.004714150372795,
+                33.29393504707726
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.07771983933149676,
+                  0.022474264331496775
+                ],
+                "mean": -0.027622787499999996,
+                "standard_error": 0.02555972032219223
+              },
+              "sample_total_reward_variance_ratio": 1.4688600147068338,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                0.8905888185835824,
+                2.1836625761753483
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.9222836520971252,
+                1.0560914729028748
+              ],
+              "mean": 0.9891875625,
+              "relative_standard_deviation": 0.19520537544727945,
+              "sample_variance_of_normalized_total_reward": 0.03728557457056141,
+              "standard_error": 0.03413464816473204,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.002050801586690447,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.03728557457056141,
+                "twice_block_luck_allocation_covariance": 0.00222066008064516
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.9214199028748882,
+                1.0473300971251118
+              ],
+              "mean": 0.984375,
+              "relative_standard_deviation": 0.18458195462229693,
+              "sample_variance_of_normalized_total_reward": 0.033014112903225805,
+              "standard_error": 0.032119947512812136,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.033014112903225805,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.7216863203043383,
+                1.2564156213623283
+              ],
+              "mean": 0.9890509708333334,
+              "relative_standard_deviation": 0.7801969189792962,
+              "sample_variance_of_normalized_total_reward": 0.5954506984797306,
+              "standard_error": 0.13641053598418115,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.6288628653704117,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.5954506984797306,
+                "twice_block_luck_allocation_covariance": -0.06642627979390676
+              },
+              "zero_payout_runs": 4
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.7216863203043383,
+                1.2564156213623283
+              ],
+              "mean": 0.9890509708333334,
+              "relative_standard_deviation": 0.7801969189792962,
+              "sample_variance_of_normalized_total_reward": 0.5954506984797306,
+              "standard_error": 0.13641053598418115,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.6288628653704117,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.5954506984797306,
+                "twice_block_luck_allocation_covariance": -0.06642627979390676
+              },
+              "zero_payout_runs": 4
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.8804795536712726,
+                1.0426499963287275
+              ],
+              "mean": 0.961564775,
+              "relative_standard_deviation": 0.24337842643976756,
+              "sample_variance_of_normalized_total_reward": 0.05476728961206759,
+              "standard_error": 0.04137001088200379,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.019698916224970817,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.05476728961206759,
+                "twice_block_luck_allocation_covariance": 0.0020542604838709702
+              },
+              "zero_payout_runs": 0
+            }
+          },
+          "pool_hashrate_fraction": 0.001
+        },
+        {
+          "normalization_expected_satoshis": 750000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.7128642360878268,
+                  1.03415606942116
+                ],
+                "mean": 0.16064591666666667,
+                "standard_error": 0.4456684452829048
+              },
+              "sample_total_reward_variance_ratio": 137.1007008301193,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                42.34451933119574,
+                277.41032426184694
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.7128642360878268,
+                  1.03415606942116
+                ],
+                "mean": 0.16064591666666667,
+                "standard_error": 0.4456684452829048
+              },
+              "sample_total_reward_variance_ratio": 137.1007008301193,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                42.34451933119574,
+                277.41032426184694
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.0018453035091854642,
+                  0.3138807201758522
+                ],
+                "mean": 0.15601770833333337,
+                "standard_error": 0.08054235298087696
+              },
+              "sample_total_reward_variance_ratio": 5.553079473906009,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                3.078852081822893,
+                10.397376816707895
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.8897235281532462,
+                1.0406244718467539
+              ],
+              "mean": 0.965174,
+              "relative_standard_deviation": 0.22561878886579248,
+              "sample_variance_of_normalized_total_reward": 0.047420022506437266,
+              "standard_error": 0.038495138697323385,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.02559873756020071,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.047420022506437266,
+                "twice_block_luck_allocation_covariance": -0.011192827956989247
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.9214199028748882,
+                1.0473300971251118
+              ],
+              "mean": 0.984375,
+              "relative_standard_deviation": 0.18458195462229693,
+              "sample_variance_of_normalized_total_reward": 0.033014112903225805,
+              "standard_error": 0.032119947512812136,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.033014112903225805,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.242370277922352,
+                2.0092695554109814
+              ],
+              "mean": 1.1258199166666667,
+              "relative_standard_deviation": 2.2648100727044955,
+              "sample_variance_of_normalized_total_reward": 6.50131831901258,
+              "standard_error": 0.4507396116042422,
+              "variance_decomposition": {
+                "allocation_residual_variance": 6.494968126360251,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 6.50131831901258,
+                "twice_block_luck_allocation_covariance": -0.026663920250896162
+              },
+              "zero_payout_runs": 26
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.242370277922352,
+                2.0092695554109814
+              ],
+              "mean": 1.1258199166666667,
+              "relative_standard_deviation": 2.2648100727044955,
+              "sample_variance_of_normalized_total_reward": 6.50131831901258,
+              "standard_error": 0.4507396116042422,
+              "variance_decomposition": {
+                "allocation_residual_variance": 6.494968126360251,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 6.50131831901258,
+                "twice_block_luck_allocation_covariance": -0.026663920250896162
+              },
+              "zero_payout_runs": 26
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.943392875959213,
+                1.2989905407074538
+              ],
+              "mean": 1.1211917083333334,
+              "relative_standard_deviation": 0.45768633399167086,
+              "sample_variance_of_normalized_total_reward": 0.26332715363265774,
+              "standard_error": 0.09071368998679612,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.22397853400900178,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.26332715363265774,
+                "twice_block_luck_allocation_covariance": 0.006334506720430112
+              },
+              "zero_payout_runs": 1
+            }
+          },
+          "pool_hashrate_fraction": 0.0001
+        }
+      ],
+      "peak_pending_proofs_across_runs": 233,
+      "runs": 32,
+      "warmup_seconds_per_run": 960000.0
+    },
+    {
+      "configuration": {
+        "admission": "all-native",
+        "batch_limit": 2048,
+        "bits": 386089497,
+        "measured_pool_blocks": 24,
+        "pool_fraction": 0.01,
+        "propagation_seconds": 2,
+        "reference_shift": 14,
+        "refresh_seconds": 30,
+        "share_shift": 10,
+        "submission_seconds": 2,
+        "warmup_pool_blocks": 16
+      },
+      "counts_sum": {
+        "admitted_current_proofs": 1563600,
+        "dense_hash_success_events": 25739373,
+        "eligible_current_proofs": 1564067,
+        "measured_pool_blocks": 734,
+        "native_blocks": 128200,
+        "pool_native_solutions": 1272,
+        "remaining_current_proofs": 467,
+        "stale_current_proofs": 45164,
+        "stale_dense_proofs": 718532,
+        "stale_pool_native_solutions": 42
+      },
+      "measured_seconds_per_run": 1440000.0,
+      "miners": [
+        {
+          "normalization_expected_satoshis": 75000000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.01617602877219865,
+                  0.014952145438865343
+                ],
+                "mean": -0.0006119416666666537,
+                "standard_error": 0.00794086076812857
+              },
+              "sample_total_reward_variance_ratio": 1.2511446945794293,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.0692095324600772,
+                1.4610290674671802
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.016138701392218822,
+                  0.015005029725552153
+                ],
+                "mean": -0.0005668358333333345,
+                "standard_error": 0.00794482936677831
+              },
+              "sample_total_reward_variance_ratio": 1.2502209072438628,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.0662436357247147,
+                1.4590729048383766
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.016283854708097775,
+                  0.01479285387476445
+                ],
+                "mean": -0.0007455004166666626,
+                "standard_error": 0.007927731781342404
+              },
+              "sample_total_reward_variance_ratio": 1.2488398615053593,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.0668706796319583,
+                1.4578403710996395
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.8962319095864758,
+                1.0181277962468576
+              ],
+              "mean": 0.9571798529166666,
+              "relative_standard_deviation": 0.18377415055760923,
+              "sample_variance_of_normalized_total_reward": 0.030942538910288656,
+              "standard_error": 0.031095889454178995,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0001373006508800571,
+                "fixed_split_block_luck_variance": 0.0320270497311828,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.030942538910288656,
+                "twice_block_luck_allocation_covariance": -0.0012218114717741986
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.8937223338155325,
+                1.0177359995178008
+              ],
+              "mean": 0.9557291666666666,
+              "relative_standard_deviation": 0.18725077644166274,
+              "sample_variance_of_normalized_total_reward": 0.0320270497311828,
+              "standard_error": 0.03163613920976234,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.0320270497311828,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.0320270497311828,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.8883948455495289,
+                1.024740976950471
+              ],
+              "mean": 0.95656791125,
+              "relative_standard_deviation": 0.2056913052751147,
+              "sample_variance_of_normalized_total_reward": 0.038713593394425205,
+              "standard_error": 0.03478217637779136,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.002064310520321262,
+                "fixed_split_block_luck_variance": 0.0320270497311828,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.038713593394425205,
+                "twice_block_luck_allocation_covariance": 0.004622233142921145
+              },
+              "zero_payout_runs": 0
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.8884651239485093,
+                1.0247609102181574
+              ],
+              "mean": 0.9566130170833334,
+              "relative_standard_deviation": 0.2056056596903095,
+              "sample_variance_of_normalized_total_reward": 0.038685009068849606,
+              "standard_error": 0.03476933323205307,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0020698045504804314,
+                "fixed_split_block_luck_variance": 0.0320270497311828,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.038685009068849606,
+                "twice_block_luck_allocation_covariance": 0.004588154787186375
+              },
+              "zero_payout_runs": 0
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.8883241092565476,
+                1.0245445957434525
+              ],
+              "mean": 0.9564343525,
+              "relative_standard_deviation": 0.20553045453998517,
+              "sample_variance_of_normalized_total_reward": 0.038642276007349076,
+              "standard_error": 0.03475012410380226,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0020631125530480043,
+                "fixed_split_block_luck_variance": 0.0320270497311828,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.038642276007349076,
+                "twice_block_luck_allocation_covariance": 0.004552113723118273
+              },
+              "zero_payout_runs": 0
+            }
+          },
+          "pool_hashrate_fraction": 0.01
+        },
+        {
+          "normalization_expected_satoshis": 7500000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.07725539354868859,
+                  0.02011111854868855
+                ],
+                "mean": -0.028572137500000018,
+                "standard_error": 0.024838395943208455
+              },
+              "sample_total_reward_variance_ratio": 1.42795780027279,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                0.8555346970089556,
+                2.085642309618046
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.07749229659224578,
+                  0.020021771592245774
+                ],
+                "mean": -0.028735262500000004,
+                "standard_error": 0.024876037802166212
+              },
+              "sample_total_reward_variance_ratio": 1.4282256048180408,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                0.8549703406729778,
+                2.0830504383394453
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.07757402042182149,
+                  0.02014354542182148
+                ],
+                "mean": -0.028715237500000004,
+                "standard_error": 0.024927950470317085
+              },
+              "sample_total_reward_variance_ratio": 1.4322090745645497,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                0.8545034847910307,
+                2.090192579719708
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.8936808331822249,
+                1.0275824168177752
+              ],
+              "mean": 0.960631625,
+              "relative_standard_deviation": 0.20114894336023328,
+              "sample_variance_of_normalized_total_reward": 0.037337846939000933,
+              "standard_error": 0.03415856725396689,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0020322126648073834,
+                "fixed_split_block_luck_variance": 0.0320270497311828,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.037337846939000933,
+                "twice_block_luck_allocation_covariance": 0.0032785845430107524
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.8937223338155325,
+                1.0177359995178008
+              ],
+              "mean": 0.9557291666666666,
+              "relative_standard_deviation": 0.18725077644166274,
+              "sample_variance_of_normalized_total_reward": 0.0320270497311828,
+              "standard_error": 0.03163613920976234,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.0320270497311828,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.0320270497311828,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.8520551737580421,
+                1.012063801241958
+              ],
+              "mean": 0.9320594875,
+              "relative_standard_deviation": 0.24773575440941323,
+              "sample_variance_of_normalized_total_reward": 0.0533168697819379,
+              "standard_error": 0.04081852741936631,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.018466833738031093,
+                "fixed_split_block_luck_variance": 0.0320270497311828,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.0533168697819379,
+                "twice_block_luck_allocation_covariance": 0.0028229863127240047
+              },
+              "zero_payout_runs": 0
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.8518845469556797,
+                1.0119081780443202
+              ],
+              "mean": 0.9318963625,
+              "relative_standard_deviation": 0.24780235325589245,
+              "sample_variance_of_normalized_total_reward": 0.05332686902705804,
+              "standard_error": 0.04082235486955112,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.018503208565588517,
+                "fixed_split_block_luck_variance": 0.0320270497311828,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.05332686902705804,
+                "twice_block_luck_allocation_covariance": 0.002796610730286731
+              },
+              "zero_payout_runs": 0
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.8517930690125006,
+                1.0120397059874993
+              ],
+              "mean": 0.9319163874999999,
+              "relative_standard_deviation": 0.24814235370633633,
+              "sample_variance_of_normalized_total_reward": 0.05347560321073933,
+              "standard_error": 0.04087924412627518,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.01858120820625905,
+                "fixed_split_block_luck_variance": 0.0320270497311828,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.05347560321073933,
+                "twice_block_luck_allocation_covariance": 0.0028673452732974882
+              },
+              "zero_payout_runs": 0
+            }
+          },
+          "pool_hashrate_fraction": 0.001
+        },
+        {
+          "normalization_expected_satoshis": 750000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.043394394818025886,
+                  0.2709513114846926
+                ],
+                "mean": 0.11377845833333335,
+                "standard_error": 0.08019023119967308
+              },
+              "sample_total_reward_variance_ratio": 5.6010067395946095,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                3.1429259863181223,
+                9.066212185335393
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.04447692092584582,
+                  0.27025750425917916
+                ],
+                "mean": 0.11289029166666667,
+                "standard_error": 0.08028939417985331
+              },
+              "sample_total_reward_variance_ratio": 5.600238839472739,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                3.142779440326471,
+                9.068080453228378
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.04497871613467873,
+                  0.2699462994680121
+                ],
+                "mean": 0.11248379166666668,
+                "standard_error": 0.0803380141843599
+              },
+              "sample_total_reward_variance_ratio": 5.60024194101092,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                3.1427217882393537,
+                9.069634762613026
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.8542194451240571,
+                1.0052455548759427
+              ],
+              "mean": 0.9297325,
+              "relative_standard_deviation": 0.23441367591475232,
+              "sample_variance_of_normalized_total_reward": 0.047498721005390675,
+              "standard_error": 0.038527068814256535,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.028747517152344075,
+                "fixed_split_block_luck_variance": 0.0320270497311828,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.047498721005390675,
+                "twice_block_luck_allocation_covariance": -0.013275845878136197
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.8937223338155325,
+                1.0177359995178008
+              ],
+              "mean": 0.9557291666666666,
+              "relative_standard_deviation": 0.18725077644166274,
+              "sample_variance_of_normalized_total_reward": 0.0320270497311828,
+              "standard_error": 0.03163613920976234,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.0320270497311828,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.0320270497311828,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.864798393555079,
+                1.2222235231115874
+              ],
+              "mean": 1.0435109583333333,
+              "relative_standard_deviation": 0.4942844993283553,
+              "sample_variance_of_normalized_total_reward": 0.2660406564733172,
+              "standard_error": 0.09117987998890523,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.2402247548156111,
+                "fixed_split_block_luck_variance": 0.0320270497311828,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.2660406564733172,
+                "twice_block_luck_allocation_covariance": -0.006211148073476681
+              },
+              "zero_payout_runs": 1
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.863922478088122,
+                1.2213231052452111
+              ],
+              "mean": 1.0426227916666666,
+              "relative_standard_deviation": 0.4946716462598998,
+              "sample_variance_of_normalized_total_reward": 0.2660041821996685,
+              "standard_error": 0.0911736293768085,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.2403458584989516,
+                "fixed_split_block_luck_variance": 0.0320270497311828,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.2660041821996685,
+                "twice_block_luck_allocation_covariance": -0.0063687260304659335
+              },
+              "zero_payout_runs": 1
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.8635159286040031,
+                1.2209166547293302
+              ],
+              "mean": 1.0422162916666666,
+              "relative_standard_deviation": 0.4948647221544234,
+              "sample_variance_of_normalized_total_reward": 0.26600432951876524,
+              "standard_error": 0.09117365462380791,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.2404181267857903,
+                "fixed_split_block_luck_variance": 0.0320270497311828,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.26600432951876524,
+                "twice_block_luck_allocation_covariance": -0.006440846998207867
+              },
+              "zero_payout_runs": 1
+            }
+          },
+          "pool_hashrate_fraction": 0.0001
+        }
+      ],
+      "peak_pending_proofs_across_runs": 6,
+      "runs": 32,
+      "warmup_seconds_per_run": 960000.0
+    },
+    {
+      "configuration": {
+        "admission": "all-native",
+        "batch_limit": 4,
+        "bits": 386089497,
+        "measured_pool_blocks": 24,
+        "pool_fraction": 0.01,
+        "propagation_seconds": 0.2,
+        "reference_shift": 14,
+        "refresh_seconds": 1.0,
+        "share_shift": 10,
+        "submission_seconds": 0.2,
+        "warmup_pool_blocks": 16
+      },
+      "counts_sum": {
+        "admitted_current_proofs": 512335,
+        "deferred_proof_block_opportunities": 5762941,
+        "dense_hash_success_events": 25739373,
+        "eligible_current_proofs": 1607332,
+        "expired_current_proofs": 1093127,
+        "measured_pool_blocks": 756,
+        "native_blocks": 128241,
+        "pool_native_solutions": 1272,
+        "remaining_current_proofs": 1870,
+        "stale_current_proofs": 1899,
+        "stale_dense_proofs": 30175,
+        "stale_pool_native_solutions": 1
+      },
+      "measured_seconds_per_run": 1440000.0,
+      "miners": [
+        {
+          "normalization_expected_satoshis": 75000000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.040637365264188784,
+                  0.028634155264188825
+                ],
+                "mean": -0.006001604999999978,
+                "standard_error": 0.017671306257239186
+              },
+              "sample_total_reward_variance_ratio": 1.4756191801229983,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.102830030866687,
+                2.08501892385379
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.04065453538225373,
+                  0.0286288387155871
+                ],
+                "mean": -0.006012848333333315,
+                "standard_error": 0.01767433012700021
+              },
+              "sample_total_reward_variance_ratio": 1.4757207278532047,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.1027853023994536,
+                2.085103012536321
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.014334865815297871,
+                  0.01614258081529788
+                ],
+                "mean": 0.0009038575000000042,
+                "standard_error": 0.007774858834335651
+              },
+              "sample_total_reward_variance_ratio": 1.2378415661226718,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.0621834657798817,
+                1.4572504186246142
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.9237931569229784,
+                1.047318263910355
+              ],
+              "mean": 0.9855557104166667,
+              "relative_standard_deviation": 0.18086851889106054,
+              "sample_variance_of_normalized_total_reward": 0.03177520211629083,
+              "standard_error": 0.031511506884534864,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0001314649702334761,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.03177520211629083,
+                "twice_block_luck_allocation_covariance": -0.0013703757571684532
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.9214199028748882,
+                1.0473300971251118
+              ],
+              "mean": 0.984375,
+              "relative_standard_deviation": 0.18458195462229693,
+              "sample_variance_of_normalized_total_reward": 0.033014112903225805,
+              "standard_error": 0.032119947512812136,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.033014112903225805,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.9045280024371383,
+                1.054580208396195
+              ],
+              "mean": 0.9795541054166667,
+              "relative_standard_deviation": 0.22105629027248466,
+              "sample_variance_of_normalized_total_reward": 0.04688809769508363,
+              "standard_error": 0.03827862396914711,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.009848948057986863,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.04688809769508363,
+                "twice_block_luck_allocation_covariance": 0.004025036733870969
+              },
+              "zero_payout_runs": 0
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.9045141776114063,
+                1.0545715465552603
+              ],
+              "mean": 0.9795428620833333,
+              "relative_standard_deviation": 0.22106643376345037,
+              "sample_variance_of_normalized_total_reward": 0.04689132439473539,
+              "standard_error": 0.038279941057105624,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.009851965689538259,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.04689132439473539,
+                "twice_block_luck_allocation_covariance": 0.004025245801971323
+              },
+              "zero_payout_runs": 0
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.9177435832589698,
+                1.0551755525743636
+              ],
+              "mean": 0.9864595679166667,
+              "relative_standard_deviation": 0.20104690989581755,
+              "sample_variance_of_normalized_total_reward": 0.03933266595149387,
+              "standard_error": 0.035059175845763735,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0019616572373361636,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.03933266595149387,
+                "twice_block_luck_allocation_covariance": 0.004356895810931905
+              },
+              "zero_payout_runs": 0
+            }
+          },
+          "pool_hashrate_fraction": 0.01
+        },
+        {
+          "normalization_expected_satoshis": 7500000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.18299598616089544,
+                  0.04475221116089545
+                ],
+                "mean": -0.06912188749999999,
+                "standard_error": 0.05809902992902829
+              },
+              "sample_total_reward_variance_ratio": 3.0347273270278197,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.3478398272720142,
+                7.36329858732151
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.1830731248707369,
+                  0.044648783204070244
+                ],
+                "mean": -0.06921217083333332,
+                "standard_error": 0.05809232348847121
+              },
+              "sample_total_reward_variance_ratio": 3.033303542224342,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                1.346462753162613,
+                7.362128415045557
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.07771983933149676,
+                  0.022474264331496775
+                ],
+                "mean": -0.027622787499999996,
+                "standard_error": 0.02555972032219223
+              },
+              "sample_total_reward_variance_ratio": 1.4688600147068338,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                0.8905888185835824,
+                2.1836625761753483
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.9222836520971252,
+                1.0560914729028748
+              ],
+              "mean": 0.9891875625,
+              "relative_standard_deviation": 0.19520537544727945,
+              "sample_variance_of_normalized_total_reward": 0.03728557457056141,
+              "standard_error": 0.03413464816473204,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.002050801586690447,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.03728557457056141,
+                "twice_block_luck_allocation_covariance": 0.00222066008064516
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.9214199028748882,
+                1.0473300971251118
+              ],
+              "mean": 0.984375,
+              "relative_standard_deviation": 0.18458195462229693,
+              "sample_variance_of_normalized_total_reward": 0.033014112903225805,
+              "standard_error": 0.032119947512812136,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.033014112903225805,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                0.8035159267206125,
+                1.0366154232793876
+              ],
+              "mean": 0.920065675,
+              "relative_standard_deviation": 0.36560441278543365,
+              "sample_variance_of_normalized_total_reward": 0.11315155205321628,
+              "standard_error": 0.05946415728540184,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.10047252920375391,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.11315155205321628,
+                "twice_block_luck_allocation_covariance": -0.020335090053763428
+              },
+              "zero_payout_runs": 0
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                0.8034529870677167,
+                1.0364977962656166
+              ],
+              "mean": 0.9199753916666666,
+              "relative_standard_deviation": 0.3655545092965752,
+              "sample_variance_of_normalized_total_reward": 0.11309846541875378,
+              "standard_error": 0.05945020642803568,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.10044096497072509,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.11309846541875378,
+                "twice_block_luck_allocation_covariance": -0.02035661245519712
+              },
+              "zero_payout_runs": 0
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.8804795536712726,
+                1.0426499963287275
+              ],
+              "mean": 0.961564775,
+              "relative_standard_deviation": 0.24337842643976756,
+              "sample_variance_of_normalized_total_reward": 0.05476728961206759,
+              "standard_error": 0.04137001088200379,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.019698916224970817,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.05476728961206759,
+                "twice_block_luck_allocation_covariance": 0.0020542604838709702
+              },
+              "zero_payout_runs": 0
+            }
+          },
+          "pool_hashrate_fraction": 0.001
+        },
+        {
+          "normalization_expected_satoshis": 750000.0,
+          "paired_comparisons": {
+            "numeric_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  0.07698913516934175,
+                  0.782296781497325
+                ],
+                "mean": 0.4296429583333333,
+                "standard_error": 0.17992541998162837
+              },
+              "sample_total_reward_variance_ratio": 23.157365251372283,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                11.56445842334411,
+                46.28763473162157
+              ]
+            },
+            "proportional_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  0.07757894278935912,
+                  0.7827970572106409
+                ],
+                "mean": 0.430188,
+                "standard_error": 0.17990258020951067
+              },
+              "sample_total_reward_variance_ratio": 23.151220242511847,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                11.552639108256955,
+                46.27855178356483
+              ]
+            },
+            "same_target_arrival_versus_dense_arrival": {
+              "bootstrap_resamples": 400,
+              "paired_normalized_reward_difference": {
+                "approximate_95_percent_mean_interval": [
+                  -0.0018453035091854642,
+                  0.3138807201758522
+                ],
+                "mean": 0.15601770833333337,
+                "standard_error": 0.08054235298087696
+              },
+              "sample_total_reward_variance_ratio": 5.553079473906009,
+              "whole_run_bootstrap_95_percent_variance_ratio_interval": [
+                3.078852081822893,
+                10.397376816707895
+              ]
+            }
+          },
+          "payouts": {
+            "dense_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.8897235281532462,
+                1.0406244718467539
+              ],
+              "mean": 0.965174,
+              "relative_standard_deviation": 0.22561878886579248,
+              "sample_variance_of_normalized_total_reward": 0.047420022506437266,
+              "standard_error": 0.038495138697323385,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.02559873756020071,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.047420022506437266,
+                "twice_block_luck_allocation_covariance": -0.011192827956989247
+              },
+              "zero_payout_runs": 0
+            },
+            "ideal_fixed_split": {
+              "approximate_95_percent_mean_interval": [
+                0.9214199028748882,
+                1.0473300971251118
+              ],
+              "mean": 0.984375,
+              "relative_standard_deviation": 0.18458195462229693,
+              "sample_variance_of_normalized_total_reward": 0.033014112903225805,
+              "standard_error": 0.032119947512812136,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.0,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.033014112903225805,
+                "twice_block_luck_allocation_covariance": 0.0
+              },
+              "zero_payout_runs": 0
+            },
+            "numeric": {
+              "approximate_95_percent_mean_interval": [
+                1.031733441896338,
+                1.7579004747703288
+              ],
+              "mean": 1.3948169583333334,
+              "relative_standard_deviation": 0.7512910786763192,
+              "sample_variance_of_normalized_total_reward": 1.098122781409862,
+              "standard_error": 0.18524669205969155,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.9950636734349515,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 1.098122781409862,
+                "twice_block_luck_allocation_covariance": 0.07004499507168463
+              },
+              "zero_payout_runs": 6
+            },
+            "proportional": {
+              "approximate_95_percent_mean_interval": [
+                1.032326660448304,
+                1.758397339551696
+              ],
+              "mean": 1.395362,
+              "relative_standard_deviation": 0.7508979687411821,
+              "sample_variance_of_normalized_total_reward": 1.0978313849513979,
+              "standard_error": 0.18522211201617148,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.994942236205878,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 1.0978313849513979,
+                "twice_block_luck_allocation_covariance": 0.06987503584229392
+              },
+              "zero_payout_runs": 6
+            },
+            "same_target_arrival": {
+              "approximate_95_percent_mean_interval": [
+                0.943392875959213,
+                1.2989905407074538
+              ],
+              "mean": 1.1211917083333334,
+              "relative_standard_deviation": 0.45768633399167086,
+              "sample_variance_of_normalized_total_reward": 0.26332715363265774,
+              "standard_error": 0.09071368998679612,
+              "variance_decomposition": {
+                "allocation_residual_variance": 0.22397853400900178,
+                "fixed_split_block_luck_variance": 0.033014112903225805,
+                "identity": "total = fixed_split + allocation_residual + twice_covariance",
+                "total_reward_variance": 0.26332715363265774,
+                "twice_block_luck_allocation_covariance": 0.006334506720430112
+              },
+              "zero_payout_runs": 1
+            }
+          },
+          "pool_hashrate_fraction": 0.0001
+        }
+      ],
+      "peak_pending_proofs_across_runs": 227,
+      "runs": 32,
+      "warmup_seconds_per_run": 960000.0
+    }
+  ],
+  "schema": 1,
+  "seed": 20260913
+}

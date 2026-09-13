@@ -3,7 +3,8 @@
 Version 6 is a fresh, opt-in **regtest-only** profile. It connects rolling payout
 accounting to native block validation, job construction, external signing and the
 mining gate. It does not activate these rules on mainnet or public testnets and
-does not convert v5 pending credits.
+does not convert v5 pending credits. The current v6 rules revision is **2**;
+revision 1 chains require their original binary and cannot reopen under these rules.
 
 ## Recipients and separate pools
 
@@ -29,20 +30,25 @@ pool behavior or measured payout variance.
 For a canonical native target T, the window contains exactly
 `8 * 2^256 / (T + 1)` expected hashes. V6 assigns each share a positive
 power-of-two work weight W and verifies a share target of `2^256 / W - 1`.
-Thus its success probability is exactly `1/W`; an unusually low submitted hash
+The threshold probability is exactly `1/W` (the protocol additionally excludes
+the single null proof ID); an unusually low submitted hash
 never increases credit. W is the largest power of two at most
 `max(1, floor(2^256 / (T + 1)) >> 10)`. This experimental setting implies roughly
-1,024–2,048 shares per native block at unclamped difficulty. It has not been
-calibrated for production pool sizes, traffic or payout variance.
+1,024–2,048 shares per native block at unclamped difficulty. The
+[coupled calibration](sharepool-tides-calibration.md) now measures its payout
+variance against explicit arrival-ordered references. It finds a substantial
+gap for small miners against denser sampling; shift 10 remains experimental.
 
 The native calculation keeps the network-work boundary rational, clips only the
-oldest eligible contribution, aggregates equal scripts, then floors each amount
+oldest eligible **native-height batch proportionally by verified work**,
+aggregates full and fractional contributions for each script, then floors each amount
 using the full native subsidy plus actual transaction fees. Rounding residue is
 unclaimed. It is neither reassigned nor carried as a satoshi balance. Repeated
 blocks can reward the same proof. A later difficulty increase can bring older
 work back into the window, so old admissions must remain retrievable.
 
-Only when the complete relevant history and current job contain no work does
+Only when the complete relevant history and current job contain no work for
+the winning pool does
 the bootstrap pay the job's recipient. Missing history never triggers bootstrap.
 An all-zero payout calculation is allowed; the native coinbase still has its
 required transaction shape and witness commitment. There is no operator fee,
@@ -56,12 +62,21 @@ body commits the resulting recipients and amounts. Later receipts require a new
 job and a new snapshot hash; they cannot modify the job already being hashed.
 A winning proof cannot insert itself into the job it solved.
 
-Admission order is `(native admission height, numeric proof ID)`. This gives
-nodes one reproducible order. It differs from OCEAN's order of reception: nodes
-cannot independently prove a single global arrival order. Batch selection,
-withholding and proof-ID selection can affect which work crosses the oldest
-window boundary. Those fairness effects need adversarial and variance analysis;
-a deterministic ordering rule alone does not resolve them.
+Native admission height gives an objective batch boundary. In revision 2, all
+work admitted in the same native block shares the oldest window boundary in
+proportion to its verified work. Numeric proof IDs remain canonical encoding
+order; changing those IDs or their order cannot change payouts for a fixed
+admitted set. The history index retrieves the complete boundary batch before
+calculating amounts. Wide intermediates preserve exact arithmetic even across
+difficulty changes.
+
+This differs from OCEAN's reception-ordered TIDES: nodes cannot prove a single
+global arrival order. The gate carries older origins first, then previously
+acknowledged receipts in durable local order. V6 gates can import and admit
+verified foreign-pool work without relabeling it or paying it from the wrong
+pool. Bounded recent and archival inventory feeds support this exchange.
+Producer omission, withholding across admission heights and insufficient service
+capacity remain possible. See the [admission audit](sharepool-admission-fairness.md).
 
 A locally durable ACK is provisional. Once a block admits a proof, its original
 pool/script position persists in branch history and can earn repeatedly. A proof
@@ -105,9 +120,13 @@ v4/v5/plain regtest or with a changed schedule, including through reindex. The
 v4/v5 hash mapping remains unchanged even for malformed preimages. V6 uses an
 explicitly selected domain in the store, RPCs and validator.
 
-The native snapshot database still has finite local capacity. Configurable
-history-cache budgets do not provide archival funding, unlimited admission or
-an initial-sync solution. RPC callers may need to retry a yielded history scan.
+The native archive has a disk index, bounded inventory pages and verified
+streaming export/import. `-sharepoolarchivemib` sets a finite charged quota; there
+is no fixed snapshot-count ceiling. See [archive operation](sharepool-archive.md).
+Startup currently authenticates the full retained archive, so restart cost still
+grows with history. Configurable history-cache budgets and archive quotas do not
+provide archival funding, unlimited admission or an initial-sync solution.
+RPC callers may need to retry a yielded history scan.
 Mining gateways must dispatch the exact bytes returned by their final
 `ready_for_dispatch()` authorization and react to tip/receipt changes.
 
@@ -122,10 +141,11 @@ The native profile is implemented in
 [consensus/sharepool_hash.cpp](../src/consensus/sharepool_hash.cpp) and
 [sharepool/tides_history.cpp](../src/sharepool/tides_history.cpp).
 
-The [v6 verification report](sharepool-v6-tides-report.md) records current native
-integration and hardware evidence separately from the earlier v4/v5 and
-arithmetic-library runs. Production release still
-needs archive scaling and recovery, difficulty/variance calibration, adversarial
-ordering analysis, realistic latency/backlog measurements, independent review,
+The [revision 2 report](sharepool-v6-r2-report.md) records the boundary, archive
+and live-relay changes. The [revision 1 report](sharepool-v6-tides-report.md)
+retains its original native and Goldshell evidence; that hardware run does not
+validate revision 2. Production release still needs a measured difficulty and
+capacity contract, scalable archival startup/initial sync, realistic latency and
+backlog measurements, independent review,
 and a reviewed activation plan. These test results cannot establish mainnet
 readiness or prove that miners run a particular software implementation.

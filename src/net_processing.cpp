@@ -260,7 +260,7 @@ struct SharePoolHashRequest {
 struct SharePoolHashPeer {
     bool hello_sent{false};
     bool hello_received{false};
-    sharepool::HashRelayInventory inventory;
+    sharepool::HashRelayInventoryLanes inventory;
     SPNClock::time_point next_admission{};
     SPNClock::time_point bucket_time{SPNClock::now()};
     double control_tokens{8};
@@ -868,8 +868,6 @@ private:
     // also prevent a ready connection from being repeatedly overtaken for a slot.
     sharepool::HashRelayTurns m_sharepool_hash_download_turns GUARDED_BY(cs_main);
     sharepool::HashRelayTurns m_sharepool_hash_admission_turns GUARDED_BY(cs_main);
-    std::optional<uint64_t> m_sharepool_hash_inventory_revision GUARDED_BY(cs_main);
-    std::vector<uint256> m_sharepool_hash_inventory GUARDED_BY(cs_main);
     SPNClock::time_point m_next_sharepool_hash_admission GUARDED_BY(cs_main){};
     bool m_sharepool_hash_retry GUARDED_BY(cs_main){false};
 
@@ -4030,17 +4028,18 @@ void PeerManagerImpl::SendSharePoolHashMessages(CNode& node, Peer& peer)
             DeferSharePoolHashDownload(peer);
         }
     }
-    if (m_sharepool_hash_inventory_revision != store.Revision()) {
-        m_sharepool_hash_inventory = store.Inventory();
-        auto& inventory = m_sharepool_hash_inventory;
-        std::sort(inventory.begin(), inventory.end());
-        inventory.erase(std::unique(inventory.begin(), inventory.end()), inventory.end());
-        m_sharepool_hash_inventory_revision = store.Revision();
-    }
-    const auto& hashes = m_sharepool_hash_inventory;
-    if (const auto range = relay.inventory.Next(store.Revision(), hashes.size(), SPH_MAX_ITEMS, now)) {
-        const std::vector<uint256> page(hashes.begin() + range->first, hashes.begin() + range->second);
-        MakeAndPushMessage(node, NetMsgType::SPHINV, page);
+    const auto inventory_lane = relay.inventory.Next(store.Revision(), store.RecentSequence(), now);
+    if (inventory_lane == sharepool::HashRelayInventoryLanes::Lane::Recent) {
+        const auto page = store.RecentInventory(relay.inventory.RecentAfter(), SPH_MAX_ITEMS);
+        std::vector<uint256> hashes;
+        for (const auto& entry : page.entries) hashes.push_back(entry.hash);
+        hashes = sharepool::CanonicalHashInventory(std::move(hashes));
+        if (!hashes.empty()) MakeAndPushMessage(node, NetMsgType::SPHINV, hashes);
+        relay.inventory.AdvanceRecent(page.next, now);
+    } else if (inventory_lane == sharepool::HashRelayInventoryLanes::Lane::Archive) {
+        const auto page = store.InventoryPage(relay.inventory.ArchiveAfter(), SPH_MAX_ITEMS);
+        if (!page.hashes.empty()) MakeAndPushMessage(node, NetMsgType::SPHINV, page.hashes);
+        relay.inventory.AdvanceArchive(page.next, page.complete, now);
     }
     RequestSharePoolHash(node, peer);
 }

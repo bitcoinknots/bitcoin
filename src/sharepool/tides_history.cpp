@@ -308,7 +308,10 @@ HistoryWindow HistoryIndex::ReadPool(const CBlockIndex* previous, uint32_t activ
             std::vector<Admission> selected;
             Work remaining = query.remaining;
             size_t extra{0};
-            for (auto it = delta->admissions.rbegin(); it != delta->admissions.rend() && remaining != 0; ++it) {
+            // A native block supplies no objective per-proof arrival order.
+            // Retain its complete pool batch so payout boundary clipping cannot
+            // select recipients by proof ID, even when enough work was found.
+            for (auto it = delta->admissions.rbegin(); it != delta->admissions.rend(); ++it) {
                 if (it->pool != pool) continue;
                 const auto charge = EntryBytes(*it);
                 if (charge > impl.budget.query_bytes - std::min(extra, impl.budget.query_bytes)) {
@@ -316,6 +319,7 @@ HistoryWindow HistoryIndex::ReadPool(const CBlockIndex* previous, uint32_t activ
                 }
                 extra += charge;
                 selected.push_back(*it);
+                selected.back().admission_height = index.nHeight;
                 remaining -= std::min(remaining, Numeric(it->work));
             }
             if (!impl.MakeQuerySpace(extra, query_id)) return fail(HistoryStatus::ResourceLimit, "tides-history-query-budget");
@@ -337,7 +341,7 @@ HistoryWindow HistoryIndex::ReadPool(const CBlockIndex* previous, uint32_t activ
         }
         result.entries.reserve(query.reverse.size());
         for (auto it = query.reverse.rbegin(); it != query.reverse.rend(); ++it) {
-            result.entries.push_back({result.entries.size() + 1, it->proof_id, it->pool, it->payout_script, it->work});
+            result.entries.push_back({result.entries.size() + 1, it->proof_id, it->pool, it->payout_script, it->work, it->admission_height});
         }
         result.status = HistoryStatus::Ready;
         result.complete_to_activation = query.to_activation;

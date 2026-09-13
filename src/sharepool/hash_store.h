@@ -13,6 +13,9 @@
 
 #include <map>
 #include <set>
+#include <deque>
+
+class AutoFile;
 
 namespace sharepool {
 /** Content-addressed, fsynced evidence. Storage is not validation/ACK.
@@ -20,13 +23,52 @@ namespace sharepool {
  * membership. Finite local quotas leave blocks pending; they never change validity.
  */
 class HashSnapshotStore {
+public:
+    struct Options {
+        // Positive logical snapshot byte quota including per-record and
+        // per-template-source index allowances, excluding LevelDB compaction.
+        // Disk exhaustion still leaves dependent blocks pending.
+        uint64_t max_bytes{1024ULL * 1024 * 1024};
+    };
+    struct Page {
+        std::vector<uint256> hashes;
+        std::optional<uint256> next;
+        bool complete{false};
+    };
+    struct ArchiveResult {
+        uint64_t records{0};
+        uint64_t bytes{0};
+        std::optional<uint256> next;
+        bool complete{false};
+    };
+    struct RecentEntry {
+        uint64_t sequence{0};
+        uint256 hash;
+    };
+    struct RecentPage {
+        std::vector<RecentEntry> entries;
+        uint64_t next{0};
+        uint64_t latest{0};
+        bool gap{false};
+        uint256 epoch;
+    };
+    static constexpr size_t MAX_INVENTORY_PAGE{1024};
+    static constexpr size_t MAX_RECENT_INVENTORY{4096};
+    static constexpr uint64_t MAX_ARCHIVE_CHUNK_BYTES{256ULL * 1024 * 1024};
+
+private:
     friend struct HashSnapshotStoreTest;
     const uint32_t m_profile_version;
-    CDBWrapper m_db;
+    const Options m_options;
+    // CDBWrapper::NewIterator is non-const even for a read-only traversal.
+    mutable CDBWrapper m_db;
     // Quarantined records still consume their disk quota, but are neither
     // advertised nor considered available. A verified Put can replace them.
-    std::map<uint256, size_t> m_sizes GUARDED_BY(cs_main);
-    std::set<uint256> m_quarantined GUARDED_BY(cs_main);
+    uint64_t m_count GUARDED_BY(cs_main){0};
+    uint64_t m_quarantined_count GUARDED_BY(cs_main){0};
+    std::deque<RecentEntry> m_recent_inventory GUARDED_BY(cs_main);
+    uint64_t m_recent_sequence GUARDED_BY(cs_main){0};
+    const uint256 m_recent_epoch;
     std::map<uint256, std::shared_ptr<const std::vector<unsigned char>>> m_cache GUARDED_BY(cs_main);
     std::map<uint256, uint64_t> m_touched GUARDED_BY(cs_main);
     std::map<uint256, std::shared_ptr<const CBlock>> m_pending GUARDED_BY(cs_main);
@@ -35,6 +77,7 @@ class HashSnapshotStore {
     std::map<uint256, std::vector<std::pair<uint256, uint32_t>>> m_template_sources GUARDED_BY(cs_main);
     std::map<uint256, size_t> m_template_sizes GUARDED_BY(cs_main);
     std::map<Wtxid, size_t> m_transaction_sizes GUARDED_BY(cs_main);
+    std::map<Wtxid, size_t> m_transaction_references GUARDED_BY(cs_main);
     std::map<Wtxid, CTransactionRef> m_transactions GUARDED_BY(cs_main);
     std::map<Wtxid, uint64_t> m_transaction_touched GUARDED_BY(cs_main);
     std::set<Wtxid> m_quarantined_transactions GUARDED_BY(cs_main);
@@ -43,6 +86,7 @@ class HashSnapshotStore {
     std::map<uint256, uint64_t> m_native_touched GUARDED_BY(cs_main);
     HashRequestQueue<uint256> m_requests GUARDED_BY(cs_main);
     size_t m_bytes GUARDED_BY(cs_main){0};
+    uint64_t m_charged_bytes GUARDED_BY(cs_main){0};
     size_t m_cache_bytes GUARDED_BY(cs_main){0};
     size_t m_pending_bytes GUARDED_BY(cs_main){0};
     size_t m_template_bytes GUARDED_BY(cs_main){0};
@@ -52,6 +96,8 @@ class HashSnapshotStore {
     void Cache(const uint256& hash, std::shared_ptr<const std::vector<unsigned char>> bytes) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void Quarantine(const uint256& hash, std::optional<size_t> disk_size = std::nullopt) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void IndexTemplates(const uint256& hash, const hashonly::Snapshot& snapshot) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    void ArchiveLocalTemplates(const hashonly::Snapshot& snapshot) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    std::vector<std::pair<uint256, uint32_t>> TemplateSources(const uint256& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     CTransactionRef Transaction(const Wtxid& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void CacheTransaction(const Wtxid& id, CTransactionRef tx) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void QuarantineTransaction(const Wtxid& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
@@ -60,12 +106,33 @@ class HashSnapshotStore {
 public:
     explicit HashSnapshotStore(const fs::path& path, bool memory_only = false,
                                uint32_t profile_version = hashonly::VERSION);
+    HashSnapshotStore(const fs::path& path, bool memory_only, uint32_t profile_version, Options options);
     bool Has(const uint256& hash) const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::optional<std::vector<unsigned char>> Get(const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::shared_ptr<const std::vector<unsigned char>> GetShared(const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::shared_ptr<const hashonly::Snapshot> Lookup(const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     uint256 Put(Span<const unsigned char> raw, std::optional<uint256> expected = std::nullopt) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::vector<uint256> Inventory() const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    /** Bounded disk-index traversal; next is an opaque exclusive cursor. A
+     * page may be empty when scanned records are quarantined. */
+    Page InventoryPage(std::optional<uint256> after = std::nullopt,
+                       size_t limit = MAX_INVENTORY_PAGE) const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    /** Bounded live announcement ring, independent of archive length. A gap
+     * means the cursor predates retained events or belongs to a prior restart;
+     * callers continue archive reconciliation instead of assuming completeness.
+     */
+    RecentPage RecentInventory(uint64_t after = 0, size_t limit = 256) const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    uint64_t RecentSequence() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_recent_sequence; }
+    /** Portable, bounded archive chunks. Hashes are verified on export and
+     * import; records already imported remain durable if a later record fails.
+     * The caller owns file creation, fsync/close and administrative access.
+     * Call without cs_main: file I/O and transcript hashing run outside it;
+     * individual bounded store reads/writes take short internal lock scopes. */
+    ArchiveResult ExportArchive(AutoFile& file, std::optional<uint256> after = std::nullopt,
+                                size_t record_limit = MAX_INVENTORY_PAGE,
+                                uint64_t byte_limit = MAX_ARCHIVE_CHUNK_BYTES);
+    ArchiveResult ImportArchive(AutoFile& file, size_t record_limit = MAX_INVENTORY_PAGE,
+                                uint64_t byte_limit = MAX_ARCHIVE_CHUNK_BYTES);
     std::vector<uint256> Needed() const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::vector<uint256> Speculative() const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     /** Unscoped callers offer low-priority hints, never block requirements. */
@@ -74,7 +141,9 @@ public:
     void Requested(const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     uint64_t Revision() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_revision; }
     size_t Bytes() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_bytes; }
-    size_t Count() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_sizes.size() - m_quarantined.size(); }
+    uint64_t ChargedBytes() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_charged_bytes; }
+    uint64_t Count() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_count - m_quarantined_count; }
+    uint64_t MaxBytes() const { return m_options.max_bytes; }
     size_t TemplateBytes() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_template_bytes; }
     size_t TemplateCount() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_template_sizes.size() - m_quarantined_templates.size(); }
     void RememberTemplate(const CBlock& block) EXCLUSIVE_LOCKS_REQUIRED(cs_main);

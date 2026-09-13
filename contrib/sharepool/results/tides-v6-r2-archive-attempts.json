@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "attempts": [
+    {
+      "portseed": 913,
+      "status": "failed, implementation corrected before final rerun",
+      "daemon_sha256": "e35c9aa19f2138d834534ed9ee3f3224a4dd2b28583a927d8d85dfa168635ba6",
+      "test_source_sha256": "01e83e30ba3ef558ea78b2cf287c73d9c3a575e811d65539abc3fe1e3687fea5",
+      "log": "/private/tmp/sharepool-v6-r2-archive-913.log",
+      "log_sha256": "c799a3d657389e1087b4e937ccb67043331d4afc07a5860fbbbb4fa4e877364d",
+      "finding": "Recent insertion-order inventory violated strict SPHINV hash ordering; healthy peer disconnected.",
+      "cleanup": "Disposable regtest nodes stopped; no mining hardware or public network used."
+    },
+    {
+      "portseed": 915,
+      "status": "failed, implementation corrected before final rerun",
+      "daemon_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+      "test_source_sha256": "b18a78b906a7aa08e2313819881f8549868e64d409c819db852a1537c6a01e9c",
+      "log": "/private/tmp/sharepool-v6-r2-archive-915.log",
+      "log_sha256": "66d7a6e8493d6f56a239fcf8f5ae2e719cc7146e308b2069c7c94f05c14688df",
+      "finding": "Separate recent/archive announcement schedules exceeded the shared receive token budget; healthy peer disconnected. File/archive/recovery/reindex checks passed before this transport failure.",
+      "cleanup": "Disposable regtest nodes stopped; no mining hardware or public network used."
+    }
+  ]
+}

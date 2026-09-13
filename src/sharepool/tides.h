@@ -35,6 +35,7 @@ struct LogEntry {
     uint256 pool;
     std::vector<unsigned char> payout_script;
     uint256 work; // Positive uint256, not observed hash quality or arrival time.
+    uint32_t admission_height{0}; // Native history only; reference sequence API ignores this field.
 };
 
 struct Cutoff {

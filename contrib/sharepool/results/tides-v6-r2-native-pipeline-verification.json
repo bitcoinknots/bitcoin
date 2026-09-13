@@ -1,0 +1,190 @@
+{
+  "schema": 1,
+  "profile": "hash-only-v6-tides",
+  "rules_revision": 2,
+  "scope": "Two native regtest nodes per case;100 logical miners or tiny-reward boundary variants; no physical miner use",
+  "python_version": "3.9.6 (default, May 22 2026, 11:13:45) \n[Clang 21.0.0 (clang-2100.1.1.101)]",
+  "results": [
+    {
+      "name": "100-miners",
+      "command": "python3 -B test/functional/feature_sharepool_hash_tides_100_miners.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-v6-r2-100-miners-963 --portseed=963 --nocleanup --results=contrib/sharepool/results/tides-v6-r2-100-miners.json",
+      "arguments": [
+        "python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_tides_100_miners.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-v6-r2-100-miners-963",
+        "--portseed=963",
+        "--nocleanup",
+        "--results=contrib/sharepool/results/tides-v6-r2-100-miners.json"
+      ],
+      "temporary_directory": "/private/tmp/sharepool-v6-r2-100-miners-963",
+      "log": "tides-v6-r2-100-miners-native.txt",
+      "result": "passed",
+      "exit_code": 0,
+      "log_sha256": "3dc53f08a9c87efca400e5fef28390ddfe931d4bf28528c18a9affaadef36506",
+      "seconds": 72.321,
+      "details": "tides-v6-r2-100-miners.json",
+      "details_sha256": "ce8cc9af154390047e3cab046b56dc8233b66cbde8006a89ec7bf757317fd661",
+      "verified": "100 distinct valid native templates and fee-paying transaction sets; exact Fraction cohort payouts to 100 addresses; altered binding and payout rejection; late work carried forward; the same recipient in separate pools; follower validation over P2P; node and gate restart",
+      "temporary_log": "/private/tmp/sharepool-v6-r2-100-miners-963.log"
+    },
+    {
+      "name": "one-satoshi",
+      "command": "python3 -B test/functional/feature_sharepool_hash_tides_zero_reward.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-v6-r2-one-satoshi-964 --portseed=964 --nocleanup --activation-height=4800",
+      "arguments": [
+        "python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_tides_zero_reward.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-v6-r2-one-satoshi-964",
+        "--portseed=964",
+        "--nocleanup",
+        "--activation-height=4800"
+      ],
+      "temporary_directory": "/private/tmp/sharepool-v6-r2-one-satoshi-964",
+      "log": "tides-v6-r2-one-satoshi-native.txt",
+      "result": "passed",
+      "exit_code": 0,
+      "log_sha256": "118a6737698c0ceb35dbff604209f744d4c18bc3c3a166cf66e2c45a5e8c3f38",
+      "seconds": 144.94,
+      "verified": "Witness-only coinbase when every entitlement floors to zero; forged positive payout rejection; repeated rolling rewards; follower convergence; chainstate reindex",
+      "temporary_log": "/private/tmp/sharepool-v6-r2-one-satoshi-964.log"
+    },
+    {
+      "name": "zero-subsidy",
+      "command": "python3 -B test/functional/feature_sharepool_hash_tides_zero_reward.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-v6-r2-zero-subsidy-965 --portseed=965 --nocleanup --activation-height=4950",
+      "arguments": [
+        "python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_tides_zero_reward.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-v6-r2-zero-subsidy-965",
+        "--portseed=965",
+        "--nocleanup",
+        "--activation-height=4950"
+      ],
+      "temporary_directory": "/private/tmp/sharepool-v6-r2-zero-subsidy-965",
+      "log": "tides-v6-r2-zero-subsidy-native.txt",
+      "result": "passed",
+      "exit_code": 0,
+      "log_sha256": "205f7eccb9d6b61ff26c5bee432303c3bb1f6307ab4e00c06d45e48a5c687b9b",
+      "seconds": 150.172,
+      "verified": "Witness-only coinbase when every entitlement floors to zero; forged positive payout rejection; repeated rolling rewards; follower convergence; chainstate reindex",
+      "temporary_log": "/private/tmp/sharepool-v6-r2-zero-subsidy-965.log"
+    }
+  ],
+  "source_sha256_prepared": {
+    "test/functional/feature_sharepool_hash_tides_100_miners.py": "cdfdf311c54cd0927f6cc2ac0b382edcdeff4b023c1b19f0989d84eaaa73963c",
+    "test/functional/feature_sharepool_hash_tides_zero_reward.py": "f48d3bdec58cdd54759fc29f0cbb54e590d62831d6a890c63e7af9dde104f599",
+    "test/functional/feature_sharepool_hash_tides.py": "a5c177582d00ee5abcdf395e6494d41ba614e91facdf0efd1498897a05c02201",
+    "contrib/sharepool/hash_mining_gate.py": "88f2f456aa17f2f7f971d70a56a7c993a60ef55415bf0b2999ecc12a4d97efa9",
+    "contrib/sharepool/hash_snapshot.py": "712f34059ac045dbfdef70b97f65408c1dd6f07942964268bd7753ac1e1d55d2",
+    "contrib/sharepool/hash_gate_inventory.py": "ab00195627caee24b371e7dac8fcc6dc561086edc346a8872a51843fdb0aa50e",
+    "contrib/sharepool/hash_gate_batch.py": "a41c510602748c50a75b66a9dddfa9f028fd5a7cfb57ccc8cccf29cff7f424c4",
+    "contrib/sharepool/native_mining_gate.py": "f05b0c8c2fdd0a26ae9b51dbaf6001568bf9011e27bc239ec95d7039a0f06c00"
+  },
+  "started_utc": "2026-09-13T07:54:30.225075+00:00",
+  "source_sha256_start": {
+    "test/functional/feature_sharepool_hash_tides_100_miners.py": "cdfdf311c54cd0927f6cc2ac0b382edcdeff4b023c1b19f0989d84eaaa73963c",
+    "test/functional/feature_sharepool_hash_tides_zero_reward.py": "f48d3bdec58cdd54759fc29f0cbb54e590d62831d6a890c63e7af9dde104f599",
+    "test/functional/feature_sharepool_hash_tides.py": "a5c177582d00ee5abcdf395e6494d41ba614e91facdf0efd1498897a05c02201",
+    "contrib/sharepool/hash_mining_gate.py": "88f2f456aa17f2f7f971d70a56a7c993a60ef55415bf0b2999ecc12a4d97efa9",
+    "contrib/sharepool/hash_snapshot.py": "712f34059ac045dbfdef70b97f65408c1dd6f07942964268bd7753ac1e1d55d2",
+    "contrib/sharepool/hash_gate_inventory.py": "2bf60749366de6217391626315d7591b5fb3029bc95c1c164f019b6b1f27860b",
+    "contrib/sharepool/hash_gate_batch.py": "a41c510602748c50a75b66a9dddfa9f028fd5a7cfb57ccc8cccf29cff7f424c4",
+    "contrib/sharepool/native_mining_gate.py": "f05b0c8c2fdd0a26ae9b51dbaf6001568bf9011e27bc239ec95d7039a0f06c00"
+  },
+  "native_binary_sha256": "ebf5acc747e5bc7d51b928ada4d14232b5d43a8f7ba948b1799a688c1b391cb8",
+  "native_signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+  "superseded_attempts": [
+    {
+      "started_utc": "2026-09-13T07:48:47.006681+00:00",
+      "native_binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+      "native_signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+      "source_sha256_start": {
+        "test/functional/feature_sharepool_hash_tides_100_miners.py": "cdfdf311c54cd0927f6cc2ac0b382edcdeff4b023c1b19f0989d84eaaa73963c",
+        "test/functional/feature_sharepool_hash_tides_zero_reward.py": "f48d3bdec58cdd54759fc29f0cbb54e590d62831d6a890c63e7af9dde104f599",
+        "test/functional/feature_sharepool_hash_tides.py": "a5c177582d00ee5abcdf395e6494d41ba614e91facdf0efd1498897a05c02201",
+        "contrib/sharepool/hash_mining_gate.py": "88f2f456aa17f2f7f971d70a56a7c993a60ef55415bf0b2999ecc12a4d97efa9",
+        "contrib/sharepool/hash_snapshot.py": "712f34059ac045dbfdef70b97f65408c1dd6f07942964268bd7753ac1e1d55d2",
+        "contrib/sharepool/hash_gate_inventory.py": "ab00195627caee24b371e7dac8fcc6dc561086edc346a8872a51843fdb0aa50e",
+        "contrib/sharepool/hash_gate_batch.py": "a41c510602748c50a75b66a9dddfa9f028fd5a7cfb57ccc8cccf29cff7f424c4",
+        "contrib/sharepool/native_mining_gate.py": "f05b0c8c2fdd0a26ae9b51dbaf6001568bf9011e27bc239ec95d7039a0f06c00"
+      },
+      "results": [
+        {
+          "name": "100-miners",
+          "command": "python3 -B test/functional/feature_sharepool_hash_tides_100_miners.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-v6-r2-100-miners-960 --portseed=960 --nocleanup --results=contrib/sharepool/results/tides-v6-r2-100-miners.json",
+          "arguments": [
+            "python3",
+            "-B",
+            "test/functional/feature_sharepool_hash_tides_100_miners.py",
+            "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+            "--tmpdir=/private/tmp/sharepool-v6-r2-100-miners-960",
+            "--portseed=960",
+            "--nocleanup",
+            "--results=contrib/sharepool/results/tides-v6-r2-100-miners.json"
+          ],
+          "temporary_directory": "/private/tmp/sharepool-v6-r2-100-miners-960",
+          "log": "/private/tmp/sharepool-v6-r2-100-miners-960.log",
+          "result": "failed",
+          "exit_code": 1,
+          "log_sha256": "ba133cf045bcf62b5fe56f7b99d6a0998444253a13df8b525bc9cfcc02f59626",
+          "failure": "Follower convergence timeout; both inventory lanes exceeded the shared receiver budget. Fixed by the subsequently built shared throttle."
+        },
+        {
+          "name": "one-satoshi",
+          "command": "python3 -B test/functional/feature_sharepool_hash_tides_zero_reward.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-v6-r2-one-satoshi-961 --portseed=961 --nocleanup --activation-height=4800",
+          "arguments": [
+            "python3",
+            "-B",
+            "test/functional/feature_sharepool_hash_tides_zero_reward.py",
+            "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+            "--tmpdir=/private/tmp/sharepool-v6-r2-one-satoshi-961",
+            "--portseed=961",
+            "--nocleanup",
+            "--activation-height=4800"
+          ],
+          "temporary_directory": "/private/tmp/sharepool-v6-r2-one-satoshi-961",
+          "log": "/private/tmp/sharepool-v6-r2-one-satoshi-961.log",
+          "result": "passed",
+          "exit_code": 0,
+          "log_sha256": "8f3f67b0eb12a7c26c755546fe6ca5c47452d5fe2222b54eba304c9e0972e3a3"
+        },
+        {
+          "name": "zero-subsidy",
+          "command": "python3 -B test/functional/feature_sharepool_hash_tides_zero_reward.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-v6-r2-zero-subsidy-962 --portseed=962 --nocleanup --activation-height=4950",
+          "arguments": [
+            "python3",
+            "-B",
+            "test/functional/feature_sharepool_hash_tides_zero_reward.py",
+            "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+            "--tmpdir=/private/tmp/sharepool-v6-r2-zero-subsidy-962",
+            "--portseed=962",
+            "--nocleanup",
+            "--activation-height=4950"
+          ],
+          "temporary_directory": "/private/tmp/sharepool-v6-r2-zero-subsidy-962",
+          "log": "/private/tmp/sharepool-v6-r2-zero-subsidy-962.log",
+          "result": "passed",
+          "exit_code": 0,
+          "log_sha256": "a73f629988b4d7963b0cd8fe802edf8061c1ecee8b3cb67400bafae65d2f7d0f"
+        }
+      ]
+    }
+  ],
+  "finished_utc": "2026-09-13T07:57:52.395064+00:00",
+  "source_sha256_end": {
+    "test/functional/feature_sharepool_hash_tides_100_miners.py": "cdfdf311c54cd0927f6cc2ac0b382edcdeff4b023c1b19f0989d84eaaa73963c",
+    "test/functional/feature_sharepool_hash_tides_zero_reward.py": "f48d3bdec58cdd54759fc29f0cbb54e590d62831d6a890c63e7af9dde104f599",
+    "test/functional/feature_sharepool_hash_tides.py": "a5c177582d00ee5abcdf395e6494d41ba614e91facdf0efd1498897a05c02201",
+    "contrib/sharepool/hash_mining_gate.py": "88f2f456aa17f2f7f971d70a56a7c993a60ef55415bf0b2999ecc12a4d97efa9",
+    "contrib/sharepool/hash_snapshot.py": "712f34059ac045dbfdef70b97f65408c1dd6f07942964268bd7753ac1e1d55d2",
+    "contrib/sharepool/hash_gate_inventory.py": "2bf60749366de6217391626315d7591b5fb3029bc95c1c164f019b6b1f27860b",
+    "contrib/sharepool/hash_gate_batch.py": "a41c510602748c50a75b66a9dddfa9f028fd5a7cfb57ccc8cccf29cff7f424c4",
+    "contrib/sharepool/native_mining_gate.py": "f05b0c8c2fdd0a26ae9b51dbaf6001568bf9011e27bc239ec95d7039a0f06c00"
+  },
+  "sources_unchanged_during_final_runs": true,
+  "all_final_tests_passed": true
+}

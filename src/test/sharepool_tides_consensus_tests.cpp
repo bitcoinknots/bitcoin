@@ -221,7 +221,7 @@ BOOST_AUTO_TEST_CASE(legacy_hash_domains_and_new_profile_remain_distinct)
     // raw-hash behavior under both legacy profiles.
     BOOST_CHECK_EQUAL(ho::RulesHash(4).GetHex(), "2d8343cd857f5ea23b189a5db0c52ddc7923a5b96bed09e3624391da04d8e9c0");
     BOOST_CHECK_EQUAL(ho::RulesHash(5).GetHex(), "44b6ecb8d0688dbe1be89dbc1008a6414935263409f03163711bff5555e51770");
-    BOOST_CHECK_EQUAL(ho::RulesHash(6).GetHex(), "765159ddb40e9c07a55450bb129e9771676bdc45e7ff841efa8de4a140ed3faf");
+    BOOST_CHECK_EQUAL(ho::RulesHash(6).GetHex(), "9050ab43fa5feddb7f0659abc4ca43f596d4465f93535f3b9ab37449397e6edd");
     const std::vector<unsigned char> malformed{6, 0xff};
     BOOST_CHECK_EQUAL(ho::SnapshotHash(malformed).GetHex(), "0ea745471620362b303b1b64cff683f020e8cb7de58de1017e677190d4949234");
     BOOST_CHECK(ho::ProfileSnapshotHash(malformed, 4) == ho::SnapshotHash(malformed));
@@ -250,13 +250,22 @@ BOOST_AUTO_TEST_CASE(legacy_hash_domains_and_new_profile_remain_distinct)
 
 BOOST_AUTO_TEST_CASE(rational_native_window_clips_boundary_without_integer_rounding)
 {
-    auto snapshot = Empty();
-    // Accounting-only inputs: at the regtest target each proof has exactly one
-    // expected hash of work. The native 8-block window is slightly more than
-    // 16, so an oldest 17th proof receives a nonzero fractional contribution.
+    auto alice = Empty(1, 0x11);
+    const auto alice_job = Block(alice);
+    auto first = Empty();
+    Add(first, alice_job, alice);
+    State(first);
+    const auto first_block = Block(first);
+    BOOST_REQUIRE(Check(first_block).IsValid());
+    Anchor(first_block);
+    auto snapshot = Empty(2);
+    // Accounting-only current inputs: at the regtest target each proof has
+    // one expected hash of work. Sixteen proofs admitted at height2 are newer
+    // than Alice's independently admitted height1 proof. The exact window is
+    // slightly more than16, so the older HEIGHT cohort receives a fraction.
     // Neither rounding network work down to 2 nor rounding the window up to 17
     // gives these payouts. The full verifier authenticates these inputs later.
-    for (uint32_t i{0}; i < 17; ++i) {
+    for (uint32_t i{0}; i < 16; ++i) {
         sharepool::Share share;
         share.header.nBits = sharepool::SHARE_BITS;
         share.header.nNonce = i;
@@ -267,12 +276,8 @@ BOOST_AUTO_TEST_CASE(rational_native_window_clips_boundary_without_integer_round
     std::sort(snapshot.shares.begin(), snapshot.shares.end(), [](const auto& a, const auto& b) {
         return UintToArith256(a.header.GetHash()) < UintToArith256(b.header.GetHash());
     });
-    snapshot.shares.front().origin.payout_script = Script(0x11);
-    const ho::Lookup no_history = [](const uint256&) -> std::shared_ptr<const ho::Snapshot> {
-        throw std::runtime_error("current delta already fills window");
-    };
     std::vector<CTxOut> payouts;
-    auto result = ho::CalculateTidesPayouts(snapshot, &indexes[0], sharepool::SHARE_BITS, consensus, no_history, MAX_MONEY, payouts);
+    auto result = ho::CalculateTidesPayouts(snapshot, &indexes[1], sharepool::SHARE_BITS, consensus, Lookup(), MAX_MONEY, payouts);
     BOOST_REQUIRE_MESSAGE(result.IsValid(), result.reason);
     const cpp_int denominator = Integer(ArithToUint256(arith_uint256{}.SetCompact(sharepool::SHARE_BITS))) + 1;
     const cpp_int requested = cpp_int{8} << 256;
@@ -286,12 +291,94 @@ BOOST_AUTO_TEST_CASE(rational_native_window_clips_boundary_without_integer_round
 
     // Reserve all eligible scripts independently of whether a tiny reward
     // floors either actual entitlement to zero.
-    result = ho::CalculateTidesPayouts(snapshot, &indexes[0], sharepool::SHARE_BITS, consensus, no_history, 1, payouts, true);
+    result = ho::CalculateTidesPayouts(snapshot, &indexes[1], sharepool::SHARE_BITS, consensus, Lookup(), 1, payouts, true);
     BOOST_REQUIRE(result.IsValid());
     BOOST_CHECK(payouts == (std::vector<CTxOut>{Output(0, 0x11), Output(0, 0x22)}));
-    result = ho::CalculateTidesPayouts(snapshot, &indexes[0], sharepool::SHARE_BITS, consensus, no_history, 1, payouts);
+    result = ho::CalculateTidesPayouts(snapshot, &indexes[1], sharepool::SHARE_BITS, consensus, Lookup(), 1, payouts);
     BOOST_REQUIRE(result.IsValid());
     BOOST_CHECK(payouts.empty());
+}
+
+BOOST_AUTO_TEST_CASE(boundary_cohort_pays_every_recipient_independently_of_proof_order)
+{
+    auto snapshot = Empty();
+    // Direct accounting inputs isolate recipient/order invariance. Native
+    // canonical serialization still requires numeric proof-ID ordering.
+    for (uint32_t i{0}; i < 100; ++i) {
+        sharepool::Share proof;
+        proof.header.nBits = sharepool::SHARE_BITS;
+        proof.header.nNonce = i;
+        proof.origin.pool = snapshot.binding.pool;
+        proof.origin.payout_script = Script(i + 1);
+        snapshot.shares.push_back(std::move(proof));
+    }
+    const ho::Lookup no_history = [](const uint256&) -> std::shared_ptr<const ho::Snapshot> {
+        throw std::runtime_error("whole current cohort already fills window");
+    };
+    std::vector<CTxOut> payouts;
+    auto result = ho::CalculateTidesPayouts(snapshot, &indexes[0], sharepool::SHARE_BITS, consensus, no_history, REWARD, payouts);
+    BOOST_REQUIRE_MESSAGE(result.IsValid(), result.reason);
+    BOOST_REQUIRE_EQUAL(payouts.size(), 100);
+    for (uint32_t i{0}; i < 100; ++i) BOOST_CHECK(payouts[i] == Output(REWARD / 100, i + 1));
+    const auto expected = payouts;
+    std::reverse(snapshot.shares.begin(), snapshot.shares.end());
+    result = ho::CalculateTidesPayouts(snapshot, &indexes[0], sharepool::SHARE_BITS, consensus, no_history, REWARD, payouts);
+    BOOST_REQUIRE(result.IsValid());
+    BOOST_CHECK(payouts == expected);
+    // Changing nonce/proof IDs does not let a recipient move ahead of the
+    // other members of its same native-height admission cohort.
+    for (auto& proof : snapshot.shares) proof.header.nNonce += 1000;
+    result = ho::CalculateTidesPayouts(snapshot, &indexes[0], sharepool::SHARE_BITS, consensus, no_history, REWARD, payouts);
+    BOOST_REQUIRE(result.IsValid());
+    BOOST_CHECK(payouts == expected);
+}
+
+BOOST_AUTO_TEST_CASE(fractional_cohort_uses_more_than_512_bits_without_losing_newer_work)
+{
+    auto historical = Empty();
+    // Arithmetic boundary fixtures, not a claim that regtest naturally moves
+    // between these difficulties. Exact historical bindings/signatures are
+    // supplied; full native ancestor validity is covered by separate tests.
+    constexpr uint32_t COHORT_SIZE{8192};
+    for (uint32_t i{0}; i < COHORT_SIZE; ++i) {
+        sharepool::Share proof;
+        proof.header.nBits = 0x01010000; // Assigned work2^245 per proof.
+        proof.header.nNonce = i + 1;
+        proof.origin.pool = historical.binding.pool;
+        proof.origin.payout_script = Script(i & 1 ? 0x22 : 0x11);
+        historical.shares.push_back(std::move(proof));
+    }
+    std::sort(historical.shares.begin(), historical.shares.end(), [](const auto& a, const auto& b) {
+        return UintToArith256(a.header.GetHash()) < UintToArith256(b.header.GetHash());
+    });
+    const auto historical_block = Block(historical);
+    Anchor(historical_block);
+    auto current = Empty(2);
+    sharepool::Share newer;
+    newer.header.nBits = sharepool::SHARE_BITS;
+    newer.header.nNonce = 300;
+    newer.origin.pool = current.binding.pool;
+    newer.origin.payout_script = Script(0x11);
+    current.shares.push_back(std::move(newer));
+    std::vector<CTxOut> payouts;
+    const auto result = ho::CalculateTidesPayouts(current, &indexes[1], sharepool::SHARE_BITS,
+        consensus, Lookup(), MAX_MONEY, payouts);
+    BOOST_REQUIRE_MESSAGE(result.IsValid(), result.reason);
+    const cpp_int denominator = Integer(ArithToUint256(arith_uint256{}.SetCompact(sharepool::SHARE_BITS))) + 1;
+    const cpp_int window = cpp_int{8} << 256;
+    const cpp_int work = cpp_int{1} << 245;
+    const cpp_int total = COHORT_SIZE * work;
+    const cpp_int each = (COHORT_SIZE / 2) * work;
+    BOOST_CHECK(total * denominator >= (cpp_int{1} << 512));
+    const cpp_int alice_numerator = cpp_int{MAX_MONEY} * (denominator * total + (window - denominator) * each);
+    const cpp_int bob_numerator = cpp_int{MAX_MONEY} * (window - denominator) * each;
+    BOOST_CHECK(alice_numerator >= (cpp_int{1} << 512));
+    BOOST_CHECK(bob_numerator >= (cpp_int{1} << 512));
+    const auto alice = (alice_numerator / (window * total)).convert_to<CAmount>();
+    const auto bob = (bob_numerator / (window * total)).convert_to<CAmount>();
+    BOOST_CHECK(alice > bob); // Alice's newer full work must survive scaling.
+    BOOST_CHECK(payouts == (std::vector<CTxOut>{Output(alice, 0x11), Output(bob, 0x22)}));
+    BOOST_CHECK_EQUAL(alice + bob, MAX_MONEY - 1);
 }
 
 BOOST_AUTO_TEST_CASE(actual_parent_plus_current_delta_pays_and_rewards_do_not_reset_history)

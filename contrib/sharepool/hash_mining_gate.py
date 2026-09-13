@@ -86,13 +86,15 @@ class HashMiningGate:
         if self.head_path.absolute() == self.path.absolute():
             raise ValueError("protected head must be separate from database")
         self.db, self._lock_fd, self._head_lock_fd, self._sealed_head = None, None, None, None
+        self._snapshot_observer = None  # Sole-owner bounded inventory ingestion only.
         # Dispatch capabilities belong to this open instance, never to the
         # persisted journal. Recovered evidence requires fresh native approval.
         self._dispatch_key, self._dispatch_pid = None, os.getpid()
         self._context()
         config = {"schema": 2, "profile": self.mode, "genesis": REGTEST_GENESIS,
             "rules": f"{self.rules:064x}", "pool": f"{pool:064x}", "public_key": public_key.hex(), "script": payout_script.hex(),
-            "batch_policy": "oldest-origin-proof-v1", "snapshot_budget": snapshot_budget}
+            "batch_policy": "oldest-origin-receipt-v2" if profile_version == TIDES_VERSION else "oldest-origin-proof-v1",
+            "snapshot_budget": snapshot_budget}
         if activation_height != 1:
             config["activation_height"] = activation_height
         self.config = native_archive.canonical(config)
@@ -129,7 +131,7 @@ class HashMiningGate:
 
     def _context(self):
         info = self.rpc("getblockchaininfo")
-        profile = self.rpc("getsharepoolhashstatus")
+        profile = self.rpc("getsharepoolhashstatus", None, 1)
         tip = self.rpc("getbestblockhash")
         height = info.get("blocks") if isinstance(info, dict) else None
         if (not isinstance(info, dict) or info.get("chain") != "regtest" or type(height) is not int or height < 0 or
@@ -573,6 +575,8 @@ class HashMiningGate:
         identity = f"{identity:064x}" if type(identity) is int else identity
         try:
             raw = self._evidence(SNAPSHOT, identity, staged)
+            if self._snapshot_observer is not None:
+                self._snapshot_observer(raw)
         except KeyError:
             result = self.rpc("getsharepoolhashsnapshot", identity)
             if not isinstance(result, dict) or result.get("hash") != identity:
@@ -581,6 +585,8 @@ class HashMiningGate:
             if type(encoded) is not str or not 1 <= len(encoded) <= MAX_SNAPSHOT_BYTES * 2:
                 raise ValueError("native snapshot lookup exceeds byte bound")
             raw = bytes.fromhex(encoded)
+            if self._snapshot_observer is not None:
+                self._snapshot_observer(raw)
             if Snapshot.deserialize(raw).hash_hex != identity:
                 raise ValueError("native snapshot bytes do not match commitment")
             if staged is None:
@@ -663,7 +669,7 @@ class HashMiningGate:
         block = parse_block(record.data)
         staged = {}
         opening = self._snapshot(block.m_mm_rhs, staged)
-        if (opening.envelope.pool != self.pool or opening.envelope.genesis != int(REGTEST_GENESIS, 16) or
+        if (not self._relay_pool(opening.envelope.pool) or opening.envelope.genesis != int(REGTEST_GENESIS, 16) or
                 opening.envelope.height != block.m_height or opening.envelope.native_parent != block.hashPrevBlock or
                 not self._eligible(block.m_height, f"{block.hashPrevBlock:064x}", height)):
             raise ValueError("template is outside this pool or eligible native ancestry")
@@ -695,17 +701,23 @@ class HashMiningGate:
         self._native_template(self._evidence(TEMPLATE, template_id(share.header), staged), tip, mining=False)
         result = self.rpc("validatesharepoolhashshare", share.serialize().hex())
         expected = {"valid": True, "native_tip": tip, "proof_id": f"{share.proof_id:064x}",
-                    "payout_script": share.envelope.payout_script.hex(), "pool": f"{self.pool:064x}",
+                    "payout_script": share.envelope.payout_script.hex(), "pool": f"{share.envelope.pool:064x}",
                     "origin_height": share.envelope.height, "native_parent": f"{share.envelope.native_parent:064x}"}
         if not isinstance(result, dict) or result.get("valid") is not True or any(result.get(key) != value for key, value in expected.items()):
             raise ValueError("native proof validation response failed binding")
         self._stable(tip)
 
     def receive(self, share):
+        """Acknowledge eligible native-verified work, preserving its original pool.
+
+        V6 relays other pools' work into the same bounded admission queue. This
+        receipt neither changes that work's recipient nor promises payment from
+        this gate's own pool. V4/v5 retain their existing pool-local policy.
+        """
         self._check_seal()
         share = parse_share(share if type(share) is bytes else share.serialize())
         height, tip = self._context()
-        if share.envelope.pool != self.pool or not self._eligible(share.envelope.height, f"{share.envelope.native_parent:064x}", height):
+        if not self._relay_pool(share.envelope.pool) or not self._eligible(share.envelope.height, f"{share.envelope.native_parent:064x}", height):
             raise ValueError("proof is outside this pool or eligible native ancestry")
         self._require_origin(share)
         staged = {}
@@ -717,6 +729,20 @@ class HashMiningGate:
         self._native_share(share, tip, staged)
         return self._persist([(kind, body) for (kind, unused), body in staged.items()] +
                              [(PROOF, share.serialize())])[-1]
+
+    def _relay_pool(self, pool):
+        # Native v6 permits cross-pool admission, while its payouts remain
+        # pool-local. The dispatched job still binds this gate's exact policy.
+        return self.profile_version == TIDES_VERSION or pool == self.pool
+
+    def sync_native_receipts(self, **options):
+        """Ingest bounded pages of native P2P snapshot evidence (v6 only).
+
+        See hash_gate_inventory.sync_native_receipts for cursor, budget and
+        explicit retry semantics. Native storage alone never authorizes work.
+        """
+        from hash_gate_inventory import sync_native_receipts
+        return sync_native_receipts(self, **options)
 
     def _eligible(self, height, parent, tip_height):
         return max(self.activation_height, tip_height + 1 - MAX_SHARE_AGE) <= height <= tip_height + 1 and self.rpc("getblockhash", height - 1) == parent
@@ -774,7 +800,14 @@ class HashMiningGate:
         return tuple(sorted((share for share in result if share.proof_id not in paid), key=lambda share: share.proof_id))
 
     def _batch(self, height, tip, parent, *, staged=None, offered=(), templates=()):
-        """The maximal fitting prefix of (origin height, numerical proof ID).
+        """Choose the maximal fitting prefix under this gate's pinned policy.
+
+        V6 orders by origin height, then durable receipt revision. An offered
+        proof without a receipt follows all retained receipts of that origin;
+        numerical IDs order only those new offers. A later same-origin proof
+        cannot overtake an ACK through hash selection. This is local scheduling,
+        not a claim about a globally authenticated reception order. V4/v5 keep
+        their original (origin height, numerical proof ID) order.
 
         Only a byte-bounded prefix's bodies are materialized. Deferred receipt
         IDs remain in the indexed journal; counting them streams scalar rows.
@@ -788,23 +821,29 @@ class HashMiningGate:
             if (share.proof_id in paid or ancestry.get(share.envelope.height) != f"{share.envelope.native_parent:064x}"):
                 raise ValueError("offered receipt is not currently eligible")
         selected = dict(offered)
+        priority = {identity: (share.envelope.height, 1, share.proof_id) for identity, share in offered.items()}
         total = len(offered)
         capacity = self.snapshot_budget // 512 + 1
         kept = 0
-        rows = self.db.execute("SELECT identity,height,parent FROM journal WHERE kind=? AND height BETWEEN ? AND ? ORDER BY height,identity",
+        order_by = "height,revision" if self.profile_version == TIDES_VERSION else "height,identity"
+        rows = self.db.execute("SELECT identity,height,parent,revision FROM journal WHERE kind=? AND height BETWEEN ? AND ? ORDER BY " + order_by,
                                (PROOF, floor, height + 1))
-        for identity, origin, parent_hash in rows:
+        for identity, origin, parent_hash, revision in rows:
             if ancestry.get(origin) != parent_hash or int(identity, 16) in paid:
                 continue
             if identity in offered:
                 if self._read(PROOF, identity) != offered[identity].serialize():
                     raise ValueError("offered receipt differs from acknowledged evidence")
+                priority[identity] = (origin, 0, revision)
                 continue
             total += 1
             if kept < capacity:
                 selected[identity] = parse_share(self._read(PROOF, identity))
+                priority[identity] = (origin, 0, revision)
                 kept += 1
-        ordered = sorted(selected.values(), key=lambda share: (share.envelope.height, share.proof_id))[:capacity]
+        key = ((lambda share: priority[f"{share.proof_id:064x}"]) if self.profile_version == TIDES_VERSION else
+               (lambda share: (share.envelope.height, share.proof_id)))
+        ordered = sorted(selected.values(), key=key)[:capacity]
         origins = {f"{record.template_id:064x}": CompactTemplateRecord.from_record(record) for record in templates}
 
         def trial(count):
@@ -1110,6 +1149,7 @@ class HashMiningGate:
                     pass
             chosen = (None if selected is None else proof.proof_id in selected) if status == "provisional" else False
             result.append({"proof_id": identity, "origin_height": origin, "receipt_revision": revision,
+                "pool": f"{proof.envelope.pool:064x}", "payout_script": proof.envelope.payout_script.hex(),
                 "status": status, "consensus_eligible": eligible, "selected_for_admission": chosen,
                 "admitted_in": admitted_in, "reward_window_eligible": None,
                 "reward_history_verified": False})
@@ -1243,7 +1283,7 @@ class HashMiningGate:
         for record in snapshot.templates:
             origin = parse_block(record.data)
             opening = self._snapshot(origin.m_mm_rhs, staged)
-            if (opening.envelope.pool != self.pool or opening.envelope.genesis != int(REGTEST_GENESIS, 16) or
+            if (not self._relay_pool(opening.envelope.pool) or opening.envelope.genesis != int(REGTEST_GENESIS, 16) or
                     opening.envelope.height != origin.m_height or opening.envelope.native_parent != origin.hashPrevBlock or
                     not self._eligible(origin.m_height, f"{origin.hashPrevBlock:064x}", height)):
                 raise ValueError("template is outside this pool or eligible native ancestry")

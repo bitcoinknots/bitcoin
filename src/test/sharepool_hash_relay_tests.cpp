@@ -207,6 +207,104 @@ BOOST_AUTO_TEST_CASE(empty_and_shrinking_inventory_does_not_emit_empty_messages)
     BOOST_CHECK_EQUAL(page->second, 2U);
 }
 
+BOOST_AUTO_TEST_CASE(archive_cursor_replays_after_sixty_seconds_and_finishes_changed_cycles)
+{
+    sharepool::HashRelayArchiveCursor cursor;
+    const auto now = std::chrono::steady_clock::time_point{} + 1s;
+    const uint256 first{1}, second{2};
+    BOOST_REQUIRE(cursor.Ready(1, now));
+    cursor.Advance(first, false, now);
+    BOOST_CHECK(!cursor.Ready(2, now));
+    BOOST_REQUIRE(cursor.Ready(2, now + 1s));
+    BOOST_CHECK(cursor.After() == first); // A new revision never resets the tail.
+    cursor.Advance(second, true, now + 1s);
+    BOOST_REQUIRE(cursor.Ready(2, now + 2s)); // Replay the changed cycle promptly.
+    BOOST_CHECK(!cursor.After());
+    cursor.Advance(second, true, now + 2s);
+    BOOST_CHECK(!cursor.Ready(2, now + 61s));
+    BOOST_CHECK(cursor.Ready(2, now + 62s));
+    BOOST_CHECK(!cursor.After());
+}
+
+BOOST_AUTO_TEST_CASE(archive_cursor_advances_empty_quarantine_pages)
+{
+    sharepool::HashRelayArchiveCursor cursor;
+    const auto now = std::chrono::steady_clock::time_point{} + 1s;
+    BOOST_REQUIRE(cursor.Ready(1, now));
+    cursor.Advance(uint256{7}, false, now); // No available hashes in this page.
+    BOOST_REQUIRE(cursor.Ready(1, now + 1s));
+    BOOST_CHECK(cursor.After() == uint256{7});
+    cursor.Advance(uint256{9}, true, now + 1s);
+    BOOST_CHECK(!cursor.Ready(1, now + 2s));
+}
+
+BOOST_AUTO_TEST_CASE(recent_work_and_archive_tail_both_progress_under_continual_insertion)
+{
+    sharepool::HashRelayInventoryLanes lanes;
+    using Lane = sharepool::HashRelayInventoryLanes::Lane;
+    const auto now = std::chrono::steady_clock::time_point{} + 1s;
+    // The archived cursor can be far beyond a newly arriving small hash. The
+    // live lane's insertion sequence is independent of that archive hash key.
+    BOOST_CHECK(lanes.Next(1, 0, now) == Lane::Archive);
+    lanes.AdvanceArchive(uint256{100}, false, now);
+    for (uint64_t i{1}; i <= 20; ++i) {
+        const auto time = now + std::chrono::seconds{2 * i - 1};
+        BOOST_CHECK(lanes.Next(i + 1, i, time) == Lane::Recent);
+        BOOST_CHECK_EQUAL(lanes.RecentAfter(), i - 1);
+        lanes.AdvanceRecent(i, time);
+        BOOST_CHECK(lanes.Next(i + 1, i, time) == Lane::None);
+        BOOST_CHECK(lanes.Next(i + 1, i, time + 999ms) == Lane::None);
+        BOOST_CHECK(lanes.Next(i + 1, i, time + 1s) == Lane::Archive);
+        BOOST_CHECK(lanes.ArchiveAfter() == uint256{static_cast<uint8_t>(99 + i)});
+        lanes.AdvanceArchive(uint256{static_cast<uint8_t>(100 + i)}, false, time + 1s);
+        BOOST_CHECK(lanes.Next(i + 1, i, time + 1s) == Lane::None);
+    }
+    // Restart resets a store's insertion sequence; an existing cursor reads
+    // that reset instead of suppressing all future announcements.
+    BOOST_CHECK(lanes.Next(100, 0, now + 41s) == Lane::Recent);
+    lanes.AdvanceRecent(0, now + 41s);
+}
+
+BOOST_AUTO_TEST_CASE(combined_live_archive_rate_fits_receiver_control_tokens)
+{
+    sharepool::HashRelayInventoryLanes lanes;
+    using Lane = sharepool::HashRelayInventoryLanes::Lane;
+    const auto start = std::chrono::steady_clock::time_point{} + 1s;
+    double tokens{7}; // The receiver's initial eight tokens minus SPHHELLO.
+    size_t recent{0}, archive{0};
+    for (uint64_t tick{0}; tick < 1000; ++tick) {
+        const auto now = start + std::chrono::milliseconds{tick * 100};
+        if (tick) tokens = std::min(8.0, tokens + 0.1);
+        const auto lane = lanes.Next(tick + 1, tick + 1, now);
+        if (lane == Lane::None) continue;
+        BOOST_REQUIRE(tokens >= 1);
+        --tokens;
+        if (lane == Lane::Recent) {
+            ++recent;
+            lanes.AdvanceRecent(tick + 1, now);
+        } else {
+            ++archive;
+            lanes.AdvanceArchive(uint256{static_cast<uint8_t>(archive)}, false, now);
+        }
+        BOOST_CHECK(lanes.Next(tick + 2, tick + 2, now + 999ms) == Lane::None);
+    }
+    BOOST_CHECK_EQUAL(recent, 50U);
+    BOOST_CHECK_EQUAL(archive, 50U);
+}
+
+BOOST_AUTO_TEST_CASE(live_event_order_and_repeated_repairs_emit_canonical_wire_inventory)
+{
+    const std::vector<uint256> events{uint256{9}, uint256{2}, uint256{7}, uint256{2}, uint256{9}};
+    const auto wire = sharepool::CanonicalHashInventory(events);
+    BOOST_CHECK(wire == std::vector<uint256>({uint256{2}, uint256{7}, uint256{9}}));
+    BOOST_CHECK_EQUAL(events.size(), 5U); // Five sequence events, three wire IDs.
+    sharepool::HashRelayInventoryLanes lanes;
+    const auto now = std::chrono::steady_clock::time_point{} + 1s;
+    BOOST_CHECK(lanes.Next(5, 5, now) == sharepool::HashRelayInventoryLanes::Lane::Recent);
+    lanes.AdvanceRecent(5, now); // Sorting never substitutes a hash/count for the sequence cursor.
+    BOOST_CHECK_EQUAL(lanes.RecentAfter(), 5U);
+}
+
 BOOST_AUTO_TEST_CASE(expired_serve_request_no_longer_conflicts_with_new_request)
 {
     struct Request {

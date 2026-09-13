@@ -898,7 +898,7 @@ uint256 RulesHash(uint32_t version)
         return DomainHash("SharePool/rules/v6", SHARE_BITS, SHARE_TARGET_SHIFT, MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES,
                           MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES,
                           MAX_EXPANDED_TEMPLATE_BYTES, MAX_TEMPLATE_TX_REFERENCES, MAX_ORIGIN_CHECKS,
-                          MAX_CERTIFICATE_BYTES, uint32_t{8}, uint32_t{1});
+                          MAX_CERTIFICATE_BYTES, uint32_t{8}, uint32_t{2});
     }
     if (version == LEDGER_VERSION) {
         return DomainHash("SharePool/rules/v5", SHARE_BITS, SHARE_TARGET_SHIFT, MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES,
@@ -1253,16 +1253,49 @@ Result CalculateTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previo
         const bool progress = old.status == tides::HistoryStatus::ResourceLimit && old.scanned_blocks > 0;
         return Result::Missing(old.missing, "bad-sharepool-hash-" + old.reason + (progress ? "-progress" : ""));
     }
-    std::map<std::vector<unsigned char>, Work> weights;
+    // Native height gives one objective batch boundary; numeric proof ID is
+    // canonical encoding order, not a payout priority. Keep each proof but
+    // clip every recipient in the boundary batch by the same work fraction.
+    // A uint256 share sum can exceed uint256. Combining a fractional boundary
+    // with full newer batches and MAX_MONEY can exceed 512 bits. With bounded
+    // snapshot counts and uint256 work, 1024-bit intermediates cannot wrap.
+    using AmountWork = boost::multiprecision::uint1024_t;
+    std::map<std::vector<unsigned char>, AmountWork> weights;
     Work remaining = requested;
-    const auto add = [&](const std::vector<unsigned char>& script, const uint256& work) {
-        if (!IsPayoutScript(script)) throw std::invalid_argument("TIDES payout script");
-        const Work included = std::min(remaining, Work{NumericWork(work) * denominator});
-        if (included != 0) weights[script] += included;
-        remaining -= included;
+    AmountWork common_scale{1};
+    const auto add_batch = [&](const auto& entries, size_t begin, size_t end) {
+        if (begin == end || remaining == 0) return;
+        std::map<std::vector<unsigned char>, Work> batch;
+        Work total{0};
+        for (size_t i{begin}; i < end; ++i) {
+            const auto& entry = entries[i];
+            if (!IsPayoutScript(entry.payout_script)) throw std::invalid_argument("TIDES payout script");
+            const auto value = NumericWork(entry.work);
+            batch[entry.payout_script] += value;
+            total += value;
+        }
+        const AmountWork scaled = AmountWork{total} * denominator;
+        if (scaled <= remaining) {
+            for (const auto& [script, value] : batch) weights[script] += AmountWork{value} * denominator;
+            remaining -= scaled.convert_to<Work>();
+        } else {
+            // Add full and fractional contributions BEFORE the one per-script
+            // satoshi floor. Only the oldest included batch is fractional.
+            common_scale = AmountWork{total};
+            for (auto& [script, value] : weights) value *= common_scale;
+            for (const auto& [script, value] : batch) weights[script] += AmountWork{remaining} * value;
+            remaining = 0;
+        }
     };
-    for (auto it = current.rbegin(); it != current.rend() && remaining != 0; ++it) add(it->payout_script, it->work);
-    for (auto it = old.entries.rbegin(); it != old.entries.rend() && remaining != 0; ++it) add(it->payout_script, it->work);
+    add_batch(current, 0, current.size());
+    for (size_t end{old.entries.size()}; end != 0 && remaining != 0;) {
+        size_t begin = end - 1;
+        const auto height = old.entries[begin].admission_height;
+        if (height == 0) return Result::Missing({}, "bad-sharepool-hash-tides-history-height");
+        while (begin != 0 && old.entries[begin - 1].admission_height == height) --begin;
+        add_batch(old.entries, begin, end);
+        end = begin;
+    }
     if (remaining != 0 && !old.complete_to_activation) return Result::Missing({}, "bad-sharepool-hash-tides-history-incomplete");
     std::vector<CTxOut> result;
     if (weights.empty()) {
@@ -1272,9 +1305,9 @@ Result CalculateTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previo
         if (!IsPayoutScript(snapshot.binding.payout_script)) return Bad("tides-bootstrap-script");
         result.emplace_back(reserve_scripts ? 0 : reward, CScript{snapshot.binding.payout_script.begin(), snapshot.binding.payout_script.end()});
     } else {
-        const Work counted = requested - remaining;
+        const AmountWork counted = AmountWork{requested - remaining} * common_scale;
         for (const auto& [script, work] : weights) {
-            const CAmount amount = (Work{reward} * work / counted).convert_to<CAmount>();
+            const CAmount amount = (AmountWork{reward} * work / counted).convert_to<CAmount>();
             if (reserve_scripts || amount > 0) result.emplace_back(reserve_scripts ? 0 : amount, CScript{script.begin(), script.end()});
         }
     }

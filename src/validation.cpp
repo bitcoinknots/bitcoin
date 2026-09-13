@@ -7751,7 +7751,8 @@ ChainstateManager::ChainstateManager(const util::SignalInterrupt& interrupt, Opt
     if (GetConsensus().SharePoolHashOnly) {
         const auto profile = sharepool::hashonly::ProfileVersion(GetConsensus());
         m_sharepool_hash_store = std::make_unique<sharepool::HashSnapshotStore>(
-            m_options.datadir / fs::PathFromString("sharepool-snapshots-v" + std::to_string(profile)), false, profile);
+            m_options.datadir / fs::PathFromString("sharepool-snapshots-v" + std::to_string(profile)), false, profile,
+            sharepool::HashSnapshotStore::Options{.max_bytes = m_options.sharepool_archive_bytes});
         m_sharepool_hash_worker = std::make_unique<sharepool::RetryWorker>(
             [this](const std::atomic<bool>& stop) {
                 util::ThreadRename("sharepool-retry");

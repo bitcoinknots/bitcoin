@@ -72,11 +72,13 @@ Deterministic carry is the intended behavior; this revision implements bounded
 selection and durable retention, but does not complete that payment guarantee.
 
 **Native historical evidence retention.** Gate cold archives do not replace the
-node's consensus evidence database. Native snapshot retention still has local
-byte/object quotas. Deduplicated standalone templates reduce repeated bodies
-but do not provide unlimited archival storage. A production deployment needs
-historical archival/restore, state-index scaling, disk provisioning and recovery
-that preserves reindex/reorg availability. Storage exhaustion is local missing
+node's consensus evidence database. The current native archive removes the fixed snapshot-count ceiling, keeps
+metadata on disk, pages inventory and supports authenticated bounded export and
+restore. Its configurable charged quota includes per-template index allowances.
+[Archive operation](sharepool-archive.md) describes verification and recovery.
+Startup still authenticates all retained payloads, which makes restart latency
+grow with history. Disk provisioning, sustainable startup/initial-sync time and
+independent archival availability remain production requirements. Storage exhaustion is local missing
 data, never evidence that a block is consensus-invalid.
 
 **Difficulty and capacity objectives.** A finite proof rate cannot guarantee
@@ -88,13 +90,17 @@ reference is a rolling work window such as PPLNS/TIDES. Fixed-duration proof-cou
 sampling variance alone does not establish miner payout variance. Version 4 one-time settlement and network-height expiry are not that rolling
 window. Version 5 removes confirmed-credit expiry, but its one-time settlement
 is also not a rolling window. Version 6 supplies a rolling window but still needs
-production difficulty and variance measurements. Its assigned share work is
-exact; its shift 10 remains experimental.
+a production difficulty and capacity contract. The
+[coupled variance calibration](sharepool-tides-calibration.md) now models shares
+and block finds from the same work stream, including rolling-window covariance,
+bootstrap, cutoff delays and expiry. It demonstrates that shift 10 does not match
+the denser reference for small miners. More proofs increase template-validation
+and archival load; changing one constant would not close this gap.
 In v4/v5 an empty selection pays the snapshot owner. In v6 only fully known empty
-pool history plus an empty current admission batch triggers bootstrap; missing
+pool history plus no current admissions for the winning pool triggers bootstrap; missing
 history never does. With sparse sampling, bootstrap needs explicit treatment
-in the payout policy and variance tests. Receipt expiry is not a percentage of
-pool revenue lost: every found block still distributes its complete reward.
+in the payout policy and variance tests. Receipt expiry is not the same fraction of revenue lost: accepted pool blocks
+pay eligible work, with satoshi-rounding residue left unclaimed.
 See [difficulty and payout comparison](sharepool-difficulty-capacity.md).
 Regtest's easy-target clamp does not measure production hashing or validate the
 experimental shift 10 as a deployment choice. An FPPS-style guarantee independent
@@ -139,12 +145,16 @@ hashrate from arrival times, or that a particular software implementation was
 used. Production claims must describe enforced behavior, not those stronger
 unobservable properties.
 
-**Admission-order fairness.** V6 orders each confirmed batch by numeric proof ID
-after admission height. This is reproducible across nodes, but differs from
-OCEAN's arrival-ordered TIDES log. Selective publication, batch composition and
-proof-ID selection can affect the window boundary. The 100-miner low-difficulty
-test makes this visible; it does not establish fair production ordering or equal
-variance. A frozen job authenticates its selected batch, not universal inclusion.
+**Admission fairness.** V6 rules revision 2 splits the oldest eligible
+native-height batch proportionally by verified work. Proof IDs cannot rank
+recipients at the window boundary for a fixed admitted set. Local carry uses
+origin age and durable ACK order; verified foreign-pool receipts can be admitted
+without changing their pool or destination. A bounded recent-work lane prevents
+historical inventory scans from delaying new announcements. These changes do not
+prove a global arrival order or prevent withholding, producer censorship, or
+expiry under insufficient admission capacity. A frozen job authenticates its
+selected batch, not universal inclusion. See the
+[admission audit and limits](sharepool-admission-fairness.md).
 
 **Local history capacity.** The v6 history index resumes bounded scans and has
 [configurable per-thread retained-history budgets](sharepool-tides-local-limits.md).
@@ -155,8 +165,9 @@ production requirements.
 
 ## Release evidence
 
-Use the [v6 verification report](sharepool-v6-tides-report.md)
-and its per-run binary/source hashes for this revision. The
+Use the [v6 revision 2 report](sharepool-v6-r2-report.md) for current changes.
+The [v6 revision 1 report](sharepool-v6-tides-report.md) retains its original
+binary/source hashes and physical Goldshell capture. The
 [earlier recovery report](sharepool-production-hardening-report.md) and prior
 v4/v5 reports retain their historical scope.
 Model results, wire fixtures, mocked gate tests and native integration

@@ -45,6 +45,8 @@
 #include <txmempool.h>
 #include <univalue.h>
 #include <util/check.h>
+#include <util/fs.h>
+#include <util/fs_helpers.h>
 #include <util/signalinterrupt.h>
 #include <util/strencodings.h>
 #include <util/string.h>
@@ -57,6 +59,15 @@
 #include <limits>
 #include <memory>
 #include <stdint.h>
+
+#include <fcntl.h>
+#include <sys/stat.h>
+#ifndef WIN32
+#include <unistd.h>
+#else
+#include <io.h>
+#include <windows.h>
+#endif
 
 using interfaces::BlockRef;
 using interfaces::BlockTemplate;
@@ -1856,7 +1867,9 @@ static RPCHelpMan getsharepoolhashsnapshot()
 
 static RPCHelpMan getsharepoolhashstatus()
 {
-    return RPCHelpMan{"getsharepoolhashstatus", "Read local hash-only snapshot availability. Stored objects are not mining authorizations.\n", {},
+    return RPCHelpMan{"getsharepoolhashstatus", "Read paged local snapshot availability. Stored objects are not mining authorizations.\n",
+        {{"after", RPCArg::Type::STR_HEX, RPCArg::Optional::OMITTED, "Exclusive opaque inventory cursor; omit to start a traversal"},
+         {"count", RPCArg::Type::NUM, RPCArg::Default{1024}, "Maximum scanned inventory records, from 1 to 1024"}},
         RPCResult{RPCResult::Type::OBJ, "", "Local hash-only profile and storage", {
             {RPCResult::Type::STR, "mode", "hash-only-v4, hash-only-v5-confirmed-ledger or hash-only-v6-tides"},
             {RPCResult::Type::STR_HEX, "rules", "Canonical active-profile rule hash"},
@@ -1865,7 +1878,12 @@ static RPCHelpMan getsharepoolhashstatus()
             {RPCResult::Type::NUM, "pending_blocks", "Blocks awaiting evidence"},
             {RPCResult::Type::NUM, "stored_snapshots", "Stored snapshot count"},
             {RPCResult::Type::NUM, "stored_bytes", "Local retained evidence bytes"},
+            {RPCResult::Type::NUM, "archive_charged_bytes", "Snapshot bytes plus 128 bytes per snapshot and 192 bytes per decoded template for local indexes"},
+            {RPCResult::Type::NUM, "archive_max_bytes", "Configured finite local archive quota"},
             {RPCResult::Type::ARR, "inventory", "Available snapshot hashes", {{RPCResult::Type::STR_HEX, "", "Hash"}}},
+            {RPCResult::Type::ANY, "inventory_next", "Exclusive next cursor or null"},
+            {RPCResult::Type::BOOL, "inventory_complete", "This local disk-index traversal reached its end; not proof of complete chain evidence"},
+            {RPCResult::Type::NUM, "inventory_revision", "Local revision; repeat completed cycles to discover insertions before a prior cursor"},
             {RPCResult::Type::OBJ, "validation_worker", "Bounded asynchronous validation telemetry", {
                 {RPCResult::Type::BOOL, "started", "Worker lifecycle started"},
                 {RPCResult::Type::BOOL, "active", "A pending-block pass is running"},
@@ -1885,6 +1903,9 @@ static RPCHelpMan getsharepoolhashstatus()
             auto& chainman = EnsureAnyChainman(request.context);
             LOCK(cs_main);
             auto& store = RequireHashSnapshotStore(chainman);
+            const auto after = request.params[0].isNull() ? std::nullopt : std::make_optional(ParseHashV(request.params[0], "after"));
+            const auto count = request.params[1].isNull() ? 1024 : request.params[1].getInt<int64_t>();
+            if (count < 1 || count > 1024) throw JSONRPCError(RPC_INVALID_PARAMETER, "count must be between 1 and 1024");
             UniValue result{UniValue::VOBJ};
             result.pushKV("mode", chainman.GetConsensus().SharePoolTides ? "hash-only-v6-tides" : chainman.GetConsensus().SharePoolAdmittedLedger ? "hash-only-v5-confirmed-ledger" : "hash-only-v4");
             result.pushKV("rules", sharepool::hashonly::RulesHash(sharepool::hashonly::ProfileVersion(chainman.GetConsensus())).GetHex());
@@ -1893,9 +1914,15 @@ static RPCHelpMan getsharepoolhashstatus()
             result.pushKV("pending_blocks", store.PendingBlocks().size());
             result.pushKV("stored_snapshots", store.Count());
             result.pushKV("stored_bytes", store.Bytes() + store.TemplateBytes());
+            result.pushKV("archive_charged_bytes", store.ChargedBytes());
+            result.pushKV("archive_max_bytes", store.MaxBytes());
             UniValue inventory{UniValue::VARR};
-            for (const auto& hash : store.Inventory()) inventory.push_back(hash.GetHex());
+            const auto page = store.InventoryPage(after, count);
+            for (const auto& hash : page.hashes) inventory.push_back(hash.GetHex());
             result.pushKV("inventory", std::move(inventory));
+            result.pushKV("inventory_next", page.next ? UniValue{page.next->GetHex()} : NullUniValue);
+            result.pushKV("inventory_complete", page.complete);
+            result.pushKV("inventory_revision", store.Revision());
             const auto stats = chainman.SharePoolHashWorkerStats();
             UniValue worker{UniValue::VOBJ};
             worker.pushKV("started", stats.started);
@@ -1914,6 +1941,172 @@ static RPCHelpMan getsharepoolhashstatus()
             return result;
         }};
 }
+
+static RPCHelpMan getsharepoolhashrecent()
+{
+    return RPCHelpMan{"getsharepoolhashrecent", "Read bounded recent snapshot availability independently of the historical archive scan.\n"
+        "Keep the returned epoch and sequence. After an epoch change restart at zero; a gap requires an archival rescan.\n"
+        "This inventory authenticates neither mining jobs nor acknowledgements.\n",
+        {{"after", RPCArg::Type::NUM, RPCArg::Default{0}, "Exclusive sequence cursor; zero starts at the oldest retained event"},
+         {"count", RPCArg::Type::NUM, RPCArg::Default{256}, "Maximum recent events scanned, from 1 to 1024"}},
+        RPCResult{RPCResult::Type::OBJ, "", "Recent local availability", {
+            {RPCResult::Type::ARR, "entries", "Available snapshots", {
+                {RPCResult::Type::OBJ, "", "Event", {
+                    {RPCResult::Type::NUM, "sequence", "Monotonic sequence within the current store epoch"},
+                    {RPCResult::Type::STR_HEX, "hash", "Snapshot hash"},
+                }},
+            }},
+            {RPCResult::Type::NUM, "next", "Last scanned sequence; may advance across quarantined records"},
+            {RPCResult::Type::NUM, "latest", "Latest local sequence"},
+            {RPCResult::Type::BOOL, "gap", "Requested sequence is outside the retained recent history"},
+            {RPCResult::Type::STR_HEX, "epoch", "Store-instance identifier; restart the cursor when this changes"},
+        }}, RPCExamples{HelpExampleCli("getsharepoolhashrecent", "0 256")},
+        [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
+            const int64_t after = request.params[0].isNull() ? 0 : request.params[0].getInt<int64_t>();
+            const int64_t count = request.params[1].isNull() ? 256 : request.params[1].getInt<int64_t>();
+            if (after < 0) throw JSONRPCError(RPC_INVALID_PARAMETER, "after must be nonnegative");
+            if (count < 1 || count > 1024) throw JSONRPCError(RPC_INVALID_PARAMETER, "count must be between 1 and 1024");
+            auto& chainman = EnsureAnyChainman(request.context);
+            LOCK(cs_main);
+            const auto page = RequireHashSnapshotStore(chainman).RecentInventory(after, count);
+            UniValue entries{UniValue::VARR};
+            for (const auto& entry : page.entries) {
+                UniValue item{UniValue::VOBJ};
+                item.pushKV("sequence", entry.sequence);
+                item.pushKV("hash", entry.hash.GetHex());
+                entries.push_back(std::move(item));
+            }
+            UniValue result{UniValue::VOBJ};
+            result.pushKV("entries", std::move(entries));
+            result.pushKV("next", page.next);
+            result.pushKV("latest", page.latest);
+            result.pushKV("gap", page.gap);
+            result.pushKV("epoch", page.epoch.GetHex());
+            return result;
+        }};
+}
+
+/** Open bounded archive files without allowing FIFOs/devices to occupy an RPC
+ * worker before parsing starts. Exclusive exports never follow an existing
+ * destination and are created private on POSIX, independent of process umask. */
+static FILE* OpenSharePoolArchiveFile(const fs::path& path, bool exporting)
+{
+#ifndef WIN32
+    const int flags = exporting ? O_WRONLY | O_CREAT | O_EXCL : O_RDONLY | O_NONBLOCK;
+    const int fd = ::open(path.c_str(), flags | O_CLOEXEC, S_IRUSR | S_IWUSR);
+    if (fd < 0) return nullptr;
+    if (exporting && ::fchmod(fd, S_IRUSR | S_IWUSR) != 0) { ::close(fd); return nullptr; }
+    struct stat info;
+    if (::fstat(fd, &info) != 0 || !S_ISREG(info.st_mode)) { ::close(fd); return nullptr; }
+    FILE* file = ::fdopen(fd, exporting ? "wb" : "rb");
+    if (!file) ::close(fd);
+#else
+    HANDLE handle = CreateFileW(path.wstring().c_str(), exporting ? GENERIC_WRITE : GENERIC_READ,
+        FILE_SHARE_READ, nullptr, exporting ? CREATE_NEW : OPEN_EXISTING,
+        FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) return nullptr;
+    BY_HANDLE_FILE_INFORMATION info;
+    if (GetFileType(handle) != FILE_TYPE_DISK || !GetFileInformationByHandle(handle, &info) ||
+        (info.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT))) {
+        CloseHandle(handle);
+        return nullptr;
+    }
+    const int fd = ::_open_osfhandle(reinterpret_cast<intptr_t>(handle), (exporting ? _O_WRONLY : _O_RDONLY) | _O_BINARY);
+    if (fd < 0) { CloseHandle(handle); return nullptr; }
+    FILE* file = ::_fdopen(fd, exporting ? "wb" : "rb");
+    if (!file) ::_close(fd);
+#endif
+    return file;
+}
+
+static bool CommitSharePoolArchiveDirectory(const fs::path& directory)
+{
+#ifndef WIN32
+    const int fd = ::open(directory.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (fd < 0) throw std::runtime_error("archive directory open failed");
+    const bool synced = ::fsync(fd) == 0;
+    const bool closed = ::close(fd) == 0;
+    if (!synced || !closed) throw std::runtime_error("archive directory commit failed");
+    return true;
+#else
+    // Windows does not provide the POSIX directory-fsync guarantee. Report
+    // this separately from the checked FlushFileBuffers on the archive file.
+    return false;
+#endif
+}
+
+static RPCHelpMan sharepoolhasharchive(bool exporting)
+{
+    const std::string name = exporting ? "exportsharepoolhasharchive" : "importsharepoolhasharchive";
+    std::vector<RPCArg> args{{"filename", RPCArg::Type::STR, RPCArg::Optional::NO,
+        "Absolute archive chunk path; export creates a new file exclusively"}};
+    if (exporting) args.push_back({"after", RPCArg::Type::STR_HEX, RPCArg::Optional::OMITTED,
+        "Exclusive opaque cursor returned by the previous chunk; omit for the first chunk"});
+    args.push_back({"max_records", RPCArg::Type::NUM, RPCArg::Default{128}, "Maximum records scanned or imported, from 1 to 1024"});
+    args.push_back({"max_bytes", RPCArg::Type::NUM, RPCArg::Default{33554432}, "Maximum snapshot payload bytes, from 1 to 268435456; bounded framing is additional"});
+    return RPCHelpMan{name,
+        "Back up or restore a bounded chunk of the local hash-only evidence archive. Administrative use only.\n"
+        "Every record is authenticated. This is availability, not native validation or a miner acknowledgement.\n"
+        "Import retains individually verified records if a later record or footer fails; dependent blocks are retried.\n"
+        "Export never overwrites a file; failure may leave an incomplete new file. Quiesce writes and save the exact native tip for a reproducible backup.\n",
+        std::move(args), RPCResult{RPCResult::Type::OBJ, "", "Local archive chunk", {
+            {RPCResult::Type::BOOL, "directory_synced", "Export parent-directory durability confirmed; false on import or platforms without directory fsync"},
+            {RPCResult::Type::NUM, "records", "Authenticated snapshot records transferred"},
+            {RPCResult::Type::NUM, "bytes", "Snapshot payload bytes transferred"},
+            {RPCResult::Type::ANY, "next_after", "Exclusive next inventory cursor or null"},
+            {RPCResult::Type::BOOL, "inventory_complete", "Chunk reached the end of its source local inventory; not proof of complete chain evidence"},
+        }}, RPCExamples{HelpExampleCli(name, "\"/absolute/path/chunk.spha\"")},
+        [exporting](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
+            auto& chainman = EnsureAnyChainman(request.context);
+            { LOCK(cs_main); RequireHashSnapshotStore(chainman); }
+            const auto filename = request.params[0].get_str();
+            if (filename.find('\0') != std::string::npos) throw JSONRPCError(RPC_INVALID_PARAMETER, "Archive filename must not contain NUL");
+            const auto path = fs::PathFromString(filename);
+            if (!path.is_absolute()) throw JSONRPCError(RPC_INVALID_PARAMETER, "Archive filename must be absolute");
+            const size_t offset = exporting ? 2 : 1;
+            const int64_t records = request.params[offset].isNull() ? 128 : request.params[offset].getInt<int64_t>();
+            const int64_t bytes = request.params[offset + 1].isNull() ? 33554432 : request.params[offset + 1].getInt<int64_t>();
+            if (records < 1 || records > static_cast<int64_t>(sharepool::HashSnapshotStore::MAX_INVENTORY_PAGE)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "max_records must be between 1 and 1024");
+            }
+            if (bytes < 1 || bytes > static_cast<int64_t>(sharepool::HashSnapshotStore::MAX_ARCHIVE_CHUNK_BYTES)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "max_bytes must be between 1 and 268435456");
+            }
+            std::optional<uint256> after;
+            if (exporting && !request.params[1].isNull()) after = ParseHashV(request.params[1], "after");
+            FILE* raw = OpenSharePoolArchiveFile(path, exporting);
+            if (!raw) throw JSONRPCError(RPC_INVALID_PARAMETER, exporting ? "Cannot create archive file exclusively; destination must not exist" : "Cannot open archive file; a regular file is required");
+            AutoFile file{raw};
+            sharepool::HashSnapshotStore::ArchiveResult chunk;
+            bool directory_synced{false};
+            try {
+                sharepool::HashSnapshotStore* store;
+                { LOCK(cs_main); store = &RequireHashSnapshotStore(chainman); }
+                // The store lives through RPC shutdown. File processing holds
+                // cs_main only around individual store operations, not the chunk.
+                chunk = exporting ? store->ExportArchive(file, after, records, bytes) : store->ImportArchive(file, records, bytes);
+                if (exporting && !FileCommit(raw)) throw std::runtime_error("archive file commit failed");
+                if (file.fclose() != 0) throw std::runtime_error("archive file close failed");
+                if (exporting) directory_synced = CommitSharePoolArchiveDirectory(path.parent_path());
+            } catch (const std::exception& e) {
+                file.fclose();
+                if (!exporting) chainman.RequestSharePoolHashBlocks();
+                throw JSONRPCError(RPC_MISC_ERROR, strprintf("Archive %s failed: %s%s", exporting ? "export" : "import", e.what(),
+                    exporting ? "; incomplete new file may remain" : "; individually verified records already imported remain stored"));
+            }
+            if (!exporting) chainman.RequestSharePoolHashBlocks();
+            UniValue result{UniValue::VOBJ};
+            result.pushKV("directory_synced", directory_synced);
+            result.pushKV("records", chunk.records);
+            result.pushKV("bytes", chunk.bytes);
+            result.pushKV("next_after", chunk.next ? UniValue{chunk.next->GetHex()} : NullUniValue);
+            result.pushKV("inventory_complete", chunk.complete);
+            return result;
+        }};
+}
+
+static RPCHelpMan exportsharepoolhasharchive() { return sharepoolhasharchive(true); }
+static RPCHelpMan importsharepoolhasharchive() { return sharepoolhasharchive(false); }
 
 static RPCHelpMan validatesharepoolhashtemplate()
 {
@@ -2084,6 +2277,9 @@ void RegisterMiningRPCCommands(CRPCTable& t)
         {"mining", &finalizesharepoolhashjob},
         {"mining", &getsharepoolhashsnapshot},
         {"mining", &getsharepoolhashstatus},
+        {"mining", &getsharepoolhashrecent},
+        {"mining", &exportsharepoolhasharchive},
+        {"mining", &importsharepoolhasharchive},
         {"mining", &validatesharepoolhashtemplate},
         {"mining", &validatesharepoolhashshare},
 

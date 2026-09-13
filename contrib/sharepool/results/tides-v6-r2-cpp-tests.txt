@@ -1,0 +1,467 @@
+Running 139 test cases...
+
+Test module "Bitcoin Core Test Suite" has passed with:
+  139 test cases out of 834 passed
+  695 test cases out of 834 skipped
+  141234 assertions out of 141234 passed
+
+  Test suite "sharepool_params_tests" has passed with:
+    9 test cases out of 9 passed
+    82 assertions out of 82 passed
+
+    Test case "sharepool_params_tests/public_network_factory_rejects_test_override" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_params_tests/command_line_parser_rejects_ambiguous_or_invalid_schedule" has passed with:
+      17 assertions out of 17 passed
+
+    Test case "sharepool_params_tests/hash_only_requires_explicit_regtest_native_schedule" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_params_tests/public_network_factory_rejects_hash_only_option" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_params_tests/confirmed_ledger_is_explicit_and_regtest_only" has passed with:
+      12 assertions out of 12 passed
+
+    Test case "sharepool_params_tests/tides_is_explicit_and_separate_from_confirmed_ledger" has passed with:
+      14 assertions out of 14 passed
+
+    Test case "sharepool_params_tests/public_network_factory_rejects_tides_option_even_disabled" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_params_tests/kernel_tides_profile_enforces_schedule_and_profile_exclusion" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_params_tests/tides_command_line_flag_is_registered_and_public_defaults_stay_disabled" has passed with:
+      7 assertions out of 7 passed
+
+  Test suite "sharepool_signer_tests" has passed with:
+    9 test cases out of 9 passed
+    63 assertions out of 63 passed
+
+    Test case "sharepool_signer_tests/native_random_key_owner_signature" has passed with:
+      2 assertions out of 2 passed
+
+    Test case "sharepool_signer_tests/native_policy_rejects_wrong_network_or_binding" has passed with:
+      11 assertions out of 11 passed
+
+    Test case "sharepool_signer_tests/native_owner_authorization_is_not_template_attestation" has passed with:
+      2 assertions out of 2 passed
+
+    Test case "sharepool_signer_tests/native_signer_canonical_bounded_decoding" has passed with:
+      9 assertions out of 9 passed
+
+    Test case "sharepool_signer_tests/native_v4_job_signature_attests_exact_job_and_contents" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_signer_tests/native_v4_job_signer_enforces_policy_and_nonzero_digests" has passed with:
+      16 assertions out of 16 passed
+
+    Test case "sharepool_signer_tests/native_v4_job_signer_decoding_is_canonical_and_bounded" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_signer_tests/native_v5_job_signer_requires_matching_profile_and_binds_domain" has passed with:
+      3 assertions out of 3 passed
+
+    Test case "sharepool_signer_tests/native_v6_job_signer_binds_profile_and_exact_history_contents" has passed with:
+      5 assertions out of 5 passed
+
+  Test suite "sharepool_tests" has passed with:
+    10 test cases out of 10 passed
+    68 assertions out of 68 passed
+
+    Test case "sharepool_tests/independent_wire_and_hash_vectors" has passed with:
+      9 assertions out of 9 passed
+
+    Test case "sharepool_tests/bounded_canonical_parser" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_tests/exact_payouts_and_current_authorization" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_tests/carrier_layout_is_exact" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_tests/shares_use_native_pow_context_and_owner_binding" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_tests/proportional_rounding_aggregates_scripts" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_tests/duplicates_and_parent_opening_are_consensus_bound" has passed with:
+      4 assertions out of 4 passed
+
+    Test case "sharepool_tests/exact_age_and_nullifier_expiry" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_tests/default_disabled_and_explicit_regtest_parameters" has passed with:
+      13 assertions out of 13 passed
+
+    Test case "sharepool_tests/help_defaults_do_not_reinterpret_test_activation" has passed with:
+      2 assertions out of 2 passed
+
+  Test suite "sharepool_hash_tests" has passed with:
+    29 test cases out of 29 passed
+    1403 assertions out of 1403 passed
+
+    Test case "sharepool_hash_tests/independent_hash_and_wire_vectors" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_hash_tests/one_hundred_proofs_and_nonce_normalization" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_hash_tests/deduplicated_large_templates_preserve_complete_transaction_bytes" has passed with:
+      711 assertions out of 711 passed
+
+    Test case "sharepool_hash_tests/unsigned_preparation_never_exempts_nested_owner_authorizations" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_hash_tests/missing_data_is_distinct_from_invalidity" has passed with:
+      10 assertions out of 10 passed
+
+    Test case "sharepool_hash_tests/known_empty_preimage_is_invalid_without_requesting_data" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_hash_tests/local_callback_failures_are_unavailable_not_invalid_encoding" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_hash_tests/current_owner_reserved_roots_and_reward" has passed with:
+      11 assertions out of 11 passed
+
+    Test case "sharepool_hash_tests/share_target_authorization_binding_and_full_origin" has passed with:
+      11 assertions out of 11 passed
+
+    Test case "sharepool_hash_tests/unused_full_templates_also_require_native_validation" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_hash_tests/origin_memo_includes_exact_witness_body" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_hash_tests/recommitting_does_not_authorize_wrong_payouts" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_hash_tests/parent_state_repeat_payment_and_late_proof" has passed with:
+      9 assertions out of 9 passed
+
+    Test case "sharepool_hash_tests/canonical_order_and_duplicate_proofs" has passed with:
+      15 assertions out of 15 passed
+
+    Test case "sharepool_hash_tests/bounded_canonical_parser" has passed with:
+      428 assertions out of 428 passed
+
+    Test case "sharepool_hash_tests/overflow_safe_payout_arithmetic_without_32_share_quota" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_hash_tests/dependency_depth_is_a_distinct_bounded_failure" has passed with:
+      3 assertions out of 3 passed
+
+    Test case "sharepool_hash_tests/worked_refresh_admission_reserves_future_settlement_depth" has passed with:
+      11 assertions out of 11 passed
+
+    Test case "sharepool_hash_tests/dependency_depth_cannot_be_bypassed_by_a_shorter_memoized_path" has passed with:
+      3 assertions out of 3 passed
+
+    Test case "sharepool_hash_tests/dense_dependency_dag_checks_each_exact_origin_once" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_hash_tests/memoized_missing_origins_still_count_declared_dependency_edges" has passed with:
+      2 assertions out of 2 passed
+
+    Test case "sharepool_hash_tests/unique_dependency_bytes_are_bounded_across_recursion" has passed with:
+      2 assertions out of 2 passed
+
+    Test case "sharepool_hash_tests/deterministic_share_target_and_weighted_payouts" has passed with:
+      10 assertions out of 10 passed
+
+    Test case "sharepool_hash_tests/owner_attests_job_and_snapshot_but_allows_search" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_hash_tests/v5_cross_pool_admissions_parent_cutoff_and_exact_credit_state" has passed with:
+      43 assertions out of 43 passed
+
+    Test case "sharepool_hash_tests/v5_confirmed_work_outlives_fresh_proof_and_certificate_age" has passed with:
+      29 assertions out of 29 passed
+
+    Test case "sharepool_hash_tests/v5_certificates_bind_witness_body_owner_and_actual_parent" has passed with:
+      15 assertions out of 15 passed
+
+    Test case "sharepool_hash_tests/v5_byte_bounded_oldest_prefix_preserves_all_confirmed_credits" has passed with:
+      11 assertions out of 11 passed
+
+    Test case "sharepool_hash_tests/v5_parent_certificate_renews_worked_graph_depth_budget" has passed with:
+      11 assertions out of 11 passed
+
+  Test suite "sharepool_hash_store_tests" has passed with:
+    17 test cases out of 17 passed
+    824 assertions out of 824 passed
+
+    Test case "sharepool_hash_store_tests/snapshot_dependencies_are_hints_and_pending_blocks_own_requirements" has passed with:
+      15 assertions out of 15 passed
+
+    Test case "sharepool_hash_store_tests/damaged_snapshot_records_are_quarantined_repaired_and_reopened" has passed with:
+      116 assertions out of 116 passed
+
+    Test case "sharepool_hash_store_tests/hash_correct_malformed_snapshot_preimage_remains_consensus_evidence" has passed with:
+      9 assertions out of 9 passed
+
+    Test case "sharepool_hash_store_tests/selected_profile_preserves_legacy_malformed_hashes_and_isolates_v6_storage" has passed with:
+      207 assertions out of 207 passed
+
+    Test case "sharepool_hash_store_tests/v6_store_retains_wrong_version_preimage_for_profile_validation" has passed with:
+      11 assertions out of 11 passed
+
+    Test case "sharepool_hash_store_tests/damaged_pending_records_do_not_suppress_downloads_and_accept_exact_repair" has passed with:
+      107 assertions out of 107 passed
+
+    Test case "sharepool_hash_store_tests/quarantined_pending_records_keep_count_quota_until_repaired_or_removed" has passed with:
+      42 assertions out of 42 passed
+
+    Test case "sharepool_hash_store_tests/pending_body_matching_includes_witness_bytes" has passed with:
+      9 assertions out of 9 passed
+
+    Test case "sharepool_hash_store_tests/alternative_snapshot_sources_survive_a_damaged_source_and_exact_repair" has passed with:
+      24 assertions out of 24 passed
+
+    Test case "sharepool_hash_store_tests/template_lookup_tries_another_verified_source_after_runtime_disk_damage" has passed with:
+      20 assertions out of 20 passed
+
+    Test case "sharepool_hash_store_tests/quarantine_and_validated_reoffer_repair_exact_local_records" has passed with:
+      121 assertions out of 121 passed
+
+    Test case "sharepool_hash_store_tests/damaged_standalone_record_does_not_mask_authenticated_snapshot_source" has passed with:
+      21 assertions out of 21 passed
+
+    Test case "sharepool_hash_store_tests/repaired_deduplicated_transaction_reactivates_other_sound_references" has passed with:
+      12 assertions out of 12 passed
+
+    Test case "sharepool_hash_store_tests/same_txid_witness_variants_remain_distinct_in_deduplicated_storage_after_restart" has passed with:
+      35 assertions out of 35 passed
+
+    Test case "sharepool_hash_store_tests/wrong_witness_under_same_txid_is_quarantined_and_repaired_without_cross_contamination" has passed with:
+      47 assertions out of 47 passed
+
+    Test case "sharepool_hash_store_tests/recent_inventory_bounds_live_events_and_reports_overrun" has passed with:
+      19 assertions out of 19 passed
+
+    Test case "sharepool_hash_store_tests/recent_inventory_restart_epoch_cannot_skip_new_low_sequences" has passed with:
+      9 assertions out of 9 passed
+
+  Test suite "sharepool_archive_tests" has passed with:
+    9 test cases out of 9 passed
+    130347 assertions out of 130347 passed
+
+    Test case "sharepool_archive_tests/disk_index_exceeds_old_object_ceiling_with_bounded_inventory_and_cache" has passed with:
+      130158 assertions out of 130158 passed
+
+    Test case "sharepool_archive_tests/local_quota_is_finite_configurable_and_never_evicts_history" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_archive_tests/template_source_index_allowance_is_charged_before_durable_admission_and_recovers" has passed with:
+      73 assertions out of 73 passed
+
+    Test case "sharepool_archive_tests/archived_v6_templates_release_duplicate_storage_with_shared_transaction_safety" has passed with:
+      21 assertions out of 21 passed
+
+    Test case "sharepool_archive_tests/disposable_metadata_damage_and_stale_keys_rebuild_from_authenticated_preimages" has passed with:
+      11 assertions out of 11 passed
+
+    Test case "sharepool_archive_tests/reoffering_cached_bytes_repairs_the_durable_record" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_archive_tests/streaming_archive_chunks_resume_and_authenticate_selected_profile" has passed with:
+      40 assertions out of 40 passed
+
+    Test case "sharepool_archive_tests/archive_streams_operate_without_a_caller_chain_mutex" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_archive_tests/streaming_archive_rejects_corruption_truncation_trailing_data_and_resource_excess" has passed with:
+      23 assertions out of 23 passed
+
+  Test suite "sharepool_hash_relay_tests" has passed with:
+    15 test cases out of 15 passed
+    665 assertions out of 665 passed
+
+    Test case "sharepool_hash_relay_tests/ready_peers_cannot_overtake_each_other" has passed with:
+      160 assertions out of 160 passed
+
+    Test case "sharepool_hash_relay_tests/required_data_priority_and_disconnected_turns" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_hash_relay_tests/ordinary_ready_data_gets_service_amid_required_work" has passed with:
+      19 assertions out of 19 passed
+
+    Test case "sharepool_hash_relay_tests/block_request_reservations_displace_only_speculative_hints" has passed with:
+      10 assertions out of 10 passed
+
+    Test case "sharepool_hash_relay_tests/required_dependencies_refill_progressively_and_keep_their_root" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_hash_relay_tests/request_rotation_and_shared_provenance_survive_refresh" has passed with:
+      10 assertions out of 10 passed
+
+    Test case "sharepool_hash_relay_tests/inventory_is_quiet_until_change_or_recovery_replay" has passed with:
+      67 assertions out of 67 passed
+
+    Test case "sharepool_hash_relay_tests/inventory_changes_during_pagination_get_a_full_followup" has passed with:
+      13 assertions out of 13 passed
+
+    Test case "sharepool_hash_relay_tests/empty_and_shrinking_inventory_does_not_emit_empty_messages" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_hash_relay_tests/archive_cursor_replays_after_sixty_seconds_and_finishes_changed_cycles" has passed with:
+      9 assertions out of 9 passed
+
+    Test case "sharepool_hash_relay_tests/archive_cursor_advances_empty_quarantine_pages" has passed with:
+      4 assertions out of 4 passed
+
+    Test case "sharepool_hash_relay_tests/recent_work_and_archive_tail_both_progress_under_continual_insertion" has passed with:
+      142 assertions out of 142 passed
+
+    Test case "sharepool_hash_relay_tests/combined_live_archive_rate_fits_receiver_control_tokens" has passed with:
+      202 assertions out of 202 passed
+
+    Test case "sharepool_hash_relay_tests/live_event_order_and_repeated_repairs_emit_canonical_wire_inventory" has passed with:
+      4 assertions out of 4 passed
+
+    Test case "sharepool_hash_relay_tests/expired_serve_request_no_longer_conflicts_with_new_request" has passed with:
+      6 assertions out of 6 passed
+
+  Test suite "sharepool_retry_worker_tests" has passed with:
+    5 test cases out of 5 passed
+    7176 assertions out of 7176 passed
+
+    Test case "sharepool_retry_worker_tests/signals_during_a_pass_are_coalesced_but_not_lost" has passed with:
+      1011 assertions out of 1011 passed
+
+    Test case "sharepool_retry_worker_tests/shutdown_stops_active_work_and_discards_a_queued_notification" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_retry_worker_tests/shutdown_before_start_never_launches_work" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_retry_worker_tests/local_worker_failure_keeps_the_worker_available_for_a_later_signal" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_retry_worker_tests/native_reward_cache_retains_a_warmed_graph_under_eviction_pressure" has passed with:
+      6145 assertions out of 6145 passed
+
+  Test suite "sharepool_tides_tests" has passed with:
+    12 test cases out of 12 passed
+    211 assertions out of 211 passed
+
+    Test case "sharepool_tides_tests/eight_blocks_of_work_with_partial_oldest_share" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_tides_tests/startup_and_zero_reward" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_tides_tests/floor_per_address_without_remainder_redistribution" has passed with:
+      4 assertions out of 4 passed
+
+    Test case "sharepool_tides_tests/repeated_reward_and_retarget_preserve_old_history" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_tides_tests/job_cutoff_rejects_extra_work_and_wrong_cutoff_proof" has passed with:
+      3 assertions out of 3 passed
+
+    Test case "sharepool_tides_tests/invalid_history_is_rejected_even_below_current_window" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_tides_tests/separate_pool_reward_and_same_address_in_old_history" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_tides_tests/resource_budgets_fail_without_dropping_work_or_outputs" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_tides_tests/whole_history_requires_external_authentication" has passed with:
+      1 assertion out of 1 passed
+
+    Test case "sharepool_tides_tests/supported_script_shapes_and_near_misses" has passed with:
+      15 assertions out of 15 passed
+
+    Test case "sharepool_tides_tests/reward_and_network_work_bounds" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_tides_tests/known_answers_match_independent_python_reference" has passed with:
+      143 assertions out of 143 passed
+
+  Test suite "sharepool_tides_history_tests" has passed with:
+    16 test cases out of 16 passed
+    187 assertions out of 187 passed
+
+    Test case "sharepool_tides_history_tests/chronological_exact_work_suffix_retains_full_boundary_share" has passed with:
+      11 assertions out of 11 passed
+
+    Test case "sharepool_tides_history_tests/boundary_native_height_retains_every_pool_member_without_reading_older_history" has passed with:
+      15 assertions out of 15 passed
+
+    Test case "sharepool_tides_history_tests/boundary_cohort_never_returns_only_the_affordable_members" has passed with:
+      9 assertions out of 9 passed
+
+    Test case "sharepool_tides_history_tests/startup_and_absent_pool_require_complete_scan_to_activation" has passed with:
+      9 assertions out of 9 passed
+
+    Test case "sharepool_tides_history_tests/competing_branches_and_repeated_rewards_do_not_mutate_history" has passed with:
+      9 assertions out of 9 passed
+
+    Test case "sharepool_tides_history_tests/higher_difficulty_retrieves_history_below_previous_window" has passed with:
+      9 assertions out of 9 passed
+
+    Test case "sharepool_tides_history_tests/missing_data_keeps_progress_but_never_returns_partial_entitlements" has passed with:
+      9 assertions out of 9 passed
+
+    Test case "sharepool_tides_history_tests/empty_block_scans_resume_across_local_budget_and_cache_eviction" has passed with:
+      21 assertions out of 21 passed
+
+    Test case "sharepool_tides_history_tests/delta_and_query_budgets_are_local_failures_not_empty_or_invalid_history" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_tides_history_tests/raising_query_budget_resumes_without_losing_acknowledged_work_or_progress" has passed with:
+      15 assertions out of 15 passed
+
+    Test case "sharepool_tides_history_tests/local_cache_options_reject_unlimited_invalid_and_overflowing_values" has passed with:
+      29 assertions out of 29 passed
+
+    Test case "sharepool_tides_history_tests/process_configuration_is_validated_and_observable_without_consensus_mutation" has passed with:
+      5 assertions out of 5 passed
+
+    Test case "sharepool_tides_history_tests/wrong_local_anchor_and_callback_failures_are_not_consensus_invalidity" has passed with:
+      13 assertions out of 13 passed
+
+    Test case "sharepool_tides_history_tests/authenticated_admission_shape_and_numeric_order_are_checked" has passed with:
+      12 assertions out of 12 passed
+
+    Test case "sharepool_tides_history_tests/payout_address_may_appear_in_separate_pool_histories" has passed with:
+      8 assertions out of 8 passed
+
+    Test case "sharepool_tides_history_tests/cached_delta_owns_bytes_and_cursor_survives_new_index_objects" has passed with:
+      6 assertions out of 6 passed
+
+  Test suite "sharepool_tides_consensus_tests" has passed with:
+    8 test cases out of 8 passed
+    208 assertions out of 208 passed
+
+    Test case "sharepool_tides_consensus_tests/exact_assigned_work_and_probability_across_native_targets" has passed with:
+      37 assertions out of 37 passed
+
+    Test case "sharepool_tides_consensus_tests/legacy_hash_domains_and_new_profile_remain_distinct" has passed with:
+      19 assertions out of 19 passed
+
+    Test case "sharepool_tides_consensus_tests/rational_native_window_clips_boundary_without_integer_rounding" has passed with:
+      10 assertions out of 10 passed
+
+    Test case "sharepool_tides_consensus_tests/boundary_cohort_pays_every_recipient_independently_of_proof_order" has passed with:
+      106 assertions out of 106 passed
+
+    Test case "sharepool_tides_consensus_tests/fractional_cohort_uses_more_than_512_bits_without_losing_newer_work" has passed with:
+      7 assertions out of 7 passed
+
+    Test case "sharepool_tides_consensus_tests/actual_parent_plus_current_delta_pays_and_rewards_do_not_reset_history" has passed with:
+      17 assertions out of 17 passed
+
+    Test case "sharepool_tides_consensus_tests/same_recipient_can_join_multiple_pools_without_moving_old_work" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "sharepool_tides_consensus_tests/native_payout_queries_apply_configured_capacity_and_recover_after_increase" has passed with:
+      6 assertions out of 6 passed
