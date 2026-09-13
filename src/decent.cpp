@@ -79,25 +79,38 @@ CScript DecentClaimScript(const std::vector<CPubKey>& committee, const Consensus
     return CScript() << OP_0 << hash;
 }
 
-std::optional<CPubKey> ParseDecentVote(const CTransaction& coinbase)
+std::vector<CPubKey> ParseDecentVote(const CTransaction& tx)
 {
-    for (const CTxOut& out : coinbase.vout) {
+    for (const CTxOut& out : tx.vout) {
         const CScript& spk{out.scriptPubKey};
-        if (spk.size() != 2 + DECENT_VOTE_TAG.size() + CPubKey::COMPRESSED_SIZE) continue;
-        if (spk[0] != OP_RETURN) continue;
+        if (spk.empty() || spk[0] != OP_RETURN) continue;
 
         CScript::const_iterator pc{spk.begin() + 1};
         opcodetype opcode;
         std::vector<unsigned char> data;
         if (!spk.GetOp(pc, opcode, data)) continue;
-        if (data.size() != DECENT_VOTE_TAG.size() + CPubKey::COMPRESSED_SIZE) continue;
+        if (pc != spk.end()) continue; // exactly one push, nothing else in the script
+
+        if (data.size() <= DECENT_VOTE_TAG.size()) continue;
         if (!std::ranges::equal(std::span{data}.first(DECENT_VOTE_TAG.size()), DECENT_VOTE_TAG)) continue;
 
-        CPubKey key{std::span{data}.subspan(DECENT_VOTE_TAG.size())};
-        if (!key.IsFullyValid()) continue;
-        return key; // the first well-formed vote counts
+        const size_t candidate_bytes{data.size() - DECENT_VOTE_TAG.size()};
+        if (candidate_bytes == 0 || candidate_bytes % CPubKey::COMPRESSED_SIZE != 0) continue;
+        const size_t n{candidate_bytes / CPubKey::COMPRESSED_SIZE};
+        if (n < 1 || n > 2) continue; // not a well-formed vote; try the next output
+
+        std::vector<CPubKey> candidates;
+        bool all_valid{true};
+        for (size_t i = 0; i < n && all_valid; ++i) {
+            const size_t off{DECENT_VOTE_TAG.size() + i * CPubKey::COMPRESSED_SIZE};
+            CPubKey key{std::span{data}.subspan(off, CPubKey::COMPRESSED_SIZE)};
+            if (!key.IsFullyValid()) { all_valid = false; break; }
+            if (std::ranges::find(candidates, key) == candidates.end()) candidates.push_back(key); // dedupe
+        }
+        if (!all_valid || candidates.empty()) continue;
+        return candidates; // the first well-formed vote output counts
     }
-    return std::nullopt;
+    return {};
 }
 
 static std::vector<CPubKey> ParseAuthority(const std::vector<std::vector<unsigned char>>& raw)
@@ -121,8 +134,13 @@ static std::vector<CPubKey> ElectFromTerm(const CBlockIndex* pindex_prev, node::
         if (!index) continue;
         CBlock block;
         if (!blockman.ReadBlock(block, *index) || block.vtx.empty()) continue;
-        if (const auto vote{ParseDecentVote(*block.vtx[0])}) {
-            ++tally[std::vector<unsigned char>(vote->begin(), vote->end())];
+        // Votes are node operators' transactions, never the block's own
+        // coinbase: skip vtx[0] so a party with a hashpower majority cannot
+        // also hand itself a majority of votes. See decent.h.
+        for (size_t i = 1; i < block.vtx.size(); ++i) {
+            for (const CPubKey& candidate : ParseDecentVote(*block.vtx[i])) {
+                ++tally[std::vector<unsigned char>(candidate.begin(), candidate.end())];
+            }
         }
     }
 

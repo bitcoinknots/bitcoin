@@ -217,18 +217,13 @@ std::shared_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     if (IsDecentActive(nHeight, chainparams.GetConsensus())) {
         // The miner names a payee; the elected authority decides whether it is
         // paid. Escrow the reward for the authority sitting at this height.
+        // Note there is deliberately no equivalent of -decentralvote here: a
+        // miner's coinbase never counts as a vote (see decent.h), precisely so
+        // that mining a block and electing the authority remain independent.
+        // Node operators vote with castdecentvote instead.
         const auto committee{ComputeDecentAuthority(pindexPrev, m_chainstate.m_blockman, chainparams.GetConsensus())};
         if (committee.size() == 3) {
             coinbaseTx.vout[0].scriptPubKey = DecentEscrowScript(m_options.coinbase_output_script, committee);
-        }
-        // Optionally cast this block's vote for the next authority.
-        if (const auto vote{gArgs.GetArg("-decentralvote")}) {
-            const auto bytes{TryParseHex<unsigned char>(*vote)};
-            if (bytes && CPubKey{*bytes}.IsFullyValid()) {
-                std::vector<unsigned char> payload(DECENT_VOTE_TAG.begin(), DECENT_VOTE_TAG.end());
-                payload.insert(payload.end(), bytes->begin(), bytes->end());
-                coinbaseTx.vout.emplace_back(0, CScript() << OP_RETURN << payload);
-            }
         }
     }
     if (nHeight == chainparams.GetConsensus().DeploymentHeight(Consensus::DEPLOYMENT_BLAKE2B)) {

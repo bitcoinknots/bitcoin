@@ -1111,6 +1111,7 @@ RPCHelpMan sendall();
 RPCHelpMan walletprocesspsbt();
 RPCHelpMan walletcreatefundedpsbt();
 RPCHelpMan signrawtransactionwithwallet();
+RPCHelpMan castdecentvote();
 
 // signmessage
 RPCHelpMan signmessage();
@@ -1182,6 +1183,7 @@ Span<const CRPCCommand> GetWalletRPCCommands()
         {"wallet", &send},
         {"wallet", &sendmany},
         {"wallet", &sendtoaddress},
+        {"wallet", &castdecentvote},
         {"wallet", &sethdseed},
         {"wallet", &setlabel},
         {"wallet", &setfeerate},

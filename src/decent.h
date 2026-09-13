@@ -33,7 +33,8 @@ class BlockManager;
  * Blocks are produced and weighted by proof of work as usual. What changes is
  * who controls newly minted coins. From the activation height, every coinbase
  * output carrying value must pay into an escrow controlled by the network's
- * authority: three public keys, elected by miners, that rotate every term.
+ * authority: three public keys, elected by node operators, that rotate every
+ * term.
  *
  * The escrow is a bare 2-of-3 multisig of the authority sitting when the block
  * was mined, with the payee the miner intended committed alongside it:
@@ -52,13 +53,28 @@ class BlockManager;
  * life of that coinbase. Elections rotate who mints future coinbases, not who
  * settles past ones.
  *
- * The authority is chosen by vote. Each block's coinbase may carry one vote:
+ * The authority is chosen by vote, and voting is deliberately decoupled from
+ * mining. A vote is an ordinary, non-coinbase transaction carrying one output:
  *
- *     OP_RETURN <"DEC1" || compressed pubkey>
+ *     OP_RETURN <"DEC1" || pubkey_1 [|| pubkey_2]>
  *
- * Over a term, the three pubkeys named in the most blocks become the next
- * term's authority. If fewer than three distinct pubkeys are voted for, the
- * sitting authority carries over.
+ * naming 1 or 2 distinct candidate pubkeys (see castdecentvote; capped at 2,
+ * not 3, because 3 compressed pubkeys plus the tag is 103 bytes, past this
+ * build's fixed 80-byte OP_RETURN policy ceiling -- a 2-candidate vote is the
+ * most this or any other default-policy node will ever relay). Each named
+ * candidate receives one point (approval voting: naming two candidates costs
+ * nothing extra and does not dilute a voter's support for either one).
+ * Votes cast in a block's own coinbase are never counted, on purpose: the
+ * whole point of moving voting out of the coinbase is that a party with a
+ * majority of hashpower must not thereby also acquire a majority of votes.
+ * Casting a vote costs an ordinary transaction fee — cheap, but not free, and
+ * priced in a currency (a spendable UTXO) that hashpower does not by itself
+ * confer.
+ *
+ * Over a term, the three pubkeys with the most points become the next term's
+ * authority, ties broken by pubkey so every node computes the same result. If
+ * fewer than three distinct pubkeys received any votes, the sitting authority
+ * carries over.
  */
 
 //! Largest payee scriptPubKey an escrow may name.
@@ -87,8 +103,11 @@ CScript DecentClaimWitnessScript(const std::vector<CPubKey>& committee, const Co
 //! Where a claim sends coins: the P2WSH output for DecentClaimWitnessScript.
 CScript DecentClaimScript(const std::vector<CPubKey>& committee, const Consensus::Params& params);
 
-//! The pubkey a coinbase votes for, if it casts a well-formed vote.
-std::optional<CPubKey> ParseDecentVote(const CTransaction& coinbase);
+//! The 1 or 2 candidate pubkeys named by a well-formed vote transaction,
+//! deduplicated, or empty if `tx` does not carry one. Operates on any
+//! transaction; callers that must not count coinbase votes (see decent.h)
+//! are responsible for excluding coinbases before calling this.
+std::vector<CPubKey> ParseDecentVote(const CTransaction& tx);
 
 //! The authority in effect for the block at `pindex_prev`'s child height (see decent.h).
 std::vector<CPubKey> ComputeDecentAuthority(const CBlockIndex* pindex_prev, node::BlockManager& blockman, const Consensus::Params& params);

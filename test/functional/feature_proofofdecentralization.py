@@ -7,7 +7,9 @@
 Blocks are mined by proof of work, but every coinbase is escrowed to a 2-of-3
 multisig of the authority sitting when it was mined. The authority may release a
 coinbase to its payee or claim it behind a timelock, but not redirect it. The
-authority is re-elected by coinbase votes each term.
+authority is re-elected each term by ordinary, non-coinbase vote transactions
+cast by node wallets via castdecentvote -- deliberately not by miners, so that
+hashpower cannot also buy itself a majority of votes (see decent.h and PR #411).
 """
 
 from decimal import Decimal
@@ -17,7 +19,7 @@ from test_framework.key import ECKey
 from test_framework.messages import COutPoint, CTransaction, CTxIn, CTxOut
 from test_framework.script import (
     CScript, LegacySignatureHash, SIGHASH_ALL,
-    OP_0, OP_2, OP_3, OP_CHECKMULTISIG, OP_DROP, OP_TRUE, hash160,
+    OP_0, OP_2, OP_3, OP_CHECKMULTISIG, OP_DROP, OP_RETURN, OP_TRUE, hash160,
 )
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, assert_raises_rpc_error
@@ -130,25 +132,53 @@ class ProofOfDecentralizationTest(BitcoinTestFramework):
         block.solve()
         assert_equal(node.submitblock(block.serialize().hex()), "bad-decent-coinbase")
 
-        self.log.info("miners elect a new authority by voting over a term")
-        # Fill the rest of the current term, then a full term voting three
-        # candidates, so the next term's authority becomes those three.
+        self.log.info("a coinbase vote from a miner does not count towards the election")
+        # This is the direct regression test for the PR #411 objection: a party
+        # with a hashpower majority must not be able to also hand itself a
+        # majority of votes just by tagging its own coinbase. Craft a block
+        # whose *coinbase* carries a well-formed DEC1 vote for a bogus key, and
+        # confirm it never appears in a later tally.
+        bogus_key = make_key(9999).get_pubkey().get_bytes()
         height = node.getblockcount()
         term_end = ((height - 0) // TERM + 1) * TERM
+        tip = node.getbestblockhash()
+        next_height = node.getblockcount() + 1
+        # The coinbase must still be validly escrowed to the *current* authority
+        # (still self.committee_pubs; the election hasn't run yet) -- the vote
+        # tag rides along as an extra zero-value output, exactly like the old
+        # miner-vote format, so this is the strongest form of the regression:
+        # a properly-formed, otherwise-valid block whose embedded vote must
+        # still be ignored.
+        decoy_payee_spk = bytes.fromhex(node.getaddressinfo(node.getnewaddress())["scriptPubKey"])
+        cb = create_coinbase(next_height, script_pubkey=self.escrow_spk(decoy_payee_spk, self.committee_pubs))
+        cb.vout.append(CTxOut(0, CScript([OP_RETURN, b'DEC1' + bogus_key])))
+        cb.rehash()
+        coinbase_vote_block = create_block(int(tip, 16), cb, node.getblock(tip)["time"] + 1)
+        coinbase_vote_block.solve()
+        assert_equal(node.submitblock(coinbase_vote_block.serialize().hex()), None)
+        self.log.info("(coinbase-vote block accepted -- it's a perfectly valid, properly-escrowed block; the vote inside it just never counts)")
+
+        self.log.info("node wallets elect a new authority with castdecentvote, not miners")
+        # Fill the rest of the current term, then cast one ordinary transaction
+        # naming all three candidates (approval voting: each named candidate
+        # gets one point) so the next term's authority becomes those three.
+        height = node.getblockcount()
         self.generatetoaddress(node, term_end - height, node.getnewaddress())  # finish current term
 
-        for cand in self.candidates:
-            self.restart_node(0, extra_args=self.base_args + [f"-decentralvote={cand.get_pubkey().get_bytes().hex()}"])
-            node = self.nodes[0]
-            self.generatetoaddress(node, TERM // len(self.candidates), node.getnewaddress())
+        # A vote names at most 2 candidates (see castdecentvote's help: 3
+        # compressed pubkeys plus the tag would exceed this build's fixed
+        # 80-byte OP_RETURN policy ceiling). One 2-candidate vote plus one
+        # 1-candidate vote gets all three of this test's candidates a point.
+        vote_txid_1 = node.castdecentvote([c.get_pubkey().get_bytes().hex() for c in self.candidates[:2]])
+        vote_txid_2 = node.castdecentvote([self.candidates[2].get_pubkey().get_bytes().hex()])
+        mempool = node.getrawmempool()
+        assert vote_txid_1 in mempool and vote_txid_2 in mempool
+        self.generatetoaddress(node, TERM, node.getnewaddress())  # confirm the votes and complete the term
 
-        # Into the next term: the authority should now be the three candidates.
-        self.restart_node(0, extra_args=self.base_args)
-        node = self.nodes[0]
-        self.generatetoaddress(node, 1, node.getnewaddress())
         elected = sorted(node.getdecentinfo()["authority"])
         assert_equal(elected, sorted(c.get_pubkey().get_bytes().hex() for c in self.candidates))
-        self.log.info("authority rotated to the elected candidates")
+        assert bogus_key.hex() not in elected
+        self.log.info("authority rotated to the elected candidates; the coinbase-only vote had no effect")
 
 
 if __name__ == '__main__':
