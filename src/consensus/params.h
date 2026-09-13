@@ -107,6 +107,10 @@ struct Params {
     int SegwitHeight;
     /** Block height at which BLAKE2b hardfork becomes active */
     int Blake2bHeight{std::numeric_limits<int>::max()};
+    //! From this height, a block whose coinbase pays any output script on
+    //! this list is rejected (Pool Blocklist / Solo Salvation).
+    int blocklist_height{std::numeric_limits<int>::max()};
+    std::vector<std::vector<unsigned char>> blocklisted_scripts;
     std::vector<unsigned char> Blake2bHeadline;
     uint8_t Blake2bTargetShift{20};
     /**

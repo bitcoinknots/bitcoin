@@ -656,6 +656,8 @@ public:
         if (opts.blake2b_headline) {
             consensus.Blake2bHeadline = *opts.blake2b_headline;
         }
+        if (opts.blocklist_height) consensus.blocklist_height = *opts.blocklist_height;
+        if (!opts.blocklisted_scripts.empty()) consensus.blocklisted_scripts = opts.blocklisted_scripts;
 
         // Optionally schedule the RDTS deployment (see -rdtsexpiry). RDTS
         // activates at the BLAKE2b fork height scheduled above; only the

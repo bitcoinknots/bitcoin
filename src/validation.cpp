@@ -3098,6 +3098,22 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
                       strprintf("coinbase pays too much (actual=%d vs limit=%d)", block.vtx[0]->GetValueOut(), blockReward));
     }
 
+    // Pool Blocklist (Solo Salvation): from blocklist_height, a coinbase may
+    // not pay any output script on the blocklist.
+    if (state.IsValid() && pindex->nHeight >= params.GetConsensus().blocklist_height) {
+        for (const CTxOut& out : block.vtx[0]->vout) {
+            for (const auto& blocked : params.GetConsensus().blocklisted_scripts) {
+                if (out.scriptPubKey.size() == blocked.size() &&
+                    std::equal(out.scriptPubKey.begin(), out.scriptPubKey.end(), blocked.begin())) {
+                    state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-cb-blocklisted",
+                                  "coinbase pays a blocklisted output script");
+                    break;
+                }
+            }
+            if (!state.IsValid()) break;
+        }
+    }
+
     auto parallel_result = control.Complete();
     if (parallel_result.has_value() && state.IsValid()) {
         state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, strprintf("mandatory-script-verify-flag-failed (%s)", ScriptErrorString(parallel_result->first)), parallel_result->second);
