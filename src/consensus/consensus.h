@@ -20,9 +20,9 @@ static const int64_t MAX_BLOCK_SIGOPS_COST = 80000;
 /** Coinbase transaction outputs can only be spent after this number of new blocks (network rule) */
 static const int COINBASE_MATURITY = 100;
 /** Batched extended coinbase maturity (temporary softfork). Assigned by
- *  creating-block hash GetUint64(0) % 6 so ~1/6 of window coinbases mature
- *  at 2016, ~2/6 at 4032, and ~1/2 at 8064. Unknown until PoW is found.
- *  No extra coinbase outputs. */
+ *  creating-block hash GetUint64(0) % 6 (low 64 bits / displayed-hash tail)
+ *  so ~1/6 of window coinbases mature at 2016, ~2/6 at 4032, and ~1/2 at
+ *  8064. The high word is unusable: PoW zeros it. No extra coinbase outputs. */
 static const int EXTENDED_COINBASE_MATURITY_SHORT = 2016;
 static const int EXTENDED_COINBASE_MATURITY_MID = 4032;
 static const int EXTENDED_COINBASE_MATURITY_LONG = 8064;

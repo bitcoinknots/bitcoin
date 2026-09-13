@@ -60,20 +60,21 @@ int CoinbaseHashMod6(const uint256& creating_block_hash);
  * CoinbaseHashMod6 of the creating block (0..5). Pass INT_MAX for both
  * bounds when the deployment is unscheduled. hash_mod6 is ignored outside
  * the window. Default 5 is only for unit tests that pass the residue
- * explicitly. CheckTxInputs Asserts a tip when the window is live.
+ * explicitly.
  */
 int RequiredCoinbaseMaturity(int coinbase_height, int ext_start_height, int ext_expiry_height, int hash_mod6 = 5);
 
 /**
  * Check whether all inputs of this transaction are valid (no double spends and amounts)
  * This does not modify the UTXO set. This does not check scripts and sigs.
- * @param[in] hash_tip Required when a coinbase input was created inside the
- *            extended-maturity window. Creating-block hash is
- *            hash_tip->GetAncestor(coin.nHeight)->GetBlockHash().
+ * @param[in] hash_tip Must be passed explicitly. Required (non-null) when a
+ *            coinbase input was created inside the extended-maturity window.
+ *            Creating-block hash is hash_tip->GetAncestor(coin.nHeight)->GetBlockHash().
+ *            Callers that pass disabled (INT_MAX) bounds may pass nullptr.
  * @param[out] txfee Set to the transaction fee if successful.
  * Preconditions: tx.IsCoinBase() is false.
  */
-[[nodiscard]] bool CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, CheckTxInputsRules rules, int ext_start_height = (std::numeric_limits<int>::max)(), int ext_expiry_height = (std::numeric_limits<int>::max)(), const CBlockIndex* hash_tip = nullptr);
+[[nodiscard]] bool CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, CheckTxInputsRules rules, int ext_start_height, int ext_expiry_height, const CBlockIndex* hash_tip);
 } // namespace Consensus
 
 /** Auxiliary functions for transaction validation (ideally should not be exposed) */

@@ -403,11 +403,6 @@ BOOST_AUTO_TEST_CASE(block_malleation)
 }
 
 
-#include <consensus/consensus.h>
-#include <consensus/tx_verify.h>
-#include <limits>
-#include <vector>
-
 static std::vector<CBlockIndex> MakeTimedChain(const std::vector<int64_t>& times)
 {
     std::vector<CBlockIndex> chain(times.size());

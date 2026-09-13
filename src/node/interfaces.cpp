@@ -592,7 +592,11 @@ public:
         ExtendedCoinbaseMaturityBounds(chainman().GetConsensus(), *tip, ext_start, ext_expiry);
         int hash_mod6 = 5;
         if (coinbase_height >= ext_start && coinbase_height < ext_expiry) {
-            const CBlockIndex* created{Assert(chainman().ActiveChain()[coinbase_height])};
+            // Height comes from a wallet TxStateConfirmed. ActiveChain()[h]
+            // is the creating block while that coin still exists. A miss is a
+            // disconnect race (entry about to be dropped); do not crash RPC.
+            const CBlockIndex* created{chainman().ActiveChain()[coinbase_height]};
+            if (!created) return COINBASE_MATURITY;
             hash_mod6 = Consensus::CoinbaseHashMod6(created->GetBlockHash());
         }
         return Consensus::RequiredCoinbaseMaturity(coinbase_height, ext_start, ext_expiry, hash_mod6);

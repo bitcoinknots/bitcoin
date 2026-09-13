@@ -175,6 +175,9 @@ bool Consensus::CheckOutputSizes(const CTransaction& tx, TxValidationState& stat
 
 int Consensus::CoinbaseHashMod6(const uint256& creating_block_hash)
 {
+    // Low 64 bits of the uint256 (tail of the displayed hash), not the
+    // PoW-zeroed high word. GetUint64(3) cannot produce residues 4 or 5
+    // at current mainnet difficulty; GetUint64(0) stays uniform.
     return static_cast<int>(creating_block_hash.GetUint64(0) % 6);
 }
 
