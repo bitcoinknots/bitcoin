@@ -47,6 +47,10 @@ class TidesRPC(FakeRPC):
                 "signing_payload": opening.signing_payload.hex(), "signing_hash": opening.owner_message[::-1].hex()}
 
     def __call__(self, method, *args):
+        if method == "getsharepoolhashtidesbudget":
+            self.calls.append((method, args))
+            return {"native_tip": self.tip, "native_bits": 0x207fffff, "pool": args[0],
+                    "payout_script": args[1], "output_count": 1, "output_bytes": 9 + len(bytes.fromhex(args[1]))}
         if method == "preparesharepoolhashjob":
             self.calls.append((method, args))
             proposal = Snapshot.deserialize(bytes.fromhex(args[0]))
@@ -220,6 +224,65 @@ class TidesGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "payout validation refused"):
             self.gate.make_native(sign_owner=signer)
         self.assertEqual(self.gate.archive_head(), head)
+
+    def test_batch_reserves_historical_and_current_recipients_and_count_prefix(self):
+        self.gate.receive(self.proof)
+        rpc = self.rpc
+        def historical(method, *args):
+            value = rpc(method, *args)
+            if method == "getsharepoolhashtidesbudget":
+                value.update(output_count=252, output_bytes=252 * 31)
+            return value
+        self.gate.rpc = historical
+        status = self.gate.batch_status()
+        # 252 historical slots + one current script crosses CompactSize's
+        # one-byte boundary. Historical zero-rounding must not erase slots.
+        self.assertEqual(status["resources"]["payout_reservation_bytes"], 252 * 31 + 2)
+        reserved = status["resources"]["reserved_snapshot_bytes"]
+        self.gate.snapshot_budget = reserved - 1  # Deliberate boundary fixture.
+        self.assertEqual(self.gate.batch_status()["selected_proofs"], ())
+        self.assertEqual(self.gate.archive_head()["receipt_revision"], 1)
+        self.gate.snapshot_budget = reserved
+        self.assertEqual(self.gate.batch_status()["selected_proofs"], (f"{self.proof.proof_id:064x}",))
+
+    def test_foreign_pool_proofs_do_not_reserve_local_payouts(self):
+        origin, opening = codec_fixture(pool=7)
+        proof = solve_share(origin, opening)
+        self.gate.register_snapshot(opening.serialize())
+        self.gate.register_template(origin.serialize())
+        self.gate.receive(proof)
+        status = self.gate.batch_status()
+        self.assertEqual(status["resources"]["payout_reservation_bytes"], 0)
+        self.assertEqual(status["selected_proofs"], (f"{proof.proof_id:064x}",))
+
+    def test_bad_reservation_context_or_sizes_never_reach_the_signer(self):
+        rpc = self.rpc
+        for mutation in ({"native_tip": "ab" * 32}, {"pool": "cd" * 32}, {"output_count": True},
+                         {"output_count": 0}, {"output_bytes": 30}, {"output_bytes": 44}, {"native_bits": 0}):
+            with self.subTest(mutation=mutation):
+                def broken(method, *args):
+                    result = rpc(method, *args)
+                    return dict(result, **mutation) if method == "getsharepoolhashtidesbudget" else result
+                self.gate.rpc = broken
+                with self.assertRaisesRegex(ValueError, "payout reservation failed"):
+                    self.gate.make_native(sign_owner=lambda unused: self.fail("signer called"))
+
+    def test_difficulty_change_after_reservation_requires_new_job(self):
+        rpc = self.rpc
+        def changed(method, *args):
+            result = rpc(method, *args)
+            return dict(result, native_bits=0x207ffffe) if method == "getsharepoolhashtidesbudget" else result
+        self.gate.rpc = changed
+        with self.assertRaisesRegex(ValueError, "difficulty changed after payout reservation"):
+            self.gate.make_native(sign_owner=lambda unused: self.fail("signer called"))
+
+    def test_payout_reservation_also_counts_toward_dependency_bytes(self):
+        self.gate.receive(self.proof)
+        size = self.gate.batch_status()["resources"]["dependency_bytes"]
+        with patch("hash_mining_gate.MAX_DEPENDENCY_BYTES", size):
+            result = self.gate.batch_status()
+        self.assertEqual(result["selected_proofs"], ())
+        self.assertEqual(result["deferred_count"], 1)
 
     def test_confirmed_receipt_never_claims_paid_once_or_current_window_eligibility(self):
         self.gate.receive(self.proof)

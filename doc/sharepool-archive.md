@@ -13,7 +13,7 @@ regtest chain; an archive cannot migrate an old chain into the revised rules.
 
 `-sharepoolarchivemib=1024` is the default positive, finite local quota. Increase
 it explicitly when provisioning more disk. The quota charges the snapshot's raw
-bytes plus 128 bytes per record and 192 bytes per decoded template for keys and
+bytes plus 128 bytes per record and 224 bytes per decoded template for keys and
 source-index overhead. The template allowance conservatively covers a complete
 four-source index record even when snapshots share existing records. There is no fixed
 snapshot-count ceiling. `getsharepoolhashstatus` reports raw retained bytes,
@@ -32,12 +32,26 @@ contained in a durable snapshot can release its duplicate local record, and
 shared transactions are released only after their remaining local references
 are gone. Unarchived jobs still consume the bounded local cache.
 
-Startup authenticates the retained snapshot records and rebuilds disposable disk
-indexes one record at a time. Memory does not grow with the snapshot count, but
-startup time and I/O grow with the retained archive. Corrupt preimages are
-quarantined, remain charged to the quota, and can be replaced by verified
-reoffers. Damaged metadata requires a restart to rebuild its index. Neither case
-turns missing local data into an invalid Bitcoin block.
+Ordinary startup loads a versioned, checksummed accounting checkpoint bound to
+the selected profile and rules hash. It reads no historical snapshot payloads.
+Snapshot bytes, metadata, template-source indexes and counters are committed in
+one synchronous LevelDB batch. Bounded unfinished jobs and pending block bodies
+still require their own startup reads; opening and recovering LevelDB's write log
+also costs I/O. This removes the full archive scan from normal restarts, not all
+startup work.
+
+The first start of a previous r2 archive migrates its disposable indexes once.
+Migration and explicit repair authenticate the retained payloads in bounded,
+durably checkpointed batches. Their total time still grows with retained history;
+interruption resumes from the last committed cursor. A quota increase can resume
+a stopped migration. See [startup and repair](sharepool-archive-startup.md).
+
+Retrieval authenticates every uncached payload against its requested hash.
+Corrupt preimages are quarantined, remain charged, and can be replaced by verified
+reoffers. Damaged or missing metadata/source indexes require explicit repair with
+`-sharepoolarchiveindexrebuild=1`; missing or damaged records remain unavailable.
+The local checkpoint does not establish consensus validity or archive completeness.
+Neither corruption nor quota exhaustion makes a block invalid.
 
 ## Inspect and export
 

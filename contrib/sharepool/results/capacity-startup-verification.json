@@ -1,0 +1,254 @@
+{
+  "schema": 1,
+  "kind": "SharePool v6-r2 archive checkpoint, payout fitting, parsing cache and finite capacity/variance follow-up",
+  "recorded_utc": "2026-09-13T09:19:28.397638+00:00",
+  "source_base_commit": "5d3194f1c110d4aebd218de8de7d64a01e7d3662",
+  "source_identity": "The source hashes identify the changes recorded with this manifest; the enclosing commit is its publication revision.",
+  "profile": {
+    "snapshot_version": 6,
+    "rules_revision": 2,
+    "rules_hash": "9050ab43fa5feddb7f0659abc4ca43f596d4465f93535f3b9ab37449397e6edd",
+    "share_shift": 10,
+    "consensus_or_wire_rules_changed": false,
+    "mainnet_enabled": false
+  },
+  "final_binary_sha256": {
+    "bitcoind": "a7c5cbd34c882ccd942cd819963d2e480212061341aaeffd7eff458ef178f116",
+    "bitcoin-sharepool-signer": "27b76bfbc15b9df4fe5ae7d68ff9bf48286e82d6aa8ff2e6829e633d56e49b81",
+    "test_bitcoin": "04d43684135e2469ac68beb565d248681f19a72d4d94e7299fa9471073706876"
+  },
+  "source_sha256": {
+    "contrib/sharepool/capacity_metrics.py": "d39eb7a191fc90333a0e4619fd02613cf7522040c894b2fd73b3333cd0e9debd",
+    "contrib/sharepool/hash_mining_gate.py": "91646df17fb30d55486b69cf485979cfd3e22d307a8a0ab3f8a74d6d553824dd",
+    "contrib/sharepool/test_capacity_metrics.py": "aefcbf8ba1a073a6e47424f21b409951ee1b01a52a1a5de25296f083535dad0d",
+    "contrib/sharepool/test_hash_mining_gate.py": "41ef360eab29a5ef36f90208828611f2fae9a8ad53c8cd114fcaf4f503964d14",
+    "contrib/sharepool/test_hash_tides.py": "6eed3b4f2b94459d21f5e81f3173f6d06c3c7c977f63fd14584a0856cea0cfb8",
+    "contrib/sharepool/test_tides_calibration.py": "cb3d082c4dfb8369475f8e349a1f5d741916721278155f6e92e294db3d019147",
+    "contrib/sharepool/test_tides_conditional_variance.py": "17185b4fd298093c37bfb8636e808ff9ceb54aa68b3bf271e63806863f56fbc8",
+    "contrib/sharepool/test_tides_service_contract.py": "34abea6a53412d2edcf71920d8d9a0a34c72267e64871aeb314a44967fac57bb",
+    "contrib/sharepool/tides_calibration.py": "43314b88018ecba91f71d51247e94252c01b4b68fece6a3965f17bb23ecfb30d",
+    "contrib/sharepool/tides_conditional_variance.py": "79a26973f08a52c0cd3d8240ea4c4adf085c34a26102f04a37bb08d233731a18",
+    "contrib/sharepool/tides_service_contract.py": "12227edb3a11700d605e42c454aeafb4c9853f4a82dd858fd72bd20f3909997d",
+    "doc/sharepool-archive-startup.md": "18e0e8b93b03cf1b11f3e291cac28517fa92a4291361f82f2a878f929c6b4221",
+    "doc/sharepool-archive.md": "84c269cdb88d170b519e675b726b09d1f0113ad0c4391fed85ca2a8a192a5097",
+    "doc/sharepool-capacity-calibration.md": "fcd6c57c85ca29ee8ce731436f5b3012d9dc94a7fb8fbd2d787aab2971c783fa",
+    "doc/sharepool-capacity-startup-report.md": "b48af060cf7a5adf5c876a8c23013217b7ccd580465b56b303e0d77c76535618",
+    "doc/sharepool-payout-reservation.md": "3560bda5ecd30984c01b2fba5204cceff1206d41cf9c4458c0edd1fc2c4c2bec",
+    "doc/sharepool-production-gaps.md": "ad4e00f2488064d529aeb53f866063f28128a793f15fa67ef63438a65a140fb1",
+    "doc/sharepool-variance-contract.md": "b34d33b3192ee812f7669c22f801e334035656dd9d955ac53cccb1ad5f05af2c",
+    "src/init.cpp": "72a6bb526528b766fc113d39cdb96d62f3a21debd56f8e973654cc39ba3ab056",
+    "src/kernel/chainstatemanager_opts.h": "52491211108db421c754616969ca703f548b567e530a140f4477a59d0e8dea59",
+    "src/node/chainstatemanager_args.cpp": "a722214596ee21d7869572a8fd008d276c188028e5f5a3811b345adcb3b37ebe",
+    "src/rpc/mining.cpp": "433a1fdc8d4c589c45d65b641301983149ad25bdbaa88fc57c3fc745b8b5868e",
+    "src/sharepool/hash_store.cpp": "a4c82e80eeef0854809f6475fbc8c07731eb8aabb33f0d47bec7879d65255acc",
+    "src/sharepool/hash_store.h": "e4c922a5521a3bfe7308b27a36f69ba651f68bb96095b22642ca1b5ddfdb6ee2",
+    "src/test/sharepool_hash_store_tests.cpp": "2a65039a77e129d71b40eef9ca38e65ff5462d2b0bfe4da48fc2383fa9097687",
+    "src/validation.cpp": "10738e8b5d76e93597b39a385cbde08dc379fd5d2072df4913d42a46d0468bff",
+    "test/functional/feature_sharepool_hash_archive.py": "ffe1655520f4a046434c4882b47b4b424e5620f8bcc5e04d5c7cffa0f6a47158",
+    "test/functional/feature_sharepool_hash_capacity.py": "2a9cc740281df65e3387f99a6517fa26daf092731f1ee21c7f97db9f0b8a0ff8",
+    "test/functional/feature_sharepool_hash_tides.py": "020a42f6676a56208be7ed019660b67bddfa1d01b293b15cd9b2a18c7085cca3",
+    "test/functional/feature_sharepool_hash_tides_zero_reward.py": "a55b5693faf3610b67482916a48cf071e71d3dccc511b5f18849158f54787be4",
+    "test/functional/test_runner.py": "0a9d77fc01cee80a7dc18470329e0a1ffecafdca57ba4fac2a94f0272995e340"
+  },
+  "build_command": [
+    "/private/tmp/sharepool-build-tools-20260912/cmake/data/bin/cmake",
+    "--build",
+    "/private/tmp/sharepool-native-build",
+    "--target",
+    "bitcoind",
+    "test_bitcoin",
+    "--parallel",
+    "2"
+  ],
+  "cpp": {
+    "command": [
+      "/private/tmp/sharepool-native-build/bin/test_bitcoin",
+      "--run_test=sharepool*",
+      "--report_level=detailed",
+      "--log_level=test_suite"
+    ],
+    "cases_passed": 145,
+    "assertions_passed": 141630,
+    "exit_code": 0,
+    "binary_sha256": "04d43684135e2469ac68beb565d248681f19a72d4d94e7299fa9471073706876",
+    "log": "capacity-startup-cpp-tests.txt"
+  },
+  "python_suites": [
+    {
+      "command": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "contrib/sharepool",
+        "-p",
+        "test_hash*.py"
+      ],
+      "cases_passed": 135,
+      "exit_code": 0,
+      "log": "capacity-startup-python-hash-tests.txt"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "contrib/sharepool",
+        "-p",
+        "test_tides*.py"
+      ],
+      "cases_passed": 74,
+      "exit_code": 0,
+      "log": "capacity-startup-python-tides-tests.txt"
+    },
+    {
+      "command": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "contrib/sharepool",
+        "-p",
+        "test_capacity_metrics.py"
+      ],
+      "cases_passed": 6,
+      "exit_code": 0,
+      "log": "capacity-startup-python-metrics-tests.txt"
+    }
+  ],
+  "python_cases_passed": 215,
+  "seven_scenario_native_regression": {
+    "artifact": "capacity-startup-native-checks.json",
+    "passed": 7,
+    "native_binary_sha256": "657c66e80bf97f9f1ed246689d23a19897d56618b2de9802c08ce382a5ce1e46",
+    "scope": "Recorded pre-cache helper and pre-final malformed-key traversal fix. Individual test commands and hashes are retained in the artifact."
+  },
+  "final_native_archive": {
+    "command": [
+      "python3",
+      "-B",
+      "test/functional/feature_sharepool_hash_archive.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-capacity-startup-archive-exact-key-final",
+      "--portseed=1028",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "native_binary_sha256": "a7c5cbd34c882ccd942cd819963d2e480212061341aaeffd7eff458ef178f116",
+    "artifact": "capacity-startup-archive-exact-key-final.json",
+    "log": "capacity-startup-archive-exact-key-final.txt"
+  },
+  "post_cache_software_transport": {
+    "command": [
+      "python3",
+      "-B",
+      "test/functional/feature_sharepool_hash_tides.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-capacity-startup-cpu-final-cache",
+      "--portseed=1027",
+      "--cpu-capture",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "native_binary_sha256": "657c66e80bf97f9f1ed246689d23a19897d56618b2de9802c08ce382a5ce1e46",
+    "log": "capacity-startup-cpu-final-cache.txt",
+    "physical_device_used": false
+  },
+  "capacity": [
+    {
+      "artifact": "capacity-native-100-small.json",
+      "native_binary_sha256": "c1bf44f6c31fc9f5b3cfea41f803d4fefebf7201a43373f88e74f4219e1c361f",
+      "proofs_admitted": 900,
+      "origins": 300,
+      "blocks": 8,
+      "elapsed_seconds": 928.4676551660001,
+      "expired": 0,
+      "final_backlog": 0,
+      "payout_oracle_verified": true,
+      "host_load": "concurrent"
+    },
+    {
+      "artifact": "capacity-native-100-interleaved-quiet.json",
+      "native_binary_sha256": "657c66e80bf97f9f1ed246689d23a19897d56618b2de9802c08ce382a5ce1e46",
+      "proofs_admitted": 900,
+      "origins": 300,
+      "blocks": 9,
+      "elapsed_seconds": 689.4476042919999,
+      "expired": 0,
+      "final_backlog": 0,
+      "payout_oracle_verified": true,
+      "host_load": "quiescent"
+    },
+    {
+      "artifact": "capacity-native-100-large.json",
+      "native_binary_sha256": "657c66e80bf97f9f1ed246689d23a19897d56618b2de9802c08ce382a5ce1e46",
+      "proofs_admitted": 300,
+      "origins": 100,
+      "blocks": 3,
+      "elapsed_seconds": 438.922719792,
+      "expired": 0,
+      "final_backlog": 0,
+      "payout_oracle_verified": true,
+      "host_load": "concurrent"
+    }
+  ],
+  "model_verification": "tides-v6-service-contract-verification.json",
+  "provenance_limits": [
+    "Capacity JSON files retain the native binary, gate, codec, metrics helper and harness hashes actually measured. They do not become measurements of a later native build.",
+    "The final native change rejects malformed archive prefix keys. Its full C++ regression and native archive rerun pass; ordinary workload timing was not repeated.",
+    "The final metrics helper adds failure-path sampling cleanup after the completed runs. Passing recorded values are unchanged; six metric unit tests cover final source.",
+    "The original payout-budget failure and pre-cache contended burst remain separately labeled artifacts.",
+    "The paced run has explicit origin-preparation pauses and controlled blocks after 100 ACKs, not random mainnet admission or indefinite continuous service.",
+    "The 65,540-record C++ fixture and extra opaque native archive pagination records establish storage behavior, not that count of native-valid mining proofs.",
+    "CPU model events are neither GPU work nor mined hashes. The conditional calculation shares a subset of labeled traces."
+  ],
+  "production_contract_passed": false,
+  "production_reason": "The fixed-target SHIFT14 statistical candidate passes proposed criteria for tested stationary miners of at least 0.1% of pool hashrate, but current general full-template admission budgets fail its workload. No easier target is activated. Long-duration native capacity, large-disk initial sync, WAN availability and public activation remain open.",
+  "physical_device_used": false,
+  "log_normalization": {
+    "contrib/sharepool/results/capacity-native-100-small-before-payout-budget-fix-native.txt": {
+      "raw_sha256": "a37dc9ed9ba09e60f8b130d4de77072df816eb8d8eada095dea902408a032395",
+      "normalization": "Removed terminal color escapes, trailing line whitespace and extra empty lines at EOF; test output content unchanged."
+    },
+    "contrib/sharepool/results/capacity-startup-cpp-tests.txt": {
+      "raw_sha256": "c90799fbdb20b02725f83baf1c01b79719588dbf5d004f7746102461b05fae08",
+      "normalization": "Removed terminal color escapes, trailing line whitespace and extra empty lines at EOF; test output content unchanged."
+    }
+  },
+  "artifact_sha256": {
+    "contrib/sharepool/results/capacity-calibration-10.json": "58f12a96ab8b203a8c2ae6f3ba6f3e1eafe67ad70762c97a0e49925b772750f6",
+    "contrib/sharepool/results/capacity-interleaved-calibration-10.json": "2cf56c5445e3830f60953e0d45ec1505b46122a9a2eda2d51c37b98b582394b6",
+    "contrib/sharepool/results/capacity-native-100-interleaved-quiet-native.txt": "6d066988e64d49dbc82a6657312ec054f63ee77aff3320b606e507ba4725427d",
+    "contrib/sharepool/results/capacity-native-100-interleaved-quiet.json": "c645a0c8ada570384fc9b708ca9a6dc358d2f5f6c11e72c3ea15b74502911467",
+    "contrib/sharepool/results/capacity-native-100-large-native.txt": "22c13977cc6cfba4fbaef42e59b1c29823b9a5f632e160d0fe746cd055f78847",
+    "contrib/sharepool/results/capacity-native-100-large.json": "463e447467797798f7ec3965431fa7d37ecbefc4a0f95ff2eee09e078e66381e",
+    "contrib/sharepool/results/capacity-native-100-small-before-payout-budget-fix-native.txt": "15a3cdce75dc89900c3cfeacf7f389b30aaa89c4c5374d4615ea1b8d0d2a6286",
+    "contrib/sharepool/results/capacity-native-100-small-before-payout-budget-fix.json": "f9463bfc3957c8b98e9ab9212a7da3f81c57f5b71790906956c9abdfcc91a37d",
+    "contrib/sharepool/results/capacity-native-100-small-native.txt": "279238f5b3f8232cd17b28a7b4fe55ac827df72f1611adfb76fa09c2645fab69",
+    "contrib/sharepool/results/capacity-native-100-small.json": "4176c7dc4227e05a10f16d726febbcfc4b52051509d5d1eeb32f97b609d2aa72",
+    "contrib/sharepool/results/capacity-startup-archive-exact-key-final.json": "00db34815652658e06261309abc049351ad5fa7b360650d3c36df27bdfa0a767",
+    "contrib/sharepool/results/capacity-startup-archive-exact-key-final.txt": "b4ee7dfe8395360724c1b5ffbf65cb571432a18f901e7fa950c13a217170dd96",
+    "contrib/sharepool/results/capacity-startup-archive-verification.json": "ac762f8e0f5bce229d6babafb099d48e8e3c43d6e170b926196ec33b2130d2a6",
+    "contrib/sharepool/results/capacity-startup-cpp-tests.txt": "9f07e3f9368d5252676a33a48ef230bf2bcf2ea0bd321f69936c3fbb77fd4ea1",
+    "contrib/sharepool/results/capacity-startup-cpu-final-cache.txt": "01896baf95087c49d282ae60e14d4fecacfae72751ba44cfd6ae603e4cf8fce2",
+    "contrib/sharepool/results/capacity-startup-cpu-preflight.json": "efef2f8a389c959399bcd4172e30c77ee4c3e6ea17a756a09810a892cb583233",
+    "contrib/sharepool/results/capacity-startup-native-checks.json": "94580d566c68bbfcd40a045f811ee21236988a38140e737340e6054035a1ff3d",
+    "contrib/sharepool/results/capacity-startup-native-checks.txt": "46d9895b61e55eb7a5601dec7130d97966e607be6521beb3aaf89aee23ad8f91",
+    "contrib/sharepool/results/capacity-startup-python-hash-tests.txt": "a99004937ab246d33be84ef3f9f88ab195d9ae50bb08b0d27b7ced2584862e70",
+    "contrib/sharepool/results/capacity-startup-python-metrics-tests.txt": "c6b9b1f09add0403cc07e90bfdf272129b1ddfa2f8f7675ea8218862f2516371",
+    "contrib/sharepool/results/capacity-startup-python-tides-tests.txt": "2ecff50585b9c8a3355d3cbc85ec50236cce41cbb937ed50ae5b8db2fc1aef8f",
+    "contrib/sharepool/results/tides-v6-conditional-variance-run.txt": "4bafe2ea5c83671720842fc53283648e5e72ce46ee8ef16d30e1b8f085c45694",
+    "contrib/sharepool/results/tides-v6-conditional-variance.json": "4c4fb84713b827264c5545ab69848bfe87e1004cb339fadade6142a3d97defdb",
+    "contrib/sharepool/results/tides-v6-service-contract-run.txt": "bfd496e682229933477a171ba43da50853e95bc18ae8ae82fe76e4bb42c9b4d9",
+    "contrib/sharepool/results/tides-v6-service-contract-tests.txt": "2e5fddd313065ab733a197fb910872e7c233fe905ee76743a759e6209d9b3f63",
+    "contrib/sharepool/results/tides-v6-service-contract-verification.json": "ada854ee875197f052df99b0428643d341d96be003128357a766c7a2d1373b9c",
+    "contrib/sharepool/results/tides-v6-service-contract.json": "da7c82e2ee20f9467a0012cef2009994113ea34d04c0ba40cc192942ad61f338"
+  }
+}

@@ -222,7 +222,7 @@ class Scenario:
     measured_pool_blocks: float = 24.0
 
 
-def simulate(seed, scenario):
+def simulate(seed, scenario, *, payout_calculator=None):
     """One independent run; same hashrate, hash marks, blocks and cutoffs for all payouts.
 
     All-native admission assumes cooperative foreign producers have these pool
@@ -233,6 +233,7 @@ def simulate(seed, scenario):
     additionally lose native solutions while its dispatched parent is stale.
     """
     s = scenario
+    calculate = payouts_from_batches if payout_calculator is None else payout_calculator
     timings = (s.pool_fraction, s.refresh_seconds, s.propagation_seconds,
                s.submission_seconds, s.warmup_pool_blocks, s.measured_pool_blocks)
     if (any(not isinstance(v, (float, int)) or isinstance(v, bool) or not math.isfinite(v) for v in timings) or
@@ -254,8 +255,8 @@ def simulate(seed, scenario):
     next_external = rng.expovariate(external_rate) if external_rate else math.inf
     native_times = [-math.inf]
     pending, batches = [], []
-    same_reference = ArrivalWindow(WINDOW_BLOCKS * k)
     dense_reference = ArrivalWindow(WINDOW_BLOCKS * ref_k)
+    same_reference = dense_reference if work == ref_work else ArrivalWindow(WINDOW_BLOCKS * k)
     payouts = {key: [0] * 4 for key in ("numeric", "proportional", "same_target_arrival", "dense_arrival", "ideal_fixed_split")}
     stats = Counter()
     thresholds = (MINER_WEIGHTS[0], sum(MINER_WEIGHTS[:2]), sum(MINER_WEIGHTS[:3]))
@@ -288,7 +289,7 @@ def simulate(seed, scenario):
         if pool_block and when >= warmup:
             stats["measured_pool_blocks"] += 1
             for policy in ("numeric", "proportional"):
-                pay = payouts_from_batches(batches + [chosen], WINDOW_BLOCKS * k, REWARD, winner, policy)
+                pay = calculate(batches + [chosen], WINDOW_BLOCKS * k, REWARD, winner, policy)
                 for owner, amount in pay.items():
                     payouts[policy][owner] += amount
             for label, reference in (("same_target_arrival", same_reference), ("dense_arrival", dense_reference)):
@@ -332,7 +333,8 @@ def simulate(seed, scenario):
         if mark <= target:
             stats["eligible_current_proofs"] += 1
             pending.append(Proof(mark, owner, when + s.submission_seconds, origin_height))
-            same_reference.append(when + s.submission_seconds, owner)
+            if same_reference is not dense_reference:
+                same_reference.append(when + s.submission_seconds, owner)
     stats["remaining_current_proofs"] = len(pending)
     assert stats["eligible_current_proofs"] == (stats["admitted_current_proofs"] +
         stats["expired_current_proofs"] + stats["remaining_current_proofs"])

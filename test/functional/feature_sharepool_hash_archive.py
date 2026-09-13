@@ -116,24 +116,50 @@ class SharePoolHashArchiveTest(SharePoolHashTidesTest):
                 "-sharepoolarchivemib must be a positive whole MiB", match=ErrorMatch.PARTIAL_REGEX)
         node.assert_start_raises_init_error(base + ["-sharepoolarchivemib=1", "-sharepoolarchivemib=2"],
             "-sharepoolarchivemib requires one value", match=ErrorMatch.PARTIAL_REGEX)
+        for value in ("2", "-1", "true", "1.0"):
+            node.assert_start_raises_init_error(base + [f"-sharepoolarchiveindexrebuild={value}"],
+                "-sharepoolarchiveindexrebuild must be 0 or 1", match=ErrorMatch.PARTIAL_REGEX)
+        node.assert_start_raises_init_error(base + ["-sharepoolarchiveindexrebuild=0", "-sharepoolarchiveindexrebuild=1"],
+            "-sharepoolarchiveindexrebuild requires one value", match=ErrorMatch.PARTIAL_REGEX)
         # A genuinely fresh datadir is used so an existing v6 profile marker
         # cannot hide the archive option's no-hash-only validation branch.
         plain = directory / "plain-regtest"
         plain.mkdir()
         node.assert_start_raises_init_error([f"-datadir={plain}", "-regtest", "-sharepoolarchivemib=1"],
             "-sharepoolarchivemib requires one value and the explicit regtest hash-only profile", match=ErrorMatch.PARTIAL_REGEX)
+        node.assert_start_raises_init_error([f"-datadir={plain}", "-regtest", "-sharepoolarchiveindexrebuild=1"],
+            "-sharepoolarchiveindexrebuild requires one value and the explicit regtest hash-only profile", match=ErrorMatch.PARTIAL_REGEX)
         assert_equal(marker.read_bytes(), before)
         self.start_node(1, base + ["-sharepoolarchivemib=1"])
         self.expected_quota = 1024 * 1024
         assert_equal(node.getbestblockhash(), final.hash)
         self.inventory(node)
         assert_equal(marker.read_bytes(), before)
+        status = node.getsharepoolhashstatus(None, 1)
+        assert_equal(status["archive_startup"]["fast_path"], True)
+        assert_equal(status["archive_startup"]["records_scanned"], 0)
+        assert_equal(status["archive_startup"]["bytes_scanned"], 0)
+        assert_equal(status["archive_repair_required"], False)
+        self.restart_node(1, base + ["-sharepoolarchivemib=1", "-sharepoolarchiveindexrebuild=1"])
+        rebuilt = node.getsharepoolhashstatus(None, 1)
+        assert_equal(rebuilt["archive_startup"]["fast_path"], False)
+        assert_equal(rebuilt["archive_startup"]["records_scanned"], status["stored_snapshots"])
+        assert rebuilt["archive_startup"]["bytes_scanned"] > 0
+        assert rebuilt["archive_startup"]["batches"] > 0
+        assert_equal(rebuilt["stored_snapshots"], status["stored_snapshots"])
+        assert_equal(rebuilt["archive_charged_bytes"], status["archive_charged_bytes"])
+        self.startup_verification = {"normal_restart": status["archive_startup"],
+            "explicit_rebuild": rebuilt["archive_startup"], "preserved_snapshot_count": rebuilt["stored_snapshots"],
+            "preserved_charged_bytes": rebuilt["archive_charged_bytes"]}
+        assert_equal(node.getbestblockhash(), final.hash)
+        assert node.verifychain(4, 0)
         self.restart_node(1, base + ["-sharepoolarchivemib=2", "-reindex-chainstate"])
         self.expected_quota = 2 * 1024 * 1024
         assert_equal(node.getbestblockhash(), final.hash)
         assert node.verifychain(4, 0)
         self.inventory(node)
         assert_equal(marker.read_bytes(), before)
+        assert_equal(node.getsharepoolhashstatus(None, 1)["archive_startup"]["fast_path"], True)
 
     def check_p2p_pages(self, source, follower, final, directory):
         self.log.info("P2P inventory crosses its first 1,024 records using bounded untrusted preimages")
@@ -291,7 +317,8 @@ class SharePoolHashArchiveTest(SharePoolHashTidesTest):
                 "pending_recovery_worker_observed": recovered_worker,
                 "p2p_inventory": transport,
                 "timing_scope": "Small disposable native recovery fixture; not sustained validation throughput",
-                "checks": ["paged RPC inventory", "exclusive 0600 export", "hash/profile/truncation rejection",
+                "archive_startup": self.startup_verification,
+                "checks": ["zero-payload-scan restart", "explicit resumable index rebuild", "paged RPC inventory", "exclusive 0600 export", "hash/profile/truncation rejection",
                            "authenticated partial retention", "pending-block import recovery", "restart",
                            "reindex-chainstate", "full reindex", "finite quota option validation", "P2P inventory beyond 1,024 records"]}
             (Path(self.options.tmpdir) / "archive-result.json").write_text(json.dumps(result, indent=2) + "\n")

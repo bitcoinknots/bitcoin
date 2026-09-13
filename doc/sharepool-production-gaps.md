@@ -76,9 +76,11 @@ node's consensus evidence database. The current native archive removes the fixed
 metadata on disk, pages inventory and supports authenticated bounded export and
 restore. Its configurable charged quota includes per-template index allowances.
 [Archive operation](sharepool-archive.md) describes verification and recovery.
-Startup still authenticates all retained payloads, which makes restart latency
-grow with history. Disk provisioning, sustainable startup/initial-sync time and
-independent archival availability remain production requirements. Storage exhaustion is local missing
+Normal startup now uses an atomic, profile-bound index checkpoint without scanning
+historical payloads. A legacy archive migrates once; explicit repair and interrupted
+rebuilds use durable bounded batches. [Startup and repair](sharepool-archive-startup.md)
+describe the bounds and lazy corruption detection. Disk provisioning, initial-sync
+time and independent archival availability remain production requirements. Storage exhaustion is local missing
 data, never evidence that a block is consensus-invalid.
 
 **Difficulty and capacity objectives.** A finite proof rate cannot guarantee
@@ -96,6 +98,12 @@ and block finds from the same work stream, including rolling-window covariance,
 bootstrap, cutoff delays and expiry. It demonstrates that shift 10 does not match
 the denser reference for small miners. More proofs increase template-validation
 and archival load; changing one constant would not close this gap.
+The [candidate variance contract](sharepool-variance-contract.md) now compares
+SHIFT10/12/14 against both a denser arrival-ordered reference and the stationary
+infinitely dense limit. It checks native origin, expanded-body, transaction-reference
+and snapshot bounds separately. The [native capacity harness](sharepool-capacity-calibration.md)
+tests repeated distinct-origin workloads and backlog drainage with actual payouts.
+A reproduced snapshot-fitting failure is fixed by [native payout reservation](sharepool-payout-reservation.md).
 In v4/v5 an empty selection pays the snapshot owner. In v6 only fully known empty
 pool history plus no current admissions for the winning pool triggers bootstrap; missing
 history never does. With sparse sampling, bootstrap needs explicit treatment
@@ -165,7 +173,9 @@ production requirements.
 
 ## Release evidence
 
-Use the [v6 revision 2 report](sharepool-v6-r2-report.md) for current changes.
+Use the [startup and capacity report](sharepool-capacity-startup-report.md) for
+this follow-up. The [v6 revision 2 report](sharepool-v6-r2-report.md) retains the
+earlier boundary-fairness and live-relay evidence.
 The [v6 revision 1 report](sharepool-v6-tides-report.md) retains its original
 binary/source hashes and physical Goldshell capture. The
 [earlier recovery report](sharepool-production-hardening-report.md) and prior

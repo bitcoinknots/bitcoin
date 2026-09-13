@@ -29,9 +29,66 @@ constexpr size_t MAX_LOCAL_TRANSACTIONS{262144};
 // allowance. This prevents tiny malformed preimages bypassing the byte quota.
 constexpr uint64_t SNAPSHOT_INDEX_ALLOWANCE{128};
 // Each decoded template may create an index key plus up to four source pairs
-// (33 + 1 + 4*36 =178 bytes). Charging192 for every occurrence is conservative
+// (33 + 1 + 4*36 + 32 = 210 bytes). Charging 224 per occurrence is conservative
 // when many snapshots share one index, and avoids an unbounded RAM size map.
-constexpr uint64_t TEMPLATE_SOURCE_ALLOWANCE{192};
+constexpr uint64_t TEMPLATE_SOURCE_ALLOWANCE{224};
+constexpr uint8_t CHECKPOINT_KEY{'C'};
+constexpr uint8_t REPAIR_KEY{'R'};
+constexpr uint32_t INDEX_FORMAT{1};
+constexpr uint8_t CLEAR_METADATA{0}, CLEAR_SOURCES{1}, SCAN_SNAPSHOTS{2}, INDEX_READY{3};
+constexpr size_t REBUILD_BATCH_RECORDS{64};
+// Stop after reaching 16 MiB or 64 records. At most one additional bounded
+// snapshot crosses the byte threshold, so valid payload bytes total <32 MiB.
+constexpr uint64_t REBUILD_BATCH_BYTES{hashonly::MAX_SNAPSHOT_BYTES};
+/** Local accounting, never a statement about consensus validity or complete
+ * chain evidence. It is committed in the same LevelDB batch as each mutation.
+ * The rebuild cursor counts only the records in preceding committed batches.
+ */
+struct IndexCheckpoint {
+    uint32_t format{INDEX_FORMAT};
+    uint32_t profile{0};
+    uint256 rules;
+    uint8_t phase{INDEX_READY};
+    bool has_cursor{false};
+    uint256 cursor;
+    uint64_t count{0}, quarantined{0}, bytes{0}, charged{0};
+    uint256 checksum;
+    uint256 Digest() const
+    {
+        HashWriter writer;
+        writer << std::string{"sharepool-local-index"} << format << profile << rules << phase << has_cursor << cursor
+               << count << quarantined << bytes << charged;
+        return writer.GetHash();
+    }
+    bool Valid() const
+    {
+        return format == INDEX_FORMAT && phase <= INDEX_READY && quarantined <= count && bytes >= count &&
+            bytes <= std::numeric_limits<size_t>::max() && charged >= bytes &&
+            count <= (charged - bytes) / SNAPSHOT_INDEX_ALLOWANCE &&
+            (has_cursor || cursor.IsNull()) && (phase != INDEX_READY || !has_cursor) && checksum == Digest();
+    }
+    void Write(CDBBatch& batch)
+    {
+        checksum = Digest();
+        batch.Write(CHECKPOINT_KEY, *this);
+    }
+    SERIALIZE_METHODS(IndexCheckpoint, obj)
+    {
+        READWRITE(obj.format, obj.profile, obj.rules, obj.phase, obj.has_cursor, obj.cursor,
+                  obj.count, obj.quarantined, obj.bytes, obj.charged, obj.checksum);
+    }
+};
+IndexCheckpoint ReadyCheckpoint(uint32_t profile, uint64_t count, uint64_t quarantined, uint64_t bytes, uint64_t charged)
+{
+    IndexCheckpoint checkpoint;
+    checkpoint.profile = profile;
+    checkpoint.rules = hashonly::RulesHash(profile);
+    checkpoint.count = count;
+    checkpoint.quarantined = quarantined;
+    checkpoint.bytes = bytes;
+    checkpoint.charged = charged;
+    return checkpoint;
+}
 struct SnapshotMeta {
     uint64_t size{0};
     uint64_t index_allowance{0};
@@ -55,8 +112,17 @@ struct SnapshotMeta {
 };
 struct TemplateSourcesRecord {
     std::vector<std::pair<uint256, uint32_t>> sources;
-    template <typename Stream> void Serialize(Stream& s) const { s << sources; }
-    template <typename Stream> void Unserialize(Stream& s) { ReadBoundedVector(s, sources, MAX_TEMPLATE_SOURCES); }
+    uint256 checksum;
+    TemplateSourcesRecord() = default;
+    TemplateSourcesRecord(const uint256& id, std::vector<std::pair<uint256, uint32_t>> values) : sources{std::move(values)}
+    {
+        HashWriter writer;
+        writer << id << sources;
+        checksum = writer.GetHash();
+    }
+    bool Valid(const uint256& id) const { return checksum == TemplateSourcesRecord{id, sources}.checksum; }
+    template <typename Stream> void Serialize(Stream& s) const { s << sources << checksum; }
+    template <typename Stream> void Unserialize(Stream& s) { ReadBoundedVector(s, sources, MAX_TEMPLATE_SOURCES); s >> checksum; }
 };
 constexpr std::array<unsigned char, 12> ARCHIVE_MAGIC{'S','P','H','A','R','C','H','I','V','E',0,1};
 struct BoundedBytes {
@@ -89,15 +155,32 @@ template <typename Value> struct StoredValue {
         if (!s.empty()) throw std::ios_base::failure("trailing local record bytes");
     }
 };
+/** Only a different prefix ends an archive range. Corrupt short/trailing keys
+ * must never turn an incomplete repair into a Ready checkpoint or an inventory
+ * into a successful complete traversal. Evidence is preserved for recovery.
+ */
+bool ReadArchiveKey(CDBIterator& it, uint8_t prefix, std::pair<uint8_t, uint256>& key)
+{
+    if (!it.Valid()) return false;
+    uint8_t actual_prefix;
+    if (!it.GetKey(actual_prefix)) throw std::runtime_error("malformed local archive key; restore the database from a sound backup");
+    if (actual_prefix != prefix) return false;
+    StoredValue<std::pair<uint8_t, uint256>> stored;
+    if (!it.GetKey(stored) || stored.size != 33) {
+        throw std::runtime_error("malformed local archive key; restore the database from a sound backup");
+    }
+    key = stored.value;
+    return true;
+}
 bool ReadSnapshotMeta(const CDBWrapper& db, const uint256& hash, SnapshotMeta& meta)
 {
     const auto key = std::make_pair(uint8_t{'m'}, hash);
     StoredValue<SnapshotMeta> stored;
     if (!db.Read(key, stored)) {
-        if (db.Exists(key)) throw std::runtime_error("local archive metadata damaged; restart to rebuild the disk index");
+        if (db.Exists(key)) throw std::runtime_error("local archive metadata damaged; restart with -sharepoolarchiveindexrebuild=1");
         return false;
     }
-    if (!stored.value.Valid(hash)) throw std::runtime_error("local archive metadata checksum mismatch; restart to rebuild the disk index");
+    if (!stored.value.Valid(hash)) throw std::runtime_error("local archive metadata checksum mismatch; restart with -sharepoolarchiveindexrebuild=1");
     meta = stored.value;
     return true;
 }
@@ -136,48 +219,45 @@ HashSnapshotStore::HashSnapshotStore(const fs::path& path, bool memory_only, uin
     // Reject an unknown selected profile even when this store is empty. The
     // selector is local configuration, never inferred from untrusted bytes.
     (void)hashonly::ProfileSnapshotHash(Span<const unsigned char>{}, m_profile_version);
+    StoredValue<IndexCheckpoint> stored_checkpoint;
+    const bool present = m_db.Exists(CHECKPOINT_KEY);
+    const bool readable = m_db.Read(CHECKPOINT_KEY, stored_checkpoint);
+    const bool valid = readable && stored_checkpoint.value.Valid();
+    if (valid && (stored_checkpoint.value.profile != m_profile_version ||
+                  stored_checkpoint.value.rules != hashonly::RulesHash(m_profile_version))) {
+        throw std::runtime_error("local archive index profile/rules mismatch; use its original profile or a separate evidence directory");
+    }
+    if (present && !valid && !m_options.rebuild_index) {
+        throw std::runtime_error("local archive checkpoint damaged or unsupported; restart with -sharepoolarchiveindexrebuild=1");
+    }
+    m_repair_required = m_db.Exists(REPAIR_KEY);
+    if (m_repair_required && !m_options.rebuild_index && (!valid || stored_checkpoint.value.phase == INDEX_READY)) {
+        throw std::runtime_error("local archive requires index repair; restart with -sharepoolarchiveindexrebuild=1");
+    }
+    if (valid && stored_checkpoint.value.phase != INDEX_READY) {
+        m_startup_stats.resumed_rebuild = true;
+    } else if (!valid || m_options.rebuild_index) {
+        // A legacy database without a checkpoint migrates once. The durable
+        // first phase makes a crash during clearing/rebuilding resumable.
+        StartIndexRebuild();
+    } else {
+        const auto& checkpoint = stored_checkpoint.value;
+        m_count = checkpoint.count;
+        m_quarantined_count = checkpoint.quarantined;
+        m_bytes = checkpoint.bytes;
+        m_charged_bytes = checkpoint.charged;
+        if (m_charged_bytes > m_options.max_bytes) throw std::runtime_error("stored hash-only snapshots exceed local quota");
+        m_startup_stats.fast_path = true;
+    }
+    if (!m_startup_stats.fast_path) {
+        while (true) {
+            if (m_options.interrupted && m_options.interrupted()) {
+                throw std::runtime_error("local archive index rebuild interrupted; durable progress will resume on next startup");
+            }
+            if (RebuildIndexBatch()) break;
+        }
+    }
     std::unique_ptr<CDBIterator> it{m_db.NewIterator()};
-    // Rebuild disposable disk indexes from authenticated preimages, streaming
-    // one record at a time. Never retain a RAM entry per historical snapshot.
-    // This also repairs stale metadata after out-of-band record loss.
-    for (const uint8_t prefix : {uint8_t{'m'}, uint8_t{'i'}}) {
-        for (it->Seek(std::make_pair(prefix, uint256{})); it->Valid(); it->Next()) {
-            std::pair<uint8_t, uint256> key;
-            if (!it->GetKey(key) || key.first != prefix) break;
-            if (!m_db.Erase(key)) throw std::runtime_error("cannot rebuild hash-only archive index");
-        }
-    }
-    for (it->Seek(std::make_pair(uint8_t{'s'}, uint256{})); it->Valid(); it->Next()) {
-        std::pair<uint8_t, uint256> key;
-        if (!it->GetKey(key) || key.first != 's') break;
-        StoredValue<BoundedBytes> stored;
-        const bool sound = it->GetValue(stored) && !stored.value.data.empty() &&
-            hashonly::ProfileSnapshotHash(stored.value.data, m_profile_version) == key.second;
-        const auto size = sound ? stored.value.data.size() : std::max(size_t{1}, stored.size);
-        std::optional<hashonly::Snapshot> snapshot;
-        if (sound) {
-            try { snapshot = hashonly::DecodeSnapshot(stored.value.data); }
-            catch (const std::ios_base::failure&) { /* Preserve hash-correct malformed consensus evidence. */ }
-        }
-        const uint64_t index_allowance = snapshot ? snapshot->templates.size() * TEMPLATE_SOURCE_ALLOWANCE : 0;
-        const uint64_t overhead = SNAPSHOT_INDEX_ALLOWANCE + index_allowance;
-        const auto available = m_options.max_bytes - m_charged_bytes;
-        if (available < overhead || size > available - overhead) {
-            throw std::runtime_error("stored hash-only snapshots exceed local quota");
-        }
-        ++m_count;
-        m_bytes += size;
-        m_charged_bytes += size + overhead;
-        if (!m_db.Write(std::make_pair(uint8_t{'m'}, key.second), SnapshotMeta{key.second, size, !sound, index_allowance})) {
-            throw std::runtime_error("cannot recover hash-only snapshot metadata");
-        }
-        if (!sound) {
-            ++m_quarantined_count;
-            Need({key.second});
-            continue;
-        }
-        if (snapshot) IndexTemplates(key.second, *snapshot);
-    }
     // Transaction bytes are atomically stored with referencing templates. The
     // Wtxid includes witness; a body checksum also authenticates each exact
     // ordered reference list. This is local storage, not a consensus root.
@@ -250,6 +330,114 @@ HashSnapshotStore::HashSnapshotStore(const fs::path& path, bool memory_only, uin
     }
 }
 
+void HashSnapshotStore::StartIndexRebuild()
+{
+    AssertLockHeld(cs_main);
+    auto checkpoint = ReadyCheckpoint(m_profile_version, 0, 0, 0, 0);
+    checkpoint.phase = CLEAR_METADATA;
+    CDBBatch batch{m_db};
+    checkpoint.Write(batch);
+    if (!m_db.WriteBatch(batch, true)) throw std::runtime_error("cannot start local archive index rebuild");
+    m_template_sources.clear();
+    m_cache.clear();
+    m_touched.clear();
+    m_cache_bytes = 0;
+}
+
+bool HashSnapshotStore::RebuildIndexBatch()
+{
+    AssertLockHeld(cs_main);
+    StoredValue<IndexCheckpoint> stored_checkpoint;
+    if (!m_db.Read(CHECKPOINT_KEY, stored_checkpoint) || !stored_checkpoint.value.Valid()) {
+        throw std::runtime_error("local archive rebuild checkpoint damaged");
+    }
+    auto checkpoint = stored_checkpoint.value;
+    if (checkpoint.profile != m_profile_version || checkpoint.rules != hashonly::RulesHash(m_profile_version)) {
+        throw std::runtime_error("local archive rebuild profile/rules mismatch");
+    }
+    if (checkpoint.charged > m_options.max_bytes) throw std::runtime_error("stored hash-only snapshots exceed local quota");
+    if (checkpoint.phase == INDEX_READY) return true;
+    const uint8_t prefix = checkpoint.phase == CLEAR_METADATA ? 'm' : checkpoint.phase == CLEAR_SOURCES ? 'i' : 's';
+    CDBBatch batch{m_db};
+    std::unique_ptr<CDBIterator> it{m_db.NewIterator()};
+    if (checkpoint.has_cursor) it->Seek(std::make_pair(prefix, checkpoint.cursor));
+    else it->Seek(prefix); // Include malformed short keys before the zero hash.
+    SourceUpdates updates;
+    std::set<uint256> staged;
+    std::vector<uint256> missing;
+    size_t records{0};
+    uint64_t bytes{0};
+    bool end{false};
+    while (true) {
+        std::pair<uint8_t, uint256> key;
+        if (!ReadArchiveKey(*it, prefix, key)) { end = true; break; }
+        if (checkpoint.has_cursor && key.second == checkpoint.cursor) { it->Next(); continue; }
+        if (records >= REBUILD_BATCH_RECORDS || bytes >= REBUILD_BATCH_BYTES) break;
+        if (checkpoint.phase != SCAN_SNAPSHOTS) {
+            batch.Erase(key);
+        } else {
+            StoredValue<BoundedBytes> stored;
+            const bool sound = it->GetValue(stored) && !stored.value.data.empty() &&
+                hashonly::ProfileSnapshotHash(stored.value.data, m_profile_version) == key.second;
+            const uint64_t size = sound ? stored.value.data.size() : std::max(size_t{1}, stored.size);
+            std::optional<hashonly::Snapshot> snapshot;
+            if (sound) {
+                try { snapshot = hashonly::DecodeSnapshot(stored.value.data); }
+                catch (const std::ios_base::failure&) { /* Retain hash-correct malformed evidence. */ }
+            }
+            const uint64_t allowance = snapshot ? snapshot->templates.size() * TEMPLATE_SOURCE_ALLOWANCE : 0;
+            const uint64_t overhead = SNAPSHOT_INDEX_ALLOWANCE + allowance;
+            const uint64_t available = m_options.max_bytes - checkpoint.charged;
+            if (available < overhead || size > available - overhead ||
+                size > std::numeric_limits<size_t>::max() - checkpoint.bytes) {
+                throw std::runtime_error("stored hash-only snapshots exceed local quota; raise quota to resume index rebuild");
+            }
+            batch.Write(std::make_pair(uint8_t{'m'}, key.second), SnapshotMeta{key.second, size, !sound, allowance});
+            ++checkpoint.count;
+            checkpoint.bytes += size;
+            checkpoint.charged += size + overhead;
+            bytes += size;
+            ++m_startup_stats.records_scanned;
+            m_startup_stats.bytes_scanned += size;
+            if (!sound) { ++checkpoint.quarantined; missing.push_back(key.second); }
+            else {
+                staged.insert(key.second);
+                if (snapshot) PlanTemplateSources(key.second, *snapshot, updates, staged);
+            }
+        }
+        ++records;
+        checkpoint.has_cursor = true;
+        checkpoint.cursor = key.second;
+        it->Next();
+    }
+    for (const auto& [id, sources] : updates) batch.Write(std::make_pair(uint8_t{'i'}, id), TemplateSourcesRecord{id, sources});
+    if (end) {
+        ++checkpoint.phase;
+        checkpoint.has_cursor = false;
+        checkpoint.cursor.SetNull();
+    }
+    if (checkpoint.phase == INDEX_READY) batch.Erase(REPAIR_KEY);
+    checkpoint.Write(batch);
+    if (!m_db.WriteBatch(batch, true)) throw std::runtime_error("cannot checkpoint local archive index rebuild");
+    ++m_startup_stats.batches;
+    m_count = checkpoint.count;
+    m_quarantined_count = checkpoint.quarantined;
+    m_bytes = checkpoint.bytes;
+    m_charged_bytes = checkpoint.charged;
+    m_template_sources.clear(); // Never expose a planned index before its batch commits.
+    if (checkpoint.phase == INDEX_READY) m_repair_required = false;
+    Need(missing);
+    return checkpoint.phase == INDEX_READY;
+}
+
+void HashSnapshotStore::MarkRepairRequired() const
+{
+    AssertLockHeld(cs_main);
+    if (m_repair_required) return;
+    if (!m_db.Write(REPAIR_KEY, true, true)) throw std::runtime_error("cannot persist local archive repair requirement");
+    m_repair_required = true;
+}
+
 void HashSnapshotStore::CacheTransaction(const Wtxid& id, CTransactionRef tx)
 {
     AssertLockHeld(cs_main);
@@ -314,7 +502,8 @@ void HashSnapshotStore::Cache(const uint256& hash, std::shared_ptr<const std::ve
     m_touched[hash] = ++m_clock;
 }
 
-void HashSnapshotStore::IndexTemplates(const uint256& hash, const hashonly::Snapshot& snapshot)
+void HashSnapshotStore::PlanTemplateSources(const uint256& hash, const hashonly::Snapshot& snapshot,
+                                          SourceUpdates& updates, const std::set<uint256>& staged)
 {
     AssertLockHeld(cs_main);
     for (size_t i = 0; i < snapshot.templates.size(); ++i) {
@@ -326,19 +515,20 @@ void HashSnapshotStore::IndexTemplates(const uint256& hash, const hashonly::Snap
         if (block->vtx.empty() || block->m_txcount != block->vtx.size() ||
             BlockMerkleRoot(*block, &mutated) != block->hashMerkleRoot || mutated ||
             !CheckWitnessMalleation(*block, true, state)) continue;
-        auto sources = TemplateSources(record.id);
-        std::erase_if(sources, [this](const auto& source) { LOCK(cs_main); return !Has(source.first); });
+        auto [entry, inserted] = updates.try_emplace(record.id);
+        if (inserted) entry->second = TemplateSources(record.id);
+        auto& sources = entry->second;
+        std::erase_if(sources, [this, &staged, &hash](const auto& source) {
+            LOCK(cs_main);
+            return source.first != hash && !staged.contains(source.first) && !Has(source.first);
+        });
         const std::pair<uint256, uint32_t> source{hash, static_cast<uint32_t>(i)};
-        if (sources.size() < MAX_TEMPLATE_SOURCES && std::find(sources.begin(), sources.end(), source) == sources.end()) {
+        if (std::find(sources.begin(), sources.end(), source) == sources.end()) {
+            // Every newly durable snapshot must index its own body before
+            // duplicate local jobs can be retired. Keep bounded fallbacks.
+            if (sources.size() == MAX_TEMPLATE_SOURCES) sources.erase(sources.begin());
             sources.push_back(source);
         }
-        if (!m_db.Write(std::make_pair(uint8_t{'i'}, record.id), TemplateSourcesRecord{sources})) {
-            throw std::runtime_error("cannot index archived template sources");
-        }
-        if (!m_template_sources.contains(record.id) && m_template_sources.size() >= MAX_TEMPLATE_INDEX) {
-            m_template_sources.erase(m_template_sources.begin());
-        }
-        m_template_sources[record.id] = std::move(sources);
     }
 }
 
@@ -347,7 +537,11 @@ std::vector<std::pair<uint256, uint32_t>> HashSnapshotStore::TemplateSources(con
     AssertLockHeld(cs_main);
     if (const auto found = m_template_sources.find(id); found != m_template_sources.end()) return found->second;
     StoredValue<TemplateSourcesRecord> stored;
-    if (!m_db.Read(std::make_pair(uint8_t{'i'}, id), stored)) return {};
+    const auto key = std::make_pair(uint8_t{'i'}, id);
+    if (!m_db.Read(key, stored) || !stored.value.Valid(id)) {
+        if (m_db.Exists(key)) MarkRepairRequired();
+        return {};
+    }
     if (m_template_sources.size() >= MAX_TEMPLATE_INDEX) m_template_sources.erase(m_template_sources.begin());
     m_template_sources[id] = stored.value.sources;
     return stored.value.sources;
@@ -357,28 +551,48 @@ bool HashSnapshotStore::Has(const uint256& hash) const
 {
     AssertLockHeld(cs_main);
     SnapshotMeta meta;
-    return ReadSnapshotMeta(m_db, hash, meta) && !meta.quarantined;
+    try {
+        // Advisory availability only. CDBWrapper::Exists reads the entire
+        // value, so probing payload keys here would turn bounded inventory and
+        // pending-root startup into expensive historical payload scans.
+        return ReadSnapshotMeta(m_db, hash, meta) && !meta.quarantined;
+    } catch (const std::runtime_error&) {
+        MarkRepairRequired();
+        return false;
+    }
 }
 
 void HashSnapshotStore::Quarantine(const uint256& hash, std::optional<size_t> disk_size)
 {
     AssertLockHeld(cs_main);
     SnapshotMeta previous;
-    if (ReadSnapshotMeta(m_db, hash, previous)) {
+    bool exists{false};
+    try { exists = ReadSnapshotMeta(m_db, hash, previous); }
+    catch (const std::runtime_error&) { MarkRepairRequired(); }
+    if (exists) {
         if (previous.size > m_bytes || previous.size > m_charged_bytes ||
             m_charged_bytes - previous.size < SNAPSHOT_INDEX_ALLOWANCE + previous.index_allowance) {
-            throw std::runtime_error("local archive accounting mismatch; restart to rebuild the disk index");
+            MarkRepairRequired();
+            throw std::runtime_error("local archive accounting mismatch; restart with -sharepoolarchiveindexrebuild=1");
         }
         const SnapshotMeta meta{hash, disk_size.value_or(previous.size), true, previous.index_allowance};
-        if (meta.size > std::numeric_limits<uint64_t>::max() - (m_charged_bytes - previous.size)) {
+        if (meta.size > std::numeric_limits<uint64_t>::max() - (m_charged_bytes - previous.size) ||
+            meta.size > std::numeric_limits<size_t>::max() - (m_bytes - previous.size)) {
             throw std::runtime_error("damaged local archive size cannot be accounted safely");
         }
-        if (!m_db.Write(std::make_pair(uint8_t{'m'}, hash), meta, true)) {
+        const auto next_bytes = m_bytes - previous.size + meta.size;
+        const auto next_charged = m_charged_bytes - previous.size + meta.size;
+        const auto next_quarantined = m_quarantined_count + !previous.quarantined;
+        CDBBatch batch{m_db};
+        batch.Write(std::make_pair(uint8_t{'m'}, hash), meta);
+        auto checkpoint = ReadyCheckpoint(m_profile_version, m_count, next_quarantined, next_bytes, next_charged);
+        checkpoint.Write(batch);
+        if (!m_db.WriteBatch(batch, true)) {
             throw std::runtime_error("cannot quarantine local archive record");
         }
-        m_bytes = m_bytes - previous.size + meta.size;
-        m_charged_bytes = m_charged_bytes - previous.size + meta.size;
-        if (!previous.quarantined) ++m_quarantined_count;
+        m_bytes = next_bytes;
+        m_charged_bytes = next_charged;
+        m_quarantined_count = next_quarantined;
     }
     if (const auto found = m_cache.find(hash); found != m_cache.end()) {
         m_cache_bytes -= found->second->size();
@@ -394,11 +608,19 @@ void HashSnapshotStore::Quarantine(const uint256& hash, std::optional<size_t> di
 std::shared_ptr<const std::vector<unsigned char>> HashSnapshotStore::GetShared(const uint256& hash)
 {
     AssertLockHeld(cs_main);
-    if (const auto found = m_cache.find(hash); found != m_cache.end()) { m_touched[hash] = ++m_clock; return found->second; }
     SnapshotMeta meta;
-    if (!ReadSnapshotMeta(m_db, hash, meta) || meta.quarantined) return {};
+    try {
+        if (!ReadSnapshotMeta(m_db, hash, meta)) {
+            if (m_db.Exists(std::make_pair(uint8_t{'s'}, hash))) MarkRepairRequired();
+            return {};
+        }
+    } catch (const std::runtime_error&) { MarkRepairRequired(); return {}; }
+    if (meta.quarantined) return {};
+    if (const auto found = m_cache.find(hash); found != m_cache.end()) { m_touched[hash] = ++m_clock; return found->second; }
     StoredValue<BoundedBytes> stored;
-    if (!m_db.Read(std::make_pair(uint8_t{'s'}, hash), stored) || stored.value.data.empty() || stored.value.data.size() != meta.size ||
+    const bool readable = m_db.Read(std::make_pair(uint8_t{'s'}, hash), stored);
+    if (!readable && !stored.size) MarkRepairRequired();
+    if (!readable || stored.value.data.empty() || stored.value.data.size() != meta.size ||
         hashonly::ProfileSnapshotHash(stored.value.data, m_profile_version) != hash) {
         Quarantine(hash, std::max(size_t{1}, stored.size));
         return {};
@@ -440,12 +662,14 @@ uint256 HashSnapshotStore::Put(Span<const unsigned char> raw, std::optional<uint
         m_touched.erase(hash);
     }
     if (GetShared(hash)) return hash;
+    if (m_repair_required) throw std::runtime_error("local archive requires index repair; restart with -sharepoolarchiveindexrebuild=1");
     SnapshotMeta previous;
     const bool existing = ReadSnapshotMeta(m_db, hash, previous);
     if ((!existing && m_db.Exists(std::make_pair(uint8_t{'s'}, hash))) ||
         (existing && (previous.size > m_bytes || previous.size > m_charged_bytes ||
                       m_charged_bytes - previous.size < SNAPSHOT_INDEX_ALLOWANCE + previous.index_allowance))) {
-        throw std::runtime_error("local archive accounting mismatch; restart to rebuild the disk index");
+        MarkRepairRequired();
+        throw std::runtime_error("local archive accounting mismatch; restart with -sharepoolarchiveindexrebuild=1");
     }
     const uint64_t replaced = existing ? previous.size : 0;
     const uint64_t charged_replacement = existing ? previous.size + SNAPSHOT_INDEX_ALLOWANCE + previous.index_allowance : 0;
@@ -453,21 +677,35 @@ uint256 HashSnapshotStore::Put(Span<const unsigned char> raw, std::optional<uint
     const uint64_t overhead = SNAPSHOT_INDEX_ALLOWANCE + index_allowance;
     const auto retained = m_charged_bytes - charged_replacement;
     if (retained > m_options.max_bytes || m_options.max_bytes - retained < overhead ||
-        raw.size() > m_options.max_bytes - retained - overhead) {
+        raw.size() > m_options.max_bytes - retained - overhead ||
+        raw.size() > std::numeric_limits<size_t>::max() - (m_bytes - replaced)) {
         throw std::runtime_error("local hash-only snapshot storage quota exhausted");
     }
     std::vector<unsigned char> bytes(raw.begin(), raw.end());
     CDBBatch batch{m_db};
     batch.Write(std::make_pair(uint8_t{'s'}, hash), bytes);
     batch.Write(std::make_pair(uint8_t{'m'}, hash), SnapshotMeta{hash, bytes.size(), false, index_allowance});
+    SourceUpdates updates;
+    if (snapshot) PlanTemplateSources(hash, *snapshot, updates);
+    if (m_repair_required) throw std::runtime_error("local archive requires index repair; restart with -sharepoolarchiveindexrebuild=1");
+    for (const auto& [id, sources] : updates) batch.Write(std::make_pair(uint8_t{'i'}, id), TemplateSourcesRecord{id, sources});
+    auto checkpoint = ReadyCheckpoint(m_profile_version, m_count + !existing,
+        m_quarantined_count - (existing && previous.quarantined), m_bytes - replaced + bytes.size(),
+        retained + bytes.size() + overhead);
+    checkpoint.Write(batch);
     if (!m_db.WriteBatch(batch, true)) throw std::runtime_error("cannot durably store hash-only snapshot");
-    if (!existing) ++m_count;
-    else if (previous.quarantined) --m_quarantined_count;
-    m_bytes = m_bytes - replaced + bytes.size();
-    m_charged_bytes = m_charged_bytes - charged_replacement + bytes.size() + overhead;
+    m_count = checkpoint.count;
+    m_quarantined_count = checkpoint.quarantined;
+    m_bytes = checkpoint.bytes;
+    m_charged_bytes = checkpoint.charged;
+    for (const auto& [id, sources] : updates) {
+        if (!m_template_sources.contains(id) && m_template_sources.size() >= MAX_TEMPLATE_INDEX) {
+            m_template_sources.erase(m_template_sources.begin());
+        }
+        m_template_sources[id] = sources;
+    }
     Cache(hash, std::make_shared<const std::vector<unsigned char>>(std::move(bytes)));
     if (snapshot) {
-        IndexTemplates(hash, *snapshot);
         if (m_profile_version == hashonly::TIDES_VERSION) ArchiveLocalTemplates(*snapshot);
     }
     m_requests.Refresh([this](const auto& id) { LOCK(cs_main); return Has(id); });
@@ -502,20 +740,25 @@ HashSnapshotStore::Page HashSnapshotStore::InventoryPage(std::optional<uint256> 
     if (!limit || limit > MAX_INVENTORY_PAGE) throw std::invalid_argument("hash-only inventory page bound");
     Page result;
     std::unique_ptr<CDBIterator> it{m_db.NewIterator()};
-    it->Seek(std::make_pair(uint8_t{'m'}, after.value_or(uint256{})));
+    if (after) it->Seek(std::make_pair(uint8_t{'m'}, *after));
+    else it->Seek(uint8_t{'m'});
     size_t scanned{0};
     while (it->Valid()) {
         std::pair<uint8_t, uint256> key;
-        if (!it->GetKey(key) || key.first != 'm') break;
+        try {
+            if (!ReadArchiveKey(*it, uint8_t{'m'}, key)) break;
+        } catch (const std::runtime_error&) {
+            MarkRepairRequired();
+            throw;
+        }
         if (after && key.second == *after) { it->Next(); continue; }
         if (scanned == limit) return result;
         ++scanned;
         result.next = key.second;
         StoredValue<SnapshotMeta> stored;
         if (!it->GetValue(stored) || !stored.value.Valid(key.second)) {
-            throw std::runtime_error("local archive metadata damaged; restart to rebuild the disk index");
-        }
-        if (!stored.value.quarantined) result.hashes.push_back(key.second);
+            MarkRepairRequired();
+        } else if (!stored.value.quarantined) result.hashes.push_back(key.second);
         it->Next();
     }
     result.complete = true;

@@ -52,6 +52,8 @@ struct ChainstateManagerOpts {
     size_t signature_cache_bytes{DEFAULT_SIGNATURE_CACHE_BYTES};
     //! Positive local charged snapshot archive quota; not a consensus or RSS limit.
     uint64_t sharepool_archive_bytes{1024ULL * 1024 * 1024};
+    //! Rebuild the disposable archive index; interrupted rebuilds resume automatically.
+    bool sharepool_archive_index_rebuild{false};
 };
 
 } // namespace kernel

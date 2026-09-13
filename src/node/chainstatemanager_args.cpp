@@ -41,6 +41,16 @@ util::Result<void> ApplyArgsManOptions(const ArgsManager& args, ChainstateManage
         }
         opts.sharepool_archive_bytes = value * MIB;
     }
+    if (args.IsArgSet("-sharepoolarchiveindexrebuild")) {
+        if (args.GetArgs("-sharepoolarchiveindexrebuild").size() != 1 || !opts.chainparams.GetConsensus().SharePoolHashOnly) {
+            return util::Error{Untranslated("-sharepoolarchiveindexrebuild requires one value and the explicit regtest hash-only profile")};
+        }
+        const auto value = args.GetArg("-sharepoolarchiveindexrebuild", "");
+        if (value != "0" && value != "1") {
+            return util::Error{Untranslated("-sharepoolarchiveindexrebuild must be 0 or 1")};
+        }
+        opts.sharepool_archive_index_rebuild = value == "1";
+    }
     if (auto value{args.GetIntArg("-checkblockindex")}) {
         // Interpret bare -checkblockindex argument as 1 instead of 0.
         opts.check_block_index = args.GetArg("-checkblockindex")->empty() ? 1 : *value;

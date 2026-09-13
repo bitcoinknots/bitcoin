@@ -375,6 +375,52 @@ class HashGateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.open_gate()
 
+    def test_description_cache_never_hides_changed_bytes_or_scalar_metadata(self):
+        raw, identity = self.opening.serialize(), self.opening.hash_hex
+        self.gate._description_cache.clear()
+        with patch.object(Snapshot, "deserialize", wraps=Snapshot.deserialize) as decoder:
+            self.assertEqual(self.gate._read(SNAPSHOT, identity), raw)
+            self.assertEqual(self.gate._read(SNAPSHOT, identity), raw)
+            self.assertEqual(decoder.call_count, 1)
+        with self.gate.db:
+            self.gate.db.execute("UPDATE journal SET parent=? WHERE kind=? AND identity=?", ("aa" * 32, SNAPSHOT, identity))
+        with self.assertRaisesRegex(ValueError, "read-time integrity"):
+            self.gate._read(SNAPSHOT, identity)
+        with self.gate.db:
+            self.gate.db.execute("UPDATE journal SET parent=?,data=zeroblob(length(data)) WHERE kind=? AND identity=?",
+                                (f"{self.opening.envelope.native_parent:064x}", SNAPSHOT, identity))
+        with self.assertRaisesRegex(ValueError, "read-time integrity"):
+            self.gate._read(SNAPSHOT, identity)
+
+    def test_description_cache_is_bounded_and_does_not_retain_failed_decodes(self):
+        self.gate._description_cache.clear()
+        first = self.opening.serialize()
+        second = self.origin.serialize()
+        proof = solve_share(self.origin, self.opening).serialize()
+        with patch("hash_mining_gate.DESCRIPTION_CACHE_ENTRIES", 2):
+            self.gate._describe(SNAPSHOT, first)
+            self.gate._describe(TEMPLATE, second)
+            self.gate._describe(SNAPSHOT, first)  # Refresh its LRU position.
+            self.gate._describe(PROOF, proof)
+            self.assertEqual(len(self.gate._description_cache), 2)
+            self.assertEqual({key[0] for key in self.gate._description_cache}, {SNAPSHOT, PROOF})
+            before = tuple(self.gate._description_cache.items())
+            for _ in range(2):
+                with self.assertRaises(ValueError):
+                    self.gate._describe(SNAPSHOT, b"malformed")
+            self.assertEqual(tuple(self.gate._description_cache.items()), before)
+        self.gate.close()
+        self.assertEqual(len(self.gate._description_cache), 0)
+
+    def test_cached_description_does_not_bypass_native_proof_rejection(self):
+        proof = solve_share(self.origin, self.opening)
+        self.gate._describe(PROOF, proof.serialize())
+        before = self.gate.archive_head()
+        self.rpc.share_error = "bad-sharepool-hash-proof"
+        with self.assertRaisesRegex(ValueError, "bad-sharepool-hash-proof"):
+            self.gate.receive(proof)
+        self.assertEqual(self.gate.archive_head(), before)
+
     def test_missing_head_and_second_owner_fail_closed(self):
         with self.assertRaisesRegex(ValueError, "owning process"):
             self.open_gate()

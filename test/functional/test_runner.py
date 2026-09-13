@@ -83,6 +83,7 @@ TEST_FRAMEWORK_UNIT_TESTS = 'feature_framework_unit_tests.py'
 EXTENDED_SCRIPTS = [
     # These tests are not run by default.
     # Longest test should go first, to favor running tests in parallel
+    'feature_sharepool_hash_capacity.py',
     'feature_sharepool_hash_100_miners.py',
     'feature_sharepool_hash_ledger_100_miners.py',
     'feature_sharepool_hash_tides_100_miners.py',

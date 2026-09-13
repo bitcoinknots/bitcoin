@@ -1648,6 +1648,65 @@ static std::vector<RPCResult> HashJobResults()
     };
 }
 
+static RPCHelpMan getsharepoolhashtidesbudget()
+{
+    return RPCHelpMan{"getsharepoolhashtidesbudget",
+        "Reserve snapshot payout space from the current native TIDES history, including zero-rounded recipients.\n"
+        "Returns the empty-candidate history or bootstrap payout size. Add selected current-pool recipients\n"
+        "for a conservative upper bound; new work can only shorten the historical window.\n"
+        "Uses bounded native history queries. This is local construction metadata, not proof validation or authorization.\n",
+        {{"pool", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Nonzero pool ID"},
+         {"payout_script", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Bootstrap payout script"}},
+        RPCResult{RPCResult::Type::OBJ, "", "Payout reservation at one native context", {
+            {RPCResult::Type::STR_HEX, "native_tip", "Active native tip"},
+            {RPCResult::Type::NUM, "native_bits", "Planned contextual difficulty"},
+            {RPCResult::Type::STR_HEX, "pool", "Requested pool ID"},
+            {RPCResult::Type::STR_HEX, "payout_script", "Requested bootstrap script"},
+            {RPCResult::Type::NUM, "output_count", "Historical or bootstrap output slots, including zero-rounded recipients"},
+            {RPCResult::Type::NUM, "output_bytes", "Sum of serialized output sizes, excluding the vector count prefix"},
+        }}, RPCExamples{HelpExampleCli("getsharepoolhashtidesbudget", "\"pool_id\" \"script_hex\"")},
+        [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
+            namespace ho = sharepool::hashonly;
+            const auto pool = ParseHashV(request.params[0], "pool");
+            const auto encoded = request.params[1].get_str();
+            if (pool.IsNull() || encoded.size() > 68 || !IsHex(encoded)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid pool or payout script");
+            }
+            const auto script = ParseHex(encoded);
+            if (!sharepool::IsPayoutScript(script)) throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid payout script");
+            auto& chainman = EnsureAnyChainman(request.context);
+            LOCK(cs_main);
+            auto& store = RequireHashSnapshotStore(chainman);
+            const auto& consensus = chainman.GetConsensus();
+            const auto* tip = chainman.ActiveChain().Tip();
+            if (!consensus.SharePoolTides || !tip || tip->nHeight + 1 < consensus.SharePoolHeight) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Active hash-only TIDES profile required");
+            }
+            ho::Snapshot snapshot;
+            snapshot.binding.version = ho::TIDES_VERSION;
+            snapshot.binding.native_parent = tip->GetBlockHash();
+            snapshot.binding.pool = pool;
+            snapshot.binding.payout_script = script;
+            CBlockHeader planned;
+            node::UpdateTime(&planned, consensus, tip);
+            const auto bits = GetNextWorkRequired(tip, &planned, consensus);
+            std::vector<CTxOut> payouts;
+            const auto accounting = ho::CalculateTidesPayouts(snapshot, tip, bits, consensus,
+                [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.Lookup(hash); }, 0, payouts, true);
+            RequireHashValidation(store, accounting);
+            uint64_t bytes{0};
+            for (const auto& output : payouts) bytes += GetSerializeSize(output);
+            UniValue result{UniValue::VOBJ};
+            result.pushKV("native_tip", tip->GetBlockHash().GetHex());
+            result.pushKV("native_bits", bits);
+            result.pushKV("pool", pool.GetHex());
+            result.pushKV("payout_script", HexStr(script));
+            result.pushKV("output_count", payouts.size());
+            result.pushKV("output_bytes", bytes);
+            return result;
+        }};
+}
+
 static RPCHelpMan preparesharepoolhashjob()
 {
     auto results = HashJobResults();
@@ -1878,8 +1937,16 @@ static RPCHelpMan getsharepoolhashstatus()
             {RPCResult::Type::NUM, "pending_blocks", "Blocks awaiting evidence"},
             {RPCResult::Type::NUM, "stored_snapshots", "Stored snapshot count"},
             {RPCResult::Type::NUM, "stored_bytes", "Local retained evidence bytes"},
-            {RPCResult::Type::NUM, "archive_charged_bytes", "Snapshot bytes plus 128 bytes per snapshot and 192 bytes per decoded template for local indexes"},
+            {RPCResult::Type::NUM, "archive_charged_bytes", "Snapshot bytes plus 128 bytes per snapshot and 224 bytes per decoded template for authenticated local indexes"},
             {RPCResult::Type::NUM, "archive_max_bytes", "Configured finite local archive quota"},
+            {RPCResult::Type::BOOL, "archive_repair_required", "Local index damage requires an explicit index rebuild; not a consensus rejection"},
+            {RPCResult::Type::OBJ, "archive_startup", "Archive index startup work; excludes bounded pending and local-job caches", {
+                {RPCResult::Type::BOOL, "fast_path", "Loaded a ready checkpoint without scanning historical payloads"},
+                {RPCResult::Type::BOOL, "resumed_rebuild", "Resumed an interrupted index rebuild"},
+                {RPCResult::Type::NUM, "records_scanned", "Historical payload records scanned during index reconstruction"},
+                {RPCResult::Type::NUM, "bytes_scanned", "Historical payload bytes scanned during index reconstruction"},
+                {RPCResult::Type::NUM, "batches", "Durable index reconstruction batches"},
+            }},
             {RPCResult::Type::ARR, "inventory", "Available snapshot hashes", {{RPCResult::Type::STR_HEX, "", "Hash"}}},
             {RPCResult::Type::ANY, "inventory_next", "Exclusive next cursor or null"},
             {RPCResult::Type::BOOL, "inventory_complete", "This local disk-index traversal reached its end; not proof of complete chain evidence"},
@@ -1916,8 +1983,17 @@ static RPCHelpMan getsharepoolhashstatus()
             result.pushKV("stored_bytes", store.Bytes() + store.TemplateBytes());
             result.pushKV("archive_charged_bytes", store.ChargedBytes());
             result.pushKV("archive_max_bytes", store.MaxBytes());
+            const auto& startup_stats = store.GetStartupStats();
+            UniValue startup{UniValue::VOBJ};
+            startup.pushKV("fast_path", startup_stats.fast_path);
+            startup.pushKV("resumed_rebuild", startup_stats.resumed_rebuild);
+            startup.pushKV("records_scanned", startup_stats.records_scanned);
+            startup.pushKV("bytes_scanned", startup_stats.bytes_scanned);
+            startup.pushKV("batches", startup_stats.batches);
+            result.pushKV("archive_startup", std::move(startup));
             UniValue inventory{UniValue::VARR};
             const auto page = store.InventoryPage(after, count);
+            result.pushKV("archive_repair_required", store.RepairRequired());
             for (const auto& hash : page.hashes) inventory.push_back(hash.GetHex());
             result.pushKV("inventory", std::move(inventory));
             result.pushKV("inventory_next", page.next ? UniValue{page.next->GetHex()} : NullUniValue);
@@ -2282,6 +2358,7 @@ void RegisterMiningRPCCommands(CRPCTable& t)
         {"mining", &importsharepoolhasharchive},
         {"mining", &validatesharepoolhashtemplate},
         {"mining", &validatesharepoolhashshare},
+        {"mining", &getsharepoolhashtidesbudget},
 
         {"hidden", &generatetoaddress},
         {"hidden", &generatetodescriptor},

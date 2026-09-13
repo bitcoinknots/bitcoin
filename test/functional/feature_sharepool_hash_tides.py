@@ -191,6 +191,13 @@ class SharePoolHashTidesTest(BitcoinTestFramework):
             signers = [HashSigner.create(self.signer_binary, path, pool=pool, payout_script=script)
                        for path, pool, script in zip(paths, (101, 101, 202), (common_script, other_script, common_script))]
             a1, a2, b = signers
+            bootstrap_budget = node.getsharepoolhashtidesbudget(f"{a1.pool:064x}", common_script.hex())
+            assert_equal(bootstrap_budget["native_tip"], node.getbestblockhash())
+            assert_equal(bootstrap_budget["output_count"], 1)
+            assert_equal(bootstrap_budget["output_bytes"], 31)
+            for pool, script in (("00" * 32, common_script.hex()), (f"{a1.pool:064x}", "51"),
+                                 (f"{a1.pool:064x}", "ab" * 35)):
+                assert_raises_rpc_error(-8, "Invalid", node.getsharepoolhashtidesbudget, pool, script)
             for current in self.nodes:
                 assert_equal(current.getsharepoolhashstatus()["rules"], f"{TIDES_RULES_HASH:064x}")
                 assert_equal(current.getsharepoolhashstatus()["activation_height"], self.options.activation_height)
@@ -227,6 +234,14 @@ class SharePoolHashTidesTest(BitcoinTestFramework):
             self.publish(0, first, first_state)
             self.connect_nodes(0, 1)
             self.wait_tip(first)
+            history_budget = node.getsharepoolhashtidesbudget(f"{a1.pool:064x}", common_script.hex())
+            assert_equal(history_budget["native_tip"], first.hash)
+            assert_equal(history_budget["native_bits"], first.nBits)
+            assert_equal(history_budget["output_count"], 2)
+            assert_equal(history_budget["output_bytes"], 62)
+            separate_budget = node.getsharepoolhashtidesbudget(f"{b.pool:064x}", common_script.hex())
+            assert_equal(separate_budget["output_count"], 1)
+            assert_equal(separate_budget["output_bytes"], 31)
 
             self.log.info("Paid shares remain in the rolling history; late submissions cannot change an issued job")
             second, second_state, prepared = self.construct(0, a2)

@@ -93,6 +93,10 @@ class SharePoolHashTidesZeroRewardTest(SharePoolHashTidesTest):
             assert_equal(node.submitblock(block.serialize().hex()), None)
             self.wait_tip(block)
             assert_equal(follower.getblock(block.hash, 0), block.serialize().hex())
+            reservation = node.getsharepoolhashtidesbudget(f"{signers[0].pool:064x}", signers[0].payout_script.hex())
+            assert_equal(reservation["native_tip"], block.hash)
+            assert_equal(reservation["output_count"], 2)  # Both zero-rounded recipients remain reserved.
+            assert_equal(reservation["output_bytes"], 62)
 
             self.log.info("Repeating the rolling window preserves the empty payout vector through restart/reindex")
             repeated, repeated_state = gate.make_native(sign_owner=signers[0].sign_owner)

@@ -14,6 +14,7 @@
 #include <map>
 #include <set>
 #include <deque>
+#include <functional>
 
 class AutoFile;
 
@@ -29,6 +30,19 @@ public:
         // per-template-source index allowances, excluding LevelDB compaction.
         // Disk exhaustion still leaves dependent blocks pending.
         uint64_t max_bytes{1024ULL * 1024 * 1024};
+        // Reconstruct disposable metadata from authenticated payloads. An
+        // interrupted rebuild resumes from its last atomic batch checkpoint.
+        bool rebuild_index{false};
+        // Checked between durable bounded startup batches. Cancellation leaves
+        // the last committed cursor available for the next ordinary startup.
+        std::function<bool()> interrupted;
+    };
+    struct StartupStats {
+        bool fast_path{false};
+        bool resumed_rebuild{false};
+        uint64_t records_scanned{0};
+        uint64_t bytes_scanned{0};
+        uint64_t batches{0};
     };
     struct Page {
         std::vector<uint256> hashes;
@@ -62,6 +76,8 @@ private:
     const Options m_options;
     // CDBWrapper::NewIterator is non-const even for a read-only traversal.
     mutable CDBWrapper m_db;
+    StartupStats m_startup_stats GUARDED_BY(cs_main);
+    mutable bool m_repair_required GUARDED_BY(cs_main){false};
     // Quarantined records still consume their disk quota, but are neither
     // advertised nor considered available. A verified Put can replace them.
     uint64_t m_count GUARDED_BY(cs_main){0};
@@ -95,7 +111,12 @@ private:
     uint64_t m_clock GUARDED_BY(cs_main){0};
     void Cache(const uint256& hash, std::shared_ptr<const std::vector<unsigned char>> bytes) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void Quarantine(const uint256& hash, std::optional<size_t> disk_size = std::nullopt) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
-    void IndexTemplates(const uint256& hash, const hashonly::Snapshot& snapshot) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    using SourceUpdates = std::map<uint256, std::vector<std::pair<uint256, uint32_t>>>;
+    void PlanTemplateSources(const uint256& hash, const hashonly::Snapshot& snapshot,
+                             SourceUpdates& updates, const std::set<uint256>& staged = {}) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    void StartIndexRebuild() EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    bool RebuildIndexBatch() EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    void MarkRepairRequired() const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void ArchiveLocalTemplates(const hashonly::Snapshot& snapshot) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::vector<std::pair<uint256, uint32_t>> TemplateSources(const uint256& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     CTransactionRef Transaction(const Wtxid& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
@@ -107,6 +128,8 @@ public:
     explicit HashSnapshotStore(const fs::path& path, bool memory_only = false,
                                uint32_t profile_version = hashonly::VERSION);
     HashSnapshotStore(const fs::path& path, bool memory_only, uint32_t profile_version, Options options);
+    /** Advisory index availability. Only GetShared/Lookup authenticate payload
+     * bytes; callers must never use Has as a consensus validation result. */
     bool Has(const uint256& hash) const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::optional<std::vector<unsigned char>> Get(const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::shared_ptr<const std::vector<unsigned char>> GetShared(const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
@@ -144,6 +167,8 @@ public:
     uint64_t ChargedBytes() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_charged_bytes; }
     uint64_t Count() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_count - m_quarantined_count; }
     uint64_t MaxBytes() const { return m_options.max_bytes; }
+    const StartupStats& GetStartupStats() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_startup_stats; }
+    bool RepairRequired() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_repair_required; }
     size_t TemplateBytes() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_template_bytes; }
     size_t TemplateCount() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_template_sizes.size() - m_quarantined_templates.size(); }
     void RememberTemplate(const CBlock& block) EXCLUSIVE_LOCKS_REQUIRED(cs_main);

@@ -37,10 +37,10 @@ class ExactWorkTests(unittest.TestCase):
                 native_target(bits)
 
     def test_converter_and_exact_sizes_match_independent_native_codec(self):
-        from hash_snapshot import EnvelopeV2, Share, share_target, rules_hash, TIDES_VERSION
+        from hash_snapshot import EnvelopeV2, Share, share_target, rules_hash, TIDES_VERSION, SHARE_TARGET_SHIFT
         for bits in (0x207fffff, 0x1d00ffff, 0x18008000, 0x17034219, 0x01010000):
             self.assertEqual(share_target(bits, TIDES_VERSION),
-                             HASH_SPACE // assigned_work(bits) - 1)
+                             HASH_SPACE // assigned_work(bits, SHARE_TARGET_SHIFT) - 1)
         for script in (b"\x00\x14" + b"a" * 20, b"\x51\x20" + b"b" * 32):
             envelope = EnvelopeV2(1, rules_hash(6), 3, 4, 5, b"c" * 32, script, version=6)
             proof = Share(b"\x00\x00\x00\x80" + bytes(160), envelope, bytes(64))

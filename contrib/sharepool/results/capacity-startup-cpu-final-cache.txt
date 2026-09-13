@@ -1,0 +1,6 @@
+2026-09-13T09:05:11.826000Z TestFramework (INFO): PRNG seed is: 7283148204642498858
+2026-09-13T09:05:11.827000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-capacity-startup-cpu-final-cache
+2026-09-13T09:05:13.765000Z TestFramework (INFO): Native Sia CPU preflight and independent replay: {'capture': {'profile': 'v6-tides', 'rules_revision': 2, 'jobs': 4, 'proofs': 3, 'blocks': 2, 'native_replay': True, 'physical_provenance_verified': False, 'last_native_tip': '46280d408df2fa8e2fb9a009ceb5c829ecd46429132d4f1b5f51831f8912e2ac'}, 'fake_guard_restored': True, 'physical_device_used': False}
+2026-09-13T09:05:13.824000Z TestFramework (INFO): Stopping nodes
+2026-09-13T09:05:14.000000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-capacity-startup-cpu-final-cache
+2026-09-13T09:05:14.000000Z TestFramework (INFO): Tests successful

@@ -10,6 +10,7 @@ resident or physical capacity stops admission before acknowledgment. Native
 RPC, not a local inventory or successful snapshot storage, establishes validity.
 One owner thread/process must use a gate. No RPC runs inside a write transaction.
 """
+from collections import OrderedDict
 from dataclasses import dataclass, field, replace
 from io import BytesIO
 import hashlib
@@ -26,11 +27,11 @@ import native_archive
 import hash_gate_archive
 import hash_gate_batch
 from hash_snapshot import (Snapshot, TemplateRecord, CompactTemplateRecord, Share, MAX_SNAPSHOT_BYTES,
-    MAX_TEMPLATE_BYTES, MAX_SHARE_AGE, SHARE_BITS, parse_share, candidate, normalize_template, build_snapshot,
+    MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_BYTES, MAX_SHARE_AGE, SHARE_BITS, parse_share, candidate, normalize_template, build_snapshot,
     job_hash, work_outputs, credit_outputs, rules_hash, LEDGER_VERSION, TIDES_VERSION)
 from native_mining_gate import (MiningAuthorization, JobOmission, parse_block, immutable_header,
     template_id, _process_lock, fcntl, REGTEST_GENESIS)
-from native_enforcement import is_payout_script, verify_schnorr
+from native_enforcement import compact_size, is_payout_script, verify_schnorr
 from test_framework.messages import CBlockHeader
 
 SNAPSHOT, TEMPLATE, PROOF = 0, 1, 2
@@ -38,6 +39,7 @@ RECORD_OVERHEAD = hash_gate_archive.RECORD.size
 LIMITS = (MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES, 1024)
 RECEIPT_HISTORY_SNAPSHOTS = 64
 RECEIPT_HISTORY_BYTES = 64 * 1024 * 1024
+DESCRIPTION_CACHE_ENTRIES = 4096
 
 
 class TemplateOmission(ValueError):
@@ -86,6 +88,7 @@ class HashMiningGate:
         if self.head_path.absolute() == self.path.absolute():
             raise ValueError("protected head must be separate from database")
         self.db, self._lock_fd, self._head_lock_fd, self._sealed_head = None, None, None, None
+        self._description_cache = OrderedDict()
         self._snapshot_observer = None  # Sole-owner bounded inventory ingestion only.
         # Dispatch capabilities belong to this open instance, never to the
         # persisted journal. Recovered evidence requires fresh native approval.
@@ -194,8 +197,29 @@ class HashMiningGate:
             raise ValueError("resident journal byte accounting exceeds quota")
         return rows[0][1]
 
+    def _describe(self, kind, raw):
+        """Memoize canonical metadata, never body availability or validity.
+
+        Every call hashes its actual bytes; journal reads still fetch and
+        authenticate those bytes and compare stored scalar metadata. Entries
+        contain only immutable strings/integers, not mutable decoded payouts,
+        full bodies, native validation results or mining authorizations.
+        """
+        if type(kind) is not int or kind not in (SNAPSHOT, TEMPLATE, PROOF) or type(raw) is not bytes or not 1 <= len(raw) <= LIMITS[kind]:
+            raise ValueError("invalid bounded journal event")
+        key = kind, len(raw), hashlib.sha256(raw).digest()
+        saved = self._description_cache.get(key)
+        if saved is not None:
+            self._description_cache.move_to_end(key)
+            return saved
+        value = self._describe_uncached(kind, raw)
+        if len(self._description_cache) >= DESCRIPTION_CACHE_ENTRIES:
+            self._description_cache.popitem(last=False)
+        self._description_cache[key] = value
+        return value
+
     @staticmethod
-    def _describe(kind, raw):
+    def _describe_uncached(kind, raw):
         if kind == SNAPSHOT:
             value = Snapshot.deserialize(raw)
             return value.hash_hex, value.envelope.height, f"{value.envelope.native_parent:064x}"
@@ -799,6 +823,23 @@ class HashMiningGate:
         self._stable(tip)
         return tuple(sorted((share for share in result if share.proof_id not in paid), key=lambda share: share.proof_id))
 
+    def _tides_payout_budget(self, tip):
+        """Native historical reservation includes recipients rounded to zero.
+
+        It is construction metadata, never evidence of payout validity. New
+        current-pool work only shortens that history window at the same target.
+        """
+        value = self.rpc("getsharepoolhashtidesbudget", f"{self.pool:064x}", self.payout_script.hex())
+        if (not isinstance(value, dict) or value.get("native_tip") != tip or
+                value.get("pool") != f"{self.pool:064x}" or value.get("payout_script") != self.payout_script.hex() or
+                type(value.get("native_bits")) is not int or not 0 < value["native_bits"] < 1 << 32 or
+                type(value.get("output_count")) is not int or not 1 <= value["output_count"] <= MAX_SNAPSHOT_BYTES // 31 or
+                type(value.get("output_bytes")) is not int or
+                not 31 * value["output_count"] <= value["output_bytes"] <= 43 * value["output_count"]):
+            raise ValueError("native TIDES payout reservation failed context or size binding")
+        self._stable(tip)
+        return value
+
     def _batch(self, height, tip, parent, *, staged=None, offered=(), templates=()):
         """Choose the maximal fitting prefix under this gate's pinned policy.
 
@@ -845,6 +886,7 @@ class HashMiningGate:
                (lambda share: (share.envelope.height, share.proof_id)))
         ordered = sorted(selected.values(), key=key)[:capacity]
         origins = {f"{record.template_id:064x}": CompactTemplateRecord.from_record(record) for record in templates}
+        payout_budget = self._tides_payout_budget(tip) if self.profile_version == TIDES_VERSION else None
 
         def trial(count):
             # A rejected larger prefix must not retain its fetched dependency
@@ -867,6 +909,23 @@ class HashMiningGate:
                     mining_job=True, activation_height=self.activation_height,
                     lookup=lambda identity: self._snapshot(identity, trial_staged),
                     parent_snapshot=lambda identity, origin_height: self._block_snapshot(origin_height, f"{identity:064x}", trial_staged))
+                if payout_budget is not None:
+                    # Count the complete native historical set plus distinct
+                    # current-pool scripts. A script present in both may be
+                    # over-reserved, keeping prefix fit monotonic without a
+                    # Python history oracle or fee/rounding assumptions.
+                    scripts = {share.envelope.payout_script for share in snapshot.shares if share.envelope.pool == self.pool}
+                    count = payout_budget["output_count"] + len(scripts)
+                    output_bytes = payout_budget["output_bytes"] + sum(8 + len(compact_size(len(script))) + len(script) for script in scripts)
+                    placeholder = len(compact_size(len(snapshot.payouts))) + sum(len(output.serialize()) for output in snapshot.payouts)
+                    additional = len(compact_size(count)) + output_bytes - placeholder
+                    resources["payout_reservation_bytes"] = additional
+                    resources["reserved_snapshot_bytes"] = resources["snapshot_bytes"] + additional
+                    resources["reserved_dependency_bytes"] = resources["dependency_bytes"] + additional
+                    if resources["reserved_snapshot_bytes"] > self.snapshot_budget:
+                        raise hash_gate_batch.BatchLimit("snapshot payout reservation budget")
+                    if resources["reserved_dependency_bytes"] > MAX_DEPENDENCY_BYTES:
+                        raise hash_gate_batch.BatchLimit("dependency payout reservation budget")
                 return snapshot, resources
             except ValueError as error:
                 if (isinstance(error, hash_gate_batch.BatchLimit) or "budget" in str(error) or "exceeds byte bound" in str(error) or
@@ -886,8 +945,11 @@ class HashMiningGate:
                 high, reason = middle - 1, resources
             else:
                 low, best = middle, (snapshot, resources)
-        return {"snapshot": best[0], "resources": best[1], "eligible_count": total,
-                "deferred_count": total - low, "limit_reason": reason}
+        result = {"snapshot": best[0], "resources": best[1], "eligible_count": total,
+                  "deferred_count": total - low, "limit_reason": reason}
+        if payout_budget is not None:
+            result["native_bits"] = payout_budget["native_bits"]
+        return result
 
     def batch_status(self):
         self._check_seal()
@@ -1189,7 +1251,8 @@ class HashMiningGate:
         height, tip = self._context()
         staged = {}
         parent = self._parent_snapshot(height, tip, staged)
-        proposal = self._batch(height, tip, parent, staged=staged)["snapshot"]
+        batch = self._batch(height, tip, parent, staged=staged)
+        proposal = batch["snapshot"]
 
         def decode(result):
             if not isinstance(result, dict):
@@ -1202,6 +1265,8 @@ class HashMiningGate:
                 bodies.append(bytes.fromhex(encoded))
             raw, snapshot_raw = bodies
             block, snapshot = parse_block(raw), Snapshot.deserialize(snapshot_raw)
+            if self.profile_version == TIDES_VERSION and block.nBits != batch["native_bits"]:
+                raise ValueError("native difficulty changed after payout reservation; prepare a new job")
             reward = result.get("reward")
             if (normalize_template(raw) != raw or block.hashPrevBlock != int(tip, 16) or
                     block.m_height != height + 1 or snapshot.envelope != proposal.envelope or
@@ -1382,6 +1447,7 @@ class HashMiningGate:
 
     def close(self):
         self._dispatch_key = None
+        self._description_cache.clear()
         try:
             if self.db is not None:
                 self.db.close()
