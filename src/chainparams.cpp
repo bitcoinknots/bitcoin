@@ -52,6 +52,18 @@ void ReadSigNetArgs(const ArgsManager& args, CChainParams::SigNetOptions& option
 
 void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& options)
 {
+    if (const auto height{args.GetIntArg("-sabbaticalheight")}) {
+        if (*height < 0) throw std::runtime_error("-sabbaticalheight cannot be negative.");
+        options.sabbatical_height = (int)*height;
+    }
+    if (const auto window{args.GetIntArg("-sabbaticalwindow")}) {
+        if (*window < 1) throw std::runtime_error("-sabbaticalwindow must be at least 1.");
+        options.sabbatical_window = (int)*window;
+    }
+    if (const auto max{args.GetIntArg("-sabbaticalmax")}) {
+        if (*max < 1) throw std::runtime_error("-sabbaticalmax must be at least 1.");
+        options.sabbatical_max = (int)*max;
+    }
     if (auto value = args.GetBoolArg("-fastprune")) options.fastprune = *value;
     if (HasTestOption(args, "bip94")) options.enforce_bip94 = true;
 

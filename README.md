@@ -1,80 +1,60 @@
-Bitcoin Knots
-=============
+Mandatory Sabbatical
+=====================
 
-https://bitcoinknots.org
+A fork of [Bitcoin Knots](https://github.com/bitcoinknots/bitcoin) that limits
+how often the same identity can mine within a rolling window of blocks, from a
+configured height. Proof of work and everything else about block validity is
+unchanged.
 
-For an immediately usable, binary version of the Bitcoin Knots software, see
-the website.
+Why
+---
 
-What is Bitcoin Knots?
-----------------------
+Concentrated, continuous block production by the same miner is a visible
+symptom of the centralization this fork's sibling proposals are responding to.
+This one attacks it directly and literally: an identity that has mined too
+many of the recent blocks must sit out until its share of the window drops.
 
-Bitcoin Knots connects to the Bitcoin peer-to-peer network to download and fully
-validate blocks and transactions. It also includes a wallet and graphical user
-interface, which can be optionally built.
+How it works
+------------
 
-Further information about Bitcoin Knots is available in the [doc folder](/doc).
+Three consensus parameters control the change:
 
-License
--------
+- `sabbatical_height` — the height from which the rule applies. Defaults to
+  unset ("never") on every network.
+- `sabbatical_window` — the size of the rolling window, in blocks. Defaults
+  to 10.
+- `sabbatical_max` — the most blocks the same identity may hold within that
+  window. Defaults to 3.
 
-Bitcoin Knots is released under the terms of the MIT license. See [COPYING](COPYING) for more
-information or see https://opensource.org/licenses/MIT.
+"Identity" here means the coinbase's primary payout script — `vout[0]`. From
+`sabbatical_height`, a new block is rejected (`bad-cb-sabbatical`) if its own
+identity's payout script would appear in more than `sabbatical_max` of the
+last `sabbatical_window` blocks, this one included. The window rolls forward
+with the chain: once enough other blocks have been mined, an identity that was
+briefly blocked can mine again.
 
-Development Process
--------------------
+Exercised on regtest for testing:
 
-Development generally takes place as part of [Bitcoin Core](https://github.com/bitcoin/bitcoin), and is merged into
-Knots for each release.
+    bitcoind -regtest -sabbaticalheight=<height> -sabbaticalwindow=<n> -sabbaticalmax=<n>
 
-Even if your pull request to Core is closed, or if your feature is not
-suitable for Core (eg, because it builds on a feature not supported in Core;
-relies on centralised services; etc), it may still be eligible for inclusion
-in Bitcoin Knots. In this case, a pull request may be opened on the
-[Knots GitHub](https://github.com/bitcoinknots/bitcoin) for review and consideration.
-When accepted, you are expected to maintain the submitted branch in your own
-repository, and it will be automatically merged into new releases of Knots.
+**This does not identify miners; it matches an exact output script.** Rotating
+payout addresses defeats it completely — an identity is only as sticky as the
+address it chooses to reuse. It is a real, working consensus rule against a
+literal reading of "the same address, too often," not a robust anti-Sybil or
+anti-concentration mechanism.
 
-Developer IRC can be found on Freenode at #bitcoin-dev.
+Activating this on a live network — real values for the three parameters — is
+a separate decision left to that network's operators. This build does not make
+that choice for mainnet, testnet, testnet4, or signet.
 
 Testing
 -------
 
-Testing and code review is the bottleneck for development; we get more pull
-requests than we can review and test on short notice. Please be patient and help out by testing
-other people's pull requests, and remember this is a security-critical project where any mistake might cost people
-lots of money.
+`test/functional/feature_mandatory_sabbatical.py` covers an identity filling
+its allowed share, being rejected for exceeding it, a different identity being
+unaffected, and the window rolling forward to allow the first identity back in.
 
-### Automated Testing
+License
+-------
 
-Developers are strongly encouraged to write [unit tests](src/test/README.md) for new code, and to
-submit new unit tests for old code. Unit tests can be compiled and run
-(assuming they weren't disabled during the generation of the build system) with: `ctest`. Further details on running
-and extending unit tests can be found in [/src/test/README.md](/src/test/README.md).
-
-There are also [regression and integration tests](/test), written
-in Python.
-These tests can be run (if the [test dependencies](/test) are installed) with: `build/test/functional/test_runner.py`
-(assuming `build` is your build directory).
-
-The CI (Continuous Integration) systems make sure that every pull request is built for Windows, Linux, and macOS,
-and that unit/sanity tests are run automatically.
-
-### Manual Quality Assurance (QA) Testing
-
-Changes should be tested by somebody other than the developer who wrote the
-code. This is especially important for large or high-risk changes. It is useful
-to add a test plan to the pull request description if testing the changes is
-not straightforward.
-
-Translations
-------------
-
-Changes to translations as well as new translations can be submitted to
-[Bitcoin Core's Transifex page](https://explore.transifex.com/bitcoin/bitcoin/).
-
-Translations are periodically pulled from Transifex and merged into the git repository. See the
-[translation process](doc/translation_process.md) for details on how this works.
-
-**Important**: We do not accept translation changes as GitHub pull requests because the next
-pull from Transifex would automatically overwrite them again.
+MIT. See [COPYING](COPYING).
