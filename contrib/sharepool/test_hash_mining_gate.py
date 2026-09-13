@@ -8,9 +8,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from hash_snapshot import Snapshot, RULES_HASH, MAX_SNAPSHOT_BYTES, parse_share, solve_share
+from hash_snapshot import Snapshot, RULES_HASH, MAX_SNAPSHOT_BYTES, parse_share, solve_share, job_hash
 from hash_mining_gate import HashMiningGate, TemplateOmission, SNAPSHOT, PROOF, TEMPLATE
-from native_mining_gate import REGTEST_GENESIS, parse_block, JobOmission, template_id
+from native_mining_gate import REGTEST_GENESIS, parse_block, JobOmission, template_id, immutable_header
+from test_framework.authproxy import JSONRPCException
 from test_framework.messages import CBlockHeader
 from test_hash_snapshot import fixture, SECRET, SCRIPT
 
@@ -22,6 +23,7 @@ class FakeRPC:
         self.template_error, self.share_error, self.bad_response, self.race = None, None, False, False
         self.calls, self.gate = [], None
         self.headers = {}
+        self.templates = {}
 
     def publish(self, block, snapshot):
         block.solve()
@@ -63,7 +65,9 @@ class FakeRPC:
                 if self.share_error and overlay.shares:
                     raise ValueError(self.share_error)
             elif f"{block.m_mm_rhs:064x}" not in self.snapshots:
-                raise ValueError("sharepool-hash-data-missing")
+                raise JSONRPCException({"code": -25, "message": "sharepool-hash-data-missing"})
+            if overlay is None:
+                self.templates[template_id(block)] = block.serialize()
             result = {"valid": True, "native_tip": self.tip, "native_parent": f"{block.hashPrevBlock:064x}",
                       "origin_height": block.m_height, "commitment": f"{block.m_mm_rhs:064x}"}
             if self.race:
@@ -73,6 +77,18 @@ class FakeRPC:
             if self.share_error:
                 raise ValueError(self.share_error)
             share = parse_share(bytes.fromhex(args[0]))
+            origin_raw = self.templates.get(template_id(share.header))
+            snapshot_raw = self.snapshots.get(f"{share.header.m_mm_rhs:064x}")
+            if origin_raw is None or snapshot_raw is None:
+                raise JSONRPCException({"code": -25, "message": "sharepool-hash-data-missing"})
+            if self.template_error:
+                raise ValueError(self.template_error)
+            origin, opening = parse_block(origin_raw), Snapshot.deserialize(bytes.fromhex(snapshot_raw))
+            if (immutable_header(origin) != immutable_header(share.header) or opening.hash != origin.m_mm_rhs or
+                    job_hash(origin) != opening.job_commitment or
+                    opening.envelope.serialize() != share.envelope.serialize() or
+                    opening.owner_signature != share.owner_signature):
+                raise JSONRPCException({"code": -26, "message": "fixture invalid proof origin"})
             return {"valid": True, "native_tip": self.tip, "proof_id": "11" * 32 if self.bad_response else f"{share.proof_id:064x}",
                     "payout_script": share.envelope.payout_script.hex(), "pool": f"{share.envelope.pool:064x}",
                     "origin_height": share.envelope.height, "native_parent": f"{share.envelope.native_parent:064x}"}

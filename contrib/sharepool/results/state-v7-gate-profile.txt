@@ -1,0 +1,53 @@
+         2508172 function calls (2506217 primitive calls) in 0.341 seconds
+
+   Ordered by: cumulative time
+   List reduced from 427 to 45 due to restriction <45>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+       20    0.000    0.000    0.344    0.017 hash_mining_gate.py:788(receive)
+      123    0.010    0.000    0.244    0.002 hash_snapshot.py:737(deserialize)
+      353    0.005    0.000    0.205    0.001 hash_snapshot.py:654(serialize)
+    37060    0.015    0.000    0.163    0.000 hash_snapshot.py:138(header_facts)
+    18560    0.002    0.000    0.162    0.000 hash_snapshot.py:164(proof_id)
+      353    0.002    0.000    0.162    0.000 hash_snapshot.py:675(<listcomp>)
+      482    0.000    0.000    0.159    0.000 hash_snapshot.py:892(snapshot)
+       20    0.000    0.000    0.111    0.006 hash_mining_gate.py:640(_provenance)
+       20    0.000    0.000    0.110    0.006 hash_gate_batch.py:20(check_graph)
+      272    0.000    0.000    0.110    0.000 test_hash_compact.py:293(__call__)
+      272    0.000    0.000    0.110    0.000 test_hash_tides.py:49(__call__)
+      272    0.000    0.000    0.110    0.000 test_hash_mining_gate.py:35(__call__)
+       21    0.000    0.000    0.103    0.005 hash_mining_gate.py:656(_rehydrate_retained)
+       43    0.000    0.000    0.102    0.002 hash_mining_gate.py:630(_submit_snapshot)
+       60    0.000    0.000    0.102    0.002 hash_snapshot.py:497(materialize_compact_state)
+      120    0.000    0.000    0.090    0.001 hash_gate_batch.py:60(account)
+       20    0.000    0.000    0.086    0.004 hash_mining_gate.py:858(_parent_snapshot)
+     6566    0.003    0.000    0.085    0.000 messages.py:904(calc_sha256)
+     6566    0.002    0.000    0.081    0.000 messages.py:186(powhash)
+     6200    0.001    0.000    0.080    0.000 messages.py:910(rehash)
+     6566    0.028    0.000    0.079    0.000 messages.py:115(blake2b_header_hash_components)
+    19683    0.031    0.000    0.052    0.000 messages.py:883(serialize)
+    13013    0.026    0.000    0.048    0.000 messages.py:837(deserialize)
+     6486    0.003    0.000    0.048    0.000 native_enforcement.py:168(header)
+    26264    0.008    0.000    0.028    0.000 messages.py:107(tagged_hash)
+       20    0.000    0.000    0.023    0.001 hash_mining_gate.py:726(_native_share)
+      353    0.012    0.000    0.023    0.000 hash_snapshot.py:602(_compact_share_jobs)
+    53680    0.009    0.000    0.020    0.000 messages.py:91(sha256)
+   439208    0.018    0.000    0.018    0.000 {method 'to_bytes' of 'int' objects}
+       60    0.000    0.000    0.018    0.000 hash_gate_batch.py:116(hydrate)
+       20    0.000    0.000    0.018    0.001 hash_gate_batch.py:170(walk)
+      149    0.000    0.000    0.017    0.000 hash_snapshot.py:842(hash)
+       80    0.000    0.000    0.017    0.000 hash_snapshot.py:822(capture)
+      129    0.000    0.000    0.017    0.000 hash_snapshot.py:846(hash_hex)
+       80    0.000    0.000    0.017    0.000 hash_snapshot.py:868(__init__)
+    41262    0.006    0.000    0.015    0.000 native_enforcement.py:80(uint)
+       20    0.000    0.000    0.015    0.001 hash_mining_gate.py:318(_persist)
+      266    0.000    0.000    0.012    0.000 native_mining_gate.py:145(parse_block)
+    85947    0.007    0.000    0.012    0.000 messages.py:230(ser_uint256)
+      200    0.000    0.000    0.012    0.000 hash_gate_batch.py:47(capture)
+   216678    0.011    0.000    0.011    0.000 messages.py:172(<genexpr>)
+    13399    0.002    0.000    0.011    0.000 messages.py:791(__init__)
+   267659    0.010    0.000    0.010    0.000 {built-in method from_bytes}
+        1    0.000    0.000    0.010    0.010 key.py:240(verify_schnorr)
+        1    0.000    0.000    0.010    0.010 secp256k1.py:209(mul)
+
+

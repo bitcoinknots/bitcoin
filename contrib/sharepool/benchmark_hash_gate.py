@@ -65,7 +65,7 @@ def benchmark(prefix):
     stats.print_stats(45)
     Path(str(prefix) + ".txt").write_text(stream.getvalue())
     sources = ("hash_mining_gate.py", "hash_gate_inventory.py", "hash_gate_batch.py",
-               "hash_snapshot.py", "hash_gate_cache.py")
+               "hash_snapshot.py", "hash_gate_cache.py", "hash_state_cache.py", "hash_gate_rpc.py")
     report = {"scope": "Python gate synthetic fixtures with RPC double; no native performance claim",
         "history_proofs": 100, "new_proofs": 20, "unique_incoming_origins": 1,
         "source_sha256": {name: hashlib.sha256((REPO / "contrib/sharepool" / name).read_bytes()).hexdigest()

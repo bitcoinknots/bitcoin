@@ -127,26 +127,32 @@ class HashGateDecodeReuseTests(unittest.TestCase):
             self.gate._snapshot(requested, staged)
         self.assertEqual(staged, {})
 
-    def test_native_storage_template_and_proof_checks_run_after_decode_hits(self):
+    def test_native_storage_and_proof_checks_run_after_decode_hits(self):
         self.gate._snapshot(self.identity)
+        self.gate._native_template(self.origin.serialize(), self.rpc.tip, mining=False)
         self.rpc.calls.clear()
         before_hits = self.gate._snapshot_decode_cache.stats()["hits"]
         proof = solve_share(self.origin, self.opening)
         self.assertTrue(self.gate.receive(proof))
         names = [name for name, _ in self.rpc.calls]
-        for method in ("submitsharepoolhashsnapshot", "validatesharepoolhashtemplate", "validatesharepoolhashshare"):
+        for method in ("submitsharepoolhashsnapshot", "validatesharepoolhashshare"):
             self.assertIn(method, names)
+        self.assertNotIn("validatesharepoolhashtemplate", names)
         self.assertGreater(self.gate._snapshot_decode_cache.stats()["hits"], before_hits)
         self.assertEqual(self.gate.archive_head()["receipt_revision"], 1)
 
     def test_same_tip_daemon_loss_rehydrates_before_native_proof_check(self):
         tip = self.rpc.tip
         self.rpc.snapshots.clear()
+        self.rpc.templates.clear()
         proof = solve_share(self.origin, self.opening)
         self.assertTrue(self.gate.receive(proof))
         names = [name for name, _ in self.rpc.calls]
         self.assertLess(names.index("submitsharepoolhashsnapshot"), names.index("validatesharepoolhashtemplate"))
-        self.assertLess(names.index("validatesharepoolhashtemplate"), names.index("validatesharepoolhashshare"))
+        proof_calls = [index for index, name in enumerate(names) if name == "validatesharepoolhashshare"]
+        self.assertEqual(len(proof_calls), 2)
+        self.assertLess(proof_calls[0], names.index("validatesharepoolhashtemplate"))
+        self.assertLess(names.index("validatesharepoolhashtemplate"), proof_calls[1])
         self.assertEqual(self.rpc.tip, tip)
         self.assertEqual(self.rpc.snapshots[self.identity], self.raw.hex())
 

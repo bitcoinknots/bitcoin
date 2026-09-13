@@ -1,0 +1,34 @@
+2026-09-13T22:13:09.700000Z TestFramework (INFO): PRNG seed is: 4798932916286568613
+2026-09-13T22:13:09.700000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v7-state-focused-2
+2026-09-13T22:13:10.507000Z TestFramework (INFO): Create an actual native parent with two admitted recipients
+2026-09-13T22:13:11.279000Z TestFramework (INFO): Warm state calculations retain fresh native proof checks and header reads
+2026-09-13T22:13:11.302000Z TestFramework (INFO): Reject an exact-header witness-body substitution before the proof endpoint
+2026-09-13T22:13:11.303000Z TestFramework (INFO): A same-tip node without the full job body triggers exactly one bounded recovery
+2026-09-13T22:13:11.336000Z TestFramework (INFO): Same-tip daemon restart cannot substitute cached Python state for a native verdict
+2026-09-13T22:13:11.778000Z TestFramework (INFO): Recovered work settles to the exact 3:2 native coinbase payouts
+2026-09-13T22:13:11.792000Z TestFramework (ERROR): Unexpected exception
+Traceback (most recent call last):
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_framework.py", line 136, in main
+    self.run_test()
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_state_reuse.py", line 186, in run_test
+    block, snapshot = gate.make_native(sign_owner=signers[0].sign_owner)
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_mining_gate.py", line 1354, in make_native
+    prepared = self.rpc("preparesharepoolhashjob", proposal.serialize().hex())
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_state_reuse.py", line 37, in __call__
+    result = getattr(self.node, method)(*args)
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/coverage.py", line 50, in __call__
+    return_val = self.auth_service_proxy_instance.__call__(*args, **kwargs)
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/authproxy.py", line 151, in __call__
+    raise JSONRPCException(response['error'], status)
+test_framework.authproxy.JSONRPCException: sharepool-hash-data-missing (-25)
+2026-09-13T22:13:11.854000Z TestFramework (INFO): Not stopping nodes as test failed. The dangling processes will be cleaned up later.
+2026-09-13T22:13:11.854000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v7-state-focused-2
+2026-09-13T22:13:11.854000Z TestFramework (ERROR): Test failed. Test logging available at /private/tmp/sharepool-v7-state-focused-2/test_framework.log
+2026-09-13T22:13:11.855000Z TestFramework (ERROR): 
+2026-09-13T22:13:11.855000Z TestFramework (ERROR): Hint: Call /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/combine_logs.py '/private/tmp/sharepool-v7-state-focused-2' to consolidate all logs
+2026-09-13T22:13:11.855000Z TestFramework (ERROR): 
+2026-09-13T22:13:11.855000Z TestFramework (ERROR): If this failure happened unexpectedly or intermittently, please file a bug and provide a link or upload of the combined log.
+2026-09-13T22:13:11.855000Z TestFramework (ERROR): https://github.com/bitcoinknots/bitcoin/issues
+2026-09-13T22:13:11.855000Z TestFramework (ERROR): 
+[node 1] Cleaning up leftover process
+[node 0] Cleaning up leftover process

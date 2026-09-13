@@ -494,7 +494,8 @@ def apply_tides_state(snapshot, parent):
                    post_state=tuple(sorted(state, key=lambda entry: entry.proof_id)))
 
 
-def materialize_compact_state(snapshot, *, parent_snapshot, activation_height=1, on_snapshot=None, capture=None):
+def materialize_compact_state(snapshot, *, parent_snapshot, activation_height=1, on_snapshot=None, capture=None,
+                              state_cache=None):
     """Reconstruct omitted state using at most three actual native ancestors.
 
     The callback must authenticate the requested native block hash and height,
@@ -502,26 +503,35 @@ def materialize_compact_state(snapshot, *, parent_snapshot, activation_height=1,
     This bounded helper verifies owner signatures and recent admission state.
     Native scripts, proof of work and chain validity remain mandatory. A capture
     resolver may reuse operation-owned encodings of its immutable inputs only;
-    external mutable snapshots must always be captured afresh.
+    external mutable snapshots must always be captured afresh. An optional
+    bounded state cache exposes get/put for exact (activation, profile, raw
+    prefix) keys. Hits replace only deterministic signature/state replay; all
+    native ancestry reads, byte/proof charges and observers still run first.
     """
-    if snapshot.envelope.version != COMPACT_TIDES_VERSION or snapshot.envelope.height < activation_height:
+    if (type(activation_height) is not int or not 1 <= activation_height <= 0x7fffffff or
+            snapshot.envelope.version != COMPACT_TIDES_VERSION or snapshot.envelope.height < activation_height):
         raise ValueError("compact state profile or activation mismatch")
     capture = capture or (lambda value: value.capture())
     sequence, seen, total, proofs = [capture(snapshot)], set(), 0, 0
+    snapshot = sequence[0].snapshot
     first = max(activation_height, snapshot.envelope.height - MAX_SHARE_AGE)
     while sequence[-1].snapshot.envelope.height > first:
         child = sequence[-1].snapshot
         previous = parent_snapshot(child.envelope.native_parent, child.envelope.height - 1)
         if previous is None:
             raise ValueError("missing compact native ancestry snapshot")
+        previous_encoding = capture(previous)
+        previous = previous_encoding.snapshot
         if (previous.envelope.version != COMPACT_TIDES_VERSION or
                 previous.envelope.height + 1 != child.envelope.height or
                 previous.envelope.genesis != snapshot.envelope.genesis or
                 previous.envelope.rules != snapshot.envelope.rules):
             raise ValueError("compact native ancestry binding mismatch")
-        sequence.append(capture(previous))
-    parent = None
-    for encoding in reversed(sequence):
+        sequence.append(previous_encoding)
+    sequence.reverse()
+    # Charge the complete authenticated suffix before consulting cached state.
+    # In particular, a warm hit cannot hide lost evidence or observer refusal.
+    for encoding in sequence:
         value, raw, identity = encoding.snapshot, encoding.raw, encoding.hash
         if identity not in seen:
             seen.add(identity)
@@ -531,15 +541,51 @@ def materialize_compact_state(snapshot, *, parent_snapshot, activation_height=1,
                 raise ValueError("compact ancestry exceeds dependency budget")
             if on_snapshot is not None:
                 on_snapshot(value, raw)
+
+    raw_sequence = tuple(encoding.raw for encoding in sequence)
+    def key(length):
+        return activation_height, snapshot.envelope.version, raw_sequence[:length]
+
+    parent, start, penultimate = None, 0, None
+    if state_cache is not None:
+        for length in range(len(sequence), 0, -1):
+            cached = state_cache.get(key(length))
+            if cached is None:
+                continue
+            if len(cached.post_state) > MAX_SNAPSHOT_BYTES // 36:
+                raise ValueError("derived compact state count exceeds original bound")
+            if length == len(sequence):
+                if cached.history_head != snapshot.history_head:
+                    raise ValueError("compact history head differs from native ancestry")
+                return cached
+            # Prefixes store the computed head, not the ancestor's committed
+            # head. Only the latter feeds the next history link. Exact prefix
+            # keys also bind the left boundary: a shifted age window must miss.
+            parent = replace(cached, history_head=sequence[length - 1].snapshot.history_head)
+            start = length
+            break
+
+    for index in range(start, len(sequence)):
+        encoding = sequence[index]
+        value = encoding.snapshot
         if not verify_schnorr(value.envelope.public_key, value.owner_signature, encoding.owner_message):
             raise ValueError("compact native ancestry owner authorization")
         derived = apply_tides_state(replace(value, post_state=(), certificates=()), parent)
         if len(derived.post_state) > MAX_SNAPSHOT_BYTES // 36:
             raise ValueError("derived compact state count exceeds original bound")
-        if encoding is sequence[0]:
+        if index == len(sequence) - 1:
             if derived.history_head != value.history_head:
                 raise ValueError("compact history head differs from native ancestry")
+            if state_cache is not None:
+                # Retain at most two candidate states, and publish neither on a
+                # failed target. The shared parent prefix benefits other jobs
+                # without retaining each intermediate admission-state tuple.
+                if penultimate is not None:
+                    state_cache.put(*penultimate)
+                state_cache.put(key(len(sequence)), derived)
             return derived
+        if state_cache is not None and index == len(sequence) - 2:
+            penultimate = key(index + 1), derived
         # Earlier history is outside this suffix. Its on-chain head remains
         # committed by the authenticated ancestor, while transient state is new.
         parent = replace(derived, history_head=value.history_head)

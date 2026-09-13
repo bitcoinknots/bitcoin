@@ -1,0 +1,23 @@
+2026-09-13T22:12:01.257000Z TestFramework (INFO): PRNG seed is: 3780059873161764065
+2026-09-13T22:12:01.257000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v7-state-focused
+2026-09-13T22:12:02.059000Z TestFramework (INFO): Create an actual native parent with two admitted recipients
+2026-09-13T22:12:02.821000Z TestFramework (INFO): Warm state calculations retain fresh native proof checks and header reads
+2026-09-13T22:12:02.843000Z TestFramework (INFO): Reject an exact-header witness-body substitution before the proof endpoint
+2026-09-13T22:12:02.845000Z TestFramework (ERROR): Unexpected exception
+Traceback (most recent call last):
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_framework.py", line 136, in main
+    self.run_test()
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_state_reuse.py", line 142, in run_test
+    assert "exact committed job" in str(error)
+AssertionError
+2026-09-13T22:12:02.907000Z TestFramework (INFO): Not stopping nodes as test failed. The dangling processes will be cleaned up later.
+2026-09-13T22:12:02.907000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v7-state-focused
+2026-09-13T22:12:02.907000Z TestFramework (ERROR): Test failed. Test logging available at /private/tmp/sharepool-v7-state-focused/test_framework.log
+2026-09-13T22:12:02.907000Z TestFramework (ERROR): 
+2026-09-13T22:12:02.907000Z TestFramework (ERROR): Hint: Call /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/combine_logs.py '/private/tmp/sharepool-v7-state-focused' to consolidate all logs
+2026-09-13T22:12:02.907000Z TestFramework (ERROR): 
+2026-09-13T22:12:02.907000Z TestFramework (ERROR): If this failure happened unexpectedly or intermittently, please file a bug and provide a link or upload of the combined log.
+2026-09-13T22:12:02.907000Z TestFramework (ERROR): https://github.com/bitcoinknots/bitcoin/issues
+2026-09-13T22:12:02.907000Z TestFramework (ERROR): 
+[node 1] Cleaning up leftover process
+[node 0] Cleaning up leftover process

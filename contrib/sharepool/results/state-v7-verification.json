@@ -1,0 +1,121 @@
+{
+  "schema": 1,
+  "base_commit": "c9eb79b1898e2061ddba3c2693abb5075b6609d7",
+  "scope": "Python v7 exact history-prefix reuse and proof-first native validation; opt-in regtest only",
+  "source_freeze": "state-v7-source-freeze.json",
+  "frozen_sources_verified": 108,
+  "binary_sha256": {
+    "bitcoind": "2f06596d94347f8491c6506d8474e4ffbfc44243fd41f0bcb884957e108d5365",
+    "bitcoin-sharepool-signer": "bbb7b90309010477f0e13866671c84cd05ddb4699c087d55897d6cf10cc169f3"
+  },
+  "consensus_changes": false,
+  "wire_changes": false,
+  "difficulty_changes": false,
+  "admission_budget_changes": false,
+  "python": {
+    "cases_passed": 314,
+    "skipped": 0,
+    "report": "state-v7-python-checks.json"
+  },
+  "native": {
+    "regression_scenarios_passed": 7,
+    "report": "state-v7-native-checks.json",
+    "focused_report": "state-v7-focused-verification.json",
+    "focused_results": "state-v7-focused-results.json",
+    "bringup_failures_preserved": [
+      {
+        "run": 1,
+        "result": "failed fixture assertion",
+        "cause": "assert_raises returns None; test incorrectly inspected that return for exception text. Corrected to a direct ValueError catch; no runtime change."
+      },
+      {
+        "run": 2,
+        "result": "incomplete fixture native backend recovery",
+        "cause": "The replacement same-tip backend had recovered B but not A. Native settlement correctly failed missing-data. Final test asserts that refusal and recovers the retained A receipt explicitly before payout settlement."
+      }
+    ]
+  },
+  "cpp": "Not rerun: unchanged native source and exact previously verified Debug daemon binary",
+  "capacity": {
+    "result": "passed",
+    "miners": 100,
+    "epochs": 3,
+    "proofs": 900,
+    "blocks": 8,
+    "seconds": 686.9725692500001,
+    "payout_oracle_verified": true,
+    "peer_recovery_verified": true,
+    "report": "state-v7-capacity-100.json",
+    "log": "state-v7-capacity-100-native.txt",
+    "baseline": "latency-v7-capacity-100.json",
+    "baseline_same_configuration": true,
+    "wall_comparison_controlled": false
+  },
+  "microbenchmarks": {
+    "prefix": {
+      "report": "state-v7-prefix-benchmark.json",
+      "same_runtime_only_cache_argument_differs": true,
+      "timing": "Three alternating cold-cache sweeps per mode; process_time CPU and perf_counter wall; separate counters",
+      "workload": "100 distinct signed jobs with empty current deltas, 300 historical proofs, three native-history snapshots",
+      "excludes": [
+        "native validation",
+        "PoW verification",
+        "networking",
+        "archive I/O",
+        "fixture creation"
+      ]
+    },
+    "gate": {
+      "report": "state-v7-gate-profile.json",
+      "profile": "state-v7-gate-profile.txt",
+      "scope": "RPC double counters, not a native timing comparison; availability model strengthened this turn"
+    }
+  },
+  "prior_artifact_integrity": {
+    "latency-v7-verification.json": {
+      "artifact_count": 26,
+      "all_unchanged": true,
+      "manifest_sha256": "04fc91d4cb17690ec620adee30479ede32dfa895ad7373c5c9b5e6f14b94fdb5"
+    },
+    "v7-compact-verification.json": {
+      "artifact_count": 45,
+      "all_unchanged": true,
+      "manifest_sha256": "27ca1483bcfa89c2fcdf25187fd3632af1747fc5cd5d778ac6df52559088a4a9"
+    }
+  },
+  "limitations": [
+    "Finite burst then drain on two loopback Debug nodes; not sustained offered-load capacity, WAN or mainnet qualification.",
+    "Follower gate receipt import covers first 300 proofs; both native peers verify all 900 admissions.",
+    "Byte/share/entry cache budgets estimate retained entries, not process RSS or transient allocations.",
+    "Distinct jobs, fresh ancestry and evidence reads, resource accounting and native validation still cost work.",
+    "Different native capture host loads prevent a controlled full-pipeline speedup claim.",
+    "Physical miners not used; SHIFT10 and disabled public-network activation unchanged.",
+    "Ten minutes is an average, not a verification deadline or validity rule."
+  ],
+  "artifact_sha256": {
+    "contrib/sharepool/results/state-v7-capacity-100-native.txt": "29c62d767a0478bda5ff7d3cbcc5f6297fe33235ce99f1fd817cc2d476064599",
+    "contrib/sharepool/results/state-v7-capacity-100.json": "6df38a44229f1a77252247dd2429e4d166dd9561b84f182cfd7802a94f1674c6",
+    "contrib/sharepool/results/state-v7-compact-results.json": "2aed876149baf93bda02946d833cffc0fc7502725fc3744496c1471e9f6a3978",
+    "contrib/sharepool/results/state-v7-focused-initial.txt": "3a8519834dd02af41902147e921882b38d9f83d0d663435994807fa588da7e8c",
+    "contrib/sharepool/results/state-v7-focused-native.txt": "a87055467bec62a0f62537523c2e2ae5cca33be94aa48d0d8637dd3fabd1cce4",
+    "contrib/sharepool/results/state-v7-focused-results.json": "89502e84fad0b040182f1cb8378ef077ccd34e7483da27a7348ddee8bbed1bff",
+    "contrib/sharepool/results/state-v7-focused-second.txt": "44a7df272028f1eb226f2eead276aae0e5aea12d1e6ab76130e2880175b87bed",
+    "contrib/sharepool/results/state-v7-focused-verification.json": "6db9299db57efc0a5870e012b8ff619a9b925b8b02bd936d58cc979f95283213",
+    "contrib/sharepool/results/state-v7-gate-profile.json": "5d7c8b12cd7f1daa3632ffb148313a478dae459ae63df97020407d405a12b761",
+    "contrib/sharepool/results/state-v7-gate-profile.txt": "992506b095d858c1349a0ba592cc4e37d806c78518c29dbfd7e22c2d17e644c0",
+    "contrib/sharepool/results/state-v7-native-checks.json": "20c4b5f9ff73e1f3cc379845544ecf0a042308882084c8625e9786d3ca1346ef",
+    "contrib/sharepool/results/state-v7-native-v4-builder.txt": "b504bfc22c20c7bcfff12373a47c5267013c3387b973343ad2eb7cae296f2341",
+    "contrib/sharepool/results/state-v7-native-v4-worker.txt": "088eb3c07a58299447cd74cb1ad455715d92e7c408f57fe810cc3cabea2613fc",
+    "contrib/sharepool/results/state-v7-native-v5-ledger.txt": "ced18f4605c628691164d713429968967d63538d7b10785baaf964208062ceb5",
+    "contrib/sharepool/results/state-v7-native-v6-archive.txt": "019b0faf4755c27e7ba44bdc29c18088187373fb083099e31c394ac49e665b20",
+    "contrib/sharepool/results/state-v7-native-v6-tides.txt": "fefed880fda92139f74b54720bd3cd5ba7cfae673ca443341cce96bc5f7fb801",
+    "contrib/sharepool/results/state-v7-native-v7-compact.txt": "86b990381dc67a06903a2ebf12bbfccbff65d25572c1830eaa7800ccc76f81c8",
+    "contrib/sharepool/results/state-v7-prefix-benchmark.json": "ebc2d92407b7af111e6668614d5698d7b1899d6367c352ed7f8ee52a0f272236",
+    "contrib/sharepool/results/state-v7-python-capacity.txt": "43a6d74e0b5eed911910301faae3ec0911a365f8af568713663a995370ec3a1d",
+    "contrib/sharepool/results/state-v7-python-checks.json": "15d8d8dae83216b09cbfa7518a8083a82e6d528a9562cde4144302e05ac8f36a",
+    "contrib/sharepool/results/state-v7-python-hash.txt": "4995694863b9985faa4e4e204bc497095b148ad825cc2a5d3d411a56fd6a3fc2",
+    "contrib/sharepool/results/state-v7-python-model.txt": "814cc4a0b47ec7ee88da05979c0e32434deeac1f91771c15cb85599929275b0f",
+    "contrib/sharepool/results/state-v7-python-tides.txt": "51b7858c93e4559906b925b6ce87b24c5803e8ffaa0b978c47740f8996103e8f",
+    "contrib/sharepool/results/state-v7-source-freeze.json": "56c131ea7705dffe9f90381799e82012205bb65dcec4ce950fd137043d86ed09"
+  }
+}

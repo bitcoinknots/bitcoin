@@ -27,6 +27,7 @@ import native_archive
 import hash_gate_archive
 import hash_gate_batch
 from hash_gate_cache import SnapshotDecodeCache
+from hash_state_cache import CompactStateCache
 from hash_snapshot import (Snapshot, TemplateRecord, CompactTemplateRecord, Share, MAX_SNAPSHOT_BYTES,
     MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_BYTES, MAX_COMPACT_SHARES, MAX_SHARE_AGE, SHARE_BITS, parse_share, candidate, normalize_template, build_snapshot,
     job_hash, work_outputs, credit_outputs, rules_hash, profile_snapshot_hash, LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION, is_tides_profile, materialize_compact_state)
@@ -91,6 +92,7 @@ class HashMiningGate:
         self.db, self._lock_fd, self._head_lock_fd, self._sealed_head = None, None, None, None
         self._description_cache = OrderedDict()
         self._snapshot_decode_cache = SnapshotDecodeCache()
+        self._compact_state_cache = CompactStateCache()
         self._snapshot_observer = None  # Sole-owner bounded inventory ingestion only.
         # Dispatch capabilities belong to this open instance, never to the
         # persisted journal. Recovered evidence requires fresh native approval.
@@ -643,7 +645,8 @@ class HashMiningGate:
         exposes its collected bytes to the caller's final atomic admission.
         """
         fetched, complete = dict(staged), {}
-        resources = hash_gate_batch.check_graph(snapshot, activation_height=self.activation_height, **context,
+        resources = hash_gate_batch.check_graph(snapshot, activation_height=self.activation_height,
+            state_cache=self._compact_state_cache, **context,
             lookup=lambda identity: self._snapshot(identity, fetched),
             parent_snapshot=lambda identity, height: self._block_snapshot(height, f"{identity:064x}", fetched),
             on_snapshot=lambda identity, raw: complete.__setitem__((SNAPSHOT, f"{identity:064x}"), raw))
@@ -721,12 +724,60 @@ class HashMiningGate:
             raise ValueError("proof does not bind its full origin snapshot")
 
     def _native_share(self, share, tip, staged=None):
-        self._require_origin(share, staged)
-        # Reestablish the original full-body validation after native restart or
-        # a branch change; a local archived admission is not a native cache hit.
-        self._submit_snapshot(self._evidence(SNAPSHOT, f"{share.header.m_mm_rhs:064x}", staged))
-        self._native_template(self._evidence(TEMPLATE, template_id(share.header), staged), tip, mining=False)
-        result = self.rpc("validatesharepoolhashshare", share.serialize().hex())
+        from hash_gate_rpc import missing_snapshot_data
+
+        origin_id = template_id(share.header)
+        snapshot_id = f"{share.header.m_mm_rhs:064x}"
+
+        def exact_origin():
+            self._require_origin(share, staged)
+            raw = self._evidence(TEMPLATE, origin_id, staged)
+            opening_raw = self._evidence(SNAPSHOT, snapshot_id, staged)
+            opening = self._snapshot_decode_cache.decode(opening_raw, self.profile_version)
+            # An immutable header/TemplateId alone cannot distinguish witness
+            # variants with the same txids. Bind the supplied full body to the
+            # exact signed job that the native proof endpoint will authenticate.
+            if (f"{profile_snapshot_hash(opening_raw, self.profile_version):064x}" != snapshot_id or
+                    job_hash(parse_block(raw)) != opening.job_commitment):
+                raise ValueError("proof origin differs from its exact committed job")
+            return raw, opening_raw
+
+        origin_raw, snapshot_raw = exact_origin()
+        encoded = share.serialize().hex()
+        try:
+            # This native endpoint independently validates the full origin and
+            # its dependencies. A preceding template check duplicates that work.
+            result = self.rpc("validatesharepoolhashshare", encoded)
+        except Exception as error:
+            if not missing_snapshot_data(error):
+                raise
+            self._check_seal()
+            height, current_tip = self._context()
+            if current_tip != tip:
+                raise ValueError("native tip changed during gate validation") from error
+            if not self._eligible(share.envelope.height, f"{share.envelope.native_parent:064x}", height):
+                raise ValueError("proof is outside eligible native ancestry") from error
+            origin_raw, snapshot_raw = exact_origin()  # Re-read after the failed RPC.
+            recovery = {} if staged is None else dict(staged)
+            recovery[SNAPSHOT, snapshot_id] = snapshot_raw
+            size = 0
+            for (kind, unused), raw in recovery.items():
+                if kind != SNAPSHOT:
+                    continue
+                if type(raw) is not bytes or not 1 <= len(raw) <= MAX_SNAPSHOT_BYTES:
+                    raise ValueError("native recovery snapshot exceeds byte bound")
+                size += len(raw)
+                if size > MAX_DEPENDENCY_BYTES:
+                    raise ValueError("native recovery dependency byte budget")
+            # Only the already bounded, retained dependency set may be replayed;
+            # never scan the lifetime archive or admit an unsuccessful offer.
+            self._rehydrate_retained(recovery)
+            self._submit_snapshot(snapshot_raw)
+            # Omit the overlay so native validation also remembers the full body.
+            self._native_template(origin_raw, tip, mining=False)
+            # Restart, eviction, resource pressure or unavailable history may
+            # still prevent validation. One retry only; any failure escapes.
+            result = self.rpc("validatesharepoolhashshare", encoded)
         expected = {"valid": True, "native_tip": tip, "proof_id": f"{share.proof_id:064x}",
                     "payout_script": share.envelope.payout_script.hex(), "pool": f"{share.envelope.pool:064x}",
                     "origin_height": share.envelope.height, "native_parent": f"{share.envelope.native_parent:064x}"}
@@ -808,6 +859,7 @@ class HashMiningGate:
         opening = self._block_snapshot(height, tip, staged)
         if opening is not None and self.profile_version == COMPACT_TIDES_VERSION:
             opening = materialize_compact_state(opening, activation_height=self.activation_height,
+                state_cache=self._compact_state_cache,
                 parent_snapshot=lambda identity, ancestor_height: self._block_snapshot(
                     ancestor_height, f"{identity:064x}", staged))
         self._stable(tip)
@@ -914,7 +966,7 @@ class HashMiningGate:
                     parent_state=() if parent is None else parent.post_state,
                     version=self.profile_version, parent_snapshot=parent)
                 resources = hash_gate_batch.check_graph(snapshot, snapshot_budget=self.snapshot_budget,
-                    mining_job=True, activation_height=self.activation_height,
+                    mining_job=True, activation_height=self.activation_height, state_cache=self._compact_state_cache,
                     lookup=lambda identity: self._snapshot(identity, trial_staged),
                     parent_snapshot=lambda identity, origin_height: self._block_snapshot(origin_height, f"{identity:064x}", trial_staged))
                 if payout_budget is not None:
@@ -1458,6 +1510,7 @@ class HashMiningGate:
         self._dispatch_key = None
         self._description_cache.clear()
         self._snapshot_decode_cache.clear()
+        self._compact_state_cache.clear()
         try:
             if self.db is not None:
                 self.db.close()

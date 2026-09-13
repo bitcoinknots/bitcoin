@@ -1,0 +1,9 @@
+2026-09-13T22:10:12.086000Z TestFramework (INFO): PRNG seed is: 9179867773486374287
+2026-09-13T22:10:12.086000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v7-state-native/v4-builder
+2026-09-13T22:10:13.463000Z TestFramework (INFO): Native construction creates distinct fully validated externally signed origins
+2026-09-13T22:10:13.717000Z TestFramework (INFO): The native mempool supplies a valid witness transaction and exact fee
+2026-09-13T22:10:13.842000Z TestFramework (INFO): A changed job or forged payout cannot reuse the exact owner authorization
+2026-09-13T22:10:13.959000Z TestFramework (INFO): Full snapshot relay permits the follower to verify and accept the winning block
+2026-09-13T22:10:15.393000Z TestFramework (INFO): Stopping nodes
+2026-09-13T22:10:15.575000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v7-state-native/v4-builder
+2026-09-13T22:10:15.575000Z TestFramework (INFO): Tests successful

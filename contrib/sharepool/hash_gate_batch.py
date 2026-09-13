@@ -19,7 +19,7 @@ class BatchLimit(ValueError):
 
 def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSHOT_BYTES,
                 on_snapshot=None, mining_job=False, trusted_parent=None,
-                root_origin=None, root_depth=0, activation_height=1):
+                root_origin=None, root_depth=0, activation_height=1, state_cache=None):
     """Check the same unique snapshot/depth/origin resource dimensions locally.
 
     Current settlement depth is zero; every full origin adds one. Parent paid
@@ -121,7 +121,8 @@ def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSH
         if value.envelope.version == COMPACT_TIDES_VERSION:
             value = materialize_compact_state(value, activation_height=activation_height,
                 parent_snapshot=lambda identity, height: load_raw_parent((identity, height)),
-                on_snapshot=lambda opening, raw: account(opening, raw), capture=capture)
+                on_snapshot=lambda opening, raw: account(opening, raw), capture=capture,
+                state_cache=state_cache)
             if native_parent:
                 native_states[identity] = value
                 while len(native_states) > NATIVE_STATE_CACHE_ENTRIES:

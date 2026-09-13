@@ -127,3 +127,8 @@ latency, block-plus-evidence readiness, tail latency and queue growth separately
 Repeated current admission deltas, dependency proof work, direct recipient
 outputs and archival availability still limit capacity. Production difficulty
 and payout variance under admission pressure remain open.
+
+The [next update](sharepool-v7-state-reuse.md) reuses exact historical state
+prefixes and removes the duplicate template check before native proof validation.
+Its measurements are recorded separately; the results above describe this
+earlier implementation.
