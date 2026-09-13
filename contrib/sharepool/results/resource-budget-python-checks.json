@@ -1,0 +1,99 @@
+[
+  {
+    "name": "hash",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "contrib/sharepool",
+      "-p",
+      "test_hash*.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "cases_passed": 135,
+    "skipped": 0,
+    "elapsed_seconds": 12.680368792000001,
+    "environment": {
+      "SHAREPOOL_SIGNER_BINARY": "/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer"
+    },
+    "test_sha256": {
+      "contrib/sharepool/test_hash_gate_archive.py": "7143537622f3ff9691bf60bd2c02fe9e8ebcd25b49ab59d35f33d6b29ba03525",
+      "contrib/sharepool/test_hash_gate_batch.py": "e260237636996e3441dc49cb766858518753c2210864501076d37d5b8ac2c903",
+      "contrib/sharepool/test_hash_gate_dispatch.py": "1eadfb713eedda128d16af003fa80bc242065eee6a68102b9282997d89f80d56",
+      "contrib/sharepool/test_hash_gate_ledger.py": "e5057ca75faa411d0ed925a8e7d3c37b1a29274631189697a542f3a4c5edd90b",
+      "contrib/sharepool/test_hash_gate_provenance.py": "10cdbe488c4e2837d2a32d5f87a0b219825f07b85b30d48cff09a0496974b3ba",
+      "contrib/sharepool/test_hash_ledger.py": "9253172df1131aacc19763f51c52714da5ac992791da4b0ada0ecb0926095624",
+      "contrib/sharepool/test_hash_mining_gate.py": "41ef360eab29a5ef36f90208828611f2fae9a8ad53c8cd114fcaf4f503964d14",
+      "contrib/sharepool/test_hash_snapshot.py": "10acdbfa21b9db00db304bce8920051ebff5e347fba92977b05ed6f409a03d67",
+      "contrib/sharepool/test_hash_tides.py": "6eed3b4f2b94459d21f5e81f3173f6d06c3c7c977f63fd14584a0856cea0cfb8",
+      "contrib/sharepool/test_hash_tides_cross_pool.py": "0d08f0f7e2209d099c453ddf461a33b6025a22f8f95812c4864c8c7a2a275b25"
+    },
+    "signer_binary_sha256": "70f6c7c438d237796705f429bad64b017ad798d110b2cfac845a1b4cb1640494",
+    "log": "resource-budget-python-hash-tests.txt"
+  },
+  {
+    "name": "tides",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "contrib/sharepool",
+      "-p",
+      "test_tides*.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "cases_passed": 83,
+    "skipped": 0,
+    "elapsed_seconds": 1.499709875,
+    "environment": {
+      "SHAREPOOL_SIGNER_BINARY": "/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer"
+    },
+    "test_sha256": {
+      "contrib/sharepool/test_tides_accounting.py": "a58b060e3f8daa9573869b85ef5434d4ec2253e279d1bb0d4d8ef4b131abc0aa",
+      "contrib/sharepool/test_tides_accounting_oracle.py": "a91abf9e7b23fe0db5670cf7a4c39b338e1437694b0271d245e20590454f18d4",
+      "contrib/sharepool/test_tides_admission_audit.py": "38c3d94db47f39274f693121df585eaf962959fcd3ecdeb8177dce03c20374ef",
+      "contrib/sharepool/test_tides_calibration.py": "cb3d082c4dfb8369475f8e349a1f5d741916721278155f6e92e294db3d019147",
+      "contrib/sharepool/test_tides_conditional_variance.py": "17185b4fd298093c37bfb8636e808ff9ceb54aa68b3bf271e63806863f56fbc8",
+      "contrib/sharepool/test_tides_hardware_capture.py": "64c84482262239a0c3bb82d1d83169003c24de31b07ff7d4d5d21830aaeae79e",
+      "contrib/sharepool/test_tides_service_contract.py": "527986941eef62632c388046ad16d5737b73fd5cd20360019e51f6106b072c42"
+    },
+    "signer_binary_sha256": "70f6c7c438d237796705f429bad64b017ad798d110b2cfac845a1b4cb1640494",
+    "log": "resource-budget-python-tides-tests.txt"
+  },
+  {
+    "name": "capacity",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "contrib/sharepool",
+      "-p",
+      "test_capacity*.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "cases_passed": 15,
+    "skipped": 0,
+    "elapsed_seconds": 0.144723666,
+    "environment": {
+      "SHAREPOOL_SIGNER_BINARY": "/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer"
+    },
+    "test_sha256": {
+      "contrib/sharepool/test_capacity_fixture.py": "17bf1846ae7ea2b407cceead5a8461a6717be233bcc8ea134ab5ddeed2f1784a",
+      "contrib/sharepool/test_capacity_metrics.py": "721075e9d9d8bb3ca6d8d8366efdb03456a497d52d70304ff94040a307311d69"
+    },
+    "signer_binary_sha256": "70f6c7c438d237796705f429bad64b017ad798d110b2cfac845a1b4cb1640494",
+    "log": "resource-budget-python-capacity-tests.txt"
+  }
+]

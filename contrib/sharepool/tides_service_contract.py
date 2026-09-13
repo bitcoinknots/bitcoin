@@ -15,6 +15,7 @@ from array import array
 from bisect import bisect_right
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
+from decimal import Decimal, localcontext
 from fractions import Fraction
 import json
 import math
@@ -210,6 +211,285 @@ def capacity_bounds(bits=ILLUSTRATIVE_BITS):
     return rows
 
 
+def geometric_sum_quantile(mean, count=1, probability=0.99):
+    """Quantile of count positive geometric waiting counts, via a binomial tail.
+
+    This is an analytic workload quantile, not a new Monte Carlo run. Individual
+    proofs have native success probability 1/mean; no cutoff or stale losses are
+    included. Quantiles of different quantities are not a joint guarantee.
+    """
+    # Bound the numerical helper's domain: Decimal precision must resolve
+    # 1-p and the requested tail. These are analysis limits, not native rules.
+    if (type(mean) is bool or not math.isfinite(mean) or not 1 <= mean <= 2**32 or
+            type(count) is not int or not 1 <= count <= 8 or
+            not 1e-12 <= probability <= 1 - 1e-12):
+        raise ValueError("invalid geometric workload")
+    if mean == 1:
+        return count
+    # Decimal arithmetic avoids a binary-float CDF just below an exact
+    # threshold (for example the median of several fair-coin waiting counts).
+    # This remains numerical evaluation, not arbitrary exact rational math.
+    with localcontext() as ctx:
+        ctx.prec = 50
+        p, threshold = 1 / Decimal(str(mean)), Decimal(str(probability))
+        def cdf(n):
+            if n < count:
+                return Decimal(0)
+            smaller = sum(Decimal(math.comb(n, i)) * p**i * (1 - p)**(n - i)
+                          for i in range(count))
+            return 1 - smaller
+        low, high = count - 1, max(count, math.ceil(mean * count))
+        while cdf(high) < threshold:
+            high *= 2
+        while low + 1 < high:
+            mid = (low + high) // 2
+            if cdf(mid) >= threshold:
+                high = mid
+            else:
+                low = mid
+        return high
+
+
+def v6_snapshot_resources(*, proofs, recent_proofs, origins, recent_origins,
+                          recipients, script_bytes=22, body_bytes=100_000,
+                          noncoinbase_transactions=199, transaction_sets=1,
+                          unique_coinbases=None, script_sig_bytes=100):
+    """Account declared v6 vectors with lower/upper CompactSize wire bounds.
+
+    The uniform workload assigns the same recipient count/body size to every
+    origin. Non-coinbase sets are disjoint from each other and reused by origins;
+    coinbase sharing is explicit. Bounds describe encoded bytes, not native
+    transaction validity, achievable mining cadence or allocation overhead.
+    An origin-free opening may still repeat the full recent state and payouts.
+    """
+    values = (proofs, recent_proofs, origins, recent_origins, recipients,
+              body_bytes, noncoinbase_transactions, transaction_sets, script_sig_bytes)
+    if (any(type(v) is not int or v < 0 for v in values) or script_bytes not in (22, 34) or
+            script_sig_bytes > 100):
+        raise ValueError("invalid v6 workload")
+    if unique_coinbases is None:
+        unique_coinbases = origins
+    if (type(unique_coinbases) is not int or unique_coinbases < 0 or
+            (origins and not 1 <= unique_coinbases <= origins) or
+            (not origins and unique_coinbases) or
+            (origins and not 1 <= transaction_sets <= origins)):
+        raise ValueError("invalid transaction sharing assumptions")
+    output_bytes = (8 + 1 + script_bytes) * recipients
+    # Explicit 100-byte-or-shorter scriptSig, one null coinbase input,
+    # R payout outputs, one 47-byte witness commitment and its 36 witness bytes.
+    coinbase_base = 4 + 1 + 36 + 1 + script_sig_bytes + 4 + compact_size_length(recipients + 1) + output_bytes + 47 + 4
+    coinbase_raw = coinbase_base + 36
+    references = table_count = table_lower = table_upper = record_lower = record_upper = 0
+    if origins:
+        tx_count = noncoinbase_transactions + 1
+        noncoinbase_bytes = body_bytes - 164 - compact_size_length(tx_count) - coinbase_raw
+        if noncoinbase_bytes < noncoinbase_transactions * 10 or (not noncoinbase_transactions and noncoinbase_bytes):
+            raise ValueError("body cannot contain the declared coinbase and transaction sets")
+        table_count = transaction_sets * noncoinbase_transactions + unique_coinbases
+        table_raw = transaction_sets * noncoinbase_bytes + unique_coinbases * coinbase_raw
+        table_lower = table_raw + table_count
+        table_upper = (table_raw + transaction_sets * noncoinbase_transactions * compact_size_length(noncoinbase_bytes) +
+                       unique_coinbases * compact_size_length(coinbase_raw))
+        references = origins * tx_count
+        record_lower = origins * (32 + 164 + compact_size_length(tx_count)) + references
+        record_upper = (origins * (32 + 164 + compact_size_length(tx_count)) +
+                        references * compact_size_length(table_count - 1))
+    counts = (table_count, origins, proofs, recent_proofs, recipients, recent_origins)
+    framing = 284 + script_bytes - 22 + 64 + 32 + 32 + sum(compact_size_length(n) for n in counts)
+    fixed = framing + proofs * (512 + script_bytes - 22) + recent_proofs * 36 + recent_origins * 100 + output_bytes
+    lower, upper = fixed + table_lower + record_lower, fixed + table_upper + record_upper
+    certificate_bytes = compact_size_length(recent_origins) + 100 * recent_origins
+    reservation = 4 * (379 + output_bytes) + 36
+    checks = {"snapshot_lower_bound_within_16MiB": lower <= 16 * 1024 * 1024,
+              "snapshot_upper_bound_within_16MiB": upper <= 16 * 1024 * 1024,
+              "expanded_bodies_within_512MiB": origins * body_bytes <= 512 * 1024 * 1024,
+              "references_within_2million": references <= 2_000_000,
+              "certificates_within_4MiB": certificate_bytes <= 4 * 1024 * 1024,
+              "individual_body_within_4million_bytes": not origins or body_bytes <= 4_000_000,
+              "payout_reservation_within_4million_WU": reservation <= 4_000_000,
+              "payout_reservation_within_RDTS_800000_WU": reservation <= 800_000}
+    return {"assumptions": {"proofs": proofs, "recent_proofs": recent_proofs, "origins": origins,
+                "recent_origins": recent_origins, "recipients_per_origin_and_winning_pool": recipients,
+                "script_bytes": script_bytes, "body_bytes_per_origin": body_bytes,
+                "noncoinbase_transactions_per_set": noncoinbase_transactions,
+                "disjoint_noncoinbase_sets": transaction_sets if origins else 0,
+                "unique_coinbases": unique_coinbases, "coinbase_script_sig_bytes": script_sig_bytes},
+            "bytes": {"snapshot_lower": lower, "snapshot_upper": upper, "framing": framing,
+                "proofs": proofs * (512 + script_bytes - 22), "recent_state": recent_proofs * 36,
+                "certificates_with_count": certificate_bytes, "payout_outputs": output_bytes,
+                "coinbase_per_origin_raw": coinbase_raw, "unique_coinbases_raw": unique_coinbases * coinbase_raw,
+                "transaction_table_lower": table_lower, "transaction_table_upper": table_upper,
+                "template_records_lower": record_lower, "template_records_upper": record_upper,
+                "expanded_templates": origins * body_bytes},
+            "transaction_references": references, "coinbase_reservation_weight": reservation,
+            "predicates": checks,
+            "encoded_size_bounds_do_not_prove_native_transaction_validity": True}
+
+
+def v6_dependency_resources(root, parent, opening, *, extra_origins=0,
+                            extra_dependency_bytes=0, depth=1, reserve_future_job=True):
+    """Best-case forest: root/parent plus one distinct opening per direct origin.
+
+    Certificates stop recursive revalidation but do not remove exact openings.
+    Extra origins/bytes must be supplied for any additional dependency closure.
+    The future job edge/origin reservation matches the local mining gate.
+    """
+    if any(type(v) is not int or v < 0 for v in (extra_origins, extra_dependency_bytes, depth)):
+        raise ValueError("invalid dependency workload")
+    origins = root["assumptions"]["origins"]
+    counts = origins + extra_origins + int(reserve_future_job)
+    lower = root["bytes"]["snapshot_lower"] + parent["bytes"]["snapshot_lower"] + origins * opening["bytes"]["snapshot_lower"] + extra_dependency_bytes
+    upper = root["bytes"]["snapshot_upper"] + parent["bytes"]["snapshot_upper"] + origins * opening["bytes"]["snapshot_upper"] + extra_dependency_bytes
+    return {"distinct_job_openings": origins, "extra_dependency_origins": extra_origins,
+            "charged_origin_count_with_future_reservation": counts,
+            "depth_with_future_reservation": depth + int(reserve_future_job),
+            "closure_lower_bytes": lower, "closure_upper_bytes": upper,
+            "empty_current_delta_job_opening_bytes": opening["bytes"]["snapshot_upper"],
+            "mean_proofs_per_origin_required_by_declared_workload": root["assumptions"]["proofs"] / origins if origins else None,
+            "predicates": {"origins_within_2048": counts <= 2048,
+                "depth_within_64": depth + int(reserve_future_job) <= 64,
+                "closure_lower_within_64MiB": lower <= 64 * 1024 * 1024,
+                "closure_upper_within_64MiB": upper <= 64 * 1024 * 1024},
+            "no_admission_or_availability_guarantee": True}
+
+
+def v6_history_resources(k, snapshot_bytes, *, pool_fraction, admission_object_bytes=128,
+                         script_bytes=22, oldest_cohort_proofs=0):
+    """Cold full-snapshot scan versus retained target-pool query estimates.
+
+    The default sizeof(Admission)=128 is a declared 64-bit layout estimate,
+    not a portable sizeof measurement. Node budgets are per-thread local limits.
+    """
+    if (not math.isfinite(k) or k < 1 or not 0 < pool_fraction <= 1 or
+            any(type(v) is not int or v < 0 for v in (snapshot_bytes, admission_object_bytes, oldest_cohort_proofs)) or
+            script_bytes not in (22, 34)):
+        raise ValueError("invalid history workload")
+    window = math.ceil(8 * k)
+    selected = window + oldest_cohort_proofs
+    scans = math.ceil(8 / pool_fraction)
+    per_entry = admission_object_bytes + script_bytes
+    return {"pool_fraction": pool_fraction, "nominal_window_pool_proofs": window,
+            "extra_retained_oldest_cohort_proofs": oldest_cohort_proofs,
+            "mean_native_blocks_to_collect_window": 8 / pool_fraction,
+            "rounded_mean_cold_snapshot_reads": scans,
+            "cold_full_snapshot_bytes_at_that_scan_length": scans * snapshot_bytes,
+            "approximate_global_admissions_examined": scans * k,
+            "assumed_charged_bytes_per_admission": per_entry,
+            "retained_one_pool_query_bytes": selected * per_entry,
+            "query_bytes_within_default_64MiB": selected * per_entry <= 64 * 1024 * 1024,
+            "minimum_64MiB_scan_budget_chunks_by_bytes": (scans * snapshot_bytes + 64 * 1024 * 1024 - 1) // (64 * 1024 * 1024),
+            "minimum_65536_entry_scan_budget_chunks": math.ceil(scans * k / 65536),
+            "history_limits_are_local_resumable_not_consensus": True,
+            "query_budget_shared_by_up_to_16_cached_queries": True,
+            "full_pool_index_or_payout_aggregate_optimization_not_assumed": True}
+
+
+def v6_mean_origin_envelope(proofs, *, recipients=100, body_bytes=100_000,
+                            noncoinbase_transactions=199):
+    """Maximum declared mean jobs under upper byte bounds and optimistic leaves.
+
+    All origins have distinct coinbases and share one non-coinbase transaction
+    set; all opening dependencies are certified leaves repeating three cohorts.
+    This is a diagnostic for the same stationary load, not an admission policy.
+    """
+    def allowed(origins, include_dependencies):
+        root = v6_snapshot_resources(proofs=proofs, recent_proofs=4 * proofs,
+            origins=origins, recent_origins=4 * origins, recipients=recipients,
+            body_bytes=body_bytes, noncoinbase_transactions=noncoinbase_transactions)
+        if not all(root["predicates"].values()):
+            return False
+        if not include_dependencies:
+            return True
+        opening = v6_snapshot_resources(proofs=0, recent_proofs=3 * proofs,
+            origins=0, recent_origins=3 * origins, recipients=recipients)
+        return all(v6_dependency_resources(root, root, opening)["predicates"].values())
+    def maximum(include_dependencies):
+        low, high = 0, 2048  # Reserve one origin for the next mining job.
+        while low + 1 < high:
+            mid = (low + high) // 2
+            if allowed(mid, include_dependencies):
+                low = mid
+            else:
+                high = mid
+        return low
+    before, after = maximum(False), maximum(True)
+    return {"proofs_per_height": proofs, "recipients": recipients,
+        "body_bytes": body_bytes, "transactions_per_origin": noncoinbase_transactions + 1,
+        "shared_noncoinbase_sets": 1, "distinct_coinbases_per_origin": True,
+        "maximum_origins_by_snapshot_expanded_references_and_future_origin_reservation": before,
+        "maximum_origins_also_fitting_optimistic_dependency_forest": after,
+        "minimum_average_proofs_per_origin_with_dependencies": proofs / after if after else None,
+        "no_supported_statistical_or_burst_contract_established": True}
+
+
+def resource_budget_report(bits=ILLUSTRATIVE_BITS):
+    """Current-v6 resource diagnostics only; no statistical sweep or rule change."""
+    k = float(shares_per_native(bits, 14))
+    average = math.ceil(k)
+    upper = 1 << 15
+    loads = [("illustrative_mean", average, 4 * average),
+             ("illustrative_single_interval_p99_prior_three_means", geometric_sum_quantile(k), 3 * average + geometric_sum_quantile(k)),
+             ("shift14_upper_density_mean", upper, 4 * upper),
+             ("shift14_upper_density_single_interval_p99_prior_three_means", geometric_sum_quantile(upper), 3 * upper + geometric_sum_quantile(upper))]
+    cases = []
+    # O=16 diagnoses the tight dependency-only mean envelope. O=100/1000
+    # represent distinct jobs, not claims about mandatory miner identities.
+    for name, proofs, recent in loads:
+        historical_per_height = upper if name.startswith("shift14_upper") else average
+        for origins, recipients, body, transactions, sets in (
+                (16, 100, 100_000, 199, 1), (100, 100, 100_000, 199, 1),
+                (100, 1000, 100_000, 199, 1), (1000, 1000, 100_000, 199, 1),
+                (100, 100, 3_850_000, 199, 1), (1000, 100, 1_000_000, 7999, 1),
+                (100, 100, 100_000, 199, 100)):
+            settings = dict(origins=origins, recent_origins=4 * origins, recipients=recipients,
+                            body_bytes=body, noncoinbase_transactions=transactions, transaction_sets=sets)
+            root = v6_snapshot_resources(proofs=proofs, recent_proofs=recent, **settings)
+            parent = v6_snapshot_resources(proofs=historical_per_height, recent_proofs=4 * historical_per_height, **settings)
+            opening = v6_snapshot_resources(proofs=0, recent_proofs=3 * historical_per_height,
+                origins=0, recent_origins=3 * origins, recipients=recipients)
+            graph = v6_dependency_resources(root, parent, opening)
+            lower_checks = [v for key, v in root["predicates"].items() if key not in ("snapshot_upper_bound_within_16MiB", "payout_reservation_within_RDTS_800000_WU")]
+            lower_checks += [v for key, v in graph["predicates"].items() if key != "closure_upper_within_64MiB"]
+            cases.append({"load": name, "root": root, "assumed_native_parent": parent,
+                "minimum_current_delta_job_opening": opening, "dependency_forest": graph,
+                "not_ruled_out_by_declared_4M_WU_necessary_bounds": all(lower_checks),
+                "sufficient_for_production_or_native_admission": False})
+    sample = next(c for c in cases if c["load"] == "illustrative_mean" and c["root"]["assumptions"]["origins"] == 100 and c["root"]["assumptions"]["recipients_per_origin_and_winning_pool"] == 100 and c["root"]["assumptions"]["body_bytes_per_origin"] == 100_000)
+    history = [v6_history_resources(k, sample["root"]["bytes"]["snapshot_upper"], pool_fraction=q,
+                oldest_cohort_proofs=math.ceil(q * k)) for q in (0.1, 0.01, 0.001)]
+    output_limits = []
+    for script in (22, 34):
+        for weight in (4_000_000, 800_000):
+            count = max(0, ((weight - 36) // 4 - 379) // (9 + script))
+            output_limits.append({"script_bytes": script, "native_weight_limit": weight,
+                "maximum_recipients_by_RPC_conservative_coinbase_only_reservation": count,
+                "ordinary_transaction_capacity_reserved": False})
+    return {"schema": 2, "kind": "Resource-only current-v6 bounds and local history costs; no new Monte Carlo",
+        "native_bits_hex": f"{bits:08x}", "candidate_shift": 14, "native_shift_unchanged": 10,
+        "illustrative_proofs_per_expected_native_block": k,
+        "shift14_density_interval": {"inclusive_lower": 16384, "exclusive_upper": 32768},
+        "single_interval_proofs_p99": geometric_sum_quantile(k),
+        "four_interval_total_proofs_p99": geometric_sum_quantile(k, 4),
+        "proof_plus_four_height_state_bytes_per_mean_proof": {"P2WPKH": 512 + 4 * 36, "P2TR": 524 + 4 * 36},
+        "maximum_equal_per_height_proofs_by_proof_and_state_only_16MiB": {"P2WPKH": (16 * 1024 * 1024) // 656, "P2TR": (16 * 1024 * 1024) // 668},
+        "workloads": cases, "history_estimates": history, "recipient_reservation_bounds": output_limits,
+        "mean_origin_reuse_diagnostics": [v6_mean_origin_envelope(average, body_bytes=body,
+                noncoinbase_transactions=transactions) for body, transactions in
+                ((100_000, 199), (1_000_000, 1999), (3_850_000, 199))],
+        "current_v6_SHIFT14_general_production_envelope_passes": False,
+        "limits": [
+            "Recent-state/certificate counts assume immediate admissions across four height cohorts; each load declares its state count. Backlog and older origins can change those counts.",
+            "Every exact origin opening is charged even when certified. The diagnostic dependency forest omits additional recursive origins and thus gives optimistic lower bounds.",
+            "An origin with no new share delta still includes inherited recent state and payout outputs. It does not represent a miner updating all newly received work every second.",
+            "Native 4M/800k weight checks cover conservative coinbase reservation only. Body sizes and transaction counts are synthetic encoding workloads, not validated transactions or a simultaneous native-limit achievement.",
+            "Unique coinbases are an explicit workload assumption, not implied solely by different header commitments. Shared transaction tables do not share identical byte prefixes of different coinbase transactions.",
+            "Wire upper bounds assume declared body lengths, vector counts and sharing; they do not bound native validation CPU, heap overhead, disk latency or additional dependencies.",
+            "A single-interval p99 with three prior means is a declared stress case, not a joint 99% guarantee. Unbounded Poisson/geometric tails and finite share age prevent unconditional admission guarantees.",
+            "History estimates assume full network work is admitted and snapshot size held at the stated value. They are cold read/operation estimates, not measured disk throughput.",
+            "The 2048-origin,512MiB-expanded,2M-reference,16MiB-snapshot and64MiB-dependency consensus limits and difficulty are unchanged.",
+            "Prior statistical artifacts and source-hash manifests remain historical evidence; this resource-only artifact does not rewrite or rerun them."]}
+
+
 def _task(arg):
     seed, scenario = arg
     return run_fast(seed, scenario)
@@ -264,14 +544,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--replicas", type=int, default=128)
+    parser.add_argument("--resource-only", action="store_true", help="write corrected resource bounds without running simulations")
     parser.add_argument("--seed", type=int, default=20260919)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--measured-pool-blocks", type=float, default=24)
     parser.add_argument("--warmup-pool-blocks", type=float, default=16)
     parser.add_argument("--no-controls", action="store_true")
     args = parser.parse_args()
-    result = report(replicas=args.replicas, seed=args.seed, workers=args.workers,
-                    measured=args.measured_pool_blocks, warmup=args.warmup_pool_blocks, controls=not args.no_controls)
+    result = resource_budget_report() if args.resource_only else report(
+        replicas=args.replicas, seed=args.seed, workers=args.workers,
+        measured=args.measured_pool_blocks, warmup=args.warmup_pool_blocks, controls=not args.no_controls)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8")
 
 

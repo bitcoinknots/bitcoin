@@ -7,10 +7,18 @@
 from dataclasses import replace
 from fractions import Fraction
 import itertools
+import math
+from pathlib import Path
+import sys
 import unittest
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "test" / "functional"))
+
 from tides_calibration import MINER_WEIGHTS, REWARD, Proof, Scenario, payouts_from_batches, shares_per_native, simulate
-from tides_service_contract import CachedCohortPayouts, capacity_bounds, capacity_predicates, compact_size_length, compare_to_ideal, run_fast
+from tides_service_contract import (CachedCohortPayouts, capacity_bounds, capacity_predicates,
+    compact_size_length, compare_to_ideal, geometric_sum_quantile, resource_budget_report,
+    run_fast, v6_dependency_resources, v6_history_resources, v6_mean_origin_envelope,
+    v6_snapshot_resources)
 
 
 class CohortCacheTests(unittest.TestCase):
@@ -141,6 +149,150 @@ class ContractTests(unittest.TestCase):
             self.assertLess(row["current_2million_reference_budget_mean_references_per_unique_job"], 2000)
         self.assertAlmostEqual(rows[2]["minimum_unique_proof_bytes_per_day"],
                                rows[0]["minimum_unique_proof_bytes_per_day"] * 16)
+
+
+class ResourceBudgetTests(unittest.TestCase):
+    def test_geometric_quantiles_match_exact_fair_coin_binomial_tail(self):
+        for count in range(1, 9):
+            for probability in (0.5, 0.9, 0.99):
+                actual = geometric_sum_quantile(2, count, probability)
+                def cdf(n):
+                    return 1 - sum(Fraction(math.comb(n, j), 2**n) for j in range(count))
+                self.assertGreaterEqual(cdf(actual), Fraction(str(probability)))
+                self.assertLess(cdf(actual - 1), Fraction(str(probability)))
+        self.assertEqual(geometric_sum_quantile(1, 8), 8)
+        self.assertEqual(geometric_sum_quantile(20114.210697376002), 92628)
+
+    def test_origin_free_opening_matches_real_codec_across_count_prefixes(self):
+        from hash_snapshot import EnvelopeV2, OriginCertificate, Snapshot, StateEntry, rules_hash
+        from test_framework.messages import CTxOut, ser_uint256
+        for script_size in (22, 34):
+            prefix = b"\x00\x14" if script_size == 22 else b"\x51\x20"
+            script = prefix + bytes(script_size - 2)
+            envelope = EnvelopeV2(1, rules_hash(6), 4, 5, 6, bytes(32), script, version=6)
+            for count in (0, 1, 252, 253):
+                state = tuple(StateEntry(4, i) for i in range(count))
+                certs = tuple(sorted((OriginCertificate(4, 5, i, i + 1) for i in range(count)),
+                                     key=lambda c: ser_uint256(c.identity)))
+                payouts = tuple(CTxOut(1, prefix + i.to_bytes(script_size - 2, "big")) for i in range(count))
+                snapshot = Snapshot(envelope, bytes(64), post_state=state, payouts=payouts, certificates=certs)
+                size = len(snapshot.serialize())
+                estimate = v6_snapshot_resources(proofs=0, recent_proofs=count, origins=0,
+                    recent_origins=count, recipients=count, script_bytes=script_size)
+                self.assertEqual(estimate["bytes"]["snapshot_lower"], size)
+                self.assertEqual(estimate["bytes"]["snapshot_upper"], size)
+
+    def test_shared_table_bounds_and_coinbase_multiplier_match_real_transactions(self):
+        from hash_snapshot import EnvelopeV2, Snapshot, TemplateRecord, rules_hash
+        from test_framework.blocktools import add_witness_commitment, create_block, create_coinbase
+        from test_framework.messages import COutPoint, CTransaction, CTxIn, CTxOut, ser_uint256
+        for script_size in (22, 34):
+            prefix = b"\x00\x14" if script_size == 22 else b"\x51\x20"
+            for recipients in (3, 253):
+                payouts = tuple(CTxOut(1, prefix + i.to_bytes(script_size - 2, "big")) for i in range(recipients))
+                tx = CTransaction()
+                tx.vin = [CTxIn(COutPoint(2, 0))]
+                tx.vout = [CTxOut(1, payouts[0].scriptPubKey)]
+                records, body_size, coinbase_size = [], None, None
+                for number in range(5):
+                    coinbase = create_coinbase(4)
+                    coinbase.vin[0].scriptSig = bytes([number]) * 100
+                    coinbase.vout = list(payouts)
+                    block = create_block(5, coinbase, 6, height=4, header_v2=True, txlist=[tx])
+                    add_witness_commitment(block)
+                    coinbase_size = len(block.vtx[0].serialize_with_witness())
+                    body_size = len(block.serialize())
+                    records.append(TemplateRecord.from_block(block))
+                records.sort(key=lambda t: ser_uint256(t.template_id))
+                envelope = EnvelopeV2(1, rules_hash(6), 4, 5, 6, bytes(32), bytes(payouts[0].scriptPubKey), version=6)
+                snapshot = Snapshot(envelope, bytes(64), templates=tuple(records), payouts=payouts)
+                estimate = v6_snapshot_resources(proofs=0, recent_proofs=0, origins=5,
+                    recent_origins=0, recipients=recipients, script_bytes=script_size,
+                    body_bytes=body_size, noncoinbase_transactions=1)
+                self.assertEqual(estimate["bytes"]["coinbase_per_origin_raw"], coinbase_size)
+                self.assertEqual(estimate["bytes"]["unique_coinbases_raw"], 5 * coinbase_size)
+                self.assertLessEqual(estimate["bytes"]["snapshot_lower"], len(snapshot.serialize()))
+                self.assertGreaterEqual(estimate["bytes"]["snapshot_upper"], len(snapshot.serialize()))
+
+    def test_certified_openings_remain_charged_and_future_job_reserves_one_origin(self):
+        root = v6_snapshot_resources(proofs=100, recent_proofs=400, origins=2,
+                                    recent_origins=8, recipients=3)
+        opening = v6_snapshot_resources(proofs=0, recent_proofs=300, origins=0,
+                                       recent_origins=6, recipients=3)
+        graph = v6_dependency_resources(root, root, opening)
+        self.assertEqual(graph["charged_origin_count_with_future_reservation"], 3)
+        self.assertEqual(graph["depth_with_future_reservation"], 2)
+        self.assertEqual(graph["closure_upper_bytes"],
+                         2 * root["bytes"]["snapshot_upper"] + 2 * opening["bytes"]["snapshot_upper"])
+        larger = v6_dependency_resources(root, root, opening, extra_origins=2046,
+                                         extra_dependency_bytes=64 * 1024 * 1024, depth=64)
+        self.assertFalse(larger["predicates"]["origins_within_2048"])
+        self.assertFalse(larger["predicates"]["depth_within_64"])
+        self.assertFalse(larger["predicates"]["closure_lower_within_64MiB"])
+
+    def test_recipient_reservation_boundary_leaves_no_ordinary_transaction_claim(self):
+        for script_size, cap, count in ((22, 4_000_000, 32245), (22, 800_000, 6439),
+                                      (34, 4_000_000, 23246), (34, 800_000, 4642)):
+            kwargs = dict(proofs=0, recent_proofs=0, origins=0, recent_origins=0, script_bytes=script_size)
+            at = v6_snapshot_resources(**kwargs, recipients=count)
+            over = v6_snapshot_resources(**kwargs, recipients=count + 1)
+            self.assertLessEqual(at["coinbase_reservation_weight"], cap)
+            self.assertGreater(over["coinbase_reservation_weight"], cap)
+
+    def test_history_scan_scales_with_pool_fraction_but_retained_window_does_not(self):
+        large = v6_history_resources(20000, 13 * 1024 * 1024, pool_fraction=0.1)
+        small = v6_history_resources(20000, 13 * 1024 * 1024, pool_fraction=0.001)
+        self.assertEqual(small["cold_full_snapshot_bytes_at_that_scan_length"],
+                         100 * large["cold_full_snapshot_bytes_at_that_scan_length"])
+        self.assertEqual(small["approximate_global_admissions_examined"],
+                         100 * large["approximate_global_admissions_examined"])
+        self.assertEqual(large["retained_one_pool_query_bytes"], 160000 * 150)
+        self.assertEqual(small["retained_one_pool_query_bytes"], large["retained_one_pool_query_bytes"])
+        oversized = v6_history_resources(20000, 1024, pool_fraction=1, oldest_cohort_proofs=400000)
+        self.assertFalse(oversized["query_bytes_within_default_64MiB"])
+        self.assertTrue(oversized["history_limits_are_local_resumable_not_consensus"])
+
+    def test_mean_burst_and_density_reports_do_not_claim_production_admission(self):
+        report = resource_budget_report()
+        self.assertFalse(report["current_v6_SHIFT14_general_production_envelope_passes"])
+        for case in report["workloads"]:
+            self.assertFalse(case["sufficient_for_production_or_native_admission"])
+            if case["load"] != "illustrative_mean":
+                self.assertFalse(case["not_ruled_out_by_declared_4M_WU_necessary_bounds"])
+        # Regardless of transaction sharing, proofs plus four recent-height
+        # state cohorts alone exceed 16MiB near SHIFT14's upper density.
+        upper = v6_snapshot_resources(proofs=32768, recent_proofs=4 * 32768,
+            origins=0, recent_origins=0, recipients=0)
+        self.assertFalse(upper["predicates"]["snapshot_lower_bound_within_16MiB"])
+
+    def test_mean_origin_boundary_includes_repeated_leaf_state(self):
+        result = v6_mean_origin_envelope(20115)
+        self.assertEqual(result["maximum_origins_also_fitting_optimistic_dependency_forest"], 18)
+        # Reconstruct both sides of the boundary independently with actual
+        # vector-byte formulas, including origin-dependent certificates in
+        # every leaf; the limit is not merely64MiB / one constant opening.
+        for origins, expected in ((18, True), (19, False)):
+            root = v6_snapshot_resources(proofs=20115, recent_proofs=80460,
+                origins=origins, recent_origins=4 * origins, recipients=100)
+            leaf_bytes = 284 + 64 + 32 + 32 + (1 + 1 + 1 + 3 + 1 + 1)
+            leaf_bytes += 60345 * 36 + 3 * origins * 100 + 100 * 31
+            self.assertEqual(2 * root["bytes"]["snapshot_upper"] + origins * leaf_bytes <= 64 * 1024 * 1024,
+                             expected)
+        self.assertEqual(v6_mean_origin_envelope(32768)["maximum_origins_also_fitting_optimistic_dependency_forest"], 0)
+
+    def test_invalid_resource_inputs(self):
+        valid = dict(proofs=1, recent_proofs=1, origins=1, recent_origins=1, recipients=1)
+        for key, value in (("proofs", -1), ("recent_proofs", True), ("origins", 1.5),
+                           ("script_bytes", 23), ("unique_coinbases", 2),
+                           ("body_bytes", 100), ("transaction_sets", 0), ("script_sig_bytes", 101)):
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                v6_snapshot_resources(**(valid | {key: value}))
+        for args in ((0,), (True,), (float("inf"),), (1e100,), (2, 0), (2, 9),
+                     (2, 1, 1), (2, 1, 1e-100)):
+            with self.assertRaises(ValueError):
+                geometric_sum_quantile(*args)
+        with self.assertRaises(ValueError):
+            v6_history_resources(20000, 1024, pool_fraction=0)
 
 
 if __name__ == "__main__":

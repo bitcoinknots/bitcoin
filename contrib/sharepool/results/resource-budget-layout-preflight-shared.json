@@ -1,0 +1,733 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "network": "isolated native regtest",
+  "started_utc": "2026-09-13T16:45:03.561488+00:00",
+  "rules_hash": "9050ab43fa5feddb7f0659abc4ca43f596d4465f93535f3b9ab37449397e6edd",
+  "native_binary_sha256": "a7c5cbd34c882ccd942cd819963d2e480212061341aaeffd7eff458ef178f116",
+  "signer_binary_sha256": "27b76bfbc15b9df4fe5ae7d68ff9bf48286e82d6aa8ff2e6829e633d56e49b81",
+  "harness_sha256": "6579dd4510401414fc2cbf19ccd538e0adaff82632197e68f989f86ef7be7263",
+  "source_sha256": {
+    "contrib/sharepool/hash_mining_gate.py": "91646df17fb30d55486b69cf485979cfd3e22d307a8a0ab3f8a74d6d553824dd",
+    "contrib/sharepool/hash_snapshot.py": "712f34059ac045dbfdef70b97f65408c1dd6f07942964268bd7753ac1e1d55d2",
+    "contrib/sharepool/hash_gate_batch.py": "a41c510602748c50a75b66a9dddfa9f028fd5a7cfb57ccc8cccf29cff7f424c4",
+    "contrib/sharepool/hash_gate_inventory.py": "2bf60749366de6217391626315d7591b5fb3029bc95c1c164f019b6b1f27860b",
+    "contrib/sharepool/capacity_metrics.py": "71f68e44d56a555fdae635c3467eed67e97c3db4dacc0758a426b0cafd993934",
+    "test/functional/feature_sharepool_hash_tides_100_miners.py": "cdfdf311c54cd0927f6cc2ac0b382edcdeff4b023c1b19f0989d84eaaa73963c"
+  },
+  "command": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "test/functional/feature_sharepool_hash_capacity.py",
+    "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+    "--miners=2",
+    "--epochs=1",
+    "--shares-per-origin=3",
+    "--max-runtime-seconds=240",
+    "--host-load=quiescent",
+    "--nocleanup",
+    "--tmpdir=/private/tmp/resource-budget-layout-preflight-shared",
+    "--portseed=1006",
+    "--results=contrib/sharepool/results/resource-budget-layout-preflight-shared.json",
+    "--template-layout=shared"
+  ],
+  "host": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "logical_cpus": 10
+  },
+  "operator_declared_host_load": "quiescent",
+  "configuration": {
+    "miners": 2,
+    "epochs": 1,
+    "shares_per_origin": 3,
+    "padding_outputs": 0,
+    "template_layout": "shared",
+    "witness_heavy": false,
+    "resource_diagnostics": false,
+    "snapshot_budget_bytes": 0,
+    "batch_fraction": 0.75,
+    "offer_interval_ms": 0,
+    "settle_every": 0,
+    "max_runtime_seconds": 240
+  },
+  "native_nodes": 2,
+  "physical_miners_used": 0,
+  "opaque_proof_fixtures": 0,
+  "transaction_fee_satoshis": 1000,
+  "transaction_policy": {
+    "acceptnonstdtxn_explicit": false,
+    "witness_items_per_input": 0,
+    "witness_item_bytes": 0,
+    "consensus_limits_changed": false,
+    "disjoint_selection": null
+  },
+  "epochs": [
+    {
+      "epoch": 1,
+      "native_origin_height": 102,
+      "real_distinct_origins": 2,
+      "real_distinct_transaction_sets": 1,
+      "template_bytes": {
+        "count": 2,
+        "total_bytes": 1062,
+        "min_bytes": 531,
+        "p50_bytes": 531,
+        "p95_bytes": 531,
+        "p99_bytes": 531,
+        "max_bytes": 531
+      },
+      "template_weight": {
+        "count": 2,
+        "total_weight_units": 3972,
+        "min_weight_units": 1986,
+        "p50_weight_units": 1986,
+        "p95_weight_units": 1986,
+        "p99_weight_units": 1986,
+        "max_weight_units": 1986
+      },
+      "template_transaction_references": {
+        "count": 2,
+        "total_references": 6,
+        "min_references": 3,
+        "p50_references": 3,
+        "p95_references": 3,
+        "p99_references": 3,
+        "max_references": 3
+      },
+      "full_unbounded_proposal_bytes": 4459,
+      "offered": 6,
+      "acknowledged": 6,
+      "origin_preparation_seconds": 0.31120899999999985,
+      "client_queue_trace": [
+        {
+          "event": "ingress_start",
+          "elapsed_seconds": 6.737499999998064e-05,
+          "offered_due": 6,
+          "acknowledged": 0,
+          "client_queue": 6,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 6
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 0.01045633300000004,
+          "offered_due": 6,
+          "acknowledged": 1,
+          "client_queue": 5,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 5
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 0.04260116600000008,
+          "offered_due": 6,
+          "acknowledged": 6,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        },
+        {
+          "event": "before_settlement",
+          "elapsed_seconds": 0.04903374999999999,
+          "offered_due": 6,
+          "acknowledged": 6,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        },
+        {
+          "event": "after_settlement",
+          "elapsed_seconds": 1.0398226659999998,
+          "offered_due": 6,
+          "acknowledged": 6,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        },
+        {
+          "event": "before_settlement",
+          "elapsed_seconds": 1.04029,
+          "offered_due": 6,
+          "acknowledged": 6,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        },
+        {
+          "event": "after_settlement",
+          "elapsed_seconds": 1.4048403749999998,
+          "offered_due": 6,
+          "acknowledged": 6,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        }
+      ],
+      "blocks": [
+        {
+          "height": 102,
+          "hash": "21385258ffc220a547a2c1a518edc480c9e968621b476e29b3a39c3087522000",
+          "admitted": 4,
+          "snapshot_bytes": 3810,
+          "planned_resources": {
+            "snapshot_bytes": 3779,
+            "dependency_bytes": 4677,
+            "origins": 3,
+            "payout_reservation_bytes": 62,
+            "reserved_snapshot_bytes": 3841,
+            "reserved_dependency_bytes": 4739
+          },
+          "eligible_backlog": 2,
+          "deferred_backlog": 0,
+          "client_queue_before": 0,
+          "offers_still_unacknowledged": 0,
+          "drain_step_seconds": 0.990787166
+        },
+        {
+          "height": 103,
+          "hash": "0662c791498b48ad38991098b0b90740b859f68241e1b6971574c064a40e5fa8",
+          "admitted": 2,
+          "snapshot_bytes": 2489,
+          "planned_resources": {
+            "snapshot_bytes": 2458,
+            "dependency_bytes": 6717,
+            "origins": 2,
+            "payout_reservation_bytes": 62,
+            "reserved_snapshot_bytes": 2520,
+            "reserved_dependency_bytes": 6779
+          },
+          "eligible_backlog": 0,
+          "deferred_backlog": 0,
+          "client_queue_before": 0,
+          "offers_still_unacknowledged": 0,
+          "drain_step_seconds": 0.36454916699999984
+        }
+      ],
+      "admission_seconds": 0.04260258300000008,
+      "observed_serial_acknowledgements_per_second": 140.8365309680868,
+      "scheduler_lateness": {
+        "count": 6,
+        "total_seconds": 0.11627291399999984,
+        "min_seconds": 7.054099999992403e-05,
+        "p50_seconds": 0.015952666000000004,
+        "p95_seconds": 0.03691604100000001,
+        "p99_seconds": 0.03691604100000001,
+        "max_seconds": 0.03691604100000001
+      },
+      "ingress_includes_interleaved_settlement": false,
+      "initial_deferred": 2,
+      "initial_batch_resources": {
+        "snapshot_bytes": 3779,
+        "dependency_bytes": 4677,
+        "origins": 3,
+        "payout_reservation_bytes": 62,
+        "reserved_snapshot_bytes": 3841,
+        "reserved_dependency_bytes": 4739
+      },
+      "receipt_states": {
+        "confirmed_admitted": 6
+      },
+      "admitted": 6,
+      "total_admitted": 6,
+      "seconds": 1.723474
+    }
+  ],
+  "rewards": [
+    {
+      "height": 102,
+      "commitment": "882ec62c71b50c0190a8251a07e67c2fe0a076e3a63757756b2d820208637df0",
+      "new_admissions": 4,
+      "eligible_proofs": 4,
+      "payout_scripts": 2,
+      "reward_satoshis": 5000002000,
+      "unclaimed_rounding_satoshis": 0,
+      "whole_admission_height_cohorts_verified": true,
+      "exact_rational_window_and_coinbase_verified": true
+    },
+    {
+      "height": 103,
+      "commitment": "24d87c3108c4baaea481d0ddab9064030f724a07f0d326953681779e31ef4290",
+      "new_admissions": 2,
+      "eligible_proofs": 6,
+      "payout_scripts": 2,
+      "reward_satoshis": 5000000000,
+      "unclaimed_rounding_satoshis": 0,
+      "whole_admission_height_cohorts_verified": true,
+      "exact_rational_window_and_coinbase_verified": true
+    }
+  ],
+  "limitations": [
+    "Sequential local RPC driver; observed service rate is not a concurrent saturation maximum",
+    "Offered bursts are finite precomputed native proofs; client queue and settlement backlog are measured separately",
+    "Two loopback native nodes, not 100 native nodes, WAN propagation, or a public testnet",
+    "Easy regtest proof target does not establish production sampling variance or mining hashrate",
+    "The driver deliberately schedules settlement blocks; qualifying headers may also satisfy native difficulty without immediate publication",
+    "Snapshot budget overload tests deterministic carry and expiry; it does not exhaust host RAM or disk",
+    "RSS is sampled, CPU is cumulative ps time, disk sizes are logical lengths rather than physical allocation",
+    "Local durable ACKs become recurring reward eligible only after native canonical admission"
+  ],
+  "pinned_snapshot_budget_bytes": 4096,
+  "snapshot_policy_selection": {
+    "explicit_override": false,
+    "native_prepared_one_origin_snapshot_floor_bytes": 1666,
+    "full_proposal_bytes": 4459,
+    "fraction_of_remaining_bytes": 0.75,
+    "policy_frozen_after_first_epoch": true
+  },
+  "peer_recovery_seconds": 0.800503167,
+  "offered": 6,
+  "acknowledged": 6,
+  "admitted": 6,
+  "current_acknowledged_backlog": 0,
+  "expired": 0,
+  "unresolved_receipts": 0,
+  "follower_gate_recovery": {
+    "native_verified_acknowledgements": 6,
+    "inventory_pages": 10,
+    "deferred_attempts": 0,
+    "receipt_states": {
+      "confirmed_admitted": 6
+    }
+  },
+  "final_backlog": 0,
+  "payout_oracle_verified": true,
+  "peer_recovery_verified": true,
+  "native_p2p_bytes": [
+    {
+      "totalbytessent": 10454,
+      "totalbytesrecv": 1706
+    },
+    {
+      "totalbytessent": 1706,
+      "totalbytesrecv": 10454
+    }
+  ],
+  "seconds": 3.0214852500000005,
+  "measurements": {
+    "gate.batch_status": {
+      "count": 3,
+      "total_seconds": 0.02943687400000017,
+      "min_seconds": 0.00641825000000007,
+      "p50_seconds": 0.009288957999999958,
+      "p95_seconds": 0.01372966600000014,
+      "p99_seconds": 0.01372966600000014,
+      "max_seconds": 0.01372966600000014,
+      "failures": 0
+    },
+    "gate.origin_job": {
+      "count": 2,
+      "total_seconds": 0.2858995420000001,
+      "min_seconds": 0.14045841700000006,
+      "p50_seconds": 0.14045841700000006,
+      "p95_seconds": 0.14544112500000006,
+      "p99_seconds": 0.14544112500000006,
+      "max_seconds": 0.14544112500000006,
+      "failures": 0
+    },
+    "gate.p2p_recovery_import": {
+      "count": 1,
+      "total_seconds": 0.07602966700000025,
+      "min_seconds": 0.07602966700000025,
+      "p50_seconds": 0.07602966700000025,
+      "p95_seconds": 0.07602966700000025,
+      "p99_seconds": 0.07602966700000025,
+      "max_seconds": 0.07602966700000025,
+      "failures": 0
+    },
+    "gate.receipt_status": {
+      "count": 2,
+      "total_seconds": 0.01155391700000008,
+      "min_seconds": 0.00487649999999995,
+      "p50_seconds": 0.00487649999999995,
+      "p95_seconds": 0.00667741700000013,
+      "p99_seconds": 0.00667741700000013,
+      "max_seconds": 0.00667741700000013,
+      "failures": 0
+    },
+    "gate.receive": {
+      "count": 6,
+      "total_seconds": 0.04250383399999991,
+      "min_seconds": 0.0054893749999997965,
+      "p50_seconds": 0.0055945840000000135,
+      "p95_seconds": 0.010382499999999961,
+      "p99_seconds": 0.010382499999999961,
+      "max_seconds": 0.010382499999999961,
+      "failures": 0
+    },
+    "gate.register_origin": {
+      "count": 2,
+      "total_seconds": 0.008064167000000122,
+      "min_seconds": 0.0040197500000001,
+      "p50_seconds": 0.0040197500000001,
+      "p95_seconds": 0.004044417000000022,
+      "p99_seconds": 0.004044417000000022,
+      "max_seconds": 0.004044417000000022,
+      "failures": 0
+    },
+    "gate.register_snapshot": {
+      "count": 2,
+      "total_seconds": 0.0018665829999997552,
+      "min_seconds": 0.0008772079999999072,
+      "p50_seconds": 0.0008772079999999072,
+      "p95_seconds": 0.000989374999999848,
+      "p99_seconds": 0.000989374999999848,
+      "max_seconds": 0.000989374999999848,
+      "failures": 0
+    },
+    "gate.settlement_job": {
+      "count": 2,
+      "total_seconds": 0.33720379099999986,
+      "min_seconds": 0.1678984579999998,
+      "p50_seconds": 0.1678984579999998,
+      "p95_seconds": 0.16930533300000006,
+      "p99_seconds": 0.16930533300000006,
+      "max_seconds": 0.16930533300000006,
+      "failures": 0
+    },
+    "p2p.block_and_snapshot_ready": {
+      "count": 2,
+      "total_seconds": 0.8516927910000001,
+      "min_seconds": 0.17837208300000018,
+      "p50_seconds": 0.17837208300000018,
+      "p95_seconds": 0.6733207079999999,
+      "p99_seconds": 0.6733207079999999,
+      "max_seconds": 0.6733207079999999,
+      "failures": 0
+    },
+    "rpc.node0.finalizesharepoolhashjob": {
+      "count": 4,
+      "total_seconds": 0.008709209000000495,
+      "min_seconds": 0.0012679170000000628,
+      "p50_seconds": 0.0013794579999999446,
+      "p95_seconds": 0.0032611670000002313,
+      "p99_seconds": 0.0032611670000002313,
+      "max_seconds": 0.0032611670000002313,
+      "failures": 0
+    },
+    "rpc.node0.getbestblockhash": {
+      "count": 104,
+      "total_seconds": 0.022369492999998908,
+      "min_seconds": 0.00014458299999997593,
+      "p50_seconds": 0.0001986249999998968,
+      "p95_seconds": 0.0003536250000002461,
+      "p99_seconds": 0.0003872910000000118,
+      "max_seconds": 0.00047266599999984393,
+      "failures": 0
+    },
+    "rpc.node0.getblockchaininfo": {
+      "count": 27,
+      "total_seconds": 0.009698126000001084,
+      "min_seconds": 0.00024895900000010407,
+      "p50_seconds": 0.0003111670000000011,
+      "p95_seconds": 0.0006070419999999466,
+      "p99_seconds": 0.0006968330000001188,
+      "max_seconds": 0.0006968330000001188,
+      "failures": 0
+    },
+    "rpc.node0.getblockhash": {
+      "count": 83,
+      "total_seconds": 0.017953751999997936,
+      "min_seconds": 0.00014904200000009915,
+      "p50_seconds": 0.00019258300000002393,
+      "p95_seconds": 0.00034012500000013546,
+      "p99_seconds": 0.000505624999999732,
+      "max_seconds": 0.000505624999999732,
+      "failures": 0
+    },
+    "rpc.node0.getblockheader": {
+      "count": 17,
+      "total_seconds": 0.005562082000000412,
+      "min_seconds": 0.00022529200000009908,
+      "p50_seconds": 0.0003294579999999492,
+      "p95_seconds": 0.0004683749999996323,
+      "p99_seconds": 0.0004683749999996323,
+      "max_seconds": 0.0004683749999996323,
+      "failures": 0
+    },
+    "rpc.node0.getnettotals": {
+      "count": 3,
+      "total_seconds": 0.00100374999999997,
+      "min_seconds": 0.00025779100000011823,
+      "p50_seconds": 0.00029508399999977897,
+      "p95_seconds": 0.00045087500000007275,
+      "p99_seconds": 0.00045087500000007275,
+      "max_seconds": 0.00045087500000007275,
+      "failures": 0
+    },
+    "rpc.node0.getsharepoolhashstatus": {
+      "count": 27,
+      "total_seconds": 0.011695956999999257,
+      "min_seconds": 0.0003252500000001657,
+      "p50_seconds": 0.0003845829999999939,
+      "p95_seconds": 0.0007226249999998657,
+      "p99_seconds": 0.0008321250000000724,
+      "max_seconds": 0.0008321250000000724,
+      "failures": 0
+    },
+    "rpc.node0.getsharepoolhashtidesbudget": {
+      "count": 11,
+      "total_seconds": 0.006924458999999716,
+      "min_seconds": 0.00022062500000008534,
+      "p50_seconds": 0.00026570800000014216,
+      "p95_seconds": 0.0016015000000000335,
+      "p99_seconds": 0.0016015000000000335,
+      "max_seconds": 0.0016015000000000335,
+      "failures": 0
+    },
+    "rpc.node0.preparesharepoolhashjob": {
+      "count": 5,
+      "total_seconds": 0.013769750000000247,
+      "min_seconds": 0.0011624580000000329,
+      "p50_seconds": 0.0020820000000001393,
+      "p95_seconds": 0.0050914170000000425,
+      "p99_seconds": 0.0050914170000000425,
+      "max_seconds": 0.0050914170000000425,
+      "failures": 0
+    },
+    "rpc.node0.sendrawtransaction": {
+      "count": 2,
+      "total_seconds": 0.004554041999999869,
+      "min_seconds": 0.0021668749999999015,
+      "p50_seconds": 0.0021668749999999015,
+      "p95_seconds": 0.002387166999999968,
+      "p99_seconds": 0.002387166999999968,
+      "max_seconds": 0.002387166999999968,
+      "failures": 0
+    },
+    "rpc.node0.submitblock": {
+      "count": 2,
+      "total_seconds": 0.014935082999999683,
+      "min_seconds": 0.006972457999999904,
+      "p50_seconds": 0.006972457999999904,
+      "p95_seconds": 0.007962624999999779,
+      "p99_seconds": 0.007962624999999779,
+      "max_seconds": 0.007962624999999779,
+      "failures": 0
+    },
+    "rpc.node0.submitsharepoolhashsnapshot": {
+      "count": 24,
+      "total_seconds": 0.03263329200000009,
+      "min_seconds": 0.00028687500000001975,
+      "p50_seconds": 0.0003183330000000595,
+      "p95_seconds": 0.005657583000000077,
+      "p99_seconds": 0.010289541000000124,
+      "max_seconds": 0.010289541000000124,
+      "failures": 0
+    },
+    "rpc.node0.validatesharepoolhashshare": {
+      "count": 6,
+      "total_seconds": 0.0036892099999998873,
+      "min_seconds": 0.000591083999999853,
+      "p50_seconds": 0.0006032910000000058,
+      "p95_seconds": 0.0006392089999998074,
+      "p99_seconds": 0.0006392089999998074,
+      "max_seconds": 0.0006392089999998074,
+      "failures": 0
+    },
+    "rpc.node0.validatesharepoolhashtemplate": {
+      "count": 16,
+      "total_seconds": 0.02415541600000015,
+      "min_seconds": 0.00047666699999981965,
+      "p50_seconds": 0.000587499999999963,
+      "p95_seconds": 0.005193166999999832,
+      "p99_seconds": 0.005193166999999832,
+      "max_seconds": 0.005193166999999832,
+      "failures": 0
+    },
+    "rpc.node1.getbestblockhash": {
+      "count": 58,
+      "total_seconds": 0.011858335000002551,
+      "min_seconds": 0.00016658400000002516,
+      "p50_seconds": 0.00020179099999984018,
+      "p95_seconds": 0.00023558300000026122,
+      "p99_seconds": 0.00025129100000009785,
+      "max_seconds": 0.00025129100000009785,
+      "failures": 0
+    },
+    "rpc.node1.getblockchaininfo": {
+      "count": 12,
+      "total_seconds": 0.004308959000000279,
+      "min_seconds": 0.00030666699999981617,
+      "p50_seconds": 0.00034079199999981213,
+      "p95_seconds": 0.0004922500000001939,
+      "p99_seconds": 0.0004922500000001939,
+      "max_seconds": 0.0004922500000001939,
+      "failures": 0
+    },
+    "rpc.node1.getblockhash": {
+      "count": 32,
+      "total_seconds": 0.006792290000000367,
+      "min_seconds": 0.00017562500000023462,
+      "p50_seconds": 0.00020987500000035908,
+      "p95_seconds": 0.00026583300000027066,
+      "p99_seconds": 0.00026766600000005525,
+      "max_seconds": 0.00026766600000005525,
+      "failures": 0
+    },
+    "rpc.node1.getblockheader": {
+      "count": 8,
+      "total_seconds": 0.001940208999999804,
+      "min_seconds": 0.00022304199999956253,
+      "p50_seconds": 0.00023883300000004937,
+      "p95_seconds": 0.0002740829999998695,
+      "p99_seconds": 0.0002740829999998695,
+      "max_seconds": 0.0002740829999998695,
+      "failures": 0
+    },
+    "rpc.node1.getnettotals": {
+      "count": 3,
+      "total_seconds": 0.0008753330000004222,
+      "min_seconds": 0.00023499999999998522,
+      "p50_seconds": 0.00030787500000029056,
+      "p95_seconds": 0.00033245800000014647,
+      "p99_seconds": 0.00033245800000014647,
+      "max_seconds": 0.00033245800000014647,
+      "failures": 0
+    },
+    "rpc.node1.getsharepoolhashrecent": {
+      "count": 5,
+      "total_seconds": 0.0013745430000002834,
+      "min_seconds": 0.00025937500000017266,
+      "p50_seconds": 0.00026658300000015345,
+      "p95_seconds": 0.0002997090000000924,
+      "p99_seconds": 0.0002997090000000924,
+      "max_seconds": 0.0002997090000000924,
+      "failures": 0
+    },
+    "rpc.node1.getsharepoolhashsnapshot": {
+      "count": 10,
+      "total_seconds": 0.00308758300000056,
+      "min_seconds": 0.00024045799999994344,
+      "p50_seconds": 0.0002849580000003904,
+      "p95_seconds": 0.0003709579999999768,
+      "p99_seconds": 0.0003709579999999768,
+      "max_seconds": 0.0003709579999999768,
+      "failures": 0
+    },
+    "rpc.node1.getsharepoolhashstatus": {
+      "count": 17,
+      "total_seconds": 0.007629584000000911,
+      "min_seconds": 0.0003804170000001328,
+      "p50_seconds": 0.0004318340000000198,
+      "p95_seconds": 0.0006020420000001359,
+      "p99_seconds": 0.0006020420000001359,
+      "max_seconds": 0.0006020420000001359,
+      "failures": 0
+    },
+    "rpc.node1.submitsharepoolhashsnapshot": {
+      "count": 15,
+      "total_seconds": 0.007737709999999787,
+      "min_seconds": 0.0003062500000003965,
+      "p50_seconds": 0.0003639170000000469,
+      "p95_seconds": 0.0009313749999999565,
+      "p99_seconds": 0.0009313749999999565,
+      "max_seconds": 0.0009313749999999565,
+      "failures": 0
+    },
+    "rpc.node1.validatesharepoolhashshare": {
+      "count": 6,
+      "total_seconds": 0.0076141660000002,
+      "min_seconds": 0.0011341250000000969,
+      "p50_seconds": 0.0012025000000002173,
+      "p95_seconds": 0.0014944579999998098,
+      "p99_seconds": 0.0014944579999998098,
+      "max_seconds": 0.0014944579999998098,
+      "failures": 0
+    },
+    "rpc.node1.validatesharepoolhashtemplate": {
+      "count": 6,
+      "total_seconds": 0.007529751000000751,
+      "min_seconds": 0.0011325420000001252,
+      "p50_seconds": 0.0011730830000002967,
+      "p95_seconds": 0.0015485000000001747,
+      "p99_seconds": 0.0015485000000001747,
+      "max_seconds": 0.0015485000000001747,
+      "failures": 0
+    }
+  },
+  "resources": {
+    "interval_seconds": 5,
+    "samples": [
+      {
+        "elapsed_seconds": 2.3666000000144294e-05,
+        "processes": {
+          "node0": {
+            "rss_bytes": 64192512,
+            "cpu_seconds": 0.72
+          },
+          "node1": {
+            "rss_bytes": 63766528,
+            "cpu_seconds": 0.67
+          },
+          "driver": {
+            "rss_bytes": 29245440,
+            "cpu_seconds": 0.14
+          }
+        },
+        "disk_bytes": {
+          "node0": 19137211,
+          "node1": 18830818,
+          "gates": 148622,
+          "node0_snapshot_store": 717,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 2.200161541,
+        "processes": {
+          "node0": {
+            "rss_bytes": 66256896,
+            "cpu_seconds": 1.03
+          },
+          "node1": {
+            "rss_bytes": 65814528,
+            "cpu_seconds": 0.95
+          },
+          "driver": {
+            "rss_bytes": 30900224,
+            "cpu_seconds": 0.38
+          }
+        },
+        "disk_bytes": {
+          "node0": 19477632,
+          "node1": 19108662,
+          "gates": 774923,
+          "node0_snapshot_store": 11024,
+          "node1_snapshot_store": 10565
+        }
+      }
+    ],
+    "errors": [],
+    "processes": {
+      "node0": {
+        "cpu_seconds": 0.31000000000000005,
+        "average_cpu_cores": 0.14090026062571195,
+        "max_sampled_rss_bytes": 66256896
+      },
+      "node1": {
+        "cpu_seconds": 0.2799999999999999,
+        "average_cpu_cores": 0.12726475153290107,
+        "max_sampled_rss_bytes": 65814528
+      },
+      "driver": {
+        "cpu_seconds": 0.24,
+        "average_cpu_cores": 0.10908407274248666,
+        "max_sampled_rss_bytes": 30900224
+      }
+    },
+    "logical_disk_growth_bytes": {
+      "node0": 340421,
+      "node1": 277844,
+      "gates": 626301,
+      "node0_snapshot_store": 10307,
+      "node1_snapshot_store": 9848
+    }
+  },
+  "preflight_scope": {
+    "purpose": "Small native fixture correctness before the resource-counter build and full-size calibration",
+    "resource_rpc_exercised": false,
+    "native_limits_approached": false,
+    "unsigned_shared_coinbase_tag_added_after_this_run": true,
+    "native_build": "a7c5cbd3",
+    "required_follow_up": "New-build two-epoch shared calibration including external unsigned coinbase tags and resource diagnostics before full-size run"
+  }
+}

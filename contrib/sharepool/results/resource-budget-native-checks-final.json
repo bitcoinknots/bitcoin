@@ -1,0 +1,105 @@
+[
+  {
+    "name": "v4-builder",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "test/functional/feature_sharepool_hash_builder.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-resource-budget-pacing-regressions/v4-builder",
+      "--portseed=1060",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 4.328061667,
+    "binary_sha256": "7356a4948dd4ee2a1e9dbd222f7c9524a61a145d09b0ca95cfb2658bf694236c",
+    "test_sha256": "71b4189f1017609be1844ebb232fb269af5e5f8fbb49c04247a95f828ac2aedc",
+    "log": "resource-budget-pacing-v4-builder.txt"
+  },
+  {
+    "name": "v5-ledger",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "test/functional/feature_sharepool_hash_ledger.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-resource-budget-pacing-regressions/v5-ledger",
+      "--portseed=1061",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 9.230980375,
+    "binary_sha256": "7356a4948dd4ee2a1e9dbd222f7c9524a61a145d09b0ca95cfb2658bf694236c",
+    "test_sha256": "da43f90a01a25c2a0b750dac4e681d982959c1d3275603fd64831f990187e162",
+    "log": "resource-budget-pacing-v5-ledger.txt"
+  },
+  {
+    "name": "v6-tides",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "test/functional/feature_sharepool_hash_tides.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-resource-budget-pacing-regressions/v6-tides",
+      "--portseed=1062",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 14.289245583000001,
+    "binary_sha256": "7356a4948dd4ee2a1e9dbd222f7c9524a61a145d09b0ca95cfb2658bf694236c",
+    "test_sha256": "2860c6916f21b2f8007599e21171be5fc0c342f179ab6453428e07ae074f45c6",
+    "log": "resource-budget-pacing-v6-tides.txt"
+  },
+  {
+    "name": "v4-worker",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "test/functional/feature_sharepool_hash_worker.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-resource-budget-pacing-regressions/v4-worker",
+      "--portseed=1063",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 12.2362095,
+    "binary_sha256": "7356a4948dd4ee2a1e9dbd222f7c9524a61a145d09b0ca95cfb2658bf694236c",
+    "test_sha256": "7c864a7835fb74d5e3e355ab66e6a2c8721112cca3a4e51ebd07771bb84b3de2",
+    "log": "resource-budget-pacing-v4-worker.txt"
+  },
+  {
+    "name": "v6-cpu-transport",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "test/functional/feature_sharepool_hash_tides.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-resource-budget-pacing-regressions/v6-cpu-transport",
+      "--portseed=1064",
+      "--nocleanup",
+      "--cpu-capture"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 2.201336042000001,
+    "binary_sha256": "7356a4948dd4ee2a1e9dbd222f7c9524a61a145d09b0ca95cfb2658bf694236c",
+    "test_sha256": "2860c6916f21b2f8007599e21171be5fc0c342f179ab6453428e07ae074f45c6",
+    "log": "resource-budget-pacing-v6-cpu-transport.txt"
+  },
+  {
+    "name": "v6-archive",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "test/functional/feature_sharepool_hash_archive.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-resource-budget-pacing-regressions/v6-archive",
+      "--portseed=1065",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 29.263946917,
+    "binary_sha256": "7356a4948dd4ee2a1e9dbd222f7c9524a61a145d09b0ca95cfb2658bf694236c",
+    "test_sha256": "ffe1655520f4a046434c4882b47b4b424e5620f8bcc5e04d5c7cffa0f6a47158",
+    "log": "resource-budget-pacing-v6-archive.txt"
+  }
+]

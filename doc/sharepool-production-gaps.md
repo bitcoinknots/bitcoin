@@ -33,6 +33,13 @@ Payout scripts are recipients, not exclusive identities: no spending-key proof
 or global pool-membership lock is required. Same-script work in another pool
 does not transfer or relabel old proofs.
 
+The [resource-budget follow-up](sharepool-resource-budget-report.md) adds exact
+read-only snapshot counters, reduces repeated codec/cache work and checks payout
+reservation against the candidate's contextual native weight limit. It preserves
+all profile commitments and consensus resource limits. The corrected
+[resource model](sharepool-resource-model.md) includes exact job openings,
+repeated recent state, distinct recipient coinbases and cold history scans.
+
 ## Hardening implemented in version 4
 
 | Area | Implementation | Evidence to inspect |
@@ -104,6 +111,13 @@ infinitely dense limit. It checks native origin, expanded-body, transaction-refe
 and snapshot bounds separately. The [native capacity harness](sharepool-capacity-calibration.md)
 tests repeated distinct-origin workloads and backlog drainage with actual payouts.
 A reproduced snapshot-fitting failure is fixed by [native payout reservation](sharepool-payout-reservation.md).
+Passing the earlier proof/template screen is insufficient: exact job openings
+can exhaust the dependency budget while the root snapshot still fits. Repeated
+state alone can make the SHIFT14 upper-density workload exceed 16 MiB, and
+direct payout outputs must fit the native coinbase. Transaction-table reuse and
+validation caches do not remove those encoded constraints. The resource model
+therefore keeps the general SHIFT14 production envelope explicitly failing;
+the native target remains SHIFT10.
 In v4/v5 an empty selection pays the snapshot owner. In v6 only fully known empty
 pool history plus no current admissions for the winning pool triggers bootstrap; missing
 history never does. With sparse sampling, bootstrap needs explicit treatment
@@ -173,8 +187,9 @@ production requirements.
 
 ## Release evidence
 
-Use the [startup and capacity report](sharepool-capacity-startup-report.md) for
-this follow-up. The [v6 revision 2 report](sharepool-v6-r2-report.md) retains the
+Use the [resource-budget report](sharepool-resource-budget-report.md) for this
+follow-up. The [startup and capacity report](sharepool-capacity-startup-report.md)
+retains the preceding measurements. The [v6 revision 2 report](sharepool-v6-r2-report.md) retains the
 earlier boundary-fairness and live-relay evidence.
 The [v6 revision 1 report](sharepool-v6-tides-report.md) retains its original
 binary/source hashes and physical Goldshell capture. The

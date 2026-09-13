@@ -120,6 +120,32 @@ public:
  */
 using ValidateOrigin = std::function<Result(const CBlock&, const CBlockIndex*)>;
 
+/** Encoding resource accounting, independent of native validity. Component byte
+ * fields include their wire prefixes and sum to encoded_bytes; profile-absent
+ * components are zero. unique_transaction_bytes excludes table prefixes.
+ * Expanded bytes and references remain charged for every template occurrence,
+ * even when immutable transaction bodies share one wire-table entry. */
+struct SnapshotResourceUsage {
+    size_t encoded_bytes{0};
+    size_t unique_transactions{0};
+    size_t unique_transaction_bytes{0};
+    size_t transaction_table_bytes{0};
+    size_t templates{0};
+    size_t expanded_template_bytes{0};
+    size_t transaction_references{0};
+    size_t template_table_bytes{0};
+    size_t binding_bytes{0};
+    size_t share_bytes{0};
+    size_t state_bytes{0};
+    size_t payout_bytes{0};
+    size_t pending_bytes{0};
+    size_t settled_bytes{0};
+    size_t certificate_bytes{0};
+    size_t history_bytes{0};
+};
+/** Applies the same resource/field bounds as EncodeSnapshot; does not establish
+ * canonical ordering, signatures, witness validity, ancestry or native UTXOs. */
+SnapshotResourceUsage MeasureSnapshotResources(const Snapshot& snapshot);
 std::vector<unsigned char> EncodeSnapshot(const Snapshot& snapshot);
 Snapshot DecodeSnapshot(Span<const unsigned char> bytes);
 /** Bounded full native-body decoders; native UTXO/witness rules remain external. */

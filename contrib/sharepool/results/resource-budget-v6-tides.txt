@@ -1,0 +1,25 @@
+2026-09-13T16:54:38.568000Z TestFramework (INFO): PRNG seed is: 528784869404895931
+2026-09-13T16:54:38.568000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-resource-budget-regressions/v6-tides
+2026-09-13T16:54:40.106000Z TestFramework (INFO): Resource measurement is read-only and does not validate or store an unsigned job
+2026-09-13T16:54:40.110000Z TestFramework (ERROR): Unexpected exception
+Traceback (most recent call last):
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_framework.py", line 136, in main
+    self.run_test()
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_tides.py", line 231, in run_test
+    assert_raises_rpc_error(-8, "Snapshot profile differs", node.getsharepoolhashresources, legacy.serialize().hex())
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py", line 499, in serialize
+    result = bytearray(self.envelope.serialize() + self.owner_signature + ser_uint256(self.job_commitment))
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py", line 109, in serialize
+    raise ValueError("invalid v4 envelope or nonzero reserved roots")
+ValueError: invalid v4 envelope or nonzero reserved roots
+2026-09-13T16:54:40.172000Z TestFramework (INFO): Not stopping nodes as test failed. The dangling processes will be cleaned up later.
+2026-09-13T16:54:40.172000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-resource-budget-regressions/v6-tides
+2026-09-13T16:54:40.172000Z TestFramework (ERROR): Test failed. Test logging available at /private/tmp/sharepool-resource-budget-regressions/v6-tides/test_framework.log
+2026-09-13T16:54:40.172000Z TestFramework (ERROR): 
+2026-09-13T16:54:40.172000Z TestFramework (ERROR): Hint: Call /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/combine_logs.py '/private/tmp/sharepool-resource-budget-regressions/v6-tides' to consolidate all logs
+2026-09-13T16:54:40.172000Z TestFramework (ERROR): 
+2026-09-13T16:54:40.172000Z TestFramework (ERROR): If this failure happened unexpectedly or intermittently, please file a bug and provide a link or upload of the combined log.
+2026-09-13T16:54:40.172000Z TestFramework (ERROR): https://github.com/bitcoinknots/bitcoin/issues
+2026-09-13T16:54:40.172000Z TestFramework (ERROR): 
+[node 1] Cleaning up leftover process
+[node 0] Cleaning up leftover process

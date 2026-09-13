@@ -17,6 +17,7 @@
 #include <consensus/sharepool.h>
 #include <consensus/sharepool_hash.h>
 #include <sharepool/hash_store.h>
+#include <sharepool/hash_validation_cache.h>
 #include <sharepool/retry_worker.h>
 #include <consensus/tx_check.h>
 #include <consensus/tx_verify.h>
@@ -5413,9 +5414,7 @@ bool TestSharePoolTemplateOnAncestor(BlockValidationState& state,
 namespace {
 uint256 HashPoolNativeBody(const CBlock& block)
 {
-    HashWriter writer;
-    writer << TX_WITH_WITNESS(block);
-    return writer.GetHash();
+    return sharepool::NativeBodyCacheKey(block);
 }
 
 sharepool::hashonly::Result PrepareHashPoolNativeBody(ChainstateManager& chainman,

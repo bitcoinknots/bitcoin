@@ -492,6 +492,8 @@ NON_SCRIPTS = [
     "combine_logs.py",
     "create_cache.py",
     "test_runner.py",
+    # Opt-in native replay requires an existing local capture via --source-dir.
+    "feature_sharepool_hash_capacity_replay.py",
 ]
 
 def main():

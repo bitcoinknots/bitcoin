@@ -54,47 +54,57 @@ uint256 DomainHash(const char (&domain)[N], const T&... values)
 }
 
 struct TransactionTable {
-    std::map<Wtxid, std::pair<CTransactionRef, uint32_t>> entries;
+    struct Entry {
+        CTransactionRef transaction;
+        uint32_t index{0};
+        size_t bytes{0};
+    };
+    std::map<Wtxid, Entry> entries;
+    size_t expanded_bytes{0};
+    size_t references{0};
     explicit TransactionTable(const Snapshot& snapshot)
     {
-        size_t expanded{0}, references{0};
         for (const auto& item : snapshot.templates) {
-            if (item.block.vtx.size() > MAX_TEMPLATE_TX_REFERENCES - references ||
-                std::any_of(item.block.vtx.begin(), item.block.vtx.end(), [](const auto& tx) { return !tx; })) {
+            if (item.block.vtx.size() > MAX_TEMPLATE_TX_REFERENCES - references) {
                 throw std::ios_base::failure("template transaction reference budget");
             }
-            const auto size = GetSerializeSize(TX_WITH_WITNESS(item.block));
-            if (size < MIN_TEMPLATE_BYTES || size > MAX_TEMPLATE_BYTES ||
-                size > MAX_EXPANDED_TEMPLATE_BYTES - expanded ||
-                item.block.vtx.size() > MAX_TEMPLATE_TX_REFERENCES - references) {
+            size_t size = GetSerializeSize(item.block.GetBlockHeader()) + GetSizeOfCompactSize(item.block.vtx.size());
+            if (size > MAX_TEMPLATE_BYTES) throw std::ios_base::failure("expanded template budget");
+            for (const auto& tx : item.block.vtx) {
+                if (!tx) throw std::ios_base::failure("template transaction reference budget");
+                const auto [found, inserted] = entries.try_emplace(tx->GetWitnessHash(), Entry{tx});
+                // Transactions are immutable and witness-addressed. Only their
+                // unique structure is traversed for sizing; every occurrence
+                // still pays the unchanged expanded-body/reference charge.
+                if (inserted) found->second.bytes = GetSerializeSize(TX_WITH_WITNESS(*tx));
+                if (found->second.bytes > MAX_TEMPLATE_BYTES - size) throw std::ios_base::failure("expanded template budget");
+                size += found->second.bytes;
+            }
+            if (size < MIN_TEMPLATE_BYTES || size > MAX_EXPANDED_TEMPLATE_BYTES - expanded_bytes) {
                 throw std::ios_base::failure("expanded template budget");
             }
-            expanded += size;
+            expanded_bytes += size;
             references += item.block.vtx.size();
-            for (const auto& tx : item.block.vtx) {
-                entries.try_emplace(tx->GetWitnessHash(), tx, 0);
-            }
         }
         uint32_t index{0};
-        for (auto& [id, entry] : entries) entry.second = index++;
+        for (auto& [id, entry] : entries) entry.index = index++;
     }
 };
 
 template <typename Stream>
-void WriteSnapshot(Stream& stream, const Snapshot& snapshot, bool unsigned_contents = false)
+void WriteSnapshot(Stream& stream, const Snapshot& snapshot, const TransactionTable& table, bool unsigned_contents = false)
 {
-    const TransactionTable table{snapshot};
     stream << snapshot.binding << (unsigned_contents ? Signature{} : snapshot.authorization) << snapshot.job_commitment;
     WriteCompactSize(stream, table.entries.size());
     for (const auto& [id, entry] : table.entries) {
-        WriteCompactSize(stream, GetSerializeSize(TX_WITH_WITNESS(*entry.first)));
-        stream << TX_WITH_WITNESS(*entry.first);
+        WriteCompactSize(stream, entry.bytes);
+        stream << TX_WITH_WITNESS(*entry.transaction);
     }
     WriteCompactSize(stream, snapshot.templates.size());
     for (const auto& item : snapshot.templates) {
         stream << item.id << item.block.GetBlockHeader();
         WriteCompactSize(stream, item.block.vtx.size());
-        for (const auto& tx : item.block.vtx) WriteCompactSize(stream, table.entries.at(tx->GetWitnessHash()).second);
+        for (const auto& tx : item.block.vtx) WriteCompactSize(stream, table.entries.at(tx->GetWitnessHash()).index);
     }
     stream << snapshot.shares << snapshot.post_state << snapshot.payouts;
     if (snapshot.binding.version == LEDGER_VERSION) stream << snapshot.pending << snapshot.settled << snapshot.certificates;
@@ -127,7 +137,7 @@ bool CertificatesOrdered(const std::vector<OriginCertificate>& certificates)
     return true;
 }
 
-size_t EncodedSize(const Snapshot& snapshot)
+void CheckEncodingFields(const Snapshot& snapshot)
 {
     if (snapshot.binding.version == LEDGER_VERSION) {
         CreditBounds(snapshot.pending, MAX_PENDING_BYTES);
@@ -154,11 +164,76 @@ size_t EncodedSize(const Snapshot& snapshot)
     for (const auto& payout : snapshot.payouts) {
         if (payout.scriptPubKey.size() > 34) throw std::ios_base::failure("payout script byte bound");
     }
-    SizeComputer size;
-    WriteSnapshot(size, snapshot);
-    if (size.size() == 0 || size.size() > MAX_SNAPSHOT_BYTES) throw std::ios_base::failure("snapshot byte bound");
-    return size.size();
 }
+
+/** Operation-local preparation. No pointers or mutable snapshot results survive
+ * the call, so subsequent mutations are always remeasured and reserialized. */
+struct PreparedSnapshot {
+    TransactionTable table;
+    SnapshotResourceUsage usage;
+
+    explicit PreparedSnapshot(const Snapshot& snapshot) : table{snapshot}
+    {
+        usage.unique_transactions = table.entries.size();
+        usage.transaction_table_bytes = GetSizeOfCompactSize(table.entries.size());
+        for (const auto& [id, entry] : table.entries) {
+            usage.unique_transaction_bytes += entry.bytes;
+            usage.transaction_table_bytes += GetSizeOfCompactSize(entry.bytes) + entry.bytes;
+        }
+        usage.templates = snapshot.templates.size();
+        usage.expanded_template_bytes = table.expanded_bytes;
+        usage.transaction_references = table.references;
+        usage.template_table_bytes = GetSizeOfCompactSize(snapshot.templates.size());
+        for (const auto& record : snapshot.templates) {
+            usage.template_table_bytes += GetSerializeSize(record.id) + GetSerializeSize(record.block.GetBlockHeader()) + GetSizeOfCompactSize(record.block.vtx.size());
+            for (const auto& tx : record.block.vtx) usage.template_table_bytes += GetSizeOfCompactSize(table.entries.at(tx->GetWitnessHash()).index);
+        }
+        usage.binding_bytes = GetSerializeSize(snapshot.binding) + GetSerializeSize(snapshot.authorization) + GetSerializeSize(snapshot.job_commitment);
+        usage.share_bytes = GetSerializeSize(snapshot.shares);
+        usage.state_bytes = GetSerializeSize(snapshot.post_state);
+        usage.payout_bytes = GetSerializeSize(snapshot.payouts);
+        if (snapshot.binding.version == LEDGER_VERSION) {
+            usage.pending_bytes = GetSerializeSize(snapshot.pending);
+            usage.settled_bytes = GetSerializeSize(snapshot.settled);
+        }
+        if (snapshot.binding.version == LEDGER_VERSION || snapshot.binding.version == TIDES_VERSION) usage.certificate_bytes = GetSerializeSize(snapshot.certificates);
+        if (snapshot.binding.version == TIDES_VERSION) usage.history_bytes = GetSerializeSize(snapshot.history_head);
+        // Earlier field, transaction and expanded-body bounds keep this sum
+        // below size_t overflow, including on a 32-bit host.
+        usage.encoded_bytes = usage.binding_bytes + usage.transaction_table_bytes + usage.template_table_bytes + usage.share_bytes +
+            usage.state_bytes + usage.payout_bytes + usage.pending_bytes + usage.settled_bytes + usage.certificate_bytes + usage.history_bytes;
+        if (usage.encoded_bytes == 0 || usage.encoded_bytes > MAX_SNAPSHOT_BYTES) throw std::ios_base::failure("snapshot byte bound");
+    }
+};
+
+PreparedSnapshot PrepareSnapshot(const Snapshot& snapshot)
+{
+    CheckEncodingFields(snapshot);
+    return PreparedSnapshot{snapshot};
+}
+
+size_t EncodedSize(const Snapshot& snapshot) { return PrepareSnapshot(snapshot).usage.encoded_bytes; }
+
+/** Compare the canonical serialization in place, without allocating a second
+ * complete transaction or snapshot byte buffer. */
+class CanonicalWriter {
+    Span<const unsigned char> m_remaining;
+public:
+    explicit CanonicalWriter(Span<const unsigned char> bytes) : m_remaining{bytes} {}
+    void write(Span<const std::byte> bytes)
+    {
+        if (bytes.size() > m_remaining.size() || !std::equal(bytes.begin(), bytes.end(), AsBytes(m_remaining).begin())) {
+            throw std::ios_base::failure("noncanonical encoding");
+        }
+        m_remaining = m_remaining.subspan(bytes.size());
+    }
+    template <typename T> CanonicalWriter& operator<<(const T& object)
+    {
+        ::Serialize(*this, object);
+        return *this;
+    }
+    bool empty() const { return m_remaining.empty(); }
+};
 
 size_t ReadCount(SpanReader& reader, size_t minimum)
 {
@@ -701,13 +776,15 @@ public:
 
 std::vector<unsigned char> EncodeSnapshot(const Snapshot& snapshot)
 {
-    const auto size = EncodedSize(snapshot);
+    const auto prepared = PrepareSnapshot(snapshot);
     std::vector<unsigned char> bytes;
-    bytes.reserve(size);
+    bytes.reserve(prepared.usage.encoded_bytes);
     VectorWriter writer{bytes, 0};
-    WriteSnapshot(writer, snapshot);
+    WriteSnapshot(writer, snapshot, prepared.table);
     return bytes;
 }
+
+SnapshotResourceUsage MeasureSnapshotResources(const Snapshot& snapshot) { return PrepareSnapshot(snapshot).usage; }
 
 CBlock DecodeTemplate(Span<const unsigned char> bytes) { return ReadTemplate(bytes); }
 CBlock DecodeBlock(Span<const unsigned char> bytes) { return ReadBlock(bytes, false); }
@@ -722,10 +799,9 @@ CTransactionRef DecodeTransaction(Span<const unsigned char> bytes)
     CMutableTransaction decoded;
     encoded >> TX_WITH_WITNESS(decoded);
     auto tx = MakeTransactionRef(std::move(decoded));
-    DataStream canonical;
+    CanonicalWriter canonical{bytes};
     canonical << TX_WITH_WITNESS(*tx);
-    if (!encoded.empty() || canonical.size() != bytes.size() ||
-        !std::equal(bytes.begin(), bytes.end(), UCharCast(canonical.data()))) throw std::ios_base::failure("noncanonical transaction");
+    if (!encoded.empty() || !canonical.empty()) throw std::ios_base::failure("noncanonical transaction");
     return tx;
 }
 
@@ -836,9 +912,11 @@ Snapshot DecodeSnapshot(Span<const unsigned char> bytes)
         }
     }
     if (snapshot.binding.version == TIDES_VERSION) reader >> snapshot.history_head;
-    const auto canonical = EncodeSnapshot(snapshot);
-    if (!reader.empty() || canonical.size() != bytes.size() ||
-        !std::equal(canonical.begin(), canonical.end(), bytes.begin())) throw std::ios_base::failure("noncanonical snapshot");
+    const auto prepared = PrepareSnapshot(snapshot);
+    if (!reader.empty() || prepared.usage.encoded_bytes != bytes.size()) throw std::ios_base::failure("noncanonical snapshot");
+    CanonicalWriter canonical{bytes};
+    WriteSnapshot(canonical, snapshot, prepared.table);
+    if (!canonical.empty()) throw std::ios_base::failure("noncanonical snapshot");
     return snapshot;
 }
 
@@ -876,14 +954,14 @@ uint256 ProfileSnapshotHash(const Snapshot& snapshot, uint32_t version)
     if (version != VERSION && version != LEDGER_VERSION && version != TIDES_VERSION) {
         throw std::invalid_argument("unknown snapshot hash profile");
     }
-    EncodedSize(snapshot);
+    const auto prepared = PrepareSnapshot(snapshot);
     static constexpr char old_domain[]{"SharePool/snapshot/v4"};
     static constexpr char new_domain[]{"SharePool/snapshot/v5"};
     static constexpr char tides_domain[]{"SharePool/snapshot/v6"};
     HashWriter writer;
     writer.write(AsBytes(version == TIDES_VERSION ? Span{tides_domain} :
                         snapshot.binding.version == LEDGER_VERSION ? Span{new_domain} : Span{old_domain}));
-    WriteSnapshot(writer, snapshot);
+    WriteSnapshot(writer, snapshot, prepared.table);
     return writer.GetHash();
 }
 
@@ -915,14 +993,14 @@ uint256 RulesHash(uint32_t version)
 uint256 SnapshotContentsHash(const Snapshot& snapshot)
 {
     // Stream rather than copying a potentially 16 MiB snapshot.
-    EncodedSize(snapshot);
+    const auto prepared = PrepareSnapshot(snapshot);
     HashWriter writer;
     static constexpr char old_domain[]{"SharePool/contents/v4"};
     static constexpr char new_domain[]{"SharePool/contents/v5"};
     static constexpr char tides_domain[]{"SharePool/contents/v6"};
     writer.write(AsBytes(snapshot.binding.version == TIDES_VERSION ? Span{tides_domain} :
                         snapshot.binding.version == LEDGER_VERSION ? Span{new_domain} : Span{old_domain}));
-    WriteSnapshot(writer, snapshot, true);
+    WriteSnapshot(writer, snapshot, prepared.table, true);
     return writer.GetHash();
 }
 

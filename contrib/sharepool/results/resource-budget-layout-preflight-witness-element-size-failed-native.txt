@@ -1,0 +1,24 @@
+2026-09-13T16:45:10.763000Z TestFramework (INFO): PRNG seed is: 8506782464082688800
+2026-09-13T16:45:10.763000Z TestFramework (INFO): Initializing test directory /private/tmp/resource-budget-layout-preflight-witness
+2026-09-13T16:45:11.968000Z TestFramework (ERROR): Unexpected exception
+Traceback (most recent call last):
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_framework.py", line 136, in main
+    self.run_test()
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_capacity.py", line 195, in run_test
+    node.sendrawtransaction(funding.serialize().hex())
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/coverage.py", line 50, in __call__
+    return_val = self.auth_service_proxy_instance.__call__(*args, **kwargs)
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/authproxy.py", line 151, in __call__
+    raise JSONRPCException(response['error'], status)
+test_framework.authproxy.JSONRPCException: mempool-script-verify-flag-failed (Push value size limit exceeded), input 0 of 92687e2497cc2739bb7a0899b05683dc2a2efac1a1d68a7f2bbf296c7b8ecad2 (wtxid 697740aa7c7f4e9c44a5ababbec7c36b627fb23b244f874d8dcc192dd643b74b), spending 9fde8ae29c39a2220e02260efc09625a6f0877f5ba8637963690700a853ebac8:0 (-26)
+2026-09-13T16:45:12.025000Z TestFramework (INFO): Not stopping nodes as test failed. The dangling processes will be cleaned up later.
+2026-09-13T16:45:12.025000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/resource-budget-layout-preflight-witness
+2026-09-13T16:45:12.025000Z TestFramework (ERROR): Test failed. Test logging available at /private/tmp/resource-budget-layout-preflight-witness/test_framework.log
+2026-09-13T16:45:12.025000Z TestFramework (ERROR): 
+2026-09-13T16:45:12.025000Z TestFramework (ERROR): Hint: Call /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/combine_logs.py '/private/tmp/resource-budget-layout-preflight-witness' to consolidate all logs
+2026-09-13T16:45:12.025000Z TestFramework (ERROR): 
+2026-09-13T16:45:12.025000Z TestFramework (ERROR): If this failure happened unexpectedly or intermittently, please file a bug and provide a link or upload of the combined log.
+2026-09-13T16:45:12.025000Z TestFramework (ERROR): https://github.com/bitcoinknots/bitcoin/issues
+2026-09-13T16:45:12.025000Z TestFramework (ERROR): 
+[node 1] Cleaning up leftover process
+[node 0] Cleaning up leftover process

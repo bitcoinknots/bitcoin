@@ -1,0 +1,1394 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "network": "isolated native regtest",
+  "started_utc": "2026-09-13T16:54:27.922775+00:00",
+  "rules_hash": "9050ab43fa5feddb7f0659abc4ca43f596d4465f93535f3b9ab37449397e6edd",
+  "native_binary_sha256": "120fd9ee24d7f53de8f6dee754a4ebdea3aa535a696ce59f05d99fedf19c9459",
+  "signer_binary_sha256": "70f6c7c438d237796705f429bad64b017ad798d110b2cfac845a1b4cb1640494",
+  "harness_sha256": "c9f48b374b5d7c0c5b31dbab25072927ea109f2ec2f153d013736226130971cd",
+  "source_sha256": {
+    "contrib/sharepool/hash_mining_gate.py": "91646df17fb30d55486b69cf485979cfd3e22d307a8a0ab3f8a74d6d553824dd",
+    "contrib/sharepool/hash_snapshot.py": "712f34059ac045dbfdef70b97f65408c1dd6f07942964268bd7753ac1e1d55d2",
+    "contrib/sharepool/hash_gate_batch.py": "a41c510602748c50a75b66a9dddfa9f028fd5a7cfb57ccc8cccf29cff7f424c4",
+    "contrib/sharepool/hash_gate_inventory.py": "2bf60749366de6217391626315d7591b5fb3029bc95c1c164f019b6b1f27860b",
+    "contrib/sharepool/capacity_metrics.py": "71f68e44d56a555fdae635c3467eed67e97c3db4dacc0758a426b0cafd993934",
+    "test/functional/feature_sharepool_hash_tides_100_miners.py": "cdfdf311c54cd0927f6cc2ac0b382edcdeff4b023c1b19f0989d84eaaa73963c"
+  },
+  "command": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "test/functional/feature_sharepool_hash_capacity.py",
+    "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+    "--miners=2",
+    "--epochs=2",
+    "--shares-per-origin=3",
+    "--template-layout=shared",
+    "--witness-heavy",
+    "--padding-outputs=24",
+    "--resource-diagnostics",
+    "--max-runtime-seconds=300",
+    "--host-load=concurrent",
+    "--nocleanup",
+    "--tmpdir=/private/tmp/resource-budget-shared-two-epoch-preflight",
+    "--portseed=1011",
+    "--results=contrib/sharepool/results/resource-budget-shared-two-epoch-preflight.json"
+  ],
+  "host": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "logical_cpus": 10
+  },
+  "operator_declared_host_load": "concurrent",
+  "configuration": {
+    "miners": 2,
+    "epochs": 2,
+    "shares_per_origin": 3,
+    "padding_outputs": 24,
+    "template_layout": "shared",
+    "witness_heavy": true,
+    "resource_diagnostics": true,
+    "snapshot_budget_bytes": 0,
+    "batch_fraction": 0.75,
+    "offer_interval_ms": 0,
+    "settle_every": 0,
+    "max_runtime_seconds": 300
+  },
+  "native_nodes": 2,
+  "physical_miners_used": 0,
+  "opaque_proof_fixtures": 0,
+  "transaction_fee_satoshis": 12200,
+  "transaction_policy": {
+    "acceptnonstdtxn_explicit": true,
+    "witness_items_per_input": 128,
+    "witness_item_bytes": 256,
+    "consensus_limits_changed": false,
+    "shared_coinbase_tags": "external unsigned native-job transformation before exact signing/finalization/authorization",
+    "disjoint_selection": null
+  },
+  "epochs": [
+    {
+      "epoch": 1,
+      "native_origin_height": 102,
+      "real_distinct_origins": 2,
+      "real_distinct_transaction_sets": 1,
+      "template_bytes": {
+        "count": 2,
+        "total_bytes": 138350,
+        "min_bytes": 69175,
+        "p50_bytes": 69175,
+        "p95_bytes": 69175,
+        "p99_bytes": 69175,
+        "max_bytes": 69175
+      },
+      "template_weight": {
+        "count": 2,
+        "total_weight_units": 153764,
+        "min_weight_units": 76882,
+        "p50_weight_units": 76882,
+        "p95_weight_units": 76882,
+        "p99_weight_units": 76882,
+        "max_weight_units": 76882
+      },
+      "template_transaction_references": {
+        "count": 2,
+        "total_references": 6,
+        "min_references": 3,
+        "p50_references": 3,
+        "p95_references": 3,
+        "p99_references": 3,
+        "max_references": 3
+      },
+      "full_unbounded_proposal_bytes": 73127,
+      "offered": 6,
+      "acknowledged": 6,
+      "origin_preparation_seconds": 0.6211231669999995,
+      "client_queue_trace": [
+        {
+          "event": "ingress_start",
+          "elapsed_seconds": 1.000000000139778e-06,
+          "offered_due": 6,
+          "acknowledged": 0,
+          "client_queue": 6,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 6
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 0.03734441699999991,
+          "offered_due": 6,
+          "acknowledged": 1,
+          "client_queue": 5,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 5
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 0.23031199999999963,
+          "offered_due": 6,
+          "acknowledged": 6,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        },
+        {
+          "event": "before_settlement",
+          "elapsed_seconds": 0.25586058399999967,
+          "offered_due": 6,
+          "acknowledged": 6,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        },
+        {
+          "event": "after_settlement",
+          "elapsed_seconds": 1.5349373750000002,
+          "offered_due": 6,
+          "acknowledged": 6,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        },
+        {
+          "event": "before_settlement",
+          "elapsed_seconds": 1.5388414589999995,
+          "offered_due": 6,
+          "acknowledged": 6,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        },
+        {
+          "event": "after_settlement",
+          "elapsed_seconds": 2.057848375,
+          "offered_due": 6,
+          "acknowledged": 6,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        }
+      ],
+      "blocks": [
+        {
+          "height": 102,
+          "hash": "76eb32edf8b332fd180fc72d7ea165757de13b7ca255ed5e221370b8f3936757",
+          "admitted": 3,
+          "snapshot_bytes": 71410,
+          "planned_resources": {
+            "snapshot_bytes": 71410,
+            "dependency_bytes": 71859,
+            "origins": 2,
+            "payout_reservation_bytes": 31,
+            "reserved_snapshot_bytes": 71441,
+            "reserved_dependency_bytes": 71890
+          },
+          "eligible_backlog": 3,
+          "deferred_backlog": 0,
+          "client_queue_before": 0,
+          "offers_still_unacknowledged": 0,
+          "drain_step_seconds": 1.2790709159999993,
+          "planned_resource_utilization": {
+            "snapshot_bytes": {
+              "used": 71441,
+              "limit": 72423,
+              "fraction": 0.9864407715780898,
+              "remaining": 982,
+              "within_limit": true
+            },
+            "dependency_bytes": {
+              "used": 71890,
+              "limit": 67108864,
+              "fraction": 0.001071244478225708,
+              "remaining": 67036974,
+              "within_limit": true
+            },
+            "origins": {
+              "used": 2,
+              "limit": 2048,
+              "fraction": 0.0009765625,
+              "remaining": 2046,
+              "within_limit": true
+            }
+          },
+          "native_snapshot_resources": {
+            "hash": "5dea5615b5f7d6a4db0a9576189ab9f103f12dc7dc08dfdd7cd3b4060f7540f6",
+            "version": 6,
+            "consensus_validated": false,
+            "dependency_graph_checked": false,
+            "usage": {
+              "encoded_bytes": 71410,
+              "unique_transactions": 3,
+              "unique_transaction_bytes": 69010,
+              "templates": 1,
+              "expanded_template_bytes": 69175,
+              "transaction_references": 3,
+              "binding_bytes": 380,
+              "transaction_table_bytes": 69018,
+              "template_table_bytes": 201,
+              "share_bytes": 1537,
+              "state_bytes": 109,
+              "payout_bytes": 32,
+              "pending_bytes": 0,
+              "settled_bytes": 0,
+              "certificate_bytes": 101,
+              "history_bytes": 32
+            },
+            "limits": {
+              "snapshot_bytes": 16777216,
+              "template_bytes": 4000000,
+              "expanded_template_bytes": 536870912,
+              "transaction_references": 2000000,
+              "origins": 2048,
+              "dependency_bytes": 67108864,
+              "dependency_depth": 64,
+              "certificate_bytes": 4194304
+            }
+          }
+        },
+        {
+          "height": 103,
+          "hash": "5a9b5c881da3e012017418841d8f8d80c44fad6795e26337d079770852917384",
+          "admitted": 3,
+          "snapshot_bytes": 71649,
+          "planned_resources": {
+            "snapshot_bytes": 71618,
+            "dependency_bytes": 143477,
+            "origins": 2,
+            "payout_reservation_bytes": 31,
+            "reserved_snapshot_bytes": 71649,
+            "reserved_dependency_bytes": 143508
+          },
+          "eligible_backlog": 0,
+          "deferred_backlog": 0,
+          "client_queue_before": 0,
+          "offers_still_unacknowledged": 0,
+          "drain_step_seconds": 0.519003208,
+          "planned_resource_utilization": {
+            "snapshot_bytes": {
+              "used": 71649,
+              "limit": 72423,
+              "fraction": 0.9893127873741767,
+              "remaining": 774,
+              "within_limit": true
+            },
+            "dependency_bytes": {
+              "used": 143508,
+              "limit": 67108864,
+              "fraction": 0.0021384358406066895,
+              "remaining": 66965356,
+              "within_limit": true
+            },
+            "origins": {
+              "used": 2,
+              "limit": 2048,
+              "fraction": 0.0009765625,
+              "remaining": 2046,
+              "within_limit": true
+            }
+          },
+          "native_snapshot_resources": {
+            "hash": "f548951289b85e6e33229f0708f6f32d74a645aa2e5106b0c68f528dae413417",
+            "version": 6,
+            "consensus_validated": false,
+            "dependency_graph_checked": false,
+            "usage": {
+              "encoded_bytes": 71649,
+              "unique_transactions": 3,
+              "unique_transaction_bytes": 69010,
+              "templates": 1,
+              "expanded_template_bytes": 69175,
+              "transaction_references": 3,
+              "binding_bytes": 380,
+              "transaction_table_bytes": 69018,
+              "template_table_bytes": 201,
+              "share_bytes": 1537,
+              "state_bytes": 217,
+              "payout_bytes": 63,
+              "pending_bytes": 0,
+              "settled_bytes": 0,
+              "certificate_bytes": 201,
+              "history_bytes": 32
+            },
+            "limits": {
+              "snapshot_bytes": 16777216,
+              "template_bytes": 4000000,
+              "expanded_template_bytes": 536870912,
+              "transaction_references": 2000000,
+              "origins": 2048,
+              "dependency_bytes": 67108864,
+              "dependency_depth": 64,
+              "certificate_bytes": 4194304
+            }
+          }
+        }
+      ],
+      "native_template_context": {
+        "previousblockhash": "6d37117c4d11cf62f1710eebb9d88e7a4a94cb3d752945ed589a089333de5294",
+        "height": 102,
+        "bits": "207fffff",
+        "curtime": 1789318486,
+        "weightlimit": 4000000,
+        "sizelimit": 4000000
+      },
+      "template_geometry": {
+        "template_count": 2,
+        "expanded_template_bytes": 138350,
+        "transaction_references": 6,
+        "referenced_transaction_bytes": 138020,
+        "unique_transactions": 4,
+        "unique_transaction_bytes": 69198,
+        "noncoinbase_transaction_references": 4,
+        "noncoinbase_referenced_bytes": 137644,
+        "unique_noncoinbase_transactions": 2,
+        "unique_noncoinbase_transaction_bytes": 68822,
+        "distinct_noncoinbase_transaction_sets": 1,
+        "noncoinbase_byte_reuse_factor": 2.0,
+        "transaction_bytes_eliminated_by_dictionary": 68822,
+        "template_bytes": {
+          "count": 2,
+          "total_bytes": 138350,
+          "min_bytes": 69175,
+          "p50_bytes": 69175,
+          "p95_bytes": 69175,
+          "p99_bytes": 69175,
+          "max_bytes": 69175
+        },
+        "template_weight": {
+          "count": 2,
+          "total_weight_units": 153764,
+          "min_weight_units": 76882,
+          "p50_weight_units": 76882,
+          "p95_weight_units": 76882,
+          "p99_weight_units": 76882,
+          "max_weight_units": 76882
+        },
+        "template_transaction_references": {
+          "count": 2,
+          "total_references": 6,
+          "min_references": 3,
+          "p50_references": 3,
+          "p95_references": 3,
+          "p99_references": 3,
+          "max_references": 3
+        }
+      },
+      "proposal_resource_utilization": {
+        "snapshot_bytes": {
+          "used": 73127,
+          "limit": 16777216,
+          "fraction": 0.00435870885848999,
+          "remaining": 16704089,
+          "within_limit": true
+        },
+        "expanded_template_bytes": {
+          "used": 138350,
+          "limit": 536870912,
+          "fraction": 0.0002576969563961029,
+          "remaining": 536732562,
+          "within_limit": true
+        },
+        "template_transaction_references": {
+          "used": 6,
+          "limit": 2000000,
+          "fraction": 3e-06,
+          "remaining": 1999994,
+          "within_limit": true
+        },
+        "largest_template_bytes": {
+          "used": 69175,
+          "limit": 4000000,
+          "fraction": 0.01729375,
+          "remaining": 3930825,
+          "within_limit": true
+        },
+        "largest_native_weight": {
+          "used": 76882,
+          "limit": 4000000,
+          "fraction": 0.0192205,
+          "remaining": 3923118,
+          "within_limit": true
+        },
+        "source_origins": {
+          "used": 2,
+          "limit": 2048,
+          "fraction": 0.0009765625,
+          "remaining": 2046,
+          "within_limit": true
+        }
+      },
+      "pre_ingress_diagnostics_seconds": 0.0020899160000000805,
+      "admission_seconds": 0.2303136669999999,
+      "observed_serial_acknowledgements_per_second": 26.05142837658871,
+      "scheduler_lateness": {
+        "count": 6,
+        "total_seconds": 0.5644231259999977,
+        "min_seconds": 4.458999999457092e-06,
+        "p50_seconds": 0.0745338749999993,
+        "p95_seconds": 0.1871742919999999,
+        "p99_seconds": 0.1871742919999999,
+        "max_seconds": 0.1871742919999999
+      },
+      "ingress_includes_interleaved_settlement": false,
+      "initial_deferred": 3,
+      "initial_batch_resources": {
+        "snapshot_bytes": 71410,
+        "dependency_bytes": 71859,
+        "origins": 2,
+        "payout_reservation_bytes": 31,
+        "reserved_snapshot_bytes": 71441,
+        "reserved_dependency_bytes": 71890
+      },
+      "receipt_states": {
+        "confirmed_admitted": 6
+      },
+      "admitted": 6,
+      "total_admitted": 6,
+      "seconds": 2.6968636249999998,
+      "post_ingress_diagnostics_seconds": 0.020039999999999836
+    },
+    {
+      "epoch": 2,
+      "native_origin_height": 104,
+      "real_distinct_origins": 2,
+      "real_distinct_transaction_sets": 1,
+      "template_bytes": {
+        "count": 2,
+        "total_bytes": 138412,
+        "min_bytes": 69206,
+        "p50_bytes": 69206,
+        "p95_bytes": 69206,
+        "p99_bytes": 69206,
+        "max_bytes": 69206
+      },
+      "template_weight": {
+        "count": 2,
+        "total_weight_units": 154012,
+        "min_weight_units": 77006,
+        "p50_weight_units": 77006,
+        "p95_weight_units": 77006,
+        "p99_weight_units": 77006,
+        "max_weight_units": 77006
+      },
+      "template_transaction_references": {
+        "count": 2,
+        "total_references": 6,
+        "min_references": 3,
+        "p50_references": 3,
+        "p95_references": 3,
+        "p99_references": 3,
+        "max_references": 3
+      },
+      "full_unbounded_proposal_bytes": 73189,
+      "offered": 6,
+      "acknowledged": 6,
+      "origin_preparation_seconds": 0.8364137080000011,
+      "client_queue_trace": [
+        {
+          "event": "ingress_start",
+          "elapsed_seconds": 3.249999998899966e-06,
+          "offered_due": 6,
+          "acknowledged": 0,
+          "client_queue": 6,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 6
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 0.0993559589999986,
+          "offered_due": 6,
+          "acknowledged": 1,
+          "client_queue": 5,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 5
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 0.5503145839999988,
+          "offered_due": 6,
+          "acknowledged": 6,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        },
+        {
+          "event": "before_settlement",
+          "elapsed_seconds": 0.6026282089999988,
+          "offered_due": 6,
+          "acknowledged": 6,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        },
+        {
+          "event": "after_settlement",
+          "elapsed_seconds": 1.2602979999999988,
+          "offered_due": 6,
+          "acknowledged": 6,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        },
+        {
+          "event": "before_settlement",
+          "elapsed_seconds": 1.2609634169999993,
+          "offered_due": 6,
+          "acknowledged": 6,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        },
+        {
+          "event": "after_settlement",
+          "elapsed_seconds": 1.6897181669999988,
+          "offered_due": 6,
+          "acknowledged": 6,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        }
+      ],
+      "blocks": [
+        {
+          "height": 104,
+          "hash": "02b3b095249361ffaa11b747c8b8794a1df3f2247e3123f4b8145fe431dc0467",
+          "admitted": 3,
+          "snapshot_bytes": 71888,
+          "planned_resources": {
+            "snapshot_bytes": 71857,
+            "dependency_bytes": 144402,
+            "origins": 2,
+            "payout_reservation_bytes": 62,
+            "reserved_snapshot_bytes": 71919,
+            "reserved_dependency_bytes": 144464
+          },
+          "eligible_backlog": 3,
+          "deferred_backlog": 0,
+          "client_queue_before": 0,
+          "offers_still_unacknowledged": 0,
+          "drain_step_seconds": 0.6576656669999998,
+          "planned_resource_utilization": {
+            "snapshot_bytes": {
+              "used": 71919,
+              "limit": 72423,
+              "fraction": 0.9930408848017895,
+              "remaining": 504,
+              "within_limit": true
+            },
+            "dependency_bytes": {
+              "used": 144464,
+              "limit": 67108864,
+              "fraction": 0.002152681350708008,
+              "remaining": 66964400,
+              "within_limit": true
+            },
+            "origins": {
+              "used": 2,
+              "limit": 2048,
+              "fraction": 0.0009765625,
+              "remaining": 2046,
+              "within_limit": true
+            }
+          },
+          "native_snapshot_resources": {
+            "hash": "4b9b7e4903235e04c02d83f3b5e72c1a0181bc6e67a08e75a222670c68e8ecd1",
+            "version": 6,
+            "consensus_validated": false,
+            "dependency_graph_checked": false,
+            "usage": {
+              "encoded_bytes": 71888,
+              "unique_transactions": 3,
+              "unique_transaction_bytes": 69041,
+              "templates": 1,
+              "expanded_template_bytes": 69206,
+              "transaction_references": 3,
+              "binding_bytes": 380,
+              "transaction_table_bytes": 69049,
+              "template_table_bytes": 201,
+              "share_bytes": 1537,
+              "state_bytes": 325,
+              "payout_bytes": 63,
+              "pending_bytes": 0,
+              "settled_bytes": 0,
+              "certificate_bytes": 301,
+              "history_bytes": 32
+            },
+            "limits": {
+              "snapshot_bytes": 16777216,
+              "template_bytes": 4000000,
+              "expanded_template_bytes": 536870912,
+              "transaction_references": 2000000,
+              "origins": 2048,
+              "dependency_bytes": 67108864,
+              "dependency_depth": 64,
+              "certificate_bytes": 4194304
+            }
+          }
+        },
+        {
+          "height": 105,
+          "hash": "6adf0630e78174b0362e4ad50488836443ffd1fd8d9c88ba0ee08f58215a799d",
+          "admitted": 3,
+          "snapshot_bytes": 72096,
+          "planned_resources": {
+            "snapshot_bytes": 72065,
+            "dependency_bytes": 216498,
+            "origins": 2,
+            "payout_reservation_bytes": 62,
+            "reserved_snapshot_bytes": 72127,
+            "reserved_dependency_bytes": 216560
+          },
+          "eligible_backlog": 0,
+          "deferred_backlog": 0,
+          "client_queue_before": 0,
+          "offers_still_unacknowledged": 0,
+          "drain_step_seconds": 0.42875029200000014,
+          "planned_resource_utilization": {
+            "snapshot_bytes": {
+              "used": 72127,
+              "limit": 72423,
+              "fraction": 0.9959129005978764,
+              "remaining": 296,
+              "within_limit": true
+            },
+            "dependency_bytes": {
+              "used": 216560,
+              "limit": 67108864,
+              "fraction": 0.0032269954681396484,
+              "remaining": 66892304,
+              "within_limit": true
+            },
+            "origins": {
+              "used": 2,
+              "limit": 2048,
+              "fraction": 0.0009765625,
+              "remaining": 2046,
+              "within_limit": true
+            }
+          },
+          "native_snapshot_resources": {
+            "hash": "b88a7d18f31f5986e8f8a8b573e3772d46f8ff82ed39fe5dc77881293494663a",
+            "version": 6,
+            "consensus_validated": false,
+            "dependency_graph_checked": false,
+            "usage": {
+              "encoded_bytes": 72096,
+              "unique_transactions": 3,
+              "unique_transaction_bytes": 69041,
+              "templates": 1,
+              "expanded_template_bytes": 69206,
+              "transaction_references": 3,
+              "binding_bytes": 380,
+              "transaction_table_bytes": 69049,
+              "template_table_bytes": 201,
+              "share_bytes": 1537,
+              "state_bytes": 433,
+              "payout_bytes": 63,
+              "pending_bytes": 0,
+              "settled_bytes": 0,
+              "certificate_bytes": 401,
+              "history_bytes": 32
+            },
+            "limits": {
+              "snapshot_bytes": 16777216,
+              "template_bytes": 4000000,
+              "expanded_template_bytes": 536870912,
+              "transaction_references": 2000000,
+              "origins": 2048,
+              "dependency_bytes": 67108864,
+              "dependency_depth": 64,
+              "certificate_bytes": 4194304
+            }
+          }
+        }
+      ],
+      "native_template_context": {
+        "previousblockhash": "5a9b5c881da3e012017418841d8f8d80c44fad6795e26337d079770852917384",
+        "height": 104,
+        "bits": "207fffff",
+        "curtime": 1789318487,
+        "weightlimit": 4000000,
+        "sizelimit": 4000000
+      },
+      "template_geometry": {
+        "template_count": 2,
+        "expanded_template_bytes": 138412,
+        "transaction_references": 6,
+        "referenced_transaction_bytes": 138082,
+        "unique_transactions": 4,
+        "unique_transaction_bytes": 69260,
+        "noncoinbase_transaction_references": 4,
+        "noncoinbase_referenced_bytes": 137644,
+        "unique_noncoinbase_transactions": 2,
+        "unique_noncoinbase_transaction_bytes": 68822,
+        "distinct_noncoinbase_transaction_sets": 1,
+        "noncoinbase_byte_reuse_factor": 2.0,
+        "transaction_bytes_eliminated_by_dictionary": 68822,
+        "template_bytes": {
+          "count": 2,
+          "total_bytes": 138412,
+          "min_bytes": 69206,
+          "p50_bytes": 69206,
+          "p95_bytes": 69206,
+          "p99_bytes": 69206,
+          "max_bytes": 69206
+        },
+        "template_weight": {
+          "count": 2,
+          "total_weight_units": 154012,
+          "min_weight_units": 77006,
+          "p50_weight_units": 77006,
+          "p95_weight_units": 77006,
+          "p99_weight_units": 77006,
+          "max_weight_units": 77006
+        },
+        "template_transaction_references": {
+          "count": 2,
+          "total_references": 6,
+          "min_references": 3,
+          "p50_references": 3,
+          "p95_references": 3,
+          "p99_references": 3,
+          "max_references": 3
+        }
+      },
+      "proposal_resource_utilization": {
+        "snapshot_bytes": {
+          "used": 73189,
+          "limit": 16777216,
+          "fraction": 0.0043624043464660645,
+          "remaining": 16704027,
+          "within_limit": true
+        },
+        "expanded_template_bytes": {
+          "used": 138412,
+          "limit": 536870912,
+          "fraction": 0.0002578124403953552,
+          "remaining": 536732500,
+          "within_limit": true
+        },
+        "template_transaction_references": {
+          "used": 6,
+          "limit": 2000000,
+          "fraction": 3e-06,
+          "remaining": 1999994,
+          "within_limit": true
+        },
+        "largest_template_bytes": {
+          "used": 69206,
+          "limit": 4000000,
+          "fraction": 0.0173015,
+          "remaining": 3930794,
+          "within_limit": true
+        },
+        "largest_native_weight": {
+          "used": 77006,
+          "limit": 4000000,
+          "fraction": 0.0192515,
+          "remaining": 3922994,
+          "within_limit": true
+        },
+        "source_origins": {
+          "used": 2,
+          "limit": 2048,
+          "fraction": 0.0009765625,
+          "remaining": 2046,
+          "within_limit": true
+        }
+      },
+      "pre_ingress_diagnostics_seconds": 0.0021965829999999187,
+      "admission_seconds": 0.5503163749999995,
+      "observed_serial_acknowledgements_per_second": 10.902819310074147,
+      "scheduler_lateness": {
+        "count": 6,
+        "total_seconds": 1.3857271269999938,
+        "min_seconds": 7.2089999996194365e-06,
+        "p50_seconds": 0.17727974999999851,
+        "p95_seconds": 0.46783691699999963,
+        "p99_seconds": 0.46783691699999963,
+        "max_seconds": 0.46783691699999963
+      },
+      "ingress_includes_interleaved_settlement": false,
+      "initial_deferred": 3,
+      "initial_batch_resources": {
+        "snapshot_bytes": 71857,
+        "dependency_bytes": 144402,
+        "origins": 2,
+        "payout_reservation_bytes": 62,
+        "reserved_snapshot_bytes": 71919,
+        "reserved_dependency_bytes": 144464
+      },
+      "receipt_states": {
+        "confirmed_admitted": 12
+      },
+      "admitted": 6,
+      "total_admitted": 12,
+      "seconds": 2.538236917,
+      "post_ingress_diagnostics_seconds": 0.016088708999999923
+    }
+  ],
+  "rewards": [
+    {
+      "height": 102,
+      "commitment": "5dea5615b5f7d6a4db0a9576189ab9f103f12dc7dc08dfdd7cd3b4060f7540f6",
+      "new_admissions": 3,
+      "eligible_proofs": 3,
+      "payout_scripts": 1,
+      "reward_satoshis": 5000024400,
+      "unclaimed_rounding_satoshis": 0,
+      "whole_admission_height_cohorts_verified": true,
+      "exact_rational_window_and_coinbase_verified": true
+    },
+    {
+      "height": 103,
+      "commitment": "f548951289b85e6e33229f0708f6f32d74a645aa2e5106b0c68f528dae413417",
+      "new_admissions": 3,
+      "eligible_proofs": 6,
+      "payout_scripts": 2,
+      "reward_satoshis": 5000000000,
+      "unclaimed_rounding_satoshis": 0,
+      "whole_admission_height_cohorts_verified": true,
+      "exact_rational_window_and_coinbase_verified": true
+    },
+    {
+      "height": 104,
+      "commitment": "4b9b7e4903235e04c02d83f3b5e72c1a0181bc6e67a08e75a222670c68e8ecd1",
+      "new_admissions": 3,
+      "eligible_proofs": 9,
+      "payout_scripts": 2,
+      "reward_satoshis": 5000024400,
+      "unclaimed_rounding_satoshis": 0,
+      "whole_admission_height_cohorts_verified": true,
+      "exact_rational_window_and_coinbase_verified": true
+    },
+    {
+      "height": 105,
+      "commitment": "b88a7d18f31f5986e8f8a8b573e3772d46f8ff82ed39fe5dc77881293494663a",
+      "new_admissions": 3,
+      "eligible_proofs": 12,
+      "payout_scripts": 2,
+      "reward_satoshis": 5000000000,
+      "unclaimed_rounding_satoshis": 0,
+      "whole_admission_height_cohorts_verified": true,
+      "exact_rational_window_and_coinbase_verified": true
+    }
+  ],
+  "limitations": [
+    "Sequential local RPC driver; observed service rate is not a concurrent saturation maximum",
+    "Offered bursts are finite precomputed native proofs; client queue and settlement backlog are measured separately",
+    "Two loopback native nodes, not 100 native nodes, WAN propagation, or a public testnet",
+    "Easy regtest proof target does not establish production sampling variance or mining hashrate",
+    "The driver deliberately schedules settlement blocks; qualifying headers may also satisfy native difficulty without immediate publication",
+    "Snapshot budget overload tests deterministic carry and expiry; it does not exhaust host RAM or disk",
+    "RSS is sampled, CPU is cumulative ps time, disk sizes are logical lengths rather than physical allocation",
+    "Local durable ACKs become recurring reward eligible only after native canonical admission"
+  ],
+  "pinned_snapshot_budget_bytes": 72423,
+  "snapshot_policy_selection": {
+    "explicit_override": false,
+    "native_prepared_one_origin_snapshot_floor_bytes": 70314,
+    "full_proposal_bytes": 73127,
+    "fraction_of_remaining_bytes": 0.75,
+    "policy_frozen_after_first_epoch": true
+  },
+  "peer_recovery_seconds": 0.8754420000000005,
+  "offered": 12,
+  "acknowledged": 12,
+  "admitted": 12,
+  "current_acknowledged_backlog": 0,
+  "expired": 0,
+  "unresolved_receipts": 0,
+  "follower_gate_recovery": {
+    "native_verified_acknowledgements": 6,
+    "inventory_pages": 10,
+    "deferred_attempts": 0,
+    "receipt_states": {
+      "confirmed_admitted": 6
+    }
+  },
+  "final_backlog": 0,
+  "payout_oracle_verified": true,
+  "peer_recovery_verified": true,
+  "native_p2p_bytes": [
+    {
+      "totalbytessent": 432557,
+      "totalbytesrecv": 2794
+    },
+    {
+      "totalbytessent": 2794,
+      "totalbytesrecv": 432557
+    }
+  ],
+  "seconds": 9.338394792,
+  "measurements": {
+    "diagnostic.native_limits": {
+      "count": 2,
+      "total_seconds": 0.0014678749999994523,
+      "min_seconds": 0.0007160829999994789,
+      "p50_seconds": 0.0007160829999994789,
+      "p95_seconds": 0.0007517919999999734,
+      "p99_seconds": 0.0007517919999999734,
+      "max_seconds": 0.0007517919999999734,
+      "failures": 0
+    },
+    "diagnostic.snapshot_resources": {
+      "count": 4,
+      "total_seconds": 0.034943751000000134,
+      "min_seconds": 0.007731542000000147,
+      "p50_seconds": 0.007733041999999912,
+      "p95_seconds": 0.011059083000000136,
+      "p99_seconds": 0.011059083000000136,
+      "max_seconds": 0.011059083000000136,
+      "failures": 0
+    },
+    "gate.batch_status": {
+      "count": 6,
+      "total_seconds": 0.18642008499999996,
+      "min_seconds": 0.011568958999999879,
+      "p50_seconds": 0.025533750000000133,
+      "p95_seconds": 0.05229645800000071,
+      "p99_seconds": 0.05229645800000071,
+      "max_seconds": 0.05229645800000071,
+      "failures": 0
+    },
+    "gate.origin_job": {
+      "count": 4,
+      "total_seconds": 1.0664452899999999,
+      "min_seconds": 0.22380091600000007,
+      "p50_seconds": 0.2278992080000002,
+      "p95_seconds": 0.3279003749999996,
+      "p99_seconds": 0.3279003749999996,
+      "max_seconds": 0.3279003749999996,
+      "failures": 0
+    },
+    "gate.p2p_recovery_import": {
+      "count": 1,
+      "total_seconds": 0.7000849169999999,
+      "min_seconds": 0.7000849169999999,
+      "p50_seconds": 0.7000849169999999,
+      "p95_seconds": 0.7000849169999999,
+      "p99_seconds": 0.7000849169999999,
+      "max_seconds": 0.7000849169999999,
+      "failures": 0
+    },
+    "gate.receipt_status": {
+      "count": 3,
+      "total_seconds": 0.033381501000000036,
+      "min_seconds": 0.007695584000000366,
+      "p50_seconds": 0.012136708999999968,
+      "p95_seconds": 0.013549207999999702,
+      "p99_seconds": 0.013549207999999702,
+      "max_seconds": 0.013549207999999702,
+      "failures": 0
+    },
+    "gate.receive": {
+      "count": 12,
+      "total_seconds": 0.7805449980000017,
+      "min_seconds": 0.03503975000000015,
+      "p50_seconds": 0.04313370800000005,
+      "p95_seconds": 0.1011473340000002,
+      "p99_seconds": 0.1011473340000002,
+      "max_seconds": 0.1011473340000002,
+      "failures": 0
+    },
+    "gate.register_origin": {
+      "count": 4,
+      "total_seconds": 0.20678416699999946,
+      "min_seconds": 0.031189541999999904,
+      "p50_seconds": 0.03132783299999975,
+      "p95_seconds": 0.07291012499999994,
+      "p99_seconds": 0.07291012499999994,
+      "max_seconds": 0.07291012499999994,
+      "failures": 0
+    },
+    "gate.register_snapshot": {
+      "count": 4,
+      "total_seconds": 0.019205250999998924,
+      "min_seconds": 0.0012220000000002784,
+      "p50_seconds": 0.004084416999999618,
+      "p95_seconds": 0.009284083999999027,
+      "p99_seconds": 0.009284083999999027,
+      "max_seconds": 0.009284083999999027,
+      "failures": 0
+    },
+    "gate.settlement_job": {
+      "count": 4,
+      "total_seconds": 1.4449435829999988,
+      "min_seconds": 0.3272025000000003,
+      "p50_seconds": 0.3279576249999998,
+      "p95_seconds": 0.4534849999999988,
+      "p99_seconds": 0.4534849999999988,
+      "max_seconds": 0.4534849999999988,
+      "failures": 0
+    },
+    "p2p.block_and_snapshot_ready": {
+      "count": 4,
+      "total_seconds": 1.062765875000002,
+      "min_seconds": 0.06240391700000103,
+      "p50_seconds": 0.12913695800000013,
+      "p95_seconds": 0.7392242080000004,
+      "p99_seconds": 0.7392242080000004,
+      "max_seconds": 0.7392242080000004,
+      "failures": 0
+    },
+    "rpc.node0.finalizesharepoolhashjob": {
+      "count": 8,
+      "total_seconds": 0.16982120899999842,
+      "min_seconds": 0.013620249999999778,
+      "p50_seconds": 0.020678874999999763,
+      "p95_seconds": 0.03199641700000022,
+      "p99_seconds": 0.03199641700000022,
+      "max_seconds": 0.03199641700000022,
+      "failures": 0
+    },
+    "rpc.node0.getbestblockhash": {
+      "count": 205,
+      "total_seconds": 0.221115488999994,
+      "min_seconds": 0.0001759169999999699,
+      "p50_seconds": 0.00042187499999890576,
+      "p95_seconds": 0.0034763340000001364,
+      "p99_seconds": 0.0045620839999998,
+      "max_seconds": 0.005954250000000272,
+      "failures": 0
+    },
+    "rpc.node0.getblockchaininfo": {
+      "count": 51,
+      "total_seconds": 0.05279683300000393,
+      "min_seconds": 0.0003001249999998734,
+      "p50_seconds": 0.0005873339999995508,
+      "p95_seconds": 0.003341333999999918,
+      "p99_seconds": 0.004341958999999562,
+      "max_seconds": 0.004341958999999562,
+      "failures": 0
+    },
+    "rpc.node0.getblockhash": {
+      "count": 182,
+      "total_seconds": 0.14906132900000424,
+      "min_seconds": 0.00017158300000019722,
+      "p50_seconds": 0.00021870800000023394,
+      "p95_seconds": 0.0038169159999998925,
+      "p99_seconds": 0.00594249999999974,
+      "max_seconds": 0.005960875000001309,
+      "failures": 0
+    },
+    "rpc.node0.getblockheader": {
+      "count": 83,
+      "total_seconds": 0.131757537999996,
+      "min_seconds": 0.00023395800000081124,
+      "p50_seconds": 0.0005052079999998682,
+      "p95_seconds": 0.005190332999999825,
+      "p99_seconds": 0.006000832999999872,
+      "max_seconds": 0.006000832999999872,
+      "failures": 0
+    },
+    "rpc.node0.getnettotals": {
+      "count": 3,
+      "total_seconds": 0.0011007069999999786,
+      "min_seconds": 0.0002491659999996898,
+      "p50_seconds": 0.0003436660000009084,
+      "p95_seconds": 0.0005078749999993803,
+      "p99_seconds": 0.0005078749999993803,
+      "max_seconds": 0.0005078749999993803,
+      "failures": 0
+    },
+    "rpc.node0.getsharepoolhashsnapshot": {
+      "count": 4,
+      "total_seconds": 0.01611979199999869,
+      "min_seconds": 0.0026404589999993178,
+      "p50_seconds": 0.0027327499999998395,
+      "p95_seconds": 0.007910916000000157,
+      "p99_seconds": 0.007910916000000157,
+      "max_seconds": 0.007910916000000157,
+      "failures": 0
+    },
+    "rpc.node0.getsharepoolhashstatus": {
+      "count": 51,
+      "total_seconds": 0.06670616099999238,
+      "min_seconds": 0.0003817499999998475,
+      "p50_seconds": 0.00048133299999975065,
+      "p95_seconds": 0.0039371249999984315,
+      "p99_seconds": 0.006026624999998731,
+      "max_seconds": 0.006026624999998731,
+      "failures": 0
+    },
+    "rpc.node0.getsharepoolhashtidesbudget": {
+      "count": 22,
+      "total_seconds": 0.0731687509999972,
+      "min_seconds": 0.00025258400000005565,
+      "p50_seconds": 0.0034219590000006406,
+      "p95_seconds": 0.006990040999999891,
+      "p99_seconds": 0.008464124999999711,
+      "max_seconds": 0.008464124999999711,
+      "failures": 0
+    },
+    "rpc.node0.preparesharepoolhashjob": {
+      "count": 9,
+      "total_seconds": 0.2032146680000011,
+      "min_seconds": 0.0055218750000003425,
+      "p50_seconds": 0.022562624999999947,
+      "p95_seconds": 0.046987000000001444,
+      "p99_seconds": 0.046987000000001444,
+      "max_seconds": 0.046987000000001444,
+      "failures": 0
+    },
+    "rpc.node0.sendrawtransaction": {
+      "count": 4,
+      "total_seconds": 0.03017216499999975,
+      "min_seconds": 0.005625832999999858,
+      "p50_seconds": 0.005691957999999886,
+      "p95_seconds": 0.009888790999999841,
+      "p99_seconds": 0.009888790999999841,
+      "max_seconds": 0.009888790999999841,
+      "failures": 0
+    },
+    "rpc.node0.submitblock": {
+      "count": 4,
+      "total_seconds": 0.12480020900000088,
+      "min_seconds": 0.026623709000000773,
+      "p50_seconds": 0.027531250000000007,
+      "p95_seconds": 0.03745695799999993,
+      "p99_seconds": 0.03745695799999993,
+      "max_seconds": 0.03745695799999993,
+      "failures": 0
+    },
+    "rpc.node0.submitsharepoolhashsnapshot": {
+      "count": 56,
+      "total_seconds": 0.40122983599999706,
+      "min_seconds": 0.0003433339999991958,
+      "p50_seconds": 0.0031458750000004088,
+      "p95_seconds": 0.02437250000000013,
+      "p99_seconds": 0.025604291999999695,
+      "max_seconds": 0.025604291999999695,
+      "failures": 0
+    },
+    "rpc.node0.validatesharepoolhashshare": {
+      "count": 12,
+      "total_seconds": 0.07926175099999977,
+      "min_seconds": 0.0038746249999999094,
+      "p50_seconds": 0.004068499999999808,
+      "p95_seconds": 0.01729779200000081,
+      "p99_seconds": 0.01729779200000081,
+      "max_seconds": 0.01729779200000081,
+      "failures": 0
+    },
+    "rpc.node0.validatesharepoolhashtemplate": {
+      "count": 32,
+      "total_seconds": 0.4938767900000052,
+      "min_seconds": 0.007151791000000074,
+      "p50_seconds": 0.016012790999999638,
+      "p95_seconds": 0.024600917000000777,
+      "p99_seconds": 0.027143708000000544,
+      "max_seconds": 0.027143708000000544,
+      "failures": 0
+    },
+    "rpc.node1.getbestblockhash": {
+      "count": 58,
+      "total_seconds": 0.1291021260000056,
+      "min_seconds": 0.00017562499999979053,
+      "p50_seconds": 0.0004952920000000915,
+      "p95_seconds": 0.007697958999999699,
+      "p99_seconds": 0.009527791000000008,
+      "max_seconds": 0.009527791000000008,
+      "failures": 0
+    },
+    "rpc.node1.getblockchaininfo": {
+      "count": 12,
+      "total_seconds": 0.030774958000001185,
+      "min_seconds": 0.0002837499999994719,
+      "p50_seconds": 0.0004589590000003696,
+      "p95_seconds": 0.00765016700000043,
+      "p99_seconds": 0.00765016700000043,
+      "max_seconds": 0.00765016700000043,
+      "failures": 0
+    },
+    "rpc.node1.getblockhash": {
+      "count": 32,
+      "total_seconds": 0.051283543000000265,
+      "min_seconds": 0.00017599999999973193,
+      "p50_seconds": 0.00022949999999966053,
+      "p95_seconds": 0.00810820799999945,
+      "p99_seconds": 0.008353167000000106,
+      "max_seconds": 0.008353167000000106,
+      "failures": 0
+    },
+    "rpc.node1.getblockheader": {
+      "count": 8,
+      "total_seconds": 0.005160958000002047,
+      "min_seconds": 0.00021924999999978212,
+      "p50_seconds": 0.00033804100000001114,
+      "p95_seconds": 0.0022372500000003015,
+      "p99_seconds": 0.0022372500000003015,
+      "max_seconds": 0.0022372500000003015,
+      "failures": 0
+    },
+    "rpc.node1.getnettotals": {
+      "count": 3,
+      "total_seconds": 0.000933250000001884,
+      "min_seconds": 0.000269666000001223,
+      "p50_seconds": 0.00029754200000020603,
+      "p95_seconds": 0.00036604200000045495,
+      "p99_seconds": 0.00036604200000045495,
+      "max_seconds": 0.00036604200000045495,
+      "failures": 0
+    },
+    "rpc.node1.getsharepoolhashrecent": {
+      "count": 5,
+      "total_seconds": 0.010262332999999124,
+      "min_seconds": 0.00023295799999978328,
+      "p50_seconds": 0.0029944579999998666,
+      "p95_seconds": 0.0036512499999998838,
+      "p99_seconds": 0.0036512499999998838,
+      "max_seconds": 0.0036512499999998838,
+      "failures": 0
+    },
+    "rpc.node1.getsharepoolhashsnapshot": {
+      "count": 9,
+      "total_seconds": 0.027214293000001888,
+      "min_seconds": 0.0002830000000004773,
+      "p50_seconds": 0.0026103749999997206,
+      "p95_seconds": 0.007867500000000582,
+      "p99_seconds": 0.007867500000000582,
+      "max_seconds": 0.007867500000000582,
+      "failures": 0
+    },
+    "rpc.node1.getsharepoolhashstatus": {
+      "count": 17,
+      "total_seconds": 0.036116792999998815,
+      "min_seconds": 0.00037241700000034683,
+      "p50_seconds": 0.0005020419999999248,
+      "p95_seconds": 0.008005999999999958,
+      "p99_seconds": 0.008005999999999958,
+      "max_seconds": 0.008005999999999958,
+      "failures": 0
+    },
+    "rpc.node1.submitsharepoolhashsnapshot": {
+      "count": 15,
+      "total_seconds": 0.14144170799999944,
+      "min_seconds": 0.00036774999999966695,
+      "p50_seconds": 0.002609999999999779,
+      "p95_seconds": 0.046085249999999967,
+      "p99_seconds": 0.046085249999999967,
+      "max_seconds": 0.046085249999999967,
+      "failures": 0
+    },
+    "rpc.node1.validatesharepoolhashshare": {
+      "count": 6,
+      "total_seconds": 0.07731650000000023,
+      "min_seconds": 0.008354583000000027,
+      "p50_seconds": 0.01347029200000005,
+      "p95_seconds": 0.017668207999999908,
+      "p99_seconds": 0.017668207999999908,
+      "max_seconds": 0.017668207999999908,
+      "failures": 0
+    },
+    "rpc.node1.validatesharepoolhashtemplate": {
+      "count": 6,
+      "total_seconds": 0.11696962400000022,
+      "min_seconds": 0.01567262500000055,
+      "p50_seconds": 0.018277125000000005,
+      "p95_seconds": 0.023074207999999707,
+      "p99_seconds": 0.023074207999999707,
+      "max_seconds": 0.023074207999999707,
+      "failures": 0
+    }
+  },
+  "resources": {
+    "interval_seconds": 5,
+    "samples": [
+      {
+        "elapsed_seconds": 2.666600000011954e-05,
+        "processes": {
+          "node0": {
+            "rss_bytes": 64847872,
+            "cpu_seconds": 1.25
+          },
+          "node1": {
+            "rss_bytes": 63848448,
+            "cpu_seconds": 1.16
+          },
+          "driver": {
+            "rss_bytes": 30474240,
+            "cpu_seconds": 0.15
+          }
+        },
+        "disk_bytes": {
+          "node0": 19100856,
+          "node1": 18868508,
+          "gates": 148622,
+          "node0_snapshot_store": 717,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 5.017821333,
+        "processes": {
+          "node0": {
+            "rss_bytes": 69926912,
+            "cpu_seconds": 2.25
+          },
+          "node1": {
+            "rss_bytes": 67567616,
+            "cpu_seconds": 1.55
+          },
+          "driver": {
+            "rss_bytes": 37011456,
+            "cpu_seconds": 1.13
+          }
+        },
+        "disk_bytes": {
+          "node0": 19667258,
+          "node1": 19206623,
+          "gates": 2225171,
+          "node0_snapshot_store": 288878,
+          "node1_snapshot_store": 218194
+        }
+      },
+      {
+        "elapsed_seconds": 6.458431083,
+        "processes": {
+          "node0": {
+            "rss_bytes": 70631424,
+            "cpu_seconds": 2.81
+          },
+          "node1": {
+            "rss_bytes": 68321280,
+            "cpu_seconds": 1.8
+          },
+          "driver": {
+            "rss_bytes": 37715968,
+            "cpu_seconds": 1.31
+          }
+        },
+        "disk_bytes": {
+          "node0": 20057409,
+          "node1": 19619666,
+          "gates": 2492971,
+          "node0_snapshot_store": 433935,
+          "node1_snapshot_store": 432796
+        }
+      }
+    ],
+    "errors": [],
+    "processes": {
+      "node0": {
+        "cpu_seconds": 1.56,
+        "average_cpu_cores": 0.24154572852293404,
+        "max_sampled_rss_bytes": 70631424
+      },
+      "node1": {
+        "cpu_seconds": 0.6400000000000001,
+        "average_cpu_cores": 0.09909568349658834,
+        "max_sampled_rss_bytes": 68321280
+      },
+      "driver": {
+        "cpu_seconds": 1.1600000000000001,
+        "average_cpu_cores": 0.17961092633756637,
+        "max_sampled_rss_bytes": 37715968
+      }
+    },
+    "logical_disk_growth_bytes": {
+      "node0": 956553,
+      "node1": 751158,
+      "gates": 2344349,
+      "node0_snapshot_store": 433218,
+      "node1_snapshot_store": 432079
+    }
+  }
+}

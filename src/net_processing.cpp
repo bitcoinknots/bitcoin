@@ -264,7 +264,7 @@ struct SharePoolHashPeer {
     SPNClock::time_point next_admission{};
     SPNClock::time_point bucket_time{SPNClock::now()};
     double control_tokens{8};
-    double request_tokens{32};
+    sharepool::HashRelayRequestBudget request_service;
     double outgoing_requests{32};
     double inbound_bytes{8'000'000};
     double outbound_bytes{8'000'000};
@@ -279,7 +279,6 @@ struct SharePoolHashPeer {
         const double elapsed = std::chrono::duration<double>(now - bucket_time).count();
         bucket_time = now;
         control_tokens = std::min(8.0, control_tokens + elapsed);
-        request_tokens = std::min(32.0, request_tokens + elapsed * 32);
         outgoing_requests = std::min(32.0, outgoing_requests + elapsed * 32);
         inbound_bytes = std::min(8'000'000.0, inbound_bytes + elapsed * 1'000'000);
         outbound_bytes = std::min(8'000'000.0, outbound_bytes + elapsed * 1'000'000);
@@ -3965,7 +3964,7 @@ void PeerManagerImpl::SendSharePoolHashMessages(CNode& node, Peer& peer)
     auto& store = *m_chainman.m_sharepool_hash_store;
     if (relay.serve_request) {
         const auto request = *relay.serve_request;
-        if (relay.outbound_bytes >= SPH_CHUNK_BYTES + 45) {
+        if (relay.outbound_bytes >= SPH_CHUNK_BYTES + 45 && relay.request_service.Take(now)) {
             std::shared_ptr<const std::vector<unsigned char>> raw;
             try {
                 raw = store.GetShared(request.hash);
@@ -4091,19 +4090,17 @@ void PeerManagerImpl::ProcessSharePoolHashMessage(CNode& node, Peer& peer, const
             return;
         }
         if (type == NetMsgType::SPHGET) {
-            fail(stream.size() == 36 && relay.request_tokens >= 1);
-            --relay.request_tokens;
+            fail(stream.size() == 36);
             uint256 hash;
             uint32_t offset;
             stream >> hash >> offset;
             fail(offset < sharepool::hashonly::MAX_SNAPSHOT_BYTES);
             const auto now = SPNClock::now();
-            sharepool::ExpireHashRelayRequest(relay.serve_request, now);
-            if (relay.serve_request) {
-                fail(relay.serve_request->hash == hash && relay.serve_request->offset == offset);
-                return; // An exact retry never extends the existing deadline.
-            }
-            relay.serve_request.emplace(SharePoolHashRequest{hash, offset, now + SPH_PROGRESS_TIMEOUT});
+            // One fixed-size request may wait for service/byte credits. A
+            // sender's clock and packet arrival spacing are not ours: budget
+            // pressure must not disconnect a structurally valid transfer.
+            fail(sharepool::QueueHashRelayRequest(relay.serve_request,
+                SharePoolHashRequest{hash, offset, now + SPH_PROGRESS_TIMEOUT}, now));
             return;
         }
         if (type == NetMsgType::SPHDATA) {

@@ -6,6 +6,7 @@
 #include <chain.h>
 #include <consensus/merkle.h>
 #include <consensus/sharepool_hash.h>
+#include <hash.h>
 #include <key.h>
 #include <kernel/chainparams.h>
 #include <pow.h>
@@ -40,6 +41,46 @@ std::vector<unsigned char> Payout(unsigned char fill)
 bool ProofLess(const uint256& a, const uint256& b)
 {
     return UintToArith256(a) < UintToArith256(b);
+}
+
+// Frozen pre-optimization serialization oracle. Deliberately sizes complete
+// bodies and each table transaction independently; do not use resource helpers
+// here, so component accounting and optimized traversal cannot agree by accident.
+std::vector<unsigned char> OriginalSnapshotEncoding(const ho::Snapshot& snapshot)
+{
+    std::map<Wtxid, std::pair<CTransactionRef, uint32_t>> table;
+    size_t expanded{0};
+    for (const auto& record : snapshot.templates) {
+        expanded += GetSerializeSize(TX_WITH_WITNESS(record.block));
+        for (const auto& tx : record.block.vtx) table.try_emplace(tx->GetWitnessHash(), tx, 0);
+    }
+    BOOST_REQUIRE_LE(expanded, ho::MAX_EXPANDED_TEMPLATE_BYTES);
+    uint32_t index{0};
+    for (auto& [id, entry] : table) entry.second = index++;
+    std::vector<unsigned char> bytes;
+    VectorWriter writer{bytes, 0};
+    writer << snapshot.binding << snapshot.authorization << snapshot.job_commitment;
+    WriteCompactSize(writer, table.size());
+    for (const auto& [id, entry] : table) {
+        WriteCompactSize(writer, GetSerializeSize(TX_WITH_WITNESS(*entry.first)));
+        writer << TX_WITH_WITNESS(*entry.first);
+    }
+    WriteCompactSize(writer, snapshot.templates.size());
+    for (const auto& record : snapshot.templates) {
+        writer << record.id << record.block.GetBlockHeader();
+        WriteCompactSize(writer, record.block.vtx.size());
+        for (const auto& tx : record.block.vtx) WriteCompactSize(writer, table.at(tx->GetWitnessHash()).second);
+    }
+    writer << snapshot.shares << snapshot.post_state << snapshot.payouts;
+    if (snapshot.binding.version == ho::LEDGER_VERSION) writer << snapshot.pending << snapshot.settled << snapshot.certificates;
+    if (snapshot.binding.version == ho::TIDES_VERSION) writer << snapshot.certificates << snapshot.history_head;
+    return bytes;
+}
+
+size_t ComponentBytes(const ho::SnapshotResourceUsage& usage)
+{
+    return usage.binding_bytes + usage.transaction_table_bytes + usage.template_table_bytes + usage.share_bytes + usage.state_bytes +
+        usage.payout_bytes + usage.pending_bytes + usage.settled_bytes + usage.certificate_bytes + usage.history_bytes;
 }
 
 struct HashFixture : BasicTestingSetup {
@@ -282,6 +323,150 @@ BOOST_AUTO_TEST_CASE(one_hundred_proofs_and_nonce_normalization)
     BOOST_CHECK(nonce.GetHash() != snapshot.shares.front().header.GetHash());
     nonce.hashMerkleRoot = uint256{uint8_t{8}};
     BOOST_CHECK(ho::TemplateId(nonce) != ho::TemplateId(snapshot.shares.front().header));
+}
+
+BOOST_AUTO_TEST_CASE(prepared_codec_matches_original_wire_and_profile_hashes)
+{
+    auto snapshot = WithShares(3);
+    CMutableTransaction shared;
+    shared.vin.resize(1);
+    shared.vin[0].prevout = COutPoint{Txid::FromUint256(uint256{uint8_t{123}}), 0};
+    shared.vin[0].scriptWitness.stack = {{1, 2, 3}};
+    shared.vout.emplace_back(1, CScript{} << OP_TRUE);
+    const auto first = MakeTransactionRef(shared);
+    shared.vin[0].scriptWitness.stack[0][0] = 9;
+    const auto second = MakeTransactionRef(shared);
+    BOOST_CHECK(first->GetHash() == second->GetHash());
+    BOOST_CHECK(first->GetWitnessHash() != second->GetWitnessHash());
+    // Cross the 252/253 CompactSize thresholds for table/template counts and
+    // transaction indices, while retaining distinct witness-only tx bodies.
+    const auto original = snapshot.templates.front().block;
+    for (int i{0}; i < 260; ++i) {
+        auto origin = original;
+        CMutableTransaction coinbase{*origin.vtx.front()};
+        coinbase.vin[0].scriptSig << int64_t{i + 100};
+        origin.vtx = {MakeTransactionRef(std::move(coinbase)), i % 2 ? first : second};
+        origin.m_txcount = origin.vtx.size();
+        origin.hashMerkleRoot = BlockMerkleRoot(origin);
+        snapshot.templates.push_back(Record(origin));
+    }
+    std::sort(snapshot.templates.begin(), snapshot.templates.end(), [](const auto& a, const auto& b) { return a.id < b.id; });
+    for (const auto version : {ho::VERSION, ho::LEDGER_VERSION, ho::TIDES_VERSION}) {
+        snapshot.binding.version = version;
+        snapshot.binding.rules = ho::RulesHash(version);
+        snapshot.pending.clear();
+        snapshot.settled.clear();
+        snapshot.certificates.clear();
+        snapshot.history_head.SetNull();
+        if (version == ho::LEDGER_VERSION) {
+            snapshot.pending.push_back({1, 1, uint256{uint8_t{5}}, snapshot.binding.pool, SHARE_BITS, Payout(0x61)});
+            snapshot.settled.push_back({1, 1, uint256{uint8_t{6}}, snapshot.binding.pool, SHARE_BITS, Payout(0x62)});
+        }
+        if (version != ho::VERSION) snapshot.certificates.push_back({1, hashes[0], uint256{uint8_t{7}}, uint256{uint8_t{8}}});
+        if (version == ho::TIDES_VERSION) snapshot.history_head = uint256{uint8_t{9}};
+        const auto expected = OriginalSnapshotEncoding(snapshot);
+        BOOST_CHECK(ho::EncodeSnapshot(snapshot) == expected);
+        BOOST_CHECK(ho::ProfileSnapshotHash(snapshot, version) == ho::ProfileSnapshotHash(expected, version));
+        BOOST_CHECK(ho::EncodeSnapshot(ho::DecodeSnapshot(expected)) == expected);
+        const auto usage = ho::MeasureSnapshotResources(snapshot);
+        BOOST_CHECK_EQUAL(usage.encoded_bytes, expected.size());
+        BOOST_CHECK_EQUAL(ComponentBytes(usage), expected.size());
+        BOOST_CHECK_EQUAL(usage.templates, 261);
+        BOOST_CHECK_EQUAL(usage.unique_transactions, 263);
+        BOOST_CHECK_EQUAL(usage.transaction_references, 521);
+        BOOST_CHECK_EQUAL(usage.pending_bytes, version == ho::LEDGER_VERSION ? GetSerializeSize(snapshot.pending) : 0);
+        BOOST_CHECK_EQUAL(usage.history_bytes, version == ho::TIDES_VERSION ? 32 : 0);
+        auto unsigned_snapshot = snapshot;
+        unsigned_snapshot.authorization.fill(0);
+        const auto unsigned_raw = OriginalSnapshotEncoding(unsigned_snapshot);
+        HashWriter contents;
+        static constexpr char v4[]{"SharePool/contents/v4"};
+        static constexpr char v5[]{"SharePool/contents/v5"};
+        static constexpr char v6[]{"SharePool/contents/v6"};
+        contents.write(AsBytes(version == ho::TIDES_VERSION ? Span{v6} : version == ho::LEDGER_VERSION ? Span{v5} : Span{v4}));
+        contents.write(AsBytes(Span{unsigned_raw}));
+        BOOST_CHECK(ho::SnapshotContentsHash(snapshot) == contents.GetHash());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(resource_measurement_never_reuses_mutated_object_metadata)
+{
+    auto snapshot = WithShares(1);
+    const auto before = ho::MeasureSnapshotResources(snapshot);
+    const auto original_hash = ho::SnapshotHash(snapshot);
+    auto& origin = snapshot.templates.front().block;
+    CMutableTransaction coinbase{*origin.vtx.front()};
+    coinbase.vin[0].scriptWitness.stack = {std::vector<unsigned char>(32, 1)};
+    origin.vtx.front() = MakeTransactionRef(std::move(coinbase));
+    const auto after = ho::MeasureSnapshotResources(snapshot);
+    BOOST_CHECK_GT(after.unique_transaction_bytes, before.unique_transaction_bytes);
+    BOOST_CHECK_GT(after.expanded_template_bytes, before.expanded_template_bytes);
+    BOOST_CHECK(ho::SnapshotHash(snapshot) != original_hash);
+    BOOST_CHECK(ho::EncodeSnapshot(snapshot) == OriginalSnapshotEncoding(snapshot));
+    snapshot.payouts[0].scriptPubKey.push_back(OP_TRUE);
+    BOOST_CHECK_EQUAL(ho::MeasureSnapshotResources(snapshot).encoded_bytes, after.encoded_bytes + 1);
+    snapshot.templates.front().block.vtx.front().reset();
+    BOOST_CHECK_THROW(ho::MeasureSnapshotResources(snapshot), std::ios_base::failure);
+    BOOST_CHECK_THROW(ho::EncodeSnapshot(snapshot), std::ios_base::failure);
+    BOOST_CHECK_THROW(ho::SnapshotHash(snapshot), std::ios_base::failure);
+    snapshot = WithShares(1);
+    snapshot.shares.resize(ho::MAX_SNAPSHOT_BYTES / 512 + 1, snapshot.shares.front());
+    BOOST_CHECK_THROW(ho::MeasureSnapshotResources(snapshot), std::ios_base::failure);
+}
+
+BOOST_AUTO_TEST_CASE(shared_references_keep_the_original_global_reference_budget)
+{
+    auto snapshot = Empty();
+    auto origin = Block(Empty());
+    origin.vtx.resize(20'000, origin.vtx.front());
+    origin.m_txcount = origin.vtx.size();
+    // Structural resource fixture: duplicate coinbases are not native-valid.
+    snapshot.templates.resize(100, Record(origin));
+    const auto usage = ho::MeasureSnapshotResources(snapshot);
+    BOOST_CHECK_EQUAL(usage.transaction_references, ho::MAX_TEMPLATE_TX_REFERENCES);
+    BOOST_CHECK_EQUAL(usage.unique_transactions, 1);
+    BOOST_CHECK_EQUAL(usage.expanded_template_bytes, 100 * GetSerializeSize(TX_WITH_WITNESS(origin)));
+    BOOST_CHECK_EQUAL(usage.encoded_bytes, ho::EncodeSnapshot(snapshot).size());
+    snapshot.templates.back().block.vtx.push_back(origin.vtx.front());
+    BOOST_CHECK_THROW(ho::MeasureSnapshotResources(snapshot), std::ios_base::failure);
+    BOOST_CHECK_THROW(ho::EncodeSnapshot(snapshot), std::ios_base::failure);
+}
+
+BOOST_AUTO_TEST_CASE(shared_payload_keeps_exact_individual_and_expanded_byte_limits)
+{
+    auto origin = Block(Empty());
+    CMutableTransaction transaction;
+    transaction.vin.resize(1);
+    transaction.vin[0].prevout = COutPoint{Txid::FromUint256(uint256{uint8_t{123}}), 0};
+    CScript script;
+    script.resize(3'850'000);
+    transaction.vout.emplace_back(1, script);
+    origin.vtx.push_back(MakeTransactionRef(transaction));
+    const auto padding = ho::MAX_TEMPLATE_BYTES - GetSerializeSize(TX_WITH_WITNESS(origin));
+    transaction.vout[0].scriptPubKey.resize(script.size() + padding);
+    origin.vtx.back() = MakeTransactionRef(transaction);
+    origin.m_txcount = origin.vtx.size();
+    origin.hashMerkleRoot = BlockMerkleRoot(origin);
+    BOOST_CHECK_EQUAL(GetSerializeSize(TX_WITH_WITNESS(origin)), ho::MAX_TEMPLATE_BYTES);
+    auto snapshot = Empty();
+    snapshot.templates.push_back(Record(origin));
+    const auto one = ho::MeasureSnapshotResources(snapshot);
+    BOOST_CHECK_EQUAL(one.expanded_template_bytes, ho::MAX_TEMPLATE_BYTES);
+    BOOST_CHECK(ho::EncodeSnapshot(ho::DecodeSnapshot(ho::EncodeSnapshot(snapshot))) == OriginalSnapshotEncoding(snapshot));
+    transaction.vout[0].scriptPubKey.push_back(OP_0);
+    snapshot.templates[0].block.vtx.back() = MakeTransactionRef(transaction);
+    BOOST_CHECK_THROW(ho::MeasureSnapshotResources(snapshot), std::ios_base::failure);
+    snapshot.templates[0] = Record(origin);
+    const auto maximum = ho::MAX_EXPANDED_TEMPLATE_BYTES / ho::MAX_TEMPLATE_BYTES;
+    snapshot.templates.resize(maximum, Record(origin));
+    const auto usage = ho::MeasureSnapshotResources(snapshot);
+    BOOST_CHECK_EQUAL(usage.unique_transaction_bytes, one.unique_transaction_bytes);
+    BOOST_CHECK_EQUAL(usage.expanded_template_bytes, maximum * size_t{ho::MAX_TEMPLATE_BYTES});
+    BOOST_CHECK_LT(usage.encoded_bytes, ho::MAX_SNAPSHOT_BYTES);
+    snapshot.templates.push_back(Record(origin));
+    BOOST_CHECK_THROW(ho::MeasureSnapshotResources(snapshot), std::ios_base::failure);
+    BOOST_CHECK_THROW(ho::EncodeSnapshot(snapshot), std::ios_base::failure);
+    BOOST_CHECK_THROW(ho::SnapshotContentsHash(snapshot), std::ios_base::failure);
 }
 
 BOOST_AUTO_TEST_CASE(deduplicated_large_templates_preserve_complete_transaction_bytes)

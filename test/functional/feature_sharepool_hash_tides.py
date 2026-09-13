@@ -15,7 +15,7 @@ import sys
 from unittest import SkipTest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "contrib" / "sharepool"))
-from hash_snapshot import EnvelopeV2, HashSigner, Snapshot, TemplateRecord, TIDES_RULES_HASH, TIDES_VERSION, apply_tides_state, solve_share
+from hash_snapshot import EnvelopeV2, HashSigner, Snapshot, TemplateRecord, TIDES_RULES_HASH, TIDES_VERSION, apply_tides_state, rules_hash, solve_share
 from test_framework.address import script_to_p2wsh
 from test_framework.messages import CBlock, COutPoint, CTransaction, CTxIn, CTxInWitness, CTxOut, from_hex, ser_uint256
 from test_framework.script import CScript, OP_TRUE
@@ -75,7 +75,32 @@ class SharePoolHashTidesTest(BitcoinTestFramework):
         assert_equal(finalized["commitment"], signed.hash_hex)
         assert_equal(block.m_mm_rhs, signed.hash)
         assert_equal(finalized["reward"], reward)
+        self.check_resources(node, signed)
         return block, signed, prepared
+
+    def check_resources(self, node, snapshot):
+        raw = snapshot.serialize()
+        measured = node.getsharepoolhashresources(raw.hex())
+        assert_equal(measured["hash"], snapshot.hash_hex)
+        assert_equal(measured["version"], TIDES_VERSION)
+        assert_equal(measured["consensus_validated"], False)
+        assert_equal(measured["dependency_graph_checked"], False)
+        usage = measured["usage"]
+        components = ("binding_bytes", "transaction_table_bytes", "template_table_bytes", "share_bytes",
+                      "state_bytes", "payout_bytes", "pending_bytes", "settled_bytes", "certificate_bytes", "history_bytes")
+        assert_equal(sum(usage[name] for name in components), len(raw))
+        assert_equal(usage["encoded_bytes"], len(raw))
+        bodies = [from_hex(CBlock(), record.data.hex()) for record in snapshot.templates]
+        transactions = {tx.serialize_with_witness() for body in bodies for tx in body.vtx}
+        assert_equal(usage["templates"], len(bodies))
+        assert_equal(usage["unique_transactions"], len(transactions))
+        assert_equal(usage["unique_transaction_bytes"], sum(map(len, transactions)))
+        assert_equal(usage["expanded_template_bytes"], sum(len(body.serialize()) for body in bodies))
+        assert_equal(usage["transaction_references"], sum(len(body.vtx) for body in bodies))
+        assert_equal(usage["pending_bytes"], 0)
+        assert_equal(usage["settled_bytes"], 0)
+        assert_equal(usage["history_bytes"], 32)
+        return measured
 
     def store(self, index, snapshot):
         assert_equal(self.nodes[index].submitsharepoolhashsnapshot(snapshot.serialize().hex())["hash"], snapshot.hash_hex)
@@ -191,6 +216,23 @@ class SharePoolHashTidesTest(BitcoinTestFramework):
             signers = [HashSigner.create(self.signer_binary, path, pool=pool, payout_script=script)
                        for path, pool, script in zip(paths, (101, 101, 202), (common_script, other_script, common_script))]
             a1, a2, b = signers
+            self.log.info("Resource measurement is read-only and does not validate or store an unsigned job")
+            before = node.getsharepoolhashstatus()
+            probe = self.proposal(0, a1)
+            self.check_resources(node, probe)
+            invalid_authorization = replace(probe, owner_signature=b"x" * 64)
+            assert_equal(self.check_resources(node, invalid_authorization)["usage"],
+                         self.check_resources(node, probe)["usage"])
+            for raw in ("", "xyz"):
+                assert_raises_rpc_error(-8, "Snapshot exceeds byte bound", node.getsharepoolhashresources, raw)
+            assert_raises_rpc_error(-22, "Noncanonical or malformed", node.getsharepoolhashresources,
+                                    (probe.serialize() + b"\x00").hex())
+            legacy = replace(probe, envelope=replace(probe.envelope, version=4, rules=rules_hash(4)),
+                             history_head=0, certificates=())
+            assert_raises_rpc_error(-8, "Snapshot profile differs", node.getsharepoolhashresources, legacy.serialize().hex())
+            after = node.getsharepoolhashstatus()
+            for field in ("stored_snapshots", "stored_bytes", "archive_charged_bytes", "pending_blocks"):
+                assert_equal(after[field], before[field])
             bootstrap_budget = node.getsharepoolhashtidesbudget(f"{a1.pool:064x}", common_script.hex())
             assert_equal(bootstrap_budget["native_tip"], node.getbestblockhash())
             assert_equal(bootstrap_budget["output_count"], 1)

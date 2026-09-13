@@ -11,6 +11,12 @@ See the [current verification report](../../doc/sharepool-v6-r2-report.md) and
 Goldshell capture and restoration to Lazarus; that capture is not revision 2
 hardware evidence. Mainnet and public-testnet activation remain disabled.
 
+The [resource-budget follow-up](../../doc/sharepool-resource-budget-report.md)
+adds exact snapshot counters, avoids repeated codec/cache work and tests shared
+and disjoint native transaction sets. Its corrected model includes exact job
+dependencies, repeated state and recipient coinbases; production capacity
+remains an explicit open constraint.
+
 The profiles and results below are earlier experiments and retain their original
 scope and revision-specific limitations.
 

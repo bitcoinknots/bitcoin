@@ -4,6 +4,8 @@
 
 #include <sharepool/retry_worker.h>
 #include <sharepool/hash_store.h>
+#include <sharepool/hash_validation_cache.h>
+#include <sharepool/mining_budget.h>
 #include <arith_uint256.h>
 #include <test/util/setup_common.h>
 
@@ -12,6 +14,7 @@
 #include <atomic>
 #include <chrono>
 #include <future>
+#include <limits>
 #include <stdexcept>
 #include <thread>
 
@@ -134,6 +137,86 @@ BOOST_FIXTURE_TEST_CASE(native_reward_cache_retains_a_warmed_graph_under_evictio
         BOOST_CHECK_EQUAL(*reward, i);
     }
     BOOST_CHECK(!store.NativeValidated(ArithToUint256(arith_uint256{2048})));
+}
+
+BOOST_AUTO_TEST_CASE(native_cache_identity_binds_witness_order_coinbase_and_header)
+{
+    CMutableTransaction coinbase;
+    coinbase.vin.resize(1);
+    coinbase.vout.emplace_back(50, CScript{} << OP_TRUE);
+    CMutableTransaction spend;
+    spend.vin.emplace_back(COutPoint{Txid::FromUint256(uint256::ONE), 0});
+    spend.vin[0].scriptWitness.stack = {{1, 2, 3}};
+    spend.vout.emplace_back(20, CScript{} << OP_TRUE);
+    CBlock block;
+    block.m_header_v2 = true;
+    block.m_txcount = 2;
+    block.vtx = {MakeTransactionRef(coinbase), MakeTransactionRef(spend)};
+    const auto identity = sharepool::NativeBodyCacheKey(block);
+    CBlock copy{block};
+    copy.vtx = {MakeTransactionRef(coinbase), MakeTransactionRef(spend)};
+    BOOST_CHECK_EQUAL(sharepool::NativeBodyCacheKey(copy), identity);
+
+    // A witness-only substitution leaves the transaction ID and header alone.
+    spend.vin[0].scriptWitness.stack[0].push_back(4);
+    copy.vtx[1] = MakeTransactionRef(spend);
+    BOOST_CHECK_EQUAL(copy.vtx[1]->GetHash(), block.vtx[1]->GetHash());
+    BOOST_CHECK(sharepool::NativeBodyCacheKey(copy) != identity);
+    copy = block;
+    std::swap(copy.vtx[0], copy.vtx[1]);
+    BOOST_CHECK(sharepool::NativeBodyCacheKey(copy) != identity);
+    copy = block;
+    copy.vtx.push_back(block.vtx[1]);
+    BOOST_CHECK(sharepool::NativeBodyCacheKey(copy) != identity);
+    copy = block;
+    coinbase.vout[0].nValue++;
+    copy.vtx[0] = MakeTransactionRef(coinbase);
+    BOOST_CHECK(sharepool::NativeBodyCacheKey(copy) != identity);
+
+    // Cache keys retain fields deliberately normalized by mining template IDs.
+    const auto changed = [&](auto mutate) {
+        CBlock alternative{block};
+        mutate(alternative);
+        BOOST_CHECK(sharepool::NativeBodyCacheKey(alternative) != identity);
+    };
+    changed([](CBlock& b) { b.nVersion++; });
+    changed([](CBlock& b) { b.hashPrevBlock = uint256::ONE; });
+    changed([](CBlock& b) { b.hashMerkleRoot = uint256::ONE; });
+    changed([](CBlock& b) { b.nTime++; });
+    changed([](CBlock& b) { b.nBits++; });
+    changed([](CBlock& b) { b.nNonce++; });
+    changed([](CBlock& b) { b.m_nonce2++; });
+    changed([](CBlock& b) { b.m_nonce3++; });
+    changed([](CBlock& b) { b.m_extranonce.begin()[0] = 1; });
+    changed([](CBlock& b) { b.m_time_offset++; });
+    changed([](CBlock& b) { b.m_txcount++; });
+    changed([](CBlock& b) { b.m_flags++; });
+    changed([](CBlock& b) { b.m_xor_key_mask_clear_bits++; });
+    changed([](CBlock& b) { b.m_xor_key.begin()[0] = 1; });
+    changed([](CBlock& b) { b.m_height++; });
+    changed([](CBlock& b) { b.m_mm_rhs = uint256::ONE; });
+    copy = block;
+    copy.vtx[1].reset();
+    BOOST_CHECK_THROW(sharepool::NativeBodyCacheKey(copy), std::invalid_argument);
+}
+
+BOOST_AUTO_TEST_CASE(payout_reservation_rejects_contextual_weight_excess_before_assembly)
+{
+    // 6,500 P2WPKH outputs fit the ordinary weight limit, but not RDTS.
+    const auto ordinary = sharepool::ReserveCoinbasePayouts(6500 * 31, false);
+    BOOST_REQUIRE(ordinary);
+    BOOST_CHECK(ordinary->weight <= MAX_BLOCK_WEIGHT);
+    BOOST_CHECK(!sharepool::ReserveCoinbasePayouts(6500 * 31, true));
+    for (const bool reduced : {false, true}) {
+        const size_t limit = reduced ? REDUCED_DATA_MAX_BLOCK_WEIGHT : MAX_BLOCK_WEIGHT;
+        const size_t maximum_outputs = (limit - 36) / WITNESS_SCALE_FACTOR - 379;
+        const auto boundary = sharepool::ReserveCoinbasePayouts(maximum_outputs, reduced);
+        BOOST_REQUIRE(boundary);
+        BOOST_CHECK_EQUAL(boundary->weight, limit);
+        BOOST_CHECK(boundary->serialized_bytes <= MAX_BLOCK_SERIALIZED_SIZE);
+        BOOST_CHECK(!sharepool::ReserveCoinbasePayouts(maximum_outputs + 1, reduced));
+        BOOST_CHECK(!sharepool::ReserveCoinbasePayouts(std::numeric_limits<size_t>::max(), reduced));
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

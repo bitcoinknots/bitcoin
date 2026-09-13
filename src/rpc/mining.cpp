@@ -40,6 +40,7 @@
 #include <script/signingprovider.h>
 #include <sharepool/relay.h>
 #include <sharepool/hash_store.h>
+#include <sharepool/mining_budget.h>
 #include <sharepool/retry_worker.h>
 #include <streams.h>
 #include <txmempool.h>
@@ -1648,6 +1649,97 @@ static std::vector<RPCResult> HashJobResults()
     };
 }
 
+static RPCHelpMan getsharepoolhashresources()
+{
+    return RPCHelpMan{"getsharepoolhashresources",
+        "Measure canonical snapshot bytes and template resource use without storing evidence.\n"
+        "Checks one snapshot's encoding only. Dependency closure, native transactions, owner signatures,\n"
+        "payout correctness and mining authorization are not established by these counters.\n",
+        {{"snapshot", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Canonical snapshot, at most 16 MiB"}},
+        RPCResult{RPCResult::Type::OBJ, "", "Resource usage for one snapshot", {
+            {RPCResult::Type::STR_HEX, "hash", "Hash of the supplied canonical snapshot"},
+            {RPCResult::Type::NUM, "version", "Snapshot profile version"},
+            {RPCResult::Type::BOOL, "consensus_validated", "Always false; resource measurement is not native validation"},
+            {RPCResult::Type::BOOL, "dependency_graph_checked", "Always false; references outside this snapshot are not opened"},
+            {RPCResult::Type::OBJ, "usage", "Measured bytes and counts", {
+                {RPCResult::Type::NUM, "encoded_bytes", "Complete canonical snapshot bytes"},
+                {RPCResult::Type::NUM, "unique_transactions", "Unique witness transaction IDs"},
+                {RPCResult::Type::NUM, "unique_transaction_bytes", "Unique serialized witness transaction bytes, excluding table framing"},
+                {RPCResult::Type::NUM, "templates", "Declared templates, excluding origins in external dependencies and a future mining job"},
+                {RPCResult::Type::NUM, "expanded_template_bytes", "Sum of full template sizes, including repeated transaction bodies"},
+                {RPCResult::Type::NUM, "transaction_references", "Sum of ordered template transaction references"},
+                {RPCResult::Type::NUM, "binding_bytes", "Binding, authorization and exact job commitment bytes"},
+                {RPCResult::Type::NUM, "transaction_table_bytes", "Unique transaction table including count and length prefixes"},
+                {RPCResult::Type::NUM, "template_table_bytes", "Template table including IDs, headers, counts and reference indices"},
+                {RPCResult::Type::NUM, "share_bytes", "Proof vector bytes including count"},
+                {RPCResult::Type::NUM, "state_bytes", "Recent admitted-proof state vector bytes"},
+                {RPCResult::Type::NUM, "payout_bytes", "Payout vector bytes"},
+                {RPCResult::Type::NUM, "pending_bytes", "V5 pending-credit vector bytes, otherwise zero"},
+                {RPCResult::Type::NUM, "settled_bytes", "V5 settled-credit vector bytes, otherwise zero"},
+                {RPCResult::Type::NUM, "certificate_bytes", "V5/V6 certificate vector bytes, otherwise zero"},
+                {RPCResult::Type::NUM, "history_bytes", "V6 history commitment bytes, otherwise zero"},
+            }},
+            {RPCResult::Type::OBJ, "limits", "Independent profile limits; graph limits are not evaluated here", {
+                {RPCResult::Type::NUM, "snapshot_bytes", "Maximum canonical snapshot bytes"},
+                {RPCResult::Type::NUM, "template_bytes", "Maximum individual full template bytes"},
+                {RPCResult::Type::NUM, "expanded_template_bytes", "Maximum expanded bytes per snapshot"},
+                {RPCResult::Type::NUM, "transaction_references", "Maximum transaction references per snapshot"},
+                {RPCResult::Type::NUM, "origins", "Maximum unique full origins across the dependency graph"},
+                {RPCResult::Type::NUM, "dependency_bytes", "Maximum unique snapshot bytes across the dependency graph"},
+                {RPCResult::Type::NUM, "dependency_depth", "Maximum dependency depth"},
+                {RPCResult::Type::NUM, "certificate_bytes", "Maximum V5/V6 certificate vector bytes"},
+            }},
+        }}, RPCExamples{HelpExampleCli("getsharepoolhashresources", "\"snapshot_hex\"")},
+        [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
+            namespace ho = sharepool::hashonly;
+            auto& chainman = EnsureAnyChainman(request.context);
+            uint32_t version;
+            {
+                LOCK(cs_main);
+                RequireHashSnapshotStore(chainman);
+                version = ho::ProfileVersion(chainman.GetConsensus());
+            }
+            const auto snapshot = ParseHashSnapshot(request.params[0]);
+            if (snapshot.binding.version != version) throw JSONRPCError(RPC_INVALID_PARAMETER, "Snapshot profile differs from this node");
+            // Sizing/hashing runs outside cs_main and has no archive side effects.
+            const auto measured = ho::MeasureSnapshotResources(snapshot);
+            UniValue usage{UniValue::VOBJ};
+            usage.pushKV("encoded_bytes", measured.encoded_bytes);
+            usage.pushKV("unique_transactions", measured.unique_transactions);
+            usage.pushKV("unique_transaction_bytes", measured.unique_transaction_bytes);
+            usage.pushKV("templates", measured.templates);
+            usage.pushKV("expanded_template_bytes", measured.expanded_template_bytes);
+            usage.pushKV("transaction_references", measured.transaction_references);
+            usage.pushKV("binding_bytes", measured.binding_bytes);
+            usage.pushKV("transaction_table_bytes", measured.transaction_table_bytes);
+            usage.pushKV("template_table_bytes", measured.template_table_bytes);
+            usage.pushKV("share_bytes", measured.share_bytes);
+            usage.pushKV("state_bytes", measured.state_bytes);
+            usage.pushKV("payout_bytes", measured.payout_bytes);
+            usage.pushKV("pending_bytes", measured.pending_bytes);
+            usage.pushKV("settled_bytes", measured.settled_bytes);
+            usage.pushKV("certificate_bytes", measured.certificate_bytes);
+            usage.pushKV("history_bytes", measured.history_bytes);
+            UniValue limits{UniValue::VOBJ};
+            limits.pushKV("snapshot_bytes", ho::MAX_SNAPSHOT_BYTES);
+            limits.pushKV("template_bytes", ho::MAX_TEMPLATE_BYTES);
+            limits.pushKV("expanded_template_bytes", ho::MAX_EXPANDED_TEMPLATE_BYTES);
+            limits.pushKV("transaction_references", ho::MAX_TEMPLATE_TX_REFERENCES);
+            limits.pushKV("origins", ho::MAX_ORIGIN_CHECKS);
+            limits.pushKV("dependency_bytes", ho::MAX_DEPENDENCY_BYTES);
+            limits.pushKV("dependency_depth", ho::MAX_DEPENDENCY_DEPTH);
+            limits.pushKV("certificate_bytes", ho::MAX_CERTIFICATE_BYTES);
+            UniValue result{UniValue::VOBJ};
+            result.pushKV("hash", ho::ProfileSnapshotHash(snapshot, version).GetHex());
+            result.pushKV("version", version);
+            result.pushKV("consensus_validated", false);
+            result.pushKV("dependency_graph_checked", false);
+            result.pushKV("usage", std::move(usage));
+            result.pushKV("limits", std::move(limits));
+            return result;
+        }};
+}
+
 static RPCHelpMan getsharepoolhashtidesbudget()
 {
     return RPCHelpMan{"getsharepoolhashtidesbudget",
@@ -1778,17 +1870,17 @@ static RPCHelpMan preparesharepoolhashjob()
                 } else snapshot.payouts = ho::CalculatePayouts(snapshot, 0);
                 size_t output_bytes{0};
                 for (const auto& output : snapshot.payouts) output_bytes += GetSerializeSize(output);
-                const size_t base_bytes = 164 + 9 + 4 + 1 + 36 + 1 + 100 + 4 + 9 + output_bytes + 47 + 4;
-                const size_t reserved_weight = base_bytes * WITNESS_SCALE_FACTOR + 36;
-                if (base_bytes + 36 > MAX_BLOCK_SERIALIZED_SIZE || reserved_weight > MAX_BLOCK_WEIGHT) {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Settlement payouts exceed native block capacity");
+                const auto reservation = sharepool::ReserveCoinbasePayouts(output_bytes,
+                    consensus.RdtsActiveAt(tip->nHeight + 1, tip->GetMedianTimePast()));
+                if (!reservation) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Settlement payouts exceed native block capacity for the current context");
                 }
                 BlockAssembler::Options options;
                 node::ApplyArgsManOptions(*node.args, options);
                 options.test_block_validity = false; // Incomplete until exact reward and signature are bound.
                 options.coinbase_output_script = CScript{snapshot.binding.payout_script.begin(), snapshot.binding.payout_script.end()};
-                options.block_reserved_size = std::max(options.block_reserved_size, base_bytes + 36);
-                options.block_reserved_weight = std::max(options.block_reserved_weight, reserved_weight);
+                options.block_reserved_size = std::max(options.block_reserved_size, reservation->serialized_bytes);
+                options.block_reserved_weight = std::max(options.block_reserved_weight, reservation->weight);
                 const auto assembled = BlockAssembler(chainman.ActiveChainstate(), node.mempool.get(), options, node).CreateNewBlock();
                 block = assembled->block;
                 reward = block.vtx.at(0)->GetValueOut();
@@ -2359,6 +2451,7 @@ void RegisterMiningRPCCommands(CRPCTable& t)
         {"mining", &validatesharepoolhashtemplate},
         {"mining", &validatesharepoolhashshare},
         {"mining", &getsharepoolhashtidesbudget},
+        {"mining", &getsharepoolhashresources},
 
         {"hidden", &generatetoaddress},
         {"hidden", &generatetodescriptor},

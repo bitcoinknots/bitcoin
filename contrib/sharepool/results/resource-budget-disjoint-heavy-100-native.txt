@@ -1,0 +1,11 @@
+2026-09-13T17:42:22.263000Z TestFramework (INFO): PRNG seed is: 8983669862907202620
+2026-09-13T17:42:22.264000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-resource-budget-disjoint-heavy-100
+2026-09-13T17:42:34.656000Z TestFramework (INFO): Capacity epoch 1/1: 100 distinct native origins, layout=disjoint, padding outputs=24, witness-heavy=True
+2026-09-13T17:42:39.365000Z TestFramework (INFO): Epoch 1: 25/100 native origins ready
+2026-09-13T17:42:44.061000Z TestFramework (INFO): Epoch 1: 50/100 native origins ready
+2026-09-13T17:42:48.833000Z TestFramework (INFO): Epoch 1: 75/100 native origins ready
+2026-09-13T17:42:53.677000Z TestFramework (INFO): Epoch 1: 100/100 native origins ready
+2026-09-13T17:46:03.435000Z TestFramework (INFO): Epoch 1: 300 offers admitted in 2 blocks; zero expired
+2026-09-13T17:46:04.857000Z TestFramework (INFO): Stopping nodes
+2026-09-13T17:46:05.032000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-resource-budget-disjoint-heavy-100
+2026-09-13T17:46:05.032000Z TestFramework (INFO): Tests successful

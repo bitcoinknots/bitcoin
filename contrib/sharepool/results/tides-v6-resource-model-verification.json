@@ -1,0 +1,53 @@
+{
+  "artifact_command": "python3 -B contrib/sharepool/tides_service_contract.py --resource-only --output contrib/sharepool/results/tides-v6-resource-budget.json",
+  "base_commit": "12067610cfd57f23a692f19353f70a590ab79916",
+  "created_utc": "2026-09-13T16:59:49.605467+00:00",
+  "files": {
+    "contrib/sharepool/hash_snapshot.py": {
+      "bytes": 38143,
+      "sha256": "712f34059ac045dbfdef70b97f65408c1dd6f07942964268bd7753ac1e1d55d2"
+    },
+    "contrib/sharepool/results/tides-v6-resource-budget.json": {
+      "bytes": 173594,
+      "sha256": "f99993dd454b637519d86756b67c2ba94676c72bad226d817592d6464cd9d8a5"
+    },
+    "contrib/sharepool/results/tides-v6-resource-model-tests.txt": {
+      "bytes": 182,
+      "sha256": "d741908ff13afcb826c8d2322a6e20cb530db8c19513cf90a6b1aa4b68aa2218"
+    },
+    "contrib/sharepool/test_tides_service_contract.py": {
+      "bytes": 19546,
+      "sha256": "527986941eef62632c388046ad16d5737b73fd5cd20360019e51f6106b072c42"
+    },
+    "contrib/sharepool/tides_service_contract.py": {
+      "bytes": 37417,
+      "sha256": "97440e8f1bd17e950d879cf3f8d7bf285ce6401706fb0165ab92820f0e73566e"
+    },
+    "doc/sharepool-resource-model.md": {
+      "bytes": 10424,
+      "sha256": "ac4ed5793646b2aa3ba97307d4331ebe449975822d315d621c69514895f664a8"
+    }
+  },
+  "historical_calibration_and_test_log_confirmed_identical_to_HEAD": true,
+  "kind": "Resource-only model verification; no statistical simulations or native activation",
+  "limits": [
+    "SHIFT14 remains an unactivated candidate; current SHIFT10 and resource limits are unchanged.",
+    "Passing byte predicates does not prove native validity, capacity, availability or inclusion.",
+    "Shared transaction codec checks use actual serialization, not native transaction validation.",
+    "No new statistical sweep, hardware test or native throughput measurement is part of this artifact."
+  ],
+  "prior_evidence_sha256_confirmed_unchanged": {
+    "contrib/sharepool/results/tides-v6-conditional-variance.json": "4c4fb84713b827264c5545ab69848bfe87e1004cb339fadade6142a3d97defdb",
+    "contrib/sharepool/results/tides-v6-service-contract-verification.json": "ada854ee875197f052df99b0428643d341d96be003128357a766c7a2d1373b9c",
+    "contrib/sharepool/results/tides-v6-service-contract.json": "da7c82e2ee20f9467a0012cef2009994113ea34d04c0ba40cc192942ad61f338"
+  },
+  "review": "Independent mathematical/native-code review found no current-workload undercount; large-mean numerical-helper domain was bounded and tested.",
+  "tests": {
+    "command": "python3 -B -m unittest discover -s contrib/sharepool -p 'test_tides*.py'",
+    "count": 83,
+    "exit_code": 0,
+    "log": "contrib/sharepool/results/tides-v6-resource-model-tests.txt",
+    "resource_focused_module_count": 22,
+    "seconds_reported_by_unittest": 1.293
+  }
+}

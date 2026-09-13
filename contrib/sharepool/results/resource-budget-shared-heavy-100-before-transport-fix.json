@@ -1,0 +1,5963 @@
+{
+  "schema": 1,
+  "result": "failed",
+  "network": "isolated native regtest",
+  "started_utc": "2026-09-13T16:56:27.699659+00:00",
+  "rules_hash": "9050ab43fa5feddb7f0659abc4ca43f596d4465f93535f3b9ab37449397e6edd",
+  "native_binary_sha256": "120fd9ee24d7f53de8f6dee754a4ebdea3aa535a696ce59f05d99fedf19c9459",
+  "signer_binary_sha256": "70f6c7c438d237796705f429bad64b017ad798d110b2cfac845a1b4cb1640494",
+  "harness_sha256": "c9f48b374b5d7c0c5b31dbab25072927ea109f2ec2f153d013736226130971cd",
+  "source_sha256": {
+    "contrib/sharepool/hash_mining_gate.py": "91646df17fb30d55486b69cf485979cfd3e22d307a8a0ab3f8a74d6d553824dd",
+    "contrib/sharepool/hash_snapshot.py": "712f34059ac045dbfdef70b97f65408c1dd6f07942964268bd7753ac1e1d55d2",
+    "contrib/sharepool/hash_gate_batch.py": "a41c510602748c50a75b66a9dddfa9f028fd5a7cfb57ccc8cccf29cff7f424c4",
+    "contrib/sharepool/hash_gate_inventory.py": "2bf60749366de6217391626315d7591b5fb3029bc95c1c164f019b6b1f27860b",
+    "contrib/sharepool/capacity_metrics.py": "71f68e44d56a555fdae635c3467eed67e97c3db4dacc0758a426b0cafd993934",
+    "test/functional/feature_sharepool_hash_tides_100_miners.py": "cdfdf311c54cd0927f6cc2ac0b382edcdeff4b023c1b19f0989d84eaaa73963c"
+  },
+  "command": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "test/functional/feature_sharepool_hash_capacity.py",
+    "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+    "--miners=100",
+    "--epochs=1",
+    "--shares-per-origin=3",
+    "--template-layout=shared",
+    "--witness-heavy",
+    "--padding-outputs=24",
+    "--resource-diagnostics",
+    "--max-runtime-seconds=3600",
+    "--host-load=quiescent",
+    "--nocleanup",
+    "--tmpdir=/private/tmp/sharepool-resource-budget-shared-heavy-100",
+    "--portseed=1012",
+    "--results=contrib/sharepool/results/resource-budget-shared-heavy-100.json"
+  ],
+  "host": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "logical_cpus": 10
+  },
+  "operator_declared_host_load": "quiescent",
+  "configuration": {
+    "miners": 100,
+    "epochs": 1,
+    "shares_per_origin": 3,
+    "padding_outputs": 24,
+    "template_layout": "shared",
+    "witness_heavy": true,
+    "resource_diagnostics": true,
+    "snapshot_budget_bytes": 0,
+    "batch_fraction": 0.75,
+    "offer_interval_ms": 0,
+    "settle_every": 0,
+    "max_runtime_seconds": 3600
+  },
+  "native_nodes": 2,
+  "physical_miners_used": 0,
+  "opaque_proof_fixtures": 0,
+  "transaction_fee_satoshis": 12200,
+  "transaction_policy": {
+    "acceptnonstdtxn_explicit": true,
+    "witness_items_per_input": 128,
+    "witness_item_bytes": 256,
+    "consensus_limits_changed": false,
+    "shared_coinbase_tags": "external unsigned native-job transformation before exact signing/finalization/authorization",
+    "disjoint_selection": null
+  },
+  "epochs": [
+    {
+      "epoch": 1,
+      "native_origin_height": 102,
+      "real_distinct_origins": 100,
+      "real_distinct_transaction_sets": 1,
+      "template_bytes": {
+        "count": 100,
+        "total_bytes": 344145300,
+        "min_bytes": 3441453,
+        "p50_bytes": 3441453,
+        "p95_bytes": 3441453,
+        "p99_bytes": 3441453,
+        "max_bytes": 3441453
+      },
+      "template_weight": {
+        "count": 100,
+        "total_weight_units": 378020400,
+        "min_weight_units": 3780204,
+        "p50_weight_units": 3780204,
+        "p95_weight_units": 3780204,
+        "p99_weight_units": 3780204,
+        "max_weight_units": 3780204
+      },
+      "template_transaction_references": {
+        "count": 100,
+        "total_references": 10100,
+        "min_references": 101,
+        "p50_references": 101,
+        "p95_references": 101,
+        "p99_references": 101,
+        "max_references": 101
+      },
+      "full_unbounded_proposal_bytes": 3644151,
+      "offered": 300,
+      "acknowledged": 300,
+      "origin_preparation_seconds": 586.758555791,
+      "client_queue_trace": [
+        {
+          "event": "ingress_start",
+          "elapsed_seconds": 6.41700000869605e-06,
+          "offered_due": 300,
+          "acknowledged": 0,
+          "client_queue": 300,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 300
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 1.3178720419999763,
+          "offered_due": 300,
+          "acknowledged": 1,
+          "client_queue": 299,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 299
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 32.83200770799999,
+          "offered_due": 300,
+          "acknowledged": 26,
+          "client_queue": 274,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 274
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 64.36282875000006,
+          "offered_due": 300,
+          "acknowledged": 51,
+          "client_queue": 249,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 249
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 95.83511095799997,
+          "offered_due": 300,
+          "acknowledged": 76,
+          "client_queue": 224,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 224
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 127.26566954200007,
+          "offered_due": 300,
+          "acknowledged": 101,
+          "client_queue": 199,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 199
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 158.81890404199999,
+          "offered_due": 300,
+          "acknowledged": 126,
+          "client_queue": 174,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 174
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 190.600139292,
+          "offered_due": 300,
+          "acknowledged": 151,
+          "client_queue": 149,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 149
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 222.60466391700004,
+          "offered_due": 300,
+          "acknowledged": 176,
+          "client_queue": 124,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 124
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 254.59756100000004,
+          "offered_due": 300,
+          "acknowledged": 201,
+          "client_queue": 99,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 99
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 286.45246491700004,
+          "offered_due": 300,
+          "acknowledged": 226,
+          "client_queue": 74,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 74
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 318.307459417,
+          "offered_due": 300,
+          "acknowledged": 251,
+          "client_queue": 49,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 49
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 350.27159912499997,
+          "offered_due": 300,
+          "acknowledged": 276,
+          "client_queue": 24,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 24
+        },
+        {
+          "event": "acknowledgement",
+          "elapsed_seconds": 380.79351633300007,
+          "offered_due": 300,
+          "acknowledged": 300,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        },
+        {
+          "event": "before_settlement",
+          "elapsed_seconds": 408.43293004200007,
+          "offered_due": 300,
+          "acknowledged": 300,
+          "client_queue": 0,
+          "scheduled_not_yet_due": 0,
+          "offers_not_yet_acknowledged": 0
+        }
+      ],
+      "blocks": [],
+      "native_template_context": {
+        "previousblockhash": "3e96167f0546594a9c33a30c38f6a9f01ee624022c3913506ae9ed02ce84a7a2",
+        "height": 102,
+        "bits": "207fffff",
+        "curtime": 1789318605,
+        "weightlimit": 4000000,
+        "sizelimit": 4000000
+      },
+      "template_geometry": {
+        "template_count": 100,
+        "expanded_template_bytes": 344145300,
+        "transaction_references": 10100,
+        "referenced_transaction_bytes": 344128800,
+        "unique_transactions": 200,
+        "unique_transaction_bytes": 3459900,
+        "noncoinbase_transaction_references": 10000,
+        "noncoinbase_referenced_bytes": 344110000,
+        "unique_noncoinbase_transactions": 100,
+        "unique_noncoinbase_transaction_bytes": 3441100,
+        "distinct_noncoinbase_transaction_sets": 1,
+        "noncoinbase_byte_reuse_factor": 100.0,
+        "transaction_bytes_eliminated_by_dictionary": 340668900,
+        "template_bytes": {
+          "count": 100,
+          "total_bytes": 344145300,
+          "min_bytes": 3441453,
+          "p50_bytes": 3441453,
+          "p95_bytes": 3441453,
+          "p99_bytes": 3441453,
+          "max_bytes": 3441453
+        },
+        "template_weight": {
+          "count": 100,
+          "total_weight_units": 378020400,
+          "min_weight_units": 3780204,
+          "p50_weight_units": 3780204,
+          "p95_weight_units": 3780204,
+          "p99_weight_units": 3780204,
+          "max_weight_units": 3780204
+        },
+        "template_transaction_references": {
+          "count": 100,
+          "total_references": 10100,
+          "min_references": 101,
+          "p50_references": 101,
+          "p95_references": 101,
+          "p99_references": 101,
+          "max_references": 101
+        }
+      },
+      "proposal_resource_utilization": {
+        "snapshot_bytes": {
+          "used": 3644151,
+          "limit": 16777216,
+          "fraction": 0.21720832586288452,
+          "remaining": 13133065,
+          "within_limit": true
+        },
+        "expanded_template_bytes": {
+          "used": 344145300,
+          "limit": 536870912,
+          "fraction": 0.6410205736756325,
+          "remaining": 192725612,
+          "within_limit": true
+        },
+        "template_transaction_references": {
+          "used": 10100,
+          "limit": 2000000,
+          "fraction": 0.00505,
+          "remaining": 1989900,
+          "within_limit": true
+        },
+        "largest_template_bytes": {
+          "used": 3441453,
+          "limit": 4000000,
+          "fraction": 0.86036325,
+          "remaining": 558547,
+          "within_limit": true
+        },
+        "largest_native_weight": {
+          "used": 3780204,
+          "limit": 4000000,
+          "fraction": 0.945051,
+          "remaining": 219796,
+          "within_limit": true
+        },
+        "source_origins": {
+          "used": 100,
+          "limit": 2048,
+          "fraction": 0.048828125,
+          "remaining": 1948,
+          "within_limit": true
+        }
+      },
+      "pre_ingress_diagnostics_seconds": 7.125333208000029,
+      "admission_seconds": 380.79352362500003,
+      "observed_serial_acknowledgements_per_second": 0.7878285248764778,
+      "scheduler_lateness": {
+        "count": 300,
+        "total_seconds": 56768.44097041699,
+        "min_seconds": 1.791700003650476e-05,
+        "p50_seconds": 188.07968475000007,
+        "p95_seconds": 360.409610875,
+        "p99_seconds": 375.70371312500004,
+        "max_seconds": 379.49639145800006
+      },
+      "ingress_includes_interleaved_settlement": false,
+      "initial_deferred": 99,
+      "initial_batch_resources": {
+        "snapshot_bytes": 3591326,
+        "dependency_bytes": 3621409,
+        "origins": 68,
+        "payout_reservation_bytes": 2077,
+        "reserved_snapshot_bytes": 3593403,
+        "reserved_dependency_bytes": 3623486
+      }
+    }
+  ],
+  "rewards": [
+    {
+      "height": 102,
+      "commitment": "12cce52c20d9c9c7f44a24f273b6c5d68f631b15a4d197492e40bc6770e94bd2",
+      "new_admissions": 201,
+      "eligible_proofs": 201,
+      "payout_scripts": 67,
+      "reward_satoshis": 5001220000,
+      "unclaimed_rounding_satoshis": 42,
+      "whole_admission_height_cohorts_verified": true,
+      "exact_rational_window_and_coinbase_verified": true
+    }
+  ],
+  "limitations": [
+    "Sequential local RPC driver; observed service rate is not a concurrent saturation maximum",
+    "Offered bursts are finite precomputed native proofs; client queue and settlement backlog are measured separately",
+    "Two loopback native nodes, not 100 native nodes, WAN propagation, or a public testnet",
+    "Easy regtest proof target does not establish production sampling variance or mining hashrate",
+    "The driver deliberately schedules settlement blocks; qualifying headers may also satisfy native difficulty without immediate publication",
+    "Snapshot budget overload tests deterministic carry and expiry; it does not exhaust host RAM or disk",
+    "RSS is sampled, CPU is cumulative ps time, disk sizes are logical lengths rather than physical allocation",
+    "Local durable ACKs become recurring reward eligible only after native canonical admission"
+  ],
+  "pinned_snapshot_budget_bytes": 3593859,
+  "snapshot_policy_selection": {
+    "explicit_override": false,
+    "native_prepared_one_origin_snapshot_floor_bytes": 3442984,
+    "full_proposal_bytes": 3644151,
+    "fraction_of_remaining_bytes": 0.75,
+    "policy_frozen_after_first_epoch": true
+  },
+  "error_type": "AssertionError",
+  "error": "Predicate ''''\n        self.wait_until(lambda: all(node.getbestblockhash() == block.hash for node in self.nodes), timeout=120)\n''' not true after 120 seconds",
+  "seconds": 1209.580062292,
+  "measurements": {
+    "diagnostic.native_limits": {
+      "count": 1,
+      "total_seconds": 0.0008871669999983567,
+      "min_seconds": 0.0008871669999983567,
+      "p50_seconds": 0.0008871669999983567,
+      "p95_seconds": 0.0008871669999983567,
+      "p99_seconds": 0.0008871669999983567,
+      "max_seconds": 0.0008871669999983567,
+      "failures": 0
+    },
+    "gate.batch_status": {
+      "count": 1,
+      "total_seconds": 27.63933733400006,
+      "min_seconds": 27.63933733400006,
+      "p50_seconds": 27.63933733400006,
+      "p95_seconds": 27.63933733400006,
+      "p99_seconds": 27.63933733400006,
+      "max_seconds": 27.63933733400006,
+      "failures": 0
+    },
+    "gate.origin_job": {
+      "count": 100,
+      "total_seconds": 356.1269759109997,
+      "min_seconds": 3.4966356659999995,
+      "p50_seconds": 3.559860624999999,
+      "p95_seconds": 3.6093599159999883,
+      "p99_seconds": 3.625263708999995,
+      "max_seconds": 3.700905542000001,
+      "failures": 0
+    },
+    "gate.receive": {
+      "count": 300,
+      "total_seconds": 380.79009767300045,
+      "min_seconds": 1.2282005000000709,
+      "p50_seconds": 1.2687084159999813,
+      "p95_seconds": 1.3076961670000173,
+      "p99_seconds": 1.3212734579999506,
+      "max_seconds": 1.3366457089999813,
+      "failures": 0
+    },
+    "gate.register_origin": {
+      "count": 100,
+      "total_seconds": 107.01170479599938,
+      "min_seconds": 1.0423582500000066,
+      "p50_seconds": 1.064545083999974,
+      "p95_seconds": 1.1077724579999995,
+      "p99_seconds": 1.1112412500000346,
+      "max_seconds": 1.1284239579999849,
+      "failures": 0
+    },
+    "gate.register_snapshot": {
+      "count": 100,
+      "total_seconds": 0.2830724110007168,
+      "min_seconds": 0.0012102080000317983,
+      "p50_seconds": 0.0023567080000361784,
+      "p95_seconds": 0.004314875000090979,
+      "p99_seconds": 0.017794332999983453,
+      "max_seconds": 0.01823500000000422,
+      "failures": 0
+    },
+    "gate.settlement_job": {
+      "count": 1,
+      "total_seconds": 64.70634724999991,
+      "min_seconds": 64.70634724999991,
+      "p50_seconds": 64.70634724999991,
+      "p95_seconds": 64.70634724999991,
+      "p99_seconds": 64.70634724999991,
+      "max_seconds": 64.70634724999991,
+      "failures": 0
+    },
+    "p2p.block_and_snapshot_ready": {
+      "count": 1,
+      "total_seconds": 120.01387829199984,
+      "min_seconds": 120.01387829199984,
+      "p50_seconds": 120.01387829199984,
+      "p95_seconds": 120.01387829199984,
+      "p99_seconds": 120.01387829199984,
+      "max_seconds": 120.01387829199984,
+      "failures": 1
+    },
+    "rpc.node0.finalizesharepoolhashjob": {
+      "count": 101,
+      "total_seconds": 55.24028796900035,
+      "min_seconds": 0.5120107090000019,
+      "p50_seconds": 0.5191670840000029,
+      "p95_seconds": 0.523658791999992,
+      "p99_seconds": 0.5305382909999992,
+      "max_seconds": 3.3254769590000706,
+      "failures": 0
+    },
+    "rpc.node0.getbestblockhash": {
+      "count": 3019,
+      "total_seconds": 0.9653273460027012,
+      "min_seconds": 0.00016387499999837019,
+      "p50_seconds": 0.0002951249999796346,
+      "p95_seconds": 0.0005246250000254804,
+      "p99_seconds": 0.0005867080001280556,
+      "max_seconds": 0.008296083999994153,
+      "failures": 0
+    },
+    "rpc.node0.getblockchaininfo": {
+      "count": 805,
+      "total_seconds": 0.4087360850002788,
+      "min_seconds": 0.00034512499996708357,
+      "p50_seconds": 0.0005302910000182237,
+      "p95_seconds": 0.0006301249999864922,
+      "p99_seconds": 0.0006854999999998945,
+      "max_seconds": 0.00084500000002663,
+      "failures": 0
+    },
+    "rpc.node0.getblockhash": {
+      "count": 2280,
+      "total_seconds": 0.5451523380007013,
+      "min_seconds": 0.00017079200000580386,
+      "p50_seconds": 0.0002203329999019843,
+      "p95_seconds": 0.00042283400011911,
+      "p99_seconds": 0.0005240419999950063,
+      "max_seconds": 0.0037398750000079417,
+      "failures": 0
+    },
+    "rpc.node0.getnettotals": {
+      "count": 1,
+      "total_seconds": 0.0004813750000014494,
+      "min_seconds": 0.0004813750000014494,
+      "p50_seconds": 0.0004813750000014494,
+      "p95_seconds": 0.0004813750000014494,
+      "p99_seconds": 0.0004813750000014494,
+      "max_seconds": 0.0004813750000014494,
+      "failures": 0
+    },
+    "rpc.node0.getsharepoolhashstatus": {
+      "count": 805,
+      "total_seconds": 0.3992130420011466,
+      "min_seconds": 0.00039512499999982964,
+      "p50_seconds": 0.0004976669999905425,
+      "p95_seconds": 0.0005450419999988299,
+      "p99_seconds": 0.0005650410000157535,
+      "max_seconds": 0.0006211669999629521,
+      "failures": 0
+    },
+    "rpc.node0.getsharepoolhashtidesbudget": {
+      "count": 203,
+      "total_seconds": 0.0659244149999072,
+      "min_seconds": 0.00025358299998856637,
+      "p50_seconds": 0.00031479200004014274,
+      "p95_seconds": 0.00035429099997941194,
+      "p99_seconds": 0.00039645900005780277,
+      "max_seconds": 0.0022224579999488014,
+      "failures": 0
+    },
+    "rpc.node0.preparesharepoolhashjob": {
+      "count": 102,
+      "total_seconds": 25.084976089999948,
+      "min_seconds": 0.2063277499999998,
+      "p50_seconds": 0.2121473329999617,
+      "p95_seconds": 0.21684683399999471,
+      "p99_seconds": 0.8180956250000122,
+      "max_seconds": 3.056257624999944,
+      "failures": 0
+    },
+    "rpc.node0.sendrawtransaction": {
+      "count": 100,
+      "total_seconds": 1.124684497000013,
+      "min_seconds": 0.006064291999999583,
+      "p50_seconds": 0.011004916999999281,
+      "p95_seconds": 0.016733166999999938,
+      "p99_seconds": 0.017189082999999883,
+      "max_seconds": 0.017270000000001673,
+      "failures": 0
+    },
+    "rpc.node0.submitblock": {
+      "count": 1,
+      "total_seconds": 5.0795298330001515,
+      "min_seconds": 5.0795298330001515,
+      "p50_seconds": 5.0795298330001515,
+      "p95_seconds": 5.0795298330001515,
+      "p99_seconds": 5.0795298330001515,
+      "max_seconds": 5.0795298330001515,
+      "failures": 0
+    },
+    "rpc.node0.submitsharepoolhashsnapshot": {
+      "count": 968,
+      "total_seconds": 4.904351181000315,
+      "min_seconds": 0.00032479199990120833,
+      "p50_seconds": 0.000673165999955927,
+      "p95_seconds": 0.006378083000001311,
+      "p99_seconds": 0.008238250000090375,
+      "max_seconds": 3.655154833000097,
+      "failures": 0
+    },
+    "rpc.node0.validatesharepoolhashshare": {
+      "count": 300,
+      "total_seconds": 51.94484395600034,
+      "min_seconds": 0.1713839580000922,
+      "p50_seconds": 0.1730032079999546,
+      "p95_seconds": 0.17445675000010397,
+      "p99_seconds": 0.1757378749999816,
+      "max_seconds": 0.17633587500006342,
+      "failures": 0
+    },
+    "rpc.node0.validatesharepoolhashtemplate": {
+      "count": 602,
+      "total_seconds": 256.62397127400004,
+      "min_seconds": 0.32163558400003467,
+      "p50_seconds": 0.48558458299999074,
+      "p95_seconds": 0.5203943750000235,
+      "p99_seconds": 0.5303418329999658,
+      "max_seconds": 2.9518299589999515,
+      "failures": 0
+    },
+    "rpc.node1.getnettotals": {
+      "count": 1,
+      "total_seconds": 0.00035095800000028987,
+      "min_seconds": 0.00035095800000028987,
+      "p50_seconds": 0.00035095800000028987,
+      "p95_seconds": 0.00035095800000028987,
+      "p99_seconds": 0.00035095800000028987,
+      "max_seconds": 0.00035095800000028987,
+      "failures": 0
+    }
+  },
+  "resources": {
+    "interval_seconds": 5,
+    "samples": [
+      {
+        "elapsed_seconds": 2.1000000000270802e-05,
+        "processes": {
+          "node0": {
+            "rss_bytes": 64847872,
+            "cpu_seconds": 0.82
+          },
+          "node1": {
+            "rss_bytes": 63717376,
+            "cpu_seconds": 0.67
+          },
+          "driver": {
+            "rss_bytes": 62357504,
+            "cpu_seconds": 0.53
+          }
+        },
+        "disk_bytes": {
+          "node0": 19258248,
+          "node1": 18840662,
+          "gates": 7431100,
+          "node0_snapshot_store": 717,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 5.0333855419999995,
+        "processes": {
+          "node0": {
+            "rss_bytes": 85409792,
+            "cpu_seconds": 3.23
+          },
+          "node1": {
+            "rss_bytes": 63766528,
+            "cpu_seconds": 0.67
+          },
+          "driver": {
+            "rss_bytes": 92422144,
+            "cpu_seconds": 3.04
+          }
+        },
+        "disk_bytes": {
+          "node0": 19425653,
+          "node1": 18842430,
+          "gates": 10920746,
+          "node0_snapshot_store": 1453,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 10.354420875,
+        "processes": {
+          "node0": {
+            "rss_bytes": 85622784,
+            "cpu_seconds": 4.74
+          },
+          "node1": {
+            "rss_bytes": 63766528,
+            "cpu_seconds": 0.67
+          },
+          "driver": {
+            "rss_bytes": 110329856,
+            "cpu_seconds": 6.6
+          }
+        },
+        "disk_bytes": {
+          "node0": 19447581,
+          "node1": 18842430,
+          "gates": 14410392,
+          "node0_snapshot_store": 2189,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 15.447720167000002,
+        "processes": {
+          "node0": {
+            "rss_bytes": 85901312,
+            "cpu_seconds": 6.54
+          },
+          "node1": {
+            "rss_bytes": 63766528,
+            "cpu_seconds": 0.67
+          },
+          "driver": {
+            "rss_bytes": 139067392,
+            "cpu_seconds": 9.85
+          }
+        },
+        "disk_bytes": {
+          "node0": 19465996,
+          "node1": 18842430,
+          "gates": 17900038,
+          "node0_snapshot_store": 2925,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 20.876287167,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86032384,
+            "cpu_seconds": 8.46
+          },
+          "node1": {
+            "rss_bytes": 63766528,
+            "cpu_seconds": 0.68
+          },
+          "driver": {
+            "rss_bytes": 123764736,
+            "cpu_seconds": 13.23
+          }
+        },
+        "disk_bytes": {
+          "node0": 19486568,
+          "node1": 18842635,
+          "gates": 24879324,
+          "node0_snapshot_store": 3661,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 26.215118500000003,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86097920,
+            "cpu_seconds": 9.97
+          },
+          "node1": {
+            "rss_bytes": 63766528,
+            "cpu_seconds": 0.68
+          },
+          "driver": {
+            "rss_bytes": 146882560,
+            "cpu_seconds": 16.97
+          }
+        },
+        "disk_bytes": {
+          "node0": 19510977,
+          "node1": 18842635,
+          "gates": 28368976,
+          "node0_snapshot_store": 5133,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 31.774394417000003,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86147072,
+            "cpu_seconds": 11.78
+          },
+          "node1": {
+            "rss_bytes": 63766528,
+            "cpu_seconds": 0.68
+          },
+          "driver": {
+            "rss_bytes": 170737664,
+            "cpu_seconds": 20.53
+          }
+        },
+        "disk_bytes": {
+          "node0": 19529139,
+          "node1": 18843234,
+          "gates": 31858622,
+          "node0_snapshot_store": 5869,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 37.469688542,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86212608,
+            "cpu_seconds": 13.72
+          },
+          "node1": {
+            "rss_bytes": 63766528,
+            "cpu_seconds": 0.69
+          },
+          "driver": {
+            "rss_bytes": 164167680,
+            "cpu_seconds": 24.14
+          }
+        },
+        "disk_bytes": {
+          "node0": 19550595,
+          "node1": 18843977,
+          "gates": 38837908,
+          "node0_snapshot_store": 6605,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 42.851526,
+        "processes": {
+          "node0": {
+            "rss_bytes": 97927168,
+            "cpu_seconds": 15.21
+          },
+          "node1": {
+            "rss_bytes": 63766528,
+            "cpu_seconds": 0.69
+          },
+          "driver": {
+            "rss_bytes": 168574976,
+            "cpu_seconds": 27.91
+          }
+        },
+        "disk_bytes": {
+          "node0": 19574383,
+          "node1": 18843977,
+          "gates": 42327560,
+          "node0_snapshot_store": 8077,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 47.884719084000004,
+        "processes": {
+          "node0": {
+            "rss_bytes": 99008512,
+            "cpu_seconds": 16.6
+          },
+          "node1": {
+            "rss_bytes": 63832064,
+            "cpu_seconds": 0.71
+          },
+          "driver": {
+            "rss_bytes": 204079104,
+            "cpu_seconds": 31.36
+          }
+        },
+        "disk_bytes": {
+          "node0": 19590949,
+          "node1": 18844582,
+          "gates": 45817206,
+          "node0_snapshot_store": 8813,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 52.925904375,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86409216,
+            "cpu_seconds": 18.39
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.71
+          },
+          "driver": {
+            "rss_bytes": 201998336,
+            "cpu_seconds": 34.56
+          }
+        },
+        "disk_bytes": {
+          "node0": 19625002,
+          "node1": 18860558,
+          "gates": 49306852,
+          "node0_snapshot_store": 9549,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 58.437642709,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86441984,
+            "cpu_seconds": 20.33
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.71
+          },
+          "driver": {
+            "rss_bytes": 198443008,
+            "cpu_seconds": 38.02
+          }
+        },
+        "disk_bytes": {
+          "node0": 19645986,
+          "node1": 18860558,
+          "gates": 56286138,
+          "node0_snapshot_store": 10285,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 63.808980167,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86474752,
+            "cpu_seconds": 21.86
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.72
+          },
+          "driver": {
+            "rss_bytes": 213237760,
+            "cpu_seconds": 41.78
+          }
+        },
+        "disk_bytes": {
+          "node0": 19670376,
+          "node1": 18860558,
+          "gates": 59775790,
+          "node0_snapshot_store": 11757,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 69.441784792,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86474752,
+            "cpu_seconds": 23.68
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.72
+          },
+          "driver": {
+            "rss_bytes": 235421696,
+            "cpu_seconds": 45.36
+          }
+        },
+        "disk_bytes": {
+          "node0": 19689158,
+          "node1": 18861177,
+          "gates": 63265436,
+          "node0_snapshot_store": 12493,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 75.22859425,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86507520,
+            "cpu_seconds": 25.62
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.72
+          },
+          "driver": {
+            "rss_bytes": 229687296,
+            "cpu_seconds": 49.11
+          }
+        },
+        "disk_bytes": {
+          "node0": 19711073,
+          "node1": 18862974,
+          "gates": 67760362,
+          "node0_snapshot_store": 13229,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 80.58200075,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86507520,
+            "cpu_seconds": 27.14
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.73
+          },
+          "driver": {
+            "rss_bytes": 246169600,
+            "cpu_seconds": 52.84
+          }
+        },
+        "disk_bytes": {
+          "node0": 19736082,
+          "node1": 18863585,
+          "gates": 73734374,
+          "node0_snapshot_store": 14701,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 86.194104334,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86523904,
+            "cpu_seconds": 28.95
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.73
+          },
+          "driver": {
+            "rss_bytes": 272809984,
+            "cpu_seconds": 56.43
+          }
+        },
+        "disk_bytes": {
+          "node0": 19753631,
+          "node1": 18864783,
+          "gates": 77224020,
+          "node0_snapshot_store": 15437,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 91.92036862500001,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86523904,
+            "cpu_seconds": 30.88
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.73
+          },
+          "driver": {
+            "rss_bytes": 275841024,
+            "cpu_seconds": 60.13
+          }
+        },
+        "disk_bytes": {
+          "node0": 19774353,
+          "node1": 18864783,
+          "gates": 84203306,
+          "node0_snapshot_store": 16173,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 97.28282545900001,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86540288,
+            "cpu_seconds": 32.41
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.74
+          },
+          "driver": {
+            "rss_bytes": 280608768,
+            "cpu_seconds": 63.85
+          }
+        },
+        "disk_bytes": {
+          "node0": 19799977,
+          "node1": 18865402,
+          "gates": 87692958,
+          "node0_snapshot_store": 17645,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 102.887084625,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86556672,
+            "cpu_seconds": 34.24
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.74
+          },
+          "driver": {
+            "rss_bytes": 311476224,
+            "cpu_seconds": 67.4
+          }
+        },
+        "disk_bytes": {
+          "node0": 19817521,
+          "node1": 18865402,
+          "gates": 91182604,
+          "node0_snapshot_store": 18381,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 108.557488917,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86556672,
+            "cpu_seconds": 36.18
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.75
+          },
+          "driver": {
+            "rss_bytes": 305676288,
+            "cpu_seconds": 71.08
+          }
+        },
+        "disk_bytes": {
+          "node0": 19838230,
+          "node1": 18865402,
+          "gates": 94672250,
+          "node0_snapshot_store": 19117,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 113.914577959,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86556672,
+            "cpu_seconds": 37.7
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.76
+          },
+          "driver": {
+            "rss_bytes": 319913984,
+            "cpu_seconds": 74.78999999999999
+          }
+        },
+        "disk_bytes": {
+          "node0": 19862035,
+          "node1": 18866001,
+          "gates": 101651542,
+          "node0_snapshot_store": 20589,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 119.56086775,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86556672,
+            "cpu_seconds": 39.52
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.76
+          },
+          "driver": {
+            "rss_bytes": 334331904,
+            "cpu_seconds": 78.39
+          }
+        },
+        "disk_bytes": {
+          "node0": 19879593,
+          "node1": 18866001,
+          "gates": 105141188,
+          "node0_snapshot_store": 21325,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 125.270315917,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86556672,
+            "cpu_seconds": 41.45
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.76
+          },
+          "driver": {
+            "rss_bytes": 328318976,
+            "cpu_seconds": 82.03999999999999
+          }
+        },
+        "disk_bytes": {
+          "node0": 19900302,
+          "node1": 18866001,
+          "gates": 112120474,
+          "node0_snapshot_store": 22061,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 130.658023875,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86556672,
+            "cpu_seconds": 42.97
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.77
+          },
+          "driver": {
+            "rss_bytes": 349208576,
+            "cpu_seconds": 85.83
+          }
+        },
+        "disk_bytes": {
+          "node0": 19925311,
+          "node1": 18866001,
+          "gates": 115610126,
+          "node0_snapshot_store": 23533,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 136.2658505,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86573056,
+            "cpu_seconds": 44.78
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.77
+          },
+          "driver": {
+            "rss_bytes": 377634816,
+            "cpu_seconds": 89.43
+          }
+        },
+        "disk_bytes": {
+          "node0": 19944672,
+          "node1": 18866600,
+          "gates": 119099772,
+          "node0_snapshot_store": 24269,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 141.888890209,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86573056,
+            "cpu_seconds": 46.72
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.77
+          },
+          "driver": {
+            "rss_bytes": 364691456,
+            "cpu_seconds": 93.0
+          }
+        },
+        "disk_bytes": {
+          "node0": 19965389,
+          "node1": 18866600,
+          "gates": 125984298,
+          "node0_snapshot_store": 25005,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 147.259119334,
+        "processes": {
+          "node0": {
+            "rss_bytes": 99991552,
+            "cpu_seconds": 48.24
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.78
+          },
+          "driver": {
+            "rss_bytes": 388317184,
+            "cpu_seconds": 96.72999999999999
+          }
+        },
+        "disk_bytes": {
+          "node0": 19989799,
+          "node1": 18867199,
+          "gates": 129568710,
+          "node0_snapshot_store": 26477,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 152.966507292,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86589440,
+            "cpu_seconds": 50.06
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.78
+          },
+          "driver": {
+            "rss_bytes": 413548544,
+            "cpu_seconds": 100.46000000000001
+          }
+        },
+        "disk_bytes": {
+          "node0": 20008546,
+          "node1": 18867798,
+          "gates": 133058356,
+          "node0_snapshot_store": 27213,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 158.688277875,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86589440,
+            "cpu_seconds": 51.99
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.78
+          },
+          "driver": {
+            "rss_bytes": 413990912,
+            "cpu_seconds": 104.15
+          }
+        },
+        "disk_bytes": {
+          "node0": 20030486,
+          "node1": 18867798,
+          "gates": 140037642,
+          "node0_snapshot_store": 27949,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 164.069799084,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86589440,
+            "cpu_seconds": 53.51
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.79
+          },
+          "driver": {
+            "rss_bytes": 433045504,
+            "cpu_seconds": 107.89
+          }
+        },
+        "disk_bytes": {
+          "node0": 20054886,
+          "node1": 18867798,
+          "gates": 143527294,
+          "node0_snapshot_store": 29421,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 169.674131292,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86589440,
+            "cpu_seconds": 55.33
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.8
+          },
+          "driver": {
+            "rss_bytes": 450379776,
+            "cpu_seconds": 111.50999999999999
+          }
+        },
+        "disk_bytes": {
+          "node0": 20072430,
+          "node1": 18867798,
+          "gates": 147016940,
+          "node0_snapshot_store": 30157,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 175.31719725,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86589440,
+            "cpu_seconds": 57.26
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.8
+          },
+          "driver": {
+            "rss_bytes": 445054976,
+            "cpu_seconds": 115.11
+          }
+        },
+        "disk_bytes": {
+          "node0": 20093738,
+          "node1": 18868397,
+          "gates": 153996226,
+          "node0_snapshot_store": 30893,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 180.669301792,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86605824,
+            "cpu_seconds": 58.78
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.81
+          },
+          "driver": {
+            "rss_bytes": 467124224,
+            "cpu_seconds": 118.83
+          }
+        },
+        "disk_bytes": {
+          "node0": 20117543,
+          "node1": 18868996,
+          "gates": 157485878,
+          "node0_snapshot_store": 32365,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 186.277278625,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86622208,
+            "cpu_seconds": 60.59
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.81
+          },
+          "driver": {
+            "rss_bytes": 475611136,
+            "cpu_seconds": 122.44
+          }
+        },
+        "disk_bytes": {
+          "node0": 20135707,
+          "node1": 18870194,
+          "gates": 160975524,
+          "node0_snapshot_store": 33108,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 191.94471475,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86622208,
+            "cpu_seconds": 62.54
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.81
+          },
+          "driver": {
+            "rss_bytes": 473907200,
+            "cpu_seconds": 126.03
+          }
+        },
+        "disk_bytes": {
+          "node0": 20156416,
+          "node1": 18870813,
+          "gates": 166236770,
+          "node0_snapshot_store": 33844,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 197.336357,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86622208,
+            "cpu_seconds": 64.06
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.82
+          },
+          "driver": {
+            "rss_bytes": 495616000,
+            "cpu_seconds": 129.85
+          }
+        },
+        "disk_bytes": {
+          "node0": 20180207,
+          "node1": 18871412,
+          "gates": 171444462,
+          "node0_snapshot_store": 35316,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 202.99210679200002,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86622208,
+            "cpu_seconds": 65.87
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.82
+          },
+          "driver": {
+            "rss_bytes": 516554752,
+            "cpu_seconds": 133.46
+          }
+        },
+        "disk_bytes": {
+          "node0": 20198989,
+          "node1": 18871412,
+          "gates": 174934108,
+          "node0_snapshot_store": 36052,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 208.660688209,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86622208,
+            "cpu_seconds": 67.81
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.82
+          },
+          "driver": {
+            "rss_bytes": 507314176,
+            "cpu_seconds": 137.11
+          }
+        },
+        "disk_bytes": {
+          "node0": 20219706,
+          "node1": 18872011,
+          "gates": 181913394,
+          "node0_snapshot_store": 36788,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 214.091400459,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86622208,
+            "cpu_seconds": 69.35
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.83
+          },
+          "driver": {
+            "rss_bytes": 526368768,
+            "cpu_seconds": 140.84
+          }
+        },
+        "disk_bytes": {
+          "node0": 20244096,
+          "node1": 18872610,
+          "gates": 185403046,
+          "node0_snapshot_store": 38260,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 219.723822417,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86622208,
+            "cpu_seconds": 71.16
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.83
+          },
+          "driver": {
+            "rss_bytes": 541933568,
+            "cpu_seconds": 144.48
+          }
+        },
+        "disk_bytes": {
+          "node0": 20261645,
+          "node1": 18872610,
+          "gates": 188892692,
+          "node0_snapshot_store": 38996,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 225.377483167,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86622208,
+            "cpu_seconds": 73.1
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.83
+          },
+          "driver": {
+            "rss_bytes": 532758528,
+            "cpu_seconds": 148.09
+          }
+        },
+        "disk_bytes": {
+          "node0": 20282367,
+          "node1": 18873209,
+          "gates": 192596578,
+          "node0_snapshot_store": 39732,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 230.791377334,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86638592,
+            "cpu_seconds": 74.63
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.85
+          },
+          "driver": {
+            "rss_bytes": 554893312,
+            "cpu_seconds": 151.88
+          }
+        },
+        "disk_bytes": {
+          "node0": 20306168,
+          "node1": 18873808,
+          "gates": 199361630,
+          "node0_snapshot_store": 41204,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 236.426100792,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86638592,
+            "cpu_seconds": 76.44
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.85
+          },
+          "driver": {
+            "rss_bytes": 579813376,
+            "cpu_seconds": 155.48
+          }
+        },
+        "disk_bytes": {
+          "node0": 20323712,
+          "node1": 18873808,
+          "gates": 202851276,
+          "node0_snapshot_store": 41940,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 242.061678584,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86638592,
+            "cpu_seconds": 78.37
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.85
+          },
+          "driver": {
+            "rss_bytes": 575946752,
+            "cpu_seconds": 159.12
+          }
+        },
+        "disk_bytes": {
+          "node0": 20345026,
+          "node1": 18875026,
+          "gates": 209830562,
+          "node0_snapshot_store": 42676,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 247.43153633400001,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86638592,
+            "cpu_seconds": 79.9
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.86
+          },
+          "driver": {
+            "rss_bytes": 584859648,
+            "cpu_seconds": 162.84
+          }
+        },
+        "disk_bytes": {
+          "node0": 20370029,
+          "node1": 18875026,
+          "gates": 213320214,
+          "node0_snapshot_store": 44148,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 253.06297704200003,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86638592,
+            "cpu_seconds": 81.71000000000001
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.86
+          },
+          "driver": {
+            "rss_bytes": 616775680,
+            "cpu_seconds": 166.44
+          }
+        },
+        "disk_bytes": {
+          "node0": 20388805,
+          "node1": 18876224,
+          "gates": 216809860,
+          "node0_snapshot_store": 44884,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 258.726099042,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86638592,
+            "cpu_seconds": 83.65
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.86
+          },
+          "driver": {
+            "rss_bytes": 606175232,
+            "cpu_seconds": 170.07
+          }
+        },
+        "disk_bytes": {
+          "node0": 20410113,
+          "node1": 18876224,
+          "gates": 220299506,
+          "node0_snapshot_store": 45620,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 264.10164570899997,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86638592,
+            "cpu_seconds": 85.17
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.87
+          },
+          "driver": {
+            "rss_bytes": 614301696,
+            "cpu_seconds": 173.82
+          }
+        },
+        "disk_bytes": {
+          "node0": 20433904,
+          "node1": 18877422,
+          "gates": 227278798,
+          "node0_snapshot_store": 47092,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 269.754301834,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86654976,
+            "cpu_seconds": 86.98
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.87
+          },
+          "driver": {
+            "rss_bytes": 645660672,
+            "cpu_seconds": 177.45
+          }
+        },
+        "disk_bytes": {
+          "node0": 20451468,
+          "node1": 18879219,
+          "gates": 230768444,
+          "node0_snapshot_store": 47828,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 275.39173279199997,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86671360,
+            "cpu_seconds": 88.92
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.87
+          },
+          "driver": {
+            "rss_bytes": 635289600,
+            "cpu_seconds": 181.05
+          }
+        },
+        "disk_bytes": {
+          "node0": 20472784,
+          "node1": 18879219,
+          "gates": 237747730,
+          "node0_snapshot_store": 48564,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 280.78020649999996,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86671360,
+            "cpu_seconds": 90.45
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.87
+          },
+          "driver": {
+            "rss_bytes": 651608064,
+            "cpu_seconds": 184.82
+          }
+        },
+        "disk_bytes": {
+          "node0": 20497194,
+          "node1": 18879219,
+          "gates": 241237382,
+          "node0_snapshot_store": 50036,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 286.440269,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86671360,
+            "cpu_seconds": 92.25
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.88
+          },
+          "driver": {
+            "rss_bytes": 685867008,
+            "cpu_seconds": 188.46
+          }
+        },
+        "disk_bytes": {
+          "node0": 20514743,
+          "node1": 18879818,
+          "gates": 244727028,
+          "node0_snapshot_store": 50772,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 292.124691,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86671360,
+            "cpu_seconds": 94.2
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.89
+          },
+          "driver": {
+            "rss_bytes": 677527552,
+            "cpu_seconds": 192.11
+          }
+        },
+        "disk_bytes": {
+          "node0": 20535465,
+          "node1": 18879818,
+          "gates": 248216674,
+          "node0_snapshot_store": 51508,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 297.560235709,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86671360,
+            "cpu_seconds": 95.72999999999999
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.9
+          },
+          "driver": {
+            "rss_bytes": 696614912,
+            "cpu_seconds": 195.9
+          }
+        },
+        "disk_bytes": {
+          "node0": 20559266,
+          "node1": 18881016,
+          "gates": 255195966,
+          "node0_snapshot_store": 52980,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 303.16242929199996,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86671360,
+            "cpu_seconds": 97.53999999999999
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.9
+          },
+          "driver": {
+            "rss_bytes": 710754304,
+            "cpu_seconds": 199.5
+          }
+        },
+        "disk_bytes": {
+          "node0": 20578028,
+          "node1": 18881016,
+          "gates": 258685612,
+          "node0_snapshot_store": 53716,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 308.83285320899995,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86671360,
+            "cpu_seconds": 99.47999999999999
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.9
+          },
+          "driver": {
+            "rss_bytes": 713834496,
+            "cpu_seconds": 203.16
+          }
+        },
+        "disk_bytes": {
+          "node0": 20599336,
+          "node1": 18881016,
+          "gates": 265664898,
+          "node0_snapshot_store": 54452,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 314.199744792,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86687744,
+            "cpu_seconds": 101.0
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.9
+          },
+          "driver": {
+            "rss_bytes": 731250688,
+            "cpu_seconds": 206.88
+          }
+        },
+        "disk_bytes": {
+          "node0": 20623760,
+          "node1": 18881016,
+          "gates": 269154550,
+          "node0_snapshot_store": 55924,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 319.83611708399997,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86687744,
+            "cpu_seconds": 102.81
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.91
+          },
+          "driver": {
+            "rss_bytes": 765198336,
+            "cpu_seconds": 210.46
+          }
+        },
+        "disk_bytes": {
+          "node0": 20642516,
+          "node1": 18881016,
+          "gates": 272644196,
+          "node0_snapshot_store": 56660,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 325.50264191699995,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86687744,
+            "cpu_seconds": 104.74000000000001
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.91
+          },
+          "driver": {
+            "rss_bytes": 741982208,
+            "cpu_seconds": 214.14
+          }
+        },
+        "disk_bytes": {
+          "node0": 20663225,
+          "node1": 18881016,
+          "gates": 279623482,
+          "node0_snapshot_store": 57396,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 330.861424334,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86687744,
+            "cpu_seconds": 106.28
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.91
+          },
+          "driver": {
+            "rss_bytes": 755531776,
+            "cpu_seconds": 217.82
+          }
+        },
+        "disk_bytes": {
+          "node0": 20687016,
+          "node1": 18881016,
+          "gates": 283113134,
+          "node0_snapshot_store": 58868,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 336.504457834,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86687744,
+            "cpu_seconds": 108.09
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.92
+          },
+          "driver": {
+            "rss_bytes": 774602752,
+            "cpu_seconds": 221.44
+          }
+        },
+        "disk_bytes": {
+          "node0": 20705199,
+          "node1": 18881016,
+          "gates": 286602780,
+          "node0_snapshot_store": 59604,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 342.126425042,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86687744,
+            "cpu_seconds": 110.02000000000001
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.92
+          },
+          "driver": {
+            "rss_bytes": 773505024,
+            "cpu_seconds": 225.02
+          }
+        },
+        "disk_bytes": {
+          "node0": 20726515,
+          "node1": 18881016,
+          "gates": 293582072,
+          "node0_snapshot_store": 60340,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 347.50985970899995,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86687744,
+            "cpu_seconds": 111.53
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.92
+          },
+          "driver": {
+            "rss_bytes": 794443776,
+            "cpu_seconds": 228.78
+          }
+        },
+        "disk_bytes": {
+          "node0": 20750306,
+          "node1": 18881016,
+          "gates": 297071718,
+          "node0_snapshot_store": 61812,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 353.107704959,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86687744,
+            "cpu_seconds": 113.36
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.94
+          },
+          "driver": {
+            "rss_bytes": 825819136,
+            "cpu_seconds": 232.4
+          }
+        },
+        "disk_bytes": {
+          "node0": 20768454,
+          "node1": 18881621,
+          "gates": 300561364,
+          "node0_snapshot_store": 62548,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 358.77995616699997,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86687744,
+            "cpu_seconds": 115.28
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.94
+          },
+          "driver": {
+            "rss_bytes": 808255488,
+            "cpu_seconds": 236.04
+          }
+        },
+        "disk_bytes": {
+          "node0": 20789176,
+          "node1": 18882240,
+          "gates": 305530096,
+          "node0_snapshot_store": 63284,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 364.12392912499996,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86687744,
+            "cpu_seconds": 116.8
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.94
+          },
+          "driver": {
+            "rss_bytes": 826032128,
+            "cpu_seconds": 239.77
+          }
+        },
+        "disk_bytes": {
+          "node0": 20812977,
+          "node1": 18882240,
+          "gates": 311030302,
+          "node0_snapshot_store": 64756,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 369.74622883399996,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86687744,
+            "cpu_seconds": 118.61
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.95
+          },
+          "driver": {
+            "rss_bytes": 837255168,
+            "cpu_seconds": 243.35
+          }
+        },
+        "disk_bytes": {
+          "node0": 20830521,
+          "node1": 18882240,
+          "gates": 314519948,
+          "node0_snapshot_store": 65492,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 375.39514949999995,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86687744,
+            "cpu_seconds": 120.54
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.95
+          },
+          "driver": {
+            "rss_bytes": 837550080,
+            "cpu_seconds": 246.95
+          }
+        },
+        "disk_bytes": {
+          "node0": 20851237,
+          "node1": 18882839,
+          "gates": 321499240,
+          "node0_snapshot_store": 66235,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 380.774945959,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86687744,
+            "cpu_seconds": 122.07
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.95
+          },
+          "driver": {
+            "rss_bytes": 853721088,
+            "cpu_seconds": 250.73
+          }
+        },
+        "disk_bytes": {
+          "node0": 20875661,
+          "node1": 18883438,
+          "gates": 324988886,
+          "node0_snapshot_store": 67707,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 386.418680292,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86687744,
+            "cpu_seconds": 123.89
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.96
+          },
+          "driver": {
+            "rss_bytes": 881786880,
+            "cpu_seconds": 254.34
+          }
+        },
+        "disk_bytes": {
+          "node0": 20893219,
+          "node1": 18884037,
+          "gates": 328478532,
+          "node0_snapshot_store": 68443,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 392.136515875,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86687744,
+            "cpu_seconds": 125.83
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.96
+          },
+          "driver": {
+            "rss_bytes": 874561536,
+            "cpu_seconds": 258.0
+          }
+        },
+        "disk_bytes": {
+          "node0": 20913928,
+          "node1": 18884037,
+          "gates": 331968178,
+          "node0_snapshot_store": 69179,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 397.550318959,
+        "processes": {
+          "node0": {
+            "rss_bytes": 98516992,
+            "cpu_seconds": 127.34
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.96
+          },
+          "driver": {
+            "rss_bytes": 877428736,
+            "cpu_seconds": 261.76
+          }
+        },
+        "disk_bytes": {
+          "node0": 20937719,
+          "node1": 18884636,
+          "gates": 338947470,
+          "node0_snapshot_store": 70651,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 402.60194070899996,
+        "processes": {
+          "node0": {
+            "rss_bytes": 100122624,
+            "cpu_seconds": 128.74
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.97
+          },
+          "driver": {
+            "rss_bytes": 911867904,
+            "cpu_seconds": 265.22
+          }
+        },
+        "disk_bytes": {
+          "node0": 20954286,
+          "node1": 18885241,
+          "gates": 342437116,
+          "node0_snapshot_store": 71387,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 407.65365633399995,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86720512,
+            "cpu_seconds": 130.51
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.97
+          },
+          "driver": {
+            "rss_bytes": 917995520,
+            "cpu_seconds": 268.47
+          }
+        },
+        "disk_bytes": {
+          "node0": 20971146,
+          "node1": 18885241,
+          "gates": 345926762,
+          "node0_snapshot_store": 72123,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 413.07843075,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86720512,
+            "cpu_seconds": 132.45
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.98
+          },
+          "driver": {
+            "rss_bytes": 918880256,
+            "cpu_seconds": 271.83
+          }
+        },
+        "disk_bytes": {
+          "node0": 20992130,
+          "node1": 18885241,
+          "gates": 352906048,
+          "node0_snapshot_store": 72859,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 418.47336608399996,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86720512,
+            "cpu_seconds": 133.77
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.99
+          },
+          "driver": {
+            "rss_bytes": 930562048,
+            "cpu_seconds": 275.84000000000003
+          }
+        },
+        "disk_bytes": {
+          "node0": 21011418,
+          "node1": 18887078,
+          "gates": 356395700,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 431.89900070899995,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86720512,
+            "cpu_seconds": 133.78
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 0.99
+          },
+          "driver": {
+            "rss_bytes": 926859264,
+            "cpu_seconds": 289.26
+          }
+        },
+        "disk_bytes": {
+          "node0": 21011418,
+          "node1": 18887677,
+          "gates": 356395700,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 444.539587334,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86720512,
+            "cpu_seconds": 133.79
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.0
+          },
+          "driver": {
+            "rss_bytes": 1119780864,
+            "cpu_seconds": 301.89
+          }
+        },
+        "disk_bytes": {
+          "node0": 21012724,
+          "node1": 18887677,
+          "gates": 356395700,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 456.79147324999997,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86720512,
+            "cpu_seconds": 133.79
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.01
+          },
+          "driver": {
+            "rss_bytes": 1262895104,
+            "cpu_seconds": 314.14
+          }
+        },
+        "disk_bytes": {
+          "node0": 21013942,
+          "node1": 18888282,
+          "gates": 356395700,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 463.205813084,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86720512,
+            "cpu_seconds": 133.8
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.01
+          },
+          "driver": {
+            "rss_bytes": 1263124480,
+            "cpu_seconds": 320.52
+          }
+        },
+        "disk_bytes": {
+          "node0": 21014541,
+          "node1": 18888282,
+          "gates": 356395700,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 469.659405625,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86720512,
+            "cpu_seconds": 133.81
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.03
+          },
+          "driver": {
+            "rss_bytes": 1263124480,
+            "cpu_seconds": 327.06
+          }
+        },
+        "disk_bytes": {
+          "node0": 21016358,
+          "node1": 18888881,
+          "gates": 356395700,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 475.932200084,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86720512,
+            "cpu_seconds": 133.82
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.03
+          },
+          "driver": {
+            "rss_bytes": 920895488,
+            "cpu_seconds": 333.24
+          }
+        },
+        "disk_bytes": {
+          "node0": 21017642,
+          "node1": 18889480,
+          "gates": 356395700,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 481.026108209,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 135.84
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.04
+          },
+          "driver": {
+            "rss_bytes": 958103552,
+            "cpu_seconds": 336.39
+          }
+        },
+        "disk_bytes": {
+          "node0": 21036653,
+          "node1": 18889480,
+          "gates": 370256074,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 486.21812608399995,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110952448,
+            "cpu_seconds": 137.29
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.04
+          },
+          "driver": {
+            "rss_bytes": 975388672,
+            "cpu_seconds": 340.04
+          }
+        },
+        "disk_bytes": {
+          "node0": 21055652,
+          "node1": 18890099,
+          "gates": 384064395,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 491.272453375,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 138.62
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.04
+          },
+          "driver": {
+            "rss_bytes": 953647104,
+            "cpu_seconds": 343.83
+          }
+        },
+        "disk_bytes": {
+          "node0": 21074032,
+          "node1": 18890099,
+          "gates": 401353779,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 496.53581633399995,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 140.16
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.04
+          },
+          "driver": {
+            "rss_bytes": 951255040,
+            "cpu_seconds": 347.5
+          }
+        },
+        "disk_bytes": {
+          "node0": 21092260,
+          "node1": 18891319,
+          "gates": 418524043,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 502.031133167,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 141.71
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.05
+          },
+          "driver": {
+            "rss_bytes": 951255040,
+            "cpu_seconds": 351.47
+          }
+        },
+        "disk_bytes": {
+          "node0": 21112559,
+          "node1": 18891938,
+          "gates": 435809283,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 507.557489584,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 143.24
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.05
+          },
+          "driver": {
+            "rss_bytes": 951812096,
+            "cpu_seconds": 355.47
+          }
+        },
+        "disk_bytes": {
+          "node0": 21133372,
+          "node1": 18891938,
+          "gates": 452988011,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 513.039772959,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 144.79
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.05
+          },
+          "driver": {
+            "rss_bytes": 948355072,
+            "cpu_seconds": 359.35
+          }
+        },
+        "disk_bytes": {
+          "node0": 21151685,
+          "node1": 18891938,
+          "gates": 470285364,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 518.5288463339999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 146.34
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.06
+          },
+          "driver": {
+            "rss_bytes": 948355072,
+            "cpu_seconds": 363.28
+          }
+        },
+        "disk_bytes": {
+          "node0": 21171400,
+          "node1": 18892549,
+          "gates": 487455628,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 524.019529792,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 147.88
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.06
+          },
+          "driver": {
+            "rss_bytes": 948387840,
+            "cpu_seconds": 367.22
+          }
+        },
+        "disk_bytes": {
+          "node0": 21190492,
+          "node1": 18892549,
+          "gates": 504745012,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 529.5086824589999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 149.44
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.07
+          },
+          "driver": {
+            "rss_bytes": 948387840,
+            "cpu_seconds": 371.15
+          }
+        },
+        "disk_bytes": {
+          "node0": 21210199,
+          "node1": 18892549,
+          "gates": 521915276,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 534.994559,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 150.99
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.08
+          },
+          "driver": {
+            "rss_bytes": 951861248,
+            "cpu_seconds": 375.11
+          }
+        },
+        "disk_bytes": {
+          "node0": 21228948,
+          "node1": 18893148,
+          "gates": 539200517,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 540.5093641249999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 152.56
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.08
+          },
+          "driver": {
+            "rss_bytes": 951762944,
+            "cpu_seconds": 379.03
+          }
+        },
+        "disk_bytes": {
+          "node0": 21249879,
+          "node1": 18893148,
+          "gates": 556383117,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 546.006487417,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 154.12
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.08
+          },
+          "driver": {
+            "rss_bytes": 955334656,
+            "cpu_seconds": 383.01
+          }
+        },
+        "disk_bytes": {
+          "node0": 21268615,
+          "node1": 18893148,
+          "gates": 573643661,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 551.139165834,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110952448,
+            "cpu_seconds": 155.57999999999998
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.09
+          },
+          "driver": {
+            "rss_bytes": 976027648,
+            "cpu_seconds": 386.62
+          }
+        },
+        "disk_bytes": {
+          "node0": 21287018,
+          "node1": 18893148,
+          "gates": 587455541,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 556.1919040839999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 156.91
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.09
+          },
+          "driver": {
+            "rss_bytes": 955482112,
+            "cpu_seconds": 390.4
+          }
+        },
+        "disk_bytes": {
+          "node0": 21305673,
+          "node1": 18893148,
+          "gates": 604625805,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 561.528673625,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 158.46
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.09
+          },
+          "driver": {
+            "rss_bytes": 952025088,
+            "cpu_seconds": 394.17
+          }
+        },
+        "disk_bytes": {
+          "node0": 21325383,
+          "node1": 18893148,
+          "gates": 621923405,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 567.006561292,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 160.02
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.1
+          },
+          "driver": {
+            "rss_bytes": 958939136,
+            "cpu_seconds": 398.08
+          }
+        },
+        "disk_bytes": {
+          "node0": 21342398,
+          "node1": 18893148,
+          "gates": 639204325,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 572.150971625,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110952448,
+            "cpu_seconds": 161.47
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.1
+          },
+          "driver": {
+            "rss_bytes": 976175104,
+            "cpu_seconds": 401.71
+          }
+        },
+        "disk_bytes": {
+          "node0": 21361419,
+          "node1": 18893148,
+          "gates": 652876685,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 577.2042087919999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 162.82
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.1
+          },
+          "driver": {
+            "rss_bytes": 955482112,
+            "cpu_seconds": 405.46
+          }
+        },
+        "disk_bytes": {
+          "node0": 21380394,
+          "node1": 18893148,
+          "gates": 670166069,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 582.484871875,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 164.36
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.11
+          },
+          "driver": {
+            "rss_bytes": 952041472,
+            "cpu_seconds": 409.2
+          }
+        },
+        "disk_bytes": {
+          "node0": 21399751,
+          "node1": 18893148,
+          "gates": 687344797,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 587.930887959,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 165.6
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.11
+          },
+          "driver": {
+            "rss_bytes": 952041472,
+            "cpu_seconds": 413.42
+          }
+        },
+        "disk_bytes": {
+          "node0": 21412947,
+          "node1": 18893747,
+          "gates": 708156533,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 597.54005775,
+        "processes": {
+          "node0": {
+            "rss_bytes": 86802432,
+            "cpu_seconds": 165.61
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.12
+          },
+          "driver": {
+            "rss_bytes": 952041472,
+            "cpu_seconds": 422.98
+          }
+        },
+        "disk_bytes": {
+          "node0": 21413552,
+          "node1": 18893747,
+          "gates": 708156533,
+          "node0_snapshot_store": 74331,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 603.1478747919999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 106561536,
+            "cpu_seconds": 167.61
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.13
+          },
+          "driver": {
+            "rss_bytes": 943898624,
+            "cpu_seconds": 426.59
+          }
+        },
+        "disk_bytes": {
+          "node0": 24876402,
+          "node1": 18894945,
+          "gates": 701131933,
+          "node0_snapshot_store": 3523977,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 608.19299725,
+        "processes": {
+          "node0": {
+            "rss_bytes": 106840064,
+            "cpu_seconds": 170.26
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.13
+          },
+          "driver": {
+            "rss_bytes": 948617216,
+            "cpu_seconds": 429.0
+          }
+        },
+        "disk_bytes": {
+          "node0": 24915701,
+          "node1": 18894945,
+          "gates": 701222573,
+          "node0_snapshot_store": 3545206,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 613.2340738749999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 106921984,
+            "cpu_seconds": 172.92000000000002
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.13
+          },
+          "driver": {
+            "rss_bytes": 948617216,
+            "cpu_seconds": 431.41
+          }
+        },
+        "disk_bytes": {
+          "node0": 24938099,
+          "node1": 18894945,
+          "gates": 701313214,
+          "node0_snapshot_store": 3548917,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 618.280475125,
+        "processes": {
+          "node0": {
+            "rss_bytes": 103530496,
+            "cpu_seconds": 175.59
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.14
+          },
+          "driver": {
+            "rss_bytes": 948617216,
+            "cpu_seconds": 433.8
+          }
+        },
+        "disk_bytes": {
+          "node0": 24960500,
+          "node1": 18894945,
+          "gates": 701416214,
+          "node0_snapshot_store": 3552628,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 623.32692475,
+        "processes": {
+          "node0": {
+            "rss_bytes": 103530496,
+            "cpu_seconds": 178.21
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.14
+          },
+          "driver": {
+            "rss_bytes": 948617216,
+            "cpu_seconds": 436.25
+          }
+        },
+        "disk_bytes": {
+          "node0": 24986587,
+          "node1": 18894945,
+          "gates": 701506854,
+          "node0_snapshot_store": 3560050,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 628.376339167,
+        "processes": {
+          "node0": {
+            "rss_bytes": 103530496,
+            "cpu_seconds": 180.89
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.14
+          },
+          "driver": {
+            "rss_bytes": 948617216,
+            "cpu_seconds": 438.65
+          }
+        },
+        "disk_bytes": {
+          "node0": 25008967,
+          "node1": 18894945,
+          "gates": 701609854,
+          "node0_snapshot_store": 3563761,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 633.422189625,
+        "processes": {
+          "node0": {
+            "rss_bytes": 103530496,
+            "cpu_seconds": 183.56
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.14
+          },
+          "driver": {
+            "rss_bytes": 948617216,
+            "cpu_seconds": 441.04
+          }
+        },
+        "disk_bytes": {
+          "node0": 25031345,
+          "node1": 18894945,
+          "gates": 701729334,
+          "node0_snapshot_store": 3567472,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 638.4693784589999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 103563264,
+            "cpu_seconds": 186.2
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.15
+          },
+          "driver": {
+            "rss_bytes": 948617216,
+            "cpu_seconds": 443.47
+          }
+        },
+        "disk_bytes": {
+          "node0": 25057879,
+          "node1": 18894945,
+          "gates": 701840574,
+          "node0_snapshot_store": 3574901,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 643.584183792,
+        "processes": {
+          "node0": {
+            "rss_bytes": 100122624,
+            "cpu_seconds": 188.86
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.15
+          },
+          "driver": {
+            "rss_bytes": 952074240,
+            "cpu_seconds": 445.95
+          }
+        },
+        "disk_bytes": {
+          "node0": 25081370,
+          "node1": 18895544,
+          "gates": 701931214,
+          "node0_snapshot_store": 3578612,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 649.0792585419999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 100122624,
+            "cpu_seconds": 191.53
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.16
+          },
+          "driver": {
+            "rss_bytes": 952074240,
+            "cpu_seconds": 448.8
+          }
+        },
+        "disk_bytes": {
+          "node0": 25103857,
+          "node1": 18896143,
+          "gates": 702021854,
+          "node0_snapshot_store": 3582323,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 654.260587084,
+        "processes": {
+          "node0": {
+            "rss_bytes": 109215744,
+            "cpu_seconds": 194.17
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.17
+          },
+          "driver": {
+            "rss_bytes": 972767232,
+            "cpu_seconds": 451.31
+          }
+        },
+        "disk_bytes": {
+          "node0": 25129517,
+          "node1": 18896742,
+          "gates": 702112494,
+          "node0_snapshot_store": 3589745,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 659.306172167,
+        "processes": {
+          "node0": {
+            "rss_bytes": 112410624,
+            "cpu_seconds": 196.85
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.17
+          },
+          "driver": {
+            "rss_bytes": 972767232,
+            "cpu_seconds": 453.7
+          }
+        },
+        "disk_bytes": {
+          "node0": 25151485,
+          "node1": 18896742,
+          "gates": 702203134,
+          "node0_snapshot_store": 3593456,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 664.353757834,
+        "processes": {
+          "node0": {
+            "rss_bytes": 120815616,
+            "cpu_seconds": 199.52
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.17
+          },
+          "driver": {
+            "rss_bytes": 972767232,
+            "cpu_seconds": 456.1
+          }
+        },
+        "disk_bytes": {
+          "node0": 25173861,
+          "node1": 18897960,
+          "gates": 702293774,
+          "node0_snapshot_store": 3597167,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 669.3999585419999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 121569280,
+            "cpu_seconds": 202.19
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.17
+          },
+          "driver": {
+            "rss_bytes": 972767232,
+            "cpu_seconds": 458.49
+          }
+        },
+        "disk_bytes": {
+          "node0": 25199975,
+          "node1": 18898579,
+          "gates": 702396774,
+          "node0_snapshot_store": 3604596,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 674.444895625,
+        "processes": {
+          "node0": {
+            "rss_bytes": 120848384,
+            "cpu_seconds": 204.81
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.18
+          },
+          "driver": {
+            "rss_bytes": 972767232,
+            "cpu_seconds": 460.95
+          }
+        },
+        "disk_bytes": {
+          "node0": 25221755,
+          "node1": 18898579,
+          "gates": 702487414,
+          "node0_snapshot_store": 3608307,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 679.483693959,
+        "processes": {
+          "node0": {
+            "rss_bytes": 121110528,
+            "cpu_seconds": 207.48
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.18
+          },
+          "driver": {
+            "rss_bytes": 972767232,
+            "cpu_seconds": 463.33
+          }
+        },
+        "disk_bytes": {
+          "node0": 25243535,
+          "node1": 18898579,
+          "gates": 702590414,
+          "node0_snapshot_store": 3612018,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 684.522852375,
+        "processes": {
+          "node0": {
+            "rss_bytes": 121995264,
+            "cpu_seconds": 210.15
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.18
+          },
+          "driver": {
+            "rss_bytes": 972767232,
+            "cpu_seconds": 465.72
+          }
+        },
+        "disk_bytes": {
+          "node0": 25269023,
+          "node1": 18898579,
+          "gates": 702681054,
+          "node0_snapshot_store": 3619440,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 689.5680592499999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 121962496,
+            "cpu_seconds": 212.81
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.18
+          },
+          "driver": {
+            "rss_bytes": 972767232,
+            "cpu_seconds": 468.13
+          }
+        },
+        "disk_bytes": {
+          "node0": 25291419,
+          "node1": 18899178,
+          "gates": 702771694,
+          "node0_snapshot_store": 3623151,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 694.613695209,
+        "processes": {
+          "node0": {
+            "rss_bytes": 121356288,
+            "cpu_seconds": 215.45
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.19
+          },
+          "driver": {
+            "rss_bytes": 972767232,
+            "cpu_seconds": 470.57
+          }
+        },
+        "disk_bytes": {
+          "node0": 25313199,
+          "node1": 18899178,
+          "gates": 702895294,
+          "node0_snapshot_store": 3626862,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 699.661565875,
+        "processes": {
+          "node0": {
+            "rss_bytes": 122191872,
+            "cpu_seconds": 218.1
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.19
+          },
+          "driver": {
+            "rss_bytes": 972783616,
+            "cpu_seconds": 472.98
+          }
+        },
+        "disk_bytes": {
+          "node0": 25339888,
+          "node1": 18899178,
+          "gates": 702985934,
+          "node0_snapshot_store": 3634284,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 704.706377,
+        "processes": {
+          "node0": {
+            "rss_bytes": 122601472,
+            "cpu_seconds": 220.77
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.19
+          },
+          "driver": {
+            "rss_bytes": 972783616,
+            "cpu_seconds": 475.37
+          }
+        },
+        "disk_bytes": {
+          "node0": 25362271,
+          "node1": 18899178,
+          "gates": 703076574,
+          "node0_snapshot_store": 3638002,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 709.7529731669999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 123387904,
+            "cpu_seconds": 223.46
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.2
+          },
+          "driver": {
+            "rss_bytes": 972783616,
+            "cpu_seconds": 477.76
+          }
+        },
+        "disk_bytes": {
+          "node0": 25384647,
+          "node1": 18899178,
+          "gates": 703167214,
+          "node0_snapshot_store": 3641713,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 714.799058042,
+        "processes": {
+          "node0": {
+            "rss_bytes": 124321792,
+            "cpu_seconds": 226.13
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.21
+          },
+          "driver": {
+            "rss_bytes": 972783616,
+            "cpu_seconds": 480.16
+          }
+        },
+        "disk_bytes": {
+          "node0": 25410138,
+          "node1": 18899178,
+          "gates": 703257854,
+          "node0_snapshot_store": 3649135,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 719.845824,
+        "processes": {
+          "node0": {
+            "rss_bytes": 123830272,
+            "cpu_seconds": 228.77
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.21
+          },
+          "driver": {
+            "rss_bytes": 972783616,
+            "cpu_seconds": 482.59
+          }
+        },
+        "disk_bytes": {
+          "node0": 25432517,
+          "node1": 18899178,
+          "gates": 703348494,
+          "node0_snapshot_store": 3652846,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 724.8951952919999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 124026880,
+            "cpu_seconds": 231.43
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.21
+          },
+          "driver": {
+            "rss_bytes": 972783616,
+            "cpu_seconds": 485.0
+          }
+        },
+        "disk_bytes": {
+          "node0": 25454913,
+          "node1": 18899777,
+          "gates": 703439134,
+          "node0_snapshot_store": 3656557,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 729.9417515,
+        "processes": {
+          "node0": {
+            "rss_bytes": 124338176,
+            "cpu_seconds": 234.09
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.21
+          },
+          "driver": {
+            "rss_bytes": 972800000,
+            "cpu_seconds": 487.4
+          }
+        },
+        "disk_bytes": {
+          "node0": 25481020,
+          "node1": 18899777,
+          "gates": 703529775,
+          "node0_snapshot_store": 3663979,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 734.987259375,
+        "processes": {
+          "node0": {
+            "rss_bytes": 124338176,
+            "cpu_seconds": 236.75
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.22
+          },
+          "driver": {
+            "rss_bytes": 972800000,
+            "cpu_seconds": 489.81
+          }
+        },
+        "disk_bytes": {
+          "node0": 25502800,
+          "node1": 18899777,
+          "gates": 703632775,
+          "node0_snapshot_store": 3667690,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 740.02422125,
+        "processes": {
+          "node0": {
+            "rss_bytes": 123912192,
+            "cpu_seconds": 239.36
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.22
+          },
+          "driver": {
+            "rss_bytes": 972800000,
+            "cpu_seconds": 492.26
+          }
+        },
+        "disk_bytes": {
+          "node0": 25525206,
+          "node1": 18900995,
+          "gates": 703723415,
+          "node0_snapshot_store": 3671408,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 745.0708234169999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 124338176,
+            "cpu_seconds": 242.01
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.22
+          },
+          "driver": {
+            "rss_bytes": 972800000,
+            "cpu_seconds": 494.67
+          }
+        },
+        "disk_bytes": {
+          "node0": 25550694,
+          "node1": 18902193,
+          "gates": 703826415,
+          "node0_snapshot_store": 3678830,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 750.1198171249999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 124338176,
+            "cpu_seconds": 244.67
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.23
+          },
+          "driver": {
+            "rss_bytes": 972800000,
+            "cpu_seconds": 497.08
+          }
+        },
+        "disk_bytes": {
+          "node0": 25572471,
+          "node1": 18902193,
+          "gates": 703929415,
+          "node0_snapshot_store": 3682541,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 755.165933209,
+        "processes": {
+          "node0": {
+            "rss_bytes": 124256256,
+            "cpu_seconds": 247.32
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.23
+          },
+          "driver": {
+            "rss_bytes": 972800000,
+            "cpu_seconds": 499.51
+          }
+        },
+        "disk_bytes": {
+          "node0": 25594251,
+          "node1": 18902193,
+          "gates": 704020055,
+          "node0_snapshot_store": 3686252,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 760.21217025,
+        "processes": {
+          "node0": {
+            "rss_bytes": 124190720,
+            "cpu_seconds": 249.95
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.23
+          },
+          "driver": {
+            "rss_bytes": 972800000,
+            "cpu_seconds": 501.94
+          }
+        },
+        "disk_bytes": {
+          "node0": 25619742,
+          "node1": 18903391,
+          "gates": 704156015,
+          "node0_snapshot_store": 3693674,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 765.2600837919999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 122306560,
+            "cpu_seconds": 252.54
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.23
+          },
+          "driver": {
+            "rss_bytes": 972800000,
+            "cpu_seconds": 504.42
+          }
+        },
+        "disk_bytes": {
+          "node0": 25642138,
+          "node1": 18903391,
+          "gates": 704259015,
+          "node0_snapshot_store": 3697385,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 770.306268875,
+        "processes": {
+          "node0": {
+            "rss_bytes": 121733120,
+            "cpu_seconds": 255.2
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.25
+          },
+          "driver": {
+            "rss_bytes": 972800000,
+            "cpu_seconds": 506.85
+          }
+        },
+        "disk_bytes": {
+          "node0": 25663915,
+          "node1": 18903391,
+          "gates": 704349655,
+          "node0_snapshot_store": 3701096,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 775.344453625,
+        "processes": {
+          "node0": {
+            "rss_bytes": 122175488,
+            "cpu_seconds": 257.85
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.25
+          },
+          "driver": {
+            "rss_bytes": 972800000,
+            "cpu_seconds": 509.25
+          }
+        },
+        "disk_bytes": {
+          "node0": 25690032,
+          "node1": 18903990,
+          "gates": 704440295,
+          "node0_snapshot_store": 3708525,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 780.390308084,
+        "processes": {
+          "node0": {
+            "rss_bytes": 121274368,
+            "cpu_seconds": 260.48
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.25
+          },
+          "driver": {
+            "rss_bytes": 972849152,
+            "cpu_seconds": 511.69
+          }
+        },
+        "disk_bytes": {
+          "node0": 25713030,
+          "node1": 18903990,
+          "gates": 704530935,
+          "node0_snapshot_store": 3712236,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 785.440584125,
+        "processes": {
+          "node0": {
+            "rss_bytes": 100204544,
+            "cpu_seconds": 263.08
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.26
+          },
+          "driver": {
+            "rss_bytes": 972865536,
+            "cpu_seconds": 514.21
+          }
+        },
+        "disk_bytes": {
+          "node0": 25735219,
+          "node1": 18903990,
+          "gates": 704621575,
+          "node0_snapshot_store": 3715947,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 790.5584394589999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 100237312,
+            "cpu_seconds": 265.7
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.26
+          },
+          "driver": {
+            "rss_bytes": 972865536,
+            "cpu_seconds": 516.66
+          }
+        },
+        "disk_bytes": {
+          "node0": 25760707,
+          "node1": 18903990,
+          "gates": 704724575,
+          "node0_snapshot_store": 3723369,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 795.622318042,
+        "processes": {
+          "node0": {
+            "rss_bytes": 100237312,
+            "cpu_seconds": 268.36
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.26
+          },
+          "driver": {
+            "rss_bytes": 972865536,
+            "cpu_seconds": 519.12
+          }
+        },
+        "disk_bytes": {
+          "node0": 25783085,
+          "node1": 18903990,
+          "gates": 704815215,
+          "node0_snapshot_store": 3727080,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 800.7247509169999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 100237312,
+            "cpu_seconds": 271.01
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.26
+          },
+          "driver": {
+            "rss_bytes": 972865536,
+            "cpu_seconds": 521.57
+          }
+        },
+        "disk_bytes": {
+          "node0": 25806064,
+          "node1": 18904601,
+          "gates": 704918215,
+          "node0_snapshot_store": 3730791,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 805.822172459,
+        "processes": {
+          "node0": {
+            "rss_bytes": 100253696,
+            "cpu_seconds": 273.64
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.27
+          },
+          "driver": {
+            "rss_bytes": 972865536,
+            "cpu_seconds": 524.04
+          }
+        },
+        "disk_bytes": {
+          "node0": 25831559,
+          "node1": 18905200,
+          "gates": 705008855,
+          "node0_snapshot_store": 3738220,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 810.9210876669999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 100253696,
+            "cpu_seconds": 276.3
+          },
+          "node1": {
+            "rss_bytes": 63881216,
+            "cpu_seconds": 1.27
+          },
+          "driver": {
+            "rss_bytes": 952172544,
+            "cpu_seconds": 526.49
+          }
+        },
+        "disk_bytes": {
+          "node0": 25853765,
+          "node1": 18905200,
+          "gates": 705124215,
+          "node0_snapshot_store": 3741931,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 816.057019834,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91815936,
+            "cpu_seconds": 278.97
+          },
+          "node1": {
+            "rss_bytes": 42500096,
+            "cpu_seconds": 1.27
+          },
+          "driver": {
+            "rss_bytes": 874315776,
+            "cpu_seconds": 528.94
+          }
+        },
+        "disk_bytes": {
+          "node0": 25876143,
+          "node1": 18905200,
+          "gates": 705399175,
+          "node0_snapshot_store": 3745642,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 821.233547209,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91897856,
+            "cpu_seconds": 281.61
+          },
+          "node1": {
+            "rss_bytes": 42500096,
+            "cpu_seconds": 1.28
+          },
+          "driver": {
+            "rss_bytes": 866893824,
+            "cpu_seconds": 531.48
+          }
+        },
+        "disk_bytes": {
+          "node0": 25901805,
+          "node1": 18905200,
+          "gates": 701378055,
+          "node0_snapshot_store": 3753064,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 826.330852917,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91897856,
+            "cpu_seconds": 284.27
+          },
+          "node1": {
+            "rss_bytes": 42500096,
+            "cpu_seconds": 1.28
+          },
+          "driver": {
+            "rss_bytes": 865714176,
+            "cpu_seconds": 533.94
+          }
+        },
+        "disk_bytes": {
+          "node0": 25923412,
+          "node1": 18905200,
+          "gates": 701468695,
+          "node0_snapshot_store": 3756775,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 831.440390375,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91897856,
+            "cpu_seconds": 286.93
+          },
+          "node1": {
+            "rss_bytes": 42500096,
+            "cpu_seconds": 1.29
+          },
+          "driver": {
+            "rss_bytes": 846200832,
+            "cpu_seconds": 536.37
+          }
+        },
+        "disk_bytes": {
+          "node0": 25945808,
+          "node1": 18905799,
+          "gates": 701579935,
+          "node0_snapshot_store": 3760486,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 836.611495875,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91897856,
+            "cpu_seconds": 289.55
+          },
+          "node1": {
+            "rss_bytes": 42500096,
+            "cpu_seconds": 1.29
+          },
+          "driver": {
+            "rss_bytes": 866893824,
+            "cpu_seconds": 538.9
+          }
+        },
+        "disk_bytes": {
+          "node0": 25972673,
+          "node1": 18906997,
+          "gates": 701670575,
+          "node0_snapshot_store": 3767915,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 841.6769815839999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91897856,
+            "cpu_seconds": 292.21
+          },
+          "node1": {
+            "rss_bytes": 42500096,
+            "cpu_seconds": 1.3
+          },
+          "driver": {
+            "rss_bytes": 866893824,
+            "cpu_seconds": 541.35
+          }
+        },
+        "disk_bytes": {
+          "node0": 25995053,
+          "node1": 18907596,
+          "gates": 701761215,
+          "node0_snapshot_store": 3771626,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 846.7718300419999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91897856,
+            "cpu_seconds": 294.88
+          },
+          "node1": {
+            "rss_bytes": 42500096,
+            "cpu_seconds": 1.3
+          },
+          "driver": {
+            "rss_bytes": 853098496,
+            "cpu_seconds": 543.81
+          }
+        },
+        "disk_bytes": {
+          "node0": 26016660,
+          "node1": 18907596,
+          "gates": 701851855,
+          "node0_snapshot_store": 3775337,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 851.8861585,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91930624,
+            "cpu_seconds": 297.5
+          },
+          "node1": {
+            "rss_bytes": 42500096,
+            "cpu_seconds": 1.3
+          },
+          "driver": {
+            "rss_bytes": 866893824,
+            "cpu_seconds": 546.28
+          }
+        },
+        "disk_bytes": {
+          "node0": 26042747,
+          "node1": 18907596,
+          "gates": 701942495,
+          "node0_snapshot_store": 3782759,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 856.982598834,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91930624,
+            "cpu_seconds": 300.16
+          },
+          "node1": {
+            "rss_bytes": 42500096,
+            "cpu_seconds": 1.3
+          },
+          "driver": {
+            "rss_bytes": 849068032,
+            "cpu_seconds": 548.71
+          }
+        },
+        "disk_bytes": {
+          "node0": 26065145,
+          "node1": 18907596,
+          "gates": 702045495,
+          "node0_snapshot_store": 3786470,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 862.156675792,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91930624,
+            "cpu_seconds": 302.81
+          },
+          "node1": {
+            "rss_bytes": 42500096,
+            "cpu_seconds": 1.31
+          },
+          "driver": {
+            "rss_bytes": 866926592,
+            "cpu_seconds": 551.26
+          }
+        },
+        "disk_bytes": {
+          "node0": 26087545,
+          "node1": 18907596,
+          "gates": 702148495,
+          "node0_snapshot_store": 3790181,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 867.272284625,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91930624,
+            "cpu_seconds": 305.44
+          },
+          "node1": {
+            "rss_bytes": 42500096,
+            "cpu_seconds": 1.31
+          },
+          "driver": {
+            "rss_bytes": 866926592,
+            "cpu_seconds": 553.71
+          }
+        },
+        "disk_bytes": {
+          "node0": 26113203,
+          "node1": 18907596,
+          "gates": 702239135,
+          "node0_snapshot_store": 3797603,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 872.353390625,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91930624,
+            "cpu_seconds": 308.09
+          },
+          "node1": {
+            "rss_bytes": 42500096,
+            "cpu_seconds": 1.31
+          },
+          "driver": {
+            "rss_bytes": 866926592,
+            "cpu_seconds": 556.15
+          }
+        },
+        "disk_bytes": {
+          "node0": 26134987,
+          "node1": 18907596,
+          "gates": 702342135,
+          "node0_snapshot_store": 3801321,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 877.4435113339999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91930624,
+            "cpu_seconds": 310.75
+          },
+          "node1": {
+            "rss_bytes": 42500096,
+            "cpu_seconds": 1.32
+          },
+          "driver": {
+            "rss_bytes": 846233600,
+            "cpu_seconds": 558.59
+          }
+        },
+        "disk_bytes": {
+          "node0": 26157215,
+          "node1": 18907596,
+          "gates": 702445135,
+          "node0_snapshot_store": 3805032,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 882.589442125,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91963392,
+            "cpu_seconds": 313.37
+          },
+          "node1": {
+            "rss_bytes": 42500096,
+            "cpu_seconds": 1.32
+          },
+          "driver": {
+            "rss_bytes": 866926592,
+            "cpu_seconds": 561.08
+          }
+        },
+        "disk_bytes": {
+          "node0": 26183492,
+          "node1": 18907596,
+          "gates": 702556375,
+          "node0_snapshot_store": 3812454,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 887.655107917,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91963392,
+            "cpu_seconds": 316.03
+          },
+          "node1": {
+            "rss_bytes": 42500096,
+            "cpu_seconds": 1.32
+          },
+          "driver": {
+            "rss_bytes": 849412096,
+            "cpu_seconds": 563.53
+          }
+        },
+        "disk_bytes": {
+          "node0": 26205099,
+          "node1": 18907596,
+          "gates": 702659375,
+          "node0_snapshot_store": 3816165,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 892.7715533339999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91963392,
+            "cpu_seconds": 318.7
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.33
+          },
+          "driver": {
+            "rss_bytes": 866926592,
+            "cpu_seconds": 566.0
+          }
+        },
+        "disk_bytes": {
+          "node0": 26227803,
+          "node1": 18908327,
+          "gates": 702750015,
+          "node0_snapshot_store": 3819876,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 897.881889625,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91963392,
+            "cpu_seconds": 321.32
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.34
+          },
+          "driver": {
+            "rss_bytes": 866926592,
+            "cpu_seconds": 568.45
+          }
+        },
+        "disk_bytes": {
+          "node0": 26253293,
+          "node1": 18908327,
+          "gates": 702840655,
+          "node0_snapshot_store": 3827298,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 902.945840042,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91963392,
+            "cpu_seconds": 323.97
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.34
+          },
+          "driver": {
+            "rss_bytes": 845168640,
+            "cpu_seconds": 570.87
+          }
+        },
+        "disk_bytes": {
+          "node0": 26275503,
+          "node1": 18908926,
+          "gates": 702931295,
+          "node0_snapshot_store": 3831009,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 908.08079,
+        "processes": {
+          "node0": {
+            "rss_bytes": 91963392,
+            "cpu_seconds": 326.62
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.34
+          },
+          "driver": {
+            "rss_bytes": 865861632,
+            "cpu_seconds": 573.39
+          }
+        },
+        "disk_bytes": {
+          "node0": 26298056,
+          "node1": 18908926,
+          "gates": 703021935,
+          "node0_snapshot_store": 3834727,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 913.1900013339999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92012544,
+            "cpu_seconds": 329.26
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.34
+          },
+          "driver": {
+            "rss_bytes": 865861632,
+            "cpu_seconds": 575.84
+          }
+        },
+        "disk_bytes": {
+          "node0": 26323544,
+          "node1": 18908926,
+          "gates": 703112575,
+          "node0_snapshot_store": 3842149,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 918.265224875,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92012544,
+            "cpu_seconds": 331.91
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.35
+          },
+          "driver": {
+            "rss_bytes": 865861632,
+            "cpu_seconds": 578.28
+          }
+        },
+        "disk_bytes": {
+          "node0": 26345323,
+          "node1": 18909545,
+          "gates": 703203215,
+          "node0_snapshot_store": 3845860,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 923.331360209,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92012544,
+            "cpu_seconds": 334.56
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.35
+          },
+          "driver": {
+            "rss_bytes": 865861632,
+            "cpu_seconds": 580.74
+          }
+        },
+        "disk_bytes": {
+          "node0": 26367533,
+          "node1": 18910144,
+          "gates": 703306215,
+          "node0_snapshot_store": 3849571,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 928.4156698749999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92012544,
+            "cpu_seconds": 337.19
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.35
+          },
+          "driver": {
+            "rss_bytes": 845185024,
+            "cpu_seconds": 583.17
+          }
+        },
+        "disk_bytes": {
+          "node0": 26393021,
+          "node1": 18911342,
+          "gates": 703396855,
+          "node0_snapshot_store": 3856993,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 933.545948417,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92012544,
+            "cpu_seconds": 339.84000000000003
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.36
+          },
+          "driver": {
+            "rss_bytes": 865878016,
+            "cpu_seconds": 585.7
+          }
+        },
+        "disk_bytes": {
+          "node0": 26414798,
+          "node1": 18911941,
+          "gates": 703487495,
+          "node0_snapshot_store": 3860704,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 938.6682829169999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92012544,
+            "cpu_seconds": 342.49
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.36
+          },
+          "driver": {
+            "rss_bytes": 852082688,
+            "cpu_seconds": 588.14
+          }
+        },
+        "disk_bytes": {
+          "node0": 26436577,
+          "node1": 18911941,
+          "gates": 703590495,
+          "node0_snapshot_store": 3864415,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 943.772324875,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92045312,
+            "cpu_seconds": 345.12
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.36
+          },
+          "driver": {
+            "rss_bytes": 865878016,
+            "cpu_seconds": 590.6
+          }
+        },
+        "disk_bytes": {
+          "node0": 26462246,
+          "node1": 18913145,
+          "gates": 703705855,
+          "node0_snapshot_store": 3871844,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 948.847807584,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92045312,
+            "cpu_seconds": 347.79
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.37
+          },
+          "driver": {
+            "rss_bytes": 845185024,
+            "cpu_seconds": 593.05
+          }
+        },
+        "disk_bytes": {
+          "node0": 26483853,
+          "node1": 18913145,
+          "gates": 703808855,
+          "node0_snapshot_store": 3875555,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 953.989339709,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92045312,
+            "cpu_seconds": 350.44
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.38
+          },
+          "driver": {
+            "rss_bytes": 865878016,
+            "cpu_seconds": 595.54
+          }
+        },
+        "disk_bytes": {
+          "node0": 26505800,
+          "node1": 18913744,
+          "gates": 703915975,
+          "node0_snapshot_store": 3879266,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 959.082834875,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92045312,
+            "cpu_seconds": 353.07
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.38
+          },
+          "driver": {
+            "rss_bytes": 865878016,
+            "cpu_seconds": 597.98
+          }
+        },
+        "disk_bytes": {
+          "node0": 26531290,
+          "node1": 18913744,
+          "gates": 704018975,
+          "node0_snapshot_store": 3886688,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 964.153321959,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92045312,
+            "cpu_seconds": 355.72
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.38
+          },
+          "driver": {
+            "rss_bytes": 865878016,
+            "cpu_seconds": 600.42
+          }
+        },
+        "disk_bytes": {
+          "node0": 26553071,
+          "node1": 18913744,
+          "gates": 704109615,
+          "node0_snapshot_store": 3890399,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 969.2272567919999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92045312,
+            "cpu_seconds": 358.38
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.38
+          },
+          "driver": {
+            "rss_bytes": 845185024,
+            "cpu_seconds": 602.85
+          }
+        },
+        "disk_bytes": {
+          "node0": 26574678,
+          "node1": 18916739,
+          "gates": 704200255,
+          "node0_snapshot_store": 3894110,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 974.3632375,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92078080,
+            "cpu_seconds": 361.0
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.39
+          },
+          "driver": {
+            "rss_bytes": 865878016,
+            "cpu_seconds": 605.37
+          }
+        },
+        "disk_bytes": {
+          "node0": 26600343,
+          "node1": 18916739,
+          "gates": 704303255,
+          "node0_snapshot_store": 3901539,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 979.4378624999999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92078080,
+            "cpu_seconds": 363.65
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.39
+          },
+          "driver": {
+            "rss_bytes": 865878016,
+            "cpu_seconds": 607.82
+          }
+        },
+        "disk_bytes": {
+          "node0": 26622122,
+          "node1": 18916739,
+          "gates": 704406255,
+          "node0_snapshot_store": 3905250,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 984.512800042,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92094464,
+            "cpu_seconds": 364.32
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.39
+          },
+          "driver": {
+            "rss_bytes": 847347712,
+            "cpu_seconds": 612.21
+          }
+        },
+        "disk_bytes": {
+          "node0": 26626457,
+          "node1": 18917338,
+          "gates": 704435095,
+          "node0_snapshot_store": 3905250,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 990.288237709,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92094464,
+            "cpu_seconds": 364.32
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.4
+          },
+          "driver": {
+            "rss_bytes": 847347712,
+            "cpu_seconds": 618.02
+          }
+        },
+        "disk_bytes": {
+          "node0": 26626457,
+          "node1": 18917338,
+          "gates": 704435095,
+          "node0_snapshot_store": 3905250,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 995.737683542,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92094464,
+            "cpu_seconds": 364.32
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.4
+          },
+          "driver": {
+            "rss_bytes": 847347712,
+            "cpu_seconds": 623.45
+          }
+        },
+        "disk_bytes": {
+          "node0": 26626457,
+          "node1": 18917338,
+          "gates": 704435095,
+          "node0_snapshot_store": 3905250,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 1001.156202334,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92094464,
+            "cpu_seconds": 364.33
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.4
+          },
+          "driver": {
+            "rss_bytes": 847380480,
+            "cpu_seconds": 628.92
+          }
+        },
+        "disk_bytes": {
+          "node0": 26627056,
+          "node1": 18917338,
+          "gates": 704435095,
+          "node0_snapshot_store": 3905250,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 1006.689784125,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92094464,
+            "cpu_seconds": 364.33
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.41
+          },
+          "driver": {
+            "rss_bytes": 847380480,
+            "cpu_seconds": 634.42
+          }
+        },
+        "disk_bytes": {
+          "node0": 26628853,
+          "node1": 18917338,
+          "gates": 704435095,
+          "node0_snapshot_store": 3905250,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 1012.1156749999999,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92094464,
+            "cpu_seconds": 364.35
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.42
+          },
+          "driver": {
+            "rss_bytes": 847609856,
+            "cpu_seconds": 639.89
+          }
+        },
+        "disk_bytes": {
+          "node0": 26632904,
+          "node1": 18917338,
+          "gates": 704435095,
+          "node0_snapshot_store": 3905250,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 1017.575299667,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92094464,
+            "cpu_seconds": 364.35
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.42
+          },
+          "driver": {
+            "rss_bytes": 847609856,
+            "cpu_seconds": 645.32
+          }
+        },
+        "disk_bytes": {
+          "node0": 26633503,
+          "node1": 18917338,
+          "gates": 704435095,
+          "node0_snapshot_store": 3905250,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 1022.989106459,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92094464,
+            "cpu_seconds": 364.35
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.43
+          },
+          "driver": {
+            "rss_bytes": 847609856,
+            "cpu_seconds": 650.76
+          }
+        },
+        "disk_bytes": {
+          "node0": 26634701,
+          "node1": 18917338,
+          "gates": 704435095,
+          "node0_snapshot_store": 3905250,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 1028.4316457500001,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92094464,
+            "cpu_seconds": 364.36
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.43
+          },
+          "driver": {
+            "rss_bytes": 847609856,
+            "cpu_seconds": 656.22
+          }
+        },
+        "disk_bytes": {
+          "node0": 26634701,
+          "node1": 18917338,
+          "gates": 704435095,
+          "node0_snapshot_store": 3905250,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 1033.915415125,
+        "processes": {
+          "node0": {
+            "rss_bytes": 92094464,
+            "cpu_seconds": 364.36
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.43
+          },
+          "driver": {
+            "rss_bytes": 847609856,
+            "cpu_seconds": 661.68
+          }
+        },
+        "disk_bytes": {
+          "node0": 26635320,
+          "node1": 18918536,
+          "gates": 704435095,
+          "node0_snapshot_store": 3905250,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 1039.322576209,
+        "processes": {
+          "node0": {
+            "rss_bytes": 138903552,
+            "cpu_seconds": 367.64
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.43
+          },
+          "driver": {
+            "rss_bytes": 900988928,
+            "cpu_seconds": 663.7
+          }
+        },
+        "disk_bytes": {
+          "node0": 26638378,
+          "node1": 18918536,
+          "gates": 704435095,
+          "node0_snapshot_store": 3905250,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 1044.3676112090002,
+        "processes": {
+          "node0": {
+            "rss_bytes": 135643136,
+            "cpu_seconds": 371.7
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.44
+          },
+          "driver": {
+            "rss_bytes": 853213184,
+            "cpu_seconds": 664.73
+          }
+        },
+        "disk_bytes": {
+          "node0": 26640671,
+          "node1": 18919734,
+          "gates": 704435095,
+          "node0_snapshot_store": 3905250,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 1049.416764792,
+        "processes": {
+          "node0": {
+            "rss_bytes": 135659520,
+            "cpu_seconds": 376.47
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.44
+          },
+          "driver": {
+            "rss_bytes": 786841600,
+            "cpu_seconds": 665.04
+          }
+        },
+        "disk_bytes": {
+          "node0": 26667590,
+          "node1": 18919734,
+          "gates": 704435095,
+          "node0_snapshot_store": 3905250,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 1055.052028709,
+        "processes": {
+          "node0": {
+            "rss_bytes": 100581376,
+            "cpu_seconds": 376.5
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.44
+          },
+          "driver": {
+            "rss_bytes": 1000996864,
+            "cpu_seconds": 670.72
+          }
+        },
+        "disk_bytes": {
+          "node0": 26691438,
+          "node1": 18919734,
+          "gates": 704435095,
+          "node0_snapshot_store": 3905250,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 1060.653761084,
+        "processes": {
+          "node0": {
+            "rss_bytes": 100581376,
+            "cpu_seconds": 376.51
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.45
+          },
+          "driver": {
+            "rss_bytes": 977485824,
+            "cpu_seconds": 676.35
+          }
+        },
+        "disk_bytes": {
+          "node0": 26691438,
+          "node1": 18920333,
+          "gates": 704435095,
+          "node0_snapshot_store": 3905250,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 1073.090113792,
+        "processes": {
+          "node0": {
+            "rss_bytes": 121749504,
+            "cpu_seconds": 380.56
+          },
+          "node1": {
+            "rss_bytes": 42516480,
+            "cpu_seconds": 1.46
+          },
+          "driver": {
+            "rss_bytes": 766558208,
+            "cpu_seconds": 684.65
+          }
+        },
+        "disk_bytes": {
+          "node0": 30312042,
+          "node1": 18921531,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 717
+        }
+      },
+      {
+        "elapsed_seconds": 1078.181322334,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110526464,
+            "cpu_seconds": 385.31
+          },
+          "node1": {
+            "rss_bytes": 61292544,
+            "cpu_seconds": 1.7
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 684.73
+          }
+        },
+        "disk_bytes": {
+          "node0": 30374340,
+          "node1": 22406835,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1083.2333775420002,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 385.55
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 1.86
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 684.92
+          }
+        },
+        "disk_bytes": {
+          "node0": 30426125,
+          "node1": 22454926,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1088.316446209,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 385.68
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 1.95
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 685.12
+          }
+        },
+        "disk_bytes": {
+          "node0": 30455395,
+          "node1": 22484201,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1093.401710375,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 385.81
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 2.04
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 685.33
+          }
+        },
+        "disk_bytes": {
+          "node0": 30484668,
+          "node1": 22514070,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1098.4830745000002,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 385.94
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 2.13
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 685.54
+          }
+        },
+        "disk_bytes": {
+          "node0": 30513941,
+          "node1": 22543341,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1103.5697231670001,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 386.07
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 2.22
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 685.74
+          }
+        },
+        "disk_bytes": {
+          "node0": 30543211,
+          "node1": 22572615,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1108.650949667,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 386.2
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 2.3
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 685.94
+          }
+        },
+        "disk_bytes": {
+          "node0": 30572483,
+          "node1": 22601886,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1113.7330777500001,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 386.32
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 2.39
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 686.14
+          }
+        },
+        "disk_bytes": {
+          "node0": 30602101,
+          "node1": 22631501,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1118.8170334170002,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 386.45
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 2.47
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 686.34
+          }
+        },
+        "disk_bytes": {
+          "node0": 30631371,
+          "node1": 22660775,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1123.8988658340002,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 386.56
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 2.55
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 686.53
+          }
+        },
+        "disk_bytes": {
+          "node0": 30660643,
+          "node1": 22690046,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1128.983721125,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 386.69
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 2.64
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 686.72
+          }
+        },
+        "disk_bytes": {
+          "node0": 30689917,
+          "node1": 22719317,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1134.0657793340001,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 386.82
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 2.73
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 686.92
+          }
+        },
+        "disk_bytes": {
+          "node0": 30719187,
+          "node1": 22748590,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1139.1450530000002,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 386.95
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 2.81
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 687.12
+          }
+        },
+        "disk_bytes": {
+          "node0": 30748803,
+          "node1": 22778206,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1144.225445792,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 387.08
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 2.9
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 687.31
+          }
+        },
+        "disk_bytes": {
+          "node0": 30778077,
+          "node1": 22808077,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1149.3033520840002,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 387.19
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 2.98
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 687.5
+          }
+        },
+        "disk_bytes": {
+          "node0": 30807347,
+          "node1": 22837350,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1154.3782781250002,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 387.32
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 3.07
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 687.7
+          }
+        },
+        "disk_bytes": {
+          "node0": 30836618,
+          "node1": 22866622,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1159.4626567920002,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 387.44
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 3.15
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 687.89
+          }
+        },
+        "disk_bytes": {
+          "node0": 30866836,
+          "node1": 22896237,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1164.539589792,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 387.57
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 3.24
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 688.09
+          }
+        },
+        "disk_bytes": {
+          "node0": 30895762,
+          "node1": 22925165,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1169.6106047090002,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 387.69
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 3.32
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 688.28
+          }
+        },
+        "disk_bytes": {
+          "node0": 30925032,
+          "node1": 22955037,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1174.692226542,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 387.82
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 3.41
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 688.48
+          }
+        },
+        "disk_bytes": {
+          "node0": 30954307,
+          "node1": 22984307,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1179.775111375,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 387.94
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 3.49
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 688.68
+          }
+        },
+        "disk_bytes": {
+          "node0": 30983578,
+          "node1": 23013579,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1184.859296542,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 388.07
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 3.58
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 688.87
+          }
+        },
+        "disk_bytes": {
+          "node0": 31012848,
+          "node1": 23042853,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1189.933942375,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 388.2
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 3.67
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 689.06
+          }
+        },
+        "disk_bytes": {
+          "node0": 31042122,
+          "node1": 23072123,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1195.0177687920002,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 388.33
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 3.75
+          },
+          "driver": {
+            "rss_bytes": 743768064,
+            "cpu_seconds": 689.26
+          }
+        },
+        "disk_bytes": {
+          "node0": 31071738,
+          "node1": 23102359,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      },
+      {
+        "elapsed_seconds": 1197.8242629590002,
+        "processes": {
+          "node0": {
+            "rss_bytes": 110592000,
+            "cpu_seconds": 388.39
+          },
+          "node1": {
+            "rss_bytes": 60620800,
+            "cpu_seconds": 3.8
+          },
+          "driver": {
+            "rss_bytes": 743751680,
+            "cpu_seconds": 689.4
+          }
+        },
+        "disk_bytes": {
+          "node0": 31087236,
+          "node1": 23117856,
+          "gates": 718763463,
+          "node0_snapshot_store": 7521850,
+          "node1_snapshot_store": 3452695
+        }
+      }
+    ],
+    "errors": [],
+    "processes": {
+      "node0": {
+        "cpu_seconds": 387.57,
+        "average_cpu_cores": 0.3235616599027439,
+        "max_sampled_rss_bytes": 138903552
+      },
+      "node1": {
+        "cpu_seconds": 3.13,
+        "average_cpu_cores": 0.0026130711755181987,
+        "max_sampled_rss_bytes": 63881216
+      },
+      "driver": {
+        "cpu_seconds": 688.87,
+        "average_cpu_cores": 0.5751010673096555,
+        "max_sampled_rss_bytes": 1263124480
+      }
+    },
+    "logical_disk_growth_bytes": {
+      "node0": 11828988,
+      "node1": 4277194,
+      "gates": 711332363,
+      "node0_snapshot_store": 7521133,
+      "node1_snapshot_store": 3451978
+    }
+  },
+  "failure_observation": {
+    "stage": "first settlement follower recovery",
+    "offered": 300,
+    "durably_acknowledged": 300,
+    "node0_native_height": 102,
+    "node1_native_height": 101,
+    "proofs_admitted_by_node0_first_block": 201,
+    "proofs_not_yet_admitted_by_node0": 99,
+    "peer_recovery_completed": false,
+    "pipeline_completed": false,
+    "reason": "Node0 disconnected peer1 as malformed immediately after a 36-byte SPHGET; follower then could not obtain/validate all dependencies within the unchanged 120-second bound. Native transport investigation pending.",
+    "observation_basis": "epoch ACK counter, native submitblock success, payout oracle first-block count, native UpdateTip logs, and explicit malformed-peer log"
+  }
+}

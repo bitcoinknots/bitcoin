@@ -15,6 +15,36 @@
 #include <uint256.h>
 
 namespace sharepool {
+/** Pace request service, not packet arrival. Network/scheduler delays can make
+ * an honest sender's independently paced requests arrive with less spacing.
+ * Keep one bounded pending request while credits refill instead of treating
+ * local resource exhaustion as malformed input. The existing allowance is
+ * unchanged: a burst of 32 services, then 32 services per second.
+ * Duration credits avoid floating-point drift at the refill boundary. */
+class HashRelayRequestBudget {
+    using Clock = std::chrono::steady_clock;
+    static constexpr auto CAPACITY{std::chrono::seconds{1}};
+    static constexpr auto COST{std::chrono::microseconds{31'250}};
+    Clock::time_point m_updated;
+    Clock::duration m_credit{CAPACITY};
+
+public:
+    explicit HashRelayRequestBudget(Clock::time_point now = Clock::now()) : m_updated{now} {}
+
+    /** Charge every response attempt, including unknown hashes/offsets. */
+    bool Take(Clock::time_point now)
+    {
+        if (now > m_updated) {
+            const auto elapsed = now - m_updated;
+            m_credit = elapsed >= CAPACITY - m_credit ? CAPACITY : m_credit + elapsed;
+            m_updated = now;
+        }
+        if (m_credit < COST) return false;
+        m_credit -= COST;
+        return true;
+    }
+};
+
 /** Sequence-ordered live events may repeat a repaired hash. SPHINV itself
  * requires unique hashes in uint256 order, independently of cursor order. */
 inline std::vector<uint256> CanonicalHashInventory(std::vector<uint256> hashes)
@@ -202,6 +232,18 @@ template <typename Request>
 void ExpireHashRelayRequest(std::optional<Request>& request, std::chrono::steady_clock::time_point now)
 {
     if (request && request->deadline <= now) request.reset();
+}
+
+/** Keep exactly one request. Exact retries neither consume another slot nor
+ * extend its original deadline; a conflicting unexpired request is malformed.
+ * Shape and offset bounds must be checked before calling this helper. */
+template <typename Request>
+bool QueueHashRelayRequest(std::optional<Request>& pending, Request request, std::chrono::steady_clock::time_point now)
+{
+    ExpireHashRelayRequest(pending, now);
+    if (pending) return pending->hash == request.hash && pending->offset == request.offset;
+    pending.emplace(std::move(request));
+    return true;
 }
 } // namespace sharepool
 #endif // BITCOIN_SHAREPOOL_HASH_RELAY_H
