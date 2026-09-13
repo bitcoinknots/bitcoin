@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "base_commit": "782e352151f71fdff26c97ba643d6012810da4c1",
+  "scope": "Python verification latency; immutable operation captures and bounded canonical decoding; opt-in regtest only",
+  "source_freeze": "latency-v7-source-freeze.json",
+  "binary_sha256": {
+    "bitcoind": "2f06596d94347f8491c6506d8474e4ffbfc44243fd41f0bcb884957e108d5365",
+    "bitcoin-sharepool-signer": "bbb7b90309010477f0e13866671c84cd05ddb4699c087d55897d6cf10cc169f3"
+  },
+  "consensus_changes": false,
+  "wire_changes": false,
+  "difficulty_changes": false,
+  "admission_budget_changes": false,
+  "python": {
+    "cases_passed": 283,
+    "skipped": 0,
+    "report": "latency-v7-python-checks.json"
+  },
+  "native": {
+    "scenarios_passed": 6,
+    "report": "latency-v7-native-checks.json"
+  },
+  "cpp": "Not rerun: unchanged native source and exact preceding verified Debug daemon binary",
+  "capacity": {
+    "result": "passed",
+    "miners": 100,
+    "epochs": 3,
+    "proofs": 900,
+    "report": "latency-v7-capacity-100.json",
+    "log": "latency-v7-capacity-100-native.txt"
+  },
+  "microbenchmarks": {
+    "codec": "latency-v7-codec-{before,after}.json",
+    "codec_clock": "process_time for CPU medians; each sample also records wall time",
+    "graph": "latency-v7-graph-{before,codec-only,after}.json",
+    "graph_clock": "perf_counter wall time; three repeats after warmup; separate cProfile counts",
+    "gate": "latency-v7-gate-comparison.json",
+    "gate_clock": "cProfile cumulative receive time with RPC double; fixture creation excluded"
+  },
+  "limitations": [
+    "Ten minutes is an average, not a verification deadline or a validity rule.",
+    "Finite burst then drain on two loopback Debug nodes; not sustained offered-load capacity, WAN or mainnet qualification.",
+    "Follower gate receipt import covers first epoch; both native peers verify all 900 admissions.",
+    "Byte/share/entry cache budgets bound estimated retained entries, not process RSS or transient allocations.",
+    "Historical baseline artifacts preserved byte for byte; different native capture host loads prevent a controlled full-pipeline speedup claim.",
+    "Physical miners not used; SHIFT10 and public-network activation settings unchanged."
+  ],
+  "artifact_sha256": {
+    "contrib/sharepool/results/latency-v7-capacity-100-native.txt": "cb90326f9aff3014f88e0eed1235687bb90ca66db729299461a1dffec38817c8",
+    "contrib/sharepool/results/latency-v7-capacity-100.json": "ad74ed62a0f27b74610f6c720e30d53d3bec1b9dcbe4b55b4dfe3eda6eb21647",
+    "contrib/sharepool/results/latency-v7-codec-after.json": "befb3d5776491f498adcb608f34d8a4cd499576a3bb896e01923ad7e14bd9b7d",
+    "contrib/sharepool/results/latency-v7-codec-before.json": "3e2c0cae4a4235d63b515152aae8046cf17434281dd315d451239035ac275cc0",
+    "contrib/sharepool/results/latency-v7-gate-after.txt": "d40ad08c22075716c0eab8c332d3dc78a53aabda55643248c71905a0b2f8be87",
+    "contrib/sharepool/results/latency-v7-gate-before.txt": "3b4112b15b6592b62bce83d64ab27eeee418cfa62a786b74c5884260f1d9bfae",
+    "contrib/sharepool/results/latency-v7-gate-comparison.json": "cc0154c7cdbd7e7631bace64ec75aafe4c8a409a41f97f706d5a5e67b36e90df",
+    "contrib/sharepool/results/latency-v7-gate-reproduce.json": "55ecdf0ba11d42e27a0606eb084a8214bc21f77a5081aac471af753f4fa205d5",
+    "contrib/sharepool/results/latency-v7-gate-reproduce.txt": "f706b3e1d5e10d9b41cc26e8cda9139843b0bc49af0835df1c2b0a28bf213f49",
+    "contrib/sharepool/results/latency-v7-graph-after.json": "4fed600ebf66d9479986bfc5dc181da679ceb92b8fc956bcafddea873b42e706",
+    "contrib/sharepool/results/latency-v7-graph-before.json": "2defccf2ea3902c4077155f7fc18e91291801c889849da7053b47f80ae674330",
+    "contrib/sharepool/results/latency-v7-graph-codec-only.json": "4246383d89c8df9934a0c8297bcd316cd7273561bd7aa7bf7ad7be0a373d7c4b",
+    "contrib/sharepool/results/latency-v7-native-checks.json": "e5f7c6dd5d62661908bbf55946dbe3c285f354aa181511a36f61ec9a4f132c82",
+    "contrib/sharepool/results/latency-v7-native-compact-results.json": "92bbfafd70e21a964b8249d43fd6d2f5b460e0977d2028a39c5ac3ac559142c8",
+    "contrib/sharepool/results/latency-v7-native-v4-builder.txt": "2c31df14d3657215c37648bd9a393d636d9ed481b5da97be6b94b583ec7762fb",
+    "contrib/sharepool/results/latency-v7-native-v4-worker.txt": "9d19477f32a05c66a8462d9d938a5ce0a1c19529a7a83729e6958da9fa4529f8",
+    "contrib/sharepool/results/latency-v7-native-v5-ledger.txt": "9d6767de7154a167584003db881e3971e4d914b8c0ef44e6b794025aad12b769",
+    "contrib/sharepool/results/latency-v7-native-v6-archive.txt": "4b8aa3e0018369368e7f9caddf2818bde0a5d72aa3c96793db0ed3239d634e73",
+    "contrib/sharepool/results/latency-v7-native-v6-tides.txt": "7e75e7851dc1f345a610ab058130b597d08fc6af73a04ad59727d0df425a70fe",
+    "contrib/sharepool/results/latency-v7-native-v7-compact.txt": "d07a982268e0a120d2d66ffdc811b1371480781825cffb2c877a91fc5632fe4d",
+    "contrib/sharepool/results/latency-v7-python-capacity.txt": "1b1166d2c5ceab5f42219bc0f08d3ba0496e2edf51266fcd7542377c8380e4e4",
+    "contrib/sharepool/results/latency-v7-python-checks.json": "6ad7e0f44c37646f4f29ed85c6001780ff8588821ea8cdb7a729b8508a3d7035",
+    "contrib/sharepool/results/latency-v7-python-hash.txt": "96fbcf069c5356ad8577c22f243d4599b80903b0200ff492a37179c7a3e9fd60",
+    "contrib/sharepool/results/latency-v7-python-model.txt": "814cc4a0b47ec7ee88da05979c0e32434deeac1f91771c15cb85599929275b0f",
+    "contrib/sharepool/results/latency-v7-python-tides.txt": "1d63a36396264fd4e64374c169a88c1065bf4f5d48037b8939d59367a562b513",
+    "contrib/sharepool/results/latency-v7-source-freeze.json": "5d022faab858e0c91a306ab913da948906ee9a9b44c340b4d4b12c5aa4b31ced"
+  }
+}

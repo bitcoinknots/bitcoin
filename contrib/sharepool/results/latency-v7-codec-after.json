@@ -1,0 +1,100 @@
+{
+  "label": "after",
+  "scope": "CPU serialization and hashing only; no native validation or throughput claim",
+  "python": "3.9.6",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "repeats": 3,
+  "codec_sha256": "dd027da54e773459dfd2126822e2f38947e63936d6e096790f83a57e83678b1d",
+  "workloads": [
+    {
+      "jobs": 1,
+      "shares": 1024,
+      "encoded_bytes": 34874,
+      "raw_sha256": "68ea08c54687bbfc3f4d3a9d8cd005cb20d5a98f0de72b65586141dc82692af0",
+      "snapshot_hash": "60d765cb882b6b7f5f7093d2f37e9b5e35e2b8917152615e6fbfb1b2b3db442b",
+      "owner_message": "1d534541fc5d2fa5a7a41435b415703fe556da5d2f2aafaae47f7773cec57a63",
+      "timings": {
+        "serialize_hash_owner": {
+          "samples": [
+            {
+              "cpu_seconds": 0.003473000000000004,
+              "wall_seconds": 0.0034761669999999745
+            },
+            {
+              "cpu_seconds": 0.003469,
+              "wall_seconds": 0.0034692920000000127
+            },
+            {
+              "cpu_seconds": 0.003467999999999999,
+              "wall_seconds": 0.003470875000000012
+            }
+          ],
+          "median_cpu_seconds": 0.003469
+        },
+        "one_operation_capture": {
+          "samples": [
+            {
+              "cpu_seconds": 0.0011899999999999966,
+              "wall_seconds": 0.0011906670000000064
+            },
+            {
+              "cpu_seconds": 0.0011619999999999964,
+              "wall_seconds": 0.001166208000000002
+            },
+            {
+              "cpu_seconds": 0.0012169999999999959,
+              "wall_seconds": 0.0012171250000000133
+            }
+          ],
+          "median_cpu_seconds": 0.0011899999999999966
+        }
+      },
+      "profile": "         55990 function calls in 0.006 seconds\n\n   Ordered by: cumulative time\n   List reduced from 67 to 18 due to restriction <18>\n\n   ncalls  tottime  percall  cumtime  percall filename:lineno(function)\n        1    0.000    0.000    0.006    0.006 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/test_hash_codec_latency.py:43(triplet)\n        3    0.000    0.000    0.006    0.002 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:608(serialize)\n        3    0.002    0.001    0.003    0.001 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:556(_compact_share_jobs)\n        1    0.000    0.000    0.002    0.002 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:792(owner_message)\n        1    0.000    0.000    0.002    0.002 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:788(signing_payload)\n        1    0.000    0.000    0.002    0.002 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:784(contents_hash)\n        1    0.000    0.000    0.002    0.002 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:796(hash)\n     6144    0.001    0.000    0.001    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:138(header_facts)\n        3    0.000    0.000    0.001    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:629(<listcomp>)\n     3105    0.000    0.000    0.001    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:646(append)\n     3075    0.000    0.000    0.001    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:590(<genexpr>)\n       26    0.000    0.000    0.001    0.000 {built-in method builtins.any}\n     3072    0.000    0.000    0.001    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:164(proof_id)\n     3106    0.000    0.000    0.000    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/native_enforcement.py:38(compact_size)\n     3075    0.000    0.000    0.000    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:609(<genexpr>)\n     3075    0.000    0.000    0.000    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:611(<genexpr>)\n     9366    0.000    0.000    0.000    0.000 {built-in method builtins.len}\n     6155    0.000    0.000    0.000    0.000 {built-in method builtins.getattr}\n\n\n"
+    },
+    {
+      "jobs": 16,
+      "shares": 1024,
+      "encoded_bytes": 43079,
+      "raw_sha256": "facbe62c63e40b49f67ed719fd86d29180f4997fb87b4952f5df51b9bd23c413",
+      "snapshot_hash": "40b7619b1c4fd59abdc0ef1c7b49225ce89beef81fa29fb1150cea2e022e0489",
+      "owner_message": "805b22f62ca2d36025af2b076bae45e0c6e5bdf59a269c932c9856d2d97e7559",
+      "timings": {
+        "serialize_hash_owner": {
+          "samples": [
+            {
+              "cpu_seconds": 0.0038449999999999873,
+              "wall_seconds": 0.0038489170000000072
+            },
+            {
+              "cpu_seconds": 0.003805999999999976,
+              "wall_seconds": 0.0038092920000000197
+            },
+            {
+              "cpu_seconds": 0.0038569999999999993,
+              "wall_seconds": 0.0038604589999999828
+            }
+          ],
+          "median_cpu_seconds": 0.0038449999999999873
+        },
+        "one_operation_capture": {
+          "samples": [
+            {
+              "cpu_seconds": 0.0012990000000000501,
+              "wall_seconds": 0.0012996659999999771
+            },
+            {
+              "cpu_seconds": 0.0013060000000000294,
+              "wall_seconds": 0.0013070410000000088
+            },
+            {
+              "cpu_seconds": 0.0013030000000000541,
+              "wall_seconds": 0.0013042080000000844
+            }
+          ],
+          "median_cpu_seconds": 0.0013030000000000541
+        }
+      },
+      "profile": "         58915 function calls in 0.006 seconds\n\n   Ordered by: cumulative time\n   List reduced from 67 to 18 due to restriction <18>\n\n   ncalls  tottime  percall  cumtime  percall filename:lineno(function)\n        1    0.000    0.000    0.006    0.006 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/test_hash_codec_latency.py:43(triplet)\n        3    0.000    0.000    0.006    0.002 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:608(serialize)\n        3    0.002    0.001    0.004    0.001 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:556(_compact_share_jobs)\n        1    0.000    0.000    0.002    0.002 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:792(owner_message)\n        1    0.000    0.000    0.002    0.002 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:788(signing_payload)\n        1    0.000    0.000    0.002    0.002 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:796(hash)\n        1    0.000    0.000    0.002    0.002 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:784(contents_hash)\n     6144    0.001    0.000    0.001    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:138(header_facts)\n        3    0.000    0.000    0.001    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:629(<listcomp>)\n     3240    0.000    0.000    0.001    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:646(append)\n     3075    0.000    0.000    0.001    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:590(<genexpr>)\n      116    0.000    0.000    0.001    0.000 {built-in method builtins.any}\n     3072    0.000    0.000    0.001    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:164(proof_id)\n     3286    0.000    0.000    0.000    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/native_enforcement.py:38(compact_size)\n       52    0.000    0.000    0.000    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:115(serialize)\n     3075    0.000    0.000    0.000    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:609(<genexpr>)\n     9996    0.000    0.000    0.000    0.000 {built-in method builtins.len}\n     3075    0.000    0.000    0.000    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:611(<genexpr>)\n\n\n"
+    }
+  ]
+}

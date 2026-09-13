@@ -1,0 +1,53 @@
+         6188414 function calls (6187614 primitive calls) in 1.232 seconds
+
+   Ordered by: cumulative time
+   List reduced from 350 to 45 due to restriction <45>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+       20    0.000    0.000    1.240    0.062 hash_mining_gate.py:737(receive)
+       60    0.001    0.000    0.986    0.016 hash_snapshot.py:497(materialize_compact_state)
+       80    0.000    0.000    0.816    0.010 key.py:240(verify_schnorr)
+       80    0.012    0.000    0.806    0.010 secp256k1.py:209(mul)
+    41680    0.057    0.000    0.795    0.000 secp256k1.py:186(__add__)
+       20    0.000    0.000    0.770    0.039 hash_mining_gate.py:638(_provenance)
+       20    0.000    0.000    0.770    0.039 hash_gate_batch.py:20(check_graph)
+       60    0.000    0.000    0.669    0.011 hash_gate_batch.py:116(hydrate)
+       20    0.000    0.000    0.444    0.022 hash_gate_batch.py:169(walk)
+       20    0.000    0.000    0.318    0.016 hash_mining_gate.py:807(_parent_snapshot)
+   642160    0.264    0.000    0.298    0.000 secp256k1.py:30(__init__)
+      120    0.011    0.000    0.259    0.002 hash_snapshot.py:691(deserialize)
+    41600    0.029    0.000    0.250    0.000 secp256k1.py:171(__init__)
+   144960    0.034    0.000    0.244    0.000 secp256k1.py:83(__pow__)
+      400    0.006    0.000    0.222    0.001 hash_snapshot.py:608(serialize)
+   166400    0.079    0.000    0.193    0.000 secp256k1.py:59(__sub__)
+   290080    0.179    0.000    0.179    0.000 {built-in method builtins.pow}
+    50060    0.005    0.000    0.179    0.000 hash_snapshot.py:164(proof_id)
+    76060    0.020    0.000    0.178    0.000 hash_snapshot.py:138(header_facts)
+      400    0.000    0.000    0.172    0.000 hash_snapshot.py:846(snapshot)
+      400    0.001    0.000    0.171    0.000 hash_snapshot.py:629(<listcomp>)
+      320    0.000    0.000    0.109    0.000 test_hash_compact.py:293(__call__)
+      320    0.000    0.000    0.109    0.000 test_hash_tides.py:49(__call__)
+      320    0.000    0.000    0.109    0.000 test_hash_mining_gate.py:33(__call__)
+       60    0.000    0.000    0.108    0.002 hash_mining_gate.py:628(_submit_snapshot)
+       20    0.000    0.000    0.106    0.005 hash_mining_gate.py:653(_rehydrate_retained)
+      120    0.000    0.000    0.098    0.001 hash_gate_batch.py:60(account)
+     6400    0.003    0.000    0.089    0.000 messages.py:904(calc_sha256)
+     6100    0.001    0.000    0.085    0.000 messages.py:910(rehash)
+     6400    0.002    0.000    0.084    0.000 messages.py:186(powhash)
+     6400    0.029    0.000    0.083    0.000 messages.py:115(blake2b_header_hash_components)
+       80    0.011    0.000    0.070    0.001 hash_snapshot.py:431(apply_tides_state)
+    82240    0.027    0.000    0.070    0.000 secp256k1.py:69(__mul__)
+    83040    0.028    0.000    0.068    0.000 secp256k1.py:49(__add__)
+    19040    0.032    0.000    0.054    0.000 messages.py:883(serialize)
+    12720    0.028    0.000    0.051    0.000 messages.py:837(deserialize)
+   103440    0.048    0.000    0.050    0.000 secp256k1.py:126(__eq__)
+     6320    0.004    0.000    0.050    0.000 native_enforcement.py:168(header)
+    40800    0.009    0.000    0.044    0.000 secp256k1.py:75(__rmul__)
+  1741540    0.044    0.000    0.044    0.000 {built-in method builtins.isinstance}
+    41440    0.006    0.000    0.043    0.000 secp256k1.py:79(__truediv__)
+    25600    0.008    0.000    0.029    0.000 messages.py:107(tagged_hash)
+      360    0.001    0.000    0.029    0.000 {method 'join' of 'bytes' objects}
+     6080    0.001    0.000    0.028    0.000 hash_snapshot.py:492(<genexpr>)
+     6000    0.007    0.000    0.027    0.000 hash_snapshot.py:335(serialize)
+
+

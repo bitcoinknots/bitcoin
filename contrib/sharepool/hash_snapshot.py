@@ -9,9 +9,11 @@ required before mining. The only Merkle construction used by candidate() is the
 ordinary Bitcoin transaction commitment, never the settlement commitment.
 """
 from dataclasses import dataclass, replace
+import hashlib
 import struct
 import weakref
 from io import BytesIO
+from typing import NamedTuple
 
 from native_enforcement import (Envelope as _Envelope, Reader as _Reader,
     Share as _Share, StateEntry, SHARE_BITS, MAX_SHARE_AGE, compact_size, vector,
@@ -133,12 +135,52 @@ class EnvelopeV2(_Envelope):
 
 @dataclass(frozen=True)
 class Share(_Share):
+    @property
+    def header_facts(self):
+        """Immutable facts about exact canonical bytes, owned by this proof.
+
+        Headers returned by ``header`` remain independent mutable objects. The
+        memo never retains one, and replacing the bytes invalidates the memo.
+        Mutable byte buffers are parsed afresh rather than used as cache keys.
+        Canonical decoding fills this fixed-size memo before cache accounting.
+        """
+        raw = self.header_bytes
+        cached = getattr(self, "_header_facts", None)
+        if type(raw) is bytes and cached is not None and cached[0] is raw:
+            return cached[1]
+        header = self.header
+        identity = header.rehash()
+        search = (struct.pack("<III", header.nNonce, header.m_nonce2, header.m_nonce3) +
+                  header.m_extranonce.to_bytes(16, "little") + struct.pack("<I", header.m_time_offset))
+        for name in PHYSICAL_FIELDS:
+            setattr(header, name, 0)
+        normalized = header.serialize()
+        facts = _HeaderFacts(identity, int.from_bytes(hashlib.sha256(normalized).digest(), "big"),
+            normalized, search, header.nBits, header.m_height, header.hashPrevBlock)
+        if type(raw) is bytes:
+            object.__setattr__(self, "_header_facts", (raw, facts))
+        return facts
+
+    @property
+    def proof_id(self):
+        return self.header_facts.proof_id
+
     @classmethod
     def read(cls, reader):
         version = reader.take(4)
         if not int.from_bytes(version, "little") & 0x80000000:
             raise ValueError("v2 native share header required")
         return cls(version + reader.take(160), EnvelopeV2.read(reader), reader.take(64))
+
+
+class _HeaderFacts(NamedTuple):
+    proof_id: int
+    template_id: int
+    immutable_header: bytes
+    search_fields: bytes
+    native_bits: int
+    height: int
+    native_parent: int
 
 
 def parse_share(raw):
@@ -422,20 +464,21 @@ def apply_tides_state(snapshot, parent):
     origin_certificates = {}
     admissions = []
     for share in sorted(snapshot.shares, key=lambda value: value.proof_id):
+        facts = share.header_facts
         if (share.envelope.version != snapshot.envelope.version or
-                not minimum <= share.envelope.height <= height or share.header.m_height != share.envelope.height):
+                not minimum <= share.envelope.height <= height or facts.height != share.envelope.height):
             raise ValueError("TIDES admission profile or age")
-        share_target(share.header.nBits, snapshot.envelope.version)
+        share_target(facts.native_bits, snapshot.envelope.version)
         if share.proof_id in seen:
             raise ValueError("duplicate admitted proof")
         seen.add(share.proof_id)
         state.append(StateEntry(share.envelope.height, share.proof_id))
         admissions.append(LedgerCredit(height, share.envelope.height, share.proof_id,
-            share.envelope.pool, share.header.nBits, share.envelope.payout_script))
-        record = records.get(int(template_id(share.header), 16))
+            share.envelope.pool, facts.native_bits, share.envelope.payout_script))
+        record = records.get(facts.template_id)
         if record is None:
             raise ValueError("admitted origin template missing")
-        if record.header_bytes != immutable_header(share.header):
+        if record.header_bytes != facts.immutable_header:
             raise ValueError("TIDES admission template differs from proof")
         if record.template_id not in origin_certificates:
             origin_certificates[record.template_id] = origin_certificate(record)
@@ -451,20 +494,23 @@ def apply_tides_state(snapshot, parent):
                    post_state=tuple(sorted(state, key=lambda entry: entry.proof_id)))
 
 
-def materialize_compact_state(snapshot, *, parent_snapshot, activation_height=1, on_snapshot=None):
+def materialize_compact_state(snapshot, *, parent_snapshot, activation_height=1, on_snapshot=None, capture=None):
     """Reconstruct omitted state using at most three actual native ancestors.
 
     The callback must authenticate the requested native block hash and height,
     and its sidechain opening; gate callers do that with exact raw headers.
     This bounded helper verifies owner signatures and recent admission state.
-    Native scripts, proof of work and chain validity remain mandatory.
+    Native scripts, proof of work and chain validity remain mandatory. A capture
+    resolver may reuse operation-owned encodings of its immutable inputs only;
+    external mutable snapshots must always be captured afresh.
     """
     if snapshot.envelope.version != COMPACT_TIDES_VERSION or snapshot.envelope.height < activation_height:
         raise ValueError("compact state profile or activation mismatch")
-    sequence, seen, total, proofs = [snapshot], set(), 0, 0
+    capture = capture or (lambda value: value.capture())
+    sequence, seen, total, proofs = [capture(snapshot)], set(), 0, 0
     first = max(activation_height, snapshot.envelope.height - MAX_SHARE_AGE)
-    while sequence[-1].envelope.height > first:
-        child = sequence[-1]
+    while sequence[-1].snapshot.envelope.height > first:
+        child = sequence[-1].snapshot
         previous = parent_snapshot(child.envelope.native_parent, child.envelope.height - 1)
         if previous is None:
             raise ValueError("missing compact native ancestry snapshot")
@@ -473,11 +519,10 @@ def materialize_compact_state(snapshot, *, parent_snapshot, activation_height=1,
                 previous.envelope.genesis != snapshot.envelope.genesis or
                 previous.envelope.rules != snapshot.envelope.rules):
             raise ValueError("compact native ancestry binding mismatch")
-        sequence.append(previous)
+        sequence.append(capture(previous))
     parent = None
-    for value in reversed(sequence):
-        raw = value.serialize()
-        identity = value.hash
+    for encoding in reversed(sequence):
+        value, raw, identity = encoding.snapshot, encoding.raw, encoding.hash
         if identity not in seen:
             seen.add(identity)
             total += len(raw)
@@ -486,12 +531,12 @@ def materialize_compact_state(snapshot, *, parent_snapshot, activation_height=1,
                 raise ValueError("compact ancestry exceeds dependency budget")
             if on_snapshot is not None:
                 on_snapshot(value, raw)
-        if not verify_schnorr(value.envelope.public_key, value.owner_signature, value.owner_message):
+        if not verify_schnorr(value.envelope.public_key, value.owner_signature, encoding.owner_message):
             raise ValueError("compact native ancestry owner authorization")
         derived = apply_tides_state(replace(value, post_state=(), certificates=()), parent)
         if len(derived.post_state) > MAX_SNAPSHOT_BYTES // 36:
             raise ValueError("derived compact state count exceeds original bound")
-        if value is snapshot:
+        if encoding is sequence[0]:
             if derived.history_head != value.history_head:
                 raise ValueError("compact history head differs from native ancestry")
             return derived
@@ -517,21 +562,28 @@ def _compact_share_jobs(records, shares):
     if len(shares) > MAX_COMPACT_SHARES:
         raise ValueError("compact share count exceeds original work bound")
     by_id = {record.template_id: index for index, record in enumerate(records)}
-    jobs, encoded = {}, []
+    jobs, encoded, envelopes = {}, [], {}
     for share in shares:
-        header = share.header
-        index = by_id.get(int(template_id(header), 16))
-        if index is None or records[index].header_bytes != immutable_header(header):
+        facts = share.header_facts
+        index = by_id.get(facts.template_id)
+        if index is None or records[index].header_bytes != facts.immutable_header:
             raise ValueError("compact proof does not match an exact declared template")
         if type(share.owner_signature) is not bytes or len(share.owner_signature) != 64:
             raise ValueError("compact job authorization must contain 64 bytes")
-        descriptor = share.envelope.serialize(), share.owner_signature
+        # Exact EnvelopeV2 fields are frozen and validation requires their byte
+        # fields to be immutable. Share one serialization only in this operation.
+        key = id(share.envelope)
+        if type(share.envelope) is EnvelopeV2 and key in envelopes:
+            envelope = envelopes[key]
+        else:
+            envelope = share.envelope.serialize()
+            if type(share.envelope) is EnvelopeV2:
+                envelopes[key] = envelope
+        descriptor = envelope, share.owner_signature
         if index in jobs and jobs[index] != descriptor:
             raise ValueError("inconsistent compact job owner descriptor")
         jobs[index] = descriptor
-        search = (struct.pack("<III", header.nNonce, header.m_nonce2, header.m_nonce3) +
-                  header.m_extranonce.to_bytes(16, "little") + struct.pack("<I", header.m_time_offset))
-        encoded.append((index, search))
+        encoded.append((index, facts.search_fields))
     ordered = sorted(jobs)
     indexes = {template: index for index, template in enumerate(ordered)}
     descriptors = tuple(compact_size(index) + b"".join(jobs[index]) for index in ordered)
@@ -721,6 +773,14 @@ class Snapshot:
 
     frombytes = deserialize
 
+    def capture(self):
+        """Capture the current canonical bytes for reuse within one operation.
+
+        Snapshot.payouts may contain mutable CTxOut objects, so this never caches
+        by Snapshot identity. A later call observes and validates their edits.
+        """
+        return SnapshotEncoding(self)
+
     @property
     def contents_hash(self):
         return h256(_domain("contents", self.envelope.version), replace(self, owner_signature=bytes(64)).serialize())
@@ -740,6 +800,59 @@ class Snapshot:
     @property
     def hash_hex(self):
         return f"{self.hash:064x}"
+
+
+@dataclass(frozen=True)
+class _CapturedOutput:
+    nValue: int
+    scriptPubKey: bytes
+
+    def serialize(self):
+        return struct.pack("<q", self.nValue) + vector(self.scriptPubKey)
+
+
+class SnapshotEncoding:
+    """An immutable canonical byte capture, with a detached read-only view.
+
+    Hashes authenticate these bytes only. This object is not a validation cache
+    or proof of native validity. Its lifetime and retention belong to the caller.
+    """
+    __slots__ = ("raw", "hash", "contents_hash", "signing_payload", "owner_message", "_snapshot")
+
+    def __init__(self, snapshot):
+        raw = snapshot.serialize()
+        reader = Reader(raw)
+        envelope = EnvelopeV2.read(reader)
+        boundary = reader.stream.tell()
+        reader.take(64)
+        job = reader.take(32)
+        # Only the authorization bytes are zeroed for the contents hash. Stream
+        # the exact preimage instead of copying a potentially 16 MiB snapshot.
+        digest = hashlib.sha256(_domain("contents", envelope.version))
+        view = memoryview(raw)
+        digest.update(view[:boundary])
+        digest.update(bytes(64))
+        digest.update(view[boundary + 64:])
+        contents = int.from_bytes(hashlib.sha256(digest.digest()).digest(), "little")
+        payload = raw[:boundary] + job + ser_uint256(contents)
+        for name, value in (("raw", raw), ("hash", profile_snapshot_hash(raw, envelope.version)),
+                ("contents_hash", contents), ("signing_payload", payload),
+                ("owner_message", hash256(_domain("owner", envelope.version) + payload)), ("_snapshot", None)):
+            object.__setattr__(self, name, value)
+
+    def __setattr__(self, name, value):
+        raise AttributeError("snapshot encodings are immutable")
+
+    @property
+    def snapshot(self):
+        if self._snapshot is None:
+            decoded = Snapshot.deserialize(self.raw)
+            # All other decoded records contain only immutable bytes, integers,
+            # tuples and frozen records. Never retain an external CTxOut here.
+            detached = replace(decoded, payouts=tuple(_CapturedOutput(output.nValue, bytes(output.scriptPubKey))
+                for output in decoded.payouts))
+            object.__setattr__(self, "_snapshot", detached)
+        return self._snapshot
 
 
 def job_hash(block):

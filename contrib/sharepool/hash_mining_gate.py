@@ -26,9 +26,10 @@ import tempfile
 import native_archive
 import hash_gate_archive
 import hash_gate_batch
+from hash_gate_cache import SnapshotDecodeCache
 from hash_snapshot import (Snapshot, TemplateRecord, CompactTemplateRecord, Share, MAX_SNAPSHOT_BYTES,
     MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_BYTES, MAX_COMPACT_SHARES, MAX_SHARE_AGE, SHARE_BITS, parse_share, candidate, normalize_template, build_snapshot,
-    job_hash, work_outputs, credit_outputs, rules_hash, LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION, is_tides_profile, materialize_compact_state)
+    job_hash, work_outputs, credit_outputs, rules_hash, profile_snapshot_hash, LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION, is_tides_profile, materialize_compact_state)
 from native_mining_gate import (MiningAuthorization, JobOmission, parse_block, immutable_header,
     template_id, _process_lock, fcntl, REGTEST_GENESIS)
 from native_enforcement import compact_size, is_payout_script, verify_schnorr
@@ -89,6 +90,7 @@ class HashMiningGate:
             raise ValueError("protected head must be separate from database")
         self.db, self._lock_fd, self._head_lock_fd, self._sealed_head = None, None, None, None
         self._description_cache = OrderedDict()
+        self._snapshot_decode_cache = SnapshotDecodeCache()
         self._snapshot_observer = None  # Sole-owner bounded inventory ingestion only.
         # Dispatch capabilities belong to this open instance, never to the
         # persisted journal. Recovered evidence requires fresh native approval.
@@ -611,27 +613,27 @@ class HashMiningGate:
             raw = bytes.fromhex(encoded)
             if self._snapshot_observer is not None:
                 self._snapshot_observer(raw)
-            if Snapshot.deserialize(raw).hash_hex != identity:
+            self._snapshot_decode_cache.decode(raw, self.profile_version)
+            if f"{profile_snapshot_hash(raw, self.profile_version):064x}" != identity:
                 raise ValueError("native snapshot bytes do not match commitment")
             if staged is None:
                 self.register_snapshot(raw)
             else:
                 staged[SNAPSHOT, identity] = raw
-        snapshot = Snapshot.deserialize(raw)
-        if snapshot.envelope.version != self.profile_version:
-            raise ValueError("snapshot profile differs from gate policy")
-        return snapshot
+        # Raw evidence is still obtained and authenticated on every access.
+        # Only its canonical decode is reused; mutable payout objects are
+        # detached by the cache before handing a snapshot to a caller.
+        return self._snapshot_decode_cache.decode(raw, self.profile_version)
 
     def _submit_snapshot(self, raw):
-        snapshot = Snapshot.deserialize(raw)
-        if snapshot.envelope.version != self.profile_version:
-            raise ValueError("snapshot profile differs from gate policy")
+        self._snapshot_decode_cache.decode(raw, self.profile_version)
+        identity = f"{profile_snapshot_hash(raw, self.profile_version):064x}"
         result = self.rpc("submitsharepoolhashsnapshot", raw.hex())
-        if (not isinstance(result, dict) or result.get("hash") != snapshot.hash_hex or
+        if (not isinstance(result, dict) or result.get("hash") != identity or
                 result.get("status") not in ("stored", "present") or type(result.get("missing")) is not list or
                 any(not native_archive.is_hash(value) for value in result["missing"])):
             raise ValueError("native snapshot storage response failed binding")
-        return snapshot.hash_hex
+        return identity
 
     def _provenance(self, snapshot, staged, **context):
         """Collect the complete bounded opening graph without admitting it.
@@ -709,7 +711,8 @@ class HashMiningGate:
         identity = template_id(share.header)
         try:
             raw = self._evidence(TEMPLATE, identity, staged)
-            opening = Snapshot.deserialize(self._evidence(SNAPSHOT, f"{share.header.m_mm_rhs:064x}", staged))
+            opening = self._snapshot_decode_cache.decode(
+                self._evidence(SNAPSHOT, f"{share.header.m_mm_rhs:064x}", staged), self.profile_version)
         except KeyError:
             raise ValueError("proof requires its durably validated full origin and snapshot") from None
         if (immutable_header(parse_block(raw)) != immutable_header(share.header) or
@@ -1454,6 +1457,7 @@ class HashMiningGate:
     def close(self):
         self._dispatch_key = None
         self._description_cache.clear()
+        self._snapshot_decode_cache.clear()
         try:
             if self.db is not None:
                 self.db.close()

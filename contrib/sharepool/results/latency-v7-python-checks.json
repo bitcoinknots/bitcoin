@@ -1,0 +1,82 @@
+[
+  {
+    "name": "hash",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "contrib/sharepool",
+      "-p",
+      "test_hash*.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 18.556751625,
+    "log": "contrib/sharepool/results/latency-v7-python-hash.txt",
+    "cases_run": 178,
+    "skipped": 0
+  },
+  {
+    "name": "tides",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "contrib/sharepool",
+      "-p",
+      "test_tides*.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.4091077920000004,
+    "log": "contrib/sharepool/results/latency-v7-python-tides.txt",
+    "cases_run": 83,
+    "skipped": 0
+  },
+  {
+    "name": "capacity",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "contrib/sharepool",
+      "-p",
+      "test_capacity*.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.13751695800000263,
+    "log": "contrib/sharepool/results/latency-v7-python-capacity.txt",
+    "cases_run": 15,
+    "skipped": 0
+  },
+  {
+    "name": "model",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "contrib/sharepool",
+      "-p",
+      "test_compact_resource_model.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.39015516599999955,
+    "log": "contrib/sharepool/results/latency-v7-python-model.txt",
+    "cases_run": 7,
+    "skipped": 0
+  }
+]

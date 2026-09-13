@@ -8,6 +8,10 @@ verify exact jobs, proofs, native bodies and direct coinbase payouts.
 This is an opt-in regtest profile. V4/V5/V6 wire commitments remain unchanged;
 SHIFT10 and public-network activation settings are unchanged.
 
+Follow-up [verification latency work](sharepool-v7-latency.md) removes repeated
+Python decoding and hashing. The measurements below remain the original v7
+baseline captures.
+
 ## Measured encoding
 
 The native v7 correctness fixture reconstructs 128 proofs from four signed jobs

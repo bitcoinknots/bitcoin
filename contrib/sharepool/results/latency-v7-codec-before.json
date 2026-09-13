@@ -1,0 +1,66 @@
+{
+  "label": "before",
+  "scope": "CPU serialization and hashing only; no native validation or throughput claim",
+  "python": "3.9.6",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "repeats": 3,
+  "codec_sha256": "44173ab51d60fd5bc4378d327e14ba9cbf78f61086faa4ff2e0db92180ae3013",
+  "workloads": [
+    {
+      "jobs": 1,
+      "shares": 1024,
+      "encoded_bytes": 34874,
+      "raw_sha256": "68ea08c54687bbfc3f4d3a9d8cd005cb20d5a98f0de72b65586141dc82692af0",
+      "snapshot_hash": "60d765cb882b6b7f5f7093d2f37e9b5e35e2b8917152615e6fbfb1b2b3db442b",
+      "owner_message": "1d534541fc5d2fa5a7a41435b415703fe556da5d2f2aafaae47f7773cec57a63",
+      "timings": {
+        "serialize_hash_owner": {
+          "samples": [
+            {
+              "cpu_seconds": 0.10944500000000001,
+              "wall_seconds": 0.10947475000000007
+            },
+            {
+              "cpu_seconds": 0.11111099999999996,
+              "wall_seconds": 0.11111312500000003
+            },
+            {
+              "cpu_seconds": 0.10965899999999995,
+              "wall_seconds": 0.1096664169999999
+            }
+          ],
+          "median_cpu_seconds": 0.10965899999999995
+        }
+      },
+      "profile": "         1619527 function calls in 0.216 seconds\n\n   Ordered by: cumulative time\n   List reduced from 88 to 18 due to restriction <18>\n\n   ncalls  tottime  percall  cumtime  percall filename:lineno(function)\n        1    0.000    0.000    0.216    0.216 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/test_hash_codec_latency.py:40(triplet)\n        3    0.000    0.000    0.216    0.072 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:556(serialize)\n        3    0.005    0.002    0.151    0.050 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:511(_compact_share_jobs)\n     9216    0.003    0.000    0.116    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/messages.py:904(calc_sha256)\n     9216    0.002    0.000    0.110    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/messages.py:186(powhash)\n     9216    0.038    0.000    0.108    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/messages.py:115(blake2b_header_hash_components)\n     6144    0.003    0.000    0.101    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/native_mining_gate.py:165(immutable_header)\n    12288    0.004    0.000    0.083    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/messages.py:791(__init__)\n        1    0.000    0.000    0.072    0.072 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:736(hash)\n        1    0.000    0.000    0.072    0.072 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:732(owner_message)\n        1    0.000    0.000    0.072    0.072 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:728(signing_payload)\n        1    0.000    0.000    0.072    0.072 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:724(contents_hash)\n        3    0.000    0.000    0.062    0.021 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:577(<listcomp>)\n     3072    0.001    0.000    0.062    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/native_enforcement.py:177(proof_id)\n     3072    0.001    0.000    0.053    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/native_mining_gate.py:172(template_id)\n     6144    0.003    0.000    0.046    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/native_enforcement.py:168(header)\n     3072    0.000    0.000    0.038    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/messages.py:910(rehash)\n    36864    0.010    0.000    0.038    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/messages.py:107(tagged_hash)\n\n\n"
+    },
+    {
+      "jobs": 16,
+      "shares": 1024,
+      "encoded_bytes": 43079,
+      "raw_sha256": "facbe62c63e40b49f67ed719fd86d29180f4997fb87b4952f5df51b9bd23c413",
+      "snapshot_hash": "40b7619b1c4fd59abdc0ef1c7b49225ce89beef81fa29fb1150cea2e022e0489",
+      "owner_message": "805b22f62ca2d36025af2b076bae45e0c6e5bdf59a269c932c9856d2d97e7559",
+      "timings": {
+        "serialize_hash_owner": {
+          "samples": [
+            {
+              "cpu_seconds": 0.11309800000000036,
+              "wall_seconds": 0.11322858400000002
+            },
+            {
+              "cpu_seconds": 0.11324500000000004,
+              "wall_seconds": 0.11331174999999982
+            },
+            {
+              "cpu_seconds": 0.11109100000000005,
+              "wall_seconds": 0.11111704200000005
+            }
+          ],
+          "median_cpu_seconds": 0.11309800000000036
+        }
+      },
+      "profile": "         1620787 function calls in 0.218 seconds\n\n   Ordered by: cumulative time\n   List reduced from 88 to 18 due to restriction <18>\n\n   ncalls  tottime  percall  cumtime  percall filename:lineno(function)\n        1    0.000    0.000    0.218    0.218 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/test_hash_codec_latency.py:40(triplet)\n        3    0.000    0.000    0.218    0.073 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:556(serialize)\n        3    0.005    0.002    0.153    0.051 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:511(_compact_share_jobs)\n     9216    0.003    0.000    0.118    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/messages.py:904(calc_sha256)\n     9216    0.002    0.000    0.112    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/messages.py:186(powhash)\n     9216    0.038    0.000    0.110    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/messages.py:115(blake2b_header_hash_components)\n     6144    0.003    0.000    0.103    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/native_mining_gate.py:165(immutable_header)\n    12288    0.004    0.000    0.084    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/messages.py:791(__init__)\n        1    0.000    0.000    0.073    0.073 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:732(owner_message)\n        1    0.000    0.000    0.073    0.073 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:728(signing_payload)\n        1    0.000    0.000    0.073    0.073 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:724(contents_hash)\n        1    0.000    0.000    0.073    0.073 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:736(hash)\n        3    0.000    0.000    0.063    0.021 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py:577(<listcomp>)\n     3072    0.001    0.000    0.063    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/native_enforcement.py:177(proof_id)\n     3072    0.001    0.000    0.054    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/native_mining_gate.py:172(template_id)\n     6144    0.003    0.000    0.046    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/native_enforcement.py:168(header)\n     3072    0.000    0.000    0.039    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/messages.py:910(rehash)\n    36864    0.011    0.000    0.039    0.000 /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/messages.py:107(tagged_hash)\n\n\n"
+    }
+  ]
+}
