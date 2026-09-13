@@ -107,6 +107,11 @@ struct Params {
     int SegwitHeight;
     /** Block height at which BLAKE2b hardfork becomes active */
     int Blake2bHeight{std::numeric_limits<int>::max()};
+    //! From this height, a coinbase output requires curfew_depth additional
+    //! confirmations beyond ordinary coinbase maturity before it may be spent
+    //! (Coinbase Curfew): total required depth is COINBASE_MATURITY + curfew_depth.
+    int curfew_height{std::numeric_limits<int>::max()};
+    int curfew_depth{25200}; // ~6 months at 10 min/block, in addition to the usual 100
     std::vector<unsigned char> Blake2bHeadline;
     uint8_t Blake2bTargetShift{20};
     /**

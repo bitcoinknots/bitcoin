@@ -52,6 +52,14 @@ void ReadSigNetArgs(const ArgsManager& args, CChainParams::SigNetOptions& option
 
 void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& options)
 {
+    if (const auto height{args.GetIntArg("-curfewheight")}) {
+        if (*height < 0) throw std::runtime_error("-curfewheight cannot be negative.");
+        options.curfew_height = (int)*height;
+    }
+    if (const auto depth{args.GetIntArg("-curfewdepth")}) {
+        if (*depth < 1) throw std::runtime_error("-curfewdepth must be at least 1.");
+        options.curfew_depth = (int)*depth;
+    }
     if (auto value = args.GetBoolArg("-fastprune")) options.fastprune = *value;
     if (HasTestOption(args, "bip94")) options.enforce_bip94 = true;
 
