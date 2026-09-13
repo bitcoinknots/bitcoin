@@ -177,4 +177,39 @@ BOOST_AUTO_TEST_CASE(tides_command_line_flag_is_registered_and_public_defaults_s
     BOOST_CHECK(CreateChainParams(args, ChainType::REGTEST)->GetConsensus().SharePoolTides);
 }
 
+BOOST_AUTO_TEST_CASE(compact_tides_is_explicit_and_public_activation_is_rejected)
+{
+    ArgsManager args;
+    SetupChainParamsBaseOptions(args);
+    for (const auto chain : {ChainType::MAIN, ChainType::TESTNET, ChainType::TESTNET4, ChainType::SIGNET, ChainType::REGTEST}) {
+        BOOST_CHECK(!CreateChainParams(args, chain)->GetConsensus().SharePoolCompactTides);
+    }
+    args.ForceSetArg("-sharepoolcompacttides", "1");
+    BOOST_CHECK_THROW(CreateChainParams(args, ChainType::REGTEST), std::runtime_error);
+    args.ForceSetArg("-sharepooltides", "1");
+    args.ForceSetArg("-sharepoolhashonly", "1");
+    args.ForceSetArg("-sharepoolheight", "2");
+    args.ForceSetArg("-testactivationheight", "blake2b@1");
+    const auto compact = CreateChainParams(args, ChainType::REGTEST);
+    BOOST_CHECK(compact->GetConsensus().SharePoolCompactTides);
+    BOOST_CHECK(compact->GetConsensus().SharePoolTides);
+    BOOST_CHECK(!compact->GetConsensus().SharePoolAdmittedLedger);
+    args.ForceSetArg("-sharepooladmittedledger", "1");
+    BOOST_CHECK_THROW(CreateChainParams(args, ChainType::REGTEST), std::runtime_error);
+    for (const std::string value : {"0", "1"}) {
+        args.ForceSetArg("-sharepoolcompacttides", value);
+        for (const auto chain : {ChainType::MAIN, ChainType::TESTNET, ChainType::TESTNET4, ChainType::SIGNET}) {
+            BOOST_CHECK_THROW(CreateChainParams(args, chain), std::runtime_error);
+        }
+    }
+    CChainParams::RegTestOptions options;
+    options.sharepool_compact_tides = true;
+    BOOST_CHECK_THROW(CChainParams::RegTest(options), std::runtime_error);
+    options.sharepool_tides = true;
+    options.sharepool_hash_only = true;
+    options.sharepool_height = 2;
+    options.activation_heights[Consensus::BuriedDeployment::DEPLOYMENT_BLAKE2B] = 1;
+    BOOST_CHECK(CChainParams::RegTest(options)->GetConsensus().SharePoolCompactTides);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -140,6 +140,8 @@ BASE_SCRIPTS = [
     'feature_sharepool_hash_ledger.py',
     'feature_sharepool_hash_tides_cross_pool.py',
     'feature_sharepool_hash_tides.py',
+    'feature_sharepool_hash_compact.py',
+    'feature_sharepool_hash_compact.py',
     'feature_sharepool_hash_tides.py --activation-height=1',
     'feature_sharepool_hash_tides_zero_reward.py',
     'feature_sharepool_hash_tides_zero_reward.py --activation-height=4950',

@@ -1,0 +1,31 @@
+2026-09-13T18:54:55.460000Z TestFramework (INFO): PRNG seed is: 7518595497624756002
+2026-09-13T18:54:55.460000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v7-compact-bringup-3
+2026-09-13T18:54:56.445000Z TestFramework (INFO): Four exact signed jobs, 128 independent proofs, two independent payout pools
+2026-09-13T18:55:06.924000Z TestFramework (INFO): Missing compact ancestry remains pending through restart and recovers over native P2P
+2026-09-13T18:55:09.559000Z TestFramework (INFO): Competing branches derive their own omitted state and history
+2026-09-13T18:55:12.241000Z TestFramework (INFO): Persistent local history survives restart and falls back when its local seal is unavailable
+2026-09-13T18:55:17.581000Z TestFramework (ERROR): Unexpected exception
+Traceback (most recent call last):
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_framework.py", line 136, in main
+    self.run_test()
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_compact.py", line 227, in run_test
+    self.check_guards(right)
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_compact.py", line 67, in check_guards
+    node.assert_start_raises_init_error(self.extra_args[1] + [f"-sharepooltidesindexmib={value}"],
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_node.py", line 721, in assert_start_raises_init_error
+    self._raise_assertion_error(
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_node.py", line 212, in _raise_assertion_error
+    raise AssertionError(self._node_msg(msg))
+AssertionError: [node 1] Expected message "requires a positive whole MiB" does not partially match stderr:
+"Error: -sharepooltidesindexmib must be a positive whole MiB value that fits the platform byte size"
+2026-09-13T18:55:17.644000Z TestFramework (INFO): Not stopping nodes as test failed. The dangling processes will be cleaned up later.
+2026-09-13T18:55:17.644000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v7-compact-bringup-3
+2026-09-13T18:55:17.644000Z TestFramework (ERROR): Test failed. Test logging available at /private/tmp/sharepool-v7-compact-bringup-3/test_framework.log
+2026-09-13T18:55:17.644000Z TestFramework (ERROR): 
+2026-09-13T18:55:17.644000Z TestFramework (ERROR): Hint: Call /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/combine_logs.py '/private/tmp/sharepool-v7-compact-bringup-3' to consolidate all logs
+2026-09-13T18:55:17.644000Z TestFramework (ERROR): 
+2026-09-13T18:55:17.644000Z TestFramework (ERROR): If this failure happened unexpectedly or intermittently, please file a bug and provide a link or upload of the combined log.
+2026-09-13T18:55:17.644000Z TestFramework (ERROR): https://github.com/bitcoinknots/bitcoin/issues
+2026-09-13T18:55:17.644000Z TestFramework (ERROR): 
+[node 2] Cleaning up leftover process
+[node 0] Cleaning up leftover process

@@ -16,6 +16,8 @@ namespace sharepool::hashonly {
 inline constexpr uint32_t VERSION{4};
 inline constexpr uint32_t LEDGER_VERSION{5};
 inline constexpr uint32_t TIDES_VERSION{6};
+inline constexpr uint32_t COMPACT_TIDES_VERSION{7};
+inline constexpr bool IsTidesVersion(uint32_t version) { return version == TIDES_VERSION || version == COMPACT_TIDES_VERSION; }
 // Vector limits include their CompactSize count prefix. Confirmed credits are
 // never truncated: fresh admissions must stop when pending capacity is full.
 inline constexpr uint32_t MAX_PENDING_BYTES{4 * 1024 * 1024};
@@ -29,6 +31,9 @@ inline constexpr uint32_t MAX_TEMPLATE_TX_REFERENCES{2'000'000};
 inline constexpr uint32_t MAX_ORIGIN_CHECKS{2048};
 inline constexpr uint32_t MAX_DEPENDENCY_DEPTH{64};
 inline constexpr uint32_t MAX_DEPENDENCY_BYTES{64 * 1024 * 1024};
+// v7 preserves the old full-share wire's implicit validation-work bounds.
+inline constexpr uint32_t MAX_COMPACT_SHARES{MAX_SNAPSHOT_BYTES / 512};
+inline constexpr uint32_t MAX_DEPENDENCY_SHARES{MAX_DEPENDENCY_BYTES / 512};
 
 struct TemplateRecord {
     uint256 id;
@@ -74,9 +79,11 @@ struct Snapshot {
     std::vector<LedgerCredit> pending;
     std::vector<LedgerCredit> settled;
     std::vector<OriginCertificate> certificates;
-    // v6 only: cumulative commitment to canonical admission deltas. Historical
+    // v6/v7: cumulative commitment to canonical admission deltas. Historical
     // proofs stay in their original snapshots, not repeated pending arrays.
     uint256 history_head;
+    // v7 post_state/certificates are derived caches, omitted from canonical
+    // bytes and signatures. Never consume them without actual-parent derivation.
 
     Snapshot() { binding.version = VERSION; }
 };
@@ -135,6 +142,8 @@ struct SnapshotResourceUsage {
     size_t transaction_references{0};
     size_t template_table_bytes{0};
     size_t binding_bytes{0};
+    size_t jobs{0};
+    size_t job_table_bytes{0};
     size_t share_bytes{0};
     size_t state_bytes{0};
     size_t payout_bytes{0};
@@ -174,6 +183,13 @@ uint256 OriginCertificateId(const CBlock& block);
  */
 void ApplyLedgerState(Snapshot& snapshot, const Snapshot* parent);
 void ApplyTidesState(Snapshot& snapshot, const Snapshot* parent);
+/** v7 only: rebuild recent state and certificates from a bounded suffix of the
+ * actual native ancestry. Authenticates each snapshot hash/signature/binding;
+ * native ancestry validation remains the caller's responsibility. Does not
+ * authenticate the current job (which may be unsigned during construction).
+ * Caller-provided derived arrays are ignored, never used as validation evidence. */
+Result MaterializeTidesState(Snapshot& snapshot, const CBlockIndex* previous,
+                             const Consensus::Params& consensus, const Lookup& lookup);
 /** Deterministic target derived from the contextual native nBits; throws on malformed compact. */
 uint256 ShareTarget(uint32_t native_bits, uint32_t version = VERSION);
 /** v6 assigned proof work is an exact power of two in expected-hash units. */

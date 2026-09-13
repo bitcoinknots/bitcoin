@@ -20,6 +20,7 @@ namespace sharepool::tides {
 namespace {
 std::mutex g_cache_budget_mutex;
 HistoryCacheBudget g_cache_budget;
+std::shared_ptr<PersistentHistoryReader> g_persistent_reader;
 
 void CheckCacheBudget(const HistoryCacheBudget& budget)
 {
@@ -95,6 +96,18 @@ HistoryCacheBudget ConfiguredHistoryCacheBudget()
 {
     const std::lock_guard lock{g_cache_budget_mutex};
     return g_cache_budget;
+}
+
+void ConfigurePersistentHistoryReader(std::shared_ptr<PersistentHistoryReader> reader)
+{
+    const std::lock_guard lock{g_cache_budget_mutex};
+    g_persistent_reader = std::move(reader);
+}
+
+std::shared_ptr<PersistentHistoryReader> ConfiguredPersistentHistoryReader()
+{
+    const std::lock_guard lock{g_cache_budget_mutex};
+    return g_persistent_reader;
 }
 
 DeltaResult DeltaResult::Ready(std::shared_ptr<const HistoryDelta> value)

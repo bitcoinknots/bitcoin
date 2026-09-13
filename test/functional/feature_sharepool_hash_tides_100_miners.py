@@ -87,12 +87,12 @@ class SharePoolHashTides100MinersTest(SharePoolHashTidesTest):
             if remaining == 0:
                 break
             cohort = cohorts[admitted_height]
-            total_work = sum(share_work(proof.header.nBits, TIDES_VERSION) for proof in cohort)
+            total_work = sum(share_work(proof.header.nBits, proof.envelope.version) for proof in cohort)
             included = min(remaining, Fraction(total_work))
             fraction = included / total_work
             for proof in cohort:
                 script = proof.envelope.payout_script
-                contribution = share_work(proof.header.nBits, TIDES_VERSION) * fraction
+                contribution = share_work(proof.header.nBits, proof.envelope.version) * fraction
                 weights[script] = weights.get(script, Fraction(0)) + contribution
                 selected.append(proof.proof_id)
             remaining -= included

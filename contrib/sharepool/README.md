@@ -1,11 +1,11 @@
 # Share-pool settlement experiments
 
-The latest [v6 native experiment](../../doc/sharepool-tides-accounting.md) adds
+The [v6 native experiment](../../doc/sharepool-tides-accounting.md) adds
 separate-pool rolling payouts, exact job signatures and full-snapshot hashes on
 fresh regtest chains. **Rules revision 2** shares the oldest native-height batch
 proportionally, carries local ACKs in durable order, relays foreign-pool work
 without relabeling it, and adds paged native archives with authenticated restore.
-See the [current verification report](../../doc/sharepool-v6-r2-report.md) and
+See the [v6 verification report](../../doc/sharepool-v6-r2-report.md) and
 [coupled variance calibration](../../doc/sharepool-tides-calibration.md). The
 [revision 1 report](../../doc/sharepool-v6-tides-report.md) retains the earlier
 Goldshell capture and restoration to Lazarus; that capture is not revision 2
@@ -16,6 +16,14 @@ adds exact snapshot counters, avoids repeated codec/cache work and tests shared
 and disjoint native transaction sets. Its corrected model includes exact job
 dependencies, repeated state and recipient coinbases; production capacity
 remains an explicit open constraint.
+
+The separate [v7 compact profile](../../doc/sharepool-v7-compact.md) stores job
+authentication once per snapshot, encodes only changing fields per share and
+derives recent state from bounded native ancestry. A persistent local pool-history
+index accelerates repeated queries. Direct payout policy and SHIFT10 are unchanged;
+v7 requires a fresh regtest chain and does not migrate v6 history. Its
+[verification report](../../doc/sharepool-v7-verification.md) records the compact
+encoding, decoded-memory bounds and remaining pipeline latency.
 
 The profiles and results below are earlier experiments and retain their original
 scope and revision-specific limitations.

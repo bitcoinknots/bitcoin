@@ -123,8 +123,9 @@ explicitly selected domain in the store, RPCs and validator.
 The native archive has a disk index, bounded inventory pages and verified
 streaming export/import. `-sharepoolarchivemib` sets a finite charged quota; there
 is no fixed snapshot-count ceiling. See [archive operation](sharepool-archive.md).
-Startup currently authenticates the full retained archive, so restart cost still
-grows with history. Configurable history-cache budgets and archive quotas do not
+Normal archive startup uses its local atomic index checkpoint; explicit index
+repair authenticates retained payloads in resumable batches. This does not skip
+cold native-history validation. Configurable history-cache budgets and archive quotas do not
 provide archival funding, unlimited admission or an initial-sync solution.
 RPC callers may need to retry a yielded history scan.
 Mining gateways must dispatch the exact bytes returned by their final

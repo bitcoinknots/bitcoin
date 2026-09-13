@@ -26,7 +26,7 @@ from hash_mining_gate import HashMiningGate
 from hash_snapshot import (CompactTemplateRecord, HashSigner, MAX_DEPENDENCY_BYTES, MAX_EXPANDED_TEMPLATE_BYTES,
                            MAX_ORIGIN_CHECKS, MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES,
                            MAX_TEMPLATE_TX_REFERENCES, Snapshot, TemplateRecord, TIDES_RULES_HASH,
-                           TIDES_VERSION, job_hash, solve_share)
+                           TIDES_VERSION, rules_hash, job_hash, solve_share)
 from native_mining_gate import parse_block
 from feature_sharepool_hash_tides_100_miners import SharePoolHashTides100MinersTest
 from test_framework.address import script_to_p2wsh
@@ -38,6 +38,10 @@ from test_framework.util import assert_equal
 class SharePoolHashCapacityTest(SharePoolHashTides100MinersTest):
     def set_test_params(self):
         super().set_test_params()
+        self.PROFILE_VERSION = self.options.profile_version
+        if self.PROFILE_VERSION == 7:
+            for arguments in self.extra_args:
+                arguments.append("-sharepoolcompacttides=1")
         if self.options.witness_heavy:
             # The 256-byte stack elements are consensus-valid but exceed the
             # standard relay-policy limit. This changes disposable regtest
@@ -46,6 +50,8 @@ class SharePoolHashCapacityTest(SharePoolHashTides100MinersTest):
                 arguments.append("-acceptnonstdtxn=1")
 
     def add_options(self, parser):
+        parser.add_argument("--profile-version", type=int, choices=(6, 7), default=6,
+                            help="Explicit native TIDES profile; the v6 fixture remains the default")
         parser.add_argument("--activation-height", type=int, default=102, choices=(102,))
         parser.add_argument("--results", type=Path, help="Default: capacity-results.json inside the disposable test directory")
         parser.add_argument("--miners", type=int, default=100)
@@ -109,7 +115,7 @@ class SharePoolHashCapacityTest(SharePoolHashTides100MinersTest):
         gate = HashMiningGate(self.directory / (name + ".sqlite"),
             rpc=call,
             pool=signer.pool, public_key=signer.public_key, payout_script=signer.payout_script,
-            profile_version=TIDES_VERSION, activation_height=102, snapshot_budget=budget)
+            profile_version=self.PROFILE_VERSION, activation_height=102, snapshot_budget=budget)
         self.gates.append(gate)
         return gate
 
@@ -146,7 +152,7 @@ class SharePoolHashCapacityTest(SharePoolHashTides100MinersTest):
         transactions = {transaction.wtxid: len(transaction.raw) for record in records for transaction in record.transactions}
         result = self.metrics.call("diagnostic.snapshot_resources", self.nodes[0].getsharepoolhashresources, raw.hex())
         assert_equal(result["hash"], snapshot.hash_hex)
-        assert_equal(result["version"], TIDES_VERSION)
+        assert_equal(result["version"], self.PROFILE_VERSION)
         assert_equal(result["consensus_validated"], False)
         assert_equal(result["dependency_graph_checked"], False)
         expected = {"encoded_bytes": len(raw), "templates": len(records),
@@ -155,7 +161,7 @@ class SharePoolHashCapacityTest(SharePoolHashTides100MinersTest):
                     "unique_transactions": len(transactions), "unique_transaction_bytes": sum(transactions.values())}
         for name, value in expected.items():
             assert_equal(result["usage"][name], value)
-        components = ("binding_bytes", "transaction_table_bytes", "template_table_bytes", "share_bytes",
+        components = ("binding_bytes", "transaction_table_bytes", "template_table_bytes", "job_table_bytes", "share_bytes",
                       "state_bytes", "payout_bytes", "pending_bytes", "settled_bytes", "certificate_bytes", "history_bytes")
         assert_equal(sum(result["usage"][name] for name in components), len(raw))
         return result
@@ -180,7 +186,8 @@ class SharePoolHashCapacityTest(SharePoolHashTides100MinersTest):
         self.metrics, self.gates, keys = Measurements(), [], []
         self.started = time.monotonic()
         self.report = {"schema": 1, "result": "running", "network": "isolated native regtest",
-            "started_utc": datetime.now(timezone.utc).isoformat(), "rules_hash": f"{TIDES_RULES_HASH:064x}",
+            "started_utc": datetime.now(timezone.utc).isoformat(), "rules_hash": f"{rules_hash(self.PROFILE_VERSION):064x}",
+            "profile": "hash-only-v7-compact-tides" if self.PROFILE_VERSION == 7 else "hash-only-v6-tides",
             "native_binary_sha256": hashlib.sha256(Path(opts.bitcoind).read_bytes()).hexdigest(),
             "signer_binary_sha256": hashlib.sha256(self.signer_binary.read_bytes()).hexdigest(),
             "harness_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
@@ -192,7 +199,7 @@ class SharePoolHashCapacityTest(SharePoolHashTides100MinersTest):
             "command": [sys.executable, *sys.argv],
             "host": {"platform": platform.platform(), "logical_cpus": os.cpu_count()},
             "operator_declared_host_load": opts.host_load,
-            "configuration": {key: getattr(opts, key) for key in ("miners", "epochs", "shares_per_origin", "padding_outputs",
+            "configuration": {key: getattr(opts, key) for key in ("profile_version", "miners", "epochs", "shares_per_origin", "padding_outputs",
                 "template_layout", "witness_heavy", "resource_diagnostics", "snapshot_budget_bytes",
                 "batch_fraction", "offer_interval_ms", "settle_every", "max_runtime_seconds")},
             "native_nodes": 2, "physical_miners_used": 0, "opaque_proof_fixtures": 0,
@@ -240,8 +247,8 @@ class SharePoolHashCapacityTest(SharePoolHashTides100MinersTest):
                     origin_tag=f"capacity-origin-{index:03d}".encode() if opts.template_layout == "shared" else None))
             sampler = ResourceSampler({"node0": node.process.pid, "node1": follower.process.pid, "driver": os.getpid()},
                 {"node0": node.datadir_path, "node1": follower.datadir_path, "gates": self.directory,
-                 "node0_snapshot_store": node.datadir_path / "regtest" / "sharepool-snapshots-v6",
-                 "node1_snapshot_store": follower.datadir_path / "regtest" / "sharepool-snapshots-v6"})
+                 "node0_snapshot_store": node.datadir_path / "regtest" / f"sharepool-snapshots-v{self.PROFILE_VERSION}",
+                 "node1_snapshot_store": follower.datadir_path / "regtest" / f"sharepool-snapshots-v{self.PROFILE_VERSION}"})
             sampler.start()
             network_start = [self.rpc(index, "getnettotals") for index in range(2)]
             collector, history, admitted, offered = None, [], set(), set()

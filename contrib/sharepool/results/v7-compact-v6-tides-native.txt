@@ -1,0 +1,13 @@
+2026-09-13T18:54:20.082000Z TestFramework (INFO): PRNG seed is: 3389496392951022288
+2026-09-13T18:54:20.083000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v7-native-regressions/v6-tides
+2026-09-13T18:54:21.541000Z TestFramework (INFO): Resource measurement is read-only and does not validate or store an unsigned job
+2026-09-13T18:54:21.549000Z TestFramework (INFO): Empty-pool bootstrap jobs need only a recipient script and a separate owner signer
+2026-09-13T18:54:23.223000Z TestFramework (INFO): Paid shares remain in the rolling history; late submissions cannot change an issued job
+2026-09-13T18:54:23.780000Z TestFramework (INFO): Missing older history leaves a known native tip pending until its exact opening is restored
+2026-09-13T18:54:26.397000Z TestFramework (INFO): Competing native forks select their own admitted history and recurring payout ratios
+2026-09-13T18:54:28.330000Z TestFramework (INFO): New work fills the finite TIDES work window without deleting older historical snapshots
+2026-09-13T18:54:29.310000Z TestFramework (INFO): Offline reindex reconstructs the selected history; profile changes cannot overwrite its block database
+2026-09-13T18:54:32.718000Z TestFramework (INFO): Local history budgets reject invalid settings and can change without changing the chain profile
+2026-09-13T18:54:34.115000Z TestFramework (INFO): Stopping nodes
+2026-09-13T18:54:34.237000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v7-native-regressions/v6-tides
+2026-09-13T18:54:34.237000Z TestFramework (INFO): Tests successful

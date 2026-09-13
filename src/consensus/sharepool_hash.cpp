@@ -91,8 +91,55 @@ struct TransactionTable {
     }
 };
 
+/** Per-job authentication is stored once. The compact wire keeps complete
+ * exact job bindings and only substitutes template-bound search fields. */
+struct CompactJobs {
+    struct Job { size_t template_index; Envelope origin; Signature authorization; };
+    std::vector<Job> entries;
+    std::vector<size_t> share_jobs;
+    size_t job_bytes{0};
+    size_t share_bytes{0};
+    explicit CompactJobs(const Snapshot& snapshot)
+    {
+        if (snapshot.binding.version != COMPACT_TIDES_VERSION) return;
+        std::map<uint256, size_t> templates;
+        for (size_t i{0}; i < snapshot.templates.size(); ++i) {
+            if (!templates.emplace(snapshot.templates[i].id, i).second) throw std::ios_base::failure("duplicate compact template");
+        }
+        std::map<size_t, Job> jobs;
+        for (const auto& share : snapshot.shares) {
+            const auto found = templates.find(TemplateId(share.header));
+            if (found == templates.end() || NormalizedHeader(share.header) != NormalizedHeader(snapshot.templates[found->second].block)) {
+                throw std::ios_base::failure("compact share template");
+            }
+            const auto [job, inserted] = jobs.try_emplace(found->second, Job{found->second, share.origin, share.authorization});
+            if (!inserted) {
+                DataStream left, right;
+                left << job->second.origin << job->second.authorization;
+                right << share.origin << share.authorization;
+                if (left.size() != right.size() || !std::equal(left.begin(), left.end(), right.begin())) {
+                    throw std::ios_base::failure("conflicting compact job authentication");
+                }
+            }
+        }
+        std::map<size_t, size_t> indexes;
+        job_bytes = GetSizeOfCompactSize(jobs.size());
+        share_bytes = GetSizeOfCompactSize(snapshot.shares.size());
+        for (const auto& [template_index, job] : jobs) {
+            indexes.emplace(template_index, entries.size());
+            entries.push_back(job);
+            job_bytes += GetSizeOfCompactSize(template_index) + GetSerializeSize(job.origin) + GetSerializeSize(job.authorization);
+        }
+        for (const auto& share : snapshot.shares) {
+            const auto index = indexes.at(templates.at(TemplateId(share.header)));
+            share_jobs.push_back(index);
+            share_bytes += GetSizeOfCompactSize(index) + 32;
+        }
+    }
+};
+
 template <typename Stream>
-void WriteSnapshot(Stream& stream, const Snapshot& snapshot, const TransactionTable& table, bool unsigned_contents = false)
+void WriteSnapshot(Stream& stream, const Snapshot& snapshot, const TransactionTable& table, const CompactJobs& jobs, bool unsigned_contents = false)
 {
     stream << snapshot.binding << (unsigned_contents ? Signature{} : snapshot.authorization) << snapshot.job_commitment;
     WriteCompactSize(stream, table.entries.size());
@@ -105,6 +152,21 @@ void WriteSnapshot(Stream& stream, const Snapshot& snapshot, const TransactionTa
         stream << item.id << item.block.GetBlockHeader();
         WriteCompactSize(stream, item.block.vtx.size());
         for (const auto& tx : item.block.vtx) WriteCompactSize(stream, table.entries.at(tx->GetWitnessHash()).index);
+    }
+    if (snapshot.binding.version == COMPACT_TIDES_VERSION) {
+        WriteCompactSize(stream, jobs.entries.size());
+        for (const auto& job : jobs.entries) {
+            WriteCompactSize(stream, job.template_index);
+            stream << job.origin << job.authorization;
+        }
+        WriteCompactSize(stream, snapshot.shares.size());
+        for (size_t i{0}; i < snapshot.shares.size(); ++i) {
+            WriteCompactSize(stream, jobs.share_jobs[i]);
+            const auto& header = snapshot.shares[i].header;
+            stream << header.nNonce << header.m_nonce2 << header.m_nonce3 << header.m_extranonce << header.m_time_offset;
+        }
+        stream << snapshot.payouts << snapshot.history_head;
+        return;
     }
     stream << snapshot.shares << snapshot.post_state << snapshot.payouts;
     if (snapshot.binding.version == LEDGER_VERSION) stream << snapshot.pending << snapshot.settled << snapshot.certificates;
@@ -144,17 +206,17 @@ void CheckEncodingFields(const Snapshot& snapshot)
         CreditBounds(snapshot.settled, MAX_SETTLED_BYTES);
         if (snapshot.certificates.size() > MAX_CERTIFICATE_BYTES / CERTIFICATE_BYTES ||
             GetSerializeSize(snapshot.certificates) > MAX_CERTIFICATE_BYTES) throw std::ios_base::failure("certificate byte bound");
-    } else if (snapshot.binding.version == TIDES_VERSION) {
+    } else if (IsTidesVersion(snapshot.binding.version)) {
         if (!snapshot.pending.empty() || !snapshot.settled.empty() ||
-            GetSerializeSize(snapshot.certificates) > MAX_CERTIFICATE_BYTES) throw std::ios_base::failure("TIDES fields or certificate budget");
+            (snapshot.binding.version == TIDES_VERSION && GetSerializeSize(snapshot.certificates) > MAX_CERTIFICATE_BYTES)) throw std::ios_base::failure("TIDES fields or certificate budget");
     } else if (!snapshot.pending.empty() || !snapshot.settled.empty() || !snapshot.certificates.empty()) {
         throw std::ios_base::failure("snapshot profile or ledger fields");
     }
-    if (snapshot.binding.version != TIDES_VERSION && !snapshot.history_head.IsNull()) throw std::ios_base::failure("unexpected history head");
+    if (!IsTidesVersion(snapshot.binding.version) && !snapshot.history_head.IsNull()) throw std::ios_base::failure("unexpected history head");
     if (snapshot.binding.payout_script.size() > 34 ||
         snapshot.templates.size() > MAX_SNAPSHOT_BYTES / MIN_TEMPLATE_RECORD_BYTES ||
         snapshot.shares.size() > MAX_SNAPSHOT_BYTES / MIN_SHARE_BYTES ||
-        snapshot.post_state.size() > MAX_SNAPSHOT_BYTES / MIN_STATE_BYTES ||
+        (snapshot.binding.version != COMPACT_TIDES_VERSION && snapshot.post_state.size() > MAX_SNAPSHOT_BYTES / MIN_STATE_BYTES) ||
         snapshot.payouts.size() > MAX_SNAPSHOT_BYTES / MIN_PAYOUT_BYTES) {
         throw std::ios_base::failure("snapshot count exceeds byte bound");
     }
@@ -170,9 +232,10 @@ void CheckEncodingFields(const Snapshot& snapshot)
  * the call, so subsequent mutations are always remeasured and reserialized. */
 struct PreparedSnapshot {
     TransactionTable table;
+    CompactJobs jobs;
     SnapshotResourceUsage usage;
 
-    explicit PreparedSnapshot(const Snapshot& snapshot) : table{snapshot}
+    explicit PreparedSnapshot(const Snapshot& snapshot) : table{snapshot}, jobs{snapshot}
     {
         usage.unique_transactions = table.entries.size();
         usage.transaction_table_bytes = GetSizeOfCompactSize(table.entries.size());
@@ -189,18 +252,20 @@ struct PreparedSnapshot {
             for (const auto& tx : record.block.vtx) usage.template_table_bytes += GetSizeOfCompactSize(table.entries.at(tx->GetWitnessHash()).index);
         }
         usage.binding_bytes = GetSerializeSize(snapshot.binding) + GetSerializeSize(snapshot.authorization) + GetSerializeSize(snapshot.job_commitment);
-        usage.share_bytes = GetSerializeSize(snapshot.shares);
-        usage.state_bytes = GetSerializeSize(snapshot.post_state);
+        usage.jobs = jobs.entries.size();
+        usage.job_table_bytes = jobs.job_bytes;
+        usage.share_bytes = snapshot.binding.version == COMPACT_TIDES_VERSION ? jobs.share_bytes : GetSerializeSize(snapshot.shares);
+        usage.state_bytes = snapshot.binding.version == COMPACT_TIDES_VERSION ? 0 : GetSerializeSize(snapshot.post_state);
         usage.payout_bytes = GetSerializeSize(snapshot.payouts);
         if (snapshot.binding.version == LEDGER_VERSION) {
             usage.pending_bytes = GetSerializeSize(snapshot.pending);
             usage.settled_bytes = GetSerializeSize(snapshot.settled);
         }
         if (snapshot.binding.version == LEDGER_VERSION || snapshot.binding.version == TIDES_VERSION) usage.certificate_bytes = GetSerializeSize(snapshot.certificates);
-        if (snapshot.binding.version == TIDES_VERSION) usage.history_bytes = GetSerializeSize(snapshot.history_head);
+        if (IsTidesVersion(snapshot.binding.version)) usage.history_bytes = GetSerializeSize(snapshot.history_head);
         // Earlier field, transaction and expanded-body bounds keep this sum
         // below size_t overflow, including on a 32-bit host.
-        usage.encoded_bytes = usage.binding_bytes + usage.transaction_table_bytes + usage.template_table_bytes + usage.share_bytes +
+        usage.encoded_bytes = usage.binding_bytes + usage.transaction_table_bytes + usage.template_table_bytes + usage.job_table_bytes + usage.share_bytes +
             usage.state_bytes + usage.payout_bytes + usage.pending_bytes + usage.settled_bytes + usage.certificate_bytes + usage.history_bytes;
         if (usage.encoded_bytes == 0 || usage.encoded_bytes > MAX_SNAPSHOT_BYTES) throw std::ios_base::failure("snapshot byte bound");
     }
@@ -258,7 +323,7 @@ bool ReservedZero(const Envelope& binding)
 
 bool WireBinding(const Envelope& binding)
 {
-    return (binding.version == VERSION || binding.version == LEDGER_VERSION || binding.version == TIDES_VERSION) && ReservedZero(binding) && IsPayoutScript(binding.payout_script);
+    return (binding.version == VERSION || binding.version == LEDGER_VERSION || IsTidesVersion(binding.version)) && ReservedZero(binding) && IsPayoutScript(binding.payout_script);
 }
 
 bool SameBinding(const Envelope& a, const Envelope& b)
@@ -416,16 +481,35 @@ class Checker {
     const Lookup& m_lookup;
     const ValidateOrigin& m_validate_origin;
     std::map<uint256, std::shared_ptr<const Snapshot>> m_snapshots;
+    // Retain actual native states; release alternative job states after their
+    // recursive validation completes rather than storing one copy per origin.
+    std::map<uint256, std::shared_ptr<const Snapshot>> m_materialized;
+    std::map<uint256, std::weak_ptr<const Snapshot>> m_openings;
+    const CBlockIndex* m_native_context{nullptr};
     size_t m_dependency_bytes{0};
+    size_t m_dependency_shares{0};
     std::set<uint256> m_visiting;
     std::set<uint256> m_unique_origins;
     std::set<const Snapshot*> m_authorized;
+    std::set<std::pair<uint256, Signature>> m_compact_authorized;
     bool m_certificates_initialized{false};
     Result m_certificate_context{Result::Valid()};
     std::map<uint256, OriginCertificate> m_parent_certificates;
 
     bool Authorized(const Snapshot& snapshot)
     {
+        if (snapshot.binding.version == COMPACT_TIDES_VERSION) {
+            // Alternative materializations have weak lifetimes. Pointer
+            // memoization would be unsafe if an allocator reused an address.
+            const auto digest = hashonly::OwnerHash(snapshot);
+            const auto identity = std::make_pair(digest, snapshot.authorization);
+            if (m_compact_authorized.count(identity)) return true;
+            const XOnlyPubKey owner{Span{snapshot.binding.owner}};
+            if (snapshot.job_commitment.IsNull() || !owner.IsFullyValid() ||
+                !owner.VerifySchnorr(digest, snapshot.authorization)) return false;
+            m_compact_authorized.insert(identity);
+            return true;
+        }
         if (m_authorized.count(&snapshot)) return true;
         if (!OwnerValid(snapshot)) return false;
         m_authorized.insert(&snapshot);
@@ -447,7 +531,7 @@ class Checker {
         if (m_descendant_depth) *m_descendant_depth = std::max(*m_descendant_depth, child_depth + 1);
     }
 
-    Result Fetch(const uint256& hash, std::shared_ptr<const Snapshot>& result)
+    Result FetchRaw(const uint256& hash, std::shared_ptr<const Snapshot>& result)
     {
         // The empty preimage is already known locally and cannot encode a
         // snapshot. P2P uses total=0 as its not-found sentinel, so requesting
@@ -468,8 +552,64 @@ class Checker {
             if (ProfileSnapshotHash(*result, ProfileVersion(m_consensus)) != hash) return Result::Missing({hash});
         } catch (const std::ios_base::failure&) { return Bad("snapshot-encoding"); }
         if (size > MAX_DEPENDENCY_BYTES - m_dependency_bytes) return Bad("dependency-bytes");
+        if (m_consensus.SharePoolCompactTides && result->shares.size() > MAX_DEPENDENCY_SHARES - m_dependency_shares) return Bad("dependency-shares");
         m_dependency_bytes += size;
+        m_dependency_shares += result->shares.size();
         m_snapshots.emplace(hash, result);
+        return Result::Valid();
+    }
+
+    Result Fetch(const uint256& hash, std::shared_ptr<const Snapshot>& result)
+    {
+        if (const auto found = m_materialized.find(hash); found != m_materialized.end()) {
+            result = found->second;
+            return Result::Valid();
+        }
+        if (const auto found = m_openings.find(hash); found != m_openings.end()) {
+            if (auto live = found->second.lock()) {
+                result = std::move(live);
+                return Result::Valid();
+            }
+        }
+        auto available = FetchRaw(hash, result);
+        if (!available.IsValid() || result->binding.version != COMPACT_TIDES_VERSION) return available;
+        if (!m_native_context || !result->binding.height ||
+            int64_t{result->binding.height} > int64_t{m_native_context->nHeight} + 1) return Bad("compact-state-context");
+        const auto* previous = m_native_context->GetAncestor(result->binding.height - 1);
+        if (!previous || previous->GetBlockHash() != result->binding.native_parent) return Bad("compact-state-context");
+        Snapshot materialized{*result};
+        const auto committed_history = materialized.history_head;
+        std::optional<Result> lookup_failure;
+        const Lookup raw_lookup = [&](const uint256& dependency) -> std::shared_ptr<const Snapshot> {
+            std::shared_ptr<const Snapshot> raw;
+            const auto fetched = FetchRaw(dependency, raw);
+            if (!fetched.IsValid()) {
+                lookup_failure = fetched;
+                if (fetched.status == Status::Invalid) throw MalformedSnapshot(fetched.reason);
+                return nullptr;
+            }
+            return raw;
+        };
+        // All jobs at an already-opened native parent share its authenticated
+        // derived state. Reuse only a completed local materialization; never
+        // recursively fetch parents here, which would turn a bounded suffix
+        // into an activation-to-tip replay.
+        const auto parent = m_materialized.find(previous->m_mm_rhs);
+        if (parent != m_materialized.end() && parent->second->binding.height == uint32_t(previous->nHeight)) {
+            try { ApplyTidesState(materialized, parent->second.get()); }
+            catch (const std::ios_base::failure&) { return Bad("compact-state-budget"); }
+            catch (const std::invalid_argument&) { return Bad("compact-state"); }
+        } else {
+            available = MaterializeTidesState(materialized, previous, m_consensus, raw_lookup);
+            if (lookup_failure) return *lookup_failure;
+            if (!available.IsValid()) return available;
+        }
+        if (materialized.history_head != committed_history) return Bad("tides-history");
+        result = std::make_shared<const Snapshot>(std::move(materialized));
+        const auto* index = int64_t{result->binding.height} <= m_native_context->nHeight
+            ? m_native_context->GetAncestor(result->binding.height) : nullptr;
+        if (index && index->m_mm_rhs == hash) m_materialized.emplace(hash, result);
+        else m_openings[hash] = result; // At most one weak entry per bounded raw snapshot.
         return Result::Valid();
     }
 
@@ -526,7 +666,10 @@ class Checker {
         // Do not spend native script-validation work before the origin's own
         // snapshot is locally available and authenticates its expected hash.
         std::shared_ptr<const Snapshot> snapshot;
-        const auto available = Fetch(block.m_mm_rhs, snapshot);
+        // A native-parent certificate already authenticates the exact body's
+        // recursive state. Bind its complete canonical raw opening first, but
+        // do not reopen obsolete state ancestors merely to take that shortcut.
+        const auto available = FetchRaw(block.m_mm_rhs, snapshot);
         if (!available.IsValid()) return available;
         const auto binding = CheckBinding(snapshot->binding, m_consensus, block.m_height, block.hashPrevBlock);
         if (!binding.IsValid()) return binding;
@@ -587,6 +730,7 @@ public:
     Result MiningJob(const CBlock& block, const CBlockIndex* previous,
                      std::optional<CAmount> expected_reward, bool allow_unsigned)
     {
+        if (!m_native_context) m_native_context = previous;
         if (!SearchFieldsZero(block)) return Bad("job-search-fields");
         // A future settlement must embed this body in addition to its children.
         // Ordinary block validity deliberately keeps its unreserved depth zero.
@@ -596,6 +740,7 @@ public:
 
     Result HistoricalTemplate(const CBlock& origin, const CBlockIndex* previous, uint32_t time)
     {
+        if (!m_native_context) m_native_context = previous;
         const auto context = PrepareCertificates(previous);
         if (!context.IsValid()) return context;
         const auto* parent = OriginParent(origin, previous, time);
@@ -606,6 +751,7 @@ public:
     Result ShareProof(const Share& share, const CBlock& origin, const CBlockIndex* previous,
                       uint32_t time, uint32_t depth, bool origin_checked = false)
     {
+        if (!m_native_context) m_native_context = previous;
         const auto context = PrepareCertificates(previous);
         if (!context.IsValid()) return context;
         const auto* parent = OriginParent(share.header, previous, time);
@@ -616,7 +762,7 @@ public:
         if (m_consensus.SharePoolTides && share.header.GetHash().IsNull()) return Bad("share-identity");
         if (UintToArith256(share.header.GetHash()) > UintToArith256(ShareTarget(share.header.nBits, ProfileVersion(m_consensus)))) return Bad("share-target");
         std::shared_ptr<const Snapshot> snapshot;
-        auto result = Fetch(origin.m_mm_rhs, snapshot);
+        auto result = FetchRaw(origin.m_mm_rhs, snapshot);
         if (!result.IsValid()) return result;
         if (!SameBinding(snapshot->binding, share.origin)) return Bad("share-binding");
         if (share.authorization != snapshot->authorization) return Bad("share-authorization");
@@ -629,6 +775,7 @@ public:
 
     Result Check(const CBlock& block, const CBlockIndex* previous, std::optional<CAmount> expected_reward, uint32_t depth, bool allow_unsigned = false)
     {
+        if (!m_native_context) m_native_context = previous;
         if (!m_consensus.SharePoolHashOnly || !previous || m_consensus.SharePoolHeight == std::numeric_limits<int>::max() ||
             int64_t{previous->nHeight} + 1 < m_consensus.SharePoolHeight) return Bad("inactive");
         if (depth > MAX_DEPENDENCY_DEPTH) return Bad("dependency-depth");
@@ -780,7 +927,7 @@ std::vector<unsigned char> EncodeSnapshot(const Snapshot& snapshot)
     std::vector<unsigned char> bytes;
     bytes.reserve(prepared.usage.encoded_bytes);
     VectorWriter writer{bytes, 0};
-    WriteSnapshot(writer, snapshot, prepared.table);
+    WriteSnapshot(writer, snapshot, prepared.table, prepared.jobs);
     return bytes;
 }
 
@@ -861,19 +1008,53 @@ Snapshot DecodeSnapshot(Span<const unsigned char> bytes)
         snapshot.templates.push_back(std::move(record));
     }
     if (std::find(used.begin(), used.end(), false) != used.end()) throw std::ios_base::failure("unused transaction table entry");
-    const auto share_count = ReadCount(reader, MIN_SHARE_BYTES);
-    snapshot.shares.reserve(share_count);
-    for (size_t i{0}; i < share_count; ++i) {
-        Share share;
-        reader >> share;
-        if (!share.header.m_header_v2 || !WireBinding(share.origin) ||
-            (i && !LessProof(snapshot.shares.back().header.GetHash(), share.header.GetHash()))) throw std::ios_base::failure("share wire shape or order");
-        snapshot.shares.push_back(std::move(share));
+    if (snapshot.binding.version == COMPACT_TIDES_VERSION) {
+        const auto job_count = ReadCount(reader, 1 + 284 + 64);
+        if (job_count > snapshot.templates.size()) throw std::ios_base::failure("compact job count");
+        std::vector<CompactJobs::Job> jobs;
+        jobs.reserve(job_count);
+        for (size_t i{0}; i < job_count; ++i) {
+            const auto template_index = ReadCompactSize(reader);
+            if (template_index >= snapshot.templates.size() || (i && template_index <= jobs.back().template_index)) {
+                throw std::ios_base::failure("compact job template index or order");
+            }
+            CompactJobs::Job job{template_index, {}, {}};
+            reader >> job.origin >> job.authorization;
+            if (!WireBinding(job.origin) || job.origin.version != COMPACT_TIDES_VERSION) throw std::ios_base::failure("compact job binding");
+            jobs.push_back(std::move(job));
+        }
+        const auto share_count = ReadCount(reader, 33);
+        // Compression must not amplify proof-validation work past the old
+        // independently bounded maximum number of submitted proofs.
+        if (share_count > MAX_COMPACT_SHARES) throw std::ios_base::failure("compact proof count budget");
+        snapshot.shares.reserve(share_count);
+        std::vector<bool> used_jobs(jobs.size(), false);
+        for (size_t i{0}; i < share_count; ++i) {
+            const auto index = ReadCompactSize(reader);
+            if (index >= jobs.size()) throw std::ios_base::failure("compact share job index");
+            const auto& job = jobs[index];
+            Share share{snapshot.templates[job.template_index].block.GetBlockHeader(), job.origin, job.authorization};
+            reader >> share.header.nNonce >> share.header.m_nonce2 >> share.header.m_nonce3 >> share.header.m_extranonce >> share.header.m_time_offset;
+            if (i && !LessProof(snapshot.shares.back().header.GetHash(), share.header.GetHash())) throw std::ios_base::failure("compact share order");
+            snapshot.shares.push_back(std::move(share));
+            used_jobs[index] = true;
+        }
+        if (std::find(used_jobs.begin(), used_jobs.end(), false) != used_jobs.end()) throw std::ios_base::failure("unused compact job");
+    } else {
+        const auto share_count = ReadCount(reader, MIN_SHARE_BYTES);
+        snapshot.shares.reserve(share_count);
+        for (size_t i{0}; i < share_count; ++i) {
+            Share share;
+            reader >> share;
+            if (!share.header.m_header_v2 || !WireBinding(share.origin) ||
+                (i && !LessProof(snapshot.shares.back().header.GetHash(), share.header.GetHash()))) throw std::ios_base::failure("share wire shape or order");
+            snapshot.shares.push_back(std::move(share));
+        }
+        const auto state_count = ReadCount(reader, MIN_STATE_BYTES);
+        snapshot.post_state.resize(state_count);
+        for (auto& entry : snapshot.post_state) reader >> entry;
+        if (!StateOrdered(snapshot.post_state)) throw std::ios_base::failure("state order");
     }
-    const auto state_count = ReadCount(reader, MIN_STATE_BYTES);
-    snapshot.post_state.resize(state_count);
-    for (auto& entry : snapshot.post_state) reader >> entry;
-    if (!StateOrdered(snapshot.post_state)) throw std::ios_base::failure("state order");
     const auto payout_count = ReadCount(reader, MIN_PAYOUT_BYTES);
     snapshot.payouts.reserve(payout_count);
     for (size_t i{0}; i < payout_count; ++i) {
@@ -882,7 +1063,7 @@ Snapshot DecodeSnapshot(Span<const unsigned char> bytes)
         const auto script = ReadBytes(reader, 22, 34);
         snapshot.payouts.emplace_back(amount, CScript{script.begin(), script.end()});
     }
-    if (!(snapshot.binding.version == TIDES_VERSION && snapshot.payouts.empty()) && !PayoutsOrdered(snapshot.payouts)) throw std::ios_base::failure("payout order or shape");
+    if (!(IsTidesVersion(snapshot.binding.version) && snapshot.payouts.empty()) && !PayoutsOrdered(snapshot.payouts)) throw std::ios_base::failure("payout order or shape");
     if (snapshot.binding.version == LEDGER_VERSION) {
         const auto read_credits = [&](std::vector<LedgerCredit>& credits, size_t maximum) {
             const auto before = reader.size();
@@ -911,11 +1092,11 @@ Snapshot DecodeSnapshot(Span<const unsigned char> bytes)
             throw std::ios_base::failure("certificate byte bound or order");
         }
     }
-    if (snapshot.binding.version == TIDES_VERSION) reader >> snapshot.history_head;
+    if (IsTidesVersion(snapshot.binding.version)) reader >> snapshot.history_head;
     const auto prepared = PrepareSnapshot(snapshot);
     if (!reader.empty() || prepared.usage.encoded_bytes != bytes.size()) throw std::ios_base::failure("noncanonical snapshot");
     CanonicalWriter canonical{bytes};
-    WriteSnapshot(canonical, snapshot, prepared.table);
+    WriteSnapshot(canonical, snapshot, prepared.table, prepared.jobs);
     if (!canonical.empty()) throw std::ios_base::failure("noncanonical snapshot");
     return snapshot;
 }
@@ -934,44 +1115,53 @@ uint256 SnapshotHash(Span<const unsigned char> bytes)
 uint256 SnapshotHash(const Snapshot& snapshot)
 {
     // Preserve legacy object hashing for deliberately malformed version tags.
-    return ProfileSnapshotHash(snapshot, snapshot.binding.version == TIDES_VERSION ? TIDES_VERSION : VERSION);
+    return ProfileSnapshotHash(snapshot, IsTidesVersion(snapshot.binding.version) ? snapshot.binding.version : VERSION);
 }
 
 uint256 ProfileSnapshotHash(Span<const unsigned char> bytes, uint32_t version)
 {
     if (version == VERSION || version == LEDGER_VERSION) return SnapshotHash(bytes);
-    if (version != TIDES_VERSION) throw std::invalid_argument("unknown snapshot hash profile");
+    if (!IsTidesVersion(version)) throw std::invalid_argument("unknown snapshot hash profile");
     if (bytes.size() > MAX_SNAPSHOT_BYTES) throw std::ios_base::failure("snapshot byte bound");
     static constexpr char domain[]{"SharePool/snapshot/v6"};
+    static constexpr char compact_domain[]{"SharePool/snapshot/v7"};
     HashWriter writer;
-    writer.write(AsBytes(Span{domain}));
+    writer.write(AsBytes(version == COMPACT_TIDES_VERSION ? Span{compact_domain} : Span{domain}));
     writer.write(AsBytes(bytes));
     return writer.GetHash();
 }
 
 uint256 ProfileSnapshotHash(const Snapshot& snapshot, uint32_t version)
 {
-    if (version != VERSION && version != LEDGER_VERSION && version != TIDES_VERSION) {
+    if (version != VERSION && version != LEDGER_VERSION && !IsTidesVersion(version)) {
         throw std::invalid_argument("unknown snapshot hash profile");
     }
     const auto prepared = PrepareSnapshot(snapshot);
     static constexpr char old_domain[]{"SharePool/snapshot/v4"};
     static constexpr char new_domain[]{"SharePool/snapshot/v5"};
     static constexpr char tides_domain[]{"SharePool/snapshot/v6"};
+    static constexpr char compact_domain[]{"SharePool/snapshot/v7"};
     HashWriter writer;
-    writer.write(AsBytes(version == TIDES_VERSION ? Span{tides_domain} :
+    writer.write(AsBytes(version == COMPACT_TIDES_VERSION ? Span{compact_domain} :
+                        version == TIDES_VERSION ? Span{tides_domain} :
                         snapshot.binding.version == LEDGER_VERSION ? Span{new_domain} : Span{old_domain}));
-    WriteSnapshot(writer, snapshot, prepared.table);
+    WriteSnapshot(writer, snapshot, prepared.table, prepared.jobs);
     return writer.GetHash();
 }
 
 uint32_t ProfileVersion(const Consensus::Params& consensus)
 {
-    return consensus.SharePoolTides ? TIDES_VERSION : consensus.SharePoolAdmittedLedger ? LEDGER_VERSION : VERSION;
+    return consensus.SharePoolCompactTides ? COMPACT_TIDES_VERSION : consensus.SharePoolTides ? TIDES_VERSION : consensus.SharePoolAdmittedLedger ? LEDGER_VERSION : VERSION;
 }
 
 uint256 RulesHash(uint32_t version)
 {
+    if (version == COMPACT_TIDES_VERSION) {
+        return DomainHash("SharePool/rules/v7", SHARE_BITS, SHARE_TARGET_SHIFT, MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES,
+                          MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES,
+                          MAX_EXPANDED_TEMPLATE_BYTES, MAX_TEMPLATE_TX_REFERENCES, MAX_ORIGIN_CHECKS,
+                          MAX_CERTIFICATE_BYTES, uint32_t{8}, uint32_t{2}, uint32_t{1}, MAX_DEPENDENCY_SHARES);
+    }
     if (version == TIDES_VERSION) {
         return DomainHash("SharePool/rules/v6", SHARE_BITS, SHARE_TARGET_SHIFT, MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES,
                           MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES,
@@ -998,14 +1188,17 @@ uint256 SnapshotContentsHash(const Snapshot& snapshot)
     static constexpr char old_domain[]{"SharePool/contents/v4"};
     static constexpr char new_domain[]{"SharePool/contents/v5"};
     static constexpr char tides_domain[]{"SharePool/contents/v6"};
-    writer.write(AsBytes(snapshot.binding.version == TIDES_VERSION ? Span{tides_domain} :
+    static constexpr char compact_domain[]{"SharePool/contents/v7"};
+    writer.write(AsBytes(snapshot.binding.version == COMPACT_TIDES_VERSION ? Span{compact_domain} :
+                        snapshot.binding.version == TIDES_VERSION ? Span{tides_domain} :
                         snapshot.binding.version == LEDGER_VERSION ? Span{new_domain} : Span{old_domain}));
-    WriteSnapshot(writer, snapshot, prepared.table, true);
+    WriteSnapshot(writer, snapshot, prepared.table, prepared.jobs, true);
     return writer.GetHash();
 }
 
 uint256 OwnerHash(const Envelope& binding, const uint256& job, const uint256& contents)
 {
+    if (binding.version == COMPACT_TIDES_VERSION) return DomainHash("SharePool/owner/v7", binding, job, contents);
     if (binding.version == TIDES_VERSION) return DomainHash("SharePool/owner/v6", binding, job, contents);
     if (binding.version == LEDGER_VERSION) return DomainHash("SharePool/owner/v5", binding, job, contents);
     return DomainHash("SharePool/owner/v4", binding, job, contents);
@@ -1074,7 +1267,7 @@ uint256 TidesShareWork(uint32_t native_bits)
 
 uint256 ShareTarget(uint32_t native_bits, uint32_t version)
 {
-    if (version == TIDES_VERSION) {
+    if (IsTidesVersion(version)) {
         const auto work = UintToArith256(TidesShareWork(native_bits));
         return ArithToUint256(~arith_uint256{} / work);
     }
@@ -1203,8 +1396,8 @@ void ApplyLedgerState(Snapshot& snapshot, const Snapshot* parent)
 
 void ApplyTidesState(Snapshot& snapshot, const Snapshot* parent)
 {
-    if (snapshot.binding.version != TIDES_VERSION || !snapshot.binding.height || snapshot.binding.pool.IsNull() ||
-        snapshot.binding.rules != RulesHash(TIDES_VERSION) || !snapshot.pending.empty() || !snapshot.settled.empty()) {
+    if (!IsTidesVersion(snapshot.binding.version) || !snapshot.binding.height || snapshot.binding.pool.IsNull() ||
+        snapshot.binding.rules != RulesHash(snapshot.binding.version) || !snapshot.pending.empty() || !snapshot.settled.empty()) {
         throw std::invalid_argument("TIDES profile or binding");
     }
     const uint32_t height = snapshot.binding.height;
@@ -1213,7 +1406,7 @@ void ApplyTidesState(Snapshot& snapshot, const Snapshot* parent)
     std::set<uint256> admitted;
     std::map<uint256, OriginCertificate> certificates;
     if (parent) {
-        if (parent->binding.version != TIDES_VERSION || parent->binding.height != height - 1 ||
+        if (parent->binding.version != snapshot.binding.version || parent->binding.height != height - 1 ||
             parent->binding.genesis != snapshot.binding.genesis || parent->binding.rules != snapshot.binding.rules ||
             parent->history_head.IsNull() || !parent->pending.empty() || !parent->settled.empty() ||
             !StateOrdered(parent->post_state) || !CertificatesOrdered(parent->certificates)) {
@@ -1243,7 +1436,7 @@ void ApplyTidesState(Snapshot& snapshot, const Snapshot* parent)
     std::vector<LedgerCredit> delta;
     for (const auto& share : snapshot.shares) {
         const auto id = share.header.GetHash();
-        if (id.IsNull() || !admitted.insert(id).second || share.origin.version != TIDES_VERSION ||
+        if (id.IsNull() || !admitted.insert(id).second || share.origin.version != snapshot.binding.version ||
             share.header.m_height <= 0 || share.header.m_height < int64_t(oldest) || share.header.m_height > int64_t(height) ||
             int64_t(share.origin.height) != share.header.m_height || share.origin.pool.IsNull() || !IsPayoutScript(share.origin.payout_script)) {
             throw std::invalid_argument("TIDES admission identity or age");
@@ -1271,8 +1464,62 @@ void ApplyTidesState(Snapshot& snapshot, const Snapshot* parent)
     if (GetSerializeSize(next_certificates) > MAX_CERTIFICATE_BYTES) throw std::ios_base::failure("TIDES certificate capacity");
     snapshot.post_state = std::move(state);
     snapshot.certificates = std::move(next_certificates);
-    snapshot.history_head = DomainHash("SharePool/history/v6", snapshot.binding.genesis, snapshot.binding.native_parent,
-                                      height, parent ? parent->history_head : uint256{}, delta);
+    snapshot.history_head = snapshot.binding.version == COMPACT_TIDES_VERSION
+        ? DomainHash("SharePool/history/v7", snapshot.binding.genesis, snapshot.binding.native_parent,
+                     height, parent ? parent->history_head : uint256{}, delta)
+        : DomainHash("SharePool/history/v6", snapshot.binding.genesis, snapshot.binding.native_parent,
+                     height, parent ? parent->history_head : uint256{}, delta);
+}
+
+Result MaterializeTidesState(Snapshot& snapshot, const CBlockIndex* previous,
+                             const Consensus::Params& consensus, const Lookup& lookup)
+{
+    if (!consensus.SharePoolCompactTides || snapshot.binding.version != COMPACT_TIDES_VERSION || !previous ||
+        int64_t{snapshot.binding.height} != int64_t{previous->nHeight} + 1 ||
+        !CheckBinding(snapshot.binding, consensus, snapshot.binding.height, previous->GetBlockHash()).IsValid()) {
+        return Bad("compact-state-context");
+    }
+    // A proof cannot be admitted before its origin height. Thus admissions
+    // earlier than H-MAX_SHARE_AGE cannot survive in H's recent state or
+    // certificates. Replay only this bounded native suffix, never all history.
+    const int64_t first = std::max<int64_t>(consensus.SharePoolHeight, int64_t{snapshot.binding.height} - MAX_SHARE_AGE);
+    std::optional<Snapshot> derived_parent;
+    try {
+        for (int64_t height = first; height <= previous->nHeight; ++height) {
+            const auto* index = previous->GetAncestor(height);
+            if (!index || !index->pprev) return Bad("compact-state-parent");
+            std::shared_ptr<const Snapshot> raw;
+            try { raw = lookup(index->m_mm_rhs); }
+            catch (const MalformedSnapshot&) { return Bad("snapshot-encoding"); }
+            catch (const std::exception&) { return Result::Missing({index->m_mm_rhs}); }
+            if (!raw) return Result::Missing({index->m_mm_rhs});
+            if (ProfileSnapshotHash(*raw, COMPACT_TIDES_VERSION) != index->m_mm_rhs) return Result::Missing({index->m_mm_rhs});
+            if (!CheckBinding(raw->binding, consensus, height, index->pprev->GetBlockHash()).IsValid() ||
+                !OwnerValid(*raw) || raw->history_head.IsNull()) return Bad("compact-state-parent");
+            Snapshot current{*raw};
+            // ApplyTidesState ignores these inputs; clear explicitly so no
+            // caller-supplied derived cache can accidentally become evidence.
+            current.post_state.clear();
+            current.certificates.clear();
+            ApplyTidesState(current, derived_parent ? &*derived_parent : nullptr);
+            // The unscanned history prefix is committed by the actual native
+            // ancestor. Preserve its wire head for the next delta; validating
+            // the native branch remains a prerequisite to using its ancestry.
+            current.history_head = raw->history_head;
+            derived_parent = std::move(current);
+        }
+        Snapshot current{snapshot};
+        current.post_state.clear();
+        current.certificates.clear();
+        ApplyTidesState(current, derived_parent ? &*derived_parent : nullptr);
+        if (current.post_state.size() > MAX_SNAPSHOT_BYTES / MIN_STATE_BYTES ||
+            GetSerializeSize(current.certificates) > MAX_CERTIFICATE_BYTES) return Bad("compact-state-budget");
+        snapshot.post_state = std::move(current.post_state);
+        snapshot.certificates = std::move(current.certificates);
+        snapshot.history_head = current.history_head;
+        return Result::Valid();
+    } catch (const std::ios_base::failure&) { return Bad("compact-state-budget"); }
+    catch (const std::invalid_argument&) { return Bad("compact-state"); }
 }
 
 Result CalculateTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previous,
@@ -1280,7 +1527,7 @@ Result CalculateTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previo
                             const Lookup& lookup, CAmount reward,
                             std::vector<CTxOut>& payouts, bool reserve_scripts)
 {
-    if (!consensus.SharePoolTides || snapshot.binding.version != TIDES_VERSION || !previous ||
+    if (!consensus.SharePoolTides || snapshot.binding.version != ProfileVersion(consensus) || !previous ||
         snapshot.binding.native_parent != previous->GetBlockHash() || !MoneyRange(reward)) return Bad("tides-accounting-context");
     using tides::Work;
     const Work denominator = NumericWork(NativeTarget(native_bits)) + 1;
@@ -1304,7 +1551,7 @@ Result CalculateTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previo
         catch (const MalformedSnapshot&) { return tides::DeltaResult::Invalid("tides-history-encoding"); }
         catch (const std::exception&) { return tides::DeltaResult::Missing({index.m_mm_rhs}); }
         if (!old) return tides::DeltaResult::Missing({index.m_mm_rhs});
-        if (ProfileSnapshotHash(*old, TIDES_VERSION) != index.m_mm_rhs) return tides::DeltaResult::Missing({index.m_mm_rhs});
+        if (ProfileSnapshotHash(*old, ProfileVersion(consensus)) != index.m_mm_rhs) return tides::DeltaResult::Missing({index.m_mm_rhs});
         if (!index.pprev || !CheckBinding(old->binding, consensus, index.nHeight, index.pprev->GetBlockHash()).IsValid() ||
             !OwnerValid(*old) || old->history_head.IsNull()) return tides::DeltaResult::Invalid("tides-history-binding");
         auto delta = std::make_shared<tides::HistoryDelta>();
@@ -1324,8 +1571,18 @@ Result CalculateTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previo
         }
         return tides::DeltaResult::Ready(std::move(delta));
     };
-    const auto old = history.ReadPool(previous, consensus.SharePoolHeight, snapshot.binding.pool,
-                                      current_work >= needed ? Work{0} : Work{needed - current_work}, fetch);
+    const Work history_work = current_work >= needed ? Work{0} : Work{needed - current_work};
+    tides::HistoryWindow old;
+    bool indexed{false};
+    if (const auto reader = tides::ConfiguredPersistentHistoryReader(); reader &&
+        reader->MatchesScope(consensus.hashGenesisBlock, RulesHash(ProfileVersion(consensus)),
+                             ProfileVersion(consensus), consensus.SharePoolHeight)) {
+        old = reader->ReadPool(previous, consensus.SharePoolHeight, snapshot.binding.pool, history_work, fetch);
+        indexed = old.status == tides::HistoryStatus::Ready || old.status == tides::HistoryStatus::Invalid;
+    }
+    // This local index is an optimization. Incomplete data, an unconnected
+    // candidate branch or local index budgets fall back to the existing scanner.
+    if (!indexed) old = history.ReadPool(previous, consensus.SharePoolHeight, snapshot.binding.pool, history_work, fetch);
     if (old.status == tides::HistoryStatus::Invalid) return Bad(old.reason);
     if (old.status != tides::HistoryStatus::Ready) {
         const bool progress = old.status == tides::HistoryStatus::ResourceLimit && old.scanned_blocks > 0;
@@ -1395,7 +1652,7 @@ Result CalculateTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previo
 
 std::vector<CTxOut> CalculatePayouts(const Snapshot& snapshot, CAmount reward)
 {
-    if (snapshot.binding.version == TIDES_VERSION) throw std::invalid_argument("TIDES payouts require actual parent history and native target");
+    if (IsTidesVersion(snapshot.binding.version)) throw std::invalid_argument("TIDES payouts require actual parent history and native target");
     if (!MoneyRange(reward) || snapshot.shares.size() > MAX_SNAPSHOT_BYTES / MIN_SHARE_BYTES) throw std::invalid_argument("payout byte or reward bound");
     // Exact integers: a 256-bit per-proof work value plus the byte-bounded
     // proof count and monetary multiplication can exceed uint256/uint64.

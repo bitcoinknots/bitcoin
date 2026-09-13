@@ -219,4 +219,78 @@ BOOST_AUTO_TEST_CASE(payout_reservation_rejects_contextual_weight_excess_before_
     }
 }
 
+BOOST_AUTO_TEST_CASE(compact_decoded_snapshot_lru_charges_expansion_and_preserves_available_values)
+{
+    namespace ho = sharepool::hashonly;
+    auto snapshot = std::make_shared<ho::Snapshot>();
+    snapshot->binding.version = ho::COMPACT_TIDES_VERSION;
+    snapshot->shares.resize(128);
+    for (auto& share : snapshot->shares) share.origin.payout_script.assign(22, 1);
+    constexpr size_t WIRE_BYTES{512 + 128 * 33};
+    const size_t charge = sharepool::DecodedSnapshotCacheCharge(*snapshot, WIRE_BYTES);
+    BOOST_CHECK_GE(charge, WIRE_BYTES + 128 * (sizeof(sharepool::Share) + 22));
+    sharepool::DecodedSnapshotCache cache{2 * charge};
+    const uint256 first{uint8_t{1}}, second{uint8_t{2}}, third{uint8_t{3}};
+    BOOST_REQUIRE(cache.Put(first, snapshot, WIRE_BYTES));
+    BOOST_REQUIRE(cache.Put(second, snapshot, WIRE_BYTES));
+    BOOST_CHECK_EQUAL(cache.Bytes(), 2 * charge);
+    BOOST_CHECK(cache.Get(first) == snapshot); // Keep the first entry warm.
+    BOOST_REQUIRE(cache.Put(third, snapshot, WIRE_BYTES));
+    BOOST_CHECK(!cache.Get(second));
+    BOOST_CHECK(cache.Get(first) == snapshot);
+    BOOST_CHECK(cache.Get(third) == snapshot);
+    BOOST_CHECK_EQUAL(cache.Size(), 2);
+    BOOST_CHECK_EQUAL(cache.Bytes(), 2 * charge);
+    // Raw-byte-only accounting would have retained all three expanded values.
+    BOOST_CHECK_LT(3 * WIRE_BYTES, cache.Bytes());
+    auto small = std::make_shared<ho::Snapshot>();
+    BOOST_REQUIRE(cache.Put(first, small, 512));
+    BOOST_CHECK_EQUAL(cache.Bytes(), charge + sharepool::DecodedSnapshotCacheCharge(*small, 512));
+    sharepool::DecodedSnapshotCache tiny{charge - 1};
+    BOOST_CHECK(!tiny.Put(first, snapshot, WIRE_BYTES));
+    BOOST_CHECK_EQUAL(tiny.Bytes(), 0);
+    BOOST_CHECK_EQUAL(tiny.Size(), 0);
+    BOOST_CHECK_EQUAL(snapshot->shares.size(), 128); // Caller still owns available evidence.
+    BOOST_CHECK_EQUAL(sharepool::DecodedSnapshotCacheCharge(*snapshot, std::numeric_limits<size_t>::max()),
+                      std::numeric_limits<size_t>::max());
+}
+
+BOOST_AUTO_TEST_CASE(decoded_snapshot_cache_counts_nested_witnesses_outputs_and_shared_transaction_objects)
+{
+    namespace ho = sharepool::hashonly;
+    CMutableTransaction transaction;
+    transaction.vin.resize(1);
+    transaction.vin[0].scriptWitness.stack.assign(1024, std::vector<unsigned char>{1});
+    transaction.vout.resize(512);
+    for (auto& output : transaction.vout) output.scriptPubKey.assign(40, 0x51);
+    const auto tx = MakeTransactionRef(std::move(transaction));
+    ho::Snapshot snapshot;
+    snapshot.templates.resize(1);
+    snapshot.templates[0].block.vtx = {tx};
+    const size_t wire = GetSerializeSize(TX_WITH_WITNESS(*tx));
+    const size_t transaction_memory = memusage::DynamicUsage(tx) + RecursiveDynamicUsage(*tx);
+    const auto first = sharepool::DecodedSnapshotCacheCharge(snapshot, wire);
+    BOOST_CHECK_GT(transaction_memory, wire);
+    BOOST_CHECK_GE(first, wire + transaction_memory);
+    // The same immutable transaction referenced again is charged only for the
+    // added template/reference containers, not its large witness/output graph.
+    const size_t old_templates = memusage::DynamicUsage(snapshot.templates);
+    snapshot.templates.push_back(snapshot.templates.front());
+    const size_t metadata = memusage::DynamicUsage(snapshot.templates) - old_templates +
+                            memusage::DynamicUsage(snapshot.templates.back().block.vtx);
+    BOOST_CHECK_EQUAL(sharepool::DecodedSnapshotCacheCharge(snapshot, wire), first + metadata);
+    snapshot.post_state.resize(100);
+    snapshot.certificates.resize(100);
+    snapshot.pending.resize(10);
+    snapshot.settled.resize(10);
+    snapshot.payouts.resize(10);
+    for (auto& credit : snapshot.pending) credit.payout_script.assign(34, 1);
+    for (auto& credit : snapshot.settled) credit.payout_script.assign(34, 2);
+    for (auto& output : snapshot.payouts) output.scriptPubKey.assign(40, 0x51);
+    const auto added = memusage::DynamicUsage(snapshot.post_state) + memusage::DynamicUsage(snapshot.certificates) +
+                       memusage::DynamicUsage(snapshot.pending) + memusage::DynamicUsage(snapshot.settled) +
+                       memusage::DynamicUsage(snapshot.payouts);
+    BOOST_CHECK_GT(sharepool::DecodedSnapshotCacheCharge(snapshot, wire), first + metadata + added);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

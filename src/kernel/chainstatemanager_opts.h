@@ -54,6 +54,9 @@ struct ChainstateManagerOpts {
     uint64_t sharepool_archive_bytes{1024ULL * 1024 * 1024};
     //! Rebuild the disposable archive index; interrupted rebuilds resume automatically.
     bool sharepool_archive_index_rebuild{false};
+    //! Local derived TIDES index quota; unrelated to consensus evidence limits.
+    uint64_t sharepool_tides_index_bytes{1024ULL * 1024 * 1024};
+    bool sharepool_tides_index_rebuild{false};
 };
 
 } // namespace kernel

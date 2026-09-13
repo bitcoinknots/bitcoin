@@ -92,6 +92,23 @@ struct HistoryWindow {
     size_t scanned_bytes{0};
 };
 
+/** Optional local acceleration. Implementations cannot change payout rules:
+ * callers fall back to the authenticated snapshot scan when unavailable or
+ * locally budget-limited. In particular an absent/corrupt index is not an empty
+ * pool. The reader must not acquire the chain lock while holding a local
+ * index lock, or retain that lock across a fetch callback. */
+class PersistentHistoryReader {
+public:
+    virtual ~PersistentHistoryReader() = default;
+    virtual bool MatchesScope(const uint256& genesis, const uint256& rules,
+                              uint32_t profile, uint32_t activation_height) const = 0;
+    virtual HistoryWindow ReadPool(const CBlockIndex* previous, uint32_t activation_height,
+                                   const uint256& pool, const Work& required_work,
+                                   const FetchHistoryDelta& fetch, HistoryBudget budget = {}) = 0;
+};
+void ConfigurePersistentHistoryReader(std::shared_ptr<PersistentHistoryReader> reader);
+std::shared_ptr<PersistentHistoryReader> ConfiguredPersistentHistoryReader();
+
 /** Derived local cache, never a source of consensus authority or disk history.
  * Stored native snapshots retain the immutable deltas. Each query is keyed by
  * the exact parent header/branch, activation, pool and requested work. Reorgs

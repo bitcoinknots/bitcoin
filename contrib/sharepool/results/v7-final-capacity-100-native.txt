@@ -1,0 +1,11 @@
+2026-09-13T19:13:09.420000Z TestFramework (INFO): PRNG seed is: 7253070655486629970
+2026-09-13T19:13:09.420000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v7-final-capacity-100
+2026-09-13T19:13:22.255000Z TestFramework (INFO): Capacity epoch 1/1: 100 distinct native origins, layout=cumulative, padding outputs=0, witness-heavy=False
+2026-09-13T19:13:26.565000Z TestFramework (INFO): Epoch 1: 25/100 native origins ready
+2026-09-13T19:13:31.584000Z TestFramework (INFO): Epoch 1: 50/100 native origins ready
+2026-09-13T19:13:36.926000Z TestFramework (INFO): Epoch 1: 75/100 native origins ready
+2026-09-13T19:13:43.074000Z TestFramework (INFO): Epoch 1: 100/100 native origins ready
+2026-09-13T19:19:20.558000Z TestFramework (INFO): Epoch 1: 300 offers admitted in 2 blocks; zero expired
+2026-09-13T19:19:21.600000Z TestFramework (INFO): Stopping nodes
+2026-09-13T19:19:21.771000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v7-final-capacity-100
+2026-09-13T19:19:21.771000Z TestFramework (INFO): Tests successful

@@ -79,15 +79,15 @@ std::vector<unsigned char> OriginalSnapshotEncoding(const ho::Snapshot& snapshot
 
 size_t ComponentBytes(const ho::SnapshotResourceUsage& usage)
 {
-    return usage.binding_bytes + usage.transaction_table_bytes + usage.template_table_bytes + usage.share_bytes + usage.state_bytes +
+    return usage.binding_bytes + usage.transaction_table_bytes + usage.template_table_bytes + usage.job_table_bytes + usage.share_bytes + usage.state_bytes +
         usage.payout_bytes + usage.pending_bytes + usage.settled_bytes + usage.certificate_bytes + usage.history_bytes;
 }
 
 struct HashFixture : BasicTestingSetup {
     static constexpr CAmount REWARD{100003};
     Consensus::Params consensus{CChainParams::RegTest({})->GetConsensus()};
-    std::array<CBlockIndex, 6> indexes;
-    std::array<uint256, 6> hashes;
+    std::array<CBlockIndex, 12> indexes;
+    std::array<uint256, 12> hashes;
     CKey key;
     std::map<uint256, std::shared_ptr<const ho::Snapshot>> snapshots;
     size_t native_checks{0};
@@ -261,6 +261,35 @@ struct HashFixture : BasicTestingSetup {
         index.m_mm_rhs = block.m_mm_rhs;
         index.nTime = block.nTime;
         index.nBits = block.nBits;
+    }
+
+    ho::Snapshot CompactEmpty(uint32_t height = 1, unsigned char script = 0x61)
+    {
+        ho::Snapshot snapshot;
+        snapshot.binding = Owner(height, script);
+        CompactState(snapshot);
+        return snapshot;
+    }
+
+    void CompactState(ho::Snapshot& snapshot)
+    {
+        auto* previous = &indexes.at(snapshot.binding.height - 1);
+        const auto state = ho::MaterializeTidesState(snapshot, previous, consensus, Lookup());
+        BOOST_REQUIRE_MESSAGE(state.IsValid(), state.reason);
+        CBlockHeader header;
+        header.nTime = previous->nTime + 1;
+        const auto payouts = ho::CalculateTidesPayouts(snapshot, previous, GetNextWorkRequired(previous, &header, consensus),
+                                                     consensus, Lookup(), REWARD, snapshot.payouts);
+        BOOST_REQUIRE_MESSAGE(payouts.IsValid(), payouts.reason);
+    }
+
+    CBlock CompactBlock(ho::Snapshot& snapshot)
+    {
+        const auto block = Block(snapshot);
+        // Exercise the same empty derived-cache objects returned by the native
+        // canonical archive, not pre-populated test-only state.
+        snapshots[block.m_mm_rhs] = std::make_shared<const ho::Snapshot>(ho::DecodeSnapshot(ho::EncodeSnapshot(snapshot)));
+        return block;
     }
 
     static void SortEvidence(ho::Snapshot& snapshot)
@@ -1367,6 +1396,258 @@ BOOST_AUTO_TEST_CASE(v5_parent_certificate_renews_worked_graph_depth_budget)
         const auto result = ho::CheckMiningJob(next_origin, &indexes[1], consensus, Lookup(), Native(), REWARD);
         BOOST_REQUIRE_MESSAGE(result.IsValid(), result.reason);
     }
+}
+
+BOOST_AUTO_TEST_CASE(v7_compact_jobs_reconstruct_exact_shares_and_ignore_derived_caches)
+{
+    consensus.SharePoolTides = true;
+    consensus.SharePoolCompactTides = true;
+    auto initial = CompactEmpty();
+    const auto origin = CompactBlock(initial);
+    auto snapshot = CompactEmpty(1, 0x62);
+    snapshot.templates = {Record(origin)};
+    for (uint32_t i{0}; i < 100; ++i) {
+        auto share = Proof(origin, initial, i * 256);
+        share.header.m_nonce2 = i + 1;
+        share.header.m_nonce3 = i + 2;
+        share.header.m_extranonce.begin()[i % 16] = static_cast<uint8_t>(i + 1);
+        share.header.m_time_offset = i + 3;
+        snapshot.shares.push_back(share);
+    }
+    SortEvidence(snapshot);
+    CompactState(snapshot);
+    const auto block = CompactBlock(snapshot);
+    const auto bytes = ho::EncodeSnapshot(snapshot);
+    const auto decoded = ho::DecodeSnapshot(bytes);
+    BOOST_CHECK(decoded.post_state.empty());
+    BOOST_CHECK(decoded.certificates.empty());
+    BOOST_REQUIRE_EQUAL(decoded.shares.size(), snapshot.shares.size());
+    for (size_t i{0}; i < snapshot.shares.size(); ++i) {
+        DataStream old_share, new_share;
+        old_share << snapshot.shares[i];
+        new_share << decoded.shares[i];
+        BOOST_CHECK(old_share.size() == new_share.size() && std::equal(old_share.begin(), old_share.end(), new_share.begin()));
+    }
+    const auto usage = ho::MeasureSnapshotResources(snapshot);
+    BOOST_CHECK_EQUAL(usage.encoded_bytes, bytes.size());
+    BOOST_CHECK_EQUAL(ComponentBytes(usage), bytes.size());
+    BOOST_CHECK_EQUAL(usage.jobs, 1);
+    BOOST_CHECK_EQUAL(usage.job_table_bytes, 1 + 1 + GetSerializeSize(initial.binding) + GetSerializeSize(initial.authorization));
+    BOOST_CHECK_EQUAL(usage.share_bytes, 1 + 100 * 33);
+    BOOST_CHECK_EQUAL(usage.state_bytes, 0);
+    BOOST_CHECK_EQUAL(usage.certificate_bytes, 0);
+    BOOST_CHECK_EQUAL(usage.history_bytes, 32);
+    BOOST_CHECK(Check(block).IsValid());
+    const auto contents = ho::SnapshotContentsHash(snapshot);
+    snapshot.post_state = {{0, uint256{}}, {0, uint256{}}};
+    snapshot.certificates = {{0, {}, {}, {}}, {0, {}, {}, {}}};
+    BOOST_CHECK(ho::EncodeSnapshot(snapshot) == bytes);
+    BOOST_CHECK(ho::SnapshotContentsHash(snapshot) == contents);
+    snapshots[block.m_mm_rhs] = std::make_shared<const ho::Snapshot>(snapshot);
+    BOOST_CHECK(Check(block).IsValid());
+    BOOST_CHECK(ho::ProfileSnapshotHash(bytes, ho::COMPACT_TIDES_VERSION) == block.m_mm_rhs);
+    BOOST_CHECK(ho::ProfileSnapshotHash(bytes, ho::TIDES_VERSION) != block.m_mm_rhs);
+    BOOST_CHECK(ho::RulesHash(ho::COMPACT_TIDES_VERSION) != ho::RulesHash(ho::TIDES_VERSION));
+    BOOST_CHECK(ho::ShareTarget(0x1d00ffff, ho::COMPACT_TIDES_VERSION) == ho::ShareTarget(0x1d00ffff, ho::TIDES_VERSION));
+}
+
+BOOST_AUTO_TEST_CASE(v7_compact_dictionary_rejects_conflicts_unused_entries_and_search_rebinding)
+{
+    consensus.SharePoolTides = true;
+    consensus.SharePoolCompactTides = true;
+    auto initial = CompactEmpty();
+    const auto origin = CompactBlock(initial);
+    auto snapshot = CompactEmpty(1, 0x62);
+    snapshot.templates = {Record(origin)};
+    snapshot.shares = {Proof(origin, initial, 1), Proof(origin, initial, 512)};
+    SortEvidence(snapshot);
+    CompactState(snapshot);
+    const auto good = snapshot;
+    const auto encoded = ho::EncodeSnapshot(good);
+    const auto usage = ho::MeasureSnapshotResources(good);
+    const size_t dictionary = usage.binding_bytes + usage.transaction_table_bytes + usage.template_table_bytes;
+    auto corrupt = encoded;
+    corrupt.at(dictionary + 1) = 1; // Only template index0 exists.
+    BOOST_CHECK_THROW(ho::DecodeSnapshot(corrupt), std::ios_base::failure);
+    corrupt = encoded;
+    const size_t proofs = dictionary + usage.job_table_bytes;
+    corrupt.at(proofs + 1) = 1; // Only dictionary index0 exists.
+    BOOST_CHECK_THROW(ho::DecodeSnapshot(corrupt), std::ios_base::failure);
+    corrupt = encoded;
+    corrupt.at(proofs) = 0;
+    corrupt.erase(corrupt.begin() + proofs + 1, corrupt.begin() + proofs + usage.share_bytes);
+    BOOST_CHECK_THROW(ho::DecodeSnapshot(corrupt), std::ios_base::failure); // Unused descriptor.
+    snapshot.shares.back().authorization[0] ^= 1;
+    BOOST_CHECK_THROW(ho::EncodeSnapshot(snapshot), std::ios_base::failure);
+    snapshot = good;
+    snapshot.shares.back().origin.payout_script = Payout(0x63);
+    BOOST_CHECK_THROW(ho::EncodeSnapshot(snapshot), std::ios_base::failure);
+    snapshot = good;
+    snapshot.shares.back().header.nTime++;
+    BOOST_CHECK_THROW(ho::EncodeSnapshot(snapshot), std::ios_base::failure);
+    snapshot = good;
+    for (auto& share : snapshot.shares) share.authorization[0] ^= 1;
+    const auto wrong_auth = CompactBlock(snapshot);
+    Reason(Check(wrong_auth), "share-authorization");
+    snapshot = good;
+    snapshot.shares.resize(ho::MAX_COMPACT_SHARES + 1, snapshot.shares.front());
+    BOOST_CHECK_THROW(ho::EncodeSnapshot(snapshot), std::ios_base::failure);
+}
+
+BOOST_AUTO_TEST_CASE(v7_bounded_native_suffix_reconstructs_expiry_and_repeat_state_after_nine_heights)
+{
+    consensus.SharePoolTides = true;
+    consensus.SharePoolCompactTides = true;
+    std::vector<CBlock> origins;
+    std::vector<Share> admitted;
+    for (uint32_t height{1}; height <= 9; ++height) {
+        auto job = CompactEmpty(height);
+        origins.push_back(CompactBlock(job));
+        auto settlement = CompactEmpty(height, 0x62);
+        settlement.templates = {Record(origins.back())};
+        settlement.shares = {Proof(origins.back(), job, 1)};
+        admitted.push_back(settlement.shares.front());
+        CompactState(settlement);
+        BOOST_CHECK_EQUAL(settlement.post_state.size(), std::min<size_t>(height, MAX_SHARE_AGE + 1));
+        BOOST_CHECK_EQUAL(settlement.certificates.size(), std::min<size_t>(height, MAX_SHARE_AGE + 1));
+        const auto block = CompactBlock(settlement);
+        const auto checked = Check(block);
+        BOOST_REQUIRE_MESSAGE(checked.IsValid(), checked.reason);
+        Anchor(block);
+    }
+    auto next = CompactEmpty(10);
+    std::vector<uint256> reads;
+    const ho::Lookup recorded = [&](const uint256& hash) {
+        reads.push_back(hash);
+        return Lookup()(hash);
+    };
+    next.post_state = {{0, uint256{}}};
+    next.certificates = {{0, {}, {}, {}}};
+    BOOST_REQUIRE(ho::MaterializeTidesState(next, &indexes[9], consensus, recorded).IsValid());
+    BOOST_REQUIRE_EQUAL(reads.size(), 3);
+    for (size_t i{0}; i < reads.size(); ++i) BOOST_CHECK(reads[i] == indexes[7 + i].m_mm_rhs);
+    BOOST_CHECK_EQUAL(next.post_state.size(), 3);
+    BOOST_CHECK_EQUAL(next.certificates.size(), 3);
+    for (const auto& state : next.post_state) BOOST_CHECK_GE(state.origin_height, 7);
+    const auto retained = snapshots.at(indexes[8].m_mm_rhs);
+    snapshots.erase(indexes[8].m_mm_rhs);
+    const auto missing = ho::MaterializeTidesState(next, &indexes[9], consensus, Lookup());
+    BOOST_CHECK(missing.IsMissing());
+    BOOST_REQUIRE_EQUAL(missing.missing.size(), 1);
+    BOOST_CHECK(missing.missing.front() == indexes[8].m_mm_rhs);
+    snapshots[indexes[8].m_mm_rhs] = retained;
+    const auto fourth = snapshots.at(indexes[4].m_mm_rhs);
+    const auto fifth = snapshots.at(indexes[5].m_mm_rhs);
+    snapshots.erase(indexes[4].m_mm_rhs);
+    snapshots.erase(indexes[5].m_mm_rhs);
+    const auto opening = snapshots.at(origins[6].m_mm_rhs);
+    const auto fresh = Proof(origins[6], *opening, 512);
+    native_checks = 0;
+    // Actual parent9's certificate derivation opens native6..8. Origin7's
+    // redundant old4..6 suffix must not be required by the exact shortcut.
+    const auto certified = ho::CheckShareProof(fresh, origins[6], &indexes[9], indexes[9].nTime + 1,
+                                              consensus, Lookup(), Native());
+    BOOST_REQUIRE_MESSAGE(certified.IsValid(), certified.reason);
+    BOOST_CHECK_EQUAL(native_checks, 0);
+    BOOST_CHECK(ho::CheckHistoricalTemplate(origins[6], &indexes[9], indexes[9].nTime + 1,
+                                           consensus, Lookup(), Native()).IsValid());
+    auto changed = origins[6];
+    ++changed.nTime;
+    auto changed_opening = *opening;
+    changed_opening.job_commitment = ho::JobHash(changed);
+    changed_opening.authorization = Sign(changed_opening);
+    changed.m_mm_rhs = ho::SnapshotHash(changed_opening);
+    snapshots[changed.m_mm_rhs] = std::make_shared<const ho::Snapshot>(changed_opening);
+    // A newly signed exact job without the certificate still needs its own
+    // old ancestry. It cannot inherit the shortcut by height, owner or pool.
+    const auto uncertified = ho::CheckHistoricalTemplate(changed, &indexes[9], indexes[9].nTime + 1,
+                                                        consensus, Lookup(), Native());
+    BOOST_CHECK(uncertified.IsMissing());
+    snapshots[indexes[4].m_mm_rhs] = fourth;
+    snapshots[indexes[5].m_mm_rhs] = fifth;
+    next.templates = {Record(origins[6])};
+    next.shares = {admitted[6]}; // Origin7 is still eligible at height10 but already paid.
+    BOOST_CHECK(ho::MaterializeTidesState(next, &indexes[9], consensus, Lookup()).status == ho::Status::Invalid);
+    next = CompactEmpty(10);
+    next.templates = {Record(origins[5])};
+    next.shares = {admitted[5]}; // Origin6 has expired and cannot be reintroduced.
+    BOOST_CHECK(ho::MaterializeTidesState(next, &indexes[9], consensus, Lookup()).status == ho::Status::Invalid);
+    next = CompactEmpty(10);
+    next.history_head = uint256{uint8_t{0x99}};
+    const auto wrong_history = CompactBlock(next);
+    Reason(Check(wrong_history), "tides-history");
+    next = CompactEmpty(10);
+    next.binding.native_parent = uint256{uint8_t{0xee}};
+    BOOST_CHECK(ho::MaterializeTidesState(next, &indexes[9], consensus, Lookup()).status == ho::Status::Invalid);
+}
+
+BOOST_AUTO_TEST_CASE(v7_compact_dictionary_and_proof_indexes_cross_compactsize_boundaries)
+{
+    consensus.SharePoolTides = true;
+    consensus.SharePoolCompactTides = true;
+    auto initial = CompactEmpty();
+    const auto base = CompactBlock(initial);
+    auto snapshot = CompactEmpty(1, 0x62);
+    // Encoding-only geometry: separate RHS commitments give exact distinct
+    // template IDs. This fixture makes no origin-validity claim for those RHSs.
+    for (uint32_t i{0}; i < 254; ++i) {
+        CBlock origin{base};
+        origin.m_mm_rhs = ArithToUint256(arith_uint256{i + 1});
+        snapshot.templates.push_back(Record(origin));
+        Share share{origin.GetBlockHeader(), initial.binding, initial.authorization};
+        share.header.nNonce = i + 1;
+        snapshot.shares.push_back(share);
+    }
+    SortEvidence(snapshot);
+    const auto bytes = ho::EncodeSnapshot(snapshot);
+    const auto decoded = ho::DecodeSnapshot(bytes);
+    BOOST_CHECK(ho::EncodeSnapshot(decoded) == bytes);
+    const auto usage = ho::MeasureSnapshotResources(snapshot);
+    BOOST_CHECK_EQUAL(usage.jobs, 254);
+    BOOST_CHECK_EQUAL(usage.job_table_bytes, 3 + 253 * (1 + 348) + (3 + 348));
+    BOOST_CHECK_EQUAL(usage.share_bytes, 3 + 253 * 33 + 35);
+    BOOST_CHECK_EQUAL(ComponentBytes(usage), bytes.size());
+    const size_t dictionary = usage.binding_bytes + usage.transaction_table_bytes + usage.template_table_bytes;
+    auto noncanonical = bytes;
+    // First descriptor's template index0 must use the single-byte form.
+    noncanonical[dictionary + 3] = 0xfd;
+    noncanonical.insert(noncanonical.begin() + dictionary + 4, {0, 0});
+    BOOST_CHECK_THROW(ho::DecodeSnapshot(noncanonical), std::ios_base::failure);
+}
+
+BOOST_AUTO_TEST_CASE(v7_compact_graph_keeps_full_share_validation_work_bound)
+{
+    consensus.SharePoolTides = true;
+    consensus.SharePoolCompactTides = true;
+    auto initial = CompactEmpty();
+    const auto base = CompactBlock(initial);
+    auto snapshot = CompactEmpty(1, 0x62);
+    snapshot.templates = {Record(base)};
+    snapshot.shares.reserve(ho::MAX_COMPACT_SHARES);
+    for (uint32_t i{0}; i < ho::MAX_COMPACT_SHARES; ++i) {
+        Share share{base.GetBlockHeader(), initial.binding, initial.authorization};
+        share.header.nNonce = i + 1;
+        snapshot.shares.push_back(share);
+    }
+    SortEvidence(snapshot);
+    CompactState(snapshot);
+    auto origin = CompactBlock(snapshot);
+    CBlock boundary;
+    for (uint32_t level{2}; level <= 5; ++level) {
+        snapshot.templates = {Record(base), Record(origin)};
+        SortEvidence(snapshot);
+        // These are alternative jobs at the same native height; their complete
+        // current deltas overlap, while no actual native parent admitted them.
+        origin = CompactBlock(snapshot);
+        if (level == 4) boundary = origin;
+    }
+    // Five distinct compact snapshots fit well below64MiB on the wire but
+    // exceed131072 reconstructed proofs. A sixth zero-proof opening is shared.
+    Reason(Check(origin), "dependency-shares");
+    native_checks = 0;
+    const auto accepted = Check(boundary);
+    BOOST_REQUIRE_MESSAGE(accepted.IsValid(), accepted.reason);
+    BOOST_CHECK_EQUAL(native_checks, 4);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

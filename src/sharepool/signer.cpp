@@ -90,7 +90,7 @@ Signature SignJob(const Policy& policy, const CKey& key, const JobStatement& sta
     const auto& binding = statement.binding;
     const auto genesis = CChainParams::RegTest({})->GetConsensus().hashGenesisBlock;
     if ((binding.version != hashonly::VERSION && binding.version != hashonly::LEDGER_VERSION &&
-         binding.version != hashonly::TIDES_VERSION) ||
+         !hashonly::IsTidesVersion(binding.version)) ||
         binding.rules != hashonly::RulesHash(binding.version) ||
         !binding.shares_root.IsNull() || !binding.state_root.IsNull() || !binding.payouts_root.IsNull() ||
         binding.genesis != genesis || binding.height == 0 || binding.height >= uint32_t(std::numeric_limits<int>::max()) ||

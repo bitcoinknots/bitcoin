@@ -50,7 +50,7 @@
 class Chainstate;
 class CTxMemPool;
 class ChainstateManager;
-namespace sharepool { struct Share; class HashSnapshotStore; class RetryWorker; struct RetryWorkerStats; namespace hashonly { struct Result; struct Snapshot; } }
+namespace sharepool { struct Share; class HashSnapshotStore; class RetryWorker; struct RetryWorkerStats; namespace hashonly { struct Result; struct Snapshot; } namespace tides { class PersistentHistoryIndex; } }
 struct ChainTxData;
 class DisconnectedBlockTransactions;
 struct PrecomputedTransactionData;
@@ -1123,6 +1123,8 @@ public:
     node::BlockManager m_blockman;
 
     std::unique_ptr<sharepool::HashSnapshotStore> m_sharepool_hash_store;
+    std::shared_ptr<sharepool::tides::PersistentHistoryIndex> m_sharepool_tides_history;
+    std::string m_sharepool_tides_history_error;
     // Exact-body deterministic script failures, bounded like the native reward cache.
     std::map<uint256, std::string> m_sharepool_hash_script_failures GUARDED_BY(cs_main);
     struct VerifiedHashSnapshot {

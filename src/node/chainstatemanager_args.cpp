@@ -51,6 +51,28 @@ util::Result<void> ApplyArgsManOptions(const ArgsManager& args, ChainstateManage
         }
         opts.sharepool_archive_index_rebuild = value == "1";
     }
+    if (args.IsArgSet("-sharepooltidesindexmib")) {
+        if (args.GetArgs("-sharepooltidesindexmib").size() != 1 || !opts.chainparams.GetConsensus().SharePoolTides) {
+            return util::Error{Untranslated("-sharepooltidesindexmib requires one value and the explicit regtest TIDES profile")};
+        }
+        const auto text = args.GetArg("-sharepooltidesindexmib", "");
+        uint64_t value{0};
+        const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+        constexpr uint64_t MIB{1024 * 1024};
+        if (error != std::errc{} || end != text.data() + text.size() || value == 0 ||
+            value > std::numeric_limits<size_t>::max() / MIB) {
+            return util::Error{Untranslated("-sharepooltidesindexmib must be a positive whole MiB value that fits the platform byte size")};
+        }
+        opts.sharepool_tides_index_bytes = value * MIB;
+    }
+    if (args.IsArgSet("-sharepooltidesindexrebuild")) {
+        if (args.GetArgs("-sharepooltidesindexrebuild").size() != 1 || !opts.chainparams.GetConsensus().SharePoolTides) {
+            return util::Error{Untranslated("-sharepooltidesindexrebuild requires one value and the explicit regtest TIDES profile")};
+        }
+        const auto value = args.GetArg("-sharepooltidesindexrebuild", "");
+        if (value != "0" && value != "1") return util::Error{Untranslated("-sharepooltidesindexrebuild must be 0 or 1")};
+        opts.sharepool_tides_index_rebuild = value == "1";
+    }
     if (auto value{args.GetIntArg("-checkblockindex")}) {
         // Interpret bare -checkblockindex argument as 1 instead of 0.
         opts.check_block_index = args.GetArg("-checkblockindex")->empty() ? 1 : *value;

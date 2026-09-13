@@ -27,8 +27,8 @@ import native_archive
 import hash_gate_archive
 import hash_gate_batch
 from hash_snapshot import (Snapshot, TemplateRecord, CompactTemplateRecord, Share, MAX_SNAPSHOT_BYTES,
-    MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_BYTES, MAX_SHARE_AGE, SHARE_BITS, parse_share, candidate, normalize_template, build_snapshot,
-    job_hash, work_outputs, credit_outputs, rules_hash, LEDGER_VERSION, TIDES_VERSION)
+    MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_BYTES, MAX_COMPACT_SHARES, MAX_SHARE_AGE, SHARE_BITS, parse_share, candidate, normalize_template, build_snapshot,
+    job_hash, work_outputs, credit_outputs, rules_hash, LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION, is_tides_profile, materialize_compact_state)
 from native_mining_gate import (MiningAuthorization, JobOmission, parse_block, immutable_header,
     template_id, _process_lock, fcntl, REGTEST_GENESIS)
 from native_enforcement import compact_size, is_payout_script, verify_schnorr
@@ -62,7 +62,7 @@ class HashMiningGate:
                  quota=native_archive.DEFAULT_QUOTA, trusted_head_path=None, archive_directory=None,
                  snapshot_budget=MAX_SNAPSHOT_BYTES, profile_version=4, activation_height=1):
         if (type(activation_height) is not int or not 1 <= activation_height <= 0x7fffffff or
-                type(profile_version) is not int or profile_version not in (4, LEDGER_VERSION, TIDES_VERSION) or
+                type(profile_version) is not int or profile_version not in (4, LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION) or
                 type(pool) is not int or not 0 < pool < 1 << 256 or type(public_key) is not bytes or
                 len(public_key) != 32 or type(payout_script) is not bytes or not is_payout_script(payout_script) or
                 type(quota) is not int or not 4096 <= quota <= native_archive.MAX_QUOTA or
@@ -76,7 +76,7 @@ class HashMiningGate:
         self.profile_version, self.rules = profile_version, rules_hash(profile_version)
         self.activation_height = activation_height
         self.mode = {4: "hash-only-v4", LEDGER_VERSION: "hash-only-v5-confirmed-ledger",
-                     TIDES_VERSION: "hash-only-v6-tides"}[profile_version]
+                     TIDES_VERSION: "hash-only-v6-tides", COMPACT_TIDES_VERSION: "hash-only-v7-compact-tides"}[profile_version]
         self.archive_directory = None if archive_directory is None else Path(archive_directory).absolute()
         if self.archive_directory is not None:
             self.archive_directory.mkdir(mode=0o700, exist_ok=True)
@@ -96,7 +96,7 @@ class HashMiningGate:
         self._context()
         config = {"schema": 2, "profile": self.mode, "genesis": REGTEST_GENESIS,
             "rules": f"{self.rules:064x}", "pool": f"{pool:064x}", "public_key": public_key.hex(), "script": payout_script.hex(),
-            "batch_policy": "oldest-origin-receipt-v2" if profile_version == TIDES_VERSION else "oldest-origin-proof-v1",
+            "batch_policy": "oldest-origin-receipt-v2" if is_tides_profile(profile_version) else "oldest-origin-proof-v1",
             "snapshot_budget": snapshot_budget}
         if activation_height != 1:
             config["activation_height"] = activation_height
@@ -531,7 +531,7 @@ class HashMiningGate:
             settled = retained(parent.settled) if parent is not None else ()
             result.update(provisional_proofs=tuple(sorted(unpaid)), confirmed_pending_proofs=pending,
                           current_block_settled_proofs=settled, unsettled_proofs=tuple(sorted(set(unpaid) | set(pending))))
-        elif self.profile_version == TIDES_VERSION:
+        elif is_tides_profile(self.profile_version):
             # Recent anti-replay IDs prove admission, never one-time payment or
             # present rolling-window membership. Full reward history is separate.
             result.update(provisional_proofs=tuple(sorted(unpaid)), payout_policy="rolling-tides",
@@ -746,7 +746,7 @@ class HashMiningGate:
         self._require_origin(share)
         staged = {}
         opening = self._snapshot(share.header.m_mm_rhs, staged)
-        parent = self._parent_snapshot(height, tip, staged) if self.profile_version in (LEDGER_VERSION, TIDES_VERSION) else None
+        parent = self._parent_snapshot(height, tip, staged) if self.profile_version in (LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION) else None
         self._provenance(opening, staged, trusted_parent=parent,
             root_origin=TemplateRecord.from_block(self._evidence(TEMPLATE, template_id(share.header))), root_depth=1)
         self._rehydrate_retained(staged)
@@ -755,12 +755,12 @@ class HashMiningGate:
                              [(PROOF, share.serialize())])[-1]
 
     def _relay_pool(self, pool):
-        # Native v6 permits cross-pool admission, while its payouts remain
+        # Native TIDES permits cross-pool admission, while its payouts remain
         # pool-local. The dispatched job still binds this gate's exact policy.
-        return self.profile_version == TIDES_VERSION or pool == self.pool
+        return is_tides_profile(self.profile_version) or pool == self.pool
 
     def sync_native_receipts(self, **options):
-        """Ingest bounded pages of native P2P snapshot evidence (v6 only).
+        """Ingest bounded pages of native P2P snapshot evidence (TIDES profiles).
 
         See hash_gate_inventory.sync_native_receipts for cursor, budget and
         explicit retry semantics. Native storage alone never authorizes work.
@@ -803,6 +803,10 @@ class HashMiningGate:
 
     def _parent_snapshot(self, height, tip, staged=None):
         opening = self._block_snapshot(height, tip, staged)
+        if opening is not None and self.profile_version == COMPACT_TIDES_VERSION:
+            opening = materialize_compact_state(opening, activation_height=self.activation_height,
+                parent_snapshot=lambda identity, ancestor_height: self._block_snapshot(
+                    ancestor_height, f"{identity:064x}", staged))
         self._stable(tip)
         return opening
 
@@ -864,9 +868,10 @@ class HashMiningGate:
         selected = dict(offered)
         priority = {identity: (share.envelope.height, 1, share.proof_id) for identity, share in offered.items()}
         total = len(offered)
-        capacity = self.snapshot_budget // 512 + 1
+        capacity = (min(MAX_COMPACT_SHARES + 1, self.snapshot_budget // 33 + 1)
+                    if self.profile_version == COMPACT_TIDES_VERSION else self.snapshot_budget // 512 + 1)
         kept = 0
-        order_by = "height,revision" if self.profile_version == TIDES_VERSION else "height,identity"
+        order_by = "height,revision" if is_tides_profile(self.profile_version) else "height,identity"
         rows = self.db.execute("SELECT identity,height,parent,revision FROM journal WHERE kind=? AND height BETWEEN ? AND ? ORDER BY " + order_by,
                                (PROOF, floor, height + 1))
         for identity, origin, parent_hash, revision in rows:
@@ -882,11 +887,11 @@ class HashMiningGate:
                 selected[identity] = parse_share(self._read(PROOF, identity))
                 priority[identity] = (origin, 0, revision)
                 kept += 1
-        key = ((lambda share: priority[f"{share.proof_id:064x}"]) if self.profile_version == TIDES_VERSION else
+        key = ((lambda share: priority[f"{share.proof_id:064x}"]) if is_tides_profile(self.profile_version) else
                (lambda share: (share.envelope.height, share.proof_id)))
         ordered = sorted(selected.values(), key=key)[:capacity]
         origins = {f"{record.template_id:064x}": CompactTemplateRecord.from_record(record) for record in templates}
-        payout_budget = self._tides_payout_budget(tip) if self.profile_version == TIDES_VERSION else None
+        payout_budget = self._tides_payout_budget(tip) if is_tides_profile(self.profile_version) else None
 
         def trial(count):
             # A rejected larger prefix must not retain its fetched dependency
@@ -929,7 +934,8 @@ class HashMiningGate:
                 return snapshot, resources
             except ValueError as error:
                 if (isinstance(error, hash_gate_batch.BatchLimit) or "budget" in str(error) or "exceeds byte bound" in str(error) or
-                        str(error).startswith(("confirmed ledger capacity;", "TIDES certificate capacity;"))):
+                        str(error).startswith(("confirmed ledger capacity;", "TIDES certificate capacity;",
+                                               "compact share count exceeds original work bound"))):
                     return None, str(error)
                 raise
 
@@ -974,7 +980,7 @@ class HashMiningGate:
             raise ValueError("receipt status requires a bounded revision and page size")
         if self.profile_version == LEDGER_VERSION:
             return self._ledger_receipt_status(after_revision=after_revision, limit=limit)
-        if self.profile_version == TIDES_VERSION:
+        if is_tides_profile(self.profile_version):
             return self._tides_receipt_status(after_revision=after_revision, limit=limit)
         self._check_seal()
         height, tip = self._context()
@@ -1223,7 +1229,7 @@ class HashMiningGate:
 
     def make(self, *, ntime, sign_owner, fees=0, transactions=(), witness=False, native_bits=SHARE_BITS):
         """Explicit fixture helper; use make_native for native mempool jobs."""
-        if self.profile_version == TIDES_VERSION:
+        if is_tides_profile(self.profile_version):
             raise ValueError("TIDES jobs require make_native and full native history validation")
         self._check_seal()
         height, tip = self._context()
@@ -1265,7 +1271,7 @@ class HashMiningGate:
                 bodies.append(bytes.fromhex(encoded))
             raw, snapshot_raw = bodies
             block, snapshot = parse_block(raw), Snapshot.deserialize(snapshot_raw)
-            if self.profile_version == TIDES_VERSION and block.nBits != batch["native_bits"]:
+            if is_tides_profile(self.profile_version) and block.nBits != batch["native_bits"]:
                 raise ValueError("native difficulty changed after payout reservation; prepare a new job")
             reward = result.get("reward")
             if (normalize_template(raw) != raw or block.hashPrevBlock != int(tip, 16) or
@@ -1280,7 +1286,7 @@ class HashMiningGate:
             # every other proposed accounting byte remains fixed.
             # v6 payouts require the full authenticated history at the native
             # node. Never substitute the v4 one-batch or v5 one-time formula.
-            payouts = (snapshot.payouts if self.profile_version == TIDES_VERSION else
+            payouts = (snapshot.payouts if is_tides_profile(self.profile_version) else
                        credit_outputs(proposal.settled, reward, self.payout_script) if self.profile_version == LEDGER_VERSION else
                        work_outputs(proposal.shares, reward=reward, fallback_script=self.payout_script))
             expected = replace(proposal, job_commitment=snapshot.job_commitment, payouts=payouts,
@@ -1307,7 +1313,7 @@ class HashMiningGate:
         if (final_snapshot.serialize() != signed.serialize() or final_reward != reward or
                 job_hash(final_block) != job_hash(block)):
             raise ValueError("native finalization changed the signed job")
-        if self.profile_version == TIDES_VERSION:
+        if is_tides_profile(self.profile_version):
             self._native_template(final_block.serialize(), tip, final_snapshot.serialize())
         self._check_seal()
         return final_block, final_snapshot

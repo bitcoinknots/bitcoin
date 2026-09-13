@@ -322,6 +322,7 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   script/sigcache.cpp
   sharepool/relay.cpp
   sharepool/hash_store.cpp
+  sharepool/tides_history_store.cpp
   signet.cpp
   stats/init.cpp
   stats/rpc_stats.cpp

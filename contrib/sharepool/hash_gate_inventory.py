@@ -10,7 +10,7 @@ are reported with an exact retry cursor; a completed scan cycles from the start
 on the next call so insertions below an old hash cursor are visited too.
 """
 
-from hash_snapshot import TIDES_VERSION
+from hash_snapshot import is_tides_profile
 from copy import deepcopy
 import native_archive
 from native_mining_gate import template_id
@@ -87,7 +87,7 @@ def sync_native_receipts(gate, *, cursor=None, limit=32, max_bytes=64 * 1024 * 1
 
 
 def _sync_lanes(gate, *, cursor, limit, max_bytes, max_receipts, charge, meter):
-    if gate.profile_version != TIDES_VERSION or type(limit) is not int or not 1 <= limit <= 256 or \
+    if not is_tides_profile(gate.profile_version) or type(limit) is not int or not 1 <= limit <= 256 or \
             type(max_receipts) is not int or not 1 <= max_receipts <= 256:
         raise ValueError("invalid v6 native inventory policy or bounded budget")
     position = _fair_cursor(cursor)
@@ -173,7 +173,7 @@ def _sync_lanes(gate, *, cursor, limit, max_bytes, max_receipts, charge, meter):
 def _sync_native_receipts(gate, *, cursor, limit, max_bytes, max_receipts, charge, meter):
     from hash_mining_gate import TEMPLATE, PROOF
 
-    if gate.profile_version != TIDES_VERSION:
+    if not is_tides_profile(gate.profile_version):
         raise ValueError("cross-pool native inventory ingestion requires v6")
     if (type(limit) is not int or not 1 <= limit <= 256 or type(max_receipts) is not int or
             not 1 <= max_receipts <= 256 or type(max_bytes) is not int or not 1024 <= max_bytes <= 256 * 1024 * 1024):

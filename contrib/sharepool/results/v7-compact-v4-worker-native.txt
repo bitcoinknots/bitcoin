@@ -1,0 +1,9 @@
+2026-09-13T18:54:34.337000Z TestFramework (INFO): PRNG seed is: 6595404979721847927
+2026-09-13T18:54:34.338000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v7-native-regressions/v4-worker
+2026-09-13T18:54:39.971000Z TestFramework (INFO): A pending data notification survives shutdown and is accepted after restart
+2026-09-13T18:54:40.504000Z TestFramework (INFO): A local disconnect/reconnect revalidates the settled branch with retained evidence
+2026-09-13T18:54:41.173000Z TestFramework (INFO): A tip change during script execution discards the capture and retries the competing block
+2026-09-13T18:54:46.139000Z TestFramework (INFO): Worker measurement: {"active_rpc_samples": 119, "binary_sha256": "6b83af631e78f68305ca973fb4bef50b16fff1dfdc19302cfa7302394877e242", "block_bytes": 2203, "context_change": {"competing_branch": "accepted_and_extended", "retry_count": 1}, "inputs_per_origin": 100, "maximum_active_rpc_seconds": 0.0024877910000000725, "origins": 64, "p2p_ping_seconds": 0.06006500000000026, "pending_restart": "accepted", "pipeline_seconds": 2.053214958, "platform": "macOS-26.6.2-arm64-arm-64bit", "protocol_version": 4, "reorganization_verifydb": "valid", "sha256_ops_per_input": 199, "snapshot_bytes": 135741, "test_sha256": "7c864a7835fb74d5e3e355ab66e6a2c8721112cca3a4e51ebd07771bb84b3de2", "worker": {"active": false, "context_retries": 0, "failures": 0, "last_micros": 1941714, "locked_fallbacks": 0, "max_micros": 1941714, "outside_script_checks": 6400, "passes": 26, "pending": false, "requests": 67, "started": true, "stopping": false}}
+2026-09-13T18:54:46.199000Z TestFramework (INFO): Stopping nodes
+2026-09-13T18:54:46.371000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v7-native-regressions/v4-worker
+2026-09-13T18:54:46.371000Z TestFramework (INFO): Tests successful

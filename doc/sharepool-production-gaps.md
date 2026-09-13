@@ -1,7 +1,7 @@
 # Production gap register
 
 This branch is an opt-in regtest implementation. Passing its tests does not
-authorize mainnet deployment. Versions 4, 5 and 6 have separate wire/rules and local
+authorize mainnet deployment. Versions 4, 5, 6 and 7 have separate wire/rules and local
 database profiles; use a fresh test chain. Historical reports describe their
 recorded source revisions.
 
@@ -39,6 +39,14 @@ reservation against the candidate's contextual native weight limit. It preserves
 all profile commitments and consensus resource limits. The corrected
 [resource model](sharepool-resource-model.md) includes exact job openings,
 repeated recent state, distinct recipient coinbases and cold history scans.
+
+The separate [v7 compact profile](sharepool-v7-compact.md) removes repeated job
+authentication from individual shares and inherited recent arrays from the wire.
+Its bounded derivation and persistent local pool-history index preserve native
+branch validation and direct payouts. Explicit proof-count limits accompany the
+smaller encoding. Distinct transaction sets, repeated current admission deltas in
+different exact openings, recipient outputs, and sustained admission/variance
+remain capacity constraints; share difficulty is unchanged.
 
 ## Hardening implemented in version 4
 

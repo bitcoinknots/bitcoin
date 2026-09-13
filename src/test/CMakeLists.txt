@@ -105,6 +105,7 @@ add_executable(test_bitcoin
   sharepool_retry_worker_tests.cpp
   sharepool_tides_tests.cpp
   sharepool_tides_history_tests.cpp
+  sharepool_tides_history_store_tests.cpp
   sharepool_tides_consensus_tests.cpp
   sighash_tests.cpp
   sigopcount_tests.cpp

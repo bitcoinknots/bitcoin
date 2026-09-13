@@ -1,0 +1,124 @@
+{
+  "approximate_interval_seconds": 87,
+  "collector_journal_counts_kind_height_count": [
+    [
+      0,
+      102,
+      101
+    ],
+    [
+      0,
+      103,
+      1
+    ],
+    [
+      0,
+      104,
+      101
+    ],
+    [
+      1,
+      102,
+      101
+    ],
+    [
+      1,
+      103,
+      1
+    ],
+    [
+      1,
+      104,
+      101
+    ],
+    [
+      2,
+      102,
+      300
+    ],
+    [
+      2,
+      104,
+      300
+    ]
+  ],
+  "inference_not_sampled_python_attribution": "Repeated Python codec/graph/materialization work is consistent with the stage and source, but the macOS stack sample does not expose exact Python function names.",
+  "interval_cpu_seconds": {
+    "driver": 84.13,
+    "follower": 0.12,
+    "producer": 2.26
+  },
+  "limits": [
+    "A short interval during a finite regtest run is not sustained throughput.",
+    "Running code predates final cache-retention fixes; this diagnostic is not final-source capacity evidence.",
+    "No unrelated processes or authentication secrets were inspected."
+  ],
+  "measured_conclusion": "During the sampled interval the Python driver consumed nearly one CPU core, while the native nodes used little CPU. Epoch2 had all300proof acknowledgements and subsequently accepted native block104 locally.",
+  "mutations_to_test_run": false,
+  "observed_utc": "2026-09-13T19:12:11.333871+00:00",
+  "processes": {
+    "driver": 16658,
+    "follower": 16661,
+    "producer": 16660
+  },
+  "report_epoch_progress": [
+    {
+      "acknowledged": 300,
+      "admission_seconds": 8.119901042000002,
+      "blocks": [
+        {
+          "admitted": 219,
+          "height": 102,
+          "local_admission_step_seconds": 13.997565166999998,
+          "peer_ready": true
+        },
+        {
+          "admitted": 81,
+          "height": 103,
+          "local_admission_step_seconds": 8.275373000000002,
+          "peer_ready": true
+        }
+      ],
+      "epoch": 1
+    },
+    {
+      "acknowledged": 300,
+      "admission_seconds": 225.01858754200003,
+      "blocks": [
+        {
+          "admitted": 120,
+          "height": 104,
+          "local_admission_step_seconds": 95.634218583,
+          "peer_ready": true
+        }
+      ],
+      "epoch": 2
+    }
+  ],
+  "report_stage": "following_batch_selection",
+  "run_directory": "/private/tmp/sharepool-v7-capacity-100",
+  "stack_sample": {
+    "duration_seconds": 3,
+    "main_thread_samples": 247,
+    "path": "/private/tmp/sharepool-v7-capacity-100-driver-sample.txt",
+    "python_source_frames_available": false,
+    "requested_interval_milliseconds": 10,
+    "sha256": "759589904649b400d8cab3f4c858775f12fdf680509b87d8acc941b55408b4ad"
+  },
+  "targeted_process_observations": [
+    {
+      "driver_cpu_seconds": 430.26,
+      "driver_percent_cpu_display": 100.0,
+      "elapsed_seconds_rounded": 729,
+      "follower_cpu_seconds": 91.32,
+      "producer_cpu_seconds": 152.84
+    },
+    {
+      "driver_cpu_seconds": 514.39,
+      "driver_percent_cpu_display": 98.7,
+      "elapsed_seconds_rounded": 816,
+      "follower_cpu_seconds": 91.44,
+      "producer_cpu_seconds": 155.1
+    }
+  ]
+}

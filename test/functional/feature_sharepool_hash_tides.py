@@ -25,6 +25,8 @@ from test_framework.util import assert_equal, assert_raises_rpc_error
 
 
 class SharePoolHashTidesTest(BitcoinTestFramework):
+    PROFILE_VERSION = TIDES_VERSION
+
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
@@ -52,9 +54,9 @@ class SharePoolHashTidesTest(BitcoinTestFramework):
 
     def proposal(self, index, signer, *, templates=(), shares=()):
         node = self.nodes[index]
-        binding = EnvelopeV2(self.genesis, TIDES_RULES_HASH, node.getblockcount() + 1,
+        binding = EnvelopeV2(self.genesis, rules_hash(self.PROFILE_VERSION), node.getblockcount() + 1,
                              int(node.getbestblockhash(), 16), signer.pool, signer.public_key,
-                             signer.payout_script, version=TIDES_VERSION)
+                             signer.payout_script, version=self.PROFILE_VERSION)
         records = tuple(sorted((TemplateRecord.from_block(block) for block in templates),
                                key=lambda record: ser_uint256(record.template_id)))
         return Snapshot(binding, bytes(64), records, tuple(sorted(shares, key=lambda proof: proof.proof_id)),
@@ -64,7 +66,7 @@ class SharePoolHashTidesTest(BitcoinTestFramework):
         node = self.nodes[index]
         prepared = node.preparesharepoolhashjob(self.proposal(index, signer, **kwargs).serialize().hex())
         unsigned = Snapshot.deserialize(bytes.fromhex(prepared["snapshot"]))
-        assert_equal(unsigned.envelope.version, TIDES_VERSION)
+        assert_equal(unsigned.envelope.version, self.PROFILE_VERSION)
         assert_equal(unsigned.owner_signature, bytes(64))
         assert_equal(unsigned.pending, ())
         assert_equal(unsigned.settled, ())
@@ -82,11 +84,11 @@ class SharePoolHashTidesTest(BitcoinTestFramework):
         raw = snapshot.serialize()
         measured = node.getsharepoolhashresources(raw.hex())
         assert_equal(measured["hash"], snapshot.hash_hex)
-        assert_equal(measured["version"], TIDES_VERSION)
+        assert_equal(measured["version"], self.PROFILE_VERSION)
         assert_equal(measured["consensus_validated"], False)
         assert_equal(measured["dependency_graph_checked"], False)
         usage = measured["usage"]
-        components = ("binding_bytes", "transaction_table_bytes", "template_table_bytes", "share_bytes",
+        components = ("binding_bytes", "transaction_table_bytes", "template_table_bytes", "job_table_bytes", "share_bytes",
                       "state_bytes", "payout_bytes", "pending_bytes", "settled_bytes", "certificate_bytes", "history_bytes")
         assert_equal(sum(usage[name] for name in components), len(raw))
         assert_equal(usage["encoded_bytes"], len(raw))

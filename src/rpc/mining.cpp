@@ -42,6 +42,7 @@
 #include <sharepool/hash_store.h>
 #include <sharepool/mining_budget.h>
 #include <sharepool/retry_worker.h>
+#include <sharepool/tides_history_store.h>
 #include <streams.h>
 #include <txmempool.h>
 #include <univalue.h>
@@ -1139,7 +1140,7 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
         settlement.pushKV("rules_root", (consensusParams.SharePoolHashOnly ? sharepool::hashonly::RulesHash(sharepool::hashonly::ProfileVersion(consensusParams)) : sharepool::RulesHash()).GetHex());
         settlement.pushKV("max_share_age", sharepool::MAX_SHARE_AGE);
         if (consensusParams.SharePoolHashOnly) {
-            settlement.pushKV("mode", consensusParams.SharePoolTides ? "hash-only-v6-tides" : consensusParams.SharePoolAdmittedLedger ? "hash-only-v5-confirmed-ledger" : "hash-only-v4");
+            settlement.pushKV("mode", consensusParams.SharePoolCompactTides ? "hash-only-v7-compact-tides" : consensusParams.SharePoolTides ? "hash-only-v6-tides" : consensusParams.SharePoolAdmittedLedger ? "hash-only-v5-confirmed-ledger" : "hash-only-v4");
             if (consensusParams.SharePoolTides) {
                 settlement.pushKV("payout_cutoff", "issued-job-history");
             }
@@ -1666,18 +1667,20 @@ static RPCHelpMan getsharepoolhashresources()
                 {RPCResult::Type::NUM, "unique_transactions", "Unique witness transaction IDs"},
                 {RPCResult::Type::NUM, "unique_transaction_bytes", "Unique serialized witness transaction bytes, excluding table framing"},
                 {RPCResult::Type::NUM, "templates", "Declared templates, excluding origins in external dependencies and a future mining job"},
+                {RPCResult::Type::NUM, "jobs", "V7 shared job descriptors; zero in older profiles"},
                 {RPCResult::Type::NUM, "expanded_template_bytes", "Sum of full template sizes, including repeated transaction bodies"},
                 {RPCResult::Type::NUM, "transaction_references", "Sum of ordered template transaction references"},
                 {RPCResult::Type::NUM, "binding_bytes", "Binding, authorization and exact job commitment bytes"},
                 {RPCResult::Type::NUM, "transaction_table_bytes", "Unique transaction table including count and length prefixes"},
                 {RPCResult::Type::NUM, "template_table_bytes", "Template table including IDs, headers, counts and reference indices"},
                 {RPCResult::Type::NUM, "share_bytes", "Proof vector bytes including count"},
+                {RPCResult::Type::NUM, "job_table_bytes", "V7 shared job dictionary bytes including count; zero in older profiles"},
                 {RPCResult::Type::NUM, "state_bytes", "Recent admitted-proof state vector bytes"},
                 {RPCResult::Type::NUM, "payout_bytes", "Payout vector bytes"},
                 {RPCResult::Type::NUM, "pending_bytes", "V5 pending-credit vector bytes, otherwise zero"},
                 {RPCResult::Type::NUM, "settled_bytes", "V5 settled-credit vector bytes, otherwise zero"},
                 {RPCResult::Type::NUM, "certificate_bytes", "V5/V6 certificate vector bytes, otherwise zero"},
-                {RPCResult::Type::NUM, "history_bytes", "V6 history commitment bytes, otherwise zero"},
+                {RPCResult::Type::NUM, "history_bytes", "V6/V7 history commitment bytes, otherwise zero"},
             }},
             {RPCResult::Type::OBJ, "limits", "Independent profile limits; graph limits are not evaluated here", {
                 {RPCResult::Type::NUM, "snapshot_bytes", "Maximum canonical snapshot bytes"},
@@ -1688,6 +1691,8 @@ static RPCHelpMan getsharepoolhashresources()
                 {RPCResult::Type::NUM, "dependency_bytes", "Maximum unique snapshot bytes across the dependency graph"},
                 {RPCResult::Type::NUM, "dependency_depth", "Maximum dependency depth"},
                 {RPCResult::Type::NUM, "certificate_bytes", "Maximum V5/V6 certificate vector bytes"},
+                {RPCResult::Type::NUM, "compact_shares", "V7 per-snapshot proof-count limit; zero for older profiles"},
+                {RPCResult::Type::NUM, "dependency_shares", "V7 proof-count limit across unique snapshot dependencies; zero for older profiles"},
             }},
         }}, RPCExamples{HelpExampleCli("getsharepoolhashresources", "\"snapshot_hex\"")},
         [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
@@ -1708,12 +1713,14 @@ static RPCHelpMan getsharepoolhashresources()
             usage.pushKV("unique_transactions", measured.unique_transactions);
             usage.pushKV("unique_transaction_bytes", measured.unique_transaction_bytes);
             usage.pushKV("templates", measured.templates);
+            usage.pushKV("jobs", measured.jobs);
             usage.pushKV("expanded_template_bytes", measured.expanded_template_bytes);
             usage.pushKV("transaction_references", measured.transaction_references);
             usage.pushKV("binding_bytes", measured.binding_bytes);
             usage.pushKV("transaction_table_bytes", measured.transaction_table_bytes);
             usage.pushKV("template_table_bytes", measured.template_table_bytes);
             usage.pushKV("share_bytes", measured.share_bytes);
+            usage.pushKV("job_table_bytes", measured.job_table_bytes);
             usage.pushKV("state_bytes", measured.state_bytes);
             usage.pushKV("payout_bytes", measured.payout_bytes);
             usage.pushKV("pending_bytes", measured.pending_bytes);
@@ -1729,6 +1736,8 @@ static RPCHelpMan getsharepoolhashresources()
             limits.pushKV("dependency_bytes", ho::MAX_DEPENDENCY_BYTES);
             limits.pushKV("dependency_depth", ho::MAX_DEPENDENCY_DEPTH);
             limits.pushKV("certificate_bytes", ho::MAX_CERTIFICATE_BYTES);
+            limits.pushKV("compact_shares", version == ho::COMPACT_TIDES_VERSION ? ho::MAX_COMPACT_SHARES : 0);
+            limits.pushKV("dependency_shares", version == ho::COMPACT_TIDES_VERSION ? ho::MAX_DEPENDENCY_SHARES : 0);
             UniValue result{UniValue::VOBJ};
             result.pushKV("hash", ho::ProfileSnapshotHash(snapshot, version).GetHex());
             result.pushKV("version", version);
@@ -1775,7 +1784,7 @@ static RPCHelpMan getsharepoolhashtidesbudget()
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Active hash-only TIDES profile required");
             }
             ho::Snapshot snapshot;
-            snapshot.binding.version = ho::TIDES_VERSION;
+            snapshot.binding.version = ho::ProfileVersion(consensus);
             snapshot.binding.native_parent = tip->GetBlockHash();
             snapshot.binding.pool = pool;
             snapshot.binding.payout_script = script;
@@ -1839,7 +1848,11 @@ static RPCHelpMan preparesharepoolhashjob()
                     catch (const ho::MalformedSnapshot&) { throw JSONRPCError(RPC_VERIFY_REJECTED, "Malformed native parent settlement"); }
                     if (!parent) throw JSONRPCError(RPC_VERIFY_ERROR, "sharepool-hash-data-missing");
                 }
-                if (consensus.SharePoolTides) {
+                if (consensus.SharePoolCompactTides) {
+                    const auto derived = ho::MaterializeTidesState(snapshot, tip, consensus,
+                        [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.Lookup(hash); });
+                    RequireHashValidation(store, derived);
+                } else if (consensus.SharePoolTides) {
                     try { ho::ApplyTidesState(snapshot, parent.get()); }
                     catch (const std::invalid_argument& error) { throw JSONRPCError(RPC_INVALID_PARAMETER, error.what()); }
                     catch (const std::ios_base::failure& error) { throw JSONRPCError(RPC_INVALID_PARAMETER, error.what()); }
@@ -2039,6 +2052,15 @@ static RPCHelpMan getsharepoolhashstatus()
                 {RPCResult::Type::NUM, "bytes_scanned", "Historical payload bytes scanned during index reconstruction"},
                 {RPCResult::Type::NUM, "batches", "Durable index reconstruction batches"},
             }},
+            {RPCResult::Type::OBJ, "history_index", "Local TIDES history accelerator; never payout authority", {
+                {RPCResult::Type::BOOL, "available", "Persistent reader is available; individual queries may still fall back"},
+                {RPCResult::Type::STR, "error", "Initialization failure or empty string"},
+                {RPCResult::Type::NUM, "max_bytes", "Configured logical quota, excluding database compaction"},
+                {RPCResult::Type::NUM, "covered_blocks", "Locally indexed native blocks across retained branches"},
+                {RPCResult::Type::NUM, "pool_batches", "Stored pool admission batches"},
+                {RPCResult::Type::NUM, "map_nodes", "Persistent pool-map nodes"},
+                {RPCResult::Type::NUM, "charged_bytes", "Logical index charge"},
+            }},
             {RPCResult::Type::ARR, "inventory", "Available snapshot hashes", {{RPCResult::Type::STR_HEX, "", "Hash"}}},
             {RPCResult::Type::ANY, "inventory_next", "Exclusive next cursor or null"},
             {RPCResult::Type::BOOL, "inventory_complete", "This local disk-index traversal reached its end; not proof of complete chain evidence"},
@@ -2066,7 +2088,7 @@ static RPCHelpMan getsharepoolhashstatus()
             const auto count = request.params[1].isNull() ? 1024 : request.params[1].getInt<int64_t>();
             if (count < 1 || count > 1024) throw JSONRPCError(RPC_INVALID_PARAMETER, "count must be between 1 and 1024");
             UniValue result{UniValue::VOBJ};
-            result.pushKV("mode", chainman.GetConsensus().SharePoolTides ? "hash-only-v6-tides" : chainman.GetConsensus().SharePoolAdmittedLedger ? "hash-only-v5-confirmed-ledger" : "hash-only-v4");
+            result.pushKV("mode", chainman.GetConsensus().SharePoolCompactTides ? "hash-only-v7-compact-tides" : chainman.GetConsensus().SharePoolTides ? "hash-only-v6-tides" : chainman.GetConsensus().SharePoolAdmittedLedger ? "hash-only-v5-confirmed-ledger" : "hash-only-v4");
             result.pushKV("rules", sharepool::hashonly::RulesHash(sharepool::hashonly::ProfileVersion(chainman.GetConsensus())).GetHex());
             result.pushKV("activation_height", chainman.GetConsensus().SharePoolHeight);
             result.pushKV("max_snapshot_bytes", sharepool::hashonly::MAX_SNAPSHOT_BYTES);
@@ -2083,6 +2105,18 @@ static RPCHelpMan getsharepoolhashstatus()
             startup.pushKV("bytes_scanned", startup_stats.bytes_scanned);
             startup.pushKV("batches", startup_stats.batches);
             result.pushKV("archive_startup", std::move(startup));
+            UniValue history_index{UniValue::VOBJ};
+            const auto history_stats = chainman.m_sharepool_tides_history
+                ? chainman.m_sharepool_tides_history->GetStats()
+                : sharepool::tides::PersistentHistoryIndex::Stats{};
+            history_index.pushKV("available", bool(chainman.m_sharepool_tides_history));
+            history_index.pushKV("error", chainman.m_sharepool_tides_history_error);
+            history_index.pushKV("max_bytes", chainman.m_options.sharepool_tides_index_bytes);
+            history_index.pushKV("covered_blocks", history_stats.covered_blocks);
+            history_index.pushKV("pool_batches", history_stats.pool_batches);
+            history_index.pushKV("map_nodes", history_stats.map_nodes);
+            history_index.pushKV("charged_bytes", history_stats.charged_bytes);
+            result.pushKV("history_index", std::move(history_index));
             UniValue inventory{UniValue::VARR};
             const auto page = store.InventoryPage(after, count);
             result.pushKV("archive_repair_required", store.RepairRequired());

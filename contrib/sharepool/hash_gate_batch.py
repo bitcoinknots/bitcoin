@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """Deterministic local settlement batching; native consensus stays authoritative."""
+from collections import OrderedDict
+from dataclasses import replace
 from io import BytesIO
 
 from hash_snapshot import (MAX_SNAPSHOT_BYTES, MAX_DEPENDENCY_BYTES, MAX_DEPENDENCY_DEPTH,
                            MAX_ORIGIN_CHECKS, MAX_SHARE_AGE, CompactTemplateRecord,
-                           LEDGER_VERSION, TIDES_VERSION, origin_certificate)
+                           LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION, MAX_DEPENDENCY_SHARES,
+                           origin_certificate, materialize_compact_state)
 from test_framework.messages import CBlockHeader
+
+
+NATIVE_STATE_CACHE_ENTRIES = 4
 
 
 class BatchLimit(ValueError):
@@ -24,14 +30,17 @@ def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSH
     paid-state openings. Callers must discard collected data if this walk fails.
     New jobs reserve their own future origin edge and native origin check;
     historical graph validation leaves that reservation disabled.
-    v5/v6 use only certificates from the top actual native parent. A historical
+    TIDES certificates come only from the top actual native parent; v7 derives
+    these from its bounded authenticated suffix and counts those openings too.
+    A historical
     root_origin can supply its current settlement parent explicitly; even a
     certified origin still retains its own exact opening for authentication.
     """
     if type(activation_height) is not int or not 1 <= activation_height <= 0x7fffffff:
         raise ValueError("invalid settlement activation height")
     snapshots, origins, depths, visiting, parents = {}, {}, {}, set(), {}
-    total = 0
+    total, proof_count = 0, 0
+    root_identity = snapshot.hash
     depth_limit = MAX_DEPENDENCY_DEPTH - int(mining_job)
     origin_limit = MAX_ORIGIN_CHECKS - int(mining_job)
     if depth_limit < 0 or origin_limit < 0:
@@ -46,7 +55,7 @@ def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSH
             raise
 
     def account(value, raw=None, expected=None):
-        nonlocal total
+        nonlocal total, proof_count
         if value is None:
             raise ValueError("missing snapshot dependency")
         identity = value.hash
@@ -55,9 +64,16 @@ def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSH
         if identity not in snapshots:
             raw = encoded(value) if raw is None else raw
             total += len(raw)
+            if value.envelope.version == COMPACT_TIDES_VERSION:
+                proof_count += len(value.shares)
+                if proof_count > MAX_DEPENDENCY_SHARES:
+                    raise BatchLimit("dependency share count")
             if total > MAX_DEPENDENCY_BYTES:
                 raise BatchLimit("dependency bytes")
-            snapshots[identity] = value
+            # v7 arrays are a derived cache, not wire evidence. Retain only
+            # the wire view here, even when a caller supplied hydrated objects.
+            snapshots[identity] = (replace(value, post_state=(), certificates=())
+                if value.envelope.version == COMPACT_TIDES_VERSION else value)
             if on_snapshot is not None:
                 on_snapshot(identity, raw)
         return identity
@@ -67,19 +83,45 @@ def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSH
             account(lookup(identity), expected=identity)
         return snapshots[identity]
 
-    def load_parent(parent):
+    def load_raw_parent(parent):
         if parent not in parents:
             parents[parent] = account(parent_snapshot(*parent))
         return snapshots[parents[parent]]
 
+    # Alternative jobs may share a large native admission window. Caching
+    # each derived tuple would multiply that state by the job count despite
+    # small wire bytes. Keep at most four parent states: a provisional graph
+    # may mention many branches before native ancestry validation rejects it.
+    # Origin states are verified and released before descending the graph.
+    native_states = OrderedDict()
+    def hydrate(value, *, native_parent=False):
+        identity = value.hash
+        if identity in native_states:
+            native_states.move_to_end(identity)
+            return native_states[identity]
+        if value.envelope.version == COMPACT_TIDES_VERSION:
+            value = materialize_compact_state(value, activation_height=activation_height,
+                parent_snapshot=lambda identity, height: load_raw_parent((identity, height)),
+                on_snapshot=lambda opening, raw: account(opening, raw))
+            if native_parent:
+                native_states[identity] = value
+                while len(native_states) > NATIVE_STATE_CACHE_ENTRIES:
+                    native_states.popitem(last=False)
+        return value
+
+    def load_parent(parent):
+        return hydrate(load_raw_parent(parent), native_parent=True)
+
     certificates = {}
-    if snapshot.envelope.version in (LEDGER_VERSION, TIDES_VERSION):
+    if snapshot.envelope.version in (LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION):
         if trusted_parent is None and root_origin is None and snapshot.envelope.height > activation_height:
             trusted_parent = load_parent((snapshot.envelope.native_parent, snapshot.envelope.height - 1))
         if trusted_parent is not None and trusted_parent.envelope.height >= activation_height:
             if trusted_parent.envelope.version != snapshot.envelope.version:
                 raise ValueError("certificate parent profile mismatch")
             account(trusted_parent)
+            if snapshot.envelope.version == COMPACT_TIDES_VERSION:
+                trusted_parent = hydrate(trusted_parent, native_parent=True)
             oldest = max(activation_height, trusted_parent.envelope.height + 1 - MAX_SHARE_AGE)
             certificates = {cert.identity: cert for cert in trusted_parent.certificates if cert.origin_height >= oldest}
 
@@ -108,6 +150,8 @@ def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSH
                 raise BatchLimit("dependency depth")
             return depths[identity]
         value = load(identity)
+        if identity != root_identity or root_origin is not None:
+            hydrate(value)  # Validate and release alternate-job state now.
         visiting.add(identity)
         if value.envelope.height > activation_height:
             parent = (value.envelope.native_parent, value.envelope.height - 1)
@@ -127,17 +171,22 @@ def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSH
         depths[identity] = longest
         return longest
 
-    raw = encoded(snapshot)
-    if len(raw) > snapshot_budget:
-        raise BatchLimit("snapshot bytes")
-    identity = account(snapshot, raw)
-    certified = False
-    if root_origin is not None:
-        opening, certified = origin_entry(root_origin)
-        if opening != identity:
-            raise ValueError("historical root opening mismatch")
-    if root_depth > depth_limit:
-        raise BatchLimit("dependency depth")
-    if not certified:
-        walk(identity, root_depth)
-    return {"snapshot_bytes": len(raw), "dependency_bytes": total, "origins": len(origins) + int(mining_job)}
+    try:
+        raw = encoded(snapshot)
+        if len(raw) > snapshot_budget:
+            raise BatchLimit("snapshot bytes")
+        identity = account(snapshot, raw)
+        certified = False
+        if root_origin is not None:
+            opening, certified = origin_entry(root_origin)
+            if opening != identity:
+                raise ValueError("historical root opening mismatch")
+        if root_depth > depth_limit:
+            raise BatchLimit("dependency depth")
+        if not certified:
+            walk(identity, root_depth)
+        return {"snapshot_bytes": len(raw), "dependency_bytes": total, "origins": len(origins) + int(mining_job), "dependency_shares": proof_count}
+    finally:
+        # The recursive closure otherwise retains its own bounded operation
+        # maps until cyclic GC runs, including after a rejected prefix.
+        walk = None

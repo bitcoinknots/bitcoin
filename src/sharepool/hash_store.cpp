@@ -706,7 +706,7 @@ uint256 HashSnapshotStore::Put(Span<const unsigned char> raw, std::optional<uint
     }
     Cache(hash, std::make_shared<const std::vector<unsigned char>>(std::move(bytes)));
     if (snapshot) {
-        if (m_profile_version == hashonly::TIDES_VERSION) ArchiveLocalTemplates(*snapshot);
+        if (hashonly::IsTidesVersion(m_profile_version)) ArchiveLocalTemplates(*snapshot);
     }
     m_requests.Refresh([this](const auto& id) { LOCK(cs_main); return Has(id); });
     // Unvalidated contents can suggest dependencies but cannot reserve block
@@ -917,7 +917,7 @@ void HashSnapshotStore::RememberTemplate(const CBlock& block)
     CBlock normalized{block};
     normalized.nNonce = normalized.m_nonce2 = normalized.m_nonce3 = normalized.m_time_offset = 0;
     normalized.m_extranonce.SetNull();
-    if (m_profile_version == hashonly::TIDES_VERSION && !m_template_sizes.contains(id)) {
+    if (hashonly::IsTidesVersion(m_profile_version) && !m_template_sizes.contains(id)) {
         if (const auto archived = Template(id); archived && hashonly::JobHash(*archived) == hashonly::JobHash(normalized)) return;
     }
     const auto existing = m_template_sizes.find(id);

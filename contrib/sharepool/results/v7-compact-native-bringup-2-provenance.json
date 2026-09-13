@@ -1,0 +1,22 @@
+{
+  "result": "failed",
+  "stage": "offline reindex-chainstate after deliberate archive loss and live tip recovery",
+  "command": [
+    "python3",
+    "-B",
+    "test/functional/feature_sharepool_hash_compact.py",
+    "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+    "--tmpdir=/private/tmp/sharepool-v7-compact-bringup-2",
+    "--portseed=1231",
+    "--nocleanup"
+  ],
+  "daemon_sha256": "e1e8f695785cfe491febc3fa4ec788e9c4901c262645dccc41c74dc53c6ac06d",
+  "signer_sha256": "0a114fa90b4d386489339a9d8f867e414522fcadcededd63eb0a2737c6e3f451",
+  "sources_at_run": {
+    "contrib/sharepool/hash_snapshot.py": "44173ab51d60fd5bc4378d327e14ba9cbf78f61086faa4ff2e0db92180ae3013",
+    "contrib/sharepool/hash_mining_gate.py": "96fe589dc0f6d5b9d257800f6c4a2308104f989a1df274ade098eaa8c8e71e18",
+    "contrib/sharepool/hash_gate_batch.py": "6b0561e8cd54c055494ffc20780d64ac7b6720be3242a1999c9a10b5755401a1",
+    "test/functional/feature_sharepool_hash_compact.py": "80b50d96d2699677aa638939b9a2797e8dffda2fbc8b9ba4389544f3ea291977"
+  },
+  "note": "No performance claim; concurrent C++ correctness tests. Failed data directory preserved."
+}
