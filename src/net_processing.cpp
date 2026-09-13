@@ -568,7 +568,7 @@ private:
      *
      * @param[in]   node      The node to check.
      * @param[in]   services  The services the peer advertised in its version message.
-     * @return                True if peer lacks NODE_BLAKE2B bit AND pre-fork history is complete AND peer is not manually added.
+     * @return                True if peer lacks NODE_BLAKE2B bit AND pre-fork history is complete AND peer is not manually added AND peer is not addr-fetch or feeler.
      */
     bool CanDisconnectSpamCoinPeer(const CNode& node, ServiceFlags services) const;
 
@@ -4974,8 +4974,10 @@ bool PeerManagerImpl::CanDisconnectSpamCoinPeer(const CNode& node, ServiceFlags 
     bool weArePastSharedHistory = m_chainparams.GetConsensus().IsBlake2bHeight(m_best_height + 1);
     bool peerLacksBlakeBit = !(services & NODE_BLAKE2B);
     bool peerIsNotManuallyAdded = !node.IsManualConn();
+    // Addr-fetch and feeler connections are short-lived and close on their own.
+    bool peerIsNotShortLived = !node.IsAddrFetchConn() && !node.IsFeelerConn();
 
-    return weArePastSharedHistory && peerLacksBlakeBit && peerIsNotManuallyAdded;
+    return weArePastSharedHistory && peerLacksBlakeBit && peerIsNotManuallyAdded && peerIsNotShortLived;
 }
 
 bool PeerManagerImpl::MaybeDiscourageAndDisconnect(CNode& pnode, Peer& peer)
