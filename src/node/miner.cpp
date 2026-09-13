@@ -210,6 +210,17 @@ std::shared_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     coinbaseTx.vout.resize(1);
     coinbaseTx.vout[0].scriptPubKey = m_options.coinbase_output_script;
     coinbaseTx.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
+    if (nHeight >= chainparams.GetConsensus().loyalty_height) {
+        // Loyalty Tax: pay the treasury its share and signal loyalty, so the
+        // remainder may still go to the requested payout script.
+        const Consensus::Params& lp{chainparams.GetConsensus()};
+        const CScript treasury_script(lp.loyalty_treasury_script.begin(), lp.loyalty_treasury_script.end());
+        const CAmount reward = coinbaseTx.vout[0].nValue;
+        const CAmount tax = (reward * lp.loyalty_tax_bps) / 10000;
+        coinbaseTx.vout[0].nValue = reward - tax;
+        coinbaseTx.vout.emplace_back(tax, treasury_script);
+        coinbaseTx.vout.emplace_back(0, CScript() << OP_RETURN << std::vector<unsigned char>{'L', 'O', 'Y', '1'});
+    }
     coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
     if (nHeight == chainparams.GetConsensus().DeploymentHeight(Consensus::DEPLOYMENT_BLAKE2B)) {
         coinbaseTx.vin[0].scriptSig << chainparams.GetConsensus().Blake2bHeadline;

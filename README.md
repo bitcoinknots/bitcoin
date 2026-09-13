@@ -1,80 +1,66 @@
-Bitcoin Knots
-=============
+Loyalty Tax
+===========
 
-https://bitcoinknots.org
+A fork of [Bitcoin Knots](https://github.com/bitcoinknots/bitcoin) that
+requires every coinbase, from a configured height, to pay a fixed share of its
+reward to a network treasury. A coinbase that does not also declare loyalty is
+not merely taxed — it forfeits the entire block reward to the treasury. Proof
+of work and block validity are otherwise unchanged.
 
-For an immediately usable, binary version of the Bitcoin Knots software, see
-the website.
+Why
+---
 
-What is Bitcoin Knots?
-----------------------
+A subsidy paid unconditionally rewards a miner exactly the same whether or not
+they have any stake in the network's future. This fork ties keeping the reward
+to declaring, on-chain, an intention to keep mining faithfully — and prices
+silence (or open defection) at the cost of the entire block.
 
-Bitcoin Knots connects to the Bitcoin peer-to-peer network to download and fully
-validate blocks and transactions. It also includes a wallet and graphical user
-interface, which can be optionally built.
+How it works
+------------
 
-Further information about Bitcoin Knots is available in the [doc folder](/doc).
+Three consensus parameters control the change:
 
-License
--------
+- `loyalty_height` — the height from which the rule applies. Defaults to
+  unset ("never") on every network.
+- `loyalty_tax_bps` — the tax rate, in basis points out of 10,000. Defaults to
+  1000 (10%).
+- `loyalty_treasury_script` — the fixed output script the tax (or the whole
+  confiscated reward) is paid to.
 
-Bitcoin Knots is released under the terms of the MIT license. See [COPYING](COPYING) for more
-information or see https://opensource.org/licenses/MIT.
+From `loyalty_height`, a coinbase is checked against two possibilities:
 
-Development Process
--------------------
+- **Signaled**: if the coinbase carries a specific `OP_RETURN` output pushing
+  the four bytes `LOY1`, it need only pay `loyalty_tax_bps` of the total
+  reward (subsidy + fees) to the treasury script. It may do whatever it likes
+  with the rest.
+- **Unsignaled**: if that marker is absent, the entire reward must be paid to
+  the treasury. The miner keeps nothing.
 
-Development generally takes place as part of [Bitcoin Core](https://github.com/bitcoin/bitcoin), and is merged into
-Knots for each release.
+A block that pays the treasury less than what its signaling status requires is
+rejected (`bad-loyalty-tax`). The reference miner in this build signals
+automatically and pays the tax once `loyalty_height` is reached, so blocks
+mined the ordinary way keep working without any special handling by the
+operator.
 
-Even if your pull request to Core is closed, or if your feature is not
-suitable for Core (eg, because it builds on a feature not supported in Core;
-relies on centralised services; etc), it may still be eligible for inclusion
-in Bitcoin Knots. In this case, a pull request may be opened on the
-[Knots GitHub](https://github.com/bitcoinknots/bitcoin) for review and consideration.
-When accepted, you are expected to maintain the submitted branch in your own
-repository, and it will be automatically merged into new releases of Knots.
+Exercised on regtest for testing:
 
-Developer IRC can be found on Freenode at #bitcoin-dev.
+    bitcoind -regtest -loyaltyheight=<height> -loyaltytaxbps=<bps> -loyaltytreasury=<hex script>
+
+Activating this on a live network is a separate, deliberate choice — a real
+`loyalty_height`, a chosen tax rate, and a treasury script agreed on by that
+network's operators. This build does not make that choice for mainnet,
+testnet, testnet4, or signet.
 
 Testing
 -------
 
-Testing and code review is the bottleneck for development; we get more pull
-requests than we can review and test on short notice. Please be patient and help out by testing
-other people's pull requests, and remember this is a security-critical project where any mistake might cost people
-lots of money.
+`test/functional/feature_loyalty_tax.py` checks normal mining before
+activation, confirms the built-in miner produces a compliant coinbase after
+activation, and hand-builds blocks to confirm an underpaid signaled block is
+rejected, an unsignaled block that keeps any reward is rejected, and an
+unsignaled block that fully confiscates its reward is accepted.
 
-### Automated Testing
+License
+-------
 
-Developers are strongly encouraged to write [unit tests](src/test/README.md) for new code, and to
-submit new unit tests for old code. Unit tests can be compiled and run
-(assuming they weren't disabled during the generation of the build system) with: `ctest`. Further details on running
-and extending unit tests can be found in [/src/test/README.md](/src/test/README.md).
-
-There are also [regression and integration tests](/test), written
-in Python.
-These tests can be run (if the [test dependencies](/test) are installed) with: `build/test/functional/test_runner.py`
-(assuming `build` is your build directory).
-
-The CI (Continuous Integration) systems make sure that every pull request is built for Windows, Linux, and macOS,
-and that unit/sanity tests are run automatically.
-
-### Manual Quality Assurance (QA) Testing
-
-Changes should be tested by somebody other than the developer who wrote the
-code. This is especially important for large or high-risk changes. It is useful
-to add a test plan to the pull request description if testing the changes is
-not straightforward.
-
-Translations
-------------
-
-Changes to translations as well as new translations can be submitted to
-[Bitcoin Core's Transifex page](https://explore.transifex.com/bitcoin/bitcoin/).
-
-Translations are periodically pulled from Transifex and merged into the git repository. See the
-[translation process](doc/translation_process.md) for details on how this works.
-
-**Important**: We do not accept translation changes as GitHub pull requests because the next
-pull from Transifex would automatically overwrite them again.
+MIT. See [COPYING](COPYING).

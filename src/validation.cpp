@@ -3098,6 +3098,32 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
                       strprintf("coinbase pays too much (actual=%d vs limit=%d)", block.vtx[0]->GetValueOut(), blockReward));
     }
 
+    // Loyalty Tax: from loyalty_height, a fixed share of the reward is owed to
+    // the treasury; a coinbase that does not also carry the loyalty signal
+    // owes the treasury the entire reward instead.
+    if (state.IsValid() && pindex->nHeight >= params.GetConsensus().loyalty_height) {
+        const CScript treasury_script(params.GetConsensus().loyalty_treasury_script.begin(),
+                                      params.GetConsensus().loyalty_treasury_script.end());
+        static const CScript LOYALTY_SIGNAL = CScript() << OP_RETURN << std::vector<unsigned char>{'L', 'O', 'Y', '1'};
+
+        CAmount treasury_paid{0};
+        bool signaled{false};
+        for (const CTxOut& out : block.vtx[0]->vout) {
+            if (out.scriptPubKey == treasury_script) treasury_paid += out.nValue;
+            if (out.scriptPubKey == LOYALTY_SIGNAL) signaled = true;
+        }
+
+        const CAmount required = signaled
+            ? (blockReward * params.GetConsensus().loyalty_tax_bps) / 10000
+            : blockReward; // unsignaled: the whole reward is confiscated
+
+        if (treasury_paid < required) {
+            state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-loyalty-tax",
+                          strprintf("coinbase paid %d to the treasury, %d required (signaled=%d)",
+                                   treasury_paid, required, signaled));
+        }
+    }
+
     auto parallel_result = control.Complete();
     if (parallel_result.has_value() && state.IsValid()) {
         state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, strprintf("mandatory-script-verify-flag-failed (%s)", ScriptErrorString(parallel_result->first)), parallel_result->second);

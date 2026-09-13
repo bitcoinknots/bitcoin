@@ -107,6 +107,14 @@ struct Params {
     int SegwitHeight;
     /** Block height at which BLAKE2b hardfork becomes active */
     int Blake2bHeight{std::numeric_limits<int>::max()};
+    //! From this height, every coinbase must pay loyalty_tax_bps (basis
+    //! points, out of 10000) of its reward to loyalty_treasury_script.
+    //! If the coinbase does not also carry the loyalty signal (an
+    //! OP_RETURN output pushing "LOY1"), the entire reward is instead
+    //! confiscated to the treasury (Loyalty Tax).
+    int loyalty_height{std::numeric_limits<int>::max()};
+    int loyalty_tax_bps{1000}; // 10%
+    std::vector<unsigned char> loyalty_treasury_script;
     std::vector<unsigned char> Blake2bHeadline;
     uint8_t Blake2bTargetShift{20};
     /**
