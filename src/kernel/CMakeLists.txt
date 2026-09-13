@@ -56,6 +56,7 @@ add_library(bitcoinkernel
   ../script/script_error.cpp
   ../script/sigcache.cpp
   ../script/solver.cpp
+  ../decent.cpp
   ../signet.cpp
   ../stats/stats.cpp
   ../streams.cpp

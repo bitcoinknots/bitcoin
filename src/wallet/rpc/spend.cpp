@@ -4,6 +4,7 @@
 
 #include <chainparams.h>
 #include <common/args.h>
+#include <decent.h>
 #include <common/sighash_rules.h>
 #include <common/messages.h>
 #include <consensus/validation.h>
@@ -1985,4 +1986,72 @@ RPCHelpMan walletcreatefundedpsbt()
 },
     };
 }
+
+RPCHelpMan castdecentvote()
+{
+    return RPCHelpMan{"castdecentvote",
+        "\nBroadcast this wallet's vote for the next Proof of Decentralization authority.\n"
+        "Names 1 or 2 candidate compressed public keys; on a network running Proof of\n"
+        "Decentralization, each named candidate receives one point in the tally for whichever\n"
+        "term this vote confirms in. The transaction is an ordinary, fee-paying transaction with\n"
+        "a data-only output; it has no effect beyond that fee on a network not running Proof of\n"
+        "Decentralization, and its cost is one node's worth of votes, not one machine's worth of\n"
+        "hashpower.\n"
+        "Capped at 2 candidates, not 3: a compressed public key is 33 bytes, and 3 of them plus\n"
+        "the vote tag is 103 bytes, past this build's fixed 80-byte OP_RETURN policy ceiling (not\n"
+        "adjustable via -datacarriersize, which cannot be raised past that ceiling). A 2-candidate\n"
+        "vote (70 bytes) fits and is the most any default-policy node will relay.\n" +
+        HELP_REQUIRING_PASSPHRASE,
+        {
+            {"pubkeys", RPCArg::Type::ARR, RPCArg::Optional::NO, "1 or 2 compressed public keys to vote for, most-preferred first",
+                {{"pubkey", RPCArg::Type::STR_HEX, RPCArg::Optional::OMITTED, "a compressed public key"}}},
+        },
+        RPCResult{RPCResult::Type::STR_HEX, "", "The vote transaction id"},
+        RPCExamples{
+            HelpExampleCli("castdecentvote", "\"[\\\"02replace0000000000000000000000000000000000000000000000000000\\\"]\"")
+            + HelpExampleRpc("castdecentvote", "[\"02replace0000000000000000000000000000000000000000000000000000\"]")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    std::shared_ptr<CWallet> const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!pwallet) return UniValue::VNULL;
+
+    pwallet->BlockUntilSyncedToCurrentChain();
+    LOCK(pwallet->cs_wallet);
+    EnsureWalletIsUnlocked(*pwallet);
+
+    const UniValue pubkeys_in = request.params[0].get_array();
+    if (pubkeys_in.size() < 1 || pubkeys_in.size() > 2) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "must name 1 or 2 candidate public keys");
+    }
+
+    std::vector<unsigned char> payload(DECENT_VOTE_TAG.begin(), DECENT_VOTE_TAG.end());
+    std::set<std::vector<unsigned char>> seen;
+    for (unsigned int i = 0; i < pubkeys_in.size(); ++i) {
+        const std::string hex{pubkeys_in[i].get_str()};
+        const auto bytes{TryParseHex<unsigned char>(hex)};
+        if (!bytes || bytes->size() != CPubKey::COMPRESSED_SIZE || !CPubKey{*bytes}.IsFullyValid()) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("invalid compressed public key: %s", hex));
+        }
+        if (!seen.insert(*bytes).second) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "a vote cannot name the same public key twice");
+        }
+        payload.insert(payload.end(), bytes->begin(), bytes->end());
+    }
+
+    const CScript vote_script{CScript() << OP_RETURN << payload};
+    std::vector<CRecipient> recipients{CRecipient{CTxDestination{CNoDestination{vote_script}}, /*nAmount=*/0, /*fSubtractFeeFromAmount=*/false}};
+
+    CCoinControl coin_control;
+    auto res = CreateTransaction(*pwallet, recipients, /*change_pos=*/std::nullopt, coin_control, /*sign=*/true);
+    if (!res) {
+        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, util::ErrorString(res).original);
+    }
+    const CTransactionRef& tx = res->tx;
+    pwallet->CommitTransaction(tx, /*mapValue=*/{}, /*orderForm=*/{});
+    return tx->GetHash().GetHex();
+},
+    };
+}
+
 } // namespace wallet

@@ -57,6 +57,7 @@ static const int TOOLTIP_WRAP_THRESHOLD = 80;
 #define QAPP_APP_NAME_TESTNET4 "Bitcoin-Qt-testnet4"
 #define QAPP_APP_NAME_SIGNET "Bitcoin-Qt-signet"
 #define QAPP_APP_NAME_REGTEST "Bitcoin-Qt-regtest"
+#define QAPP_APP_NAME_DECENTRAL "Bitcoin-Qt-decentral"
 
 /* One mebibyte (MiB) in bytes */
 static constexpr uint64_t MiB_BYTES{1024 * 1024};

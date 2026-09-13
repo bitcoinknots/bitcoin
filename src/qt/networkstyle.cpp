@@ -22,6 +22,7 @@ static const struct {
     {ChainType::TESTNET4, QAPP_APP_NAME_TESTNET4, 70, 30},
     {ChainType::SIGNET, QAPP_APP_NAME_SIGNET, 35, 15},
     {ChainType::REGTEST, QAPP_APP_NAME_REGTEST, 160, 30},
+    {ChainType::DECENTRAL, QAPP_APP_NAME_DECENTRAL, 200, 30},
 };
 
 // titleAddText needs to be const char* for tr()

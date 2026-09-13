@@ -1851,6 +1851,7 @@ RPCHelpMan getblockchaininfo()
                 {RPCResult::Type::BOOL, "automatic_pruning", /*optional=*/true, "whether automatic pruning is enabled (only present if pruning is enabled)"},
                 {RPCResult::Type::NUM, "prune_target_size", /*optional=*/true, "the target size used by pruning (only present if automatic pruning is enabled)"},
                 {RPCResult::Type::STR_HEX, "signet_challenge", /*optional=*/true, "the block challenge (aka. block script), in hexadecimal (only present if the current network is a signet)"},
+                {RPCResult::Type::NUM, "decent_activation_height", /*optional=*/true, "the height Proof of Decentralization escrow rules take effect (only present when scheduled on this network)"},
                 (IsDeprecatedRPCEnabled("warnings") ?
                     RPCResult{RPCResult::Type::STR, "warnings", "any network and blockchain warnings (DEPRECATED)"} :
                     RPCResult{RPCResult::Type::ARR, "warnings", "any network and blockchain warnings (run with `-deprecatedrpc=warnings` to return the latest warning as a single string)",
@@ -1901,6 +1902,9 @@ RPCHelpMan getblockchaininfo()
         const std::vector<uint8_t>& signet_challenge =
             chainman.GetParams().GetConsensus().signet_challenge;
         obj.pushKV("signet_challenge", HexStr(signet_challenge));
+    }
+    if (chainman.GetConsensus().decent_activation_height != std::numeric_limits<int>::max()) {
+        obj.pushKV("decent_activation_height", chainman.GetConsensus().decent_activation_height);
     }
 
     NodeContext& node = EnsureAnyNodeContext(request.context);

@@ -39,6 +39,7 @@
 #include <policy/rbf.h>
 #include <policy/settings.h>
 #include <policy/truc_policy.h>
+#include <decent.h>
 #include <pow.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
@@ -1051,7 +1052,13 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
         }
     }
 
-    if (m_pool.m_opts.require_standard && !AreInputsStandard(tx, m_view, m_pool.m_opts, "bad-txns-input-", reason, ignore_rejects)) {
+    // A Proof of Decentralization decision spends a bare-multisig escrow, which
+    // is a non-standard input type; consensus governs it below instead.
+    const bool decent_escrow_spend{IsDecentActive(m_active_chainstate.m_chain.Height() + 1, m_active_chainstate.m_chainman.GetConsensus()) && IsDecentEscrowSpend(tx, m_view)};
+    if (decent_escrow_spend && !CheckDecentDecision(tx, m_view, m_active_chainstate.m_chainman.GetConsensus(), state)) {
+        return false; // state filled in by CheckDecentDecision
+    }
+    if (m_pool.m_opts.require_standard && !decent_escrow_spend && !AreInputsStandard(tx, m_view, m_pool.m_opts, "bad-txns-input-", reason, ignore_rejects)) {
         return state.Invalid(TxValidationResult::TX_INPUTS_NOT_STANDARD, reason);
     }
 
@@ -3009,6 +3016,17 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
     int64_t nSigOpsCost = 0;
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
     std::vector<unsigned int> flags_per_input;
+
+    // Proof of Decentralization: coinbases must escrow to the current authority,
+    // and a spend of an escrow may only release to its payee or claim it.
+    const bool decent_active{IsDecentActive(pindex->nHeight, params.GetConsensus())};
+    if (decent_active) {
+        const auto committee{ComputeDecentAuthority(pindex->pprev, m_blockman, params.GetConsensus())};
+        if (!block.vtx.empty() && !CheckDecentCoinbase(*block.vtx[0], committee, params.GetConsensus(), state)) {
+            return false;
+        }
+    }
+
     for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
         if (!state.IsValid()) break;
@@ -3026,6 +3044,14 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
                               tx_state.GetRejectReason(),
                               tx_state.GetDebugMessage() + " in transaction " + tx.GetHash().ToString());
                 break;
+            }
+            if (decent_active) {
+                TxValidationState decent_state;
+                if (!CheckDecentDecision(tx, view, params.GetConsensus(), decent_state)) {
+                    state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, decent_state.GetRejectReason(),
+                                  decent_state.GetDebugMessage() + " in transaction " + tx.GetHash().ToString());
+                    break;
+                }
             }
             nFees += txfee;
             if (!MoneyRange(nFees)) {

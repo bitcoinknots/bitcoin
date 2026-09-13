@@ -22,6 +22,13 @@
 #include <key_io.h>
 #include <net.h>
 #include <node/context.h>
+#include <consensus/consensus.h>
+#include <core_io.h>
+#include <decent.h>
+#include <key.h>
+#include <key_io.h>
+#include <node/blockstorage.h>
+#include <script/interpreter.h>
 #include <node/miner.h>
 #include <node/warnings.h>
 #include <policy/ephemeral_policy.h>
@@ -495,6 +502,206 @@ static RPCHelpMan getmininginfo()
     };
 }
 
+
+static RPCHelpMan getdecentinfo()
+{
+    return RPCHelpMan{"getdecentinfo",
+        "\nReturns the state of Proof of Decentralization on this network: the current authority, the term, and when the rules activate.\n",
+        {},
+        RPCResult{
+            RPCResult::Type::OBJ, "", "",
+            {
+                {RPCResult::Type::BOOL, "active", "whether the escrow rules are in force at the current tip"},
+                {RPCResult::Type::NUM, "activation_height", "the height the rules take effect"},
+                {RPCResult::Type::NUM, "term_length", "blocks per authority term"},
+                {RPCResult::Type::NUM, "claim_maturity", "blocks a claimed coinbase stays locked after the claim confirms"},
+                {RPCResult::Type::NUM, "term", /*optional=*/true, "the current term number (only when active)"},
+                {RPCResult::Type::ARR, "authority", /*optional=*/true, "the three current authority pubkeys (only when active)",
+                    {{RPCResult::Type::STR_HEX, "", "a compressed pubkey"}}},
+            }
+        },
+        RPCExamples{HelpExampleCli("getdecentinfo", "") + HelpExampleRpc("getdecentinfo", "")},
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    ChainstateManager& chainman = EnsureAnyChainman(request.context);
+    const Consensus::Params& params{chainman.GetConsensus()};
+    LOCK(cs_main);
+    const CBlockIndex* tip{chainman.ActiveChain().Tip()};
+
+    UniValue obj(UniValue::VOBJ);
+    const bool active{IsDecentActive(tip->nHeight + 1, params)};
+    obj.pushKV("active", active);
+    obj.pushKV("activation_height", params.decent_activation_height);
+    obj.pushKV("term_length", params.decent_term_length);
+    obj.pushKV("claim_maturity", params.decent_claim_maturity);
+    if (active) {
+        obj.pushKV("term", (tip->nHeight + 1 - params.decent_activation_height) / params.decent_term_length);
+        UniValue authority(UniValue::VARR);
+        for (const CPubKey& key : ComputeDecentAuthority(tip, chainman.m_blockman, params)) {
+            authority.push_back(HexStr(key));
+        }
+        obj.pushKV("authority", std::move(authority));
+    }
+    return obj;
+},
+    };
+}
+
+static RPCHelpMan getpendingcoinbases()
+{
+    return RPCHelpMan{"getpendingcoinbases",
+        "\nList escrowed coinbase outputs the authority has not yet released or claimed.\n",
+        {
+            {"depth", RPCArg::Type::NUM, RPCArg::Default{1008}, "How many blocks back from the tip to search"},
+        },
+        RPCResult{
+            RPCResult::Type::ARR, "", "",
+            {
+                {RPCResult::Type::OBJ, "", "",
+                {
+                    {RPCResult::Type::STR_HEX, "txid", "The coinbase transaction id"},
+                    {RPCResult::Type::NUM, "vout", "The escrowed output index"},
+                    {RPCResult::Type::NUM, "height", "The height that minted it"},
+                    {RPCResult::Type::STR_AMOUNT, "amount", "The escrowed amount"},
+                    {RPCResult::Type::STR, "payee", "The payee named by the miner, as an address where possible"},
+                    {RPCResult::Type::BOOL, "mature", "Whether a decision spending it could confirm in the next block"},
+                }},
+            }
+        },
+        RPCExamples{HelpExampleCli("getpendingcoinbases", "") + HelpExampleRpc("getpendingcoinbases", "")},
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    ChainstateManager& chainman = EnsureAnyChainman(request.context);
+    const int depth{request.params[0].isNull() ? 1008 : request.params[0].getInt<int>()};
+    if (depth < 1) throw JSONRPCError(RPC_INVALID_PARAMETER, "depth must be at least 1");
+
+    LOCK(cs_main);
+    const CChain& chain{chainman.ActiveChain()};
+    const int tip_height{chain.Height()};
+    CCoinsViewCache& coins{chainman.ActiveChainstate().CoinsTip()};
+
+    UniValue result(UniValue::VARR);
+    for (int height = std::max(1, tip_height - depth + 1); height <= tip_height; ++height) {
+        const CBlockIndex* index{chain[height]};
+        CBlock block;
+        if (!chainman.m_blockman.ReadBlock(block, *index) || block.vtx.empty()) continue;
+        const CTransaction& coinbase{*block.vtx[0]};
+        for (uint32_t n = 0; n < coinbase.vout.size(); ++n) {
+            const auto escrow{ParseDecentEscrow(coinbase.vout[n].scriptPubKey)};
+            if (!escrow) continue;
+            if (!coins.HaveCoin(COutPoint{coinbase.GetHash(), n})) continue;
+            CTxDestination dest;
+            UniValue e(UniValue::VOBJ);
+            e.pushKV("txid", coinbase.GetHash().GetHex());
+            e.pushKV("vout", (int)n);
+            e.pushKV("height", height);
+            e.pushKV("amount", ValueFromAmount(coinbase.vout[n].nValue));
+            e.pushKV("payee", ExtractDestination(escrow->payee, dest) ? EncodeDestination(dest) : HexStr(escrow->payee));
+            e.pushKV("mature", tip_height + 1 - height >= COINBASE_MATURITY);
+            result.push_back(std::move(e));
+        }
+    }
+    return result;
+},
+    };
+}
+
+static RPCHelpMan decidecoinbase()
+{
+    return RPCHelpMan{"decidecoinbase",
+        "\nAs a member of the authority, sign a release of an escrowed coinbase to its payee, or a claim of it.\n"
+        "Provide two authority private keys to produce a complete 2-of-3 transaction; broadcast it with sendrawtransaction.\n",
+        {
+            {"txid", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "The coinbase transaction id"},
+            {"vout", RPCArg::Type::NUM, RPCArg::Optional::NO, "The escrowed output index"},
+            {"decision", RPCArg::Type::STR, RPCArg::Optional::NO, "\"release\" to pay the payee, or \"claim\" to lock it for the authority"},
+            {"privkeys", RPCArg::Type::ARR, RPCArg::Optional::NO, "One or two authority private keys in WIF",
+                {{"privkey", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "an authority private key"}}},
+            {"fee", RPCArg::Type::NUM, RPCArg::Default{1000}, "Fee in satoshis, taken from the escrowed amount"},
+        },
+        RPCResult{
+            RPCResult::Type::OBJ, "", "",
+            {
+                {RPCResult::Type::STR_HEX, "hex", "The (partially) signed transaction"},
+                {RPCResult::Type::STR_HEX, "txid", "The transaction id"},
+                {RPCResult::Type::BOOL, "complete", "Whether it carries the two signatures needed"},
+                {RPCResult::Type::STR, "destination", "Where the coins are paid"},
+                {RPCResult::Type::STR_AMOUNT, "amount", "The amount paid"},
+                {RPCResult::Type::STR, "descriptor", /*optional=*/true, "For a claim: an output descriptor for the locked coins"},
+            }
+        },
+        RPCExamples{HelpExampleCli("decidecoinbase", "\"txid\" 0 \"release\" \"[\\\"key1\\\",\\\"key2\\\"]\"")},
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    ChainstateManager& chainman = EnsureAnyChainman(request.context);
+    const Consensus::Params& params{chainman.GetConsensus()};
+
+    const COutPoint outpoint{Txid::FromUint256(ParseHashV(request.params[0], "txid")), (uint32_t)request.params[1].getInt<int>()};
+    const std::string decision{request.params[2].get_str()};
+    if (decision != "release" && decision != "claim") {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "decision must be \"release\" or \"claim\"");
+    }
+    std::vector<CKey> keys;
+    for (const UniValue& wif : request.params[3].get_array().getValues()) {
+        const CKey key{DecodeSecret(wif.get_str())};
+        if (!key.IsValid()) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid private key");
+        keys.push_back(key);
+    }
+    if (keys.empty() || keys.size() > 2) throw JSONRPCError(RPC_INVALID_PARAMETER, "provide one or two private keys");
+    const CAmount fee{request.params[4].isNull() ? 1000 : request.params[4].getInt<int64_t>()};
+    if (fee < 0) throw JSONRPCError(RPC_INVALID_PARAMETER, "fee cannot be negative");
+
+    Coin coin;
+    {
+        LOCK(cs_main);
+        const auto found{chainman.ActiveChainstate().CoinsTip().GetCoin(outpoint)};
+        if (!found) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No unspent output found; it may already have been decided");
+        coin = *found;
+    }
+    const auto escrow{coin.IsCoinBase() ? ParseDecentEscrow(coin.out.scriptPubKey) : std::nullopt};
+    if (!escrow) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Output is not an escrowed coinbase");
+    if (fee >= coin.out.nValue) throw JSONRPCError(RPC_INVALID_PARAMETER, "fee exceeds the escrowed amount");
+
+    const CScript destination{decision == "release" ? escrow->payee : DecentClaimScript(escrow->committee, params)};
+    CMutableTransaction mtx;
+    mtx.version = 2;
+    mtx.vin.emplace_back(outpoint);
+    mtx.vout.emplace_back(coin.out.nValue - fee, destination);
+
+    const uint256 sighash{SignatureHash(coin.out.scriptPubKey, mtx, 0, SIGHASH_ALL, coin.out.nValue, SigVersion::BASE)};
+    // CHECKMULTISIG needs the signatures in the committee's key order.
+    std::map<size_t, std::vector<unsigned char>> sigs_by_index;
+    for (const CKey& key : keys) {
+        const CPubKey pub{key.GetPubKey()};
+        auto it{std::ranges::find(escrow->committee, pub)};
+        if (it == escrow->committee.end()) throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Key is not a member of this coinbase's authority");
+        std::vector<unsigned char> sig;
+        if (!key.Sign(sighash, sig)) throw JSONRPCError(RPC_MISC_ERROR, "Signing failed");
+        sig.push_back((unsigned char)SIGHASH_ALL);
+        sigs_by_index[std::distance(escrow->committee.begin(), it)] = sig;
+    }
+    CScript scriptSig;
+    scriptSig << OP_0; // CHECKMULTISIG off-by-one dummy
+    for (const auto& [index, sig] : sigs_by_index) scriptSig << sig;
+    mtx.vin[0].scriptSig = scriptSig;
+
+    const CTransaction tx{mtx};
+    CTxDestination dest;
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("hex", EncodeHexTx(tx));
+    result.pushKV("txid", tx.GetHash().GetHex());
+    result.pushKV("complete", sigs_by_index.size() == 2);
+    result.pushKV("destination", ExtractDestination(destination, dest) ? EncodeDestination(dest) : HexStr(destination));
+    result.pushKV("amount", ValueFromAmount(coin.out.nValue - fee));
+    if (decision == "claim") {
+        std::string desc{strprintf("wsh(and_v(v:older(%d),multi(2,%s,%s,%s)))", params.decent_claim_maturity,
+                                   HexStr(escrow->committee[0]), HexStr(escrow->committee[1]), HexStr(escrow->committee[2]))};
+        result.pushKV("descriptor", desc);
+    }
+    return result;
+},
+    };
+}
 
 // NOTE: Unlike wallet RPC (which use BTC values), mining RPCs follow GBT (BIP 22) in using satoshi amounts
 static RPCHelpMan prioritisetransaction()
@@ -1245,6 +1452,9 @@ void RegisterMiningRPCCommands(CRPCTable& t)
         {"mining", &getblocktemplate},
         {"mining", &submitblock},
         {"mining", &submitheader},
+        {"mining", &getdecentinfo},
+        {"mining", &getpendingcoinbases},
+        {"mining", &decidecoinbase},
 
         {"hidden", &generatetoaddress},
         {"hidden", &generatetodescriptor},

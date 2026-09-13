@@ -147,6 +147,15 @@ public:
     };
 
     /**
+     * DecentralOptions holds configuration for a Proof of Decentralization test chain.
+     */
+    struct DecentralOptions {
+        std::vector<std::vector<unsigned char>> bootstrap{};
+        std::optional<int> term_length{};
+        std::optional<int> claim_maturity{};
+    };
+
+    /**
      * VersionBitsParameters holds activation parameters
      */
     struct VersionBitsParameters {
@@ -175,6 +184,7 @@ public:
 
     static std::unique_ptr<const CChainParams> RegTest(const RegTestOptions& options);
     static std::unique_ptr<const CChainParams> SigNet(const SigNetOptions& options);
+    static std::unique_ptr<const CChainParams> Decentral(const DecentralOptions& options);
     static std::unique_ptr<const CChainParams> Main();
     static std::unique_ptr<const CChainParams> TestNet();
     static std::unique_ptr<const CChainParams> TestNet4();

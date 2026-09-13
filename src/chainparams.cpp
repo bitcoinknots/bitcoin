@@ -6,6 +6,7 @@
 #include <chainparams.h>
 
 #include <chainparamsbase.h>
+#include <pubkey.h>
 #include <common/args.h>
 #include <consensus/params.h>
 #include <deploymentinfo.h>
@@ -47,6 +48,25 @@ void ReadSigNetArgs(const ArgsManager& args, CChainParams::SigNetOptions& option
             throw std::runtime_error("-signetblocktime must be greater than 0");
         }
         options.pow_target_spacing = *signetblocktime;
+    }
+}
+
+void ReadDecentralArgs(const ArgsManager& args, CChainParams::DecentralOptions& options)
+{
+    for (const std::string& pubkey : args.GetArgs("-decentralbootstrap")) {
+        const auto bytes{TryParseHex<unsigned char>(pubkey)};
+        if (!bytes || bytes->size() != CPubKey::COMPRESSED_SIZE || !CPubKey{*bytes}.IsFullyValid()) {
+            throw std::runtime_error(strprintf("-decentralbootstrap must be a valid compressed public key, not '%s'.", pubkey));
+        }
+        options.bootstrap.push_back(*bytes);
+    }
+    if (const auto term{args.GetIntArg("-decentraltermlength")}) {
+        if (*term < 1) throw std::runtime_error("-decentraltermlength must be at least 1.");
+        options.term_length = (int)*term;
+    }
+    if (const auto maturity{args.GetIntArg("-decentralclaimmaturity")}) {
+        if (*maturity < 1 || *maturity > 0xffff) throw std::runtime_error("-decentralclaimmaturity must be between 1 and 65535.");
+        options.claim_maturity = (int)*maturity;
     }
 }
 
@@ -173,6 +193,11 @@ std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, c
         auto opts = CChainParams::SigNetOptions{};
         ReadSigNetArgs(args, opts);
         return CChainParams::SigNet(opts);
+    }
+    case ChainType::DECENTRAL: {
+        auto opts = CChainParams::DecentralOptions{};
+        ReadDecentralArgs(args, opts);
+        return CChainParams::Decentral(opts);
     }
     case ChainType::REGTEST: {
         auto opts = CChainParams::RegTestOptions{};
