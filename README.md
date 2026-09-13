@@ -1,80 +1,72 @@
-Bitcoin Knots
-=============
+Proof of Decentralization
+=========================
 
-https://bitcoinknots.org
+This is [Bitcoin Knots](https://github.com/bitcoinknots/bitcoin) with a proposed
+consensus change, **Proof of Decentralization**, added for review.
 
-For an immediately usable, binary version of the Bitcoin Knots software, see
-the website.
+Bitcoin's block reward today belongs to whoever holds the hashpower. Proof of
+Decentralization keeps proof of work for ordering blocks but places the issuance
+of new coins under an authority of three keys that miners elect and replace each
+term. Every coinbase is escrowed to that authority, which can release the reward
+to the miner who earned it or claim it, but cannot redirect it to an outsider.
 
-What is Bitcoin Knots?
+The rules are implemented in full and covered by tests. They are wired onto
+mainnet, testnet, testnet4 and signet but **dormant**: the activation height is a
+placeholder far in the future, left for a network's operators to set together
+with a first authority. A standalone `-decentral` chain runs the rules from
+genesis for testing.
+
+How it works
+------------
+
+Every coinbase output carrying value must be escrowed:
+
+    <payee scriptPubKey> OP_DROP 2 <k1> <k2> <k3> 3 OP_CHECKMULTISIG
+
+The miner names the payee it intends; the three keys are the authority sitting
+when the block is mined. The 2-of-3 multisig is enforced by the ordinary script
+interpreter. On top of it, consensus allows a spend of an escrow only to the
+named payee (a release) or to the same three keys behind a relative timelock (a
+claim). Blocks are never delayed; only the reward waits for a decision.
+
+Miners elect the authority by naming a public key in each block they mine
+(`-decentralvote`). Over a term, the three keys named in the most blocks become
+the next term's authority.
+
+See [doc/proof-of-decentralization.md](doc/proof-of-decentralization.md) for the
+full mechanism, and
+[doc/proof-of-decentralization-activation.md](doc/proof-of-decentralization-activation.md)
+for what activating it on a live network would require.
+
+Running the test chain
 ----------------------
 
-Bitcoin Knots connects to the Bitcoin peer-to-peer network to download and fully
-validate blocks and transactions. It also includes a wallet and graphical user
-interface, which can be optionally built.
+    bitcoind -decentral \
+        -decentralbootstrap=<pubkey> -decentralbootstrap=<pubkey> -decentralbootstrap=<pubkey>
 
-Further information about Bitcoin Knots is available in the [doc folder](/doc).
+`getdecentinfo` reports the authority and term, `getpendingcoinbases` lists
+rewards awaiting a decision, and `decidecoinbase` signs a release or a claim.
+
+What this changes, honestly
+---------------------------
+
+This concentrates the block subsidy in an elected committee. It is a real
+centralization of issuance, chosen deliberately: a network adopting it trusts
+whoever miners elect to pay honest miners and not to withhold or seize rewards.
+Proof of work still decides the order of blocks, and a majority of hashpower can
+still reorganise the chain. Proof of Decentralization changes who is paid, not
+who writes history. A reviewer should weigh it on exactly those terms.
+
+Everything else is Bitcoin Knots
+--------------------------------
+
+Every change is gated on a single consensus flag that only the Proof of
+Decentralization rules set. Mainnet, testnet, testnet4, signet and regtest
+behave as they do upstream until a real activation height is chosen. Further
+information about Bitcoin Knots is in the [doc folder](/doc).
 
 License
 -------
 
-Bitcoin Knots is released under the terms of the MIT license. See [COPYING](COPYING) for more
+Released under the terms of the MIT license. See [COPYING](COPYING) for more
 information or see https://opensource.org/licenses/MIT.
-
-Development Process
--------------------
-
-Development generally takes place as part of [Bitcoin Core](https://github.com/bitcoin/bitcoin), and is merged into
-Knots for each release.
-
-Even if your pull request to Core is closed, or if your feature is not
-suitable for Core (eg, because it builds on a feature not supported in Core;
-relies on centralised services; etc), it may still be eligible for inclusion
-in Bitcoin Knots. In this case, a pull request may be opened on the
-[Knots GitHub](https://github.com/bitcoinknots/bitcoin) for review and consideration.
-When accepted, you are expected to maintain the submitted branch in your own
-repository, and it will be automatically merged into new releases of Knots.
-
-Developer IRC can be found on Freenode at #bitcoin-dev.
-
-Testing
--------
-
-Testing and code review is the bottleneck for development; we get more pull
-requests than we can review and test on short notice. Please be patient and help out by testing
-other people's pull requests, and remember this is a security-critical project where any mistake might cost people
-lots of money.
-
-### Automated Testing
-
-Developers are strongly encouraged to write [unit tests](src/test/README.md) for new code, and to
-submit new unit tests for old code. Unit tests can be compiled and run
-(assuming they weren't disabled during the generation of the build system) with: `ctest`. Further details on running
-and extending unit tests can be found in [/src/test/README.md](/src/test/README.md).
-
-There are also [regression and integration tests](/test), written
-in Python.
-These tests can be run (if the [test dependencies](/test) are installed) with: `build/test/functional/test_runner.py`
-(assuming `build` is your build directory).
-
-The CI (Continuous Integration) systems make sure that every pull request is built for Windows, Linux, and macOS,
-and that unit/sanity tests are run automatically.
-
-### Manual Quality Assurance (QA) Testing
-
-Changes should be tested by somebody other than the developer who wrote the
-code. This is especially important for large or high-risk changes. It is useful
-to add a test plan to the pull request description if testing the changes is
-not straightforward.
-
-Translations
-------------
-
-Changes to translations as well as new translations can be submitted to
-[Bitcoin Core's Transifex page](https://explore.transifex.com/bitcoin/bitcoin/).
-
-Translations are periodically pulled from Transifex and merged into the git repository. See the
-[translation process](doc/translation_process.md) for details on how this works.
-
-**Important**: We do not accept translation changes as GitHub pull requests because the next
-pull from Transifex would automatically overwrite them again.
