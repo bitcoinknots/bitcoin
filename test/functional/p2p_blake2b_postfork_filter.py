@@ -4,9 +4,9 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test refusal of peers lacking NODE_BLAKE2B once shared pre-fork history is complete.
 
-While the next block to connect is below the fork height, peers without
-NODE_BLAKE2B are accepted. From then on they are disconnected: new ones at
-their version message, connected ones once the tip crosses into fork history.
+While the tip is below the fork height, peers without NODE_BLAKE2B are
+accepted. From then on they are disconnected: new ones at their version
+message, connected ones once the tip crosses into fork history.
 """
 
 from test_framework.messages import (
@@ -58,7 +58,7 @@ class Blake2bPostforkFilterTest(BitcoinTestFramework):
         addr = node.get_deterministic_priv_key().address
 
         self.log.info("Below the fork height, peers lacking NODE_BLAKE2B are accepted")
-        self.generatetoaddress(node, FORK_HEIGHT - 2, addr)
+        self.generatetoaddress(node, FORK_HEIGHT - 1, addr)
         legacy_in = self.inbound(blake2b=False)
         fork_in = self.inbound(blake2b=True)
         legacy_out = self.outbound(0, blake2b=False)
@@ -91,9 +91,9 @@ class Blake2bPostforkFilterTest(BitcoinTestFramework):
         self.outbound(3, blake2b=True).sync_with_ping()
         self.wait_until(lambda: len(node.getpeerinfo()) == 4)
 
-        self.log.info("Fork peers stay connected across the first BLAKE2b block")
+        self.log.info("Fork peers stay connected across the next BLAKE2b block")
         self.generatetoaddress(node, 1, addr)
-        assert_equal(node.getblockcount(), FORK_HEIGHT)
+        assert_equal(node.getblockcount(), FORK_HEIGHT + 1)
         for peer in node.p2ps:
             if peer.is_connected:
                 peer.sync_with_ping()

@@ -4971,7 +4971,7 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
 bool PeerManagerImpl::CanDisconnectSpamCoinPeer(const CNode& node, ServiceFlags services) const
 {
     // Past the shared pre-fork history, a peer lacking NODE_BLAKE2B is no longer useful
-    bool weArePastSharedHistory = m_chainparams.GetConsensus().IsBlake2bHeight(m_best_height + 1);
+    bool weArePastSharedHistory = m_chainparams.GetConsensus().IsBlake2bHeight(m_best_height);
     bool peerLacksBlakeBit = !(services & NODE_BLAKE2B);
     bool peerIsNotManuallyAdded = !node.IsManualConn();
     bool peerIsNotNoBan = !node.HasPermission(NetPermissionFlags::NoBan);
