@@ -40,14 +40,21 @@ coinbase maturity still applies before a decision can confirm.
 
 ## Electing the authority
 
-Each block's coinbase may carry one vote:
+Voting is a wallet operation, not a mining one, and a vote cast in a block's own
+coinbase is never counted (see `castdecentvote`). An ordinary, non-coinbase
+transaction carries the vote:
 
-    OP_RETURN <"DEC1" || compressed pubkey>
+    OP_RETURN <"DEC1" || pubkey_1 [|| pubkey_2]>
 
-`-decentralvote=<pubkey>` casts it. Over a term of `decent_term_length` blocks,
-the three pubkeys named in the most blocks become the next term's authority,
-weighted by each pool's share of blocks. If a term does not name three distinct
-pubkeys, the sitting authority carries over.
+naming 1 or 2 candidates (capped below 3 by the fixed 80-byte OP_RETURN policy
+ceiling). Over a term of `decent_term_length` blocks, the pubkeys with the most
+points across all such transactions become the next term's authority, ties
+broken by pubkey. If a term does not name three distinct pubkeys, the sitting
+authority carries over.
+
+Excluding coinbase votes from the tally is what stops a hashpower majority from
+also handing itself a majority of votes: mining a block and voting for the
+authority are unrelated actions, costing unrelated resources.
 
 The authority that mints a coinbase is the one that can settle it, for the life
 of that coinbase. An election changes who mints and settles future coinbases,

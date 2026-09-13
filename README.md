@@ -119,19 +119,29 @@ ones.
 Electing the authority
 ----------------------
 
-The authority is chosen by the miners, one vote per block. A block votes by
-adding a zero-value `OP_RETURN` output to its coinbase carrying a tag and a
-compressed public key:
+The authority is chosen by node operators, not by miners. Mining a block and
+voting for the authority are deliberately unrelated actions: a vote is an
+ordinary, fee-paying transaction cast from a wallet with `castdecentvote`, and a
+vote embedded in a block's own coinbase is never counted, no matter how it got
+there. This is the direct fix for the objection raised on this proposal's PR: a
+party with a hashpower majority must not thereby also be able to hand itself a
+majority of votes. Deciding who governs issuance now costs a spendable coin and
+a transaction fee, a different and much cheaper-to-verify resource than mining
+hardware, and one hashpower does not by itself confer.
 
-    OP_RETURN <"DEC1" || compressed pubkey>
+A vote transaction carries a single output:
 
-`-decentralvote=<pubkey>` makes the node cast this vote in every block it mines.
-Over a term of `decent_term_length` blocks, votes are tallied one per block, so
-a pool's weight is its share of blocks found. The three distinct public keys
-named in the most blocks become the next term's authority. Ties are broken by
-byte order of the pubkey, so every node reaches the same result. If a term does
-not name at least three distinct keys, the sitting authority carries over to the
-next term.
+    OP_RETURN <"DEC1" || pubkey_1 [|| pubkey_2]>
+
+naming 1 or 2 candidate public keys (capped below 3 because 3 compressed
+pubkeys plus the tag is 103 bytes, past this build's fixed 80-byte OP_RETURN
+policy ceiling, which cannot be raised past that limit). Each named candidate
+receives one point (approval voting: naming two candidates costs nothing extra
+and doesn't dilute support for either one). Over a term of `decent_term_length`
+blocks, the pubkeys with the most points across every non-coinbase vote
+transaction become the next term's authority. Ties are broken by byte order of
+the pubkey, so every node reaches the same result. If a term does not name at
+least three distinct keys, the sitting authority carries over to the next term.
 
 The first term has no prior term to elect from, so a network ships a **bootstrap
 authority** of three keys, in force until the first election completes.
@@ -212,6 +222,9 @@ RPCs
 - `decidecoinbase <txid> <vout> release|claim [privkey,privkey] [fee]` — build
   and sign a release or claim with two authority keys; a claim also returns an
   output descriptor for the locked coins.
+- `castdecentvote [pubkey,pubkey]` — broadcast this wallet's vote for the next
+  authority, naming 1 or 2 candidates. Requires a funded wallet; costs an
+  ordinary transaction fee.
 - `getblockchaininfo` — reports `decent_activation_height` where scheduled.
 
 Where the code lives
@@ -225,7 +238,8 @@ Where the code lives
   on the public networks.
 - `src/validation.cpp` — the coinbase and decision checks in block connection
   and mempool acceptance.
-- `src/node/miner.cpp` — escrowing the coinbase and casting the vote.
+- `src/node/miner.cpp` — escrowing the coinbase to the sitting authority.
+- `src/wallet/rpc/spend.cpp` — `castdecentvote`, the wallet vote transaction.
 - `src/rpc/mining.cpp` — the authority RPCs.
 
 `git grep decent_` reaches every behavioural change.
