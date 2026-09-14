@@ -1939,6 +1939,103 @@ BOOST_AUTO_TEST_CASE(v8_assignment_wire_rules_and_exact_target_vectors)
     BOOST_CHECK_THROW(ho::ShareTarget(share), std::invalid_argument);
 }
 
+BOOST_AUTO_TEST_CASE(tides_payout_plan_reuses_exact_weights_for_reservation_and_rewards)
+{
+    for (const auto version : {ho::TIDES_VERSION, ho::COMPACT_TIDES_VERSION, ho::VARIABLE_TIDES_VERSION}) {
+        consensus.SharePoolTides = true;
+        consensus.SharePoolCompactTides = ho::IsCompactTidesVersion(version);
+        consensus.SharePoolVarDiff = version == ho::VARIABLE_TIDES_VERSION;
+        ho::Snapshot snapshot;
+        snapshot.binding = Owner();
+        size_t lookups{0};
+        const ho::Lookup no_history = [&](const uint256&) -> std::shared_ptr<const ho::Snapshot> {
+            ++lookups;
+            return nullptr;
+        };
+        ho::TidesPayoutPlan plan;
+        std::vector<CTxOut> payouts;
+        BOOST_CHECK(!plan.Calculate(REWARD, payouts).IsValid());
+        BOOST_REQUIRE(ho::PrepareTidesPayouts(snapshot, &indexes[0], SHARE_BITS, consensus, no_history, plan).IsValid());
+        BOOST_REQUIRE(plan.Calculate(MAX_MONEY, payouts).IsValid());
+        BOOST_CHECK(payouts == (std::vector<CTxOut>{CTxOut{MAX_MONEY, CScript{snapshot.binding.payout_script.begin(), snapshot.binding.payout_script.end()}}}));
+        BOOST_REQUIRE(plan.Calculate(0, payouts, true).IsValid());
+        BOOST_REQUIRE_EQUAL(payouts.size(), 1);
+        BOOST_CHECK_EQUAL(payouts[0].nValue, 0);
+
+        for (const unsigned char script : {0x61, 0x62, 0x63}) {
+            Share share;
+            share.origin = snapshot.binding;
+            share.origin.payout_script = Payout(script);
+            share.header.nBits = SHARE_BITS;
+            share.header.nNonce = script;
+            if (consensus.SharePoolVarDiff) share.origin.share_work_bits = script == 0x61 ? 1 : 3;
+            if (script == 0x63) share.origin.pool = uint256{99}; // Independent pool receives no part of this reward.
+            snapshot.shares.push_back(std::move(share));
+        }
+        BOOST_REQUIRE(ho::PrepareTidesPayouts(snapshot, &indexes[0], SHARE_BITS, consensus, no_history, plan).IsValid());
+        const auto prepared_lookups = lookups;
+        BOOST_REQUIRE(plan.Calculate(0, payouts, true).IsValid());
+        const auto alice = Payout(0x61), bob = Payout(0x62);
+        BOOST_CHECK(payouts == (std::vector<CTxOut>{CTxOut{0, CScript{alice.begin(), alice.end()}}, CTxOut{0, CScript{bob.begin(), bob.end()}}}));
+        const CAmount alice_weight = consensus.SharePoolVarDiff ? 2 : 1;
+        const CAmount bob_weight = consensus.SharePoolVarDiff ? 8 : 1;
+        for (const CAmount reward : {CAmount{0}, CAmount{1}, CAmount{3}, REWARD, MAX_MONEY}) {
+            BOOST_REQUIRE(plan.Calculate(reward, payouts).IsValid());
+            std::vector<CTxOut> expected;
+            const CAmount alice_amount = reward * alice_weight / (alice_weight + bob_weight);
+            const CAmount bob_amount = reward * bob_weight / (alice_weight + bob_weight);
+            if (alice_amount) expected.emplace_back(alice_amount, CScript{alice.begin(), alice.end()});
+            if (bob_amount) expected.emplace_back(bob_amount, CScript{bob.begin(), bob.end()});
+            BOOST_CHECK(payouts == expected);
+        }
+        BOOST_CHECK_EQUAL(lookups, prepared_lookups);
+        const auto prior = payouts;
+        BOOST_CHECK(!plan.Calculate(-1, payouts).IsValid());
+        BOOST_CHECK(payouts == prior);
+        ho::TidesPayoutPlan moved{std::move(plan)};
+        BOOST_CHECK(!plan.Calculate(REWARD, payouts).IsValid());
+        BOOST_REQUIRE(moved.Calculate(REWARD, payouts).IsValid());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(tides_payout_plan_failed_history_or_context_cannot_reuse_old_weights)
+{
+    consensus.SharePoolTides = consensus.SharePoolCompactTides = consensus.SharePoolVarDiff = true;
+    auto initial = CompactEmpty();
+    const auto block = CompactBlock(initial);
+    Anchor(block);
+    auto child = CompactEmpty(2);
+    ho::TidesPayoutPlan plan;
+    const auto prepare = [&] { return ho::PrepareTidesPayouts(child, &indexes[1], SHARE_BITS, consensus, Lookup(), plan); };
+    std::vector<CTxOut> payouts;
+    BOOST_REQUIRE(prepare().IsValid());
+    BOOST_REQUIRE(plan.Calculate(REWARD, payouts).IsValid());
+    const auto expected = payouts;
+
+    const auto commitment = indexes[1].m_mm_rhs;
+    indexes[1].m_mm_rhs = uint256{0x34};
+    BOOST_CHECK(prepare().IsMissing());
+    BOOST_CHECK(!plan.Calculate(REWARD, payouts).IsValid());
+    BOOST_CHECK(payouts == expected);
+    indexes[1].m_mm_rhs = commitment;
+    BOOST_REQUIRE(prepare().IsValid());
+    BOOST_REQUIRE(plan.Calculate(REWARD, payouts).IsValid());
+    BOOST_CHECK(payouts == expected);
+
+    auto corrupt = *snapshots.at(commitment);
+    corrupt.authorization[0] ^= 1;
+    const auto bad_hash = ho::SnapshotHash(corrupt);
+    snapshots[bad_hash] = std::make_shared<const ho::Snapshot>(corrupt);
+    indexes[1].m_mm_rhs = bad_hash;
+    BOOST_CHECK(prepare().status == ho::Status::Invalid);
+    BOOST_CHECK(!plan.Calculate(REWARD, payouts).IsValid());
+    indexes[1].m_mm_rhs = commitment;
+    BOOST_REQUIRE(prepare().IsValid());
+    child.binding.native_parent = uint256{0x34};
+    BOOST_CHECK(prepare().status == ho::Status::Invalid);
+    BOOST_CHECK(!plan.Calculate(REWARD, payouts).IsValid());
+}
+
 BOOST_AUTO_TEST_CASE(v8_assigned_target_is_attested_and_native_candidates_remain_valid)
 {
     consensus.SharePoolTides = consensus.SharePoolCompactTides = consensus.SharePoolVarDiff = true;

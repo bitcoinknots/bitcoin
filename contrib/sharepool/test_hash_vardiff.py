@@ -30,6 +30,30 @@ class VardiffTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.make(min_work_bits=5)
 
+    def test_capacity_pause_cannot_lower_difficulty_or_include_partial_window(self):
+        self.controller.start()
+        self.controller.observe(4)
+        self.now = 20
+        self.controller.set_admission_paused(True)
+        self.assertEqual(self.controller.status()["window_accepted_shares"], 0)
+        self.now = 1000
+        self.controller.observe(4)
+        self.assertEqual(self.controller.next_assignment(), 4)
+        self.assertEqual(self.controller.status()["observations"], 0)
+        self.assertEqual(self.controller.status()["window_accepted_shares"], 0)
+        self.controller.set_admission_paused(False)
+        self.now = 1039
+        self.assertEqual(self.controller.next_assignment(), 4)
+        for unused in range(4):
+            self.controller.observe(4)
+        self.now = 1040
+        self.assertEqual(self.controller.next_assignment(), 4)
+        self.assertEqual(self.controller.last_estimate["elapsed_seconds"], 40)
+        self.assertEqual(self.controller.last_estimate["accepted_shares"], 4)
+        self.assertFalse(self.controller.status()["admission_paused"])
+        with self.assertRaises(ValueError):
+            self.controller.set_admission_paused(1)
+
     def test_initial_assignment_waits_for_publication(self):
         self.now = 1000
         self.assertEqual(self.controller.next_assignment(), 4)

@@ -46,6 +46,7 @@ class VardiffController:
         self._work = self._shares = 0
         self.adjustments = self.observations = 0
         self.last_estimate = None
+        self._admission_paused = False
 
     def _now(self):
         if self._owner != (os.getpid(), threading.get_ident()):
@@ -67,12 +68,30 @@ class VardiffController:
         if self._started is None:
             self._started = now
 
+    def set_admission_paused(self, paused):
+        """Exclude capacity-limited windows from hashrate-driven retargeting.
+
+        Refused work is not an idle-miner observation. Neither a partial window
+        nor elapsed drain time may ease the assigned difficulty after recovery.
+        Previously acknowledged work and its signed assignment are unchanged.
+        """
+        if type(paused) is not bool:
+            raise ValueError("admission pause must be boolean")
+        now = self._now()
+        if paused != self._admission_paused:
+            self._admission_paused = paused
+            self._work = self._shares = 0
+            if self._started is not None:
+                self._started = now
+
     def observe(self, assigned_work_bits):
         """Record one newly durably acknowledged proof at its old job weight."""
         bits = work_bits(assigned_work_bits)
         self._now()
         if self._started is None:
             raise RuntimeError("vardiff observation requires published work")
+        if self._admission_paused:
+            return
         self._work += 1 << bits
         self._shares += 1
 
@@ -84,7 +103,7 @@ class VardiffController:
         Mixed assignments are weighted before estimating, not counted equally.
         """
         now = self._now()
-        if self._started is None or now - self._started < self.retarget_seconds:
+        if self._admission_paused or self._started is None or now - self._started < self.retarget_seconds:
             return self.current_work_bits
         elapsed = now - self._started
         estimate = self._work / elapsed
@@ -110,4 +129,5 @@ class VardiffController:
             "window_accepted_shares": self._shares, "window_accepted_work": self._work,
             "adjustments": self.adjustments, "observations": self.observations,
             "last_estimate": None if self.last_estimate is None else dict(self.last_estimate),
+            "admission_paused": self._admission_paused,
             "physical_hashrate_attested": False}

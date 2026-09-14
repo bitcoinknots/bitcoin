@@ -299,6 +299,47 @@ class HashGateBatchTests(unittest.TestCase):
         authorization = self.gate.authorize(block.serialize(), snapshot.serialize())
         self.assertTrue(self.gate.ready_for_dispatch(authorization))
 
+    def test_combined_local_preparation_selects_once_and_keeps_fresh_native_check(self):
+        self.admit(self.proofs(4))
+        before = len(self.rpc.calls)
+        with patch.object(self.gate, "_batch", wraps=self.gate._batch) as batch:
+            authorization = self.gate.prepare_native_authorization(sign_owner=sign)
+        self.assertEqual(batch.call_count, 1)
+        calls = [method for method, unused in self.rpc.calls[before:]]
+        self.assertEqual(calls.count("preparesharepoolhashjob"), 1)
+        self.assertEqual(calls.count("finalizesharepoolhashjob"), 1)
+        self.assertEqual(calls.count("validatesharepoolhashtemplate"), 1)
+        self.assertTrue(self.gate.ready_for_dispatch(authorization))
+        # An external offer still computes its own complete deterministic prefix.
+        with patch.object(self.gate, "_batch", wraps=self.gate._batch) as batch:
+            self.gate.authorize(authorization.block_bytes, authorization.snapshot_bytes)
+        self.assertEqual(batch.call_count, 1)
+
+    def test_combined_preparation_refuses_changed_receipts_without_authorizing_job(self):
+        first, second = self.proofs(2)
+        self.gate.receive(first)
+        def signing(snapshot):
+            self.gate.receive(second)
+            return sign(snapshot)
+        with self.assertRaisesRegex(ValueError, "accounting changed"):
+            self.gate.prepare_native_authorization(sign_owner=signing)
+        self.assertEqual(self.gate.archive_head()["receipt_revision"], 2)
+        self.assertEqual(len(self.gate.active_templates()), 1)
+
+    def test_combined_preparation_refuses_policy_changes_and_fresh_native_rejection(self):
+        old_quota = self.gate.quota
+        def signing(snapshot):
+            self.gate.quota -= 1
+            return sign(snapshot)
+        with self.assertRaisesRegex(ValueError, "accounting changed"):
+            self.gate.prepare_native_authorization(sign_owner=signing)
+        self.gate.quota = old_quota
+        head = self.gate.archive_head()
+        with patch.object(self.gate, "_native_template", side_effect=ValueError("fresh native rejection")):
+            with self.assertRaisesRegex(ValueError, "fresh native rejection"):
+                self.gate.prepare_native_authorization(sign_owner=sign)
+        self.assertEqual(self.gate.archive_head(), head)
+
     def test_native_builder_rejects_changed_signing_payload_before_calling_signer(self):
         calls = []
         self.rpc.prepare_change = lambda value: dict(value, signing_payload="00")

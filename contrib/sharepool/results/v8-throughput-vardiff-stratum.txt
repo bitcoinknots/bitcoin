@@ -1,0 +1,6 @@
+2026-09-14T20:07:55.719000Z TestFramework (INFO): PRNG seed is: 807765405592364877
+2026-09-14T20:07:55.719000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-coinbase-guard-wire-native
+2026-09-14T20:07:57.981000Z TestFramework (INFO): Standalone v8 CLI runner publishes work and closes its listener without changing the chain
+2026-09-14T20:07:59.373000Z TestFramework (INFO): Stopping nodes
+2026-09-14T20:07:59.490000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-coinbase-guard-wire-native
+2026-09-14T20:07:59.490000Z TestFramework (INFO): Tests successful

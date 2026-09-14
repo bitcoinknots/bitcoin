@@ -1,5 +1,12 @@
 # Share-pool settlement experiments
 
+The latest [v8 admission-pressure follow-up](../../doc/sharepool-v8-admission-pressure.md)
+checks local next-batch capacity before new acknowledgements, preserves mining
+of retained work during congestion, and reuses local selection and native
+history calculations during job preparation. The default is ten shares per
+minute per miner. Mainnet remains disabled; finite regtest success does not
+establish sustained production capacity.
+
 The [v6 native experiment](../../doc/sharepool-tides-accounting.md) adds
 separate-pool rolling payouts, exact job signatures and full-snapshot hashes on
 fresh regtest chains. **Rules revision 2** shares the oldest native-height batch

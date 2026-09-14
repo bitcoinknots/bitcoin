@@ -1,0 +1,32 @@
+2026-09-14T19:37:24.277000Z TestFramework (INFO): PRNG seed is: 4914183385324413189
+2026-09-14T19:37:24.278000Z TestFramework (DEBUG): Setting up network thread
+2026-09-14T19:37:24.278000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v8-throughput-100-workers
+2026-09-14T19:37:24.280000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T19:37:24.281000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T19:37:24.817000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-14T19:37:24.820000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-14T19:38:09.500000Z TestFramework (INFO): Live block 102 admitted 334 proofs; source continues independently
+2026-09-14T19:38:32.485000Z TestFramework (INFO): Live block 103 admitted 48 proofs; source continues independently
+2026-09-14T19:38:55.635000Z TestFramework (INFO): Live block 104 admitted 38 proofs; source continues independently
+2026-09-14T19:39:19.601000Z TestFramework (INFO): Live block 105 admitted 34 proofs; source continues independently
+2026-09-14T19:39:43.612000Z TestFramework (INFO): Live block 106 admitted 32 proofs; source continues independently
+2026-09-14T19:40:06.890000Z TestFramework (INFO): Live block 107 admitted 43 proofs; source continues independently
+2026-09-14T19:40:29.550000Z TestFramework (INFO): Live block 108 admitted 49 proofs; source continues independently
+2026-09-14T19:40:52.233000Z TestFramework (INFO): Live block 109 admitted 47 proofs; source continues independently
+2026-09-14T19:41:14.896000Z TestFramework (INFO): Live block 110 admitted 44 proofs; source continues independently
+2026-09-14T19:41:38.106000Z TestFramework (INFO): Live block 111 admitted 41 proofs; source continues independently
+2026-09-14T19:42:01.010000Z TestFramework (INFO): Live block 112 admitted 40 proofs; source continues independently
+2026-09-14T19:42:24.227000Z TestFramework (INFO): Live block 113 admitted 42 proofs; source continues independently
+2026-09-14T19:42:47.860000Z TestFramework (INFO): Live block 114 admitted 43 proofs; source continues independently
+2026-09-14T19:43:10.634000Z TestFramework (INFO): Live block 115 admitted 42 proofs; source continues independently
+2026-09-14T19:43:33.762000Z TestFramework (INFO): Live block 116 admitted 43 proofs; source continues independently
+2026-09-14T19:43:56.713000Z TestFramework (INFO): Live block 117 admitted 43 proofs; source continues independently
+2026-09-14T19:44:13.031000Z TestFramework (INFO): Live block 118 admitted 37 proofs; source continues independently
+2026-09-14T19:44:17.708000Z TestFramework (DEBUG): Closing down network thread
+2026-09-14T19:44:17.769000Z TestFramework (INFO): Stopping nodes
+2026-09-14T19:44:17.769000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-14T19:44:17.769000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-14T19:44:17.950000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-14T19:44:17.950000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-14T19:44:17.950000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v8-throughput-100-workers
+2026-09-14T19:44:17.950000Z TestFramework (INFO): Tests successful

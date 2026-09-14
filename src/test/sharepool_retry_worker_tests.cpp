@@ -208,9 +208,16 @@ BOOST_AUTO_TEST_CASE(payout_reservation_rejects_contextual_weight_excess_before_
     BOOST_REQUIRE(ordinary);
     BOOST_CHECK(ordinary->weight <= MAX_BLOCK_WEIGHT);
     BOOST_CHECK(!sharepool::ReserveCoinbasePayouts(6500 * 31, true));
+    BOOST_CHECK_EQUAL(sharepool::MaxCoinbasePayoutBytes(false), 999612U);
+    BOOST_CHECK_EQUAL(sharepool::MaxCoinbasePayoutBytes(true), 199612U);
     for (const bool reduced : {false, true}) {
         const size_t limit = reduced ? REDUCED_DATA_MAX_BLOCK_WEIGHT : MAX_BLOCK_WEIGHT;
         const size_t maximum_outputs = (limit - 36) / WITNESS_SCALE_FACTOR - 379;
+        BOOST_CHECK_EQUAL(sharepool::MaxCoinbasePayoutBytes(reduced), maximum_outputs);
+        const auto empty = sharepool::ReserveCoinbasePayouts(0, reduced);
+        BOOST_REQUIRE(empty);
+        BOOST_CHECK_EQUAL(empty->serialized_bytes, 379U + 36U);
+        BOOST_CHECK_EQUAL(empty->weight, 379U * WITNESS_SCALE_FACTOR + 36U);
         const auto boundary = sharepool::ReserveCoinbasePayouts(maximum_outputs, reduced);
         BOOST_REQUIRE(boundary);
         BOOST_CHECK_EQUAL(boundary->weight, limit);

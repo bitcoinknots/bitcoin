@@ -36,7 +36,7 @@ class GraphLatencyTests(unittest.TestCase):
         self.assertEqual(dict(callbacks), expected)
         self.assertEqual(len(callbacks), len(expected))
         self.assertEqual(result, {"snapshot_bytes": len(root.serialize()), "dependency_bytes": sum(map(len, expected.values())),
-                                 "origins": 4, "dependency_shares": 16})
+                                 "origins": 4, "dependency_shares": 16, "dependency_depth": 1})
 
     def test_each_unique_input_is_captured_once_inside_the_operation(self):
         root, openings, parent, ancestor = graph_fixture(alternatives=4, inherited_proofs=12)

@@ -11,6 +11,7 @@ on the next call so insertions below an old hash cursor are visited too.
 """
 
 from hash_snapshot import is_tides_profile
+from hash_admission_budget import AdmissionRefused
 from copy import deepcopy
 import native_archive
 from native_mining_gate import template_id
@@ -65,7 +66,9 @@ def sync_native_receipts(gate, *, cursor=None, limit=32, max_bytes=64 * 1024 * 1
     Returned cursor resumes a partly read snapshot without replaying its first
     proofs. Deferred entries are unacknowledged and include retry_cursor; callers
     can retry those directly or let the next complete scan encounter them. No
-    recipient payment or global reception order is implied by an import.
+    recipient payment or global reception order is implied by an import. Local
+    admission pressure stops at the exact unacknowledged proof and returns its
+    retry cursor; it is neither consensus invalidity nor an imported receipt.
     """
     if type(max_bytes) is not int or not 1024 <= max_bytes <= 256 * 1024 * 1024:
         raise ValueError("invalid bounded native inventory budget")
@@ -95,7 +98,7 @@ def _sync_lanes(gate, *, cursor, limit, max_bytes, max_receipts, charge, meter):
     _, tip = gate._context()
     result = {"native_tip": tip, "cursor": position, "complete": False, "inventory_revision": None,
               "pages": 0, "snapshots": 0, "proofs_examined": 0, "accepted": [], "already_retained": 0,
-              "ineligible": 0, "deferred": [], "bytes_charged": 0, "limit_reason": None,
+              "ineligible": 0, "capacity_refused": 0, "deferred": [], "bytes_charged": 0, "limit_reason": None,
               "recent_gap": False, "recent_epoch_changed": False, "recent_pages": 0, "archive_pages": 0}
     archive_complete, recent_complete = False, False
     while result["pages"] < limit and result["proofs_examined"] < max_receipts:
@@ -144,7 +147,7 @@ def _sync_lanes(gate, *, cursor, limit, max_bytes, max_receipts, charge, meter):
             result["pages"] += 1
         part = _sync_native_receipts(gate, cursor=work_cursor, limit=1, max_bytes=max_bytes,
             max_receipts=max_receipts - result["proofs_examined"], charge=charge, meter=meter)
-        for key in ("snapshots", "proofs_examined", "already_retained", "ineligible"):
+        for key in ("snapshots", "proofs_examined", "already_retained", "ineligible", "capacity_refused"):
             result[key] += part[key]
         result["accepted"].extend(part["accepted"])
         result["deferred"].extend(part["deferred"])
@@ -158,7 +161,7 @@ def _sync_lanes(gate, *, cursor, limit, max_bytes, max_receipts, charge, meter):
         else:
             position["archive"] = part["cursor"]
             archive_complete = part["complete"]
-        if part["limit_reason"] in ("bytes", "proofs"):
+        if part["limit_reason"] in ("bytes", "proofs", "admission-capacity"):
             result["limit_reason"] = part["limit_reason"]
             break
     result["complete"] = archive_complete and recent_complete
@@ -183,7 +186,7 @@ def _sync_native_receipts(gate, *, cursor, limit, max_bytes, max_receipts, charg
     height, tip = gate._context()
     result = {"native_tip": tip, "cursor": position, "complete": False, "inventory_revision": None,
               "pages": 0, "snapshots": 0, "proofs_examined": 0, "accepted": [], "already_retained": 0,
-              "ineligible": 0, "deferred": [], "bytes_charged": 0, "limit_reason": None}
+              "ineligible": 0, "capacity_refused": 0, "deferred": [], "bytes_charged": 0, "limit_reason": None}
 
     def deferred(reason, error):
         result["deferred"].append({"snapshot": position["snapshot"], "share": position["share"],
@@ -260,12 +263,32 @@ def _sync_native_receipts(gate, *, cursor, limit, max_bytes, max_receipts, charg
                 opening = gate._snapshot(proof.header.m_mm_rhs, evidence)
                 parent = gate._parent_snapshot(height, tip, evidence)
                 gate._require_origin(proof, evidence)
-                gate._provenance(opening, evidence, trusted_parent=parent, root_origin=origin, root_depth=1)
-                gate._rehydrate_retained(evidence)
+                captures = [] if gate._admission_budget is not None else None
+                provenance = gate._provenance(opening, evidence, trusted_parent=parent,
+                    root_origin=origin, root_depth=1, captures=captures)
+                # The fresh native check performs bounded retained-data replay
+                # only on a structured missing-data response. Normal imports
+                # must not rewrite their complete dependency graph each time.
                 gate._native_share(proof, tip, evidence)
+                ticket = None
+                if gate._admission_budget is not None and proof.proof_id not in gate._admitted_ids(parent):
+                    from hash_gate_admission import pre_ack
+                    ticket = pre_ack(gate, proof, origin, height=height, tip=tip, parent=parent,
+                        staged=evidence, captures=captures, provenance=provenance)
                 gate._stable(tip)
-                gate._persist([(kind, raw) for (kind, unused), raw in evidence.items()] + [(PROOF, proof.serialize())])
+                accepted = gate._persist([(kind, raw) for (kind, unused), raw in evidence.items()] +
+                                         [(PROOF, proof.serialize())])[-1]
+                if ticket is not None:
+                    from hash_gate_admission import post_ack
+                    post_ack(gate, ticket, accepted)
                 result["accepted"].append(proof_id)
+            except AdmissionRefused as error:
+                gate._stable(tip)
+                gate._check_seal()
+                result["capacity_refused"] += 1
+                deferred("local-admission-capacity", error)
+                result["limit_reason"] = "admission-capacity"
+                break  # Preserve this exact unacknowledged proof for retry.
             except _ByteBudget:
                 result["limit_reason"] = "bytes"
                 break

@@ -1,0 +1,340 @@
+{
+  "inputs": [
+    {
+      "path": "/private/tmp/sharepool-v8-scale-100-final.json",
+      "sha256": "fd404db729784b257a8346d2608a4973485414664036a15a3fd854369a1bb46f"
+    },
+    {
+      "path": "/private/tmp/sharepool-v8-throughput-100-workers.json",
+      "sha256": "110872a936bf85074abdfe3eb7b2b8c921bb91f8f181b67accda6818a9a403ed"
+    }
+  ],
+  "event_accounting_independently_verified": true,
+  "scope": "Observed finite-run comparison of a bundle of gateway/native changes and 8 source owners versus the prior serial source. Not an isolated optimization effect or a sustained production throughput estimate.",
+  "configuration_changes": {
+    "max_runtime_seconds": {
+      "before": 1800,
+      "after": 900
+    },
+    "source_workers": {
+      "before": null,
+      "after": 8
+    }
+  },
+  "native_binary_changed": true,
+  "changed_recorded_sources": [
+    "test/functional/feature_sharepool_hash_live_capacity.py",
+    "contrib/sharepool/hash_admission_accounting.py",
+    "contrib/sharepool/hash_admission_budget.py",
+    "contrib/sharepool/hash_gate_admission.py",
+    "contrib/sharepool/hash_gate_batch.py",
+    "contrib/sharepool/hash_gate_inventory.py",
+    "contrib/sharepool/hash_job_scheduler.py",
+    "contrib/sharepool/hash_mining_gate.py",
+    "contrib/sharepool/hash_stratum.py",
+    "contrib/sharepool/hash_vardiff.py",
+    "contrib/sharepool/live_capacity_metrics.py"
+  ],
+  "live_and_drain_seconds": {
+    "before": 594.958582125,
+    "after": 401.357656292,
+    "observed_percent_change": -32.5402358499511
+  },
+  "capture_including_setup_seconds": {
+    "before": 606.596611167,
+    "after": 412.81633308299996,
+    "observed_percent_change": -31.945493020674178
+  },
+  "phase_offered": {
+    "before": 236,
+    "after": 403,
+    "observed_percent_change": 70.76271186440677
+  },
+  "phase_acknowledged": {
+    "before": 236,
+    "after": 389,
+    "observed_percent_change": 64.83050847457628
+  },
+  "phase_admitted": {
+    "before": 229,
+    "after": 382,
+    "observed_percent_change": 66.81222707423579
+  },
+  "jobs": {
+    "before": 903,
+    "after": 747,
+    "observed_percent_change": -17.27574750830565
+  },
+  "collector_register_and_ack_seconds": {
+    "before": 309.14681810399964,
+    "after": 330.3050736690001,
+    "observed_percent_change": 6.844080005339936
+  },
+  "collector_register_and_ack_p95_seconds": {
+    "before": 0.5005290000000002,
+    "after": 0.6040771250000034,
+    "observed_percent_change": 20.687737373859093
+  },
+  "collector_proof_rpc_seconds": {
+    "before": 53.44965784000002,
+    "after": 96.25050018599997,
+    "observed_percent_change": 80.07692485913196
+  },
+  "native_node0_cpu_seconds": {
+    "before": 465.21,
+    "after": 404.26,
+    "observed_percent_change": -13.101610025579847
+  },
+  "new_resources": {
+    "node0": {
+      "cpu_seconds": 404.26,
+      "average_cpu_cores": 1.0073136110078282,
+      "max_sampled_rss_bytes": 88637440
+    },
+    "node1": {
+      "cpu_seconds": 13.33,
+      "average_cpu_cores": 0.033214986480815195,
+      "max_sampled_rss_bytes": 77185024
+    },
+    "driver": {
+      "cpu_seconds": 272.77,
+      "average_cpu_cores": 0.6796738081299295,
+      "max_sampled_rss_bytes": 717553664
+    }
+  },
+  "new_collector_rpc_total_seconds": 216.89845276300125,
+  "new_source_rpc_total_overlapping_seconds": 396.0725404700039,
+  "new_waiting": {
+    "count": 1000,
+    "total_seconds": 2167.0946332929993,
+    "min_seconds": 4.0410000110568944e-06,
+    "p50_seconds": 0.7395499169999766,
+    "p95_seconds": 9.703508874999983,
+    "p99_seconds": 14.682666459000004,
+    "max_seconds": 21.81126925000001
+  },
+  "qualification": "The 1 MiB run started with the recorded prelaunch sources. Only hash_gate_inventory.py changed during that run; it is lazily imported by sync_native_receipts, which this fixture does not call. Used fixture/gate/helper/pressure sources and binaries matched prelaunch. During the 64 KiB run, later coinbase guard edits changed source files on disk after the old modules were imported. All 22 executed prelaunch modules are archived and hash-verified under /private/tmp/sharepool-pre-coinbase-guard. Both new throughput captures precede the final coinbase output-budget guard; their final on-disk source hashes must not be presented as a full-tree frozen or final-code measurement.",
+  "limitations": [
+    "New source_service and source RPC totals sum concurrent intervals; do not compare them to serial-source wall time.",
+    "Both large-budget runs scheduled 1,000 shares over 60 seconds; the new run completed 382 native admissions in phase, so 16.67 shares/second was not maintained.",
+    "Driver RSS is a new measurement and includes 100 gates, caches, proof/history data, queue and report objects; the wire queue budget does not bound process RSS.",
+    "Native-winning synthetic shares are not immediately submitted; controlled settlement opportunities remain 20 seconds, not mainnet block timing.",
+    "Admission status performs an additional due-build preflight included in timings.",
+    "One before/after pair, changed workloads during execution and a changed native binary; no confidence interval or isolated speedup attribution."
+  ],
+  "small_budget_overload": {
+    "input": {
+      "path": "/private/tmp/sharepool-v8-throughput-100-small.json",
+      "sha256": "c7a1ac716bffefb31ebc02d36012074b2d09ef48a8906c5e611cb424cc3983c4"
+    },
+    "stage": "Before final coinbase output-budget guard; original loaded Python modules and unchanged native binaries preserved by prelaunch hashes/source archive.",
+    "independent_event_accounting_verified": true,
+    "configuration": {
+      "miners": 100,
+      "duration_seconds": 60,
+      "offer_interval_ms": 60.0,
+      "settlement_seconds": 20,
+      "work_update_seconds": 40,
+      "snapshot_budget_bytes": 65536,
+      "padding_outputs": 0,
+      "max_runtime_seconds": 900,
+      "profile_version": 8,
+      "share_work_bits": [
+        2,
+        4,
+        6
+      ],
+      "target_share_seconds": 6.0,
+      "deduplicate_job_evidence": true,
+      "source_workers": 8
+    },
+    "measured_phase": {
+      "offered": 160,
+      "acknowledged": 122,
+      "admitted": 98,
+      "peer_verified": 98,
+      "rejected": 0,
+      "admission_refused": 21,
+      "seconds": 60,
+      "capacity_refused": 0,
+      "unacknowledged_queue": 17,
+      "acknowledged_backlog": 24,
+      "peer_backlog": 0,
+      "observed_admitted_per_second": 1.6333333333333333,
+      "observed_peer_verified_per_second": 1.6333333333333333,
+      "scheduled_requests_due": 1000,
+      "source_unfulfilled_requests": 840
+    },
+    "completed_run": {
+      "offered": 1000,
+      "acknowledged": 873,
+      "admitted": 873,
+      "peer_verified": 873,
+      "rejected": 0,
+      "admission_refused": 127,
+      "seconds": 596.1963038749999,
+      "capacity_refused": 0,
+      "unacknowledged_queue": 0,
+      "acknowledged_backlog": 0,
+      "peer_backlog": 0,
+      "observed_admitted_per_second": 1.4642828114262103,
+      "observed_peer_verified_per_second": 1.4642828114262103
+    },
+    "live_and_drain_seconds": 596.1963038749999,
+    "capture_including_setup_seconds": 607.641519667,
+    "catchup_and_drain_seconds": 536.1963038749999,
+    "receipt_states": {
+      "confirmed_admitted": 873
+    },
+    "expired_acknowledged": 0,
+    "jobs": 992,
+    "jobs_in_phase": 160,
+    "blocks": 27,
+    "max_snapshot_bytes": 64877,
+    "max_native_block_weight": 43946,
+    "max_payout_recipients": 69,
+    "pressure_decision_modes": {
+      "OPEN": 1019,
+      "DRAIN": 127
+    },
+    "pressure_decision_reasons": {
+      "pending-prefix-does-not-fit": 127,
+      "offered-proof-not-selected": 124
+    },
+    "resources": {
+      "processes": {
+        "node0": {
+          "cpu_seconds": 376.09,
+          "average_cpu_cores": 0.6308554456367877,
+          "max_sampled_rss_bytes": 84180992
+        },
+        "node1": {
+          "cpu_seconds": 12.56,
+          "average_cpu_cores": 0.021068213452094062,
+          "max_sampled_rss_bytes": 77135872
+        },
+        "driver": {
+          "cpu_seconds": 487.89,
+          "average_cpu_cores": 0.8183893838488989,
+          "max_sampled_rss_bytes": 664715264
+        }
+      },
+      "logical_disk_growth_bytes": {
+        "gates": 175832184,
+        "node0": 63488498,
+        "node1": 8452933
+      },
+      "errors": []
+    },
+    "collector_register_and_ack": {
+      "count": 1000,
+      "total_seconds": 540.7100820319988,
+      "min_seconds": 0.020760666999999344,
+      "p50_seconds": 0.38840662499995915,
+      "p95_seconds": 1.6209293329999923,
+      "p99_seconds": 1.7965336660000162,
+      "max_seconds": 1.856845999999905,
+      "failures": 0
+    },
+    "collector_proof_rpc": {
+      "count": 1000,
+      "total_seconds": 91.92872999700127,
+      "min_seconds": 0.0007339999999995683,
+      "p50_seconds": 0.0918473329999756,
+      "p95_seconds": 0.14494954100007362,
+      "p99_seconds": 0.16109979200007274,
+      "max_seconds": 0.2733483750000687,
+      "failures": 0
+    },
+    "collector_template_rpc": {
+      "count": 1019,
+      "total_seconds": 65.1863971729997,
+      "min_seconds": 0.002565917000000084,
+      "p50_seconds": 0.06450416700002393,
+      "p95_seconds": 0.09262504200000876,
+      "p99_seconds": 0.1423623750000047,
+      "max_seconds": 0.3065233750000971,
+      "failures": 0
+    },
+    "collector_rpc_total_seconds": 220.67343268700705,
+    "source_rpc_total_overlapping_seconds": 390.61093355199756,
+    "source_service": {
+      "count": 1000,
+      "total_seconds": 785.5293494530006,
+      "min_seconds": 0.0033947919999945952,
+      "p50_seconds": 0.8125644579999971,
+      "p95_seconds": 1.0365212500000212,
+      "p99_seconds": 1.1897016249999979,
+      "max_seconds": 1.2669674999999643
+    },
+    "source_queue_put_wait": {
+      "count": 1000,
+      "total_seconds": 3703.433574417998,
+      "min_seconds": 5.874999999377906e-06,
+      "p50_seconds": 1.4443192080000244,
+      "p95_seconds": 15.27583525,
+      "p99_seconds": 19.74348816600002,
+      "max_seconds": 33.19887575000001
+    },
+    "queue_high_water_items": 8,
+    "completed_queue_payload": {
+      "origin_bytes": 4664377,
+      "origin_bytes_without_deduplication": 4690981,
+      "proof_bytes": 513000,
+      "logical_payload_bytes": 5245377,
+      "transferred_items": 1000,
+      "full_origin_items": 992,
+      "reference_items": 8,
+      "origin_bytes_avoided": 26604
+    },
+    "native_tip_retries": 0,
+    "archive": "/private/tmp/sharepool-pre-coinbase-guard",
+    "manifest": "/private/tmp/sharepool-v8-throughput-small-prelaunch-manifest.json",
+    "limitations": [
+      "Finite offered workload with a fixed 60-second phase plus bounded catch-up/drain; eventual completion is not sustainable throughput.",
+      "Admission-refused proofs were offered and natively checked but never ACKed; pre-dispatch refusal has no proof and is not delivery.",
+      "Source service, RPC and wait sums overlap across 8 owners and are not CPU or elapsed time.",
+      "Final on-disk source hashes in the run report may reflect coinbase guard edits made after modules were imported; use archived prelaunch source for the executed version."
+    ]
+  },
+  "small_versus_large_budget": {
+    "scope": "Same 100 miners, 8 owners, 60-second planned workload and pre-coinbase-guard runtime; one observed run per budget, different block/queue evolution. Not an isolated estimator of budget-independent capacity.",
+    "snapshot_budget_bytes": {
+      "large": 1048576,
+      "small": 65536
+    },
+    "phase_admitted": {
+      "large": 382,
+      "small": 98
+    },
+    "final_offered": {
+      "large": 1000,
+      "small": 1000
+    },
+    "final_acknowledged_and_confirmed": {
+      "large": 1000,
+      "small": 873
+    },
+    "final_admission_refused_before_ack": {
+      "large": 0,
+      "small": 127
+    },
+    "expired_acknowledged": {
+      "large": 0,
+      "small": 0
+    },
+    "live_and_drain_seconds": {
+      "large": 401.357656292,
+      "small": 596.1963038749999
+    },
+    "collector_register_and_ack_seconds": {
+      "large": 330.3050736690001,
+      "small": 540.7100820319988
+    },
+    "collector_register_and_ack_p95_seconds": {
+      "large": 0.6040771250000034,
+      "small": 1.6209293329999923
+    },
+    "conclusion": "The smaller budget preserved acknowledged work by refusing 127 new proofs before ACK. It reduced delivered work and increased queue/service time; it did not maintain the requested cadence."
+  }
+}

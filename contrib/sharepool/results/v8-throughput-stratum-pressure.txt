@@ -1,0 +1,8 @@
+2026-09-14T20:07:29.889000Z TestFramework (INFO): PRNG seed is: 8648274506784275484
+2026-09-14T20:07:29.890000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-coinbase-guard-pressure-native
+2026-09-14T20:07:30.716000Z TestFramework (INFO): Real native-verified nonwinning shares fill the local next-batch credit budget
+2026-09-14T20:07:30.892000Z TestFramework (INFO): A duplicate is still exact, while a refused winning proof submits its original block
+2026-09-14T20:07:30.896000Z TestFramework (INFO): Only native missing data permits retained recovery; a later credit refusal still writes no receipt
+2026-09-14T20:07:31.032000Z TestFramework (INFO): Stopping nodes
+2026-09-14T20:07:31.214000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-coinbase-guard-pressure-native
+2026-09-14T20:07:31.214000Z TestFramework (INFO): Tests successful

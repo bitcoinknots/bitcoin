@@ -45,6 +45,10 @@ class Gate:
         self.issued.append(block)
         return block
 
+    def prepare_native_authorization(self, *, sign_owner):
+        block, snapshot = self.make_native(sign_owner=sign_owner)
+        return self.authorize(block.serialize(), snapshot.serialize())
+
     def ready_for_continued_work(self, auth):
         if self.fail_context:
             raise self.fail_context

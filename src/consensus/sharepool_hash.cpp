@@ -1602,14 +1602,43 @@ Result MaterializeTidesState(Snapshot& snapshot, const CBlockIndex* previous,
     catch (const std::invalid_argument&) { return Bad("compact-state"); }
 }
 
-Result CalculateTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previous,
-                            uint32_t native_bits, const Consensus::Params& consensus,
-                            const Lookup& lookup, CAmount reward,
-                            std::vector<CTxOut>& payouts, bool reserve_scripts)
+struct TidesPayoutPlan::Impl {
+    using AmountWork = boost::multiprecision::uint1024_t;
+    std::map<std::vector<unsigned char>, AmountWork> weights;
+    AmountWork counted{0};
+    std::vector<unsigned char> bootstrap_script;
+};
+
+TidesPayoutPlan::TidesPayoutPlan() = default;
+TidesPayoutPlan::~TidesPayoutPlan() = default;
+TidesPayoutPlan::TidesPayoutPlan(TidesPayoutPlan&&) noexcept = default;
+TidesPayoutPlan& TidesPayoutPlan::operator=(TidesPayoutPlan&&) noexcept = default;
+
+Result TidesPayoutPlan::Calculate(CAmount reward, std::vector<CTxOut>& payouts, bool reserve_scripts) const
 {
+    if (!m_impl || !MoneyRange(reward)) return Bad("tides-accounting-context");
+    std::vector<CTxOut> result;
+    if (m_impl->weights.empty()) {
+        result.emplace_back(reserve_scripts ? 0 : reward,
+                            CScript{m_impl->bootstrap_script.begin(), m_impl->bootstrap_script.end()});
+    } else {
+        for (const auto& [script, work] : m_impl->weights) {
+            const CAmount amount = (Impl::AmountWork{reward} * work / m_impl->counted).convert_to<CAmount>();
+            if (reserve_scripts || amount > 0) result.emplace_back(reserve_scripts ? 0 : amount, CScript{script.begin(), script.end()});
+        }
+    }
+    payouts = std::move(result);
+    return Result::Valid(reward);
+}
+
+Result PrepareTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previous,
+                          uint32_t native_bits, const Consensus::Params& consensus,
+                          const Lookup& lookup, TidesPayoutPlan& plan)
+{
+    plan.m_impl.reset();
     if (!consensus.SharePoolTides || snapshot.binding.version != ProfileVersion(consensus) || !previous ||
         (snapshot.binding.version != VARIABLE_TIDES_VERSION && snapshot.binding.share_work_bits != 0) ||
-        snapshot.binding.native_parent != previous->GetBlockHash() || !MoneyRange(reward)) return Bad("tides-accounting-context");
+        snapshot.binding.native_parent != previous->GetBlockHash()) return Bad("tides-accounting-context");
     using tides::Work;
     const Work denominator = NumericWork(NativeTarget(native_bits)) + 1;
     const Work requested = Work{8} << 256;
@@ -1719,22 +1748,30 @@ Result CalculateTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previo
         end = begin;
     }
     if (remaining != 0 && !old.complete_to_activation) return Result::Missing({}, "bad-sharepool-hash-tides-history-incomplete");
-    std::vector<CTxOut> result;
+    auto prepared = std::make_unique<TidesPayoutPlan::Impl>();
     if (weights.empty()) {
         // Explicit permissionless new-pool bootstrap. This path is available
         // only after the complete actual-parent pool history is known empty.
         if (!old.complete_to_activation) return Result::Missing({}, "bad-sharepool-hash-tides-history-incomplete");
         if (!IsPayoutScript(snapshot.binding.payout_script)) return Bad("tides-bootstrap-script");
-        result.emplace_back(reserve_scripts ? 0 : reward, CScript{snapshot.binding.payout_script.begin(), snapshot.binding.payout_script.end()});
+        prepared->bootstrap_script = snapshot.binding.payout_script;
     } else {
-        const AmountWork counted = AmountWork{requested - remaining} * common_scale;
-        for (const auto& [script, work] : weights) {
-            const CAmount amount = (AmountWork{reward} * work / counted).convert_to<CAmount>();
-            if (reserve_scripts || amount > 0) result.emplace_back(reserve_scripts ? 0 : amount, CScript{script.begin(), script.end()});
-        }
+        prepared->counted = AmountWork{requested - remaining} * common_scale;
+        prepared->weights = std::move(weights);
     }
-    payouts = std::move(result);
-    return Result::Valid(reward);
+    plan.m_impl = std::move(prepared);
+    return Result::Valid();
+}
+
+Result CalculateTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previous,
+                            uint32_t native_bits, const Consensus::Params& consensus,
+                            const Lookup& lookup, CAmount reward,
+                            std::vector<CTxOut>& payouts, bool reserve_scripts)
+{
+    if (!MoneyRange(reward)) return Bad("tides-accounting-context");
+    TidesPayoutPlan plan;
+    const auto prepared = PrepareTidesPayouts(snapshot, previous, native_bits, consensus, lookup, plan);
+    return prepared.IsValid() ? plan.Calculate(reward, payouts, reserve_scripts) : prepared;
 }
 
 std::vector<CTxOut> CalculatePayouts(const Snapshot& snapshot, CAmount reward)

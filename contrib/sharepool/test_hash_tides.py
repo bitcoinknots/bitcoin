@@ -50,7 +50,8 @@ class TidesRPC(FakeRPC):
         if method == "getsharepoolhashtidesbudget":
             self.calls.append((method, args))
             return {"native_tip": self.tip, "native_bits": 0x207fffff, "pool": args[0],
-                    "payout_script": args[1], "output_count": 1, "output_bytes": 9 + len(bytes.fromhex(args[1]))}
+                    "payout_script": args[1], "output_count": 1, "output_bytes": 9 + len(bytes.fromhex(args[1])),
+                    "max_output_bytes": 999612}
         if method == "preparesharepoolhashjob":
             self.calls.append((method, args))
             proposal = Snapshot.deserialize(bytes.fromhex(args[0]))
@@ -68,6 +69,10 @@ class TidesRPC(FakeRPC):
             return self.response(block, opening)
         if method == "finalizesharepoolhashjob":
             self.calls.append((method, args))
+            # The actual finalizer performs the same full signed-overlay payout
+            # validation as the standalone template endpoint.
+            if self.reject_built_template:
+                raise ValueError("native TIDES payout validation refused")
             block, opening = parse_block(bytes.fromhex(args[0])), Snapshot.deserialize(bytes.fromhex(args[1]))
             block.m_mm_rhs = opening.hash
             block.rehash()
@@ -206,7 +211,7 @@ class TidesGateTests(unittest.TestCase):
              patch("hash_mining_gate.credit_outputs", side_effect=AssertionError("v5 payout fallback")):
             block, opening = self.gate.make_native(sign_owner=signer)
         self.assertEqual([output.nValue for output in opening.payouts], [40, 60])
-        self.assertTrue(any(method == "validatesharepoolhashtemplate" for method, _ in self.rpc.calls))
+        self.assertTrue(any(method == "finalizesharepoolhashjob" for method, _ in self.rpc.calls))
         self.assertTrue(verify_schnorr(opening.envelope.public_key, opening.owner_signature, opening.owner_message))
         authorization = self.gate.authorize(block.serialize(), opening.serialize())
         self.assertTrue(self.gate.ready_for_dispatch(authorization))

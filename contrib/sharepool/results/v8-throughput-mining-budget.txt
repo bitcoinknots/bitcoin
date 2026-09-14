@@ -1,0 +1,7 @@
+2026-09-14T20:07:12.123000Z TestFramework (INFO): PRNG seed is: 795805709560263002
+2026-09-14T20:07:12.123000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-coinbase-guard-budget-native
+2026-09-14T20:07:13.273000Z TestFramework (INFO): Check contextual payout-byte reservation, RDTS=False
+2026-09-14T20:07:13.393000Z TestFramework (INFO): Check contextual payout-byte reservation, RDTS=True
+2026-09-14T20:07:13.588000Z TestFramework (INFO): Stopping nodes
+2026-09-14T20:07:13.770000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-coinbase-guard-budget-native
+2026-09-14T20:07:13.770000Z TestFramework (INFO): Tests successful

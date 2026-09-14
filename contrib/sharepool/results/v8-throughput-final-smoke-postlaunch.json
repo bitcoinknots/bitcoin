@@ -1,0 +1,36 @@
+{
+  "captured_utc": "2026-09-14T20:13:44.445437+00:00",
+  "source_sha256": {
+    "test/functional/feature_sharepool_hash_live_capacity.py": "89697d97b76b6e909826c755f8da433a3e27fbd66e9966e886c43779cadbd8ca",
+    "contrib/sharepool/live_capacity_metrics.py": "dd488426bc6c22f605db5e83e92d9b49bfac7b184b2b7c1e7ce9b0c225cd73b7",
+    "contrib/sharepool/capacity_metrics.py": "4c5d2534c45bdee99f12e653ec46e010f4ab6aba6108914015bc8e08498a25db",
+    "contrib/sharepool/hash_admission_accounting.py": "fc0742fc5058dce6fedb973622a50bf5fd0802416c75ace1c9704259cbbabdeb",
+    "contrib/sharepool/hash_admission_budget.py": "a8595b23b70a2d4aa467da498995c20874b14401faba077ca889279ff7df13e9",
+    "contrib/sharepool/hash_gate_admission.py": "36d4e9130667ac8c6c35f0644c3f8b1754fed0e8263836d132af270454e0d4e2",
+    "contrib/sharepool/hash_gate_archive.py": "60cb4e585c6f33c5f45d47a419c6cf8ccfd5b1781381a60a3ddbb2c48b244bca",
+    "contrib/sharepool/hash_gate_batch.py": "8edfd9ed2748bdcf960cfebfbc424c7bd3564cde9bb644b86fe0380bfe0e4f78",
+    "contrib/sharepool/hash_gate_cache.py": "49408d7b9144198591eeb36a803f6e129aacd121a14d4e5c7547d453f24fb6f5",
+    "contrib/sharepool/hash_gate_inventory.py": "0703914865c75a2ebd18b97c170ddbbc5e3b895053c1540369bd44b7ad4bafe9",
+    "contrib/sharepool/hash_gate_origin_cache.py": "26261d55be2b34ecbc719e588769be1f704f0a1705bad519ae77e5981dab7b90",
+    "contrib/sharepool/hash_gate_rpc.py": "9731a831c263f2d6e8aef6581454e748892a53c52a1f958cc66a3c62dd846c5a",
+    "contrib/sharepool/hash_gate_startup.py": "9ee4e4b994d0c7da288b1a002f3abf93ae1a9a65a15cba704a59009084845bd2",
+    "contrib/sharepool/hash_job_scheduler.py": "8617b86fd3f80574e1bd947dc73e8b4552f56fe17d4dec89a108822a4de78eb6",
+    "contrib/sharepool/hash_mining_gate.py": "9fb23b15acdf5436a5949d5417240c6ebf3159984bab883a597a700809c2be8b",
+    "contrib/sharepool/hash_signature_cache.py": "41c7bb570ad3126b62443c0140e1a4116e9deafed6581e3ebf2ed60ec92f111e",
+    "contrib/sharepool/hash_snapshot.py": "8cc9f1ae092cdd71b955e017181fd566c6015b7d6c6aae38104caa4c4598fa0c",
+    "contrib/sharepool/hash_state_cache.py": "fe452a5dfc3be9b22b77a39b4a4a44a5e430bbd9b4371b7ede65f122a95f32b8",
+    "contrib/sharepool/hash_stratum.py": "c58408b43ba7270f312be19f01a7f43b222f5f2d145581d776f5dc50c9ecf4d3",
+    "contrib/sharepool/hash_stratum_forwarder.py": "a435faed9a3320c5004ffc4960f263781521308fa6acd8a5f9e65e45b03de8d8",
+    "contrib/sharepool/hash_stratum_runner.py": "5e6c64429a51d5d5594666d9104c4f3d93656fb8fd9f8afb58dcaa3667c6483e",
+    "contrib/sharepool/hash_vardiff.py": "a2f855cc5f89748f622b1b59ea4d2435efaba38edbc7d561bb69079622086e3d",
+    "src/sharepool/mining_budget.h": "77e9c28e50e9fb0b2cd24117cfdf97d0069a21f12b457a7106c47a38856eb249",
+    "src/rpc/mining.cpp": "e54b211f6548b1d94171bd670e85ddb87b27848afea8f5faebbff681a03655d3",
+    "src/consensus/sharepool_hash.cpp": "0cfcc68537ff28c003f805501e669299ddfa9487a270ac9236c670d4ce349b4e",
+    "src/consensus/sharepool_hash.h": "7119704ad53fc2cde61ac8b2cdd055bee920a9d429f552560dc9d5cbe75da5b5"
+  },
+  "binary_sha256": {
+    "/private/tmp/sharepool-native-build/bin/bitcoind": "e2e1bf00b31ec06ae173b799337d4a6a75a567ef2e0fd508e26a05d6646ac364",
+    "/private/tmp/sharepool-native-build/bin/bitcoin-cli": "f91a8b6da17996f7166e4474418824b2db947c35ddd90cd7b059ec8f77b91b80",
+    "/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer": "6c0cfaed537b99c687e002b4248c4717419415e6b845d1a5c7ee633855ab60a0"
+  }
+}

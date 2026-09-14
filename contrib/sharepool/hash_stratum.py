@@ -24,6 +24,7 @@ import socketserver
 import threading
 import time
 
+from hash_admission_budget import AdmissionDecision, AdmissionRefused
 from hash_job_scheduler import HashJobScheduler
 from hash_snapshot import MAX_SHARE_AGE, Share, Snapshot, share_target
 from hash_vardiff import VardiffController
@@ -151,8 +152,10 @@ class HashStratumService:
 
     observer_rpc MUST use its own connection and finite network timeouts. It
     must not call the gate or share a non-thread-safe RPC client with gate.rpc.
-    Call service_once() frequently on the gate's owner thread. A True submit
-    response follows gate.receive()'s durable ACK, not native block admission.
+    Call service_once() frequently on the gate's owner thread. Share acceptance
+    follows a durable ACK; exact duplicates remain successful. V8 native-only
+    acceptance has no share credit. Capacity refusals get an explicit error,
+    including when the separately submitted native candidate succeeds.
     Snapshot availability is established via the gate before work is handed off.
     """
     MAX_JOBS = 32
@@ -160,6 +163,7 @@ class HashStratumService:
     MAX_CLIENTS = 4
     MAX_JOB_BYTES = 64 * 1024 * 1024
     MAX_LINE = 4096
+    CAPACITY_RETRY_SECONDS = 1.0
 
     def __init__(self, gate, *, sign_owner, observer_rpc, bind=("127.0.0.1", 0),
                  work_update_seconds=40, observe_seconds=0.25,
@@ -179,10 +183,12 @@ class HashStratumService:
         self.stop = threading.Event()
         self.requests = queue.Queue(maxsize=16)
         self.jobs, self.current = OrderedDict(), None
-        self.stats = {"published": 0, "acknowledged": 0, "duplicate": 0, "rejected": 0,
+        self.stats = {"published": 0, "acknowledged": 0, "duplicate": 0, "rejected": 0, "capacity_refused": 0,
                       "submitted_candidates": 0, "accepted_candidates": 0,
                       "candidate_rpc_failures": 0, "candidate_rejections": 0}
         self._closed = self._servicing = False
+        self.last_admission_decision = None
+        self._capacity_retry_at = self._capacity_retry_generation = None
         self._server = self._server_thread = self._observer_thread = None
         self.bind = bind
         self.scheduler = HashJobScheduler(gate, sign_owner=sign_owner,
@@ -273,6 +279,7 @@ class HashStratumService:
         return request.result
 
     def _submit(self, prefix, params):
+        self._owner()
         if (type(params) is not list or len(params) != 5 or params[0] != "sharepool.regtest" or
                 any(type(item) is not str or len(item) > 256 for item in params)):
             raise ValueError("invalid authorized submission")
@@ -286,8 +293,7 @@ class HashStratumService:
         if work.authorization.block_for_header(proof.header) != proof.block:
             raise ValueError("proof changes its immutable authorized block")
         share = Share(proof.header, work.snapshot.envelope, work.snapshot.owner_signature)
-        accepted = self.gate.receive(share)
-        self.stats["acknowledged" if accepted else "duplicate"] += 1
+        unused_accepted, refused = self._receive_share(share)
         # The exact old candidate is not rewritten. Native submitblock decides
         # validity/branch placement, including a candidate on an older parent.
         # A later block RPC failure cannot revoke an already durable ACK.
@@ -300,10 +306,31 @@ class HashStratumService:
                 else:
                     self.stats["candidate_rejections"] += 1
             except Exception:
-                # gate.receive retained the proof and exact origin for explicit
-                # retry/recovery; this counter is not a claim of best-chain work.
+                # This is not a claim of best-chain work or durable credit.
+                # A refused share remains unacknowledged even if its separate
+                # native candidate submission must be retried by the miner.
                 self.stats["candidate_rpc_failures"] += 1
+        if refused is not None:
+            raise refused
         return True
+
+    def _receive_share(self, share):
+        try:
+            accepted = self.gate.receive(share)
+        except AdmissionRefused as error:
+            self.stats["capacity_refused"] += 1
+            self.last_admission_decision = error.decision
+            return False, error
+        self.stats["acknowledged" if accepted else "duplicate"] += 1
+        return accepted, None
+
+    def _submit_response(self, identifier, prefix, params):
+        """Existing Stratum error response; capacity pressure keeps the socket usable."""
+        try:
+            result = self._enqueue("submit", (prefix, params))
+        except AdmissionRefused:
+            return {"id": identifier, "result": False, "error": [20, "local-admission-capacity", None]}
+        return {"id": identifier, "result": result, "error": None}
 
     def service_once(self, *, max_requests=4):
         self._owner()
@@ -333,6 +360,13 @@ class HashStratumService:
                         # Native generation is checked again at the actual send.
                     else:
                         request.result = self._submit(*request.payload)
+                except AdmissionRefused as error:
+                    request.error = error
+                    # Submit refusals are counted where gate.receive fails.
+                    # They are local pressure, never invalid client work.
+                    if request.kind != "submit":
+                        self.stats["capacity_refused"] += 1
+                        self.last_admission_decision = error.decision
                 except Exception as error:
                     request.error = error
                     self.stats["rejected"] += 1
@@ -343,7 +377,35 @@ class HashStratumService:
                     request.done.set()
             if not self.latch.check():
                 return None
-            return self.scheduler.poll()
+            # Continue servicing issued submissions above while construction
+            # is locally blocked. Frequent owner polls must not repeat history
+            # or status RPCs until the short retry delay, unless a fresh native
+            # generation requires an immediate new assessment.
+            if self._capacity_retry_at is not None:
+                with self.latch.lock:
+                    generation = self.latch.generation
+                if (generation == self._capacity_retry_generation and
+                        self.scheduler._now() < self._capacity_retry_at):
+                    return None
+                self._capacity_retry_at = self._capacity_retry_generation = None
+            try:
+                return self.scheduler.poll()
+            except AdmissionRefused as error:
+                # The scheduler already retired advertised work. Capacity is
+                # retriable local pressure, not an invalid proof or fatal daemon
+                # error. All other construction failures retain their path.
+                self.stats["capacity_refused"] += 1
+                self.last_admission_decision = error.decision
+                if self.PROFILE_VERSION == 8:
+                    self.controller.set_admission_paused(True)
+                now = self.scheduler._now()
+                deadline = now + self.CAPACITY_RETRY_SECONDS
+                if not math.isfinite(deadline) or deadline <= now:
+                    raise ValueError("capacity retry clock cannot represent its deadline") from error
+                self._capacity_retry_at = deadline
+                with self.latch.lock:
+                    self._capacity_retry_generation = self.latch.generation
+                return None
         finally:
             self._servicing = False
 
@@ -416,7 +478,8 @@ class HashStratumService:
                             elif method == "mining.submit":
                                 if not subscribed or not authorized:
                                     raise ValueError("unauthorized submission")
-                                result = service._enqueue("submit", (prefix, params))
+                                send(service._submit_response(req.get("id"), prefix, params))
+                                continue
                             elif method not in ("mining.extranonce.subscribe", "mining.suggest_difficulty"):
                                 raise ValueError("unsupported regtest method")
                             send({"id": req.get("id"), "result": result, "error": None})
@@ -507,6 +570,20 @@ class VardiffStratumService(HashStratumService):
 
     def _before_vardiff_build(self):
         self._owner()
+        # Status can require a bounded history/prefix walk. Query only at due
+        # construction, never on the transport's frequent service polls.
+        try:
+            decision = self.gate.admission_status()
+        except AdmissionRefused as error:
+            # A non-dispatchable prefix has the same estimator pressure as a
+            # fitting drain job. Preserve the refusal so no job is published.
+            self.last_admission_decision = error.decision
+            self.controller.set_admission_paused(True)
+            raise
+        if type(decision) is not AdmissionDecision or decision.mode not in ("OPEN", "DRAIN"):
+            raise ValueError("vardiff requires an exact local admission decision")
+        self.last_admission_decision = decision
+        self.controller.set_admission_paused(decision.mode == "DRAIN")
         self.gate.set_share_work_bits(self.controller.next_assignment())
 
     @staticmethod
@@ -545,16 +622,10 @@ class VardiffStratumService(HashStratumService):
         if work.authorization.block_for_header(proof.header) != proof.block:
             raise ValueError("proof changes its immutable authorized block")
         is_share = proof.hash_int <= assigned
+        accepted, refused = False, None
         if is_share:
             share = Share(proof.header, work.snapshot.envelope, work.snapshot.owner_signature)
-            accepted = self.gate.receive(share)
-            self.stats["acknowledged" if accepted else "duplicate"] += 1
-            if accepted:
-                try:
-                    self.controller.observe(share.envelope.share_work_bits)
-                except BaseException:
-                    self.withdraw()
-                    raise
+            accepted, refused = self._receive_share(share)
         else:
             self.stats["native_only_candidates"] += 1
         if proof.hash_int <= native:
@@ -572,4 +643,19 @@ class VardiffStratumService(HashStratumService):
                     self.stats["candidate_rejections"] += 1
                     if not is_share:
                         raise ValueError("native-only candidate was not accepted")
+        # Native winners are submitted before local estimator updates. Local
+        # capacity policy (or an estimator failure) must not hold back a block.
+        try:
+            if refused is not None:
+                self.controller.set_admission_paused(True)
+            elif accepted:
+                # A new durable ACK passed the offered-work admission check;
+                # resume with a fresh window and its original signed weight.
+                self.controller.set_admission_paused(False)
+                self.controller.observe(share.envelope.share_work_bits)
+        except BaseException:
+            self.withdraw()
+            raise
+        if refused is not None:
+            raise refused
         return True

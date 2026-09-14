@@ -4,8 +4,8 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Finite continuously offered native work with live mempool/jobs and settlement.
 
-A source thread owns its miner gates and a separate RPC connection. The collector
-owns its gate on the test thread. Offers follow one fixed monotonic schedule,
+A bounded number of source threads own disjoint miner gates and RPC connections.
+The collector owns its gate on the test thread. Offers follow one fixed schedule,
 including during settlement; fixed-phase results exclude all later catch-up and
 drain. This is two loopback native nodes, not a WAN or ASIC saturation claim.
 """
@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from fractions import Fraction
 import hashlib
 import math
+import os
 from pathlib import Path
 import queue
 import sys
@@ -22,9 +23,10 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'contrib' / 'sharepool'))
 from capacity_metrics import Measurements, ResourceSampler, distribution
+from hash_admission_budget import AdmissionDecision, AdmissionRefused
 from hash_mining_gate import HashMiningGate
 from hash_snapshot import HashSigner, MAX_SHARE_AGE, Snapshot, TemplateRecord, solve_share
-from live_capacity_metrics import phase_counts
+from live_capacity_metrics import merge_measurements, owner_slots, phase_counts
 from native_mining_gate import parse_block
 from feature_sharepool_hash_capacity import SharePoolHashCapacityTest
 from feature_sharepool_hash_tides_100_miners import SharePoolHashTides100MinersTest
@@ -90,6 +92,8 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
     def add_options(self, parser):
         super().add_options(parser)
         parser.add_argument('--miners', type=int, default=100)
+        parser.add_argument('--source-workers', type=int, default=1,
+            help='1..miners fixed owner threads; default1 preserves the serial baseline')
         parser.add_argument('--profile-version', type=int, choices=(7, 8), default=7)
         parser.add_argument('--share-work-bits', type=self.parse_assignments,
             help='v8 only: explicit cycling per-miner assigned exponents, e.g. 2,4,6; bounded to 0..12')
@@ -172,32 +176,75 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
         if time.monotonic() - self.started > self.options.max_runtime_seconds:
             raise AssertionError('finite live workload runtime exceeded')
 
-    def event(self, stage, proofs):
+    def event(self, stage, proofs, *, slot=None):
         with self.lock:
-            self.events.append({'stage': stage, 'seconds': time.monotonic() - self.phase_start,
-                                'proof_ids': [f'{proof.proof_id:064x}' for proof in proofs]})
+            row = {'stage': stage, 'seconds': time.monotonic() - self.phase_start,
+                   'proof_ids': [f'{proof.proof_id:064x}' for proof in proofs]}
+            if slot is not None:
+                row['slot'] = slot
+            self.events.append(row)
 
-    def produce(self, signers, unspent, redeem, script):
-        gates = []
+    def capacity_refused(self, slot, index, signer, reason):
+        """A terminal pre-dispatch refusal consumes no offered proof or ACK."""
+        with self.lock:
+            self.events.append({'stage': 'capacity_refused',
+                'seconds': time.monotonic() - self.phase_start, 'slot': slot,
+                'miner': index, 'identity': signer.public_key.hex(), 'reason': str(reason)[:160]})
+
+    def pressure_decision(self, decision, *, stage, worker=None, miner=None, slot=None):
+        if type(decision) is not AdmissionDecision or decision.mode not in ('OPEN','DRAIN'):
+            raise ValueError('fixture requires an exact admission decision')
+        with self.lock:
+            self.pressure_decisions.append({'seconds': time.monotonic()-self.phase_start,
+                'stage': stage, 'worker': worker, 'miner': miner, 'slot': slot,
+                'mode': decision.mode, 'dispatch_allowed': decision.dispatch_allowed,
+                'ack_allowed': decision.ack_allowed, 'reasons': decision.reasons,
+                'resource_failures': decision.resource_failures,
+                'eligible_count': decision.eligible_count, 'selected_count': decision.selected_count,
+                'native_height': decision.native_height, 'receipt_revision': decision.receipt_revision})
+
+    def prepare(self, gate, signer, *, stage, worker=None, miner=None, slot=None):
+        if self.PROFILE_VERSION == 8:
+            try:
+                decision = gate.admission_status()
+            except AdmissionRefused as error:
+                self.pressure_decision(error.decision,stage=stage,worker=worker,miner=miner,slot=slot)
+                raise
+            self.pressure_decision(decision,stage=stage,worker=worker,miner=miner,slot=slot)
+            # DRAIN can still dispatch the retained prefix. Refusing fresh ACKs
+            # must never suppress a valid settlement of already promised work.
+            if not decision.dispatch_allowed:
+                raise AdmissionRefused(decision)
+        return gate.prepare_native_authorization(sign_owner=signer.sign_owner)
+
+    def produce(self, worker, signers, unspent, redeem, script):
+        gates = {}
         node = self.nodes[0]
-        proxy = get_rpc_proxy(rpc_url(node.datadir_path, node.index, node.chain, node.rpchost), 0, timeout=60)
+        metrics = self.source_metrics[worker]
+        stats = self.worker_stats[worker]
+        stats['thread_ident'] = threading.get_ident()
         tag = [b'initial']
         def rpc(method, *args):
-            result = self.source_metrics.call('rpc.' + method, getattr(proxy, method), *args)
+            assert_equal(threading.get_ident(), stats['thread_ident'])
+            result = metrics.call('rpc.' + method, getattr(proxy, method), *args)
             return (SharePoolHashCapacityTest.tag_unsigned_job(result, tag[0])
                     if method == 'preparesharepoolhashjob' else result)
         try:
+            proxy = get_rpc_proxy(rpc_url(node.datadir_path, node.index, node.chain, node.rpchost), worker, timeout=60)
             for index, signer in enumerate(signers):
-                gates.append(self.open(f'live-miner-{index:03}', signer, rpc))
-            self.ready.set()
+                if index % self.options.source_workers == worker:
+                    gates[index] = self.open(f'live-miner-{index:03}', signer, rpc)
+            stats['miner_indices'] = sorted(gates)
+            self.source_ready[worker].set()
             self.begin.wait()
             active, nonces, refreshed, origin_keys, sent = {}, {}, {}, {}, {}
-            for slot in range(self.planned):
+            for slot in owner_slots(miners=len(signers), planned=self.planned,
+                    workers=self.options.source_workers, owner=worker):
                 due = self.phase_start + slot * self.options.offer_interval_ms / 1000
                 if self.stop.wait(max(0, due - time.monotonic())):
                     return
                 self.bounded()
-                index = slot % len(gates)
+                index = slot % len(signers)
                 gate, signer = gates[index], signers[index]
                 started = time.monotonic()
                 need_job = (index not in active or started - refreshed[index] >= self.options.work_update_seconds or
@@ -211,13 +258,16 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                     rpc('sendrawtransaction', tx.serialize().hex())
                     unspent[index] = tx.sha256, 0, tx.vout[0].nValue
                     tag[0] = f'live-{index:03}-{slot:05}'.encode()
+                    refused = False
                     for attempt in range(20):
                         if self.stop.is_set():
                             return
                         parent = rpc('getbestblockhash')
                         try:
-                            block, snapshot = gate.make_native(sign_owner=signer.sign_owner)
-                            authorization = gate.authorize(block.serialize(), snapshot.serialize())
+                            authorization = self.prepare(gate,signer,stage='source_due_build',
+                                worker=worker,miner=index,slot=slot)
+                            block = parse_block(authorization.block_bytes)
+                            snapshot = Snapshot.deserialize(authorization.snapshot_bytes)
                             if not gate.ready_for_dispatch(authorization):
                                 raise ValueError('native context changed before dispatch')
                             gate.register_snapshot(snapshot.serialize())
@@ -226,7 +276,7 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                                                   hashlib.sha256(authorization.snapshot_bytes).digest())
                             refreshed[index] = time.monotonic()
                             with self.lock:
-                                self.jobs.append({'slot': slot, 'miner': index,
+                                self.jobs.append({'slot': slot, 'miner': index, 'worker': worker,
                                     'seconds': refreshed[index] - self.phase_start,
                                     'native_height': block.m_height,
                                     'template_id': f'{TemplateRecord.from_block(block).template_id:064x}',
@@ -237,6 +287,12 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                                     'assigned_work_bits': snapshot.envelope.share_work_bits if self.PROFILE_VERSION == 8 else None,
                                     'native_weight': block.get_weight()})
                             break
+                        except AdmissionRefused as error:
+                            self.capacity_refused(slot,index,signer,error)
+                            with self.lock:
+                                stats['capacity_refused'] = stats.get('capacity_refused',0)+1
+                            refused = True
+                            break
                         except Exception:
                             if rpc('getbestblockhash') == parent:
                                 raise
@@ -244,6 +300,8 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                                 self.tip_retries += 1
                     else:
                         raise AssertionError('native-tip retry budget exhausted')
+                    if refused:
+                        continue
                 authorization = active[index]
                 snapshot = Snapshot.deserialize(authorization.snapshot_bytes)
                 proof = solve_share(parse_block(authorization.block_bytes), snapshot, start_nonce=nonces[index])
@@ -255,10 +313,14 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                 proof_bytes = len(proof.serialize())
                 wire = (origin_bytes if full_origin else 0) + proof_bytes + 68
                 assert wire <= self.ITEM_WIRE_LIMIT, 'fixture queue item exceeds explicit wire budget'
-                self.event('offered', [proof])
+                self.event('offered', [proof], slot=slot)
                 with self.lock:
-                    self.source_lateness.append(max(0, started - due))
-                    self.source_service.append(time.monotonic() - started)
+                    lateness, service = max(0, started - due), time.monotonic() - started
+                    self.source_lateness.append(lateness)
+                    self.source_service.append(service)
+                    stats['lateness'].append(lateness)
+                    stats['service'].append(service)
+                    stats['offered'] += 1
                 queue_started = time.monotonic()
                 while not self.stop.is_set():
                     try:
@@ -269,7 +331,9 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                         with self.lock:
                             self.queue_high_water = max(self.queue_high_water, self.inbox.qsize())
                             self.source_queue_wait.append(time.monotonic() - queue_started)
+                            stats['queue_wait'].append(time.monotonic() - queue_started)
                             self.queue_transfers.append({'seconds': time.monotonic() - self.phase_start,
+                                'slot': slot, 'miner': index, 'worker': worker,
                                 'full_origin': full_origin, 'origin_bytes': origin_bytes if full_origin else 0,
                                 'origin_bytes_without_deduplication': origin_bytes,
                                 'proof_bytes': proof_bytes, 'logical_payload_bytes': wire})
@@ -277,18 +341,31 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                     except queue.Full:
                         self.bounded()
         except BaseException as error:
-            self.source_error = error
-            self.ready.set()
+            with self.lock:
+                if self.source_error is None:
+                    self.source_error = error
+                stats['error_type'] = type(error).__name__
+            self.source_ready[worker].set()
         finally:
-            for gate in gates:
-                gate.close()
-            self.finished.set()
+            for gate in gates.values():
+                try:
+                    gate.close()
+                except BaseException as error:
+                    with self.lock:
+                        if self.source_error is None:
+                            self.source_error = error
+                        stats['error_type'] = type(error).__name__
+            with self.lock:
+                self.source_finished += 1
+                if self.source_finished == self.options.source_workers:
+                    self.finished.set()
 
     def settle(self, gate, signer, history, admitted):
         self.bounded()
         started = time.monotonic()
-        block, snapshot = gate.make_native(sign_owner=signer.sign_owner)
-        authorization = gate.authorize(block.serialize(), snapshot.serialize())
+        authorization = self.prepare(gate,signer,stage='collector_settlement')
+        block = parse_block(authorization.block_bytes)
+        snapshot = Snapshot.deserialize(authorization.snapshot_bytes)
         assert gate.ready_for_dispatch(authorization)
         gate.register_snapshot(snapshot.serialize())
         ids = {proof.proof_id for proof in snapshot.shares}
@@ -322,6 +399,7 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
         self.MINERS = opts.miners
         self.FEE = 1000 + 50 * opts.padding_outputs
         assert 2 <= opts.miners <= 100 and 10 <= opts.duration_seconds <= 600
+        assert 1 <= opts.source_workers <= opts.miners
         opts.offer_interval_ms, opts.target_share_seconds, self.planned = self.schedule(opts.miners,
             opts.duration_seconds, offer_interval_ms=opts.offer_interval_ms,
             target_share_seconds=opts.target_share_seconds, profile=self.PROFILE_VERSION)
@@ -334,30 +412,50 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
         self.directory = Path(opts.tmpdir) / 'live-capacity-gates'
         self.directory.mkdir(mode=0o700)
         self.lock, self.inbox = threading.Lock(), queue.Queue(maxsize=self.QUEUE_ITEMS)
-        self.ready, self.begin, self.stop, self.finished = (threading.Event() for _ in range(4))
+        self.begin, self.stop, self.finished = (threading.Event() for _ in range(3))
+        self.source_ready = [threading.Event() for _ in range(opts.source_workers)]
+        self.source_finished = 0
         self.events, self.jobs, self.source_lateness, self.source_service = [], [], [], []
+        self.pressure_decisions = []
         self.source_queue_wait, self.queue_transfers = [], []
         self.source_error, self.tip_retries, self.queue_high_water = None, 0, 0
-        self.metrics, self.source_metrics, self.phase_start = Measurements(), Measurements(), time.monotonic()
-        self.report = {'schema': 2, 'result': 'running',
+        self.metrics = Measurements()
+        self.source_metrics = [Measurements() for _ in range(opts.source_workers)]
+        self.worker_stats = [{'worker': index, 'offered': 0, 'service': [], 'lateness': [], 'queue_wait': []}
+                             for index in range(opts.source_workers)]
+        self.phase_start = time.monotonic()
+        self.report = {'schema': 3, 'result': 'running',
             'profile': 'hash-only-v8-vardiff-tides' if self.PROFILE_VERSION == 8 else 'hash-only-v7-compact-tides',
             'network': 'isolated native regtest', 'started_utc': datetime.now(timezone.utc).isoformat(),
             'configuration': {name: getattr(opts, name) for name in ('miners','duration_seconds','offer_interval_ms',
                 'settlement_seconds','work_update_seconds','snapshot_budget_bytes','padding_outputs','max_runtime_seconds',
-                'profile_version','share_work_bits','target_share_seconds','deduplicate_job_evidence')},
+                'profile_version','share_work_bits','target_share_seconds','deduplicate_job_evidence','source_workers')},
             'scheduled_share_interval_per_miner_seconds': opts.offer_interval_ms * opts.miners / 1000,
             'scheduled_aggregate_shares_per_second': 1000 / opts.offer_interval_ms,
             'scheduled_requests': self.planned, 'native_nodes': 2, 'physical_miners_used': 0,
             'blocks': [], 'rewards': [], 'command': [sys.executable, *sys.argv],
-            'limitations': ['One source thread serially services logical miners; source scheduling backlog is reported.',
-                'Source offers continue during settlement on separate owner gates and an independent RPC connection.',
+            'source_ownership': {'workers': opts.source_workers,
+                'identity_assignment': 'miner_index modulo source_workers; fixed for the whole run',
+                'one_owner_per_miner': True, 'rpc_connections': opts.source_workers,
+                'max_concurrent_signer_subprocesses': opts.source_workers + 1,
+                'independent_identity_owners': opts.source_workers == opts.miners,
+                'queue_items': self.QUEUE_ITEMS, 'max_pending_producer_items': opts.source_workers,
+                'max_consumer_items': 1, 'max_logical_item_bytes': self.ITEM_WIRE_LIMIT,
+                'max_transit_logical_bytes': (self.QUEUE_ITEMS + opts.source_workers + 1) * self.ITEM_WIRE_LIMIT},
+            'limitations': ['Bounded source owner threads service fixed identity shards; one worker preserves the serial baseline.',
+                'One worker per miner separates gateway scheduling; fewer workers still couple miners within each shard.',
+                'All threads share the Python GIL, one native node and host resources; this is not distributed production capacity.',
+                'Aggregate source/RPC service durations sum overlapping owner intervals, not elapsed time or CPU; driver CPU excludes signer subprocesses.',
+                'Source offers continue during settlement on separate owner gates and RPC connections.',
                 'Finite scheduled phase followed by explicit catch-up/drain; only timestamped phase completions count toward phase rates.',
                 'Two loopback Debug native nodes, easy proofs and controlled block opportunities; no WAN, ASIC or production variance claim.',
-                'Queue has eight items of at most two MiB logical payload, plus one producer and one consumer item; Python object overhead is not bounded by this charge.',
-                'Optional origin deduplication applies only to this single-producer FIFO fixture; logical payload accounting is not measured network traffic.',
+                'Queue has eight items of at most two MiB logical payload, plus one item per source owner and one consumer; Python object and persistent gate overhead are additional.',
+                'Optional origin deduplication uses per-identity ordered messages in this bounded FIFO fixture; logical payload accounting is not measured network traffic.',
                 'Each source gate retains its current job; collector deduplication retains at most one origin key/envelope/signature per logical miner, with full evidence in the durable gate.',
                 'V8 assignments are explicit fixed synthetic work exponents; cadence is an offered workload schedule, not an adaptive-controller or physical-hashrate measurement.']}
-        keys, producer, collector, sampler = [], None, None, None
+        self.report['limitations'].append('Admission pressure refuses only new local promises; existing ACKs remain retained. Native-winning synthetic shares are not auto-submitted in this controlled-block fixture; settlement block submission is independent of ACK pressure.')
+        self.report['limitations'].append('An additional admission_status query precedes due source and settlement preparation for diagnostic pressure reporting; its preflight cost is included. Collector register_and_ack service includes capacity-refused attempts, whose outcomes are counted separately.')
+        keys, producers, collector, sampler = [], [], None, None
         try:
             node, follower = self.nodes
             self.connect_nodes(0,1)
@@ -380,18 +478,23 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                     self.assignments[signers[-1].public_key] = opts.share_work_bits[index % len(opts.share_work_bits)]
             collector = self.open('live-collector',signers[0],lambda method,*args:
                 self.metrics.call('collector.rpc.' + method,getattr(node,method),*args))
-            producer = threading.Thread(target=self.produce, args=(signers,[(funding.sha256,index,value)
-                for index in range(self.MINERS)],redeem,script), name='live-native-source')
-            producer.start()
-            assert self.ready.wait(30), 'source setup timeout'
+            unspent = [(funding.sha256,index,value) for index in range(self.MINERS)]
+            for worker in range(opts.source_workers):
+                producer = threading.Thread(target=self.produce,
+                    args=(worker,signers,unspent,redeem,script), name=f'live-native-source-{worker}')
+                producers.append(producer)
+                producer.start()
+            setup_deadline = time.monotonic() + 30
+            for ready in self.source_ready:
+                assert ready.wait(max(0, setup_deadline - time.monotonic())), 'source setup timeout'
             if self.source_error: raise self.source_error
-            sampler = ResourceSampler({'node0':node.process.pid,'node1':follower.process.pid},
+            sampler = ResourceSampler({'node0':node.process.pid,'node1':follower.process.pid,'driver':os.getpid()},
                                       {'gates':self.directory,'node0':node.datadir_path,'node1':follower.datadir_path})
             sampler.start()
             network_start = [peer.getnettotals() for peer in self.nodes]
             self.phase_start = time.monotonic(); self.begin.set()
             next_block = self.phase_start + opts.settlement_seconds
-            acknowledged, admitted, history, rejected = set(), set(), [], 0
+            acknowledged, admitted, history, rejected, admission_refused = set(), set(), [], 0, 0
             seen_origins = {}
             phase_end = self.phase_start + opts.duration_seconds
             while (time.monotonic() < phase_end or not self.finished.is_set() or
@@ -420,9 +523,14 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                             if raw is not None:
                                 collector.register_snapshot(opening)
                                 collector.register_template(raw)
-                            assert collector.receive(proof)
-                        assert proof.proof_id not in acknowledged
-                        acknowledged.add(proof.proof_id); self.event('acknowledged',[proof])
+                            try:
+                                assert collector.receive(proof)
+                            except AdmissionRefused as error:
+                                self.pressure_decision(error.decision,stage='collector_pre_ack',miner=index)
+                                self.event('admission_refused',[proof]); admission_refused += 1
+                            else:
+                                assert proof.proof_id not in acknowledged
+                                acknowledged.add(proof.proof_id); self.event('acknowledged',[proof])
                 except queue.Empty:
                     pass
                 now = time.monotonic()
@@ -434,11 +542,13 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                     # Do not compress missed block opportunities into artificial
                     # immediate blocks while work is being offered.
                     next_block = time.monotonic() + opts.settlement_seconds
-            producer.join(timeout=5)
-            assert not producer.is_alive()
+            for producer in producers:
+                producer.join(timeout=5)
+                assert not producer.is_alive()
             assert_equal(len(self.jobs),len({row['template_id'] for row in self.jobs}))
             assert_equal(len(self.jobs),len({row['transaction_merkle_root'] for row in self.jobs}))
-            assert_equal(len({row['miner'] for row in self.jobs}),self.MINERS)
+            if not any(event['stage']=='capacity_refused' for event in self.events):
+                assert_equal(len({row['miner'] for row in self.jobs}),self.MINERS)
             assert node.verifychain(4,0) and follower.verifychain(4,0)
             counts, cursor = Counter(),0
             for _ in range(math.ceil(self.MAX_PLANNED / 256)):
@@ -451,18 +561,22 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                 raise AssertionError('bounded receipt pagination did not reach the end')
             assert_equal(counts.get('confirmed_admitted',0),len(acknowledged))
             assert_equal(counts.get('expired_unanchored',0),0)
+            assert_equal(sum(counts.values()),len(acknowledged))
             with self.lock:
                 complete = phase_counts(self.events, seconds=time.monotonic() - self.phase_start)
                 transfers = self.queue_accounting(self.queue_transfers, seconds=time.monotonic() - self.phase_start)
-            assert_equal(complete['offered'], self.planned)
-            assert_equal(complete['acknowledged'] + complete['rejected'], self.planned)
+            assert_equal(complete['offered'] + complete['capacity_refused'], self.planned)
+            assert_equal({event['slot'] for event in self.events if event['stage'] in ('offered','capacity_refused')},set(range(self.planned)))
+            assert_equal(complete['acknowledged'] + complete['rejected'] + complete['admission_refused'], complete['offered'])
+            assert_equal(complete['admission_refused'],admission_refused)
             assert_equal(complete['admitted'], len(acknowledged))
             assert_equal(complete['peer_verified'], len(acknowledged))
-            assert_equal(transfers['transferred_items'], self.planned)
-            assert_equal(transfers['full_origin_items'], len(self.jobs) if opts.deduplicate_job_evidence else self.planned)
+            assert_equal(transfers['transferred_items'], complete['offered'])
+            assert_equal(transfers['full_origin_items'], len(self.jobs) if opts.deduplicate_job_evidence else complete['offered'])
             assert len(seen_origins) <= self.MINERS
             self.report.update(result='passed',receipt_states=dict(counts),expired_acknowledged=0,
-                               rejected_before_ack=rejected,payout_oracle_verified=True,peer_verified=True)
+                               rejected_before_ack=rejected,admission_refused=admission_refused,
+                               payout_oracle_verified=bool(self.report['blocks']),peer_verified=bool(self.report['blocks']))
             self.report['native_p2p_bytes'] = [{key:peer.getnettotals()[key]-start[key]
                 for key in ('totalbytessent','totalbytesrecv')} for peer,start in zip(self.nodes,network_start)]
         except BaseException as error:
@@ -470,16 +584,19 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
             raise
         finally:
             self.stop.set(); self.begin.set()
-            if producer is not None:producer.join(timeout=65)
-            if producer is not None and producer.is_alive():
+            cleanup_deadline = time.monotonic() + 60
+            for producer in producers:
+                producer.join(timeout=max(0,cleanup_deadline-time.monotonic()))
+            sources_stopped = all(not producer.is_alive() for producer in producers)
+            if not sources_stopped:
                 self.report['cleanup_error'] = 'source RPC exceeded cleanup deadline'
             if sampler is not None:self.report['resources'] = sampler.finish()
             if collector is not None:collector.close()
-            if producer is None or not producer.is_alive():
+            if sources_stopped:
                 for path in keys:path.unlink(missing_ok=True)
             elapsed = max(.000001,time.monotonic()-self.phase_start)
             with self.lock:
-                self.report.update(events=list(self.events),jobs=list(self.jobs),
+                self.report.update(events=list(self.events),jobs=list(self.jobs),pressure_decisions=list(self.pressure_decisions),
                     measured_phase=phase_counts(self.events,seconds=opts.duration_seconds),
                     completed_run=phase_counts(self.events,seconds=max(elapsed,opts.duration_seconds)),
                     source_scheduling_lateness=distribution(self.source_lateness),
@@ -490,10 +607,18 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                     completed_queue_payload=self.queue_accounting(self.queue_transfers, seconds=elapsed),
                     queue_high_water_items=self.queue_high_water)
             self.report['measured_phase']['scheduled_requests_due'] = self.planned
-            self.report['measured_phase']['source_unfulfilled_requests'] = self.planned - self.report['measured_phase']['offered']
+            self.report['measured_phase']['source_unfulfilled_requests'] = (self.planned -
+                self.report['measured_phase']['offered'] - self.report['measured_phase']['capacity_refused'])
+            self.report['source_workers'] = [dict(worker=row['worker'],
+                miner_indices=list(row.get('miner_indices', ())), owner_thread=row.get('thread_ident'),
+                offered=row['offered'], source_service=distribution(row['service']),
+                capacity_refused=row.get('capacity_refused',0),
+                source_scheduling_lateness=distribution(row['lateness']),
+                queue_put_wait=distribution(row['queue_wait']), error_type=row.get('error_type'),
+                rpc_measurements=metrics.report()) for row,metrics in zip(self.worker_stats,self.source_metrics)] if sources_stopped else None
             self.report.update(seconds=time.monotonic()-self.started,live_and_drain_seconds=elapsed,
                 catchup_and_drain_seconds=max(0,elapsed-opts.duration_seconds),measurements=self.metrics.report(),
-                source_rpc_measurements=self.source_metrics.report() if producer is None or not producer.is_alive() else None,
+                source_rpc_measurements=merge_measurements(self.source_metrics) if sources_stopped else None,
                 source_sha256={str(path.relative_to(Path(__file__).resolve().parents[2])):hashlib.sha256(path.read_bytes()).hexdigest()
                     for path in [Path(__file__).resolve(),*sorted((Path(__file__).resolve().parents[2]/'contrib/sharepool').glob('hash_*.py')),
                                  Path(__file__).resolve().parents[2]/'contrib/sharepool/live_capacity_metrics.py']},

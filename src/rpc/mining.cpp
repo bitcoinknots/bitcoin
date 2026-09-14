@@ -40,6 +40,7 @@
 #include <script/signingprovider.h>
 #include <sharepool/relay.h>
 #include <sharepool/hash_store.h>
+#include <sharepool/hash_validation_cache.h>
 #include <sharepool/mining_budget.h>
 #include <sharepool/retry_worker.h>
 #include <sharepool/tides_history_store.h>
@@ -1627,6 +1628,22 @@ static sharepool::hashonly::Snapshot ParseHashSnapshot(const UniValue& value)
     catch (const std::exception&) { throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Noncanonical or malformed snapshot"); }
 }
 
+static std::shared_ptr<const sharepool::hashonly::Snapshot> LookupHashJobSnapshot(
+    sharepool::HashSnapshotStore& store, sharepool::DecodedSnapshotCache& cache,
+    const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+{
+    if (auto cached = cache.Get(hash)) return cached;
+    const auto raw = store.GetShared(hash);
+    if (!raw) return {};
+    std::shared_ptr<const sharepool::hashonly::Snapshot> snapshot;
+    try { snapshot = std::make_shared<const sharepool::hashonly::Snapshot>(sharepool::hashonly::DecodeSnapshot(*raw)); }
+    catch (const std::ios_base::failure&) { throw sharepool::hashonly::MalformedSnapshot("hash-verified snapshot encoding is invalid"); }
+    // This RPC alone owns the decoded reuse. A denied retention reservation
+    // cannot hide available evidence; a later RPC starts from the store again.
+    cache.Put(hash, snapshot, raw->size());
+    return snapshot;
+}
+
 static UniValue HashJobResult(const CBlock& block, const sharepool::hashonly::Snapshot& snapshot, CAmount reward)
 {
     DataStream encoded;
@@ -1768,6 +1785,7 @@ static RPCHelpMan getsharepoolhashtidesbudget()
         "Reserve snapshot payout space from the current native TIDES history, including zero-rounded recipients.\n"
         "Returns the empty-candidate history or bootstrap payout size. Add selected current-pool recipients\n"
         "for a conservative upper bound; new work can only shorten the historical window.\n"
+        "The maximum output-byte budget uses the block builder's current contextual size and weight reservation.\n"
         "Uses bounded native history queries. This is local construction metadata, not proof validation or authorization.\n",
         {{"pool", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Nonzero pool ID"},
          {"payout_script", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "Bootstrap payout script"}},
@@ -1778,6 +1796,7 @@ static RPCHelpMan getsharepoolhashtidesbudget()
             {RPCResult::Type::STR_HEX, "payout_script", "Requested bootstrap script"},
             {RPCResult::Type::NUM, "output_count", "Historical or bootstrap output slots, including zero-rounded recipients"},
             {RPCResult::Type::NUM, "output_bytes", "Sum of serialized output sizes, excluding the vector count prefix"},
+            {RPCResult::Type::NUM, "max_output_bytes", "Maximum serialized payout-output bytes allowed by the current native block builder, excluding the vector count prefix"},
         }}, RPCExamples{HelpExampleCli("getsharepoolhashtidesbudget", "\"pool_id\" \"script_hex\"")},
         [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
             namespace ho = sharepool::hashonly;
@@ -1817,6 +1836,8 @@ static RPCHelpMan getsharepoolhashtidesbudget()
             result.pushKV("payout_script", HexStr(script));
             result.pushKV("output_count", payouts.size());
             result.pushKV("output_bytes", bytes);
+            result.pushKV("max_output_bytes", sharepool::MaxCoinbasePayoutBytes(
+                consensus.RdtsActiveAt(tip->nHeight + 1, tip->GetMedianTimePast())));
             return result;
         }};
 }
@@ -1845,6 +1866,9 @@ static RPCHelpMan preparesharepoolhashjob()
             CBlock block;
             CAmount reward{0};
             {
+                // Declared before the lock so optional retained bodies are
+                // destroyed after unlocking and before full job validation.
+                sharepool::DecodedSnapshotCache history_snapshots{ho::MAX_DEPENDENCY_BYTES, 1024, chainman.m_sharepool_decoded_retention};
                 LOCK(cs_main);
                 auto& store = RequireHashSnapshotStore(chainman);
                 const auto* tip = chainman.ActiveChain().Tip();
@@ -1855,15 +1879,17 @@ static RPCHelpMan preparesharepoolhashjob()
                     snapshot.binding.rules != ho::RulesHash(ho::ProfileVersion(consensus))) {
                     throw JSONRPCError(RPC_INVALID_PARAMETER, "Proposal must bind the current active tip and rules");
                 }
+                const ho::Lookup lookup = [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
+                    return LookupHashJobSnapshot(store, history_snapshots, hash);
+                };
                 std::shared_ptr<const ho::Snapshot> parent;
-                if (snapshot.binding.height > uint32_t(consensus.SharePoolHeight)) {
-                    try { parent = store.Lookup(tip->m_mm_rhs); }
+                if (!consensus.SharePoolCompactTides && snapshot.binding.height > uint32_t(consensus.SharePoolHeight)) {
+                    try { parent = lookup(tip->m_mm_rhs); }
                     catch (const ho::MalformedSnapshot&) { throw JSONRPCError(RPC_VERIFY_REJECTED, "Malformed native parent settlement"); }
                     if (!parent) throw JSONRPCError(RPC_VERIFY_ERROR, "sharepool-hash-data-missing");
                 }
                 if (consensus.SharePoolCompactTides) {
-                    const auto derived = ho::MaterializeTidesState(snapshot, tip, consensus,
-                        [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.Lookup(hash); });
+                    const auto derived = ho::MaterializeTidesState(snapshot, tip, consensus, lookup);
                     RequireHashValidation(store, derived);
                 } else if (consensus.SharePoolTides) {
                     try { ho::ApplyTidesState(snapshot, parent.get()); }
@@ -1889,10 +1915,10 @@ static RPCHelpMan preparesharepoolhashjob()
                 CBlockHeader planned;
                 node::UpdateTime(&planned, consensus, tip);
                 const auto planned_bits = GetNextWorkRequired(tip, &planned, consensus);
+                ho::TidesPayoutPlan payout_plan;
                 if (consensus.SharePoolTides) {
-                    const auto accounting = ho::CalculateTidesPayouts(snapshot, tip, planned_bits, consensus,
-                        [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.Lookup(hash); }, 0, snapshot.payouts, true);
-                    RequireHashValidation(store, accounting);
+                    RequireHashValidation(store, ho::PrepareTidesPayouts(snapshot, tip, planned_bits, consensus, lookup, payout_plan));
+                    RequireHashValidation(store, payout_plan.Calculate(0, snapshot.payouts, true));
                 } else snapshot.payouts = ho::CalculatePayouts(snapshot, 0);
                 size_t output_bytes{0};
                 for (const auto& output : snapshot.payouts) output_bytes += GetSerializeSize(output);
@@ -1912,9 +1938,10 @@ static RPCHelpMan preparesharepoolhashjob()
                 reward = block.vtx.at(0)->GetValueOut();
                 if (consensus.SharePoolTides) {
                     if (block.nBits != planned_bits) throw JSONRPCError(RPC_VERIFY_ERROR, "Difficulty changed during construction; prepare a new job");
-                    const auto accounting = ho::CalculateTidesPayouts(snapshot, tip, block.nBits, consensus,
-                        [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.Lookup(hash); }, reward, snapshot.payouts);
-                    RequireHashValidation(store, accounting);
+                    // Same proposal, native parent and target under cs_main;
+                    // only fees are now known. Full validation below remains
+                    // independent and rechecks the resulting exact payouts.
+                    RequireHashValidation(store, payout_plan.Calculate(reward, snapshot.payouts));
                 } else snapshot.payouts = ho::CalculatePayouts(snapshot, reward);
                 CMutableTransaction coinbase{*block.vtx.at(0)};
                 coinbase.vout = snapshot.payouts;
@@ -1937,9 +1964,10 @@ static RPCHelpMan preparesharepoolhashjob()
             }
             auto result = HashJobResult(block, snapshot, reward);
             DataStream payload;
-            payload << snapshot.binding << snapshot.job_commitment << ho::SnapshotContentsHash(snapshot);
+            const auto contents = ho::SnapshotContentsHash(snapshot);
+            payload << snapshot.binding << snapshot.job_commitment << contents;
             result.pushKV("signing_payload", HexStr(payload));
-            result.pushKV("signing_hash", ho::OwnerHash(snapshot).GetHex());
+            result.pushKV("signing_hash", ho::OwnerHash(snapshot.binding, snapshot.job_commitment, contents).GetHex());
             return result;
         }};
 }

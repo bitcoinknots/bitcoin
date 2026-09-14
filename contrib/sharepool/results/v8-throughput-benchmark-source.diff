@@ -1,0 +1,1755 @@
+--- /dev/null
++++ b/contrib/sharepool/hash_admission_accounting.py
+@@ -0,0 +1,293 @@
++#!/usr/bin/env python3
++# Copyright (c) 2026 The Bitcoin Core developers
++# Distributed under the MIT software license, see the accompanying
++# file COPYING or http://www.opensource.org/licenses/mit-license.php.
++"""Bounded v8 wire upper bounds with transactional scalar/hash-only deltas.
++
++This is a local resource estimate, not evidence, native validity or a durable
++reservation. The owner rebuilds it on a new tip or unrelated journal revision.
++Fresh canonical provenance is still required for each proof. Preview is pure;
++commit follows the durable ACK. A stale/foreign delta cannot mutate state.
++
++All CompactSize lengths/indexes reserve nine bytes, so inserting a record cannot
++silently enlarge prior indexes. This may underutilize a tight budget: the gate
++can fall back to an exact bounded quote and rebuild after its durable commit.
++Metadata limits cover charged retained Python objects, not RSS or temporary
++canonical captures supplied by the caller. No snapshot, template, transaction,
++script, envelope, signature or native verdict is retained by this accountant.
++"""
++from dataclasses import dataclass
++import hashlib
++
++from hash_admission_budget import AdmissionResources, MAX_COUNTER
++from hash_gate_cache import _retained_size
++from hash_snapshot import (CompactTemplateRecord, Snapshot, SnapshotEncoding,
++    Share, VARIABLE_TIDES_VERSION, MAX_DEPENDENCY_BYTES, MAX_SNAPSHOT_BYTES,
++    MAX_TEMPLATE_BYTES, compact_size)
++
++
++ENTRY_OVERHEAD = 256
++CATEGORIES = ("transactions", "templates", "jobs", "proofs", "recipients", "origins", "dependencies")
++
++
++class MetadataCapacity(ValueError):
++    """Local accountant capacity; exact fallback may still admit the proof."""
++    local_policy = True
++    consensus_invalid = False
++
++    def __init__(self):
++        super().__init__("local-admission-accounting-capacity")
++
++
++def _integer(name, value, minimum=0, maximum=MAX_COUNTER):
++    if type(value) is not int or not minimum <= value <= maximum:
++        raise ValueError("invalid compact admission accountant " + name)
++
++
++def _capture(value):
++    if type(value) is Snapshot:
++        value = value.capture()
++    if type(value) is not SnapshotEncoding:
++        raise ValueError("canonical captured snapshot required")
++    return value
++
++
++@dataclass(frozen=True)
++class AccountingDelta:
++    resources: AdmissionResources
++    duplicate: bool
++    offered_origin_height: int
++    min_pending_origin_height: object
++    proof_count: int
++    _owner: object
++    _generation: int
++    _additions: tuple
++    _totals: tuple
++    _metadata_bytes: int
++    _metadata_entries: int
++
++
++class _Preview:
++    def __init__(self, owner):
++        self.owner = owner
++        self.added = {name: {} for name in CATEGORIES}
++        self.totals = dict(owner._totals)
++        self.bytes, self.entries = owner._metadata_bytes, owner._metadata_entries
++
++    def known(self, category, key):
++        return self.added[category].get(key, self.owner._maps[category].get(key))
++
++    def add(self, category, key, value):
++        previous = self.known(category, key)
++        if previous is not None:
++            if previous != value:
++                raise ValueError("conflicting compact admission " + category + " identity")
++            return False
++        charge = ENTRY_OVERHEAD + _retained_size(key, value)
++        if self.entries + 1 > self.owner.max_entries or self.bytes + charge > self.owner.max_metadata_bytes:
++            raise MetadataCapacity()
++        self.added[category][key] = value
++        self.entries += 1
++        self.bytes += charge
++        return True
++
++    def record(self, record, *, root):
++        if type(record) is not CompactTemplateRecord:
++            raise ValueError("immutable compact template record required")
++        if not 1 <= record.expanded_bytes <= MAX_TEMPLATE_BYTES:
++            raise ValueError("compact template byte bound")
++        digest = hashlib.sha256(record.header_bytes + compact_size(len(record.transactions)))
++        for tx in record.transactions:
++            digest.update(tx.raw)  # Includes complete witness bytes.
++        body = digest.digest()
++        if self.add("origins", body, record.expanded_bytes):
++            self.totals["origins"] += 1
++        self.totals["largest"] = max(self.totals["largest"], record.expanded_bytes)
++        if not root:
++            return
++        value = body, len(record.transactions), record.expanded_bytes
++        if not self.add("templates", record.template_id, value):
++            return
++        self.totals["wire"] += 32 + 164 + 9 + 9 * len(record.transactions)
++        self.totals["expanded"] += record.expanded_bytes
++        self.totals["references"] += len(record.transactions)
++        self.totals["root_templates"] += 1
++        for tx in record.transactions:
++            identity = hashlib.sha256(tx.raw).digest()
++            if self.add("transactions", identity, len(tx.raw)):
++                self.totals["wire"] += 9 + len(tx.raw)
++
++    def dependencies(self, values, *, excluded=None):
++        if type(values) is not tuple or len(values) > self.owner.max_entries:
++            raise MetadataCapacity()
++        supplied_bytes = 0
++        for value in values:
++            value = _capture(value)
++            supplied_bytes += len(value.raw)
++            if supplied_bytes > MAX_DEPENDENCY_BYTES:
++                raise MetadataCapacity()
++            if value.hash == excluded:
++                continue
++            previous = self.known("dependencies", value.hash)
++            if previous is not None:
++                if previous[0] != len(value.raw):
++                    raise ValueError("conflicting dependency snapshot length")
++                continue
++            snapshot = value.snapshot
++            if snapshot.envelope.version != VARIABLE_TIDES_VERSION:
++                raise ValueError("compact admission requires v8 dependencies")
++            facts = len(value.raw), len(snapshot.shares)
++            self.add("dependencies", value.hash, facts)
++            self.totals["dependency_bytes"] += facts[0]
++            self.totals["dependency_shares"] += facts[1]
++            for record in snapshot.templates:
++                self.record(record, root=False)
++
++    def proof(self, proof, record):
++        if type(proof) is not Share or proof.envelope.version != VARIABLE_TIDES_VERSION:
++            raise ValueError("v8 canonical proof required")
++        encoded = proof.serialize()
++        if not 1 <= len(encoded) <= 1024:
++            raise ValueError("compact admission proof byte bound")
++        facts = proof.header_facts
++        if (type(record) is not CompactTemplateRecord or facts.template_id != record.template_id or
++                facts.immutable_header != record.header_bytes or len(facts.search_fields) != 32 or
++                proof.envelope.height != facts.height or proof.envelope.native_parent != facts.native_parent):
++            raise ValueError("proof differs from its compact origin")
++        identity = hashlib.sha256(encoded).digest(), proof.envelope.height
++        if not self.add("proofs", proof.proof_id, identity):
++            return False
++        self.record(record, root=True)
++        envelope = proof.envelope.serialize()
++        descriptor = hashlib.sha256(envelope + proof.owner_signature).digest(), 9 + len(envelope) + 64
++        if self.add("jobs", record.template_id, descriptor):
++            self.totals["wire"] += descriptor[1]
++        self.totals["wire"] += 9 + len(facts.search_fields)
++        self.totals["proofs"] += 1
++        oldest = self.totals["oldest"]
++        self.totals["oldest"] = proof.envelope.height if oldest is None else min(oldest, proof.envelope.height)
++        if proof.envelope.pool == self.owner._pool:
++            script = proof.envelope.payout_script
++            output_upper = 8 + 9 + len(script)
++            if self.add("recipients", hashlib.sha256(script).digest(), output_upper):
++                self.totals["recipient_count"] += 1
++                self.totals["recipient_bytes"] += output_upper
++        return True
++
++    def resources(self):
++        t = self.totals
++        wire = t["wire"] + t["recipient_bytes"]
++        return AdmissionResources(snapshot_bytes=wire,
++            dependency_bytes=wire + t["dependency_bytes"], proofs=t["proofs"],
++            dependency_shares=t["proofs"] + t["dependency_shares"], origins=t["origins"] + 1,
++            expanded_template_bytes=t["expanded"], template_references=t["references"],
++            largest_template_bytes=t["largest"], dependency_depth=t["depth"] + 1,
++            certificate_bytes=t["certificate_bytes"] + 9 + 100 * t["root_templates"],
++            recipient_count=t["recipient_count"], recipient_bytes=t["recipient_bytes"])
++
++    def delta(self, *, duplicate, offered_height):
++        return AccountingDelta(self.resources(), duplicate, offered_height, self.totals["oldest"],
++            self.totals["proofs"], self.owner._token, self.owner._generation,
++            tuple((category, key, value) for category in CATEGORIES for key, value in self.added[category].items()),
++            tuple(self.totals.items()), self.bytes, self.entries)
++
++
++class CompactAdmissionAccountant:
++    """Owned by one gate; retain only bounded hash identities and scalar facts.
++
++    ``depth`` is the deepest supplied root dependency edge count, excluding the
++    one future mining edge reserved here. ``certificate_bytes`` is the initial
++    known parent certificate reservation; new root origins add 100 bytes each.
++    Historical payout reservation comes from the context-bound native RPC.
++    Only the constructor excludes its proposed root from dependency totals;
++    that old root can become a real origin dependency in a later preview.
++    """
++    def __init__(self, snapshot, *, historical_recipient_count, historical_recipient_bytes,
++                 dependencies=(), depth=0, certificate_bytes=0,
++                 max_metadata_bytes=16 * 1024 * 1024, max_entries=65536):
++        _integer("metadata bytes", max_metadata_bytes, 1024, 256 * 1024 * 1024)
++        _integer("metadata entries", max_entries, 1, 1_000_000)
++        _integer("depth", depth)
++        _integer("certificate bytes", certificate_bytes)
++        _integer("historical recipients", historical_recipient_count, 1, MAX_SNAPSHOT_BYTES // 31)
++        _integer("historical recipient bytes", historical_recipient_bytes, 1, MAX_SNAPSHOT_BYTES)
++        if not 31 * historical_recipient_count <= historical_recipient_bytes <= 43 * historical_recipient_count:
++            raise ValueError("invalid native historical recipient reservation")
++        captured = _capture(snapshot)
++        snapshot = captured.snapshot
++        if snapshot.envelope.version != VARIABLE_TIDES_VERSION:
++            raise ValueError("compact admission accounting requires v8")
++        self.max_metadata_bytes, self.max_entries = max_metadata_bytes, max_entries
++        self._pool = snapshot.envelope.pool
++        self._token, self._generation = object(), 0
++        self._maps = {name: {} for name in CATEGORIES}
++        self._metadata_bytes = self._metadata_entries = 0
++        self._totals = dict(wire=len(snapshot.envelope.serialize()) + 64 + 32 + 5 * 9 + 32,
++            recipient_count=historical_recipient_count, recipient_bytes=historical_recipient_bytes,
++            dependency_bytes=0, dependency_shares=0, proofs=0, origins=0,
++            expanded=0, references=0, root_templates=0, largest=0, depth=depth,
++            certificate_bytes=certificate_bytes, oldest=None)
++        pending = _Preview(self)
++        pending.dependencies(dependencies, excluded=captured.hash)
++        records = {record.template_id: record for record in snapshot.templates}
++        for record in snapshot.templates:
++            pending.record(record, root=True)
++        for proof in snapshot.shares:
++            pending.proof(proof, records[proof.header_facts.template_id])
++        self.commit(pending.delta(duplicate=False, offered_height=snapshot.envelope.height))
++
++    @property
++    def resources(self):
++        return _Preview(self).resources()
++
++    @property
++    def min_pending_origin_height(self):
++        return self._totals["oldest"]
++
++    @property
++    def proof_count(self):
++        return self._totals["proofs"]
++
++    @property
++    def pending_proof_ids(self):
++        return frozenset(self._maps["proofs"])
++
++    def contains_proof(self, identity):
++        _integer("proof identity", identity, maximum=(1 << 256) - 1)
++        return identity in self._maps["proofs"]
++
++    def preview_delta(self, proof, record, *, dependencies=(), depth=0):
++        _integer("depth", depth)
++        pending = _Preview(self)
++        fresh = pending.proof(proof, record)
++        if fresh:
++            pending.dependencies(dependencies)
++            pending.totals["depth"] = max(pending.totals["depth"], depth)
++        return pending.delta(duplicate=not fresh, offered_height=proof.envelope.height)
++
++    def commit(self, delta):
++        """Apply one preview after its durable ACK; never call on a refusal.
++
++        Foreign/stale deltas fail before mutation. If an exceptional allocation
++        failure occurs during commit, discard the accountant and rebuild from
++        the journal; the already durable receipt remains acknowledged.
++        """
++        if (type(delta) is not AccountingDelta or delta._owner is not self._token or
++                delta._generation != self._generation):
++            raise ValueError("foreign or stale compact admission delta")
++        if delta.duplicate:
++            if delta._additions or dict(delta._totals) != self._totals:
++                raise ValueError("duplicate compact admission delta changes accounting")
++            return
++        for category, key, value in delta._additions:
++            if key in self._maps[category]:
++                raise ValueError("compact admission delta no longer extends its base")
++        for category, key, value in delta._additions:
++            self._maps[category][key] = value
++        self._totals = dict(delta._totals)
++        self._metadata_bytes, self._metadata_entries = delta._metadata_bytes, delta._metadata_entries
++        self._generation += 1
++
++    def stats(self):
++        return {"metadata_bytes": self._metadata_bytes, "metadata_entries": self._metadata_entries,
++                "generation": self._generation, **{name: len(values) for name, values in self._maps.items()}}
+--- /dev/null
++++ b/contrib/sharepool/hash_admission_budget.py
+@@ -0,0 +1,219 @@
++#!/usr/bin/env python3
++# Copyright (c) 2026 The Bitcoin Core developers
++# Distributed under the MIT software license, see the accompanying
++# file COPYING or http://www.opensource.org/licenses/mit-license.php.
++"""Bounded local admission pressure, never consensus validity or a payment promise.
++
++The gate supplies a fresh, conservative or exact quote for its deterministic
++next settlement prefix. All resource fields include construction reservations;
++recipient bytes are already included in snapshot/dependency bytes, not added
++again here. A fitting conservative quote is sufficient; an oversized estimate
++may be replaced by a fresh exact quote before refusing work.
++
++This module performs no I/O, history walk, proof parsing or mutable reservation.
++The caller binds the quote to the current tip and durable receipt revision,
++authenticates its selected prefix and separately performs native validation.
++Duplicate receipts are matched against exact durable bytes before this policy.
++Already acknowledged receipts remain retained, even if fast blocks or a reorg
++later prevent their admission. Expired/orphaned work is reported separately and
++must not be supplied as eligible work in a new quote.
++"""
++from dataclasses import dataclass
++
++from hash_snapshot import (MAX_CERTIFICATE_BYTES, MAX_COMPACT_SHARES,
++    MAX_DEPENDENCY_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_SHARES,
++    MAX_EXPANDED_TEMPLATE_BYTES, MAX_ORIGIN_CHECKS, MAX_SHARE_AGE,
++    MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES, MAX_TEMPLATE_TX_REFERENCES)
++
++
++MAX_COUNTER = (1 << 63) - 1
++
++
++def _integer(name, value, minimum=0, maximum=MAX_COUNTER):
++    if type(value) is not int or not minimum <= value <= maximum:
++        raise ValueError("invalid admission quote " + name)
++
++
++@dataclass(frozen=True)
++class AdmissionResources:
++    """Actual or conservative upper bounds for one proposed settlement.
++
++    Unique origins, transaction payloads/references and dependencies are charged
++    by the caller's bounded accountant. ``recipient_bytes`` is the sum of full
++    output encodings, excluding the output-count prefix; the complete snapshot
++    count prefix and native historical recipient reservation are included in
++    ``snapshot_bytes`` and ``dependency_bytes``. Count both current-pool and
++    native historical recipients, including outputs whose value rounds to zero.
++    ``origins`` and ``dependency_depth`` include mining construction headroom.
++    """
++    snapshot_bytes: int
++    dependency_bytes: int
++    proofs: int
++    dependency_shares: int
++    origins: int
++    expanded_template_bytes: int
++    template_references: int
++    largest_template_bytes: int
++    dependency_depth: int
++    certificate_bytes: int
++    recipient_count: int
++    recipient_bytes: int
++
++    def __post_init__(self):
++        for name, value in vars(self).items():
++            _integer(name, value)
++        if (not self.snapshot_bytes or self.dependency_bytes < self.snapshot_bytes or
++                self.dependency_shares < self.proofs or
++                not 31 * self.recipient_count <= self.recipient_bytes <= 51 * self.recipient_count or
++                self.recipient_bytes > self.snapshot_bytes):
++            raise ValueError("inconsistent admission resource quote")
++
++
++@dataclass(frozen=True)
++class AdmissionQuote:
++    """A scalar-only quote tied to one tip and durable receipt revision.
++
++    Counts cover the eligible, unadmitted FIFO, including any newly offered
++    proofs. ``selected_count`` is the quoted next-batch prefix;
++    the caller verifies its exact identities/order. New proofs never overtake
++    already acknowledged work. For an atomic offered batch, its origin height
++    is the minimum across that batch. Dispatch quotes have no newly offered proof.
++    An empty selected prefix with a nonempty eligible queue cannot drain it.
++    """
++    native_tip: str
++    native_height: int
++    receipt_revision: int
++    eligible_count: int
++    selected_count: int
++    oldest_origin_height: object
++    resources: AdmissionResources
++    offered_count: int = 0
++    offered_selected: int = 0
++    offered_origin_height: object = None
++
++    def __post_init__(self):
++        if (type(self.native_tip) is not str or len(self.native_tip) != 64 or
++                any(c not in "0123456789abcdef" for c in self.native_tip)):
++            raise ValueError("invalid admission quote native_tip")
++        _integer("native_height", self.native_height, maximum=0x7fffffff)
++        for name in ("receipt_revision", "eligible_count", "selected_count"):
++            _integer(name, getattr(self, name))
++        _integer("offered_count", self.offered_count, maximum=MAX_COMPACT_SHARES)
++        _integer("offered_selected", self.offered_selected, maximum=self.offered_count)
++        if (type(self.resources) is not AdmissionResources or
++                not self.offered_selected <= self.selected_count <= self.eligible_count or
++                self.offered_count > self.eligible_count or self.resources.proofs != self.selected_count or
++                self.selected_count - self.offered_selected > self.eligible_count - self.offered_count):
++            raise ValueError("inconsistent admission prefix quote")
++        first = max(1, self.native_height + 1 - MAX_SHARE_AGE)
++        last = self.native_height + 1
++        if self.eligible_count:
++            _integer("oldest_origin_height", self.oldest_origin_height, first, last)
++        elif self.oldest_origin_height is not None:
++            raise ValueError("empty admission queue has an origin height")
++        if self.offered_count:
++            _integer("offered_origin_height", self.offered_origin_height, first, last)
++            if self.offered_origin_height < self.oldest_origin_height:
++                raise ValueError("offered origin precedes quoted oldest origin")
++        elif self.offered_origin_height is not None:
++            raise ValueError("dispatch quote has an offered origin")
++
++
++@dataclass(frozen=True)
++class AdmissionDecision:
++    mode: str
++    ack_allowed: bool
++    dispatch_allowed: bool
++    reasons: tuple
++    resource_failures: tuple
++    additional_inclusion_heights: object
++    native_tip: str
++    native_height: int
++    receipt_revision: int
++    eligible_count: int
++    selected_count: int
++
++
++class AdmissionRefused(ValueError):
++    """A local capacity refusal, never a declaration that a proof is invalid."""
++    local_policy = True
++    consensus_invalid = False
++
++    def __init__(self, decision):
++        if type(decision) is not AdmissionDecision:
++            raise ValueError("admission refusal requires its bounded decision")
++        self.decision = decision
++        self.reason_code = "local-admission-capacity"
++        super().__init__(self.reason_code + ": " + ", ".join(decision.reasons))
++
++
++@dataclass(frozen=True)
++class AdmissionBudget:
++    """Strict next-batch fit with one extra inclusion-height margin by default.
++
++    DRAIN keeps an exact fitting settlement prefix mineable while refusing new
++    local credits. Do not suppress a native-winning block because its separate
++    share acknowledgement was refused. A margin is a local safety policy; it
++    cannot guarantee settlement under future block timing, reorgs or data loss.
++    """
++    snapshot_budget: int = MAX_SNAPSHOT_BYTES
++    safety_blocks: int = 1
++
++    def __post_init__(self):
++        _integer("snapshot_budget", self.snapshot_budget, 1024, MAX_SNAPSHOT_BYTES)
++        _integer("safety_blocks", self.safety_blocks, 1, MAX_SHARE_AGE)
++
++    def evaluate(self, quote):
++        if type(quote) is not AdmissionQuote:
++            raise ValueError("canonical admission quote required")
++        resources = quote.resources
++        limits = (("snapshot_bytes", self.snapshot_budget),
++            ("dependency_bytes", MAX_DEPENDENCY_BYTES),
++            ("proofs", MAX_COMPACT_SHARES),
++            ("dependency_shares", MAX_DEPENDENCY_SHARES),
++            ("origins", MAX_ORIGIN_CHECKS),
++            ("expanded_template_bytes", MAX_EXPANDED_TEMPLATE_BYTES),
++            ("template_references", MAX_TEMPLATE_TX_REFERENCES),
++            ("largest_template_bytes", MAX_TEMPLATE_BYTES),
++            ("dependency_depth", MAX_DEPENDENCY_DEPTH),
++            ("certificate_bytes", MAX_CERTIFICATE_BYTES),
++            ("recipient_count", self.snapshot_budget // 31),
++            ("recipient_bytes", self.snapshot_budget))
++        failures = tuple(name for name, bound in limits if getattr(resources, name) > bound)
++        reasons = []
++        if failures:
++            reasons.append("resource-budget")
++        if quote.selected_count != quote.eligible_count:
++            reasons.append("pending-prefix-does-not-fit")
++        remaining = (None if quote.oldest_origin_height is None else
++                     quote.oldest_origin_height + MAX_SHARE_AGE - (quote.native_height + 1))
++        if remaining is not None and remaining < self.safety_blocks:
++            reasons.append("admission-deadline-margin")
++        if quote.offered_selected != quote.offered_count:
++            reasons.append("offered-proof-not-selected")
++        ready = not reasons
++        # Dispatch is a separate assessment of already-retained work. A fitting
++        # old prefix remains mineable during pressure; an empty prefix does not
++        # drain a nonempty queue. No offered proof can borrow this exception.
++        dispatch = (not quote.offered_count and not failures and
++                    (quote.selected_count > 0 or quote.eligible_count == 0))
++        return AdmissionDecision("OPEN" if ready else "DRAIN",
++            ready and quote.offered_count > 0, dispatch, tuple(reasons), failures,
++            remaining, quote.native_tip, quote.native_height, quote.receipt_revision,
++            quote.eligible_count, quote.selected_count)
++
++    def require_ack(self, quote):
++        if type(quote) is not AdmissionQuote or not quote.offered_count:
++            raise ValueError("new acknowledgement requires a nonempty offered proof quote")
++        decision = self.evaluate(quote)
++        if not decision.ack_allowed:
++            raise AdmissionRefused(decision)
++        return decision
++
++    def dispatch(self, quote):
++        if type(quote) is not AdmissionQuote or quote.offered_count:
++            raise ValueError("dispatch requires an already-retained prefix quote")
++        decision = self.evaluate(quote)
++        if not decision.dispatch_allowed:
++            raise AdmissionRefused(decision)
++        return decision
+--- /dev/null
++++ b/contrib/sharepool/hash_gate_admission.py
+@@ -0,0 +1,180 @@
++#!/usr/bin/env python3
++# Copyright (c) 2026 The Bitcoin Core developers
++# Distributed under the MIT software license, see the accompanying
++# file COPYING or http://www.opensource.org/licenses/mit-license.php.
++"""V8 gate-local admission accounting; native validation and the journal are authoritative.
++
++One owner keeps bounded resource metadata for one tip/receipt revision. A fresh
++proof still supplies its complete canonical provenance and native verdict. The
++metadata avoids choosing and serializing the entire pending batch on every ACK.
++Conservative overflow falls back to the gate's exact deterministic batch fit.
++"""
++from dataclasses import dataclass, replace
++
++from hash_admission_budget import AdmissionQuote, AdmissionResources, AdmissionRefused
++from hash_admission_accounting import CompactAdmissionAccountant, MetadataCapacity
++
++
++@dataclass
++class _State:
++    key: tuple
++    quote: AdmissionQuote
++    accountant: object = None
++
++
++@dataclass(frozen=True)
++class _Ticket:
++    key: tuple
++    quote: AdmissionQuote
++    accountant: object
++    delta: object = None
++
++
++def _key(gate, tip):
++    return tip, gate._head()["receipt_revision"], gate._dispatch_policy()
++
++
++def _resources(batch):
++    usage = batch["resources"]
++    return AdmissionResources(
++        snapshot_bytes=usage["reserved_snapshot_bytes"],
++        dependency_bytes=usage["reserved_dependency_bytes"],
++        proofs=len(batch["snapshot"].shares), dependency_shares=usage["dependency_shares"],
++        origins=usage["origins"], expanded_template_bytes=usage["expanded_template_bytes"],
++        template_references=usage["template_references"], largest_template_bytes=usage["largest_template_bytes"],
++        dependency_depth=usage["dependency_depth"], certificate_bytes=usage["certificate_bytes"],
++        recipient_count=usage["recipient_count"], recipient_bytes=usage["recipient_bytes"])
++
++
++def _quote(gate, height, tip, batch, *, offered=()):
++    selected = {proof.proof_id for proof in batch["snapshot"].shares}
++    return AdmissionQuote(tip, height, gate._head()["receipt_revision"],
++        batch["eligible_count"], len(selected), batch["oldest_origin_height"], _resources(batch),
++        offered_count=len(offered), offered_selected=sum(proof.proof_id in selected for proof in offered),
++        offered_origin_height=min((proof.envelope.height for proof in offered), default=None))
++
++
++def _accountant(gate, batch, staged):
++    captured = []
++    usage = gate._provenance(batch["snapshot"], staged, mining_job=True, captures=captured)
++    return CompactAdmissionAccountant(batch["snapshot"],
++        historical_recipient_count=batch["resources"]["historical_recipient_count"],
++        historical_recipient_bytes=batch["resources"]["historical_recipient_bytes"],
++        dependencies=tuple(captured), depth=usage["dependency_depth"] - 1,
++        certificate_bytes=batch["resources"]["historical_certificate_bytes"])
++
++
++def _refresh(gate, height, tip, parent, staged):
++    key = _key(gate, tip)
++    state = gate._admission_state
++    if state is not None and state.key == key:
++        return state
++    batch = gate._batch(height, tip, parent, staged=staged)
++    quote = _quote(gate, height, tip, batch)
++    accountant = None
++    if quote.selected_count == quote.eligible_count:
++        try:
++            accountant = _accountant(gate, batch, staged)
++        except MetadataCapacity:
++            pass  # Optional metadata must not replace the exact resource check.
++    gate._stable(tip)
++    gate._check_seal()
++    if _key(gate, tip) != key:
++        raise ValueError("admission context changed during resource capture")
++    state = _State(key, quote, accountant)
++    gate._admission_state = state
++    return state
++
++
++def status(gate):
++    """Return a fresh OPEN/DRAIN decision for the already retained prefix."""
++    if gate._admission_budget is None:
++        raise ValueError("admission backpressure requires an enabled v8 gate")
++    gate._check_seal()
++    height, tip = gate._context()
++    state = gate._admission_state
++    if state is None or state.key != _key(gate, tip):
++        staged = {}
++        parent = gate._parent_snapshot(height, tip, staged)
++        state = _refresh(gate, height, tip, parent, staged)
++    decision = gate._admission_budget.dispatch(state.quote)
++    gate._stable(tip)
++    gate._check_seal()
++    if state.key != _key(gate, tip):
++        raise ValueError("admission context changed before status")
++    return decision
++
++
++def pre_ack(gate, share, record, *, height, tip, parent, staged, captures, provenance):
++    """Quote one new proof after its fresh native check and before durable ACK."""
++    if gate._admission_budget is None:
++        return None
++    state = _refresh(gate, height, tip, parent, staged)
++    key = state.key
++    existing = state.quote
++    oldest = (share.envelope.height if existing.oldest_origin_height is None else
++              min(existing.oldest_origin_height, share.envelope.height))
++    # A pre-existing backlog cannot justify accepting still more promises.
++    if existing.selected_count != existing.eligible_count:
++        gate._admission_budget.require_ack(replace(existing,
++            eligible_count=existing.eligible_count + 1, oldest_origin_height=oldest,
++            offered_count=1, offered_selected=0, offered_origin_height=share.envelope.height))
++    if state.accountant is not None:
++        try:
++            delta = state.accountant.preview_delta(share, record, dependencies=tuple(captures),
++                depth=provenance["dependency_depth"])
++            if delta.duplicate:
++                raise ValueError("admission metadata differs from durable receipt inventory")
++            quote = AdmissionQuote(tip, height, key[1], delta.proof_count, delta.proof_count,
++                delta.min_pending_origin_height, delta.resources, offered_count=1,
++                offered_selected=1, offered_origin_height=share.envelope.height)
++            gate._admission_budget.require_ack(quote)
++            if _key(gate, tip) != key:
++                raise ValueError("admission context changed during preview")
++            return _Ticket(key, quote, state.accountant, delta)
++        except (MetadataCapacity, AdmissionRefused):
++            # Tight CompactSize/recipient budgets can fit more than the safe
++            # upper estimate. Only a fresh exact prefix may override refusal.
++            pass
++    batch = gate._batch(height, tip, parent, staged=staged, offered=(share,), templates=(record,))
++    quote = _quote(gate, height, tip, batch, offered=(share,))
++    gate._admission_budget.require_ack(quote)
++    accountant = None
++    try:
++        accountant = _accountant(gate, batch, staged)
++    except MetadataCapacity:
++        pass
++    gate._stable(tip)
++    gate._check_seal()
++    if _key(gate, tip) != key:
++        raise ValueError("admission context changed before acknowledgement")
++    return _Ticket(key, quote, accountant)
++
++
++def post_ack(gate, ticket, accepted):
++    """Update only optional metadata after the irreversible local receipt commit."""
++    if ticket is None or not accepted:
++        return
++    try:
++        key = _key(gate, ticket.key[0])
++        if key != (ticket.key[0], ticket.key[1] + 1, ticket.key[2]):
++            gate._admission_state = None
++            return
++        if ticket.delta is not None:
++            ticket.accountant.commit(ticket.delta)
++        quote = replace(ticket.quote, receipt_revision=key[1], offered_count=0,
++            offered_selected=0, offered_origin_height=None)
++        gate._admission_state = _State(key, quote, ticket.accountant)
++    except Exception:
++        # A failed optional allocation cannot revoke a durable receipt or turn
++        # its successful acknowledgement into a false failure to the miner.
++        gate._admission_state = None
++
++
++def authorize_offers(gate, height, tip, batch, offered):
++    """Check bulk ACK pressure or whether a retained prefix can drain."""
++    if gate._admission_budget is not None:
++        quote = _quote(gate, height, tip, batch, offered=offered)
++        if offered:
++            return gate._admission_budget.require_ack(quote)
++        return gate._admission_budget.dispatch(quote)
+--- a/contrib/sharepool/hash_gate_batch.py
++++ b/contrib/sharepool/hash_gate_batch.py
+@@ -21 +21 @@
+-                on_snapshot=None, mining_job=False, trusted_parent=None,
++                on_snapshot=None, on_capture=None, mining_job=False, trusted_parent=None,
+@@ -84,0 +85,2 @@
++            if on_capture is not None:
++                on_capture(encoded)
+@@ -212 +214,3 @@
+-        return {"snapshot_bytes": len(raw), "dependency_bytes": total, "origins": len(origins) + int(mining_job), "dependency_shares": proof_count}
++        return {"snapshot_bytes": len(raw), "dependency_bytes": total,
++                "origins": len(origins) + int(mining_job), "dependency_shares": proof_count,
++                "dependency_depth": root_depth + depths.get(root_identity, 0) + int(mining_job)}
+--- a/contrib/sharepool/hash_gate_inventory.py
++++ b/contrib/sharepool/hash_gate_inventory.py
+@@ -13,0 +14 @@
++from hash_admission_budget import AdmissionRefused
+@@ -68 +69,3 @@
+-    recipient payment or global reception order is implied by an import.
++    recipient payment or global reception order is implied by an import. Local
++    admission pressure stops at the exact unacknowledged proof and returns its
++    retry cursor; it is neither consensus invalidity nor an imported receipt.
+@@ -98 +101 @@
+-              "ineligible": 0, "deferred": [], "bytes_charged": 0, "limit_reason": None,
++              "ineligible": 0, "capacity_refused": 0, "deferred": [], "bytes_charged": 0, "limit_reason": None,
+@@ -147 +150 @@
+-        for key in ("snapshots", "proofs_examined", "already_retained", "ineligible"):
++        for key in ("snapshots", "proofs_examined", "already_retained", "ineligible", "capacity_refused"):
+@@ -161 +164 @@
+-        if part["limit_reason"] in ("bytes", "proofs"):
++        if part["limit_reason"] in ("bytes", "proofs", "admission-capacity"):
+@@ -186 +189 @@
+-              "ineligible": 0, "deferred": [], "bytes_charged": 0, "limit_reason": None}
++              "ineligible": 0, "capacity_refused": 0, "deferred": [], "bytes_charged": 0, "limit_reason": None}
+@@ -263,2 +266,6 @@
+-                gate._provenance(opening, evidence, trusted_parent=parent, root_origin=origin, root_depth=1)
+-                gate._rehydrate_retained(evidence)
++                captures = [] if gate._admission_budget is not None else None
++                provenance = gate._provenance(opening, evidence, trusted_parent=parent,
++                    root_origin=origin, root_depth=1, captures=captures)
++                # The fresh native check performs bounded retained-data replay
++                # only on a structured missing-data response. Normal imports
++                # must not rewrite their complete dependency graph each time.
+@@ -265,0 +273,5 @@
++                ticket = None
++                if gate._admission_budget is not None and proof.proof_id not in gate._admitted_ids(parent):
++                    from hash_gate_admission import pre_ack
++                    ticket = pre_ack(gate, proof, origin, height=height, tip=tip, parent=parent,
++                        staged=evidence, captures=captures, provenance=provenance)
+@@ -267 +279,5 @@
+-                gate._persist([(kind, raw) for (kind, unused), raw in evidence.items()] + [(PROOF, proof.serialize())])
++                accepted = gate._persist([(kind, raw) for (kind, unused), raw in evidence.items()] +
++                                         [(PROOF, proof.serialize())])[-1]
++                if ticket is not None:
++                    from hash_gate_admission import post_ack
++                    post_ack(gate, ticket, accepted)
+@@ -268,0 +285,7 @@
++            except AdmissionRefused as error:
++                gate._stable(tip)
++                gate._check_seal()
++                result["capacity_refused"] += 1
++                deferred("local-admission-capacity", error)
++                result["limit_reason"] = "admission-capacity"
++                break  # Preserve this exact unacknowledged proof for retry.
+--- a/contrib/sharepool/hash_job_scheduler.py
++++ b/contrib/sharepool/hash_job_scheduler.py
+@@ -116,2 +116 @@
+-            block, snapshot = self.gate.make_native(sign_owner=self._sign_owner)
+-            authorization = self.gate.authorize(block.serialize(), snapshot.serialize())
++            authorization = self.gate.prepare_native_authorization(sign_owner=self._sign_owner)
+--- a/contrib/sharepool/hash_mining_gate.py
++++ b/contrib/sharepool/hash_mining_gate.py
+@@ -70 +70,2 @@
+-                 snapshot_budget=MAX_SNAPSHOT_BYTES, profile_version=4, activation_height=1, share_work_bits=None):
++                 snapshot_budget=MAX_SNAPSHOT_BYTES, profile_version=4, activation_height=1, share_work_bits=None,
++                 admission_safety_blocks=1):
+@@ -81,0 +83,6 @@
++        from hash_admission_budget import AdmissionBudget
++        if type(admission_safety_blocks) is not int or not 1 <= admission_safety_blocks <= MAX_SHARE_AGE:
++            raise ValueError("admission safety margin must be 1..MAX_SHARE_AGE blocks")
++        self._admission_budget = (AdmissionBudget(snapshot_budget, admission_safety_blocks)
++                                  if profile_version == VARIABLE_TIDES_VERSION else None)
++        self._admission_state = None
+@@ -655 +662 @@
+-    def _provenance(self, snapshot, staged, **context):
++    def _provenance(self, snapshot, staged, *, captures=None, **context):
+@@ -667 +674,2 @@
+-            on_snapshot=lambda identity, raw: complete.__setitem__((SNAPSHOT, f"{identity:064x}"), raw))
++            on_snapshot=lambda identity, raw: complete.__setitem__((SNAPSHOT, f"{identity:064x}"), raw),
++            on_capture=None if captures is None else captures.append)
+@@ -695 +703,3 @@
+-    def _native_template(self, raw, tip, snapshot_raw=None, *, mining=True):
++    def _native_template(self, raw, tip, snapshot_raw=None, *, mining=True, staged=None):
++        from hash_gate_rpc import missing_snapshot_data
++
+@@ -700 +710,24 @@
+-        result = self.rpc("validatesharepoolhashtemplate", *arguments)
++        try:
++            result = self.rpc("validatesharepoolhashtemplate", *arguments)
++        except Exception as error:
++            if staged is None or not missing_snapshot_data(error):
++                raise
++            self._check_seal()
++            height, current_tip = self._context()
++            if current_tip != tip:
++                raise ValueError("native tip changed during template recovery") from error
++            if not self._eligible(block.m_height, f"{block.hashPrevBlock:064x}", height):
++                raise ValueError("template is outside eligible native ancestry") from error
++            size = 0
++            for (kind, unused), opening in staged.items():
++                if kind == SNAPSHOT:
++                    if type(opening) is not bytes or not 1 <= len(opening) <= MAX_SNAPSHOT_BYTES:
++                        raise ValueError("native recovery snapshot exceeds byte bound")
++                    size += len(opening)
++                    if size > MAX_DEPENDENCY_BYTES:
++                        raise ValueError("native recovery dependency byte budget")
++            # Replay only exact already-retained evidence after a structured
++            # missing-data error. Rejected speculative overlays are never stored.
++            self._rehydrate_retained(staged)
++            self._stable(tip)
++            result = self.rpc("validatesharepoolhashtemplate", *arguments)
+@@ -721 +753,0 @@
+-        self._rehydrate_retained(staged)
+@@ -726 +758 @@
+-        self._native_template(record.data, tip)
++        self._native_template(record.data, tip, staged=staged)
+@@ -817,0 +850,8 @@
++        known = False
++        try:
++            retained = self._read(PROOF, f"{share.proof_id:064x}")
++            if retained != share.serialize():
++                raise ValueError("proof differs from its durable receipt")
++            known = True
++        except KeyError:
++            pass
+@@ -821,2 +861,5 @@
+-        self._provenance(opening, staged, trusted_parent=parent,
+-            root_origin=TemplateRecord.from_block(self._evidence(TEMPLATE, template_id(share.header))), root_depth=1)
++        origin = CompactTemplateRecord.from_record(
++            TemplateRecord.from_block(self._evidence(TEMPLATE, template_id(share.header))))
++        captures = [] if self._admission_budget is not None and not known else None
++        provenance = self._provenance(opening, staged, trusted_parent=parent,
++            root_origin=origin, root_depth=1, captures=captures)
+@@ -827,2 +870,17 @@
+-        return self._persist([(kind, body) for (kind, unused), body in staged.items()] +
+-                             [(PROOF, share.serialize())])[-1]
++        ticket = None
++        if self._admission_budget is not None and not known and share.proof_id not in self._admitted_ids(parent):
++            from hash_gate_admission import pre_ack
++            ticket = pre_ack(self, share, origin, height=height, tip=tip, parent=parent,
++                staged=staged, captures=captures, provenance=provenance)
++        self._stable(tip)
++        accepted = self._persist([(kind, body) for (kind, unused), body in staged.items()] +
++                                 [(PROOF, share.serialize())])[-1]
++        if ticket is not None:
++            from hash_gate_admission import post_ack
++            post_ack(self, ticket, accepted)
++        return accepted
++
++    def admission_status(self):
++        """Fresh v8 local credit pressure, distinct from native block validity."""
++        from hash_gate_admission import status
++        return status(self)
+@@ -944,0 +1003 @@
++        oldest = min((share.envelope.height for share in offered.values()), default=None)
+@@ -953,0 +1013 @@
++            oldest = origin if oldest is None else min(oldest, origin)
+@@ -1010,0 +1071,10 @@
++                resources.update(expanded_template_bytes=expanded, template_references=references,
++                    largest_template_bytes=max((record.expanded_bytes for record in records.values()), default=0),
++                    # Compact certificates are derived state, but their native
++                    # resource limit still applies even though they are omitted
++                    # from the snapshot wire encoding.
++                    certificate_bytes=len(compact_size(len(snapshot.certificates))) +
++                        sum(len(cert.serialize()) for cert in snapshot.certificates),
++                    historical_certificate_bytes=sum(len(cert.serialize()) for cert in
++                        (() if parent is None else parent.certificates)
++                        if cert.origin_height >= max(1, height + 1 - MAX_SHARE_AGE)))
+@@ -1020,0 +1091,3 @@
++                    resources.update(recipient_count=count, recipient_bytes=output_bytes,
++                        historical_recipient_count=payout_budget["output_count"],
++                        historical_recipient_bytes=payout_budget["output_bytes"])
+@@ -1059 +1132,2 @@
+-                  "deferred_count": total - low, "limit_reason": reason}
++                  "deferred_count": total - low, "limit_reason": reason,
++                  "oldest_origin_height": oldest}
+@@ -1357,0 +1432,15 @@
++        block, snapshot, _ = self._prepare_native(sign_owner=sign_owner)
++        return block, snapshot
++
++    def prepare_native_authorization(self, *, sign_owner):
++        """Construct and authorize one local job without choosing its batch twice.
++
++        The original local selection is reusable only within this operation,
++        while the complete journal head, native context and policy are unchanged.
++        Authorization still checks the full provenance and obtains a fresh native
++        verdict. External offers always use authorize() and select independently.
++        """
++        block, snapshot, selection = self._prepare_native(sign_owner=sign_owner)
++        return self._authorize(block.serialize(), snapshot.serialize(), selection=selection)
++
++    def _prepare_native(self, *, sign_owner):
+@@ -1361,0 +1451,2 @@
++        selection_head, selection_policy = self._head(), self._dispatch_policy()
++        selection_work = self._share_work_bits
+@@ -1364,0 +1456,3 @@
++        if self._admission_budget is not None:
++            from hash_gate_admission import authorize_offers
++            authorize_offers(self, height, tip, batch, ())
+@@ -1365,0 +1460,3 @@
++        # Frozen wire bytes bind the selected accounting independently of any
++        # mutable objects returned to the external signer.
++        proposal_raw = proposal.serialize()
+@@ -1420,4 +1517,7 @@
+-        if is_tides_profile(self.profile_version):
+-            self._native_template(final_block.serialize(), tip, final_snapshot.serialize())
+-        self._check_seal()
+-        return final_block, final_snapshot
++        # Finalization already performs full mining-reserved native validation
++        # of the exact signed overlay. Repeating that same overlay RPC here has
++        # no retention side effect. Dispatch authorization remains a fresh check.
++        self._stable(tip)
++        self._check_seal()
++        selection = (height, tip, selection_head, selection_policy, selection_work, proposal_raw)
++        return final_block, final_snapshot, selection
+@@ -1432,0 +1533,3 @@
++        return self._authorize(raw, snapshot_raw)
++
++    def _authorize(self, raw, snapshot_raw=None, *, selection=None):
+@@ -1434,0 +1538,8 @@
++
++        def selection_current():
++            return (selection is not None and selection[:2] == (height, tip) and
++                    selection[2] == self._head() and selection[3] == self._dispatch_policy() and
++                    selection[4] == self._share_work_bits)
++
++        if selection is not None and not selection_current():
++            raise ValueError("native job accounting changed during preparation; prepare a fresh job")
+@@ -1455,2 +1566 @@
+-        self._rehydrate_retained(staged)
+-        self._native_template(raw, tip, snapshot.serialize())
++        self._native_template(raw, tip, snapshot.serialize(), staged=staged)
+@@ -1468 +1577,0 @@
+-        parent = self._parent_snapshot(height, tip, staged)
+@@ -1470 +1579,12 @@
+-        batch = self._batch(height, tip, parent, staged=staged, offered=snapshot.shares, templates=snapshot.templates)["snapshot"]
++        if selection is None:
++            parent = self._parent_snapshot(height, tip, staged)
++            batch_result = self._batch(height, tip, parent, staged=staged, offered=snapshot.shares, templates=snapshot.templates)
++            batch = batch_result["snapshot"]
++        else:
++            if not selection_current():
++                raise ValueError("native job accounting changed before authorization")
++            batch = Snapshot.deserialize(selection[5])
++            expected_snapshot = replace(batch, job_commitment=snapshot.job_commitment,
++                payouts=snapshot.payouts, owner_signature=snapshot.owner_signature)
++            if expected_snapshot.serialize() != snapshot.serialize():
++                raise ValueError("native job changed the selected accounting bytes")
+@@ -1483,0 +1604 @@
++        fresh_offers = []
+@@ -1486 +1607,14 @@
+-            staged[PROOF, f"{share.proof_id:064x}"] = share.serialize()
++            identity, encoded = f"{share.proof_id:064x}", share.serialize()
++            try:
++                retained = self._read(PROOF, identity)
++                if retained != encoded:
++                    raise ValueError("offered proof differs from its durable receipt")
++            except KeyError:
++                fresh_offers.append(share)
++            staged[PROOF, identity] = encoded
++        if self._admission_budget is not None:
++            if selection is not None and fresh_offers:
++                raise ValueError("prepared selection lost a retained proof")
++            if selection is None:
++                from hash_gate_admission import authorize_offers
++                authorize_offers(self, height, tip, batch_result, tuple(fresh_offers))
+@@ -1487,0 +1622,2 @@
++        if selection is not None and not selection_current():
++            raise ValueError("native job accounting changed before durable authorization")
+@@ -1505 +1641,2 @@
+-            "quota": self.quota}
++            "quota": self.quota,
++            "admission_safety_blocks": None if self._admission_budget is None else self._admission_budget.safety_blocks}
+@@ -1580,0 +1718 @@
++        self._admission_state = None
+--- a/contrib/sharepool/hash_stratum.py
++++ b/contrib/sharepool/hash_stratum.py
+@@ -26,0 +27 @@
++from hash_admission_budget import AdmissionDecision, AdmissionRefused
+@@ -154,2 +155,4 @@
+-    Call service_once() frequently on the gate's owner thread. A True submit
+-    response follows gate.receive()'s durable ACK, not native block admission.
++    Call service_once() frequently on the gate's owner thread. Share acceptance
++    follows a durable ACK; exact duplicates remain successful. V8 native-only
++    acceptance has no share credit. Capacity refusals get an explicit error,
++    including when the separately submitted native candidate succeeds.
+@@ -182 +185 @@
+-        self.stats = {"published": 0, "acknowledged": 0, "duplicate": 0, "rejected": 0,
++        self.stats = {"published": 0, "acknowledged": 0, "duplicate": 0, "rejected": 0, "capacity_refused": 0,
+@@ -185,0 +189 @@
++        self.last_admission_decision = None
+@@ -275,0 +280 @@
++        self._owner()
+@@ -289,2 +294 @@
+-        accepted = self.gate.receive(share)
+-        self.stats["acknowledged" if accepted else "duplicate"] += 1
++        unused_accepted, refused = self._receive_share(share)
+@@ -303,2 +307,3 @@
+-                # gate.receive retained the proof and exact origin for explicit
+-                # retry/recovery; this counter is not a claim of best-chain work.
++                # This is not a claim of best-chain work or durable credit.
++                # A refused share remains unacknowledged even if its separate
++                # native candidate submission must be retried by the miner.
+@@ -305,0 +311,2 @@
++        if refused is not None:
++            raise refused
+@@ -306,0 +314,18 @@
++
++    def _receive_share(self, share):
++        try:
++            accepted = self.gate.receive(share)
++        except AdmissionRefused as error:
++            self.stats["capacity_refused"] += 1
++            self.last_admission_decision = error.decision
++            return False, error
++        self.stats["acknowledged" if accepted else "duplicate"] += 1
++        return accepted, None
++
++    def _submit_response(self, identifier, prefix, params):
++        """Existing Stratum error response; capacity pressure keeps the socket usable."""
++        try:
++            result = self._enqueue("submit", (prefix, params))
++        except AdmissionRefused:
++            return {"id": identifier, "result": False, "error": [20, "local-admission-capacity", None]}
++        return {"id": identifier, "result": result, "error": None}
+@@ -335,0 +361,7 @@
++                except AdmissionRefused as error:
++                    request.error = error
++                    # Submit refusals are counted where gate.receive fails.
++                    # They are local pressure, never invalid client work.
++                    if request.kind != "submit":
++                        self.stats["capacity_refused"] += 1
++                        self.last_admission_decision = error.decision
+@@ -419 +451,2 @@
+-                                result = service._enqueue("submit", (prefix, params))
++                                send(service._submit_response(req.get("id"), prefix, params))
++                                continue
+@@ -509,0 +543,14 @@
++        # Status can require a bounded history/prefix walk. Query only at due
++        # construction, never on the transport's frequent service polls.
++        try:
++            decision = self.gate.admission_status()
++        except AdmissionRefused as error:
++            # A non-dispatchable prefix has the same estimator pressure as a
++            # fitting drain job. Preserve the refusal so no job is published.
++            self.last_admission_decision = error.decision
++            self.controller.set_admission_paused(True)
++            raise
++        if type(decision) is not AdmissionDecision or decision.mode not in ("OPEN", "DRAIN"):
++            raise ValueError("vardiff requires an exact local admission decision")
++        self.last_admission_decision = decision
++        self.controller.set_admission_paused(decision.mode == "DRAIN")
+@@ -547,0 +595 @@
++        accepted, refused = False, None
+@@ -550,8 +598 @@
+-            accepted = self.gate.receive(share)
+-            self.stats["acknowledged" if accepted else "duplicate"] += 1
+-            if accepted:
+-                try:
+-                    self.controller.observe(share.envelope.share_work_bits)
+-                except BaseException:
+-                    self.withdraw()
+-                    raise
++            accepted, refused = self._receive_share(share)
+@@ -574,0 +616,15 @@
++        # Native winners are submitted before local estimator updates. Local
++        # capacity policy (or an estimator failure) must not hold back a block.
++        try:
++            if refused is not None:
++                self.controller.set_admission_paused(True)
++            elif accepted:
++                # A new durable ACK passed the offered-work admission check;
++                # resume with a fresh window and its original signed weight.
++                self.controller.set_admission_paused(False)
++                self.controller.observe(share.envelope.share_work_bits)
++        except BaseException:
++            self.withdraw()
++            raise
++        if refused is not None:
++            raise refused
+--- a/contrib/sharepool/hash_vardiff.py
++++ b/contrib/sharepool/hash_vardiff.py
+@@ -48,0 +49 @@
++        self._admission_paused = False
+@@ -69,0 +71,16 @@
++    def set_admission_paused(self, paused):
++        """Exclude capacity-limited windows from hashrate-driven retargeting.
++
++        Refused work is not an idle-miner observation. Neither a partial window
++        nor elapsed drain time may ease the assigned difficulty after recovery.
++        Previously acknowledged work and its signed assignment are unchanged.
++        """
++        if type(paused) is not bool:
++            raise ValueError("admission pause must be boolean")
++        now = self._now()
++        if paused != self._admission_paused:
++            self._admission_paused = paused
++            self._work = self._shares = 0
++            if self._started is not None:
++                self._started = now
++
+@@ -75,0 +93,2 @@
++        if self._admission_paused:
++            return
+@@ -87 +106 @@
+-        if self._started is None or now - self._started < self.retarget_seconds:
++        if self._admission_paused or self._started is None or now - self._started < self.retarget_seconds:
+@@ -112,0 +132 @@
++            "admission_paused": self._admission_paused,
+--- a/contrib/sharepool/live_capacity_metrics.py
++++ b/contrib/sharepool/live_capacity_metrics.py
+@@ -3,0 +4,33 @@
++from collections import defaultdict
++
++from capacity_metrics import distribution
++
++
++def owner_slots(*, miners, planned, workers, owner):
++    """Partition the original absolute schedule without moving an identity.
++
++    One worker serially owns each assigned gateway for its entire lifetime.
++    Selecting one worker per miner removes coupling between gateway schedules;
++    fewer workers intentionally retain coupling within each reported shard.
++    """
++    if (type(miners) is not int or not 2 <= miners <= 100 or
++            type(planned) is not int or not miners <= planned <= 10000 or
++            type(workers) is not int or not 1 <= workers <= miners or
++            type(owner) is not int or not 0 <= owner < workers):
++        raise ValueError("invalid bounded source ownership")
++    return (slot for slot in range(planned) if (slot % miners) % workers == owner)
++
++
++def merge_measurements(measurements):
++    """Merge completed owner samples, never averages of their percentiles.
++
++    Call only after every owner has stopped: Measurements is owner-local and
++    deliberately has no shared hot-path lock. Intervals may overlap in time.
++    """
++    values, failures = defaultdict(list), defaultdict(int)
++    for measurement in measurements:
++        for name, samples in measurement.values.items():
++            values[name].extend(samples)
++            failures[name] += measurement.failures[name]
++    return {name: dict(distribution(samples), failures=failures[name])
++            for name, samples in sorted(values.items())}
+@@ -16,2 +49,4 @@
+-    stages = {name: set() for name in ("offered", "acknowledged", "admitted", "peer_verified", "rejected")}
+-    previous = {"acknowledged": "offered", "admitted": "acknowledged", "peer_verified": "admitted", "rejected": "offered"}
++    stages = {name: set() for name in ("offered", "acknowledged", "admitted", "peer_verified", "rejected", "admission_refused")}
++    previous = {"acknowledged": "offered", "admitted": "acknowledged", "peer_verified": "admitted",
++                "rejected": "offered", "admission_refused": "offered"}
++    refused, offered_slots = set(), set()
+@@ -20 +55,16 @@
+-        when, stage, identities = event["seconds"], event["stage"], event["proof_ids"]
++        when, stage = event["seconds"], event["stage"]
++        if stage == "capacity_refused":
++            slot, miner, identity = event.get("slot"), event.get("miner"), event.get("identity")
++            if (type(when) not in (int, float) or not math.isfinite(when) or when < 0 or
++                    type(slot) is not int or not 0 <= slot < 10000 or
++                    type(miner) is not int or not 0 <= miner < 100 or
++                    type(identity) is not str or len(identity) != 64 or
++                    any(char not in "0123456789abcdef" for char in identity) or
++                    "proof_ids" in event):
++                raise ValueError("invalid pre-dispatch capacity refusal")
++            if when <= seconds:
++                if slot in refused or slot in offered_slots:
++                    raise ValueError("duplicate scheduled capacity refusal")
++                refused.add(slot)
++            continue
++        identities = event["proof_ids"]
+@@ -27,0 +78,5 @@
++        if stage == "offered" and "slot" in event:
++            slot = event["slot"]
++            if type(slot) is not int or not 0 <= slot < 10000 or slot in refused or slot in offered_slots:
++                raise ValueError("scheduled work cannot be offered twice or after refusal")
++            offered_slots.add(slot)
+@@ -33,2 +88,3 @@
+-        if stage == "acknowledged" and ids & stages["rejected"] or stage == "rejected" and ids & stages["acknowledged"]:
+-            raise ValueError("offer cannot be both rejected and acknowledged")
++        outcomes = ("acknowledged", "rejected", "admission_refused")
++        if stage in outcomes and any(ids & stages[other] for other in outcomes if other != stage):
++            raise ValueError("offer cannot have conflicting acknowledgement/refusal outcomes")
+@@ -37,2 +93,2 @@
+-    return dict(counts, seconds=seconds,
+-        unacknowledged_queue=counts["offered"] - counts["acknowledged"] - counts["rejected"],
++    return dict(counts, seconds=seconds, capacity_refused=len(refused),
++        unacknowledged_queue=counts["offered"] - counts["acknowledged"] - counts["rejected"] - counts["admission_refused"],
+--- a/src/consensus/sharepool_hash.cpp
++++ b/src/consensus/sharepool_hash.cpp
+@@ -1605,5 +1605,34 @@
+-Result CalculateTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previous,
+-                            uint32_t native_bits, const Consensus::Params& consensus,
+-                            const Lookup& lookup, CAmount reward,
+-                            std::vector<CTxOut>& payouts, bool reserve_scripts)
+-{
++struct TidesPayoutPlan::Impl {
++    using AmountWork = boost::multiprecision::uint1024_t;
++    std::map<std::vector<unsigned char>, AmountWork> weights;
++    AmountWork counted{0};
++    std::vector<unsigned char> bootstrap_script;
++};
++
++TidesPayoutPlan::TidesPayoutPlan() = default;
++TidesPayoutPlan::~TidesPayoutPlan() = default;
++TidesPayoutPlan::TidesPayoutPlan(TidesPayoutPlan&&) noexcept = default;
++TidesPayoutPlan& TidesPayoutPlan::operator=(TidesPayoutPlan&&) noexcept = default;
++
++Result TidesPayoutPlan::Calculate(CAmount reward, std::vector<CTxOut>& payouts, bool reserve_scripts) const
++{
++    if (!m_impl || !MoneyRange(reward)) return Bad("tides-accounting-context");
++    std::vector<CTxOut> result;
++    if (m_impl->weights.empty()) {
++        result.emplace_back(reserve_scripts ? 0 : reward,
++                            CScript{m_impl->bootstrap_script.begin(), m_impl->bootstrap_script.end()});
++    } else {
++        for (const auto& [script, work] : m_impl->weights) {
++            const CAmount amount = (Impl::AmountWork{reward} * work / m_impl->counted).convert_to<CAmount>();
++            if (reserve_scripts || amount > 0) result.emplace_back(reserve_scripts ? 0 : amount, CScript{script.begin(), script.end()});
++        }
++    }
++    payouts = std::move(result);
++    return Result::Valid(reward);
++}
++
++Result PrepareTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previous,
++                          uint32_t native_bits, const Consensus::Params& consensus,
++                          const Lookup& lookup, TidesPayoutPlan& plan)
++{
++    plan.m_impl.reset();
+@@ -1612 +1641 @@
+-        snapshot.binding.native_parent != previous->GetBlockHash() || !MoneyRange(reward)) return Bad("tides-accounting-context");
++        snapshot.binding.native_parent != previous->GetBlockHash()) return Bad("tides-accounting-context");
+@@ -1722 +1751 @@
+-    std::vector<CTxOut> result;
++    auto prepared = std::make_unique<TidesPayoutPlan::Impl>();
+@@ -1728 +1757 @@
+-        result.emplace_back(reserve_scripts ? 0 : reward, CScript{snapshot.binding.payout_script.begin(), snapshot.binding.payout_script.end()});
++        prepared->bootstrap_script = snapshot.binding.payout_script;
+@@ -1730,8 +1759,16 @@
+-        const AmountWork counted = AmountWork{requested - remaining} * common_scale;
+-        for (const auto& [script, work] : weights) {
+-            const CAmount amount = (AmountWork{reward} * work / counted).convert_to<CAmount>();
+-            if (reserve_scripts || amount > 0) result.emplace_back(reserve_scripts ? 0 : amount, CScript{script.begin(), script.end()});
+-        }
+-    }
+-    payouts = std::move(result);
+-    return Result::Valid(reward);
++        prepared->counted = AmountWork{requested - remaining} * common_scale;
++        prepared->weights = std::move(weights);
++    }
++    plan.m_impl = std::move(prepared);
++    return Result::Valid();
++}
++
++Result CalculateTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previous,
++                            uint32_t native_bits, const Consensus::Params& consensus,
++                            const Lookup& lookup, CAmount reward,
++                            std::vector<CTxOut>& payouts, bool reserve_scripts)
++{
++    if (!MoneyRange(reward)) return Bad("tides-accounting-context");
++    TidesPayoutPlan plan;
++    const auto prepared = PrepareTidesPayouts(snapshot, previous, native_bits, consensus, lookup, plan);
++    return prepared.IsValid() ? plan.Calculate(reward, payouts, reserve_scripts) : prepared;
+--- a/src/consensus/sharepool_hash.h
++++ b/src/consensus/sharepool_hash.h
+@@ -210,0 +211,22 @@
++/** Invocation-local exact payout weights. Reuse only while constructing one
++ * unchanged snapshot against the same native parent/target. This owns derived
++ * integers, not chain pointers, evidence or a native-validity verdict. */
++class TidesPayoutPlan {
++    struct Impl;
++    std::unique_ptr<Impl> m_impl;
++    friend Result PrepareTidesPayouts(const Snapshot&, const CBlockIndex*, uint32_t,
++                                      const Consensus::Params&, const Lookup&, TidesPayoutPlan&);
++public:
++    TidesPayoutPlan();
++    ~TidesPayoutPlan();
++    TidesPayoutPlan(TidesPayoutPlan&&) noexcept;
++    TidesPayoutPlan& operator=(TidesPayoutPlan&&) noexcept;
++    TidesPayoutPlan(const TidesPayoutPlan&) = delete;
++    TidesPayoutPlan& operator=(const TidesPayoutPlan&) = delete;
++    Result Calculate(CAmount reward, std::vector<CTxOut>& payouts, bool reserve_scripts = false) const;
++};
++/** Reset plan before reading history; a failed preparation cannot leave an old
++ * plan usable. All existing scope, history availability and budget checks apply. */
++Result PrepareTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previous,
++                          uint32_t native_bits, const Consensus::Params& consensus,
++                          const Lookup& lookup, TidesPayoutPlan& plan);
+--- a/src/rpc/mining.cpp
++++ b/src/rpc/mining.cpp
+@@ -42,0 +43 @@
++#include <sharepool/hash_validation_cache.h>
+@@ -1629,0 +1631,16 @@
++static std::shared_ptr<const sharepool::hashonly::Snapshot> LookupHashJobSnapshot(
++    sharepool::HashSnapshotStore& store, sharepool::DecodedSnapshotCache& cache,
++    const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
++{
++    if (auto cached = cache.Get(hash)) return cached;
++    const auto raw = store.GetShared(hash);
++    if (!raw) return {};
++    std::shared_ptr<const sharepool::hashonly::Snapshot> snapshot;
++    try { snapshot = std::make_shared<const sharepool::hashonly::Snapshot>(sharepool::hashonly::DecodeSnapshot(*raw)); }
++    catch (const std::ios_base::failure&) { throw sharepool::hashonly::MalformedSnapshot("hash-verified snapshot encoding is invalid"); }
++    // This RPC alone owns the decoded reuse. A denied retention reservation
++    // cannot hide available evidence; a later RPC starts from the store again.
++    cache.Put(hash, snapshot, raw->size());
++    return snapshot;
++}
++
+@@ -1847,0 +1865,3 @@
++                // Declared before the lock so optional retained bodies are
++                // destroyed after unlocking and before full job validation.
++                sharepool::DecodedSnapshotCache history_snapshots{ho::MAX_DEPENDENCY_BYTES, 1024, chainman.m_sharepool_decoded_retention};
+@@ -1857,0 +1878,3 @@
++                const ho::Lookup lookup = [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
++                    return LookupHashJobSnapshot(store, history_snapshots, hash);
++                };
+@@ -1859,2 +1882,2 @@
+-                if (snapshot.binding.height > uint32_t(consensus.SharePoolHeight)) {
+-                    try { parent = store.Lookup(tip->m_mm_rhs); }
++                if (!consensus.SharePoolCompactTides && snapshot.binding.height > uint32_t(consensus.SharePoolHeight)) {
++                    try { parent = lookup(tip->m_mm_rhs); }
+@@ -1865,2 +1888 @@
+-                    const auto derived = ho::MaterializeTidesState(snapshot, tip, consensus,
+-                        [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.Lookup(hash); });
++                    const auto derived = ho::MaterializeTidesState(snapshot, tip, consensus, lookup);
+@@ -1891,0 +1914 @@
++                ho::TidesPayoutPlan payout_plan;
+@@ -1893,3 +1916,2 @@
+-                    const auto accounting = ho::CalculateTidesPayouts(snapshot, tip, planned_bits, consensus,
+-                        [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.Lookup(hash); }, 0, snapshot.payouts, true);
+-                    RequireHashValidation(store, accounting);
++                    RequireHashValidation(store, ho::PrepareTidesPayouts(snapshot, tip, planned_bits, consensus, lookup, payout_plan));
++                    RequireHashValidation(store, payout_plan.Calculate(0, snapshot.payouts, true));
+@@ -1915,3 +1937,4 @@
+-                    const auto accounting = ho::CalculateTidesPayouts(snapshot, tip, block.nBits, consensus,
+-                        [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.Lookup(hash); }, reward, snapshot.payouts);
+-                    RequireHashValidation(store, accounting);
++                    // Same proposal, native parent and target under cs_main;
++                    // only fees are now known. Full validation below remains
++                    // independent and rechecks the resulting exact payouts.
++                    RequireHashValidation(store, payout_plan.Calculate(reward, snapshot.payouts));
+@@ -1940 +1963,2 @@
+-            payload << snapshot.binding << snapshot.job_commitment << ho::SnapshotContentsHash(snapshot);
++            const auto contents = ho::SnapshotContentsHash(snapshot);
++            payload << snapshot.binding << snapshot.job_commitment << contents;
+@@ -1942 +1966 @@
+-            result.pushKV("signing_hash", ho::OwnerHash(snapshot).GetHex());
++            result.pushKV("signing_hash", ho::OwnerHash(snapshot.binding, snapshot.job_commitment, contents).GetHex());
+--- a/src/test/sharepool_hash_tests.cpp
++++ b/src/test/sharepool_hash_tests.cpp
+@@ -1941,0 +1942,97 @@
++BOOST_AUTO_TEST_CASE(tides_payout_plan_reuses_exact_weights_for_reservation_and_rewards)
++{
++    for (const auto version : {ho::TIDES_VERSION, ho::COMPACT_TIDES_VERSION, ho::VARIABLE_TIDES_VERSION}) {
++        consensus.SharePoolTides = true;
++        consensus.SharePoolCompactTides = ho::IsCompactTidesVersion(version);
++        consensus.SharePoolVarDiff = version == ho::VARIABLE_TIDES_VERSION;
++        ho::Snapshot snapshot;
++        snapshot.binding = Owner();
++        size_t lookups{0};
++        const ho::Lookup no_history = [&](const uint256&) -> std::shared_ptr<const ho::Snapshot> {
++            ++lookups;
++            return nullptr;
++        };
++        ho::TidesPayoutPlan plan;
++        std::vector<CTxOut> payouts;
++        BOOST_CHECK(!plan.Calculate(REWARD, payouts).IsValid());
++        BOOST_REQUIRE(ho::PrepareTidesPayouts(snapshot, &indexes[0], SHARE_BITS, consensus, no_history, plan).IsValid());
++        BOOST_REQUIRE(plan.Calculate(MAX_MONEY, payouts).IsValid());
++        BOOST_CHECK(payouts == (std::vector<CTxOut>{CTxOut{MAX_MONEY, CScript{snapshot.binding.payout_script.begin(), snapshot.binding.payout_script.end()}}}));
++        BOOST_REQUIRE(plan.Calculate(0, payouts, true).IsValid());
++        BOOST_REQUIRE_EQUAL(payouts.size(), 1);
++        BOOST_CHECK_EQUAL(payouts[0].nValue, 0);
++
++        for (const unsigned char script : {0x61, 0x62, 0x63}) {
++            Share share;
++            share.origin = snapshot.binding;
++            share.origin.payout_script = Payout(script);
++            share.header.nBits = SHARE_BITS;
++            share.header.nNonce = script;
++            if (consensus.SharePoolVarDiff) share.origin.share_work_bits = script == 0x61 ? 1 : 3;
++            if (script == 0x63) share.origin.pool = uint256{99}; // Independent pool receives no part of this reward.
++            snapshot.shares.push_back(std::move(share));
++        }
++        BOOST_REQUIRE(ho::PrepareTidesPayouts(snapshot, &indexes[0], SHARE_BITS, consensus, no_history, plan).IsValid());
++        const auto prepared_lookups = lookups;
++        BOOST_REQUIRE(plan.Calculate(0, payouts, true).IsValid());
++        const auto alice = Payout(0x61), bob = Payout(0x62);
++        BOOST_CHECK(payouts == (std::vector<CTxOut>{CTxOut{0, CScript{alice.begin(), alice.end()}}, CTxOut{0, CScript{bob.begin(), bob.end()}}}));
++        const CAmount alice_weight = consensus.SharePoolVarDiff ? 2 : 1;
++        const CAmount bob_weight = consensus.SharePoolVarDiff ? 8 : 1;
++        for (const CAmount reward : {CAmount{0}, CAmount{1}, CAmount{3}, REWARD, MAX_MONEY}) {
++            BOOST_REQUIRE(plan.Calculate(reward, payouts).IsValid());
++            std::vector<CTxOut> expected;
++            const CAmount alice_amount = reward * alice_weight / (alice_weight + bob_weight);
++            const CAmount bob_amount = reward * bob_weight / (alice_weight + bob_weight);
++            if (alice_amount) expected.emplace_back(alice_amount, CScript{alice.begin(), alice.end()});
++            if (bob_amount) expected.emplace_back(bob_amount, CScript{bob.begin(), bob.end()});
++            BOOST_CHECK(payouts == expected);
++        }
++        BOOST_CHECK_EQUAL(lookups, prepared_lookups);
++        const auto prior = payouts;
++        BOOST_CHECK(!plan.Calculate(-1, payouts).IsValid());
++        BOOST_CHECK(payouts == prior);
++        ho::TidesPayoutPlan moved{std::move(plan)};
++        BOOST_CHECK(!plan.Calculate(REWARD, payouts).IsValid());
++        BOOST_REQUIRE(moved.Calculate(REWARD, payouts).IsValid());
++    }
++}
++
++BOOST_AUTO_TEST_CASE(tides_payout_plan_failed_history_or_context_cannot_reuse_old_weights)
++{
++    consensus.SharePoolTides = consensus.SharePoolCompactTides = consensus.SharePoolVarDiff = true;
++    auto initial = CompactEmpty();
++    const auto block = CompactBlock(initial);
++    Anchor(block);
++    auto child = CompactEmpty(2);
++    ho::TidesPayoutPlan plan;
++    const auto prepare = [&] { return ho::PrepareTidesPayouts(child, &indexes[1], SHARE_BITS, consensus, Lookup(), plan); };
++    std::vector<CTxOut> payouts;
++    BOOST_REQUIRE(prepare().IsValid());
++    BOOST_REQUIRE(plan.Calculate(REWARD, payouts).IsValid());
++    const auto expected = payouts;
++
++    const auto commitment = indexes[1].m_mm_rhs;
++    indexes[1].m_mm_rhs = uint256{0x34};
++    BOOST_CHECK(prepare().IsMissing());
++    BOOST_CHECK(!plan.Calculate(REWARD, payouts).IsValid());
++    BOOST_CHECK(payouts == expected);
++    indexes[1].m_mm_rhs = commitment;
++    BOOST_REQUIRE(prepare().IsValid());
++    BOOST_REQUIRE(plan.Calculate(REWARD, payouts).IsValid());
++    BOOST_CHECK(payouts == expected);
++
++    auto corrupt = *snapshots.at(commitment);
++    corrupt.authorization[0] ^= 1;
++    const auto bad_hash = ho::SnapshotHash(corrupt);
++    snapshots[bad_hash] = std::make_shared<const ho::Snapshot>(corrupt);
++    indexes[1].m_mm_rhs = bad_hash;
++    BOOST_CHECK(prepare().status == ho::Status::Invalid);
++    BOOST_CHECK(!plan.Calculate(REWARD, payouts).IsValid());
++    indexes[1].m_mm_rhs = commitment;
++    BOOST_REQUIRE(prepare().IsValid());
++    child.binding.native_parent = uint256{0x34};
++    BOOST_CHECK(prepare().status == ho::Status::Invalid);
++    BOOST_CHECK(!plan.Calculate(REWARD, payouts).IsValid());
++}
++
+--- a/test/functional/feature_sharepool_hash_live_capacity.py
++++ b/test/functional/feature_sharepool_hash_live_capacity.py
+@@ -7,2 +7,2 @@
+-A source thread owns its miner gates and a separate RPC connection. The collector
+-owns its gate on the test thread. Offers follow one fixed monotonic schedule,
++A bounded number of source threads own disjoint miner gates and RPC connections.
++The collector owns its gate on the test thread. Offers follow one fixed schedule,
+@@ -16,0 +17 @@
++import os
+@@ -24,0 +26 @@
++from hash_admission_budget import AdmissionDecision, AdmissionRefused
+@@ -27 +29 @@
+-from live_capacity_metrics import phase_counts
++from live_capacity_metrics import merge_measurements, owner_slots, phase_counts
+@@ -92,0 +95,2 @@
++        parser.add_argument('--source-workers', type=int, default=1,
++            help='1..miners fixed owner threads; default1 preserves the serial baseline')
+@@ -175 +179 @@
+-    def event(self, stage, proofs):
++    def event(self, stage, proofs, *, slot=None):
+@@ -177,5 +181,41 @@
+-            self.events.append({'stage': stage, 'seconds': time.monotonic() - self.phase_start,
+-                                'proof_ids': [f'{proof.proof_id:064x}' for proof in proofs]})
+-
+-    def produce(self, signers, unspent, redeem, script):
+-        gates = []
++            row = {'stage': stage, 'seconds': time.monotonic() - self.phase_start,
++                   'proof_ids': [f'{proof.proof_id:064x}' for proof in proofs]}
++            if slot is not None:
++                row['slot'] = slot
++            self.events.append(row)
++
++    def capacity_refused(self, slot, index, signer, reason):
++        """A terminal pre-dispatch refusal consumes no offered proof or ACK."""
++        with self.lock:
++            self.events.append({'stage': 'capacity_refused',
++                'seconds': time.monotonic() - self.phase_start, 'slot': slot,
++                'miner': index, 'identity': signer.public_key.hex(), 'reason': str(reason)[:160]})
++
++    def pressure_decision(self, decision, *, stage, worker=None, miner=None, slot=None):
++        if type(decision) is not AdmissionDecision or decision.mode not in ('OPEN','DRAIN'):
++            raise ValueError('fixture requires an exact admission decision')
++        with self.lock:
++            self.pressure_decisions.append({'seconds': time.monotonic()-self.phase_start,
++                'stage': stage, 'worker': worker, 'miner': miner, 'slot': slot,
++                'mode': decision.mode, 'dispatch_allowed': decision.dispatch_allowed,
++                'ack_allowed': decision.ack_allowed, 'reasons': decision.reasons,
++                'resource_failures': decision.resource_failures,
++                'eligible_count': decision.eligible_count, 'selected_count': decision.selected_count,
++                'native_height': decision.native_height, 'receipt_revision': decision.receipt_revision})
++
++    def prepare(self, gate, signer, *, stage, worker=None, miner=None, slot=None):
++        if self.PROFILE_VERSION == 8:
++            try:
++                decision = gate.admission_status()
++            except AdmissionRefused as error:
++                self.pressure_decision(error.decision,stage=stage,worker=worker,miner=miner,slot=slot)
++                raise
++            self.pressure_decision(decision,stage=stage,worker=worker,miner=miner,slot=slot)
++            # DRAIN can still dispatch the retained prefix. Refusing fresh ACKs
++            # must never suppress a valid settlement of already promised work.
++            if not decision.dispatch_allowed:
++                raise AdmissionRefused(decision)
++        return gate.prepare_native_authorization(sign_owner=signer.sign_owner)
++
++    def produce(self, worker, signers, unspent, redeem, script):
++        gates = {}
+@@ -183 +223,3 @@
+-        proxy = get_rpc_proxy(rpc_url(node.datadir_path, node.index, node.chain, node.rpchost), 0, timeout=60)
++        metrics = self.source_metrics[worker]
++        stats = self.worker_stats[worker]
++        stats['thread_ident'] = threading.get_ident()
+@@ -186 +228,2 @@
+-            result = self.source_metrics.call('rpc.' + method, getattr(proxy, method), *args)
++            assert_equal(threading.get_ident(), stats['thread_ident'])
++            result = metrics.call('rpc.' + method, getattr(proxy, method), *args)
+@@ -189,0 +233 @@
++            proxy = get_rpc_proxy(rpc_url(node.datadir_path, node.index, node.chain, node.rpchost), worker, timeout=60)
+@@ -191,2 +235,4 @@
+-                gates.append(self.open(f'live-miner-{index:03}', signer, rpc))
+-            self.ready.set()
++                if index % self.options.source_workers == worker:
++                    gates[index] = self.open(f'live-miner-{index:03}', signer, rpc)
++            stats['miner_indices'] = sorted(gates)
++            self.source_ready[worker].set()
+@@ -195 +241,2 @@
+-            for slot in range(self.planned):
++            for slot in owner_slots(miners=len(signers), planned=self.planned,
++                    workers=self.options.source_workers, owner=worker):
+@@ -200 +247 @@
+-                index = slot % len(gates)
++                index = slot % len(signers)
+@@ -213,0 +261 @@
++                    refused = False
+@@ -219,2 +267,4 @@
+-                            block, snapshot = gate.make_native(sign_owner=signer.sign_owner)
+-                            authorization = gate.authorize(block.serialize(), snapshot.serialize())
++                            authorization = self.prepare(gate,signer,stage='source_due_build',
++                                worker=worker,miner=index,slot=slot)
++                            block = parse_block(authorization.block_bytes)
++                            snapshot = Snapshot.deserialize(authorization.snapshot_bytes)
+@@ -229 +279 @@
+-                                self.jobs.append({'slot': slot, 'miner': index,
++                                self.jobs.append({'slot': slot, 'miner': index, 'worker': worker,
+@@ -239,0 +290,6 @@
++                        except AdmissionRefused as error:
++                            self.capacity_refused(slot,index,signer,error)
++                            with self.lock:
++                                stats['capacity_refused'] = stats.get('capacity_refused',0)+1
++                            refused = True
++                            break
+@@ -246,0 +303,2 @@
++                    if refused:
++                        continue
+@@ -258 +316 @@
+-                self.event('offered', [proof])
++                self.event('offered', [proof], slot=slot)
+@@ -260,2 +318,6 @@
+-                    self.source_lateness.append(max(0, started - due))
+-                    self.source_service.append(time.monotonic() - started)
++                    lateness, service = max(0, started - due), time.monotonic() - started
++                    self.source_lateness.append(lateness)
++                    self.source_service.append(service)
++                    stats['lateness'].append(lateness)
++                    stats['service'].append(service)
++                    stats['offered'] += 1
+@@ -271,0 +334 @@
++                            stats['queue_wait'].append(time.monotonic() - queue_started)
+@@ -272,0 +336 @@
++                                'slot': slot, 'miner': index, 'worker': worker,
+@@ -280,2 +344,5 @@
+-            self.source_error = error
+-            self.ready.set()
++            with self.lock:
++                if self.source_error is None:
++                    self.source_error = error
++                stats['error_type'] = type(error).__name__
++            self.source_ready[worker].set()
+@@ -283,3 +350,12 @@
+-            for gate in gates:
+-                gate.close()
+-            self.finished.set()
++            for gate in gates.values():
++                try:
++                    gate.close()
++                except BaseException as error:
++                    with self.lock:
++                        if self.source_error is None:
++                            self.source_error = error
++                        stats['error_type'] = type(error).__name__
++            with self.lock:
++                self.source_finished += 1
++                if self.source_finished == self.options.source_workers:
++                    self.finished.set()
+@@ -290,2 +366,3 @@
+-        block, snapshot = gate.make_native(sign_owner=signer.sign_owner)
+-        authorization = gate.authorize(block.serialize(), snapshot.serialize())
++        authorization = self.prepare(gate,signer,stage='collector_settlement')
++        block = parse_block(authorization.block_bytes)
++        snapshot = Snapshot.deserialize(authorization.snapshot_bytes)
+@@ -324,0 +402 @@
++        assert 1 <= opts.source_workers <= opts.miners
+@@ -337 +415,3 @@
+-        self.ready, self.begin, self.stop, self.finished = (threading.Event() for _ in range(4))
++        self.begin, self.stop, self.finished = (threading.Event() for _ in range(3))
++        self.source_ready = [threading.Event() for _ in range(opts.source_workers)]
++        self.source_finished = 0
+@@ -338,0 +419 @@
++        self.pressure_decisions = []
+@@ -341,2 +422,6 @@
+-        self.metrics, self.source_metrics, self.phase_start = Measurements(), Measurements(), time.monotonic()
+-        self.report = {'schema': 2, 'result': 'running',
++        self.metrics = Measurements()
++        self.source_metrics = [Measurements() for _ in range(opts.source_workers)]
++        self.worker_stats = [{'worker': index, 'offered': 0, 'service': [], 'lateness': [], 'queue_wait': []}
++                             for index in range(opts.source_workers)]
++        self.phase_start = time.monotonic()
++        self.report = {'schema': 3, 'result': 'running',
+@@ -347 +432 @@
+-                'profile_version','share_work_bits','target_share_seconds','deduplicate_job_evidence')},
++                'profile_version','share_work_bits','target_share_seconds','deduplicate_job_evidence','source_workers')},
+@@ -352,2 +437,13 @@
+-            'limitations': ['One source thread serially services logical miners; source scheduling backlog is reported.',
+-                'Source offers continue during settlement on separate owner gates and an independent RPC connection.',
++            'source_ownership': {'workers': opts.source_workers,
++                'identity_assignment': 'miner_index modulo source_workers; fixed for the whole run',
++                'one_owner_per_miner': True, 'rpc_connections': opts.source_workers,
++                'max_concurrent_signer_subprocesses': opts.source_workers + 1,
++                'independent_identity_owners': opts.source_workers == opts.miners,
++                'queue_items': self.QUEUE_ITEMS, 'max_pending_producer_items': opts.source_workers,
++                'max_consumer_items': 1, 'max_logical_item_bytes': self.ITEM_WIRE_LIMIT,
++                'max_transit_logical_bytes': (self.QUEUE_ITEMS + opts.source_workers + 1) * self.ITEM_WIRE_LIMIT},
++            'limitations': ['Bounded source owner threads service fixed identity shards; one worker preserves the serial baseline.',
++                'One worker per miner separates gateway scheduling; fewer workers still couple miners within each shard.',
++                'All threads share the Python GIL, one native node and host resources; this is not distributed production capacity.',
++                'Aggregate source/RPC service durations sum overlapping owner intervals, not elapsed time or CPU; driver CPU excludes signer subprocesses.',
++                'Source offers continue during settlement on separate owner gates and RPC connections.',
+@@ -356,2 +452,2 @@
+-                'Queue has eight items of at most two MiB logical payload, plus one producer and one consumer item; Python object overhead is not bounded by this charge.',
+-                'Optional origin deduplication applies only to this single-producer FIFO fixture; logical payload accounting is not measured network traffic.',
++                'Queue has eight items of at most two MiB logical payload, plus one item per source owner and one consumer; Python object and persistent gate overhead are additional.',
++                'Optional origin deduplication uses per-identity ordered messages in this bounded FIFO fixture; logical payload accounting is not measured network traffic.',
+@@ -360 +456,3 @@
+-        keys, producer, collector, sampler = [], None, None, None
++        self.report['limitations'].append('Admission pressure refuses only new local promises; existing ACKs remain retained. Native-winning synthetic shares are not auto-submitted in this controlled-block fixture; settlement block submission is independent of ACK pressure.')
++        self.report['limitations'].append('An additional admission_status query precedes due source and settlement preparation for diagnostic pressure reporting; its preflight cost is included. Collector register_and_ack service includes capacity-refused attempts, whose outcomes are counted separately.')
++        keys, producers, collector, sampler = [], [], None, None
+@@ -383,4 +481,9 @@
+-            producer = threading.Thread(target=self.produce, args=(signers,[(funding.sha256,index,value)
+-                for index in range(self.MINERS)],redeem,script), name='live-native-source')
+-            producer.start()
+-            assert self.ready.wait(30), 'source setup timeout'
++            unspent = [(funding.sha256,index,value) for index in range(self.MINERS)]
++            for worker in range(opts.source_workers):
++                producer = threading.Thread(target=self.produce,
++                    args=(worker,signers,unspent,redeem,script), name=f'live-native-source-{worker}')
++                producers.append(producer)
++                producer.start()
++            setup_deadline = time.monotonic() + 30
++            for ready in self.source_ready:
++                assert ready.wait(max(0, setup_deadline - time.monotonic())), 'source setup timeout'
+@@ -388 +491 @@
+-            sampler = ResourceSampler({'node0':node.process.pid,'node1':follower.process.pid},
++            sampler = ResourceSampler({'node0':node.process.pid,'node1':follower.process.pid,'driver':os.getpid()},
+@@ -394 +497 @@
+-            acknowledged, admitted, history, rejected = set(), set(), [], 0
++            acknowledged, admitted, history, rejected, admission_refused = set(), set(), [], 0, 0
+@@ -423,3 +526,8 @@
+-                            assert collector.receive(proof)
+-                        assert proof.proof_id not in acknowledged
+-                        acknowledged.add(proof.proof_id); self.event('acknowledged',[proof])
++                            try:
++                                assert collector.receive(proof)
++                            except AdmissionRefused as error:
++                                self.pressure_decision(error.decision,stage='collector_pre_ack',miner=index)
++                                self.event('admission_refused',[proof]); admission_refused += 1
++                            else:
++                                assert proof.proof_id not in acknowledged
++                                acknowledged.add(proof.proof_id); self.event('acknowledged',[proof])
+@@ -437,2 +545,3 @@
+-            producer.join(timeout=5)
+-            assert not producer.is_alive()
++            for producer in producers:
++                producer.join(timeout=5)
++                assert not producer.is_alive()
+@@ -441 +550,2 @@
+-            assert_equal(len({row['miner'] for row in self.jobs}),self.MINERS)
++            if not any(event['stage']=='capacity_refused' for event in self.events):
++                assert_equal(len({row['miner'] for row in self.jobs}),self.MINERS)
+@@ -453,0 +564 @@
++            assert_equal(sum(counts.values()),len(acknowledged))
+@@ -457,2 +568,4 @@
+-            assert_equal(complete['offered'], self.planned)
+-            assert_equal(complete['acknowledged'] + complete['rejected'], self.planned)
++            assert_equal(complete['offered'] + complete['capacity_refused'], self.planned)
++            assert_equal({event['slot'] for event in self.events if event['stage'] in ('offered','capacity_refused')},set(range(self.planned)))
++            assert_equal(complete['acknowledged'] + complete['rejected'] + complete['admission_refused'], complete['offered'])
++            assert_equal(complete['admission_refused'],admission_refused)
+@@ -461,2 +574,2 @@
+-            assert_equal(transfers['transferred_items'], self.planned)
+-            assert_equal(transfers['full_origin_items'], len(self.jobs) if opts.deduplicate_job_evidence else self.planned)
++            assert_equal(transfers['transferred_items'], complete['offered'])
++            assert_equal(transfers['full_origin_items'], len(self.jobs) if opts.deduplicate_job_evidence else complete['offered'])
+@@ -465 +578,2 @@
+-                               rejected_before_ack=rejected,payout_oracle_verified=True,peer_verified=True)
++                               rejected_before_ack=rejected,admission_refused=admission_refused,
++                               payout_oracle_verified=bool(self.report['blocks']),peer_verified=bool(self.report['blocks']))
+@@ -473,2 +587,5 @@
+-            if producer is not None:producer.join(timeout=65)
+-            if producer is not None and producer.is_alive():
++            cleanup_deadline = time.monotonic() + 60
++            for producer in producers:
++                producer.join(timeout=max(0,cleanup_deadline-time.monotonic()))
++            sources_stopped = all(not producer.is_alive() for producer in producers)
++            if not sources_stopped:
+@@ -478 +595 @@
+-            if producer is None or not producer.is_alive():
++            if sources_stopped:
+@@ -482 +599 @@
+-                self.report.update(events=list(self.events),jobs=list(self.jobs),
++                self.report.update(events=list(self.events),jobs=list(self.jobs),pressure_decisions=list(self.pressure_decisions),
+@@ -493 +610,9 @@
+-            self.report['measured_phase']['source_unfulfilled_requests'] = self.planned - self.report['measured_phase']['offered']
++            self.report['measured_phase']['source_unfulfilled_requests'] = (self.planned -
++                self.report['measured_phase']['offered'] - self.report['measured_phase']['capacity_refused'])
++            self.report['source_workers'] = [dict(worker=row['worker'],
++                miner_indices=list(row.get('miner_indices', ())), owner_thread=row.get('thread_ident'),
++                offered=row['offered'], source_service=distribution(row['service']),
++                capacity_refused=row.get('capacity_refused',0),
++                source_scheduling_lateness=distribution(row['lateness']),
++                queue_put_wait=distribution(row['queue_wait']), error_type=row.get('error_type'),
++                rpc_measurements=metrics.report()) for row,metrics in zip(self.worker_stats,self.source_metrics)] if sources_stopped else None
+@@ -496 +621 @@
+-                source_rpc_measurements=self.source_metrics.report() if producer is None or not producer.is_alive() else None,
++                source_rpc_measurements=merge_measurements(self.source_metrics) if sources_stopped else None,

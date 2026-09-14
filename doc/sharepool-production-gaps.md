@@ -1,11 +1,18 @@
 # Production gap register
 
 This branch is an opt-in regtest implementation. Passing its tests does not
-authorize mainnet deployment. Versions 4, 5, 6 and 7 have separate wire/rules and local
+authorize mainnet deployment. Versions 4, 5, 6, 7 and 8 have separate wire/rules and local
 database profiles; use a fresh test chain. Historical reports describe their
 recorded source revisions.
 
 ## Current follow-up
+
+The latest [v8 admission-pressure change](sharepool-v8-admission-pressure.md)
+adds local next-batch resource and deadline checks before new ACKs, with bounded
+incremental accounting and continued settlement during overload. It also removes
+repeated local selection and native payout preparation. This does not reserve a
+globally guaranteed inclusion slot or resolve sustained capacity, permissionless
+resource fairness, random-block expiry, WAN availability or production variance.
 
 The optional [v5 confirmed ledger](sharepool-confirmed-ledger.md) anchors
 admissions in native blocks and derives later payouts from the actual parent.

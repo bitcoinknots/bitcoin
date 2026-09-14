@@ -113,8 +113,7 @@ class HashJobScheduler:
             # New receipts alone never invoke this hook or move the deadline.
             if self._before_build is not None:
                 self._before_build()
-            block, snapshot = self.gate.make_native(sign_owner=self._sign_owner)
-            authorization = self.gate.authorize(block.serialize(), snapshot.serialize())
+            authorization = self.gate.prepare_native_authorization(sign_owner=self._sign_owner)
             if not self.gate.ready_for_dispatch(authorization):
                 raise ValueError("job changed before scheduled dispatch; prepare a fresh job")
             self.last_prepare_seconds = self._now() - started

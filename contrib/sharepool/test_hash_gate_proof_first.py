@@ -107,7 +107,10 @@ class HashGateProofFirstTests(unittest.TestCase):
                 gate.register_template(origin.serialize())
                 self.assertEqual(rpc.snapshots[opening.hash_hex], opening.serialize().hex())
                 registrations = [args for name, args in rpc.calls if name == "validatesharepoolhashtemplate"]
-                self.assertEqual(registrations, [(origin.serialize().hex(),)])
+                self.assertEqual(registrations, [(origin.serialize().hex(),)] * 2)
+                methods = self.names(rpc)
+                first = methods.index("validatesharepoolhashtemplate")
+                self.assertNotIn("submitsharepoolhashsnapshot", methods[:first])
                 self.assertIn(template_id(origin), rpc.templates)
                 rpc.calls.clear()
                 self.assertTrue(gate.receive(proof))
@@ -134,7 +137,7 @@ class HashGateProofFirstTests(unittest.TestCase):
                 with self.assertRaises(KeyError):
                     gate._read(TEMPLATE, template_id(origin))
                 self.assert_no_ack(gate, proof, head)
-                self.assertEqual(self.names(rpc).count("validatesharepoolhashtemplate"), 1)
+                self.assertEqual(self.names(rpc).count("validatesharepoolhashtemplate"), 1 if failure == "invalid" else 2)
 
     def test_native_retention_does_not_override_later_registration_failure(self):
         for failure in ("tip", "persist"):

@@ -1,0 +1,16 @@
+2026-09-14T20:12:39.513000Z TestFramework (INFO): PRNG seed is: 8862808624983912708
+2026-09-14T20:12:39.514000Z TestFramework (DEBUG): Setting up network thread
+2026-09-14T20:12:39.514000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v8-final-guard-smoke-r2
+2026-09-14T20:12:39.516000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T20:12:39.518000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T20:12:40.049000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-14T20:12:40.053000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-14T20:12:53.871000Z TestFramework (INFO): Live block 102 admitted 16 proofs; source continues independently
+2026-09-14T20:12:54.246000Z TestFramework (DEBUG): Closing down network thread
+2026-09-14T20:12:54.307000Z TestFramework (INFO): Stopping nodes
+2026-09-14T20:12:54.307000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-14T20:12:54.307000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-14T20:12:54.424000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-14T20:12:54.485000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-14T20:12:54.485000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v8-final-guard-smoke-r2
+2026-09-14T20:12:54.485000Z TestFramework (INFO): Tests successful

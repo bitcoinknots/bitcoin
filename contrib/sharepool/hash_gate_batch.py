@@ -2,6 +2,7 @@
 """Deterministic local settlement batching; native consensus stays authoritative."""
 from collections import OrderedDict
 from io import BytesIO
+from types import MappingProxyType
 
 from hash_snapshot import (MAX_SNAPSHOT_BYTES, MAX_DEPENDENCY_BYTES, MAX_DEPENDENCY_DEPTH,
                            MAX_ORIGIN_CHECKS, MAX_SHARE_AGE, CompactTemplateRecord,
@@ -17,8 +18,34 @@ class BatchLimit(ValueError):
     pass
 
 
+class EmptyBatchCapacity(BatchLimit):
+    """Even the empty settlement cannot fit; no new work was acknowledged.
+
+    Preserve bounded scalar queue/resource diagnostics only. The gate converts
+    this local construction failure into admission pressure; native validity
+    and unavailable evidence never create this exception directly.
+    """
+    def __init__(self, reason, *, eligible_count, oldest_origin_height, resources=None):
+        if (type(reason) is not str or not reason or len(reason) > 160 or
+                type(eligible_count) is not int or not 0 <= eligible_count < 1 << 63 or
+                (eligible_count == 0 and oldest_origin_height is not None) or
+                (eligible_count > 0 and (type(oldest_origin_height) is not int or
+                                         not 1 <= oldest_origin_height <= 0x7fffffff))):
+            raise ValueError("invalid empty-batch capacity metadata")
+        resources = {} if resources is None else resources
+        if (type(resources) is not dict or len(resources) > 32 or
+                any(type(key) is not str or not 1 <= len(key) <= 64 or
+                    type(value) is not int or not 0 <= value < 1 << 63
+                    for key, value in resources.items())):
+            raise ValueError("invalid empty-batch resource metadata")
+        self.reason, self.eligible_count = reason, eligible_count
+        self.oldest_origin_height = oldest_origin_height
+        self.resources = MappingProxyType(dict(resources))
+        super().__init__("even an empty settlement exceeds local or native resource budgets: " + reason)
+
+
 def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSHOT_BYTES,
-                on_snapshot=None, mining_job=False, trusted_parent=None,
+                on_snapshot=None, on_capture=None, mining_job=False, trusted_parent=None,
                 root_origin=None, root_depth=0, activation_height=1, state_cache=None, signature_cache=None):
     """Check the same unique snapshot/depth/origin resource dimensions locally.
 
@@ -82,6 +109,8 @@ def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSH
             owned[id(value)] = encoded
             if on_snapshot is not None:
                 on_snapshot(identity, encoded.raw)
+            if on_capture is not None:
+                on_capture(encoded)
         return identity
 
     # Freeze the supplied proposal before any external lookup callback runs.
@@ -209,7 +238,9 @@ def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSH
             raise BatchLimit("dependency depth")
         if not certified:
             walk(identity, root_depth)
-        return {"snapshot_bytes": len(raw), "dependency_bytes": total, "origins": len(origins) + int(mining_job), "dependency_shares": proof_count}
+        return {"snapshot_bytes": len(raw), "dependency_bytes": total,
+                "origins": len(origins) + int(mining_job), "dependency_shares": proof_count,
+                "dependency_depth": root_depth + depths.get(root_identity, 0) + int(mining_job)}
     finally:
         # The recursive closure otherwise retains its own bounded operation
         # maps until cyclic GC runs, including after a rejected prefix.

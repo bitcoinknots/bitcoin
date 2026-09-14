@@ -1,0 +1,48 @@
+{
+  "network": "two disconnected native regtest nodes",
+  "profile": 8,
+  "hardware_used": false,
+  "contexts": [
+    {
+      "rdts": false,
+      "budget": {
+        "native_tip": "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206",
+        "native_bits": 545259519,
+        "pool": "0000000000000000000000000000000000000000000000000000000000000065",
+        "payout_script": "00146262626262626262626262626262626262626262",
+        "output_count": 1,
+        "output_bytes": 31,
+        "max_output_bytes": 999612
+      },
+      "signed_native_job_constructed": true,
+      "template_bytes": 333
+    },
+    {
+      "rdts": true,
+      "budget": {
+        "native_tip": "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206",
+        "native_bits": 545259519,
+        "pool": "0000000000000000000000000000000000000000000000000000000000000065",
+        "payout_script": "00146262626262626262626262626262626262626262",
+        "output_count": 1,
+        "output_bytes": 31,
+        "max_output_bytes": 199612
+      },
+      "signed_native_job_constructed": true,
+      "template_bytes": 333
+    }
+  ],
+  "daemon_sha256": "e2e1bf00b31ec06ae173b799337d4a6a75a567ef2e0fd508e26a05d6646ac364",
+  "source_sha256": {
+    "src/sharepool/mining_budget.h": "77e9c28e50e9fb0b2cd24117cfdf97d0069a21f12b457a7106c47a38856eb249",
+    "src/rpc/mining.cpp": "e54b211f6548b1d94171bd670e85ddb87b27848afea8f5faebbff681a03655d3",
+    "src/test/sharepool_retry_worker_tests.cpp": "679420d1520e426e8f0aeff453fa2862fa06fe64383571457ffb22382eb2766f",
+    "test/functional/feature_sharepool_hash_mining_budget.py": "b655d9a715e5cf97c6c5459602fbfd850aeeb0ec6236becff9004ad62821fa29"
+  },
+  "checks": [
+    "ordinary_context_max_output_bytes",
+    "rdts_context_max_output_bytes",
+    "payout_budget_tip_and_target_binding",
+    "native_job_construction_in_both_contexts"
+  ]
+}

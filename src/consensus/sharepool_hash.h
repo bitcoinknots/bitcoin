@@ -208,6 +208,28 @@ uint256 ShareTarget(const Share& share);
 std::vector<unsigned char> NormalizedHeader(const CBlockHeader& header);
 uint256 TemplateId(const CBlockHeader& header);
 std::vector<CTxOut> CalculatePayouts(const Snapshot& snapshot, CAmount reward);
+/** Invocation-local exact payout weights. Reuse only while constructing one
+ * unchanged snapshot against the same native parent/target. This owns derived
+ * integers, not chain pointers, evidence or a native-validity verdict. */
+class TidesPayoutPlan {
+    struct Impl;
+    std::unique_ptr<Impl> m_impl;
+    friend Result PrepareTidesPayouts(const Snapshot&, const CBlockIndex*, uint32_t,
+                                      const Consensus::Params&, const Lookup&, TidesPayoutPlan&);
+public:
+    TidesPayoutPlan();
+    ~TidesPayoutPlan();
+    TidesPayoutPlan(TidesPayoutPlan&&) noexcept;
+    TidesPayoutPlan& operator=(TidesPayoutPlan&&) noexcept;
+    TidesPayoutPlan(const TidesPayoutPlan&) = delete;
+    TidesPayoutPlan& operator=(const TidesPayoutPlan&) = delete;
+    Result Calculate(CAmount reward, std::vector<CTxOut>& payouts, bool reserve_scripts = false) const;
+};
+/** Reset plan before reading history; a failed preparation cannot leave an old
+ * plan usable. All existing scope, history availability and budget checks apply. */
+Result PrepareTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previous,
+                          uint32_t native_bits, const Consensus::Params& consensus,
+                          const Lookup& lookup, TidesPayoutPlan& plan);
 /** Current job admissions extend actual-parent history. Full native reward is
  * required: flooring residue is unclaimed, never inferred from coinbase totals.
  * reserve_scripts returns zero-valued slots for every eligible script so the

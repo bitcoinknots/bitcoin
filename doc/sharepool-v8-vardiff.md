@@ -10,6 +10,12 @@ This is a separately selected regtest profile. V4–v7 rules, encodings and sign
 evidence remain unchanged. Existing datadirs cannot silently switch profiles.
 Mainnet activation is not provided.
 
+The [admission-pressure policy](sharepool-v8-admission-pressure.md) separately
+limits new local credits to work that fits the next settlement batch. During
+congestion the difficulty estimator pauses its observation window so capacity
+refusals cannot be mistaken for lower hashrate. Native-winning submissions
+remain eligible for block submission independently of their local receipt.
+
 ## Commitment and work credit
 
 The v8 envelope adds one byte, `share_work_bits`, after `payout_script` and before

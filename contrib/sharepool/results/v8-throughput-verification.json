@@ -1,0 +1,566 @@
+{
+  "generated_utc": "2026-09-14T20:15:14.254375+00:00",
+  "base_commit": "4eb1e2a40aca74360b4ce325fb9c239f56bb6d2e",
+  "profile": "hash-only-v8-vardiff-tides",
+  "rules_hash": "173ff6fa511f227cc8d4751bb15373afdca5c8ec235dc69ca2680d7ade13ea31",
+  "default_target_share_seconds": 6,
+  "default_target_shares_per_minute_per_miner": 10,
+  "mainnet_enabled": false,
+  "physical_hardware_used": false,
+  "consensus_limits_changed": false,
+  "correctness_result": "passed",
+  "production_capacity": "not_qualified",
+  "verification": {
+    "python_gateway_tests": 386,
+    "python_gateway_seconds": 28.103,
+    "python_fixture_tests": 10,
+    "python_fixture_seconds": 0.051,
+    "python_total": 396,
+    "python_command": "PYTHONPATH=contrib/sharepool:test/functional python3 -B -m unittest discover -s contrib/sharepool -p 'test_hash_*.py' -v",
+    "fixture_command": "PYTHONPATH=contrib/sharepool:test/functional python3 -B -m unittest test_live_capacity_metrics test_live_capacity_workers -v",
+    "command_cwd": "repository root",
+    "native_cpp_cases": 121,
+    "native_cpp_command": "/usr/bin/time -p /private/tmp/sharepool-native-build/bin/test_bitcoin --run_test=sharepool_params_tests,sharepool_signer_tests,sharepool_hash_tests,sharepool_tides_history_tests,sharepool_tides_history_store_tests,sharepool_tides_consensus_tests,sharepool_retry_worker_tests --log_level=test_suite --report_level=detailed > /private/tmp/sharepool-coinbase-guard-cpp120.txt 2>&1",
+    "native_cpp_seconds": {
+      "real": 122.01,
+      "user": 119.05,
+      "sys": 0.6
+    },
+    "native_scenarios": [
+      {
+        "name": "feature_sharepool_hash_mining_budget",
+        "passed": true,
+        "command": "python3 -B test/functional/feature_sharepool_hash_mining_budget.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-coinbase-guard-budget-native --nocleanup > /private/tmp/sharepool-coinbase-guard-budget-native.txt 2>&1",
+        "log": "contrib/sharepool/results/v8-throughput-mining-budget.txt",
+        "report": "contrib/sharepool/results/v8-throughput-mining-budget.json",
+        "checks": [
+          "ordinary_context_max_output_bytes",
+          "rdts_context_max_output_bytes",
+          "payout_budget_tip_and_target_binding",
+          "native_job_construction_in_both_contexts"
+        ]
+      },
+      {
+        "name": "feature_sharepool_hash_stratum_pressure",
+        "passed": true,
+        "command": "python3 -B test/functional/feature_sharepool_hash_stratum_pressure.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-coinbase-guard-pressure-native --nocleanup > /private/tmp/sharepool-coinbase-guard-pressure-native.txt 2>&1",
+        "log": "contrib/sharepool/results/v8-throughput-stratum-pressure.txt",
+        "report": "contrib/sharepool/results/v8-throughput-stratum-pressure.json",
+        "checks": [
+          "actual_gate_budget_refuses_native_valid_share",
+          "refused_proofs_not_journaled",
+          "warm_proofs_no_template_or_snapshot_replay",
+          "exact_duplicate_not_recredited",
+          "missing_only_recovery_into_empty_native_peer",
+          "recovered_refusal_not_journaled",
+          "native_winner_submitted_with_exact_old_bytes",
+          "native_block_accepted",
+          "pressure_pauses_estimator_without_credit",
+          "native_verifychain"
+        ]
+      },
+      {
+        "name": "feature_sharepool_hash_vardiff_stratum",
+        "passed": true,
+        "command": "python3 -B test/functional/feature_sharepool_hash_vardiff_stratum.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-coinbase-guard-wire-native --nocleanup > /private/tmp/sharepool-coinbase-guard-wire-native.txt 2>&1",
+        "log": "contrib/sharepool/results/v8-throughput-vardiff-stratum.txt",
+        "report": "contrib/sharepool/results/v8-throughput-vardiff-stratum.json",
+        "checks": [
+          "explicit_registration_first_proof_without_missing_recovery",
+          "wire_submissions_no_missing_origin_recovery",
+          "independent_signed_assignments_and_real_notifications",
+          "wire_difficulty_matches_union_of_assigned_and_native_targets",
+          "one_active_client_per_identity",
+          "eight_native_validated_shares_without_refresh",
+          "duplicate_does_not_affect_estimator",
+          "retarget_only_on_due_refresh",
+          "other_identity_assignment_unchanged",
+          "late_old_target_share_keeps_original_work",
+          "all_gate_rpc_calls_on_owner_thread",
+          "native_only_winner_exact_bytes_accepted",
+          "native_only_winner_not_credited",
+          "exact_work_weighted_coinbase_payouts",
+          "native_verifychain",
+          "standalone_cli_startup_default_cadence_and_shutdown"
+        ]
+      },
+      {
+        "name": "feature_sharepool_hash_gate_provenance",
+        "passed": true,
+        "command": "python3 -B test/functional/feature_sharepool_hash_gate_provenance.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-coinbase-guard-provenance-native --nocleanup > /private/tmp/sharepool-coinbase-guard-provenance-native.txt 2>&1",
+        "log": "contrib/sharepool/results/v8-throughput-provenance.txt"
+      },
+      {
+        "name": "Eight miners and eight owners, final-code capacity smoke",
+        "passed": true,
+        "report": "contrib/sharepool/results/v8-throughput-final-smoke.json",
+        "independent_audit": "contrib/sharepool/results/v8-throughput-final-smoke-verification.json",
+        "scheduled_requests": 16,
+        "measured_phase": {
+          "offered": 16,
+          "acknowledged": 16,
+          "admitted": 0,
+          "peer_verified": 0,
+          "rejected": 0,
+          "admission_refused": 0,
+          "seconds": 12,
+          "capacity_refused": 0,
+          "unacknowledged_queue": 0,
+          "acknowledged_backlog": 16,
+          "peer_backlog": 0,
+          "observed_admitted_per_second": 0.0,
+          "observed_peer_verified_per_second": 0.0,
+          "scheduled_requests_due": 16,
+          "source_unfulfilled_requests": 0
+        },
+        "completed_run": {
+          "offered": 16,
+          "acknowledged": 16,
+          "admitted": 16,
+          "peer_verified": 16,
+          "rejected": 0,
+          "admission_refused": 0,
+          "seconds": 12.713718958000001,
+          "capacity_refused": 0,
+          "unacknowledged_queue": 0,
+          "acknowledged_backlog": 0,
+          "peer_backlog": 0,
+          "observed_admitted_per_second": 1.2584830648574417,
+          "observed_peer_verified_per_second": 1.2584830648574417
+        },
+        "limitation": "Finite 12-second source; final drain follows cutoff. Not a sustained capacity benchmark."
+      }
+    ],
+    "native_manifest": "contrib/sharepool/results/v8-throughput-native-verification.json"
+  },
+  "earlier_revision_verification": {
+    "report": "contrib/sharepool/results/v8-throughput-vardiff-before-guard.json",
+    "passed": true,
+    "checks": 13,
+    "scope": "100 miners, weighted payouts, assignment mutation, forks, restart and reindex on pre-final-guard daemon",
+    "native_binary_sha256": "9e108546089e821dca93344f10a2fe5020f07d7df61e2deb4139f18218422893"
+  },
+  "capacity_runs": [
+    {
+      "artifact": "contrib/sharepool/results/v8-throughput-100-workers.json",
+      "revision": "recorded pre-final-guard sources, see prelaunch manifests and reconstructable patch",
+      "configuration": {
+        "miners": 100,
+        "duration_seconds": 60,
+        "offer_interval_ms": 60.0,
+        "settlement_seconds": 20,
+        "work_update_seconds": 40,
+        "snapshot_budget_bytes": 1048576,
+        "padding_outputs": 0,
+        "max_runtime_seconds": 900,
+        "profile_version": 8,
+        "share_work_bits": [
+          2,
+          4,
+          6
+        ],
+        "target_share_seconds": 6.0,
+        "deduplicate_job_evidence": true,
+        "source_workers": 8
+      },
+      "measured_phase": {
+        "offered": 403,
+        "acknowledged": 389,
+        "admitted": 382,
+        "peer_verified": 382,
+        "rejected": 0,
+        "admission_refused": 0,
+        "seconds": 60,
+        "capacity_refused": 0,
+        "unacknowledged_queue": 14,
+        "acknowledged_backlog": 7,
+        "peer_backlog": 0,
+        "observed_admitted_per_second": 6.366666666666666,
+        "observed_peer_verified_per_second": 6.366666666666666,
+        "scheduled_requests_due": 1000,
+        "source_unfulfilled_requests": 597
+      },
+      "completed_run": {
+        "offered": 1000,
+        "acknowledged": 1000,
+        "admitted": 1000,
+        "peer_verified": 1000,
+        "rejected": 0,
+        "admission_refused": 0,
+        "seconds": 401.357656292,
+        "capacity_refused": 0,
+        "unacknowledged_queue": 0,
+        "acknowledged_backlog": 0,
+        "peer_backlog": 0,
+        "observed_admitted_per_second": 2.491543351231026,
+        "observed_peer_verified_per_second": 2.491543351231026
+      },
+      "receipt_states": {
+        "confirmed_admitted": 1000
+      },
+      "expired_acknowledged": 0,
+      "payout_oracle_verified": true,
+      "peer_verified": true,
+      "native_binary_sha256": "9e108546089e821dca93344f10a2fe5020f07d7df61e2deb4139f18218422893"
+    },
+    {
+      "artifact": "contrib/sharepool/results/v8-throughput-100-small.json",
+      "revision": "recorded pre-final-guard sources, see prelaunch manifests and reconstructable patch",
+      "configuration": {
+        "miners": 100,
+        "duration_seconds": 60,
+        "offer_interval_ms": 60.0,
+        "settlement_seconds": 20,
+        "work_update_seconds": 40,
+        "snapshot_budget_bytes": 65536,
+        "padding_outputs": 0,
+        "max_runtime_seconds": 900,
+        "profile_version": 8,
+        "share_work_bits": [
+          2,
+          4,
+          6
+        ],
+        "target_share_seconds": 6.0,
+        "deduplicate_job_evidence": true,
+        "source_workers": 8
+      },
+      "measured_phase": {
+        "offered": 160,
+        "acknowledged": 122,
+        "admitted": 98,
+        "peer_verified": 98,
+        "rejected": 0,
+        "admission_refused": 21,
+        "seconds": 60,
+        "capacity_refused": 0,
+        "unacknowledged_queue": 17,
+        "acknowledged_backlog": 24,
+        "peer_backlog": 0,
+        "observed_admitted_per_second": 1.6333333333333333,
+        "observed_peer_verified_per_second": 1.6333333333333333,
+        "scheduled_requests_due": 1000,
+        "source_unfulfilled_requests": 840
+      },
+      "completed_run": {
+        "offered": 1000,
+        "acknowledged": 873,
+        "admitted": 873,
+        "peer_verified": 873,
+        "rejected": 0,
+        "admission_refused": 127,
+        "seconds": 596.1963038749999,
+        "capacity_refused": 0,
+        "unacknowledged_queue": 0,
+        "acknowledged_backlog": 0,
+        "peer_backlog": 0,
+        "observed_admitted_per_second": 1.4642828114262103,
+        "observed_peer_verified_per_second": 1.4642828114262103
+      },
+      "receipt_states": {
+        "confirmed_admitted": 873
+      },
+      "expired_acknowledged": 0,
+      "payout_oracle_verified": true,
+      "peer_verified": true,
+      "native_binary_sha256": "9e108546089e821dca93344f10a2fe5020f07d7df61e2deb4139f18218422893"
+    }
+  ],
+  "benchmark_reconstruction": {
+    "base_commit": "4eb1e2a40aca74360b4ce325fb9c239f56bb6d2e",
+    "patch": "contrib/sharepool/results/v8-throughput-benchmark-source.diff",
+    "source_hashes": "contrib/sharepool/results/v8-throughput-benchmark-sources.json",
+    "files_verified": 26,
+    "context_lines": 0,
+    "large_prelaunch": "contrib/sharepool/results/v8-throughput-large-prelaunch.json",
+    "small_prelaunch": "contrib/sharepool/results/v8-throughput-small-prelaunch.json",
+    "disk_drift": "Raw report source_sha256 maps are end-of-run disk hashes. One unused inventory importer changed during the large run; three already imported Python modules changed during the small run. Use prelaunch sources for the measured revisions. Final contextual coinbase/empty-settlement/retry guards are verified separately.",
+    "audit": "contrib/sharepool/results/v8-throughput-comparison.json"
+  },
+  "limitations": [
+    "Finite synthetic regtest, fixed easy work assignments and controlled block opportunities, two loopback Debug nodes. No ASIC, WAN or production-variance measurement.",
+    "The 100-miner comparison changes code and source owners from one to eight. The 32.54% shorter live-and-drain runtime is not an isolated code speedup.",
+    "Only 389 of 1000 scheduled requests were acknowledged in the first minute at 1 MiB; eventual settlement is not scheduled throughput.",
+    "The 64 KiB run protects 873 acknowledged shares by refusing 127 native-valid offers before ACK; it does not deliver all scheduled work.",
+    "Local admission margins do not guarantee settlement under arbitrary block arrivals, reorgs, budget changes or unavailable evidence.",
+    "Fresh native validation and durable per-receipt sealing remain. Repeated provenance/canonicalization, ancestry RPCs and native lock contention still constrain capacity.",
+    "Permissionless CPU/RSS/disk fairness, WAN data availability, production payout variance and lifetime archive startup remain unresolved.",
+    "Existing proof/origin/dependency/recipient/coinbase limits are unchanged. The 32768-proof cap cannot fit 1000 miners at ten shares/minute in each average ten-minute block.",
+    "Final small native fixtures overlapped Python correctness tests; their elapsed times are not isolated performance measurements."
+  ],
+  "source_sha256": {
+    "contrib/sharepool/capacity_metrics.py": "4c5d2534c45bdee99f12e653ec46e010f4ab6aba6108914015bc8e08498a25db",
+    "contrib/sharepool/hash_admission_accounting.py": "fc0742fc5058dce6fedb973622a50bf5fd0802416c75ace1c9704259cbbabdeb",
+    "contrib/sharepool/hash_admission_budget.py": "a8595b23b70a2d4aa467da498995c20874b14401faba077ca889279ff7df13e9",
+    "contrib/sharepool/hash_gate_admission.py": "36d4e9130667ac8c6c35f0644c3f8b1754fed0e8263836d132af270454e0d4e2",
+    "contrib/sharepool/hash_gate_archive.py": "60cb4e585c6f33c5f45d47a419c6cf8ccfd5b1781381a60a3ddbb2c48b244bca",
+    "contrib/sharepool/hash_gate_batch.py": "8edfd9ed2748bdcf960cfebfbc424c7bd3564cde9bb644b86fe0380bfe0e4f78",
+    "contrib/sharepool/hash_gate_cache.py": "49408d7b9144198591eeb36a803f6e129aacd121a14d4e5c7547d453f24fb6f5",
+    "contrib/sharepool/hash_gate_inventory.py": "0703914865c75a2ebd18b97c170ddbbc5e3b895053c1540369bd44b7ad4bafe9",
+    "contrib/sharepool/hash_gate_origin_cache.py": "26261d55be2b34ecbc719e588769be1f704f0a1705bad519ae77e5981dab7b90",
+    "contrib/sharepool/hash_gate_rpc.py": "9731a831c263f2d6e8aef6581454e748892a53c52a1f958cc66a3c62dd846c5a",
+    "contrib/sharepool/hash_gate_startup.py": "9ee4e4b994d0c7da288b1a002f3abf93ae1a9a65a15cba704a59009084845bd2",
+    "contrib/sharepool/hash_job_scheduler.py": "8617b86fd3f80574e1bd947dc73e8b4552f56fe17d4dec89a108822a4de78eb6",
+    "contrib/sharepool/hash_mining_gate.py": "9fb23b15acdf5436a5949d5417240c6ebf3159984bab883a597a700809c2be8b",
+    "contrib/sharepool/hash_signature_cache.py": "41c7bb570ad3126b62443c0140e1a4116e9deafed6581e3ebf2ed60ec92f111e",
+    "contrib/sharepool/hash_snapshot.py": "8cc9f1ae092cdd71b955e017181fd566c6015b7d6c6aae38104caa4c4598fa0c",
+    "contrib/sharepool/hash_state_cache.py": "fe452a5dfc3be9b22b77a39b4a4a44a5e430bbd9b4371b7ede65f122a95f32b8",
+    "contrib/sharepool/hash_stratum.py": "c58408b43ba7270f312be19f01a7f43b222f5f2d145581d776f5dc50c9ecf4d3",
+    "contrib/sharepool/hash_stratum_forwarder.py": "a435faed9a3320c5004ffc4960f263781521308fa6acd8a5f9e65e45b03de8d8",
+    "contrib/sharepool/hash_stratum_runner.py": "5e6c64429a51d5d5594666d9104c4f3d93656fb8fd9f8afb58dcaa3667c6483e",
+    "contrib/sharepool/hash_vardiff.py": "a2f855cc5f89748f622b1b59ea4d2435efaba38edbc7d561bb69079622086e3d",
+    "contrib/sharepool/live_capacity_metrics.py": "dd488426bc6c22f605db5e83e92d9b49bfac7b184b2b7c1e7ce9b0c225cd73b7",
+    "contrib/sharepool/share_difficulty_capacity.py": "be4db0dabb2689c2adee4525b5a2606df30b27cc199b24974375daec9ba851dc",
+    "contrib/sharepool/test_capacity_fixture.py": "17bf1846ae7ea2b407cceead5a8461a6717be233bcc8ea134ab5ddeed2f1784a",
+    "contrib/sharepool/test_capacity_metrics.py": "721075e9d9d8bb3ca6d8d8366efdb03456a497d52d70304ff94040a307311d69",
+    "contrib/sharepool/test_hash_admission_accounting.py": "9a2292dcaa6e4af4ed928017b3018da0d7d1baea95fb0e6b6af614d1bae3cb60",
+    "contrib/sharepool/test_hash_admission_budget.py": "7b1a8335bd01f881b093f1711bb41b2dabcb1697a4d21c962f99195e52589f63",
+    "contrib/sharepool/test_hash_batch_resource_loading.py": "809750d8be71f5453550ec1a90392d30f339d3838d273a2afd58230f5c9dd6d6",
+    "contrib/sharepool/test_hash_codec_latency.py": "b25e68c48f39fdf45443bf05c657d11b2abee2a4aa153006b1d022e865b92c6c",
+    "contrib/sharepool/test_hash_compact.py": "2987dfc4346cea6b3d58bed960522b33b47ba948ed33869f4bffa6188f7472a7",
+    "contrib/sharepool/test_hash_gate_admission.py": "198c27f7562cb91ac0cc2ee222941afa0e02115dfd5cccbe561ea70f8f68dca0",
+    "contrib/sharepool/test_hash_gate_archive.py": "7143537622f3ff9691bf60bd2c02fe9e8ebcd25b49ab59d35f33d6b29ba03525",
+    "contrib/sharepool/test_hash_gate_batch.py": "9c0a0c1e2eb65d587ee00660df4ce3c0b669147c996545067a852deaaf6a4f73",
+    "contrib/sharepool/test_hash_gate_cache.py": "da93a2abf081f2b4e48d36a6ba3b1b7f19d200b0b947a593b7820abfa7f24eea",
+    "contrib/sharepool/test_hash_gate_context.py": "90182d673f654a2625ea91139da0aa70d308826a775341475f6cef94fee366e2",
+    "contrib/sharepool/test_hash_gate_decode_reuse.py": "f29d13eb2f8da735b7544a9c9f9c00eb7cce857f69fbeda52b5e97181851bb2b",
+    "contrib/sharepool/test_hash_gate_dispatch.py": "eed264dec4d48df3658c1279277cf1447a17bcc7dfd2124f83d837b631243336",
+    "contrib/sharepool/test_hash_gate_inventory.py": "0a03003f3eba81b0dee9562cf2ac31cc467c09ac8c7e2d09395e95de4a21e932",
+    "contrib/sharepool/test_hash_gate_ledger.py": "e5057ca75faa411d0ed925a8e7d3c37b1a29274631189697a542f3a4c5edd90b",
+    "contrib/sharepool/test_hash_gate_origin_cache.py": "6a8a64f7509847aad787a64f0375d7cbe0ca8c6d06907b7d319deeebc4c7b7df",
+    "contrib/sharepool/test_hash_gate_proof_first.py": "b5ef4806cd8ee47f2f3a5c40249996867e3833708010cb1af4b74adf893d1e57",
+    "contrib/sharepool/test_hash_gate_provenance.py": "cb30d078355180dae3d822ad6dbda4be20bf2b75c3147f1211623d0dcfb969e9",
+    "contrib/sharepool/test_hash_gate_startup.py": "2a49430e86a2f77b2a0d8c9c3202ac05ffe91535bc16fdef68dc88b84d7aef24",
+    "contrib/sharepool/test_hash_gate_state_reuse.py": "4be5076cc39306041851c183279c31d1994cc8091217fb77d2931b462eead467",
+    "contrib/sharepool/test_hash_graph_latency.py": "40c330142b44fc91a7618dc214c073f416162da1f88509fc6b9753e7d56fb149",
+    "contrib/sharepool/test_hash_job_scheduler.py": "fb5c7c40fea7b7e99a71bc98cae4f02f8a4ceb6568911cef050444507e56117f",
+    "contrib/sharepool/test_hash_ledger.py": "9253172df1131aacc19763f51c52714da5ac992791da4b0ada0ecb0926095624",
+    "contrib/sharepool/test_hash_mining_gate.py": "e3e56dc417d5caa03c5543ab59b9d2b16885ba5a7e27e0cb7091804963eff79e",
+    "contrib/sharepool/test_hash_signature_cache.py": "1aff7e5e62ef02007a9e0ba1b9738baa1656fbc7a7d01c3b1db7b310824bde62",
+    "contrib/sharepool/test_hash_snapshot.py": "10acdbfa21b9db00db304bce8920051ebff5e347fba92977b05ed6f409a03d67",
+    "contrib/sharepool/test_hash_state_cache.py": "016f8280058687f02164495fe46ebf1b3ca0b017ddef9161bdbc697ea2e23d10",
+    "contrib/sharepool/test_hash_state_replay.py": "5037b9f5ac19dfb3915f6ecbd5d1b1ff43766bb01ccee3235ff26d21bb481ab3",
+    "contrib/sharepool/test_hash_stratum.py": "6d0b58278af8c1bce42691733f207a5510702270073e36cc0765b323db3a4885",
+    "contrib/sharepool/test_hash_stratum_forwarder.py": "36641a91fc7faa5002d74f429c10a046e66011f27d7457d00b62a2c43b8e2b9a",
+    "contrib/sharepool/test_hash_stratum_pressure.py": "52eb55b35f936821b3826f9c4100e5b7a17ee0b601f93a546eb75b13fd7332f2",
+    "contrib/sharepool/test_hash_tides.py": "7a2c10b64e3c7953cfbb629b3dde8b9bc38ade13c01ea3ee9bf03ae93b4daf06",
+    "contrib/sharepool/test_hash_tides_cross_pool.py": "0d08f0f7e2209d099c453ddf461a33b6025a22f8f95812c4864c8c7a2a275b25",
+    "contrib/sharepool/test_hash_vardiff.py": "cdf84dec9391676396b9435c9230f6cdfc95b2f7d731d3e0d31b61fbff24c408",
+    "contrib/sharepool/test_hash_vardiff_stratum.py": "a406d69e2f85b763159422c9240265ac68bb7a39897506b74cbb10bcd202c863",
+    "contrib/sharepool/test_hash_variable.py": "be4c8d372962936334b12f4044403b513cef5494317b99a5b93216aa2f02005e",
+    "contrib/sharepool/test_live_capacity_metrics.py": "f5431d5a51e86128be20a393b9a51d479d4f36cdf6328a71382ea195e2f85f19",
+    "contrib/sharepool/test_live_capacity_workers.py": "42b9b1c9ba4d098df31ce5b20ed9479ea601656a3485797ee80a591702cb7aa3",
+    "contrib/sharepool/test_share_difficulty_capacity.py": "62c74f33f7aca0128d2b63b727d577cc81ed89e54d1a6e6faa6abbbc7bef36d1",
+    "src/consensus/sharepool_hash.cpp": "0cfcc68537ff28c003f805501e669299ddfa9487a270ac9236c670d4ce349b4e",
+    "src/consensus/sharepool_hash.h": "7119704ad53fc2cde61ac8b2cdd055bee920a9d429f552560dc9d5cbe75da5b5",
+    "src/rpc/mining.cpp": "e54b211f6548b1d94171bd670e85ddb87b27848afea8f5faebbff681a03655d3",
+    "src/sharepool/mining_budget.h": "77e9c28e50e9fb0b2cd24117cfdf97d0069a21f12b457a7106c47a38856eb249",
+    "src/test/sharepool_hash_tests.cpp": "c5115402b78773a8d1d967bdc895080fee58e813198bf4078e5b67f3755c0488",
+    "src/test/sharepool_retry_worker_tests.cpp": "679420d1520e426e8f0aeff453fa2862fa06fe64383571457ffb22382eb2766f",
+    "test/functional/feature_sharepool_hash_gate_provenance.py": "86bfd53fed9dc75dfe3d0e6407253690c2ffd7c50a59b72be847383176b8a5e0",
+    "test/functional/feature_sharepool_hash_live_capacity.py": "89697d97b76b6e909826c755f8da433a3e27fbd66e9966e886c43779cadbd8ca",
+    "test/functional/feature_sharepool_hash_mining_budget.py": "b655d9a715e5cf97c6c5459602fbfd850aeeb0ec6236becff9004ad62821fa29",
+    "test/functional/feature_sharepool_hash_stratum_pressure.py": "ac30576c8477677fa7a04a4771e492431a4ca79c7c1bb8fb8d34f1d6ad2f1c2e",
+    "test/functional/feature_sharepool_hash_vardiff_stratum.py": "26dabe067a218a98c6897e7981d0a28c692f6ec21cf6279f9b73cf8fa61b210a",
+    "test/functional/test_runner.py": "c3ae0ad1f32e92692f4c2f24eb4b907577420ed86a73a560c354f19810607205"
+  },
+  "binary_sha256": {
+    "bitcoind": "e2e1bf00b31ec06ae173b799337d4a6a75a567ef2e0fd508e26a05d6646ac364",
+    "bitcoin-sharepool-signer": "6c0cfaed537b99c687e002b4248c4717419415e6b845d1a5c7ee633855ab60a0",
+    "test_bitcoin": "1a84d016dac09e1866c5156a756acf7b4d179a690e831df624a974a2e30829f3"
+  },
+  "artifacts": {
+    "contrib/sharepool/results/v8-throughput-100-workers.json": {
+      "original_path": "/private/tmp/sharepool-v8-throughput-100-workers.json",
+      "sha256": "110872a936bf85074abdfe3eb7b2b8c921bb91f8f181b67accda6818a9a403ed",
+      "bytes": 3005257,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-100-workers.txt": {
+      "original_path": "/private/tmp/sharepool-v8-throughput-100-workers.txt",
+      "sha256": "74143b5f57fd3ce5ff5e7154adee0b8e378233a4efd629bd871a2af32e2dc771",
+      "bytes": 3244,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-100-small.json": {
+      "original_path": "/private/tmp/sharepool-v8-throughput-100-small.json",
+      "sha256": "c7a1ac716bffefb31ebc02d36012074b2d09ef48a8906c5e611cb424cc3983c4",
+      "bytes": 3447767,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-100-small.txt": {
+      "original_path": "/private/tmp/sharepool-v8-throughput-100-small.txt",
+      "sha256": "c4e4d4eeace8abe7ff4f15433ab1ff4bc3b3098aa55bdba59c174998fb09b728",
+      "bytes": 4399,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-smoke-before-guard.json": {
+      "original_path": "/private/tmp/sharepool-v8-throughput-smoke.json",
+      "sha256": "fcccef7b3915449cc3d36471a4c70126be1a2415eeda346098bf8cda756b7a49",
+      "bytes": 84863,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-smoke-before-guard.txt": {
+      "original_path": "/private/tmp/sharepool-v8-throughput-smoke.txt",
+      "sha256": "1cd08e0e5649c7188beed4b6a73c4e309a9be1ab113fa4bbebb08ab5faa99b17",
+      "bytes": 1374,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-large-prelaunch.json": {
+      "original_path": "/private/tmp/sharepool-v8-throughput-prelaunch-manifest.json",
+      "sha256": "1e9fedd6ed357f7f272a97a8eafaa6529289e1eefbc2b6daf7b5e085291add9e",
+      "bytes": 3197,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-small-prelaunch.json": {
+      "original_path": "/private/tmp/sharepool-v8-throughput-small-prelaunch-manifest.json",
+      "sha256": "b5a1c26e75fbdfc6bf4f2657aaf5697f8a30acb58a6954f39c1d9137665a8d75",
+      "bytes": 3175,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-benchmark-source.diff": {
+      "original_path": "/private/tmp/sharepool-v8-throughput-benchmark-source.diff",
+      "sha256": "bf60d3bcc3bf99771c30ca23cc85d5c31d5b1c438227dc0f0aacbb4582d62dd4",
+      "bytes": 95156,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-benchmark-sources.json": {
+      "original_path": "/private/tmp/sharepool-v8-throughput-benchmark-sources.json",
+      "sha256": "dec03134d7bafc75fdcb26b52d289b6c779d58dd817c93c7db528b1f325704f1",
+      "bytes": 3415,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-comparison.json": {
+      "original_path": "/private/tmp/sharepool-v8-throughput-comparison.json",
+      "sha256": "6d8aeb10440ba22b35ea2ca33798135cc62685d92352e3a1db9049493744e2ce",
+      "bytes": 12460,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-vardiff-before-guard.json": {
+      "original_path": "/private/tmp/sharepool-pressure-vardiff-100-native/vardiff-results.json",
+      "sha256": "d5fa23290666a98c9bc4d2dcf82fdfe59c363d925322f9d2598a67b0d8ac8426",
+      "bytes": 943,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-vardiff-before-guard.txt": {
+      "original_path": "/private/tmp/sharepool-pressure-vardiff-100-native.txt",
+      "sha256": "e50f60adfe8ccb21d8569764a967d09c13a1ea1b1eb2e2d173841b773d98deb2",
+      "bytes": 1002,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-python-tests.txt": {
+      "original_path": "/private/tmp/sharepool-v8-throughput-python-tests-final.txt",
+      "sha256": "21d9b7d1a99612076027c376ff006ab85158360dbbdabf2300eda247521352d2",
+      "bytes": 44539,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-fixture-tests.txt": {
+      "original_path": "/private/tmp/sharepool-v8-throughput-fixture-tests-final.txt",
+      "sha256": "bb0878d2c658dc694f18fcb1876b54ba0cd5a79e809ce79aed43922a73891f66",
+      "bytes": 1313,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-native-verification.json": {
+      "original_path": "/private/tmp/sharepool-coinbase-guard-native-verification.json",
+      "sha256": "fd6fa420f67203ec685b1b8ecd88773e8226e0caf0b021270f30929643ce7271",
+      "bytes": 11610,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-native-build.txt": {
+      "original_path": "/private/tmp/sharepool-coinbase-guard-build.txt",
+      "sha256": "56f4a1806f512feea8ccb4bfd003ea4542e20b52e9151d6f4eda47c6142dc6a4",
+      "bytes": 1880,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-native-cpp-raw.txt": {
+      "original_path": "/private/tmp/sharepool-coinbase-guard-cpp120.txt",
+      "sha256": "5c57bc06439adee0111f09de1655f008851840797d64b1d3686418b10ad82d2e",
+      "bytes": 72226,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-native-cpp.txt": {
+      "original_path": "/private/tmp/sharepool-coinbase-guard-cpp121-clean.txt",
+      "sha256": "09e7ac6e406300b91b0a965bae2280c8935fe271c475602aae997df157b297e5",
+      "bytes": 64506,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-native-cpp-cases.json": {
+      "original_path": "/private/tmp/sharepool-coinbase-guard-cpp121-results.json",
+      "sha256": "b743ef164d4f49024c1c418d54a76b90e84d422f344bce1f37c56b7c948b54b9",
+      "bytes": 14266,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-mining-budget.txt": {
+      "original_path": "/private/tmp/sharepool-coinbase-guard-budget-native.txt",
+      "sha256": "1ba7855d6e987f9293231ab443706777bed32400c2a74acd2ab97d69c713ac89",
+      "bytes": 675,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-mining-budget.json": {
+      "original_path": "/private/tmp/sharepool-coinbase-guard-budget-native/mining-budget-results.json",
+      "sha256": "d59cc64697d1a9300ab6819b00821748360c961bb9cdb99ad563167e3a428037",
+      "bytes": 1875,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-stratum-pressure.txt": {
+      "original_path": "/private/tmp/sharepool-coinbase-guard-pressure-native.txt",
+      "sha256": "e0c21590c5bb3c112ebe8d0805ab0cc57bfca0d0e70a6c5aa46d62f9f5311ede",
+      "bytes": 888,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-stratum-pressure.json": {
+      "original_path": "/private/tmp/sharepool-coinbase-guard-pressure-native/stratum-pressure-results.json",
+      "sha256": "601f12e28a16336e7415af4a107dda0b7061901a234f65075e7834155d73c420",
+      "bytes": 2141,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-vardiff-stratum.txt": {
+      "original_path": "/private/tmp/sharepool-coinbase-guard-wire-native.txt",
+      "sha256": "66eb1cfa7ff816a2d8192fdc9f64da628ae0e1a4f41f2f9a865a76f10bf0210c",
+      "bytes": 607,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-vardiff-stratum.json": {
+      "original_path": "/private/tmp/sharepool-coinbase-guard-wire-native/vardiff-stratum-results.json",
+      "sha256": "134d9d1135c6e58e4c6556f9eb349fd3e984d944a14e7557b6a1e557a0046288",
+      "bytes": 4925,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-provenance.txt": {
+      "original_path": "/private/tmp/sharepool-coinbase-guard-provenance-native.txt",
+      "sha256": "c5d474f18ab47c6bb7635f8242a7d579aa9c76b8d593ac4302e2ffb8e7aa0299",
+      "bytes": 885,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-final-smoke.json": {
+      "original_path": "/private/tmp/sharepool-v8-final-guard-smoke.json",
+      "sha256": "ce0ed8a9e78b4ec219b2b3cb47fca00bc94ed0420db9766c60e0d422cf06991d",
+      "bytes": 84790,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-final-smoke.txt": {
+      "original_path": "/private/tmp/sharepool-v8-final-guard-smoke.txt",
+      "sha256": "2a711802be23bac41aebdb5c39349bec2ddc92c64ced535f8f736ddb02ede44f",
+      "bytes": 1383,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-final-smoke-prelaunch.json": {
+      "original_path": "/private/tmp/sharepool-v8-final-guard-smoke-prelaunch-manifest.json",
+      "sha256": "2308ac41b14ec24b13822c770e69946302583e22d1e8822140036fcbc3cc053b",
+      "bytes": 3647,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-final-smoke-verification.json": {
+      "original_path": "/private/tmp/sharepool-v8-final-guard-smoke-verification.json",
+      "sha256": "9c1da014302e527935e86b216949141371225fe54283feb7ef080db249b87df3",
+      "bytes": 4525,
+      "byte_identical": true
+    },
+    "contrib/sharepool/results/v8-throughput-final-smoke-postlaunch.json": {
+      "original_path": "/private/tmp/sharepool-v8-final-guard-smoke-postlaunch-manifest.json",
+      "sha256": "9b34acd495b5ba7e4654a7280eb5156ff6c6968a984e782d9c40eec472fc7449",
+      "bytes": 3447,
+      "byte_identical": true
+    }
+  }
+}
