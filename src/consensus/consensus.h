@@ -20,6 +20,16 @@ static const int64_t MAX_BLOCK_SIGOPS_COST = 80000;
 /** Coinbase transaction outputs can only be spent after this number of new blocks (network rule) */
 static const int COINBASE_MATURITY = 100;
 
+/** Extra-work temporary soft fork (see ExtraWorkCache): hashrate estimator windows in
+ *  blocks (about half a day and about a month at the target spacing), the band the
+ *  fast estimate must exceed the slow one by before any extra work is required (5/4),
+ *  and the most extra work the rule ever requires (8x the header target's work). */
+static const int EXTRA_WORK_FAST_WINDOW = 72;
+static const int EXTRA_WORK_SLOW_WINDOW = 4320;
+static const unsigned int EXTRA_WORK_BAND_NUM = 5;
+static const unsigned int EXTRA_WORK_BAND_DEN = 4;
+static const unsigned int EXTRA_WORK_MAX_FACTOR = 8;
+
 static const int WITNESS_SCALE_FACTOR = 4;
 
 static const size_t MIN_TRANSACTION_WEIGHT = WITNESS_SCALE_FACTOR * 60; // 60 is the lower bound for the size of a valid serialized CTransaction

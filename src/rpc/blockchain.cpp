@@ -1916,7 +1916,9 @@ const std::vector<RPCResult> RPCHelpForDeployment{
     {RPCResult::Type::NUM, "height", /*optional=*/true, "height of the first block which enforces the rules (only for \"buried\" and \"flagday\" types, or \"bip9\" type with \"active\" status; for \"flagday\" this is the BLAKE2b hardfork height)"},
     {RPCResult::Type::NUM, "height_end", /*optional=*/true, "height of the last block which enforces the rules (only for \"bip9\" type with \"active\" status and temporary deployments)"},
     {RPCResult::Type::BOOL, "active", "true if the rules are enforced for the mempool and the next block (the mempool applies the RDTS rules regardless of this flag)"},
-    {RPCResult::Type::NUM_TIME, "expiry_time", /*optional=*/true, "median time past at and after which the rules are no longer enforced (only for \"flagday\" type; a block is past expiry when its parent's median time past has reached this value)"},
+    {RPCResult::Type::NUM_TIME, "start_time", /*optional=*/true, "median time past at and after which the rules are enforced (only for the \"extra_work\" flag-day deployment; a block enforces the rules when its parent's median time past has reached this value)"},
+    {RPCResult::Type::NUM_TIME, "expiry_time", /*optional=*/true, "median time past at and after which the rules are no longer enforced (only for \"flagday\" type; a block is past expiry when its parent's median time past has reached this value; \"extra_work\" shares the \"reduced_data\" expiry)"},
+    {RPCResult::Type::NUM, "factor", /*optional=*/true, "the extra-work factor the next block's target is divided by (only for \"extra_work\"; 1 when no extra work is required)"},
     {RPCResult::Type::OBJ, "bip9", /*optional=*/true, "status of bip9 softforks (only for \"bip9\" type)",
     {
         {RPCResult::Type::NUM, "bit", /*optional=*/true, "the bit (0-28) in the block version field used to signal this softfork (only for \"started\" and \"locked_in\" status)"},
@@ -1962,6 +1964,24 @@ void RdtsFlagDayDescPushBack(const CBlockIndex* blockindex, UniValue& softforks,
     softforks.pushKV("reduced_data", std::move(rv));
 }
 
+// Extra-work: from the block whose parent's median-time-past reaches
+// ExtraWorkStartTime until the RDTS expiry (it expires with RDTS). "active"
+// and "factor" describe the NEXT block, as the versionbits entries do.
+void ExtraWorkDescPushBack(const CBlockIndex* blockindex, UniValue& softforks, const ChainstateManager& chainman)
+{
+    const Consensus::Params& params{chainman.GetConsensus()};
+    if (params.ExtraWorkStartTime == std::numeric_limits<int64_t>::max() ||
+        params.RdtsExpiryTime == std::numeric_limits<int64_t>::min()) return;
+
+    UniValue rv(UniValue::VOBJ);
+    rv.pushKV("type", "flagday");
+    rv.pushKV("start_time", params.ExtraWorkStartTime);
+    rv.pushKV("expiry_time", params.RdtsExpiryTime);
+    rv.pushKV("active", params.ExtraWorkActiveAt(blockindex->GetMedianTimePast()));
+    rv.pushKV("factor", double(chainman.m_extra_work_cache.FactorFixed(params, blockindex)) / double(EXTRA_WORK_FACTOR_ONE));
+    softforks.pushKV("extra_work", std::move(rv));
+}
+
 UniValue DeploymentInfo(const CBlockIndex* blockindex, const ChainstateManager& chainman)
 {
     UniValue softforks(UniValue::VOBJ);
@@ -1973,6 +1993,7 @@ UniValue DeploymentInfo(const CBlockIndex* blockindex, const ChainstateManager& 
     SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_TESTDUMMY);
     SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_TAPROOT);
     RdtsFlagDayDescPushBack(blockindex, softforks, chainman);
+    ExtraWorkDescPushBack(blockindex, softforks, chainman);
     return softforks;
 }
 } // anon namespace

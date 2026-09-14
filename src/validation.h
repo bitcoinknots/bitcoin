@@ -34,6 +34,7 @@
 #include <util/time.h>
 #include <util/translation.h>
 #include <versionbits.h>
+#include <extrawork.h>
 
 #include <atomic>
 #include <map>
@@ -1219,6 +1220,11 @@ public:
      * Track versionbit status
      */
     mutable VersionBitsCache m_versionbitscache;
+
+    /**
+     * Extra-work soft fork state (cumulative extra work per block index; see ExtraWorkCache)
+     */
+    mutable ExtraWorkCache m_extra_work_cache;
 
     //! @returns true if a snapshot-based chainstate is in use. Also implies
     //!          that a background validation chainstate is also in use.

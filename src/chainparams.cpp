@@ -93,6 +93,20 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         options.rdts_expiry_time = expiry;
     }
 
+    if (const auto arg{args.GetArg("-extrawork", "")}; !arg.empty()) {
+        // The rule expires with RDTS: without an RDTS expiry, or with a start
+        // at or after it, it could never apply, which is indistinguishable
+        // from not scheduling it at all.
+        if (!options.rdts_expiry_time) {
+            throw std::runtime_error("-extrawork requires -rdtsexpiry=<time> (the rule expires with RDTS).");
+        }
+        int64_t start;
+        if (!ParseInt64(arg, &start) || start >= *options.rdts_expiry_time) {
+            throw std::runtime_error(strprintf("Invalid start (%s) for -extrawork=<time>: must precede the RDTS expiry (%d).", arg, *options.rdts_expiry_time));
+        }
+        options.extra_work_start_time = start;
+    }
+
     if (const auto arg{args.GetArg("-blake2b_headline")}; arg) {
         if (!options.activation_heights.contains(Consensus::BuriedDeployment::DEPLOYMENT_BLAKE2B)) {
             throw std::runtime_error("-blake2b_headline requires -testactivationheight=blake2b@<height>");

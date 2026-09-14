@@ -100,6 +100,7 @@ BASE_SCRIPTS = [
     'feature_reduced_data_temporary_deployment.py',
     'feature_bip9_max_activation_height.py',
     'feature_rdts.py',
+    'feature_extra_work.py',
     'feature_rdts_ignore_rejects.py',
     'feature_block.py',
     'mempool_ephemeral_dust.py',
