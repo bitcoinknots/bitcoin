@@ -495,7 +495,7 @@ def apply_tides_state(snapshot, parent):
 
 
 def materialize_compact_state(snapshot, *, parent_snapshot, activation_height=1, on_snapshot=None, capture=None,
-                              state_cache=None):
+                              state_cache=None, signature_cache=None):
     """Reconstruct omitted state using at most three actual native ancestors.
 
     The callback must authenticate the requested native block hash and height,
@@ -507,6 +507,8 @@ def materialize_compact_state(snapshot, *, parent_snapshot, activation_height=1,
     bounded state cache exposes get/put for exact (activation, profile, raw
     prefix) keys. Hits replace only deterministic signature/state replay; all
     native ancestry reads, byte/proof charges and observers still run first.
+    A separate signature memo may retain only exact successful BIP340 checks,
+    without retaining alternate jobs' potentially large derived state arrays.
     """
     if (type(activation_height) is not int or not 1 <= activation_height <= 0x7fffffff or
             snapshot.envelope.version != COMPACT_TIDES_VERSION or snapshot.envelope.height < activation_height):
@@ -568,7 +570,8 @@ def materialize_compact_state(snapshot, *, parent_snapshot, activation_height=1,
     for index in range(start, len(sequence)):
         encoding = sequence[index]
         value = encoding.snapshot
-        if not verify_schnorr(value.envelope.public_key, value.owner_signature, encoding.owner_message):
+        verify = verify_schnorr if signature_cache is None else signature_cache.verify
+        if not verify(value.envelope.public_key, value.owner_signature, encoding.owner_message):
             raise ValueError("compact native ancestry owner authorization")
         derived = apply_tides_state(replace(value, post_state=(), certificates=()), parent)
         if len(derived.post_state) > MAX_SNAPSHOT_BYTES // 36:

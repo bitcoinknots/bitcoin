@@ -314,6 +314,18 @@ class HashJobSchedulerTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "closed"):
                 scheduler.poll()
 
+    def test_transport_invalidation_requires_fresh_authorization(self):
+        first = self.scheduler.poll()
+        self.now = 1
+        self.scheduler.invalidate()
+        self.assertIsNone(self.scheduler.active)
+        self.assertIsNone(self.scheduler.next_refresh_at)
+        self.assertEqual(self.withdrawals, [1])
+        second = self.scheduler.poll()
+        self.assertIsNot(first, second)
+        self.assertEqual(self.gate.builds, 2)
+        self.assertEqual(self.scheduler.last_update_reason, "initial")
+
 
 if __name__ == "__main__":
     unittest.main()

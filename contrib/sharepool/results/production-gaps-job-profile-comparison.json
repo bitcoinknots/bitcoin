@@ -1,0 +1,32 @@
+{
+  "scope": "Single profiled final job per revision after 100 real proofs; profiler overhead included",
+  "before_source_commit": "31d3fa9f375144c65bacfa5c2c2f3d1f205a57ee",
+  "before_driver_copy": "production-gaps-job-profile-before-driver.txt",
+  "before_profile_seconds": 16.491953725000002,
+  "after_profile_seconds": 2.7187922899999992,
+  "reduction_fraction": 0.83514431732375,
+  "before_stage_wall_seconds": {
+    "construct_wall_seconds": 8.157926792000005,
+    "authorize_wall_seconds": 8.234527582999995,
+    "publish_wall_seconds": 0.11780208399999736
+  },
+  "after_stage_wall_seconds": {
+    "construct_wall_seconds": 1.760800666999998,
+    "authorize_wall_seconds": 0.8465816670000024,
+    "publish_wall_seconds": 0.11723374999999692
+  },
+  "after_signature_cache": {
+    "entries": 100,
+    "bytes": 80300,
+    "hits": 299,
+    "misses": 100,
+    "failures": 0,
+    "oversized": 0
+  },
+  "limitations": [
+    "Before profile did not capture binary hashes; it used the pre-rebuild native installation",
+    "After profile uses rebuilt native backend with predecode change; not a Python-only binary A/B",
+    "Proof receipt warms signature cache before the profiled job; not a cold-cache guarantee",
+    "Native block settlement is exercised separately in cadence/transport/capacity fixtures"
+  ]
+}

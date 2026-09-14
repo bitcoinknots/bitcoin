@@ -251,6 +251,17 @@ struct SharePoolHashDownload {
     bool requested{false};
 };
 
+/** One selected download remains charged to its existing global slot while
+ * owned bytes are hashed/decoded outside cs_main. No additional work queue.
+ */
+struct SharePoolHashAdmission {
+    uint256 hash;
+    uint32_t total;
+    std::vector<unsigned char> bytes;
+    sharepool::HashSnapshotStore* store;
+    SPNClock::time_point started;
+};
+
 struct SharePoolHashRequest {
     uint256 hash;
     uint32_t offset{0};
@@ -650,7 +661,10 @@ private:
     void ClearSharePoolHashDownload(Peer& peer) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void DeferSharePoolHashDownload(Peer& peer) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void RequestSharePoolHash(CNode& node, Peer& peer) EXCLUSIVE_LOCKS_REQUIRED(cs_main, g_msgproc_mutex);
-    void SendSharePoolHashMessages(CNode& node, Peer& peer) EXCLUSIVE_LOCKS_REQUIRED(cs_main, g_msgproc_mutex);
+    void SendSharePoolHashMessages(CNode& node, Peer& peer, std::optional<SharePoolHashAdmission>& admission)
+        EXCLUSIVE_LOCKS_REQUIRED(cs_main, g_msgproc_mutex);
+    bool AdmitSharePoolHashSnapshot(CNode& node, Peer& peer, SharePoolHashAdmission& admission)
+        EXCLUSIVE_LOCKS_REQUIRED(g_msgproc_mutex);
     void ProcessSharePoolHashMessage(CNode& node, Peer& peer, const std::string& type, DataStream& stream)
         EXCLUSIVE_LOCKS_REQUIRED(cs_main, g_msgproc_mutex);
 
@@ -868,7 +882,6 @@ private:
     sharepool::HashRelayTurns m_sharepool_hash_download_turns GUARDED_BY(cs_main);
     sharepool::HashRelayTurns m_sharepool_hash_admission_turns GUARDED_BY(cs_main);
     SPNClock::time_point m_next_sharepool_hash_admission GUARDED_BY(cs_main){};
-    bool m_sharepool_hash_retry GUARDED_BY(cs_main){false};
 
     /** Synchronizes tx download including TxRequestTracker, rejection filters, and TxOrphanage.
      * Lock invariants:
@@ -3926,7 +3939,8 @@ void PeerManagerImpl::RequestSharePoolHash(CNode& node, Peer& peer)
     MakeAndPushMessage(node, NetMsgType::SPHGET, hash, uint32_t{0});
 }
 
-void PeerManagerImpl::SendSharePoolHashMessages(CNode& node, Peer& peer)
+void PeerManagerImpl::SendSharePoolHashMessages(CNode& node, Peer& peer,
+    std::optional<SharePoolHashAdmission>& admission)
 {
     AssertLockHeld(cs_main);
     AssertLockHeld(g_msgproc_mutex);
@@ -3991,8 +4005,9 @@ void PeerManagerImpl::SendSharePoolHashMessages(CNode& node, Peer& peer)
         MakeAndPushMessage(node, NetMsgType::SPHGET, relay.download->hash, uint32_t(relay.download->bytes.size()));
         relay.download->requested = true;
     }
-    // Canonical decoding/hash verification/durable admission happen after the
-    // ordinary block/transaction scheduler. Every outcome consumes the budget.
+    // Select one completed download after the ordinary block/transaction
+    // scheduler. Hashing/decoding happens after SendMessages releases cs_main;
+    // storage and peer invariants are checked again before durable admission.
     const bool admission_ready = relay.download && relay.download->total != 0 &&
         relay.download->bytes.size() == relay.download->total && now >= relay.next_admission;
     if (admission_ready) {
@@ -4004,28 +4019,10 @@ void PeerManagerImpl::SendSharePoolHashMessages(CNode& node, Peer& peer)
     }
     if (admission_ready && now >= m_next_sharepool_hash_admission &&
         m_sharepool_hash_admission_turns.IsTurn(peer.m_id)) {
-        const auto hash = relay.download->hash;
-        const auto started = SPNClock::now();
-        bool admitted{false};
-        const bool already_present = store.Has(hash);
-        try {
-            admitted = store.Put(relay.download->bytes, hash) == hash;
-        } catch (const std::exception&) {
-            // Wrong content for a requested hash, quota exhaustion or local
-            // storage failure never marks a pending Bitcoin block invalid.
-        }
-        const auto finished = SPNClock::now();
-        relay.next_admission = finished + 250ms;
-        m_next_sharepool_hash_admission = finished +
-            std::max(std::chrono::duration_cast<SPNClock::duration>(50ms), (finished - started) * 4);
-        m_sharepool_hash_admission_turns.Complete(peer.m_id);
-        if (admitted) {
-            if (!already_present) m_sharepool_hash_retry = true;
-            ClearSharePoolHashDownload(peer);
-        } else {
-            LogDebug(BCLog::NET, "Hash-only snapshot not admitted peer=%d hash=%s\n", node.GetId(), hash.ToString());
-            DeferSharePoolHashDownload(peer);
-        }
+        assert(!admission);
+        admission.emplace(SharePoolHashAdmission{relay.download->hash, relay.download->total,
+            std::move(relay.download->bytes), &store, SPNClock::now()});
+        relay.download->bytes.clear();
     }
     const auto inventory_lane = relay.inventory.Next(store.Revision(), store.RecentSequence(), now);
     if (inventory_lane == sharepool::HashRelayInventoryLanes::Lane::Recent) {
@@ -4041,6 +4038,53 @@ void PeerManagerImpl::SendSharePoolHashMessages(CNode& node, Peer& peer)
         relay.inventory.AdvanceArchive(page.next, page.complete, now);
     }
     RequestSharePoolHash(node, peer);
+}
+
+bool PeerManagerImpl::AdmitSharePoolHashSnapshot(CNode& node, Peer& peer, SharePoolHashAdmission& admission)
+{
+    AssertLockNotHeld(cs_main);
+    AssertLockHeld(g_msgproc_mutex);
+    std::optional<sharepool::HashSnapshotStore::PreparedSnapshot> prepared;
+    try {
+        prepared.emplace(sharepool::HashSnapshotStore::PreparePut(std::move(admission.bytes),
+            sharepool::hashonly::ProfileVersion(m_chainparams.GetConsensus()), admission.hash));
+    } catch (const std::exception&) {
+        // Preparation has no store or peer side effects. Charge failed work
+        // below, and leave any dependent block pending for another source.
+    }
+    // Peer finalization and storage mutation can run while cs_main is released.
+    // The message-loop mutex still serializes protocol processing; this change
+    // does not move durable I/O or all network latency outside global locks.
+    LOCK(cs_main);
+    auto& relay = peer.m_sharepool_hash;
+    const auto reservation = m_sharepool_hash_downloads.find(admission.hash);
+    const bool owns_transfer = relay.download && relay.download->hash == admission.hash &&
+        relay.download->total == admission.total && relay.download->bytes.empty() && !relay.download->requested &&
+        reservation != m_sharepool_hash_downloads.end() && reservation->second == peer.m_id;
+    bool admitted{false}, already_present{false};
+    if (owns_transfer && !node.fDisconnect && SharePoolHashActive() &&
+        m_chainman.m_sharepool_hash_store.get() == admission.store && prepared) {
+        already_present = admission.store->Has(admission.hash);
+        try {
+            admitted = admission.store->PutPrepared(*prepared) == admission.hash;
+        } catch (const std::exception&) {
+            // Wrong contents, quota exhaustion and storage failure never mark
+            // a pending Bitcoin block invalid or authorize incomplete evidence.
+        }
+    }
+    const auto finished = SPNClock::now();
+    m_next_sharepool_hash_admission = finished +
+        std::max(std::chrono::duration_cast<SPNClock::duration>(50ms), (finished - admission.started) * 4);
+    m_sharepool_hash_admission_turns.Complete(peer.m_id);
+    if (!owns_transfer) return false;
+    relay.next_admission = finished + 250ms;
+    if (admitted) {
+        ClearSharePoolHashDownload(peer);
+    } else {
+        LogDebug(BCLog::NET, "Hash-only snapshot not admitted peer=%d hash=%s\n", node.GetId(), admission.hash.ToString());
+        DeferSharePoolHashDownload(peer);
+    }
+    return admitted && !already_present;
 }
 
 void PeerManagerImpl::ProcessSharePoolHashMessage(CNode& node, Peer& peer, const std::string& type, DataStream& stream)
@@ -6277,7 +6321,7 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
 
     MaybeSendSendHeaders(*pto, *peer);
 
-    bool retry_hash_blocks{false};
+    std::optional<SharePoolHashAdmission> hash_admission;
     {
         LOCK(cs_main);
 
@@ -6725,10 +6769,11 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
         if (!vGetData.empty())
             MakeAndPushMessage(*pto, NetMsgType::GETDATA, vGetData);
         SendSharePoolMessages(*pto, *peer);
-        SendSharePoolHashMessages(*pto, *peer);
-        retry_hash_blocks = std::exchange(m_sharepool_hash_retry, false);
+        SendSharePoolHashMessages(*pto, *peer, hash_admission);
     } // release cs_main
-    if (retry_hash_blocks) m_chainman.RequestSharePoolHashBlocks();
+    if (hash_admission && AdmitSharePoolHashSnapshot(*pto, *peer, *hash_admission)) {
+        m_chainman.RequestSharePoolHashBlocks();
+    }
     MaybeSendFeefilter(*pto, *peer, current_time);
     return true;
 }

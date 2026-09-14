@@ -104,6 +104,30 @@ class HashGateBatchTests(unittest.TestCase):
         self.assertEqual(self.gate.batch_status(), first)
         self.assertEqual([entry["status"] for entry in self.gate.receipt_status()["receipts"]].count("deferred"), 8)
 
+    def test_fitting_full_prefix_avoids_intermediate_trials(self):
+        self.admit(self.proofs(2))
+        counts = []
+        def inspect(snapshot, **options):
+            counts.append(len(snapshot.shares))
+            return check_graph(snapshot, **options)
+        with patch("hash_gate_batch.check_graph", side_effect=inspect):
+            batch = self.gate.batch_status()
+        self.assertEqual(len(batch["selected_proofs"]), 2)
+        self.assertEqual(batch["deferred_count"], 0)
+        self.assertEqual(counts, [0, 2])
+
+    def test_full_trial_invalidity_is_not_hidden_by_a_smaller_prefix(self):
+        self.admit(self.proofs(2))
+        head = self.gate.archive_head()
+        def inspect(snapshot, **options):
+            if len(snapshot.shares) == 2:
+                raise ValueError("corrupt origin evidence")
+            return check_graph(snapshot, **options)
+        with patch("hash_gate_batch.check_graph", side_effect=inspect):
+            with self.assertRaisesRegex(ValueError, "corrupt origin"):
+                self.gate.batch_status()
+        self.assertEqual(self.gate.archive_head(), head)
+
     def test_only_canonical_payment_advances_carry_and_reorg_reactivates_it(self):
         self.admit(self.proofs(6))
         first = self.gate.batch_status()["selected_proofs"]

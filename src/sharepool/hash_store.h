@@ -15,6 +15,7 @@
 #include <set>
 #include <deque>
 #include <functional>
+#include <utility>
 
 class AutoFile;
 
@@ -25,6 +26,24 @@ namespace sharepool {
  */
 class HashSnapshotStore {
 public:
+    /** Owned content preparation, not storage, validation or availability.
+     * Only PreparePut constructs these bindings. Callers cannot replace the
+     * owned bytes, decoded template metadata, hash or selected profile.
+     */
+    class PreparedSnapshot {
+        friend class HashSnapshotStore;
+        const uint32_t m_profile;
+        const uint256 m_hash;
+        std::vector<unsigned char> m_bytes;
+        std::optional<hashonly::Snapshot> m_snapshot;
+        PreparedSnapshot(uint32_t profile, uint256 hash, std::vector<unsigned char> bytes,
+                         std::optional<hashonly::Snapshot> snapshot)
+            : m_profile{profile}, m_hash{hash}, m_bytes{std::move(bytes)}, m_snapshot{std::move(snapshot)} {}
+    public:
+        PreparedSnapshot(PreparedSnapshot&&) = default;
+        PreparedSnapshot(const PreparedSnapshot&) = delete;
+        const uint256& Hash() const { return m_hash; }
+    };
     struct Options {
         // Positive logical snapshot byte quota including per-record and
         // per-template-source index allowances, excluding LevelDB compaction.
@@ -134,6 +153,18 @@ public:
     std::optional<std::vector<unsigned char>> Get(const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::shared_ptr<const std::vector<unsigned char>> GetShared(const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::shared_ptr<const hashonly::Snapshot> Lookup(const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    /** Hash and decode owned bytes without accessing the store. P2P/RPC callers
+     * run this outside cs_main. A requested hash mismatch fails before decode;
+     * hash-bound malformed bytes remain evidence for later native validation.
+     */
+    static PreparedSnapshot PreparePut(std::vector<unsigned char> raw, uint32_t profile_version,
+                                       std::optional<uint256> expected = std::nullopt);
+    /** Recheck current durable evidence, quota and index state before committing.
+     * Preparation neither reserves storage nor bypasses a fresh durable read.
+     * The consumed bytes become empty; reusing a consumed preparation fails.
+     * Durable reads/writes and index operations still execute under cs_main.
+     */
+    uint256 PutPrepared(PreparedSnapshot& prepared) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     uint256 Put(Span<const unsigned char> raw, std::optional<uint256> expected = std::nullopt) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::vector<uint256> Inventory() const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     /** Bounded disk-index traversal; next is an opaque exclusive cursor. A

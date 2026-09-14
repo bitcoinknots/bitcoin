@@ -1,0 +1,11 @@
+2026-09-14T06:23:46.718000Z TestFramework (INFO): PRNG seed is: 395798126857145154
+2026-09-14T06:23:46.718000Z TestFramework (DEBUG): Setting up network thread
+2026-09-14T06:23:46.718000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v7-stratum-agent-r8
+2026-09-14T06:23:46.720000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T06:23:47.242000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-14T06:23:52.566000Z TestFramework (DEBUG): Closing down network thread
+2026-09-14T06:23:52.622000Z TestFramework (INFO): Stopping nodes
+2026-09-14T06:23:52.622000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-14T06:23:52.737000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-14T06:23:52.737000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v7-stratum-agent-r8
+2026-09-14T06:23:52.737000Z TestFramework (INFO): Tests successful

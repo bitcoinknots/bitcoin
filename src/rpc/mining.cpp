@@ -1984,15 +1984,26 @@ static RPCHelpMan submitsharepoolhashsnapshot()
             if (value.empty() || value.size() > 2 * sharepool::hashonly::MAX_SNAPSHOT_BYTES || !IsHex(value)) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Snapshot exceeds the snapshot byte bound or is not hexadecimal");
             }
-            const auto raw = ParseHex(value);
+            auto raw = ParseHex(value);
             auto& chainman = EnsureAnyChainman(request.context);
+            {
+                LOCK(cs_main);
+                RequireHashSnapshotStore(chainman);
+            }
+            std::optional<sharepool::HashSnapshotStore::PreparedSnapshot> prepared;
+            try {
+                prepared.emplace(sharepool::HashSnapshotStore::PreparePut(std::move(raw),
+                    sharepool::hashonly::ProfileVersion(chainman.GetConsensus())));
+            } catch (const std::exception& e) {
+                throw JSONRPCError(RPC_VERIFY_ERROR, e.what());
+            }
+            const auto hash = prepared->Hash();
             UniValue result{UniValue::VOBJ};
             {
                 LOCK(cs_main);
                 auto& store = RequireHashSnapshotStore(chainman);
-                const auto hash = sharepool::hashonly::ProfileSnapshotHash(raw, sharepool::hashonly::ProfileVersion(chainman.GetConsensus()));
                 const bool present = store.Has(hash);
-                try { store.Put(raw, hash); }
+                try { store.PutPrepared(*prepared); }
                 catch (const std::exception& e) { throw JSONRPCError(RPC_VERIFY_ERROR, e.what()); }
                 result.pushKV("hash", hash.GetHex());
                 result.pushKV("status", present ? "present" : "stored");

@@ -85,6 +85,7 @@ EXTENDED_SCRIPTS = [
     # Longest test should go first, to favor running tests in parallel
     'feature_sharepool_hash_capacity.py',
     'feature_sharepool_hash_cadence_benchmark.py',
+    'feature_sharepool_hash_job_profile.py',
     'feature_sharepool_hash_100_miners.py',
     'feature_sharepool_hash_ledger_100_miners.py',
     'feature_sharepool_hash_tides_100_miners.py',
@@ -144,6 +145,7 @@ BASE_SCRIPTS = [
     'feature_sharepool_hash_compact.py',
     'feature_sharepool_hash_state_reuse.py',
     'feature_sharepool_hash_datum_cadence.py',
+    'feature_sharepool_hash_stratum.py',
     'feature_sharepool_hash_tides.py --activation-height=1',
     'feature_sharepool_hash_tides_zero_reward.py',
     'feature_sharepool_hash_tides_zero_reward.py --activation-height=4950',

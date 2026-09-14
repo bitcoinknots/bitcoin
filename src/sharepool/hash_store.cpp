@@ -645,15 +645,34 @@ std::shared_ptr<const hashonly::Snapshot> HashSnapshotStore::Lookup(const uint25
     catch (const std::ios_base::failure&) { throw hashonly::MalformedSnapshot("hash-verified snapshot encoding is invalid"); }
 }
 
+HashSnapshotStore::PreparedSnapshot HashSnapshotStore::PreparePut(std::vector<unsigned char> raw,
+    uint32_t profile_version, std::optional<uint256> expected)
+{
+    if (raw.empty() || raw.size() > hashonly::MAX_SNAPSHOT_BYTES) throw std::runtime_error("hash-only snapshot byte bound");
+    const auto hash = hashonly::ProfileSnapshotHash(raw, profile_version);
+    if (expected && *expected != hash) throw std::runtime_error("hash-only snapshot differs from requested hash");
+    std::optional<hashonly::Snapshot> snapshot;
+    try { snapshot = hashonly::DecodeSnapshot(raw); }
+    catch (const std::ios_base::failure&) { /* Hash-verified invalid encodings prove invalidity. */ }
+    return PreparedSnapshot{profile_version, hash, std::move(raw), std::move(snapshot)};
+}
+
 uint256 HashSnapshotStore::Put(Span<const unsigned char> raw, std::optional<uint256> expected)
 {
     AssertLockHeld(cs_main);
     if (raw.empty() || raw.size() > hashonly::MAX_SNAPSHOT_BYTES) throw std::runtime_error("hash-only snapshot byte bound");
-    std::optional<hashonly::Snapshot> snapshot;
-    try { snapshot = hashonly::DecodeSnapshot(raw); }
-    catch (const std::ios_base::failure&) { /* Hash-verified invalid encodings prove invalidity. */ }
-    const auto hash = hashonly::ProfileSnapshotHash(raw, m_profile_version);
-    if (expected && *expected != hash) throw std::runtime_error("hash-only snapshot differs from requested hash");
+    auto prepared = PreparePut({raw.begin(), raw.end()}, m_profile_version, expected);
+    return PutPrepared(prepared);
+}
+
+uint256 HashSnapshotStore::PutPrepared(PreparedSnapshot& prepared)
+{
+    AssertLockHeld(cs_main);
+    if (prepared.m_profile != m_profile_version) throw std::runtime_error("prepared hash-only snapshot profile mismatch");
+    const auto& raw = prepared.m_bytes;
+    if (raw.empty() || raw.size() > hashonly::MAX_SNAPSHOT_BYTES) throw std::runtime_error("hash-only snapshot byte bound");
+    const auto& snapshot = prepared.m_snapshot;
+    const auto hash = prepared.m_hash;
     // A reoffer, including archive recovery, must verify the durable record.
     // A still-sound RAM copy must not conceal damage to its on-disk backing.
     if (const auto found = m_cache.find(hash); found != m_cache.end()) {
@@ -661,7 +680,10 @@ uint256 HashSnapshotStore::Put(Span<const unsigned char> raw, std::optional<uint
         m_cache.erase(found);
         m_touched.erase(hash);
     }
-    if (GetShared(hash)) return hash;
+    if (GetShared(hash)) {
+        prepared.m_bytes.clear();
+        return hash;
+    }
     if (m_repair_required) throw std::runtime_error("local archive requires index repair; restart with -sharepoolarchiveindexrebuild=1");
     SnapshotMeta previous;
     const bool existing = ReadSnapshotMeta(m_db, hash, previous);
@@ -681,7 +703,8 @@ uint256 HashSnapshotStore::Put(Span<const unsigned char> raw, std::optional<uint
         raw.size() > std::numeric_limits<size_t>::max() - (m_bytes - replaced)) {
         throw std::runtime_error("local hash-only snapshot storage quota exhausted");
     }
-    std::vector<unsigned char> bytes(raw.begin(), raw.end());
+    std::vector<unsigned char> bytes{std::move(prepared.m_bytes)};
+    prepared.m_bytes.clear();
     CDBBatch batch{m_db};
     batch.Write(std::make_pair(uint8_t{'s'}, hash), bytes);
     batch.Write(std::make_pair(uint8_t{'m'}, hash), SnapshotMeta{hash, bytes.size(), false, index_allowance});

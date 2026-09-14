@@ -1,0 +1,1774 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "network": "isolated native regtest",
+  "profile": "hash-only-v7-compact-tides",
+  "started_utc": "2026-09-14T06:17:55.998269+00:00",
+  "command": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "test/functional/feature_sharepool_hash_cadence_benchmark.py",
+    "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+    "--tmpdir=/private/tmp/sharepool-production-gaps-cadence-forward",
+    "--portseed=1651",
+    "--nocleanup",
+    "--results=contrib/sharepool/results/production-gaps-cadence-forward.json",
+    "--miners=100",
+    "--offer-interval-ms=1000",
+    "--work-update-seconds=40",
+    "--arm-order=per-ack-first",
+    "--max-runtime-seconds=1200"
+  ],
+  "arm_order": [
+    "per_ack",
+    "datum"
+  ],
+  "configuration": {
+    "miners": 100,
+    "offer_interval_ms": 1000.0,
+    "refresh_seconds": 40,
+    "max_runtime_seconds": 1200
+  },
+  "host": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "logical_cpus": 10,
+    "declared_load": "unknown"
+  },
+  "native_binary_sha256": "4cf54b5fadd3d4cee0354feb609508d0cf1107c7d0ccdf3935f862a15717678d",
+  "signer_binary_sha256": "f4f592321ccce37ae9c416fb4e1a2263da4c95438959b58fa356ac937148e250",
+  "source_sha256": {
+    "test/functional/feature_sharepool_hash_cadence_benchmark.py": "dcc96ccef53a73a63ee2d5914f4f2789ec257b1bbbe18c10b542932659c81bc9",
+    "contrib/sharepool/hash_job_scheduler.py": "e4c19eff41b4c7ca94c3bdb44669c1e1048e3b5d3454fe4d71bf5f748dbc95e0",
+    "contrib/sharepool/hash_mining_gate.py": "0e2b1375b0b582eeb1ce42912c09abe5f41d10ecb15ee494e8c58d9abcc51d3d",
+    "contrib/sharepool/hash_snapshot.py": "2dc99c6ee4682d8a9b90af7dfa8b61e82e1d233ea1ba78e9a1229a8b9ea19181",
+    "contrib/sharepool/hash_gate_batch.py": "54247ed9c7757a573460179837a0d89f1f4e575ddcfd4e9361a770c94f52971c",
+    "contrib/sharepool/capacity_metrics.py": "4c5d2534c45bdee99f12e653ec46e010f4ab6aba6108914015bc8e08498a25db",
+    "test/functional/feature_sharepool_hash_tides_100_miners.py": "5b6903c6806c970577ae661755139175317600a6faf92851004486e81b022529"
+  },
+  "arms": {
+    "per_ack": {
+      "node": 0,
+      "result": "passed",
+      "offered": 100,
+      "acknowledged": 100,
+      "published_jobs": 101,
+      "replacement_jobs": 100,
+      "initial_preloaded_gate_open_seconds_excluded": 0.4552243340000004,
+      "published_body_bytes": {
+        "template_bytes": 1186983,
+        "snapshot_bytes": 4657848
+      },
+      "paced_wall_seconds": 113.99138516699999,
+      "busy_operation_wall_seconds": 87.2544000420002,
+      "explicit_pacing_sleep_seconds": 26.718504841000147,
+      "other_driver_wall_seconds": 0.018480283999643632,
+      "offers_to_last_ack_and_refresh_seconds": 113.778090625,
+      "final_refresh_wait_and_work_seconds": 0.012064499999979716,
+      "driver_cpu_seconds": 45.872049999999994,
+      "driver_children_cpu_seconds": 10.656783,
+      "rpc_json_reencoding_cpu_seconds": 0.28285700000014735,
+      "driver_cpu_excluding_json_reencoding_seconds": 45.589192999999845,
+      "signer_children_cpu_seconds": 10.656783,
+      "native_cpu_seconds": 29.16,
+      "rss_at_boundaries_bytes": {
+        "driver_start": 38780928,
+        "driver_end": 50626560,
+        "native_start": 61472768,
+        "native_end": 81985536
+      },
+      "logical_disk_growth_bytes": {
+        "gate_logical_bytes": 7710787,
+        "native_snapshot_logical_bytes": 4997386
+      },
+      "receipt_due_to_ack": {
+        "count": 100,
+        "total_seconds": 163.75737317499957,
+        "min_seconds": 0.022565958000001274,
+        "p50_seconds": 0.06963712499999986,
+        "p95_seconds": 9.55044295799999,
+        "p99_seconds": 12.313231333000004,
+        "max_seconds": 13.058051040999999
+      },
+      "receipt_service": {
+        "count": 100,
+        "total_seconds": 5.4940336689999185,
+        "min_seconds": 0.022561708999994323,
+        "p50_seconds": 0.05371562499999527,
+        "p95_seconds": 0.06856487499999275,
+        "p99_seconds": 0.07012116699999638,
+        "max_seconds": 0.0723379169999987
+      },
+      "receipt_queue_wait": {
+        "count": 100,
+        "total_seconds": 158.26332134199967,
+        "min_seconds": 4.166000003635872e-06,
+        "p50_seconds": 0.009446124999996641,
+        "p95_seconds": 9.4956435,
+        "p99_seconds": 12.256513041000005,
+        "max_seconds": 13.000053291
+      },
+      "job_preparation": {
+        "count": 101,
+        "total_seconds": 81.76166633400011,
+        "min_seconds": 0.20118370800000207,
+        "p50_seconds": 0.7321074580000015,
+        "p95_seconds": 1.6006683330000158,
+        "p99_seconds": 1.6868131669999968,
+        "max_seconds": 1.719968625000007
+      },
+      "job_preparation_boundary": "entire fresh-job operation: build, sign, authorize, publish, final context checks",
+      "ack_to_first_publication": {
+        "count": 100,
+        "total_seconds": 81.25835604000005,
+        "min_seconds": 0.21032333300000516,
+        "p50_seconds": 0.7291797090000074,
+        "p95_seconds": 1.5964551250000056,
+        "p99_seconds": 1.6823409999999797,
+        "max_seconds": 1.7155820840000047
+      },
+      "publication_trace": [
+        {
+          "elapsed_seconds": 0.19932383300000112,
+          "proofs": 0,
+          "snapshot_hash": "7270070606d73cfa85aa574357c7c4c51dccc1cf2abfe517feaa5433359e3a5a"
+        },
+        {
+          "elapsed_seconds": 0.4341166250000015,
+          "proofs": 1,
+          "snapshot_hash": "72b61f93577aa1120d42d5ec3e7cc8b4fa01d223254ebac102c6b99eb7e45a0c"
+        },
+        {
+          "elapsed_seconds": 1.475739333,
+          "proofs": 2,
+          "snapshot_hash": "1e08436230c13f9f314965a9c56663748dfd6664d67d51115b7ca198428970d1"
+        },
+        {
+          "elapsed_seconds": 2.480679000000002,
+          "proofs": 3,
+          "snapshot_hash": "c84b5f2f2630aa6b73e663504956db46ce1453eec0fbb5d565d57820433e6e2c"
+        },
+        {
+          "elapsed_seconds": 3.4905482919999997,
+          "proofs": 4,
+          "snapshot_hash": "d2107ebb2e22cb51e4e561b26c44a88fbfc2429ea5a915c0c300ff864918526f"
+        },
+        {
+          "elapsed_seconds": 4.501559166999996,
+          "proofs": 5,
+          "snapshot_hash": "715f234c31bcdbdd4cbe71947e62cee3bcc805021d1ca5da24c3f7e2191e0c6f"
+        },
+        {
+          "elapsed_seconds": 5.509194416999996,
+          "proofs": 6,
+          "snapshot_hash": "8b8e828fe2776b9480d25fef6eea366bb48c37295f2bb4d0a01b9b8b6f897dd2"
+        },
+        {
+          "elapsed_seconds": 6.504289833000001,
+          "proofs": 7,
+          "snapshot_hash": "6adb20aaeb2fba029198283f3591ea9271537480fdd37b6d79ebae7607cc9c19"
+        },
+        {
+          "elapsed_seconds": 7.492630917,
+          "proofs": 8,
+          "snapshot_hash": "0bb22b46e056a082adf89d19a6c5b7a227ac8873be5c8f4b291eab53d23e060d"
+        },
+        {
+          "elapsed_seconds": 8.521932125,
+          "proofs": 9,
+          "snapshot_hash": "e59887b447e0d3517d230047706838cb9e750a20a48b8e41123d2055746408e1"
+        },
+        {
+          "elapsed_seconds": 9.514642582999997,
+          "proofs": 10,
+          "snapshot_hash": "e4a36138ac234a56f0109a78a38777af210461525809d552c238e8e260f79f16"
+        },
+        {
+          "elapsed_seconds": 10.548211416999997,
+          "proofs": 11,
+          "snapshot_hash": "94fff2686ab3e00e9b8633b129f7ec32a29c6404507043f1372b5c811a19e46d"
+        },
+        {
+          "elapsed_seconds": 11.543379332999997,
+          "proofs": 12,
+          "snapshot_hash": "c50a03ec0568d9c637839be3a014fa01197b5d9ec5f3d5addbc60d5b9037d1e4"
+        },
+        {
+          "elapsed_seconds": 12.5565365,
+          "proofs": 13,
+          "snapshot_hash": "efa705cfc95345f17a36282800c533376972fb84118c56b7e757bcacc4556af1"
+        },
+        {
+          "elapsed_seconds": 13.545597166999997,
+          "proofs": 14,
+          "snapshot_hash": "364272539845b06612dd65677ab4f4d40f11998febd2469790165a3823d73fca"
+        },
+        {
+          "elapsed_seconds": 14.574211208000001,
+          "proofs": 15,
+          "snapshot_hash": "3ce4647c4c632be1317a7c9715c933689279540eca196f5acec527237f64ea19"
+        },
+        {
+          "elapsed_seconds": 15.575494667000001,
+          "proofs": 16,
+          "snapshot_hash": "198a28f1b1d9c692d8aae40ab94306e26746e6525bcb8c96ee34c953884e0e4d"
+        },
+        {
+          "elapsed_seconds": 16.585101707999996,
+          "proofs": 17,
+          "snapshot_hash": "8a34ea2d396a0f8b74792368467379fce7c2bd7d74a37ac494b85a6419d63ef0"
+        },
+        {
+          "elapsed_seconds": 17.599187417000003,
+          "proofs": 18,
+          "snapshot_hash": "f1f98853d4be88f5812306e2ff3254e8c172ea75bd4da7efc3b9a9c1dcec060e"
+        },
+        {
+          "elapsed_seconds": 18.603176458,
+          "proofs": 19,
+          "snapshot_hash": "3563b66e183e31265299b41d7a67d312743db930d62607a796701dd0a24f891c"
+        },
+        {
+          "elapsed_seconds": 19.624291125,
+          "proofs": 20,
+          "snapshot_hash": "684608288f4ea3e8689d2bcd1b52c9bd19d6dda6231b9e564ca7432eeb39d876"
+        },
+        {
+          "elapsed_seconds": 20.629091125000002,
+          "proofs": 21,
+          "snapshot_hash": "e2c8bb6217572b63e1ad124a2a521ad5e0d36e84db4b753fdc38b2f968fc86bb"
+        },
+        {
+          "elapsed_seconds": 21.634462833,
+          "proofs": 22,
+          "snapshot_hash": "22b9d1eecf6f119ac8b9a28fe8d9cec7cc81c64314ac113329ffb715a742de22"
+        },
+        {
+          "elapsed_seconds": 22.63853425,
+          "proofs": 23,
+          "snapshot_hash": "ab7dee2d7cb95664e255f6e01494f93d1cbc6f00eb39da3a524c73c275015ecb"
+        },
+        {
+          "elapsed_seconds": 23.662304958,
+          "proofs": 24,
+          "snapshot_hash": "d8e4ec6f59cb21a722f73632858328ee6963a7305c065efa0d4f4cd8ce8213f1"
+        },
+        {
+          "elapsed_seconds": 24.667891625000003,
+          "proofs": 25,
+          "snapshot_hash": "34f81412e58e5682a3e3e23c2e09943c4d6507c451c639343ea26a5d98156159"
+        },
+        {
+          "elapsed_seconds": 25.672006625,
+          "proofs": 26,
+          "snapshot_hash": "c76cba229795512fc2bd8eab71d5caf1682750f95ff1ca5b17b6d6cfbbe99a4b"
+        },
+        {
+          "elapsed_seconds": 26.692905542,
+          "proofs": 27,
+          "snapshot_hash": "c55a943d7fd2a409015d6e2f408dd4ad8cedaee2a326f3b4bfb296023f15c1fb"
+        },
+        {
+          "elapsed_seconds": 27.701446458,
+          "proofs": 28,
+          "snapshot_hash": "a389e48dcd9dbea85988c483df2ebc4ceebfd8a321a159e1e9c4d40a79e2bf6d"
+        },
+        {
+          "elapsed_seconds": 28.709381333000003,
+          "proofs": 29,
+          "snapshot_hash": "9c494a1fdb5a0ccbd7b8bf2db738e65ea92757272f6b9da6e4a2380a74a5dad0"
+        },
+        {
+          "elapsed_seconds": 29.729232167000006,
+          "proofs": 30,
+          "snapshot_hash": "ba23461c8cf892b1cfff1ba8c35619cd8e929f3f8116a6e77362f2b74ecc8d5b"
+        },
+        {
+          "elapsed_seconds": 30.736505499999993,
+          "proofs": 31,
+          "snapshot_hash": "ae52684f6e903d136884d033cb77f327f929cdead9de7b231f86023446a4b368"
+        },
+        {
+          "elapsed_seconds": 31.750750374999996,
+          "proofs": 32,
+          "snapshot_hash": "6364fef3d701828bef3561ad1c2fe8b2396a46e7b3e2144fbf694849bfce2b91"
+        },
+        {
+          "elapsed_seconds": 32.765755625,
+          "proofs": 33,
+          "snapshot_hash": "fc8c0cc55a3d0700dad5ddc1b23d18d09af1289aff8e402d426ed6b1b6336731"
+        },
+        {
+          "elapsed_seconds": 33.784496833000006,
+          "proofs": 34,
+          "snapshot_hash": "7e4d35a1196959bb82b901fbf948fbdb3d483ad10755f169dfafbc75f254b53e"
+        },
+        {
+          "elapsed_seconds": 34.798208042,
+          "proofs": 35,
+          "snapshot_hash": "7ee7253c411dcf0c96eb3297467e629ea1d9aa092771c4a2f6a53b4228dfb8ff"
+        },
+        {
+          "elapsed_seconds": 35.809596083,
+          "proofs": 36,
+          "snapshot_hash": "b756aae6429309cf4a9de65270446c31442681be7da9a838fe66f98c4df3dd25"
+        },
+        {
+          "elapsed_seconds": 36.816961667,
+          "proofs": 37,
+          "snapshot_hash": "fe0897d1dc43442c7e462acb5ab8cf6aeb815a4e3f10539e1f854437176f96a2"
+        },
+        {
+          "elapsed_seconds": 37.832686083,
+          "proofs": 38,
+          "snapshot_hash": "6534a699ba756cffa9562676f337bb345b328933091177ceab107422866fc307"
+        },
+        {
+          "elapsed_seconds": 38.836987957999995,
+          "proofs": 39,
+          "snapshot_hash": "cbaae157de09ec42178298fac8fb1c6ca67e1133eb06dec02969d358788e772e"
+        },
+        {
+          "elapsed_seconds": 39.86775729199999,
+          "proofs": 40,
+          "snapshot_hash": "f11cb1cca90f4d22ef54c435e20a6a571db975dcdc7f50a8c8671869b5bcf229"
+        },
+        {
+          "elapsed_seconds": 40.870173917,
+          "proofs": 41,
+          "snapshot_hash": "ec6a27b7c341ac02abd0fd23af5c5b36fd0c22b5bd4bd38109ca59be63ed820f"
+        },
+        {
+          "elapsed_seconds": 41.879849375000006,
+          "proofs": 42,
+          "snapshot_hash": "cceb17c78abed98f974598d910157165edab60044fcfe79cf9ff4dc5d04b9935"
+        },
+        {
+          "elapsed_seconds": 42.886552707999996,
+          "proofs": 43,
+          "snapshot_hash": "3775c322e74241ed5c14d65d730b161d5348aedb133329eec7218868481d3121"
+        },
+        {
+          "elapsed_seconds": 43.918215125,
+          "proofs": 44,
+          "snapshot_hash": "f6b01ef771c423f967b94ee945f29f8329e12e69e2cdbb02cd74a1fcd8acef9a"
+        },
+        {
+          "elapsed_seconds": 44.936372500000004,
+          "proofs": 45,
+          "snapshot_hash": "96d28f3aaa15eab4a82da8096fc3664187fe84b76e8b083b70cdb9812e001ee0"
+        },
+        {
+          "elapsed_seconds": 45.950980708,
+          "proofs": 46,
+          "snapshot_hash": "43d2da7f030291e562560f16b33604109fa98f2e51fb0e67416ea088d0192231"
+        },
+        {
+          "elapsed_seconds": 46.958422541999994,
+          "proofs": 47,
+          "snapshot_hash": "40aa244374b666886822831c35d837e011e59e440f7b22b17797ed066800f689"
+        },
+        {
+          "elapsed_seconds": 47.976377166999995,
+          "proofs": 48,
+          "snapshot_hash": "12e8291680148da1201fc8f5ba86c877370ae8274b5a03b676b5e62809ae3ac1"
+        },
+        {
+          "elapsed_seconds": 48.979947708,
+          "proofs": 49,
+          "snapshot_hash": "ea7ff933efb89e6f732835156cb2ed397b365f6b92ff27e3a43a1b8b7c2f11fe"
+        },
+        {
+          "elapsed_seconds": 50.001653167,
+          "proofs": 50,
+          "snapshot_hash": "05809e4edbaf97ea29b3a84032c787fc451fe2407c214cc694f6c953b64d5c29"
+        },
+        {
+          "elapsed_seconds": 51.0279345,
+          "proofs": 51,
+          "snapshot_hash": "9d42c024f8220d73fe314265726c0a5a5e6b9dd6500b0ed4aed92f810b75186c"
+        },
+        {
+          "elapsed_seconds": 52.035805917000005,
+          "proofs": 52,
+          "snapshot_hash": "996469b8ebc403ce1cfc69c92dfa20304cd0aadc9df51b6d106ad2e37a138a09"
+        },
+        {
+          "elapsed_seconds": 53.06030425,
+          "proofs": 53,
+          "snapshot_hash": "52903f4d7aa78cec352d4a2eb7c18bb001c12dd2d8a29fdcf06a9a7c55f0012c"
+        },
+        {
+          "elapsed_seconds": 54.05581375,
+          "proofs": 54,
+          "snapshot_hash": "631bbf416f2987cd6df2ff136369400bb249e2215cb39d8c14f9a28ff930ac43"
+        },
+        {
+          "elapsed_seconds": 55.070888083,
+          "proofs": 55,
+          "snapshot_hash": "d57194dff1f87e043cf160488bf982ef41e431d9619d2d310cf080bb693b3c27"
+        },
+        {
+          "elapsed_seconds": 56.087349833000005,
+          "proofs": 56,
+          "snapshot_hash": "19ca38cc4c1233f7c09db60f206d3592f49e601a2e5f3d14ee61b2ec9acbe48c"
+        },
+        {
+          "elapsed_seconds": 57.107753625,
+          "proofs": 57,
+          "snapshot_hash": "fa7dadddb0bb4a04a87a10b29bec296ce271aaa645ba15c12ad2940a944c4180"
+        },
+        {
+          "elapsed_seconds": 58.11753,
+          "proofs": 58,
+          "snapshot_hash": "3d213bd9c50d32d0e573d2f95dfc0aa3646fd6afae4a70b047d859df8e7fe691"
+        },
+        {
+          "elapsed_seconds": 59.12888516699999,
+          "proofs": 59,
+          "snapshot_hash": "09ee52631df05792d5bcdd5452af44090b76a5dc5a579fc18061ecd6f73c71f8"
+        },
+        {
+          "elapsed_seconds": 60.143045833,
+          "proofs": 60,
+          "snapshot_hash": "12e23479a982e8bc83c609373029b13a3e0ba2555cf2d189da840db5604e90d3"
+        },
+        {
+          "elapsed_seconds": 61.164469958,
+          "proofs": 61,
+          "snapshot_hash": "7ffc06117c2a873028ebac1402fe2b59a29ef55379f3ae08ef3345f22261a48b"
+        },
+        {
+          "elapsed_seconds": 62.183568875000006,
+          "proofs": 62,
+          "snapshot_hash": "f40ca2308d08387b6bc6e0a71ff503c470e89be5c2f98a77970c0bd78f5dd1fb"
+        },
+        {
+          "elapsed_seconds": 63.189468082999994,
+          "proofs": 63,
+          "snapshot_hash": "0a7250a8b13fcfab24dd8a491ec4f66e9a18965318b3ac20851e74f59751cd5f"
+        },
+        {
+          "elapsed_seconds": 64.200241125,
+          "proofs": 64,
+          "snapshot_hash": "8f48789ea5c93c9b72b76f1919d63a6f83654e4356f806f7357537f4f83e57a1"
+        },
+        {
+          "elapsed_seconds": 65.227176083,
+          "proofs": 65,
+          "snapshot_hash": "af4faab569dd51e539c0d104517c7e7fc5bfbb831986c61fd3fc9498910747dd"
+        },
+        {
+          "elapsed_seconds": 66.266948292,
+          "proofs": 66,
+          "snapshot_hash": "dbbb34e30e4057cbca69b9ffa1c065ea126926df000d3c879c4abbfdd9c9e5d5"
+        },
+        {
+          "elapsed_seconds": 67.325824042,
+          "proofs": 67,
+          "snapshot_hash": "05842550f64721d7620e3676a1de59fa973fa841d3afa44ed70744a1addeab87"
+        },
+        {
+          "elapsed_seconds": 68.402894125,
+          "proofs": 68,
+          "snapshot_hash": "db14d856ce6c57bc96e9458a02514d560453c1d4bfaef85aa3aecbabe5f28294"
+        },
+        {
+          "elapsed_seconds": 69.5007775,
+          "proofs": 69,
+          "snapshot_hash": "bb457be494d676bd8a63b790584bf1b55c669bdddc3cbbc4c9864aee088eacba"
+        },
+        {
+          "elapsed_seconds": 70.62296125,
+          "proofs": 70,
+          "snapshot_hash": "5663d86adea4605725983708ea4eccd0538a2ffe570443ab59df72f19a832e74"
+        },
+        {
+          "elapsed_seconds": 71.763269958,
+          "proofs": 71,
+          "snapshot_hash": "6f4b762277b299b3c2380b973c7706e7b1e7095ec36aa5bf044af02025ad6bf1"
+        },
+        {
+          "elapsed_seconds": 72.918669417,
+          "proofs": 72,
+          "snapshot_hash": "b4ab3f6e85f7e690d537ed8e87272490b22433bfdd3099e1705d708e0d140e1c"
+        },
+        {
+          "elapsed_seconds": 74.093591292,
+          "proofs": 73,
+          "snapshot_hash": "ff6950669fa4dba8d747a6afed9806fa1a9da4c3afb77b606ee2062533ca3799"
+        },
+        {
+          "elapsed_seconds": 75.289522458,
+          "proofs": 74,
+          "snapshot_hash": "0732ae1df8cf6decadcabd5403853498fd0622326001014e0fc6168332c213a5"
+        },
+        {
+          "elapsed_seconds": 76.500304917,
+          "proofs": 75,
+          "snapshot_hash": "d8e8eaba517a766e3f28523fd07693cb12ae62fb153dcd02497c98716c465258"
+        },
+        {
+          "elapsed_seconds": 77.740445375,
+          "proofs": 76,
+          "snapshot_hash": "e76894ce4f36ac9da6148aa6f9d2ac4c1bbfc86ce5c29ed3afcc58e125d865e5"
+        },
+        {
+          "elapsed_seconds": 79.001047542,
+          "proofs": 77,
+          "snapshot_hash": "748a6046c83eae0326fe06c533a65a34f978555d0c1b993e05b681d29712a97b"
+        },
+        {
+          "elapsed_seconds": 80.28126575,
+          "proofs": 78,
+          "snapshot_hash": "fd3aae82e6cb7ec947dcca730493ba50d6f72baa5f4f5d9a0e62334f50b26a37"
+        },
+        {
+          "elapsed_seconds": 81.585337333,
+          "proofs": 79,
+          "snapshot_hash": "9b4896f1a7b3536b416703cb11b7888a4bacae55df7055f68a0af71c18394d6f"
+        },
+        {
+          "elapsed_seconds": 82.909308333,
+          "proofs": 80,
+          "snapshot_hash": "078fa7dcd3131e8121bf6ada11ba3e25590b85226be4c4df54fa9233fd41913e"
+        },
+        {
+          "elapsed_seconds": 84.248751542,
+          "proofs": 81,
+          "snapshot_hash": "2d58f7a816591c6ed642c09e30ea34e4e1685e1e582808f7f59b2e03e3222bed"
+        },
+        {
+          "elapsed_seconds": 85.620661167,
+          "proofs": 82,
+          "snapshot_hash": "039b9634cdc84c45f084de24eb052fc21de1f2c89426722c50de31687c4e12a1"
+        },
+        {
+          "elapsed_seconds": 87.014367458,
+          "proofs": 83,
+          "snapshot_hash": "80e8e8fef52af082bd0571538d9e9fdf20d0663aac844d21c28c2c9ca0032f5c"
+        },
+        {
+          "elapsed_seconds": 88.412472458,
+          "proofs": 84,
+          "snapshot_hash": "78c054bfcd0a5dacf4678c6852efdafc8947f2f9f373b75c8cfef8fa9e3ae09b"
+        },
+        {
+          "elapsed_seconds": 89.847464917,
+          "proofs": 85,
+          "snapshot_hash": "cebd16fe189aa09dcbc6a54d3820986476a7d37c94a1b2b6e3ea4c2d0b6f1743"
+        },
+        {
+          "elapsed_seconds": 91.303711042,
+          "proofs": 86,
+          "snapshot_hash": "7ee5adc645e526c2a04ff6adae72f85a9c940512e7e2bf6bcdef86707074afc7"
+        },
+        {
+          "elapsed_seconds": 92.77375787499999,
+          "proofs": 87,
+          "snapshot_hash": "88189ca2072b593145f7004a2b0057d0975d71312a1d6ed8220a28aa7938e397"
+        },
+        {
+          "elapsed_seconds": 94.26344454199999,
+          "proofs": 88,
+          "snapshot_hash": "9e38eef1b783a4ceaea812ffd2b877b9b60383f23aeca67856a2c518354b605f"
+        },
+        {
+          "elapsed_seconds": 95.77391945800001,
+          "proofs": 89,
+          "snapshot_hash": "4b3fd97959c1bfe512c90dd371b6f1ae600defd5dc5f8bc14a08b85460174a8e"
+        },
+        {
+          "elapsed_seconds": 97.31235979200001,
+          "proofs": 90,
+          "snapshot_hash": "c61f125a8e02b8dc2d2083f1a2b9bafea38665086730df5ac0e03cc96bc20bf1"
+        },
+        {
+          "elapsed_seconds": 98.868927583,
+          "proofs": 91,
+          "snapshot_hash": "281b14813fe6a9744c990e81140fad9d0301a33b189189ef0ecba3259df61a61"
+        },
+        {
+          "elapsed_seconds": 100.45062054200001,
+          "proofs": 92,
+          "snapshot_hash": "9ff4c13c23bb35f2627ea583f488307e7ada8475e89279e3d397e0b9961ff1aa"
+        },
+        {
+          "elapsed_seconds": 102.055801125,
+          "proofs": 93,
+          "snapshot_hash": "e3c0ae4a40cfd34cfb9254fe8fc27e50d488b5e151529b4e780fa75cbf395046"
+        },
+        {
+          "elapsed_seconds": 103.69268949999999,
+          "proofs": 94,
+          "snapshot_hash": "4355acbaea025f07596177bd7e09793b50ea8d577b90b4fddce1371f2dff0c5e"
+        },
+        {
+          "elapsed_seconds": 105.348127083,
+          "proofs": 95,
+          "snapshot_hash": "40f8d8e30189d8025ba4ef4591cae745d280bd3990415f60e8665a6516846708"
+        },
+        {
+          "elapsed_seconds": 107.02478212499999,
+          "proofs": 96,
+          "snapshot_hash": "ce272583f4d0e176f23517c11cb5e11ceaff69e7052fd28705c2806a37f514d8"
+        },
+        {
+          "elapsed_seconds": 108.72318833300001,
+          "proofs": 97,
+          "snapshot_hash": "d9901efb12d59db9f12698129908d03269f617e9de327f37c701a8bdad34e276"
+        },
+        {
+          "elapsed_seconds": 110.453419958,
+          "proofs": 98,
+          "snapshot_hash": "f6befc82a754883d8b899f900c1193e9f02a3a729a504d4d641cbe94a87fbcd4"
+        },
+        {
+          "elapsed_seconds": 112.19680137499999,
+          "proofs": 99,
+          "snapshot_hash": "455c1c521190a3b4d9159add723e4407a67424317de987168bf6361191edd8fe"
+        },
+        {
+          "elapsed_seconds": 113.97486191700001,
+          "proofs": 100,
+          "snapshot_hash": "7f2adace883c56a0f156e8557d4250b9c5b983e1a9fc233437a176c7f35e68ac"
+        }
+      ],
+      "refresh_due_lateness": {
+        "count": 0
+      },
+      "rpc": {
+        "methods": {
+          "per_ack.rpc.node0.getblockchaininfo": {
+            "request_bytes": 25368,
+            "calls": 604,
+            "response_bytes": 292940
+          },
+          "per_ack.rpc.node0.getsharepoolhashstatus": {
+            "request_bytes": 32012,
+            "calls": 604,
+            "response_bytes": 614702
+          },
+          "per_ack.rpc.node0.getbestblockhash": {
+            "request_bytes": 86756,
+            "calls": 2116,
+            "response_bytes": 139656
+          },
+          "per_ack.rpc.node0.getblockhash": {
+            "request_bytes": 265192,
+            "calls": 6660,
+            "response_bytes": 439560
+          },
+          "per_ack.rpc.node0.getsharepoolhashtidesbudget": {
+            "request_bytes": 33330,
+            "calls": 202,
+            "response_bytes": 55954
+          },
+          "per_ack.rpc.node0.preparesharepoolhashjob": {
+            "request_bytes": 9013846,
+            "calls": 101,
+            "response_bytes": 11801570
+          },
+          "per_ack.rpc.node0.finalizesharepoolhashjob": {
+            "request_bytes": 11695116,
+            "calls": 101,
+            "response_bytes": 11720871
+          },
+          "per_ack.rpc.node0.validatesharepoolhashtemplate": {
+            "request_bytes": 24464442,
+            "calls": 302,
+            "response_bytes": 83654
+          },
+          "per_ack.rpc.node0.submitsharepoolhashsnapshot": {
+            "request_bytes": 14403650,
+            "calls": 5451,
+            "response_bytes": 583156
+          },
+          "per_ack.rpc.node0.validatesharepoolhashshare": {
+            "request_bytes": 215400,
+            "calls": 200,
+            "response_bytes": 41200
+          }
+        },
+        "totals": {
+          "calls": 16341,
+          "request_bytes": 60235112,
+          "response_bytes": 25773263
+        }
+      },
+      "measurements": {
+        "per_ack.job_prepare_dispatch": {
+          "count": 101,
+          "total_seconds": 81.76134216700001,
+          "min_seconds": 0.20117404100000158,
+          "p50_seconds": 0.7321042500000061,
+          "p95_seconds": 1.6006655829999943,
+          "p99_seconds": 1.6868101670000044,
+          "max_seconds": 1.719965333999994,
+          "failures": 0
+        },
+        "per_ack.receive": {
+          "count": 100,
+          "total_seconds": 5.49007621199997,
+          "min_seconds": 0.022554958000000624,
+          "p50_seconds": 0.05370883400000537,
+          "p95_seconds": 0.06851062499998761,
+          "p99_seconds": 0.07006358299999249,
+          "max_seconds": 0.07227954200000397,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.finalizesharepoolhashjob": {
+          "count": 101,
+          "total_seconds": 6.360082164999945,
+          "min_seconds": 0.006228165999999646,
+          "p50_seconds": 0.05858562499999209,
+          "p95_seconds": 0.1271797079999999,
+          "p99_seconds": 0.13408104199999116,
+          "max_seconds": 0.1367316249999817,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.getbestblockhash": {
+          "count": 2116,
+          "total_seconds": 0.5701532080004839,
+          "min_seconds": 0.00015995900000120855,
+          "p50_seconds": 0.0002190000000013015,
+          "p95_seconds": 0.0004986659999985932,
+          "p99_seconds": 0.0008848750000112204,
+          "max_seconds": 0.0038787909999769,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.getblockchaininfo": {
+          "count": 604,
+          "total_seconds": 0.33935773699999316,
+          "min_seconds": 0.0002723750000086511,
+          "p50_seconds": 0.0003789579999988746,
+          "p95_seconds": 0.0023819160000044803,
+          "p99_seconds": 0.002916124999998715,
+          "max_seconds": 0.0031822079999983544,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.getblockhash": {
+          "count": 6660,
+          "total_seconds": 1.5235116260002002,
+          "min_seconds": 0.00015799999999899228,
+          "p50_seconds": 0.00021604200000524543,
+          "p95_seconds": 0.00026995799999696146,
+          "p99_seconds": 0.0006617080000026476,
+          "max_seconds": 0.004079625000002807,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.getsharepoolhashstatus": {
+          "count": 604,
+          "total_seconds": 0.3994583729999732,
+          "min_seconds": 0.00041745900000478287,
+          "p50_seconds": 0.0005004159999941749,
+          "p95_seconds": 0.0021451249999984157,
+          "p99_seconds": 0.0023727079999957823,
+          "max_seconds": 0.003319707999999366,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.getsharepoolhashtidesbudget": {
+          "count": 202,
+          "total_seconds": 0.06072674500008901,
+          "min_seconds": 0.0002411660000021243,
+          "p50_seconds": 0.0002967499999897427,
+          "p95_seconds": 0.0003448750000032419,
+          "p99_seconds": 0.0004199170000021013,
+          "max_seconds": 0.00045087499999851843,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.preparesharepoolhashjob": {
+          "count": 101,
+          "total_seconds": 7.141482706999994,
+          "min_seconds": 0.005282332999996697,
+          "p50_seconds": 0.06586079200000938,
+          "p95_seconds": 0.14354566600002272,
+          "p99_seconds": 0.15394266699999548,
+          "max_seconds": 0.15450841599999876,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.submitsharepoolhashsnapshot": {
+          "count": 5451,
+          "total_seconds": 4.393448293999853,
+          "min_seconds": 0.00029254200000394803,
+          "p50_seconds": 0.00034291699999755565,
+          "p95_seconds": 0.0004660410000028037,
+          "p99_seconds": 0.022333708000005004,
+          "max_seconds": 0.05118237499999623,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.validatesharepoolhashshare": {
+          "count": 200,
+          "total_seconds": 0.25926642000008115,
+          "min_seconds": 0.000384041999993201,
+          "p50_seconds": 0.0008504159999986882,
+          "p95_seconds": 0.0027236249999873507,
+          "p99_seconds": 0.0029160409999917647,
+          "max_seconds": 0.0029902910000032534,
+          "failures": 100
+        },
+        "per_ack.rpc.node0.validatesharepoolhashtemplate": {
+          "count": 302,
+          "total_seconds": 11.279852125999923,
+          "min_seconds": 0.002487750000000233,
+          "p50_seconds": 0.022151333000003604,
+          "p95_seconds": 0.102994625000008,
+          "p99_seconds": 0.11190341700000772,
+          "max_seconds": 0.1136434999999949,
+          "failures": 0
+        }
+      },
+      "initial_job_cutoff_bytes_preserved": true,
+      "total_measured_cpu_seconds": 85.68883299999999,
+      "idle_context_probe": {
+        "operations": 50,
+        "wall_seconds": 0.09129420799999366,
+        "driver_cpu_seconds": 0.03470199999999579,
+        "extra_publications": 0,
+        "rpc": {
+          "methods": {
+            "per_ack_idle_probe.rpc.node0.getblockchaininfo": {
+              "request_bytes": 2100,
+              "calls": 50,
+              "response_bytes": 24250
+            },
+            "per_ack_idle_probe.rpc.node0.getsharepoolhashstatus": {
+              "request_bytes": 2650,
+              "calls": 50,
+              "response_bytes": 51050
+            },
+            "per_ack_idle_probe.rpc.node0.getbestblockhash": {
+              "request_bytes": 4100,
+              "calls": 100,
+              "response_bytes": 6600
+            },
+            "per_ack_idle_probe.rpc.node0.getblockhash": {
+              "request_bytes": 3900,
+              "calls": 100,
+              "response_bytes": 6600
+            }
+          },
+          "totals": {
+            "calls": 300,
+            "request_bytes": 12750,
+            "response_bytes": 88500
+          }
+        },
+        "measurements": {
+          "per_ack_idle_probe.context_check": {
+            "count": 50,
+            "total_seconds": 0.09116933000007066,
+            "min_seconds": 0.0016965419999905862,
+            "p50_seconds": 0.001815207999982249,
+            "p95_seconds": 0.0019154160000027787,
+            "p99_seconds": 0.002307250000001204,
+            "max_seconds": 0.002307250000001204,
+            "failures": 0
+          },
+          "per_ack_idle_probe.rpc.node0.getbestblockhash": {
+            "count": 100,
+            "total_seconds": 0.020076709999926834,
+            "min_seconds": 0.00018587499999966894,
+            "p50_seconds": 0.0002006250000192722,
+            "p95_seconds": 0.00021312500001613444,
+            "p99_seconds": 0.00022154199999135926,
+            "max_seconds": 0.00022441699999831144,
+            "failures": 0
+          },
+          "per_ack_idle_probe.rpc.node0.getblockchaininfo": {
+            "count": 50,
+            "total_seconds": 0.015367670000102862,
+            "min_seconds": 0.0002822090000051958,
+            "p50_seconds": 0.00030291699999906996,
+            "p95_seconds": 0.00032479200001489517,
+            "p99_seconds": 0.0005093340000144053,
+            "max_seconds": 0.0005093340000144053,
+            "failures": 0
+          },
+          "per_ack_idle_probe.rpc.node0.getblockhash": {
+            "count": 100,
+            "total_seconds": 0.02036645699988071,
+            "min_seconds": 0.00018199999999524152,
+            "p50_seconds": 0.00020366700002227844,
+            "p95_seconds": 0.00021583299999861083,
+            "p99_seconds": 0.00023120800000242525,
+            "max_seconds": 0.00023566599998048332,
+            "failures": 0
+          },
+          "per_ack_idle_probe.rpc.node0.getsharepoolhashstatus": {
+            "count": 50,
+            "total_seconds": 0.022198455999955513,
+            "min_seconds": 0.0004205000000183645,
+            "p50_seconds": 0.0004410000000234504,
+            "p95_seconds": 0.00047087499999065585,
+            "p99_seconds": 0.0005222910000100001,
+            "max_seconds": 0.0005222910000100001,
+            "failures": 0
+          }
+        }
+      },
+      "settlement": {
+        "block": "76fbba62a4982929f3d20ef2bc4c4e663af407bfc0aeb1d0bc1ebe6d112aa9d3",
+        "parent": "1778e71e83a8f75c13ab75e5a365dad60b09acca64374ca6e1d087b80aa11c7f",
+        "snapshot_hash": "7f2adace883c56a0f156e8557d4250b9c5b983e1a9fc233437a176c7f35e68ac",
+        "all_proof_ids_preserved": true,
+        "exact_rational_payouts_verified": true,
+        "receipt_states": {
+          "confirmed_admitted": 100
+        },
+        "remaining_eligible_backlog": 0,
+        "expired_or_unknown": 0,
+        "stored_block_bytes_match": true,
+        "verifychain_level4": true
+      },
+      "populated_collector_reopen": {
+        "close_wall_seconds": 0.0049759580000170445,
+        "open_wall_seconds": 2.0526300839999863,
+        "open_driver_cpu_seconds": 2.0514279999999943,
+        "journal_events": 502,
+        "journal_bytes": 6548879,
+        "exact_head_preserved": true,
+        "confirmed_receipts_preserved": 100,
+        "archive_rotation_exercised": false,
+        "rpc": {
+          "methods": {
+            "per_ack_reopen.rpc.node0.getblockchaininfo": {
+              "request_bytes": 84,
+              "calls": 2,
+              "response_bytes": 970
+            },
+            "per_ack_reopen.rpc.node0.getsharepoolhashstatus": {
+              "request_bytes": 106,
+              "calls": 2,
+              "response_bytes": 2042
+            },
+            "per_ack_reopen.rpc.node0.getbestblockhash": {
+              "request_bytes": 164,
+              "calls": 4,
+              "response_bytes": 264
+            },
+            "per_ack_reopen.rpc.node0.getblockhash": {
+              "request_bytes": 196,
+              "calls": 5,
+              "response_bytes": 330
+            },
+            "per_ack_reopen.rpc.node0.getblockheader": {
+              "request_bytes": 111,
+              "calls": 1,
+              "response_bytes": 330
+            }
+          },
+          "totals": {
+            "calls": 14,
+            "request_bytes": 661,
+            "response_bytes": 3936
+          }
+        }
+      }
+    },
+    "datum": {
+      "node": 1,
+      "result": "passed",
+      "offered": 100,
+      "acknowledged": 100,
+      "published_jobs": 4,
+      "replacement_jobs": 3,
+      "initial_preloaded_gate_open_seconds_excluded": 0.44844487499997854,
+      "published_body_bytes": {
+        "template_bytes": 47690,
+        "snapshot_bytes": 205370
+      },
+      "paced_wall_seconds": 123.901897083,
+      "busy_operation_wall_seconds": 10.649502297999618,
+      "explicit_pacing_sleep_seconds": 113.20837207400103,
+      "other_driver_wall_seconds": 0.04402271099934296,
+      "offers_to_last_ack_and_refresh_seconds": 99.09619866599999,
+      "final_refresh_wait_and_work_seconds": 24.600594,
+      "driver_cpu_seconds": 6.761696000000001,
+      "driver_children_cpu_seconds": 0.421477000000003,
+      "rpc_json_reencoding_cpu_seconds": 0.06428099999974535,
+      "driver_cpu_excluding_json_reencoding_seconds": 6.697415000000255,
+      "signer_children_cpu_seconds": 0.421477000000003,
+      "native_cpu_seconds": 3.39,
+      "rss_at_boundaries_bytes": {
+        "driver_start": 44302336,
+        "driver_end": 44843008,
+        "native_start": 61440000,
+        "native_end": 68976640
+      },
+      "logical_disk_growth_bytes": {
+        "gate_logical_bytes": 2781034,
+        "native_snapshot_logical_bytes": 491212
+      },
+      "receipt_due_to_ack": {
+        "count": 100,
+        "total_seconds": 8.661828839998606,
+        "min_seconds": 0.022318415999990293,
+        "p50_seconds": 0.07444583299999863,
+        "p95_seconds": 0.09404216599997994,
+        "p99_seconds": 0.6658803750000004,
+        "max_seconds": 1.0045717909999894
+      },
+      "receipt_service": {
+        "count": 100,
+        "total_seconds": 6.5627990470000555,
+        "min_seconds": 0.02231158300000402,
+        "p50_seconds": 0.0680694170000038,
+        "p95_seconds": 0.08735712500001114,
+        "p99_seconds": 0.09006412499999783,
+        "max_seconds": 0.09098854100000153
+      },
+      "receipt_queue_wait": {
+        "count": 100,
+        "total_seconds": 2.099011046998669,
+        "min_seconds": 6.582999986903815e-06,
+        "p50_seconds": 0.00492779100000007,
+        "p95_seconds": 0.010081790999976192,
+        "p99_seconds": 0.6286897909999993,
+        "max_seconds": 0.9550972499999943
+      },
+      "job_preparation": {
+        "count": 4,
+        "total_seconds": 3.877503582999964,
+        "min_seconds": 0.2050304589999996,
+        "p50_seconds": 0.6286671660000138,
+        "p95_seconds": 1.7226287079999452,
+        "p99_seconds": 1.7226287079999452,
+        "max_seconds": 1.7226287079999452
+      },
+      "job_preparation_boundary": "entire fresh-job operation: build, sign, authorize, publish, final context checks",
+      "ack_to_first_publication": {
+        "count": 100,
+        "total_seconds": 2376.3219810010005,
+        "min_seconds": 1.5538336670000206,
+        "p50_seconds": 25.56430287500001,
+        "p95_seconds": 40.58992441699999,
+        "p99_seconds": 41.62915879199997,
+        "max_seconds": 41.67611608299998
+      },
+      "publication_trace": [
+        {
+          "elapsed_seconds": 0.20322962499997743,
+          "proofs": 0,
+          "snapshot_hash": "ae0b443cb0194abbe83c7682678b82b27b435fd06a781634c70780cdfeea15ba"
+        },
+        {
+          "elapsed_seconds": 40.831243416999996,
+          "proofs": 40,
+          "snapshot_hash": "1759f10227a532046c66cbab92e19aa99d607cf373795fac8935205e11ee7f63"
+        },
+        {
+          "elapsed_seconds": 82.15644733299999,
+          "proofs": 81,
+          "snapshot_hash": "20bfaf63c99c5fd9477f25c308998a795bbbde7e4e670ea7dc45053b34b556b1"
+        },
+        {
+          "elapsed_seconds": 123.88579112499997,
+          "proofs": 100,
+          "snapshot_hash": "1c3301527ab98f68aa29453ece0fc6ef4525065c9101f82ba7d3e31a0f771f05"
+        }
+      ],
+      "refresh_due_lateness": {
+        "count": 4,
+        "total_seconds": 0.012836625999995022,
+        "min_seconds": 0,
+        "p50_seconds": 0.00016670900001258815,
+        "p95_seconds": 0.007316374999959407,
+        "p99_seconds": 0.007316374999959407,
+        "max_seconds": 0.007316374999959407
+      },
+      "rpc": {
+        "methods": {
+          "datum.rpc.node1.getblockchaininfo": {
+            "request_bytes": 13398,
+            "calls": 319,
+            "response_bytes": 154715
+          },
+          "datum.rpc.node1.getsharepoolhashstatus": {
+            "request_bytes": 16907,
+            "calls": 319,
+            "response_bytes": 323044
+          },
+          "datum.rpc.node1.getbestblockhash": {
+            "request_bytes": 31570,
+            "calls": 770,
+            "response_bytes": 50820
+          },
+          "datum.rpc.node1.getblockhash": {
+            "request_bytes": 42042,
+            "calls": 1067,
+            "response_bytes": 70422
+          },
+          "datum.rpc.node1.getsharepoolhashtidesbudget": {
+            "request_bytes": 1320,
+            "calls": 8,
+            "response_bytes": 2216
+          },
+          "datum.rpc.node1.preparesharepoolhashjob": {
+            "request_bytes": 397424,
+            "calls": 4,
+            "response_bytes": 510552
+          },
+          "datum.rpc.node1.finalizesharepoolhashjob": {
+            "request_bytes": 506336,
+            "calls": 4,
+            "response_bytes": 507356
+          },
+          "datum.rpc.node1.validatesharepoolhashtemplate": {
+            "request_bytes": 2085912,
+            "calls": 108,
+            "response_bytes": 29916
+          },
+          "datum.rpc.node1.submitsharepoolhashsnapshot": {
+            "request_bytes": 905906,
+            "calls": 525,
+            "response_bytes": 56171
+          },
+          "datum.rpc.node1.validatesharepoolhashshare": {
+            "request_bytes": 215400,
+            "calls": 200,
+            "response_bytes": 41200
+          }
+        },
+        "totals": {
+          "calls": 3324,
+          "request_bytes": 4216215,
+          "response_bytes": 1746412
+        }
+      },
+      "measurements": {
+        "datum.receive": {
+          "count": 100,
+          "total_seconds": 6.556752948999929,
+          "min_seconds": 0.022306583999977647,
+          "p50_seconds": 0.06799799999998868,
+          "p95_seconds": 0.08730758299998342,
+          "p99_seconds": 0.09000241600000436,
+          "max_seconds": 0.09092066599998816,
+          "failures": 0
+        },
+        "datum.rpc.node1.finalizesharepoolhashjob": {
+          "count": 4,
+          "total_seconds": 0.28703812400004836,
+          "min_seconds": 0.006282333000001472,
+          "p50_seconds": 0.04604975000000877,
+          "p95_seconds": 0.13330083300002116,
+          "p99_seconds": 0.13330083300002116,
+          "max_seconds": 0.13330083300002116,
+          "failures": 0
+        },
+        "datum.rpc.node1.getbestblockhash": {
+          "count": 770,
+          "total_seconds": 0.30103936199986947,
+          "min_seconds": 0.0001621249999743668,
+          "p50_seconds": 0.000246458999981769,
+          "p95_seconds": 0.0010583340000209773,
+          "p99_seconds": 0.0014832079999962389,
+          "max_seconds": 0.0017986250000205928,
+          "failures": 0
+        },
+        "datum.rpc.node1.getblockchaininfo": {
+          "count": 319,
+          "total_seconds": 0.31787754600009066,
+          "min_seconds": 0.00027475000001686567,
+          "p50_seconds": 0.00046358400001622613,
+          "p95_seconds": 0.002946167000004607,
+          "p99_seconds": 0.0030756670000187114,
+          "max_seconds": 0.0031593749999956344,
+          "failures": 0
+        },
+        "datum.rpc.node1.getblockhash": {
+          "count": 1067,
+          "total_seconds": 0.38008065999994756,
+          "min_seconds": 0.00016262500000152613,
+          "p50_seconds": 0.0002482499999985066,
+          "p95_seconds": 0.0008833750000007967,
+          "p99_seconds": 0.001073999999988473,
+          "max_seconds": 0.0015595410000059928,
+          "failures": 0
+        },
+        "datum.rpc.node1.getsharepoolhashstatus": {
+          "count": 319,
+          "total_seconds": 0.3252234930001521,
+          "min_seconds": 0.00042099999998868043,
+          "p50_seconds": 0.0006274589999861746,
+          "p95_seconds": 0.0023973749999868232,
+          "p99_seconds": 0.0026109579999911148,
+          "max_seconds": 0.0028242500000033033,
+          "failures": 0
+        },
+        "datum.rpc.node1.getsharepoolhashtidesbudget": {
+          "count": 8,
+          "total_seconds": 0.004988333999989436,
+          "min_seconds": 0.0002642919999971127,
+          "p50_seconds": 0.00033804199998144213,
+          "p95_seconds": 0.001427624999962518,
+          "p99_seconds": 0.001427624999962518,
+          "max_seconds": 0.001427624999962518,
+          "failures": 0
+        },
+        "datum.rpc.node1.preparesharepoolhashjob": {
+          "count": 4,
+          "total_seconds": 0.3217442919999769,
+          "min_seconds": 0.005382999999994809,
+          "p50_seconds": 0.051079541999996536,
+          "p95_seconds": 0.15052495800000543,
+          "p99_seconds": 0.15052495800000543,
+          "max_seconds": 0.15052495800000543,
+          "failures": 0
+        },
+        "datum.rpc.node1.submitsharepoolhashsnapshot": {
+          "count": 525,
+          "total_seconds": 0.3882310049994544,
+          "min_seconds": 0.00030404200001044046,
+          "p50_seconds": 0.0004177920000074664,
+          "p95_seconds": 0.0010814160000052198,
+          "p99_seconds": 0.001560332999986258,
+          "max_seconds": 0.05362737500001913,
+          "failures": 0
+        },
+        "datum.rpc.node1.validatesharepoolhashshare": {
+          "count": 200,
+          "total_seconds": 0.27157913500005293,
+          "min_seconds": 0.0003859999999917818,
+          "p50_seconds": 0.0008572080000135429,
+          "p95_seconds": 0.0029705419999856986,
+          "p99_seconds": 0.0031242910000059965,
+          "max_seconds": 0.0031731250000177624,
+          "failures": 100
+        },
+        "datum.rpc.node1.validatesharepoolhashtemplate": {
+          "count": 108,
+          "total_seconds": 1.4478078350001056,
+          "min_seconds": 0.0024884999999983393,
+          "p50_seconds": 0.009987167000019781,
+          "p95_seconds": 0.0365770829999974,
+          "p99_seconds": 0.11221599999998944,
+          "max_seconds": 0.112333499999977,
+          "failures": 0
+        },
+        "datum.scheduler_poll": {
+          "count": 104,
+          "total_seconds": 4.088023873000168,
+          "min_seconds": 0.001610666999994237,
+          "p50_seconds": 0.0020613330000003316,
+          "p95_seconds": 0.0027142909999895437,
+          "p99_seconds": 1.32112833299999,
+          "max_seconds": 1.7225679160000027,
+          "failures": 0
+        }
+      },
+      "initial_job_cutoff_bytes_preserved": true,
+      "total_measured_cpu_seconds": 10.573173000000004,
+      "idle_context_probe": {
+        "operations": 50,
+        "wall_seconds": 0.08665854099996295,
+        "driver_cpu_seconds": 0.03338300000000061,
+        "extra_publications": 0,
+        "rpc": {
+          "methods": {
+            "datum_idle_probe.rpc.node1.getblockchaininfo": {
+              "request_bytes": 2100,
+              "calls": 50,
+              "response_bytes": 24250
+            },
+            "datum_idle_probe.rpc.node1.getsharepoolhashstatus": {
+              "request_bytes": 2650,
+              "calls": 50,
+              "response_bytes": 50750
+            },
+            "datum_idle_probe.rpc.node1.getbestblockhash": {
+              "request_bytes": 4100,
+              "calls": 100,
+              "response_bytes": 6600
+            },
+            "datum_idle_probe.rpc.node1.getblockhash": {
+              "request_bytes": 3900,
+              "calls": 100,
+              "response_bytes": 6600
+            }
+          },
+          "totals": {
+            "calls": 300,
+            "request_bytes": 12750,
+            "response_bytes": 88200
+          }
+        },
+        "measurements": {
+          "datum_idle_probe.poll": {
+            "count": 50,
+            "total_seconds": 0.08654050099994492,
+            "min_seconds": 0.0016565000000241525,
+            "p50_seconds": 0.001716582999961247,
+            "p95_seconds": 0.0018026669999926526,
+            "p99_seconds": 0.002299083000025348,
+            "max_seconds": 0.002299083000025348,
+            "failures": 0
+          },
+          "datum_idle_probe.rpc.node1.getbestblockhash": {
+            "count": 100,
+            "total_seconds": 0.019144087999848125,
+            "min_seconds": 0.00017845899998292225,
+            "p50_seconds": 0.00019033400002399503,
+            "p95_seconds": 0.00020354200000838318,
+            "p99_seconds": 0.00021225000000413274,
+            "max_seconds": 0.00021650000002182423,
+            "failures": 0
+          },
+          "datum_idle_probe.rpc.node1.getblockchaininfo": {
+            "count": 50,
+            "total_seconds": 0.01446262500002149,
+            "min_seconds": 0.0002654159999906369,
+            "p50_seconds": 0.0002832089999742493,
+            "p95_seconds": 0.00030716700001676145,
+            "p99_seconds": 0.0005062500000008185,
+            "max_seconds": 0.0005062500000008185,
+            "failures": 0
+          },
+          "datum_idle_probe.rpc.node1.getblockhash": {
+            "count": 100,
+            "total_seconds": 0.019457626000132677,
+            "min_seconds": 0.00018166600000313338,
+            "p50_seconds": 0.00019424999999273496,
+            "p95_seconds": 0.00020483299999796145,
+            "p99_seconds": 0.0002164170000469312,
+            "max_seconds": 0.00023354199998948388,
+            "failures": 0
+          },
+          "datum_idle_probe.rpc.node1.getsharepoolhashstatus": {
+            "count": 50,
+            "total_seconds": 0.020907957000019906,
+            "min_seconds": 0.00039487500004042886,
+            "p50_seconds": 0.0004094589999681375,
+            "p95_seconds": 0.0004428330000223468,
+            "p99_seconds": 0.0005236659999923177,
+            "max_seconds": 0.0005236659999923177,
+            "failures": 0
+          }
+        }
+      },
+      "settlement": {
+        "block": "197c869fdaec463255d5b4e1cbb29673ebc84bc25a05b4abdb201a6ff3c6d281",
+        "parent": "1778e71e83a8f75c13ab75e5a365dad60b09acca64374ca6e1d087b80aa11c7f",
+        "snapshot_hash": "1c3301527ab98f68aa29453ece0fc6ef4525065c9101f82ba7d3e31a0f771f05",
+        "all_proof_ids_preserved": true,
+        "exact_rational_payouts_verified": true,
+        "receipt_states": {
+          "confirmed_admitted": 100
+        },
+        "remaining_eligible_backlog": 0,
+        "expired_or_unknown": 0,
+        "stored_block_bytes_match": true,
+        "verifychain_level4": true
+      },
+      "populated_collector_reopen": {
+        "close_wall_seconds": 0.002781249999998181,
+        "open_wall_seconds": 0.6069513749999942,
+        "open_driver_cpu_seconds": 0.6058730000000025,
+        "journal_events": 308,
+        "journal_bytes": 928202,
+        "exact_head_preserved": true,
+        "confirmed_receipts_preserved": 100,
+        "archive_rotation_exercised": false,
+        "rpc": {
+          "methods": {
+            "datum_reopen.rpc.node1.getblockchaininfo": {
+              "request_bytes": 84,
+              "calls": 2,
+              "response_bytes": 970
+            },
+            "datum_reopen.rpc.node1.getsharepoolhashstatus": {
+              "request_bytes": 106,
+              "calls": 2,
+              "response_bytes": 2030
+            },
+            "datum_reopen.rpc.node1.getbestblockhash": {
+              "request_bytes": 164,
+              "calls": 4,
+              "response_bytes": 264
+            },
+            "datum_reopen.rpc.node1.getblockhash": {
+              "request_bytes": 196,
+              "calls": 5,
+              "response_bytes": 330
+            },
+            "datum_reopen.rpc.node1.getblockheader": {
+              "request_bytes": 111,
+              "calls": 1,
+              "response_bytes": 330
+            }
+          },
+          "totals": {
+            "calls": 14,
+            "request_bytes": 661,
+            "response_bytes": 3924
+          }
+        }
+      }
+    }
+  },
+  "rewards": [
+    {
+      "height": 102,
+      "commitment": "7f2adace883c56a0f156e8557d4250b9c5b983e1a9fc233437a176c7f35e68ac",
+      "new_admissions": 100,
+      "eligible_proofs": 100,
+      "payout_scripts": 100,
+      "reward_satoshis": 5000100000,
+      "unclaimed_rounding_satoshis": 0,
+      "whole_admission_height_cohorts_verified": true,
+      "exact_rational_window_and_coinbase_verified": true
+    },
+    {
+      "height": 102,
+      "commitment": "1c3301527ab98f68aa29453ece0fc6ef4525065c9101f82ba7d3e31a0f771f05",
+      "new_admissions": 100,
+      "eligible_proofs": 100,
+      "payout_scripts": 100,
+      "reward_satoshis": 5000100000,
+      "unclaimed_rounding_satoshis": 0,
+      "whole_admission_height_cohorts_verified": true,
+      "exact_rational_window_and_coinbase_verified": true
+    }
+  ],
+  "limitations": [
+    "One finite sequential local workload and fixed arm order; no statistical confidence interval or saturation claim",
+    "Real monotonic pacing; slow service creates a measured client queue instead of slowing offered due offsets",
+    "Two disconnected native backends share the same parent, origin bytes and mempool; separate fresh collector journals",
+    "Native validation caches are restarted, but OS file cache and thermals are not reset or controlled",
+    "All source jobs and proofs are prepared before timing; fixture cost is reported separately",
+    "This begins at activation with empty reward history; later-round accumulated history and archive rotation are unmeasured",
+    "Per-ACK rebuilding is an explicit comparator caller, not a claim that the old gate automatically rebuilt jobs",
+    "Logical publish callback stores native snapshot and retains bytes; no Stratum hardware or WAN transmission",
+    "RPC byte totals re-encode method/params and result JSON without HTTP, authentication, envelope IDs or framing",
+    "Driver CPU includes measurement overhead; separately timed JSON re-encoding cost is an approximate removable diagnostic cost",
+    "RSS is measured at boundaries only, not peak; logical disk growth is not physical allocation or fsync latency",
+    "Native CPU uses cumulative ps time; signer CPU uses reaped child rusage around individual signing calls",
+    "Regtest share difficulty does not establish mainnet sampling variance or physical mining hashrate",
+    "The final scheduled refresh can add deliberate waiting; busy work and paced wall time are reported separately",
+    "One hundred logical miner origins feed one coordinator per arm, not one hundred full validating nodes"
+  ],
+  "fixture": {
+    "native_parent": "1778e71e83a8f75c13ab75e5a365dad60b09acca64374ca6e1d087b80aa11c7f",
+    "height": 101,
+    "distinct_valid_origins": 100,
+    "distinct_transaction_sets": 100,
+    "payout_identities": 100,
+    "real_proofs": 100,
+    "template_bytes": {
+      "count": 100,
+      "total_bytes": 533250,
+      "min_bytes": 432,
+      "p50_bytes": 5283,
+      "p95_bytes": 9738,
+      "p99_bytes": 10134,
+      "max_bytes": 10233
+    },
+    "proof_sequence_sha256": "e9a5737c9db5249b24bebfa6d6c7a0c0f76311f8ea474e63b8a74e32b042a883",
+    "mempool_txids": [
+      "009900a5f3d127bf2096d7d29d0583826f013ed65ac9963b646ec73a86de8c94",
+      "033b21f881ea5b43486d4f60d5fb392880c436bc9bb1eac76de7993bb83381ba",
+      "04bd7ba283da64127f5a6fe1192e985d0a3efac3e8816c238dbeb5daff21b2be",
+      "06df886cf904be0b31c7a807b4771c688634a908edb3c1180b59c12c5f4b9c2f",
+      "093614e97b0317b2745af89f383516c3f8f5b8074d59221cfeaf100468318396",
+      "097631b144d467f2ed6adefc7fcf482701f61ddb8c25deb52da2b4058677265f",
+      "09dc02f18258be173cec71fbb635289b4c2a7fa46adde7f0fd733e48f4e89f06",
+      "100c25f466f42553e8223d910f2636a5b595bbf2c0951bdfb6f98ebfa7c29637",
+      "10fd401e13be448f88a90870108d99ae4f0c3c9d9610c91f656b5dbf93f90ffd",
+      "12198b5d0107dafcd3307d5702129e212b190951ce2f8259fcba3e90c0a69b5b",
+      "12b691fd77e21b72a366374d5a9bbd2e6dfee0892f6b271211fc3008aebf1f57",
+      "157d24bb54e21e2031d8db88f846880c98ad50aa91534fe6985977083d44dc7b",
+      "1698b265334be446564190de847b9d810e74689f82ab2a7030ede4dbd2af7c72",
+      "1789e521a158fb48dedd78090f07bd039f9fcaa75f67dd93ce82994aaf4e70ee",
+      "17dcf2186aefaa48c8b6bb6d20aed35da034f200983f755715b5f7b7629eb34a",
+      "1dad5453d34f9cb2a22a96797069fdb81daa2739bca00956361809d74d36b1b9",
+      "1e8602f2600b3e8e7bf9f37936143b9daa290b9cd04da03f868aa1ef8d4b4bd4",
+      "24c29e11986778c1cce7bb2d89a77ce605ed1e3ed135a4f84f76132182e5cb4b",
+      "28dbb455fdb9b1d805cc51b88ca1793796260e094d046d442262913727e2f876",
+      "2ba9bb72e2accdf8507cce4fa17f7555eb3297c30c19ab108630ff7b6b3b02ff",
+      "328db20df5f24e83f2b7d7306c1845dc38a430d8d90c7d5c9aaeb1dca42bbd15",
+      "3396df01faf3cd98573057ee36b7eabf1815ea48b3ec9f7e97e93af01e5446d3",
+      "33c78f3f44b02e7d9e6e996c3163cebaf76b2ac8abc0ef4414fbd384b72c8d1e",
+      "38e7df72c5c05415d9685bea58511c9be319846b5590e3d8279588f0949d44d9",
+      "3ab70632e5d3376bede160858cdcd70cda5a8453b8aeb339cf62c2d5930de720",
+      "3bde7136d0cdd7bba16d41cfad97e17b90381573dd8e0ff925dac0233a0ca6d2",
+      "3d7ce2576070f0be17204a91294cb1195a864a4a5a6a88a061ea870ff338c619",
+      "3dfc811fd585213aab730e6f53d473a7d76bdc112576d3dcfc3c83b3ddd1527b",
+      "3f9a6b2530d1bc85e95ce3b4c976541120271033dbced132727da95bc18725f1",
+      "4086f8aa82a4f0771e66f35e76c3190b0936d486baccf55d985653cefc4bb460",
+      "44358a673e02210aca3fc5bf5b03552cf6bdab2aa5befe53ddfec22ac05a4dbb",
+      "443f7159b4dcb279276a1efd7bb563634711acf4fe7cc22e3a43f63d526828a2",
+      "4850064700296ccbc4efc03170603d7962283aebf67a47f3bb597acee2832bcd",
+      "508160efb8742a3be09ba1a64d658cdc026df7865c09fce1c054e3dc3029d79f",
+      "50c3e6a69cd9c707ff29105c9ab687664f265a98b29a099291c4c4caa793c2b1",
+      "515d820f7879a1127085eaaffd9ef7ff61946e30407ed93436d71844745277b1",
+      "526ac1349cb0aeaf8a24500b8829721c1c1dc2ffee01d9359855c51f06b245b6",
+      "53d860e60e6e7897c63eb07634292f25794f31e8743661797ac0e12a905bf507",
+      "54aed601e751694009ed2643bb54fe86690fce90087d0b0651e1ef5e2cfd2c3a",
+      "55d4a437b8d8ef87f0741fae4370fa1dfa96f151d357dbdd178aa482badf4e94",
+      "566f4c49e9d668a4c242d20a71b980bab35e769b1213f09aead7fed6c0fa0e23",
+      "56cf7aad87e4a210392b20d1ac7fc1982ff1ebcb6ac83289311a3ea9cef3d2e9",
+      "5ad4883c17ab9f86abc799d8a1b5d8cb9237d2c836d47bafc5f882fc79eae1ec",
+      "5f103622be48cf71acbe25b0ad0b1ab28442dca27e534adf39872e0c1e8c0b57",
+      "6018b25e01bd23db73f457cbc477fe2707d1e13c30c2444e23482ab694ceadd3",
+      "64edb23cf7516dbc37e67590b50983debc49f891b86f067c2f5dbe57887ba7c5",
+      "65515632173870fdb69b37eee2f4db2c6c3dff6a2a184bf9f08b73dd32f9fdb2",
+      "67c37974f926b4433604aaae9e1f0be22971ec2b1d80676f40a89fae843303d9",
+      "68f2adab6bd0ce3a7fef098d51cf64869c07078344aed9184f96e69c6b780e8b",
+      "6be748cbc995c040be0af4b81a4e1020e26549e3fce18842ff01708d3c298972",
+      "6e8205e64e9d56da98d3f252cce02de36f9033129a128012f8476522c7895a59",
+      "704f967bc64d3962c618a1dbd5c71cb1e5f77e1e8091956b23eff9d093e10e55",
+      "71e19eab45bbc1acbb9e4f1bf5666dcc46c5767823780ae7913a2fbd329d2157",
+      "7559d4bbf4f4e8d1b94196aab3c8aeb6a52b44a3a0331e95d07e810f418de578",
+      "7992ab8e703c36be50e1fe56c14a0ecc94bb2a8aecd368a4fca3c30cd3b65d7b",
+      "7f75b780f687e91aaf53cf8a27724cc5b67ca69e1753c39426deeff11e73a127",
+      "7ffa2e210867848886970b1b511d221f6c62f94636350464c3435da85b3dd7ac",
+      "858ef64ff8e8f6aabee0ba296e50ae83b19abcef54e29de4868be4c784077c48",
+      "8de4e4708717fe4476ba1f22285b55896fa722aff832be69bc78494ed639eacc",
+      "905be302a88d97e91e24f10d8665322ec66eddf1b992b5dda0fb671e95df3946",
+      "93a5feb328ddfb05f6c2ede1cbb39315813d930fdbf4fd666f9b447f3e0fbe8d",
+      "9885e809dda9542a6b35fa67c84d8872fca0172bed0384866052ebe7a6444856",
+      "9af35e368b9d569265a85a533eef3ac578814b4a85a8e7c46f163af906fcc702",
+      "9bdc422edb02f67083ac1b34695fb39091f0c75a141d755b055dbdf3c9c54b04",
+      "9f0ea32b1d472e258fd286c4d57266b5f5af96cb85f388e88476397d43798188",
+      "aac24921ebd8271ca87dd1302ca385f4afccd6afb1a5dcdfd963cafd3df70d64",
+      "aea8dbabd3bc261a4893e391c8fc48dc5905010c5499d2f211364244df917679",
+      "b0a11d6311ea488e6e4f4143965d3385d631815300e567103a9ff3e3639fa035",
+      "b20f5aa3dbd0682b3980e503dde691008c708202b67a2da459645089378cd4eb",
+      "b38370f7c5367f144b9c6f9fc6c156a24b656ed158ed89298c494b3a1e31ac98",
+      "b4b322282a964dbde750c116f63d0ed2bb164eb609d144891fc93335bb401159",
+      "b770472c2cbd58cf58afe56a1b23bb2559cba874849e4bf2a2f826e70cd25b49",
+      "b9b759cb2fb49191ae04582f586b7ac244176655a9ac6c0ad728fb5aa6909135",
+      "ba62780e96a7764ea10daf06e67e56284c07f18d0a509de95f0b6a7a852d96c9",
+      "bb903542a8767268cd9f16a7de08e4ec47aa8518b9486c9d274b21303aa9943c",
+      "bc85c2ea8f47608682c60b174d7c7a0cf2dcafd53259c12db460716da5ba7f35",
+      "bf400e5094f4d9f30e984ab95d890a909eb9728133213c9ffe794ac4929254d3",
+      "c8d2186bbed8cfc9018db4c495e464cddff3fc5d24835509333de409c2576866",
+      "c900f200cfdad18cabdff3115dd68e065048209a577fde6e49f787807146eaa5",
+      "c9ec33cbe87c89a337661619c7a6b5417cb1fc2936b76f20284a840cb03a4d97",
+      "ca3d80e8bee173b989abd05b4ac1f6a7a7ecc74e5012ce441513017f1c2c49a6",
+      "ca853ab22687ac98f2f3d9f8df84b07b20fb586889d7613bb27c15175321214d",
+      "cef1d5130ca317414d2e7fe23f59abbbeae66b8b22a37000f20e3fc2531849f2",
+      "d2a82a76638ffca56f62f24a266a84cf54ef84e647246f64d9f50c87b5a4e744",
+      "d77c7c256feb15c5818e3e71b301bd60f2379613369220382c8722d08849b73a",
+      "d790295f6a5acff5d477590299b5529c051340f9e58560592d89e9ef31c7316e",
+      "df1ca3424986dfd7c4c5c17bed1ce26b05fb6805df62986957c8ca81df6bb1d4",
+      "e1f1b2a84a4708a7accc61dce9732175464e220bd91c54cda7250ecd0818b419",
+      "e2c4a261a916dc71d08395e5aece615877cee8eccf2d2491b2fde960c3b18701",
+      "e3676332bb77be25a79bd05ef4c2ad2002e02e3443d4fbc01d36134e63d9e1d9",
+      "e46f705f1a89e5d7bda6db5aca3f01884bbd1f3952d72ed6bf81284fba45969f",
+      "e7c3fee61fedcc40b3254a72cabfefe7470049725a3bd36e31cd1b522e65ef8c",
+      "e98ec24d177233037b2939b390e8df5fef8881502c610c987e50e12b4a1dc6ed",
+      "ed60e778fde284617c32862b683d2ed302696c20cde0404f0549bee3e5c69d29",
+      "f07c1832d4c5c044d9a7b324990b6dd97c03885522c717a05199c0e010defbd1",
+      "f270a068f54b277f12b0397cb91fffd400de98d535a8abe0d8e02d184a8c3ea4",
+      "f2d429fed9dcdbeec69efc78fa81c062d5b7f958381f796c87092e0c0e713eca",
+      "f4af8bfaf8706f3b32ff4b7da4ed3cc8c59247f99d8b3bb96671bc62eb93b124",
+      "f89de18d1b4cd56b2566a266022bb356604b1c94fc8ca1db2f2ddca709bf955a",
+      "fe4ef4c351ad90316cf7d35e39d02548d4ca5be0faea935cf0d17e1ebceb7666"
+    ],
+    "mock_native_time": 1789366695,
+    "scheduler_clock": "real time.monotonic; native block time fixed equally in both arms",
+    "both_backends_restarted_after_identical_collector_preload": true,
+    "wall_seconds": 34.104873833999996,
+    "measurements": {
+      "fixture.origin_job": {
+        "count": 100,
+        "total_seconds": 16.816755834999988,
+        "min_seconds": 0.14226333300000005,
+        "p50_seconds": 0.16848579200000025,
+        "p95_seconds": 0.19066370799999888,
+        "p99_seconds": 0.19282862500000064,
+        "max_seconds": 0.19731645799999953,
+        "failures": 0
+      },
+      "fixture.rpc.node0.finalizesharepoolhashjob": {
+        "count": 100,
+        "total_seconds": 0.3631551660000025,
+        "min_seconds": 0.0011868750000001427,
+        "p50_seconds": 0.0036296660000001424,
+        "p95_seconds": 0.00571924999999851,
+        "p99_seconds": 0.006031749999998226,
+        "max_seconds": 0.006141833000000929,
+        "failures": 0
+      },
+      "fixture.rpc.node0.getbestblockhash": {
+        "count": 1801,
+        "total_seconds": 0.3947547299998797,
+        "min_seconds": 0.00015745900000041502,
+        "p50_seconds": 0.00020449999999883062,
+        "p95_seconds": 0.0003655830000006688,
+        "p99_seconds": 0.00047258400000060874,
+        "max_seconds": 0.0007673749999996815,
+        "failures": 0
+      },
+      "fixture.rpc.node0.getblockchaininfo": {
+        "count": 501,
+        "total_seconds": 0.18773099699999407,
+        "min_seconds": 0.00028500000000164505,
+        "p50_seconds": 0.00034016700000005784,
+        "p95_seconds": 0.00040404199999954926,
+        "p99_seconds": 0.0005174999999999486,
+        "max_seconds": 0.01567574999999999,
+        "failures": 0
+      },
+      "fixture.rpc.node0.getblockhash": {
+        "count": 1302,
+        "total_seconds": 0.26229121500003716,
+        "min_seconds": 0.0001598750000013638,
+        "p50_seconds": 0.00020145799999937708,
+        "p95_seconds": 0.0002257080000003242,
+        "p99_seconds": 0.00024462500000055343,
+        "max_seconds": 0.0006481669999995887,
+        "failures": 0
+      },
+      "fixture.rpc.node0.getsharepoolhashstatus": {
+        "count": 501,
+        "total_seconds": 0.2341012159999991,
+        "min_seconds": 0.00039579200000261494,
+        "p50_seconds": 0.00046479199999893694,
+        "p95_seconds": 0.000517957999999652,
+        "p99_seconds": 0.0005620000000003955,
+        "max_seconds": 0.000728541999999166,
+        "failures": 0
+      },
+      "fixture.rpc.node0.getsharepoolhashtidesbudget": {
+        "count": 200,
+        "total_seconds": 0.05315024600003859,
+        "min_seconds": 0.0002342079999984037,
+        "p50_seconds": 0.0002632079999997927,
+        "p95_seconds": 0.00029250000000047294,
+        "p99_seconds": 0.00030987499999923784,
+        "max_seconds": 0.0004945830000000484,
+        "failures": 0
+      },
+      "fixture.rpc.node0.preparesharepoolhashjob": {
+        "count": 100,
+        "total_seconds": 0.31433199800000233,
+        "min_seconds": 0.0012129159999998418,
+        "p50_seconds": 0.003145375000000783,
+        "p95_seconds": 0.004807833000000983,
+        "p99_seconds": 0.004932040999999998,
+        "max_seconds": 0.005078874999998817,
+        "failures": 0
+      },
+      "fixture.rpc.node0.submitsharepoolhashsnapshot": {
+        "count": 300,
+        "total_seconds": 0.5798389130000532,
+        "min_seconds": 0.0003069579999994687,
+        "p50_seconds": 0.0003580000000020789,
+        "p95_seconds": 0.005419124999999525,
+        "p99_seconds": 0.005517832999999861,
+        "max_seconds": 0.031826957999999905,
+        "failures": 0
+      },
+      "fixture.rpc.node0.validatesharepoolhashtemplate": {
+        "count": 300,
+        "total_seconds": 0.44937195500001836,
+        "min_seconds": 0.0005057079999999381,
+        "p50_seconds": 0.0014944579999998098,
+        "p95_seconds": 0.0023640839999998775,
+        "p99_seconds": 0.0024795409999995854,
+        "max_seconds": 0.002519750000001153,
+        "failures": 0
+      },
+      "fixture.rpc.node1.getbestblockhash": {
+        "count": 301,
+        "total_seconds": 0.058334960999943064,
+        "min_seconds": 0.00016099999999852344,
+        "p50_seconds": 0.00019404100000031121,
+        "p95_seconds": 0.0002180420000001959,
+        "p99_seconds": 0.00023291699999816728,
+        "max_seconds": 0.00024716700000482206,
+        "failures": 0
+      },
+      "fixture.rpc.node1.getblockchaininfo": {
+        "count": 101,
+        "total_seconds": 0.03132466500002096,
+        "min_seconds": 0.00026691699999759066,
+        "p50_seconds": 0.00030858400000255415,
+        "p95_seconds": 0.00034520799999882,
+        "p99_seconds": 0.0003797920000039312,
+        "max_seconds": 0.0004429579999936095,
+        "failures": 0
+      },
+      "fixture.rpc.node1.getblockhash": {
+        "count": 302,
+        "total_seconds": 0.058759450000010816,
+        "min_seconds": 0.0001557909999974072,
+        "p50_seconds": 0.00018825000000077807,
+        "p95_seconds": 0.00023541699999896082,
+        "p99_seconds": 0.0002476670000035597,
+        "max_seconds": 0.0002705409999990138,
+        "failures": 0
+      },
+      "fixture.rpc.node1.getsharepoolhashstatus": {
+        "count": 101,
+        "total_seconds": 0.04363475599998168,
+        "min_seconds": 0.0003963330000047449,
+        "p50_seconds": 0.00043041699999690763,
+        "p95_seconds": 0.00046458299999585506,
+        "p99_seconds": 0.00048375000000078217,
+        "max_seconds": 0.0005228329999980019,
+        "failures": 0
+      },
+      "fixture.rpc.node1.submitsharepoolhashsnapshot": {
+        "count": 200,
+        "total_seconds": 0.48636074500002024,
+        "min_seconds": 0.00030229200000064793,
+        "p50_seconds": 0.0003962079999979551,
+        "p95_seconds": 0.0052197910000018055,
+        "p99_seconds": 0.0053828329999987545,
+        "max_seconds": 0.00942158399999471,
+        "failures": 0
+      },
+      "fixture.rpc.node1.validatesharepoolhashtemplate": {
+        "count": 100,
+        "total_seconds": 0.2910841289999837,
+        "min_seconds": 0.0010260829999992893,
+        "p50_seconds": 0.0029093340000017065,
+        "p95_seconds": 0.004645124999996142,
+        "p99_seconds": 0.004770667000002504,
+        "max_seconds": 0.0048520420000031095,
+        "failures": 0
+      }
+    }
+  },
+  "active_stage": "complete",
+  "comparison": {
+    "replacement_jobs": {
+      "per_ack": 100,
+      "datum": 3,
+      "reduction_fraction": 0.97
+    },
+    "busy_operation_wall_seconds": {
+      "per_ack": 87.2544000420002,
+      "datum": 10.649502297999618,
+      "reduction_fraction": 0.8779488221468092
+    },
+    "paced_wall_seconds": {
+      "per_ack": 113.99138516699999,
+      "datum": 123.901897083,
+      "reduction_fraction": -0.08694088506320785
+    },
+    "driver_cpu_seconds": {
+      "per_ack": 45.872049999999994,
+      "datum": 6.761696000000001,
+      "reduction_fraction": 0.8525966029423145
+    },
+    "signer_children_cpu_seconds": {
+      "per_ack": 10.656783,
+      "datum": 0.421477000000003,
+      "reduction_fraction": 0.960449884360036
+    },
+    "native_cpu_seconds": {
+      "per_ack": 29.16,
+      "datum": 3.39,
+      "reduction_fraction": 0.8837448559670782
+    },
+    "total_measured_cpu_seconds": {
+      "per_ack": 85.68883299999999,
+      "datum": 10.573173000000004,
+      "reduction_fraction": 0.8766096744484779
+    }
+  },
+  "wall_seconds": 277.253699708
+}

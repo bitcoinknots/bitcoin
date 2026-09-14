@@ -28,8 +28,10 @@ import hash_gate_archive
 import hash_gate_batch
 from hash_gate_cache import SnapshotDecodeCache
 from hash_state_cache import CompactStateCache
+from hash_signature_cache import SignatureVerifyCache
 from hash_snapshot import (Snapshot, TemplateRecord, CompactTemplateRecord, Share, MAX_SNAPSHOT_BYTES,
-    MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_BYTES, MAX_COMPACT_SHARES, MAX_SHARE_AGE, SHARE_BITS, parse_share, candidate, normalize_template, build_snapshot,
+    MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_BYTES, MAX_COMPACT_SHARES, MAX_SHARE_AGE, MAX_EXPANDED_TEMPLATE_BYTES,
+    MAX_TEMPLATE_TX_REFERENCES, SHARE_BITS, parse_share, candidate, normalize_template, build_snapshot,
     job_hash, work_outputs, credit_outputs, rules_hash, profile_snapshot_hash, LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION, is_tides_profile, materialize_compact_state)
 from native_mining_gate import (MiningAuthorization, JobOmission, parse_block, immutable_header,
     template_id, _process_lock, fcntl, REGTEST_GENESIS)
@@ -93,6 +95,7 @@ class HashMiningGate:
         self._description_cache = OrderedDict()
         self._snapshot_decode_cache = SnapshotDecodeCache()
         self._compact_state_cache = CompactStateCache()
+        self._signature_cache = SignatureVerifyCache()
         self._snapshot_observer = None  # Sole-owner bounded inventory ingestion only.
         # Dispatch capabilities belong to this open instance, never to the
         # persisted journal. Recovered evidence requires fresh native approval.
@@ -253,33 +256,9 @@ class HashMiningGate:
         return result, digest
 
     def _verify_store(self, prefix):
-        head = self._head()
-        if prefix["binding"] != self.binding or prefix["events"] > head["events"]:
-            raise ValueError("journal is behind protected high-water")
-        count, size, bad, resident = self.db.execute("SELECT count(*),COALESCE(sum(size+?),0),COALESCE(sum(kind NOT IN (0,1,2) OR typeof(data)!='blob' OR typeof(size)!='integer' OR size<1 OR size>CASE kind WHEN 0 THEN ? WHEN 1 THEN ? ELSE 1024 END OR typeof(segment)!='integer' OR segment<0 OR typeof(offset)!='integer' OR (segment=0 AND (offset!=0 OR length(data)!=size)) OR (segment>0 AND (offset<12 OR length(data)!=0))),0),COALESCE(sum(CASE WHEN segment=0 THEN size+? ELSE 0 END),0) FROM journal", (RECORD_OVERHEAD, MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES, RECORD_OVERHEAD)).fetchone()
-        if count != head["events"] or size != head["bytes"] or bad or resident != self.resident_bytes():
-            raise ValueError("journal count or data length failed integrity")
-        invalid_scalars = self.db.execute("SELECT 1 FROM journal WHERE typeof(sequence)!='integer' OR sequence<1 OR typeof(kind)!='integer' OR typeof(revision)!='integer' OR revision<0 OR typeof(height)!='integer' OR height<1 OR height>4294967295 OR typeof(identity)!='text' OR length(identity)!=64 OR typeof(digest)!='text' OR length(digest)!=64 OR typeof(previous)!='text' OR length(previous)!=64 OR typeof(root)!='text' OR length(root)!=64 OR typeof(parent)!='text' OR length(parent)!=64 LIMIT 1").fetchone()
-        if invalid_scalars is not None:
-            raise ValueError("journal scalar metadata exceeds its bound")
-        current = native_archive.initial_head(self.binding)
-        matched = current == prefix
-        for sequence, kind, identity, digest, previous, root, revision, height, parent in self.db.execute("SELECT sequence,kind,identity,digest,previous,root,revision,height,parent FROM journal ORDER BY sequence"):
-            raw = self._read(kind, identity)
-            expected, expected_digest = self._next(current, kind, identity, raw)
-            if (sequence != expected["events"] or digest != expected_digest or previous != current["root"] or
-                    root != expected["root"] or revision != expected["receipt_revision"] or
-                    self._describe(kind, raw) != (identity, height, parent)):
-                raise ValueError("journal contains missing or corrupt acknowledged evidence")
-            current = expected
-            if sequence == prefix["events"]:
-                matched = current == prefix
-        if current != head or not matched:
-            raise ValueError("journal diverges from protected high-water")
-        self._cold_prefix()
-        # Every acknowledged proof retains its complete normalized origin body.
-        for identity, in self.db.execute("SELECT identity FROM journal WHERE kind=2"):
-            self._require_origin(parse_share(self._read(PROOF, identity)))
+        from hash_gate_startup import verify_store
+
+        verify_store(self, prefix)
 
     def _check_seal(self):
         if hash_gate_archive.read_head(self.head_path) != self._sealed_head:
@@ -424,7 +403,12 @@ class HashMiningGate:
         if len(str(path)) > 4096:
             raise ValueError("cold archive path exceeds its bound")
         if not path.exists() and not path.is_symlink():
-            self.export_archive(path, since=start)
+            # The complete store was verified above. Reusing that verification
+            # avoids a second lifetime scan; the writer still authenticates each
+            # exported body and the sealed endpoint while streaming the suffix.
+            from hash_gate_startup import write_verified_archive
+
+            write_verified_archive(self, path, start=start, end=end)
         descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
         try:
             status = os.fstat(descriptor)
@@ -468,24 +452,9 @@ class HashMiningGate:
         start = native_archive.initial_head(self.binding) if since is None else hash_gate_archive.check_head(since)
         self._verify_store(start)
         end = self.archive_head()
+        from hash_gate_startup import write_verified_archive
 
-        def records():
-            current = start
-            cursor = self.db.execute("SELECT sequence,kind,identity,digest,previous,root,revision FROM journal WHERE sequence>? ORDER BY sequence",
-                                     (start["events"],))
-            for sequence, kind, identity, digest, previous, root, revision in cursor:
-                raw = self._read(kind, identity)
-                expected, expected_digest = self._next(current, kind, identity, raw)
-                if (sequence != expected["events"] or revision != expected["receipt_revision"] or
-                        previous != current["root"] or root != expected["root"] or digest != expected_digest):
-                    raise native_archive.ArchiveError("journal export diverges from its trusted checkpoint")
-                yield sequence, kind, revision, identity, digest, previous, root, raw
-                current = expected
-            if current != end:
-                raise native_archive.ArchiveError("journal changed during archive export")
-            self._check_seal()
-
-        return hash_gate_archive.write_segment(path, start=start, end=end, records=records())
+        return write_verified_archive(self, path, start=start, end=end)
 
     def revalidate_active(self):
         """Reconcile retained evidence with the current native branch.
@@ -646,7 +615,7 @@ class HashMiningGate:
         """
         fetched, complete = dict(staged), {}
         resources = hash_gate_batch.check_graph(snapshot, activation_height=self.activation_height,
-            state_cache=self._compact_state_cache, **context,
+            state_cache=self._compact_state_cache, signature_cache=self._signature_cache, **context,
             lookup=lambda identity: self._snapshot(identity, fetched),
             parent_snapshot=lambda identity, height: self._block_snapshot(height, f"{identity:064x}", fetched),
             on_snapshot=lambda identity, raw: complete.__setitem__((SNAPSHOT, f"{identity:064x}"), raw))
@@ -859,7 +828,7 @@ class HashMiningGate:
         opening = self._block_snapshot(height, tip, staged)
         if opening is not None and self.profile_version == COMPACT_TIDES_VERSION:
             opening = materialize_compact_state(opening, activation_height=self.activation_height,
-                state_cache=self._compact_state_cache,
+                state_cache=self._compact_state_cache, signature_cache=self._signature_cache,
                 parent_snapshot=lambda identity, ancestor_height: self._block_snapshot(
                     ancestor_height, f"{identity:064x}", staged))
         self._stable(tip)
@@ -945,21 +914,39 @@ class HashMiningGate:
         key = ((lambda share: priority[f"{share.proof_id:064x}"]) if is_tides_profile(self.profile_version) else
                (lambda share: (share.envelope.height, share.proof_id)))
         ordered = sorted(selected.values(), key=key)[:capacity]
-        origins = {f"{record.template_id:064x}": CompactTemplateRecord.from_record(record) for record in templates}
+        supplied_origins = {f"{record.template_id:064x}": record for record in templates}
         payout_budget = self._tides_payout_budget(tip) if is_tides_profile(self.profile_version) else None
 
         def trial(count):
             # A rejected larger prefix must not retain its fetched dependency
             # bodies across subsequent binary-search attempts.
             trial_staged = dict(staged)
-            records = {}
-            for share in ordered[:count]:
-                identity = template_id(share.header)
-                if identity not in origins:
-                    origins[identity] = CompactTemplateRecord.from_record(TemplateRecord.from_block(
-                        self._evidence(TEMPLATE, identity, staged)))
-                records[identity] = origins[identity]
+            records, transactions = {}, set()
+            expanded = references = wire_lower_bound = 0
             try:
+                for share in ordered[:count]:
+                    identity = template_id(share.header)
+                    if identity in records:
+                        continue
+                    # Reserve the new job's own future origin before reading
+                    # another body. Fetched origins belong only to this trial.
+                    if len(records) >= hash_gate_batch.MAX_ORIGIN_CHECKS - 1:
+                        raise hash_gate_batch.BatchLimit("origin count")
+                    record = supplied_origins.get(identity)
+                    if record is None:
+                        record = TemplateRecord.from_block(self._evidence(TEMPLATE, identity, trial_staged))
+                    record = CompactTemplateRecord.from_record(record)
+                    expanded += record.expanded_bytes
+                    references += len(record.transactions)
+                    if expanded > MAX_EXPANDED_TEMPLATE_BYTES or references > MAX_TEMPLATE_TX_REFERENCES:
+                        raise hash_gate_batch.BatchLimit("expanded template budget")
+                    for transaction in record.transactions:
+                        if transaction.wtxid not in transactions:
+                            wire_lower_bound += len(compact_size(len(transaction.raw))) + len(transaction.raw)
+                            if wire_lower_bound > self.snapshot_budget:
+                                raise hash_gate_batch.BatchLimit("snapshot transaction byte budget")
+                            transactions.add(transaction.wtxid)
+                    records[identity] = record
                 snapshot = build_snapshot(genesis=int(REGTEST_GENESIS, 16), native_parent=int(tip, 16),
                     height=height + 1, pool=self.pool, payout_script=self.payout_script, public_key=self.public_key,
                     sign_owner=lambda unused: None, reward=0, templates=tuple(records.values()), shares=ordered[:count],
@@ -967,6 +954,7 @@ class HashMiningGate:
                     version=self.profile_version, parent_snapshot=parent)
                 resources = hash_gate_batch.check_graph(snapshot, snapshot_budget=self.snapshot_budget,
                     mining_job=True, activation_height=self.activation_height, state_cache=self._compact_state_cache,
+                    signature_cache=self._signature_cache,
                     lookup=lambda identity: self._snapshot(identity, trial_staged),
                     parent_snapshot=lambda identity, origin_height: self._block_snapshot(origin_height, f"{identity:064x}", trial_staged))
                 if payout_budget is not None:
@@ -999,6 +987,16 @@ class HashMiningGate:
         if empty is None:
             raise ValueError("even an empty settlement exceeds local or native resource budgets: " + resources)
         best = empty, resources
+        # Normal uncongested jobs fit their complete bounded receipt prefix.
+        # Avoid rebuilding and traversing every binary-search prefix in that
+        # case. A failed full trial still falls back to the same maximal-prefix
+        # policy, retaining neither that trial's fetched bodies nor a verdict.
+        if high:
+            snapshot, resources = trial(high)
+            if snapshot is not None:
+                low, best = high, (snapshot, resources)
+            else:
+                high, reason = high - 1, resources
         while low < high:
             middle = (low + high + 1) // 2
             snapshot, resources = trial(middle)
@@ -1527,6 +1525,7 @@ class HashMiningGate:
         self._description_cache.clear()
         self._snapshot_decode_cache.clear()
         self._compact_state_cache.clear()
+        self._signature_cache.clear()
         try:
             if self.db is not None:
                 self.db.close()

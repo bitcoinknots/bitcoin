@@ -1,0 +1,95 @@
+{
+  "scope": "Historical same-configuration 100-miner/900-proof/three-epoch native workload; single new capture",
+  "result": "passed",
+  "admitted": 900,
+  "peer_verified": 900,
+  "blocks": 8,
+  "expired": 0,
+  "final_backlog": 0,
+  "native_payouts_verified": true,
+  "configuration": {
+    "profile_version": 7,
+    "miners": 100,
+    "epochs": 3,
+    "shares_per_origin": 3,
+    "padding_outputs": 0,
+    "template_layout": "cumulative",
+    "witness_heavy": false,
+    "resource_diagnostics": true,
+    "snapshot_budget_bytes": 0,
+    "batch_fraction": 0.75,
+    "offer_interval_ms": 20.0,
+    "settle_every": 0,
+    "max_runtime_seconds": 1800
+  },
+  "elapsed_seconds": {
+    "before": 686.9725692500001,
+    "after": 640.5107502080001,
+    "reduction_fraction": 0.06763271362162904
+  },
+  "per_epoch": [
+    {
+      "origin_preparation_seconds": {
+        "before": 20.011900165999997,
+        "after": 20.252182583
+      },
+      "admission_seconds": {
+        "before": 7.3803897919999955,
+        "after": 7.450940875000001
+      },
+      "seconds": {
+        "before": 86.606633625,
+        "after": 70.91306533299999
+      }
+    },
+    {
+      "origin_preparation_seconds": {
+        "before": 103.78682420800001,
+        "after": 103.62728058299999
+      },
+      "admission_seconds": {
+        "before": 79.02669824999998,
+        "after": 78.860686625
+      },
+      "seconds": {
+        "before": 223.48486158300003,
+        "after": 210.38322416699998
+      }
+    },
+    {
+      "origin_preparation_seconds": {
+        "before": 138.33229616700004,
+        "after": 137.34563525
+      },
+      "admission_seconds": {
+        "before": 114.65407266600005,
+        "after": 114.47146687500003
+      },
+      "seconds": {
+        "before": 298.538723167,
+        "after": 280.992017791
+      }
+    }
+  ],
+  "cpu_seconds": {
+    "driver": {
+      "before": 217.95000000000002,
+      "after": 173.03
+    },
+    "node0": {
+      "before": 337.42,
+      "after": 336.45000000000005
+    },
+    "node1": {
+      "before": 62.02,
+      "after": 61.87
+    }
+  },
+  "limits": [
+    "Origin preparation includes constructing all100jobs, proposal sizing and collector registration",
+    "Round3 preparation137.35s and ingress114.47s remain close to prior138.33s/114.65s",
+    "Observed elapsed improvement is mostly outside these stages; native CPU is nearly unchanged",
+    "Finite bursts and controlled blocks; offers stop to drain, not continuous production saturation",
+    "Small simple-script transaction sets, Debug build, no ASIC/WAN or production variance qualification"
+  ]
+}

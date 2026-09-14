@@ -148,3 +148,17 @@ class HashJobScheduler:
             self._retire()
         finally:
             self._busy = False
+
+    def invalidate(self):
+        """Owner-side retirement after an external transport context change.
+
+        A separate transport may already have stopped sockets during a blocked
+        build. Call this after control returns to the owner to prevent a recovered
+        native observation from reviving an old handoff. The next poll constructs
+        fresh work and still performs the normal strict dispatch fence.
+        """
+        self._enter()
+        try:
+            self._retire()
+        finally:
+            self._busy = False

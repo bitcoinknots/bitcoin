@@ -1,0 +1,9 @@
+2026-09-14T06:36:25.339000Z TestFramework (INFO): PRNG seed is: 7850005991314910564
+2026-09-14T06:36:25.339000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-gaps-regression-compact
+2026-09-14T06:36:26.601000Z TestFramework (INFO): Four exact signed jobs, 128 independent proofs, two independent payout pools
+2026-09-14T06:36:31.491000Z TestFramework (INFO): Missing compact ancestry remains pending through restart and recovers over native P2P
+2026-09-14T06:36:34.099000Z TestFramework (INFO): Competing branches derive their own omitted state and history
+2026-09-14T06:36:36.478000Z TestFramework (INFO): Persistent local history survives restart and falls back when its local seal is unavailable
+2026-09-14T06:36:41.881000Z TestFramework (INFO): Stopping nodes
+2026-09-14T06:36:42.041000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-gaps-regression-compact
+2026-09-14T06:36:42.041000Z TestFramework (INFO): Tests successful

@@ -1,0 +1,11 @@
+2026-09-14T06:36:37.898000Z TestFramework (INFO): PRNG seed is: 8478989806808796815
+2026-09-14T06:36:37.899000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-gaps-regression-state_reuse
+2026-09-14T06:36:38.671000Z TestFramework (INFO): Create an actual native parent with two admitted recipients
+2026-09-14T06:36:39.466000Z TestFramework (INFO): Warm state calculations retain fresh native proof checks and header reads
+2026-09-14T06:36:39.490000Z TestFramework (INFO): Reject an exact-header witness-body substitution before the proof endpoint
+2026-09-14T06:36:39.491000Z TestFramework (INFO): A same-tip node without the full job body triggers exactly one bounded recovery
+2026-09-14T06:36:39.529000Z TestFramework (INFO): Same-tip daemon restart cannot substitute cached Python state for a native verdict
+2026-09-14T06:36:39.954000Z TestFramework (INFO): Recovered work settles to the exact 3:2 native coinbase payouts
+2026-09-14T06:36:40.229000Z TestFramework (INFO): Stopping nodes
+2026-09-14T06:36:40.405000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-gaps-regression-state_reuse
+2026-09-14T06:36:40.405000Z TestFramework (INFO): Tests successful

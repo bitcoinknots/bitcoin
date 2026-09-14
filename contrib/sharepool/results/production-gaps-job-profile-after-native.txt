@@ -1,0 +1,10 @@
+2026-09-14T06:14:45.075000Z TestFramework (INFO): PRNG seed is: 132733751837372154
+2026-09-14T06:14:45.075000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-job-profile-after
+2026-09-14T06:14:52.877000Z TestFramework (INFO): Prepared 25/100 distinct native origins
+2026-09-14T06:14:59.805000Z TestFramework (INFO): Prepared 50/100 distinct native origins
+2026-09-14T06:15:07.079000Z TestFramework (INFO): Prepared 75/100 distinct native origins
+2026-09-14T06:15:14.717000Z TestFramework (INFO): Prepared 100/100 distinct native origins
+2026-09-14T06:15:24.118000Z TestFramework (INFO): Profiling final job with 100 acknowledged proofs
+2026-09-14T06:15:26.911000Z TestFramework (INFO): Stopping nodes
+2026-09-14T06:15:27.026000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-job-profile-after
+2026-09-14T06:15:27.026000Z TestFramework (INFO): Tests successful

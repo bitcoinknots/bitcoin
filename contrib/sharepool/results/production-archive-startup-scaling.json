@@ -1,0 +1,360 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "started_utc": "2026-09-14T06:09:29.947729+00:00",
+  "command": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "contrib/sharepool/benchmark_archive_startup.py",
+    "--baseline-source=/private/tmp/sharepool-archive-baseline-31d3fa9.py",
+    "--counts",
+    "100",
+    "1000",
+    "5000",
+    "--repeats=3",
+    "--results=contrib/sharepool/results/production-archive-startup-scaling.json"
+  ],
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "baseline_source_sha256": "fb317723022963485cdf4ac5c7497c3dc8c4bb44c17a570c974d10434e6b1596",
+  "current_source_sha256": {
+    "hash_mining_gate.py": "5152079fd68f199223adb163726ff8a2e61759a4144df48b215918fd1e46c817",
+    "hash_gate_startup.py": "6707b348d2fe846baf8add953b09c819aa0fe009ba6f8a918ca9b5a82c1ffe6e",
+    "hash_gate_archive.py": "60cb4e585c6f33c5f45d47a419c6cf8ccfd5b1781381a60a3ddbb2c48b244bca",
+    "benchmark_archive_startup.py": "1777df39e1dd52a200462ddc9e8c4d9b927d3e77c7d202df8a86a85e2b9b8c98"
+  },
+  "cases": [
+    {
+      "receipts": 100,
+      "modes": {
+        "legacy": {
+          "rollover": {
+            "cold_file_opens": 2,
+            "point_evidence_reads": 1008,
+            "wall_seconds": 0.03590849999999998,
+            "cpu_seconds": 0.03584599999999999
+          },
+          "verification_runs": [
+            {
+              "cold_file_opens": 402,
+              "point_evidence_reads": 402,
+              "wall_seconds": 0.04261279200000001,
+              "cpu_seconds": 0.04261300000000001
+            },
+            {
+              "cold_file_opens": 402,
+              "point_evidence_reads": 402,
+              "wall_seconds": 0.041920874999999996,
+              "cpu_seconds": 0.04192000000000001
+            },
+            {
+              "cold_file_opens": 402,
+              "point_evidence_reads": 402,
+              "wall_seconds": 0.04185862499999998,
+              "cpu_seconds": 0.04185899999999998
+            }
+          ],
+          "verification_wall": {
+            "count": 3,
+            "total_seconds": 0.126392292,
+            "min_seconds": 0.04185862499999998,
+            "p50_seconds": 0.041920874999999996,
+            "p95_seconds": 0.04261279200000001,
+            "p99_seconds": 0.04261279200000001,
+            "max_seconds": 0.04261279200000001
+          },
+          "verification_cpu": {
+            "count": 3,
+            "total_seconds": 0.126392,
+            "min_seconds": 0.04185899999999998,
+            "p50_seconds": 0.04192000000000001,
+            "p95_seconds": 0.04261300000000001,
+            "p99_seconds": 0.04261300000000001,
+            "max_seconds": 0.04261300000000001
+          },
+          "cold_file_bytes": 67524,
+          "exact_head_preserved": true
+        },
+        "streaming": {
+          "rollover": {
+            "cold_file_opens": 2,
+            "point_evidence_reads": 404,
+            "wall_seconds": 0.01960416599999998,
+            "cpu_seconds": 0.019564000000000026
+          },
+          "verification_runs": [
+            {
+              "cold_file_opens": 201,
+              "point_evidence_reads": 200,
+              "wall_seconds": 0.029095833999999987,
+              "cpu_seconds": 0.029051999999999967
+            },
+            {
+              "cold_file_opens": 201,
+              "point_evidence_reads": 200,
+              "wall_seconds": 0.028947292000000013,
+              "cpu_seconds": 0.028928999999999983
+            },
+            {
+              "cold_file_opens": 201,
+              "point_evidence_reads": 200,
+              "wall_seconds": 0.028735167000000006,
+              "cpu_seconds": 0.028729000000000005
+            }
+          ],
+          "verification_wall": {
+            "count": 3,
+            "total_seconds": 0.086778293,
+            "min_seconds": 0.028735167000000006,
+            "p50_seconds": 0.028947292000000013,
+            "p95_seconds": 0.029095833999999987,
+            "p99_seconds": 0.029095833999999987,
+            "max_seconds": 0.029095833999999987
+          },
+          "verification_cpu": {
+            "count": 3,
+            "total_seconds": 0.08670999999999995,
+            "min_seconds": 0.028729000000000005,
+            "p50_seconds": 0.028928999999999983,
+            "p95_seconds": 0.029051999999999967,
+            "p99_seconds": 0.029051999999999967,
+            "max_seconds": 0.029051999999999967
+          },
+          "cold_file_bytes": 67524,
+          "exact_head_preserved": true
+        }
+      },
+      "journal_events": 102,
+      "journal_bytes": 67063,
+      "comparison": {
+        "verification_wall_p50_reduction_fraction": 0.3094778675301979,
+        "verification_cpu_p50_reduction_fraction": 0.309899809160306,
+        "rollover_wall_reduction_fraction": 0.45405221604912516
+      }
+    },
+    {
+      "receipts": 1000,
+      "modes": {
+        "legacy": {
+          "rollover": {
+            "cold_file_opens": 2,
+            "point_evidence_reads": 10008,
+            "wall_seconds": 0.3378560829999999,
+            "cpu_seconds": 0.3375389999999999
+          },
+          "verification_runs": [
+            {
+              "cold_file_opens": 4002,
+              "point_evidence_reads": 4002,
+              "wall_seconds": 0.4114287080000001,
+              "cpu_seconds": 0.4113970000000001
+            },
+            {
+              "cold_file_opens": 4002,
+              "point_evidence_reads": 4002,
+              "wall_seconds": 0.4188408749999999,
+              "cpu_seconds": 0.418701
+            },
+            {
+              "cold_file_opens": 4002,
+              "point_evidence_reads": 4002,
+              "wall_seconds": 0.4114242499999998,
+              "cpu_seconds": 0.41133299999999995
+            }
+          ],
+          "verification_wall": {
+            "count": 3,
+            "total_seconds": 1.2416938329999998,
+            "min_seconds": 0.4114242499999998,
+            "p50_seconds": 0.4114287080000001,
+            "p95_seconds": 0.4188408749999999,
+            "p99_seconds": 0.4188408749999999,
+            "max_seconds": 0.4188408749999999
+          },
+          "verification_cpu": {
+            "count": 3,
+            "total_seconds": 1.241431,
+            "min_seconds": 0.41133299999999995,
+            "p50_seconds": 0.4113970000000001,
+            "p95_seconds": 0.418701,
+            "p99_seconds": 0.418701,
+            "max_seconds": 0.418701
+          },
+          "cold_file_bytes": 662427,
+          "exact_head_preserved": true
+        },
+        "streaming": {
+          "rollover": {
+            "cold_file_opens": 2,
+            "point_evidence_reads": 4004,
+            "wall_seconds": 0.181692709,
+            "cpu_seconds": 0.18122599999999967
+          },
+          "verification_runs": [
+            {
+              "cold_file_opens": 2001,
+              "point_evidence_reads": 2000,
+              "wall_seconds": 0.28117179199999986,
+              "cpu_seconds": 0.28116200000000013
+            },
+            {
+              "cold_file_opens": 2001,
+              "point_evidence_reads": 2000,
+              "wall_seconds": 0.2800604999999998,
+              "cpu_seconds": 0.27998199999999995
+            },
+            {
+              "cold_file_opens": 2001,
+              "point_evidence_reads": 2000,
+              "wall_seconds": 0.27583908300000015,
+              "cpu_seconds": 0.27582299999999993
+            }
+          ],
+          "verification_wall": {
+            "count": 3,
+            "total_seconds": 0.8370713749999998,
+            "min_seconds": 0.27583908300000015,
+            "p50_seconds": 0.2800604999999998,
+            "p95_seconds": 0.28117179199999986,
+            "p99_seconds": 0.28117179199999986,
+            "max_seconds": 0.28117179199999986
+          },
+          "verification_cpu": {
+            "count": 3,
+            "total_seconds": 0.836967,
+            "min_seconds": 0.27582299999999993,
+            "p50_seconds": 0.27998199999999995,
+            "p95_seconds": 0.28116200000000013,
+            "p99_seconds": 0.28116200000000013,
+            "max_seconds": 0.28116200000000013
+          },
+          "cold_file_bytes": 662427,
+          "exact_head_preserved": true
+        }
+      },
+      "journal_events": 1002,
+      "journal_bytes": 661963,
+      "comparison": {
+        "verification_wall_p50_reduction_fraction": 0.3192976217887067,
+        "verification_cpu_p50_reduction_fraction": 0.3194359706074671,
+        "rollover_wall_reduction_fraction": 0.4622186246088692
+      }
+    },
+    {
+      "receipts": 5000,
+      "modes": {
+        "legacy": {
+          "rollover": {
+            "cold_file_opens": 2,
+            "point_evidence_reads": 50008,
+            "wall_seconds": 2.208095417,
+            "cpu_seconds": 2.2025179999999995
+          },
+          "verification_runs": [
+            {
+              "cold_file_opens": 20002,
+              "point_evidence_reads": 20002,
+              "wall_seconds": 2.1681459160000003,
+              "cpu_seconds": 2.1678250000000006
+            },
+            {
+              "cold_file_opens": 20002,
+              "point_evidence_reads": 20002,
+              "wall_seconds": 2.1710930410000007,
+              "cpu_seconds": 2.170736999999999
+            },
+            {
+              "cold_file_opens": 20002,
+              "point_evidence_reads": 20002,
+              "wall_seconds": 2.168247124999999,
+              "cpu_seconds": 2.167788
+            }
+          ],
+          "verification_wall": {
+            "count": 3,
+            "total_seconds": 6.507486082,
+            "min_seconds": 2.1681459160000003,
+            "p50_seconds": 2.168247124999999,
+            "p95_seconds": 2.1710930410000007,
+            "p99_seconds": 2.1710930410000007,
+            "max_seconds": 2.1710930410000007
+          },
+          "verification_cpu": {
+            "count": 3,
+            "total_seconds": 6.506349999999999,
+            "min_seconds": 2.167788,
+            "p50_seconds": 2.1678250000000006,
+            "p95_seconds": 2.170736999999999,
+            "p99_seconds": 2.170736999999999,
+            "max_seconds": 2.170736999999999
+          },
+          "cold_file_bytes": 3306428,
+          "exact_head_preserved": true
+        },
+        "streaming": {
+          "rollover": {
+            "cold_file_opens": 2,
+            "point_evidence_reads": 20004,
+            "wall_seconds": 1.2426510420000003,
+            "cpu_seconds": 1.2378280000000004
+          },
+          "verification_runs": [
+            {
+              "cold_file_opens": 10001,
+              "point_evidence_reads": 10000,
+              "wall_seconds": 1.4214310000000001,
+              "cpu_seconds": 1.421087
+            },
+            {
+              "cold_file_opens": 10001,
+              "point_evidence_reads": 10000,
+              "wall_seconds": 1.4232179589999987,
+              "cpu_seconds": 1.4229259999999986
+            },
+            {
+              "cold_file_opens": 10001,
+              "point_evidence_reads": 10000,
+              "wall_seconds": 1.4148625420000016,
+              "cpu_seconds": 1.4146080000000012
+            }
+          ],
+          "verification_wall": {
+            "count": 3,
+            "total_seconds": 4.259511501,
+            "min_seconds": 1.4148625420000016,
+            "p50_seconds": 1.4214310000000001,
+            "p95_seconds": 1.4232179589999987,
+            "p99_seconds": 1.4232179589999987,
+            "max_seconds": 1.4232179589999987
+          },
+          "verification_cpu": {
+            "count": 3,
+            "total_seconds": 4.258621,
+            "min_seconds": 1.4146080000000012,
+            "p50_seconds": 1.421087,
+            "p95_seconds": 1.4229259999999986,
+            "p99_seconds": 1.4229259999999986,
+            "max_seconds": 1.4229259999999986
+          },
+          "cold_file_bytes": 3306428,
+          "exact_head_preserved": true
+        }
+      },
+      "journal_events": 5002,
+      "journal_bytes": 3305963,
+      "comparison": {
+        "verification_wall_p50_reduction_fraction": 0.3444331212937728,
+        "verification_cpu_p50_reduction_fraction": 0.3444641518572765,
+        "rollover_wall_reduction_fraction": 0.4372294637120746
+      }
+    }
+  ],
+  "limitations": [
+    "Archive-only canonical/hash-chain benchmark; native validity, Stratum, mainnet difficulty and payouts are outside its scope",
+    "Exact solved regtest proof bodies share one origin; setup directly persists these fixture bodies outside measurement",
+    "Every verification still reads all lifetime bytes and authenticates proof origins; no incremental skip or trusted timestamp",
+    "Methods are compared on identical checkpoint/evidence with fresh bounded metadata caches, but OS file cache remains warm",
+    "Fixed legacy-first order and finite repeats are descriptive measurements, not statistical confidence intervals",
+    "Local filesystem and small shared-origin proofs do not characterize large snapshots, many origins or WAN archive recovery",
+    "Point-read and file-open accounting adds a small amount of Python overhead proportional to those operations"
+  ],
+  "wall_seconds": 18.094449917000002
+}

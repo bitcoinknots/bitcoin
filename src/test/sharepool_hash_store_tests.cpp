@@ -14,6 +14,8 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
+#include <future>
 
 #include <boost/test/unit_test.hpp>
 
@@ -230,6 +232,101 @@ struct StoreFixture : BasicTestingSetup {
 } // namespace
 
 BOOST_FIXTURE_TEST_SUITE(sharepool_hash_store_tests, StoreFixture)
+
+BOOST_AUTO_TEST_CASE(prepared_snapshot_owns_bytes_and_does_not_require_the_chain_lock)
+{
+    using Store = sharepool::HashSnapshotStore;
+    Store store{m_path_root / "prepared-owned", true};
+    auto raw = ho::EncodeSnapshot(source);
+    const auto expected = raw;
+    const auto hash = ho::ProfileSnapshotHash(raw, ho::VERSION);
+    std::future<Store::PreparedSnapshot> future;
+    bool finished{false};
+    {
+        // Preparation can finish while another thread owns cs_main. Release
+        // the lock before any failing assertion or future destruction.
+        LOCK(cs_main);
+        future = std::async(std::launch::async, [raw, hash] {
+            AssertLockNotHeld(cs_main);
+            return Store::PreparePut(raw, ho::VERSION, hash);
+        });
+        finished = future.wait_for(std::chrono::seconds{10}) == std::future_status::ready;
+        BOOST_CHECK_EQUAL(store.Count(), 0);
+    }
+    BOOST_REQUIRE(finished);
+    auto prepared = future.get();
+    raw.back() ^= 1;
+    LOCK(cs_main);
+    BOOST_CHECK_EQUAL(store.Count(), 0);
+    BOOST_CHECK(prepared.Hash() == hash);
+    BOOST_CHECK(store.PutPrepared(prepared) == hash);
+    BOOST_CHECK(store.Get(hash) == expected);
+    BOOST_CHECK(store.Template(ho::TemplateId(block)) != nullptr);
+    BOOST_CHECK_THROW(store.PutPrepared(prepared), std::runtime_error);
+    BOOST_CHECK_EQUAL(store.Count(), 1);
+}
+
+BOOST_AUTO_TEST_CASE(prepared_snapshot_rechecks_profile_and_current_storage_quota)
+{
+    using Store = sharepool::HashSnapshotStore;
+    const std::vector<unsigned char> first{6, 1, 2, 3}, second{6, 4, 5, 6};
+    Store limited{m_path_root / "prepared-quota", true, ho::TIDES_VERSION, {.max_bytes = first.size() + 128}};
+    Store other_profile{m_path_root / "prepared-wrong-profile", true, ho::VERSION};
+    auto prepared = Store::PreparePut(first, ho::TIDES_VERSION);
+    LOCK(cs_main);
+    BOOST_CHECK_THROW(other_profile.PutPrepared(prepared), std::runtime_error);
+    BOOST_CHECK_EQUAL(other_profile.Count(), 0);
+    // Another admission consumes capacity after preparation. Preparation did
+    // not reserve bytes and cannot override the current quota/checkpoint.
+    const auto other_hash = limited.Put(second);
+    BOOST_CHECK_THROW(limited.PutPrepared(prepared), std::runtime_error);
+    BOOST_CHECK_EQUAL(limited.Count(), 1);
+    BOOST_CHECK_EQUAL(limited.ChargedBytes(), second.size() + 128);
+    BOOST_CHECK(limited.Get(other_hash) == second);
+    BOOST_CHECK(!limited.Has(prepared.Hash()));
+}
+
+BOOST_AUTO_TEST_CASE(prepared_reoffer_rechecks_durable_bytes_despite_a_warm_cache)
+{
+    using Store = sharepool::HashSnapshotStore;
+    Store store{m_path_root / "prepared-repair", true};
+    const auto raw = ho::EncodeSnapshot(source);
+    const auto hash = ho::ProfileSnapshotHash(raw, ho::VERSION);
+    {
+        LOCK(cs_main);
+        store.Put(raw, hash);
+        BOOST_REQUIRE(store.GetShared(hash));
+    }
+    auto prepared = Store::PreparePut(raw, ho::VERSION, hash);
+    LOCK(cs_main);
+    const auto charged = store.ChargedBytes();
+    sharepool::HashSnapshotStoreTest::DamageSnapshot(store, hash);
+    BOOST_CHECK(store.PutPrepared(prepared) == hash);
+    BOOST_CHECK(store.Get(hash) == raw);
+    BOOST_CHECK_EQUAL(store.Count(), 1);
+    BOOST_CHECK_EQUAL(store.ChargedBytes(), charged);
+    // Even an already present reoffer consumes this preparation, while
+    // independently prepared evidence remains safe to offer again.
+    auto duplicate = Store::PreparePut(raw, ho::VERSION, hash);
+    BOOST_CHECK(store.PutPrepared(duplicate) == hash);
+    BOOST_CHECK_THROW(store.PutPrepared(duplicate), std::runtime_error);
+}
+
+BOOST_AUTO_TEST_CASE(prepared_malformed_preimage_is_evidence_and_wrong_hash_is_not_admitted)
+{
+    using Store = sharepool::HashSnapshotStore;
+    Store store{m_path_root / "prepared-malformed", true, ho::COMPACT_TIDES_VERSION};
+    const std::vector<unsigned char> raw{7, 0xff};
+    const auto hash = ho::ProfileSnapshotHash(raw, ho::COMPACT_TIDES_VERSION);
+    BOOST_CHECK_THROW(Store::PreparePut({}, ho::COMPACT_TIDES_VERSION), std::runtime_error);
+    BOOST_CHECK_THROW(Store::PreparePut(raw, ho::COMPACT_TIDES_VERSION, uint256{}), std::runtime_error);
+    auto prepared = Store::PreparePut(raw, ho::COMPACT_TIDES_VERSION, hash);
+    LOCK(cs_main);
+    BOOST_CHECK_EQUAL(store.Count(), 0);
+    BOOST_CHECK(store.PutPrepared(prepared) == hash);
+    BOOST_CHECK(store.Get(hash) == raw);
+    BOOST_CHECK_THROW(store.Lookup(hash), ho::MalformedSnapshot);
+}
 
 BOOST_AUTO_TEST_CASE(snapshot_dependencies_are_hints_and_pending_blocks_own_requirements)
 {

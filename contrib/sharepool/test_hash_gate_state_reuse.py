@@ -107,8 +107,10 @@ class GateStateReuseTests(unittest.TestCase):
     def test_close_discards_state_without_persisting_it_as_evidence(self):
         self.load_parent()
         self.assertGreater(self.gate._compact_state_cache.stats()["entries"], 0)
+        self.assertGreater(self.gate._signature_cache.stats()["entries"], 0)
         self.gate.close()
         self.assertEqual(self.gate._compact_state_cache.stats()["entries"], 0)
+        self.assertEqual(self.gate._signature_cache.stats()["entries"], 0)
 
 
 if __name__ == "__main__":
