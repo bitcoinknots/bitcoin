@@ -2,16 +2,17 @@
 
 #### Preparation
 
-Bitcoin Knots releases from 23.x onwards ship a `SHA256SUMS` file signed by a number of
-builders. When verifying binary downloads, you (the end user) decide which of these
-public keys you trust and then use that trust model to evaluate the signature on a file
-that contains hashes of the release binaries. The downloaded binaries are then hashed and
-compared to the signed checksum file.
+Bitcoin Knots releases from 23.x onwards are signed by a number of public keys on the
+basis of the [guix.sigs repository](https://github.com/bitcoinknots/guix.sigs/). When
+verifying binary downloads, you (the end user) decide which of these public keys you
+trust and then use that trust model to evaluate the signature on a file that contains
+hashes of the release binaries. The downloaded binaries are then hashed and compared to
+the signed checksum file.
 
-First, you have to figure out which public keys to recognize. Running the script against
-a release will list the key IDs that signed it, along with the identity attached to each
-key. Decide which of these keys you would like to trust. For each key you want to trust,
-you must obtain that key for your local GPG installation.
+First, you have to figure out which public keys to recognize. Browse the [list of frequent
+builder-keys](https://github.com/bitcoinknots/guix.sigs/tree/knots/builder-keys) and
+decide which of these keys you would like to trust. For each key you want to trust, you
+must obtain that key for your local GPG installation.
 
 You can obtain these keys by
   - through a browser using a key server (e.g. keyserver.ubuntu.com),
@@ -19,14 +20,12 @@ You can obtain these keys by
   - you can run the packaged `verify.py --import-keys ...` script to
     have it automatically retrieve unrecognized keys.
 
-Note that `--trusted-keys` only affects how already-valid signatures are labelled; it
-does not import anything. A key must be present in your local GPG keyring before its
-signature can count towards the threshold.
-
 #### Usage
 
 This script attempts to download the checksum file (`SHA256SUMS`) and corresponding
-signature file `SHA256SUMS.asc` from https://bitcoinknots.org.
+signature file `SHA256SUMS.asc` from https://bitcoinknots.org and https://github.com.
+Only final releases are published on GitHub, so for a release candidate the check falls
+back to bitcoinknots.org alone.
 
 It first checks if the checksum file is valid based upon a plurality of signatures, and
 then downloads the release files specified in the checksum file, and checks if the
