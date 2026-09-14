@@ -1,0 +1,1224 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "network": "isolated native regtest",
+  "profile": "hash-only-v7-compact-tides",
+  "started_utc": "2026-09-14T04:48:22.965466+00:00",
+  "command": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "test/functional/feature_sharepool_hash_cadence_benchmark.py",
+    "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+    "--tmpdir=/private/tmp/sharepool-cadence-benchmark-preflight",
+    "--portseed=1600",
+    "--nocleanup",
+    "--miners=10",
+    "--offer-interval-ms=50.0",
+    "--work-update-seconds=5",
+    "--arm-order=per-ack-first",
+    "--max-runtime-seconds=1200",
+    "--results=contrib/sharepool/results/cadence-benchmark-preflight.json"
+  ],
+  "arm_order": [
+    "per_ack",
+    "datum"
+  ],
+  "configuration": {
+    "miners": 10,
+    "offer_interval_ms": 50.0,
+    "refresh_seconds": 5,
+    "max_runtime_seconds": 1200
+  },
+  "host": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "logical_cpus": 10,
+    "declared_load": "unknown"
+  },
+  "native_binary_sha256": "2f06596d94347f8491c6506d8474e4ffbfc44243fd41f0bcb884957e108d5365",
+  "signer_binary_sha256": "bbb7b90309010477f0e13866671c84cd05ddb4699c087d55897d6cf10cc169f3",
+  "source_sha256": {
+    "test/functional/feature_sharepool_hash_cadence_benchmark.py": "dcc96ccef53a73a63ee2d5914f4f2789ec257b1bbbe18c10b542932659c81bc9",
+    "contrib/sharepool/hash_job_scheduler.py": "0b44d3e63c843240d2dd27c4029278b86c5632bf4695a178076fd04d6861b911",
+    "contrib/sharepool/hash_mining_gate.py": "fb317723022963485cdf4ac5c7497c3dc8c4bb44c17a570c974d10434e6b1596",
+    "contrib/sharepool/hash_snapshot.py": "075ac241ba3f90517df8521967509df3b9af4d29351bc2ff51bb60c121417492",
+    "contrib/sharepool/hash_gate_batch.py": "9cbbe4bcb32d353811cbbd555aae70c9d86b155c1ba296f09094c7adbc47663c",
+    "contrib/sharepool/capacity_metrics.py": "4c5d2534c45bdee99f12e653ec46e010f4ab6aba6108914015bc8e08498a25db",
+    "test/functional/feature_sharepool_hash_tides_100_miners.py": "5b6903c6806c970577ae661755139175317600a6faf92851004486e81b022529"
+  },
+  "arms": {
+    "per_ack": {
+      "node": 0,
+      "result": "passed",
+      "offered": 10,
+      "acknowledged": 10,
+      "published_jobs": 11,
+      "replacement_jobs": 10,
+      "initial_preloaded_gate_open_seconds_excluded": 0.021767875000000103,
+      "published_body_bytes": {
+        "template_bytes": 15948,
+        "snapshot_bytes": 53238
+      },
+      "paced_wall_seconds": 4.416945791,
+      "busy_operation_wall_seconds": 4.416200333,
+      "explicit_pacing_sleep_seconds": 0.0,
+      "other_driver_wall_seconds": 0.0007454579999999211,
+      "offers_to_last_ack_and_refresh_seconds": 4.262212583,
+      "final_refresh_wait_and_work_seconds": 0.0006059579999995179,
+      "driver_cpu_seconds": 2.7416919999999996,
+      "driver_children_cpu_seconds": 1.1557329999999997,
+      "rpc_json_reencoding_cpu_seconds": 0.008119000000001764,
+      "driver_cpu_excluding_json_reencoding_seconds": 2.733572999999998,
+      "signer_children_cpu_seconds": 1.1557329999999997,
+      "native_cpu_seconds": 0.37,
+      "rss_at_boundaries_bytes": {
+        "driver_start": 34799616,
+        "driver_end": 36470784,
+        "native_start": 61145088,
+        "native_end": 64995328
+      },
+      "logical_disk_growth_bytes": {
+        "gate_logical_bytes": 609793,
+        "native_snapshot_logical_bytes": 83109
+      },
+      "receipt_due_to_ack": {
+        "count": 10,
+        "total_seconds": 10.470108038999996,
+        "min_seconds": 0.021204540999999466,
+        "p50_seconds": 0.583172499999999,
+        "p95_seconds": 3.0025137499999994,
+        "p99_seconds": 3.0025137499999994,
+        "max_seconds": 3.0025137499999994
+      },
+      "receipt_service": {
+        "count": 10,
+        "total_seconds": 0.23028620899999908,
+        "min_seconds": 0.021200916000000625,
+        "p50_seconds": 0.022857625000000326,
+        "p95_seconds": 0.024839207999999502,
+        "p99_seconds": 0.024839207999999502,
+        "max_seconds": 0.024839207999999502
+      },
+      "receipt_queue_wait": {
+        "count": 10,
+        "total_seconds": 10.239820870999996,
+        "min_seconds": 3.4999999991569553e-06,
+        "p50_seconds": 0.5583332079999996,
+        "p95_seconds": 2.977837332999999,
+        "p99_seconds": 2.977837332999999,
+        "max_seconds": 2.977837332999999
+      },
+      "job_preparation": {
+        "count": 11,
+        "total_seconds": 4.1859364580000005,
+        "min_seconds": 0.1540746250000007,
+        "p50_seconds": 0.27368537500000034,
+        "p95_seconds": 0.8096953750000004,
+        "p99_seconds": 0.8096953750000004,
+        "max_seconds": 0.8096953750000004
+      },
+      "job_preparation_boundary": "entire fresh-job operation: build, sign, authorize, publish, final context checks",
+      "ack_to_first_publication": {
+        "count": 10,
+        "total_seconds": 4.013469207,
+        "min_seconds": 0.1573402909999997,
+        "p50_seconds": 0.2718626669999997,
+        "p95_seconds": 0.8078668750000002,
+        "p99_seconds": 0.8078668750000002,
+        "max_seconds": 0.8078668750000002
+      },
+      "publication_trace": [
+        {
+          "elapsed_seconds": 0.15233804100000015,
+          "proofs": 0,
+          "snapshot_hash": "e1e7766a43d747293e32a322140801d0883313896599a496fe41bdcff22947e3"
+        },
+        {
+          "elapsed_seconds": 0.33267104099999933,
+          "proofs": 1,
+          "snapshot_hash": "d47ff0168ff587f31e9b0265d8c15cab1c4477a7f40c8f2434bab05e8503481d"
+        },
+        {
+          "elapsed_seconds": 0.5197114579999997,
+          "proofs": 2,
+          "snapshot_hash": "8c706145e206b663b5cc74fad30a046d89b4cd04e5a927c4784210701603d12f"
+        },
+        {
+          "elapsed_seconds": 0.7117620410000001,
+          "proofs": 3,
+          "snapshot_hash": "14d5d2260bb66c5160f4e92b8ad4ca66d766c0acaf1f811e591bd61bb22fc9de"
+        },
+        {
+          "elapsed_seconds": 0.9107264160000001,
+          "proofs": 4,
+          "snapshot_hash": "0af6d8e9cc4dd52cd2a09c256c4c3a8be53b6ce2a20d77e9e9e2808f90e2fdde"
+        },
+        {
+          "elapsed_seconds": 1.2091613749999999,
+          "proofs": 5,
+          "snapshot_hash": "8e72256cadd676f1f70d89bf43a151842034b4e4ba7b488872adb6c9f04147b2"
+        },
+        {
+          "elapsed_seconds": 1.635465291,
+          "proofs": 6,
+          "snapshot_hash": "ca17271bb0c20e06ab062779e61f6724728a277c1b187b3e3ae763949972b73a"
+        },
+        {
+          "elapsed_seconds": 2.1523969999999997,
+          "proofs": 7,
+          "snapshot_hash": "7174df3254fb08360d6a9c955fd8bb6ef550935895d468dad83389202dfdcf44"
+        },
+        {
+          "elapsed_seconds": 2.808370708,
+          "proofs": 8,
+          "snapshot_hash": "84a320760dec607d87c41f037d26d9ac6bc639ce4b563bdcdd152efef729d03a"
+        },
+        {
+          "elapsed_seconds": 3.5800666660000005,
+          "proofs": 9,
+          "snapshot_hash": "e267fd9741f5531376f3ad60ee6c534807b517b3fcfa57c9771a93cf3454fc80"
+        },
+        {
+          "elapsed_seconds": 4.414507,
+          "proofs": 10,
+          "snapshot_hash": "c0c8f2a971fe4a04a10c924ed62c2a440c19254322351424f41b1237a36b144c"
+        }
+      ],
+      "refresh_due_lateness": {
+        "count": 0
+      },
+      "rpc": {
+        "methods": {
+          "per_ack.rpc.node0.getblockchaininfo": {
+            "request_bytes": 2688,
+            "calls": 64,
+            "response_bytes": 31040
+          },
+          "per_ack.rpc.node0.getsharepoolhashstatus": {
+            "request_bytes": 3392,
+            "calls": 64,
+            "response_bytes": 64482
+          },
+          "per_ack.rpc.node0.getbestblockhash": {
+            "request_bytes": 9266,
+            "calls": 226,
+            "response_bytes": 14916
+          },
+          "per_ack.rpc.node0.getblockhash": {
+            "request_bytes": 8872,
+            "calls": 225,
+            "response_bytes": 14850
+          },
+          "per_ack.rpc.node0.getsharepoolhashtidesbudget": {
+            "request_bytes": 3630,
+            "calls": 22,
+            "response_bytes": 6094
+          },
+          "per_ack.rpc.node0.preparesharepoolhashjob": {
+            "request_bytes": 104236,
+            "calls": 11,
+            "response_bytes": 150560
+          },
+          "per_ack.rpc.node0.finalizesharepoolhashjob": {
+            "request_bytes": 138966,
+            "calls": 11,
+            "response_bytes": 141771
+          },
+          "per_ack.rpc.node0.validatesharepoolhashtemplate": {
+            "request_bytes": 296262,
+            "calls": 32,
+            "response_bytes": 8864
+          },
+          "per_ack.rpc.node0.submitsharepoolhashsnapshot": {
+            "request_bytes": 187820,
+            "calls": 96,
+            "response_bytes": 10261
+          },
+          "per_ack.rpc.node0.validatesharepoolhashshare": {
+            "request_bytes": 21540,
+            "calls": 20,
+            "response_bytes": 4120
+          }
+        },
+        "totals": {
+          "calls": 771,
+          "request_bytes": 776672,
+          "response_bytes": 446958
+        }
+      },
+      "measurements": {
+        "per_ack.job_prepare_dispatch": {
+          "count": 11,
+          "total_seconds": 4.185896919,
+          "min_seconds": 0.15406099999999956,
+          "p50_seconds": 0.2736830000000001,
+          "p95_seconds": 0.8096929999999993,
+          "p99_seconds": 0.8096929999999993,
+          "max_seconds": 0.8096929999999993,
+          "failures": 0
+        },
+        "per_ack.receive": {
+          "count": 10,
+          "total_seconds": 0.23023695799999722,
+          "min_seconds": 0.021196207999999217,
+          "p50_seconds": 0.022852874999999884,
+          "p95_seconds": 0.024834249999999614,
+          "p99_seconds": 0.024834249999999614,
+          "max_seconds": 0.024834249999999614,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.finalizesharepoolhashjob": {
+          "count": 11,
+          "total_seconds": 0.06317129199999982,
+          "min_seconds": 0.0016681250000001313,
+          "p50_seconds": 0.006203791999999986,
+          "p95_seconds": 0.009790333999999845,
+          "p99_seconds": 0.009790333999999845,
+          "max_seconds": 0.009790333999999845,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.getbestblockhash": {
+          "count": 226,
+          "total_seconds": 0.048309117999996154,
+          "min_seconds": 0.00015020799999998502,
+          "p50_seconds": 0.00020012500000010647,
+          "p95_seconds": 0.00035520799999844144,
+          "p99_seconds": 0.000463249999999249,
+          "max_seconds": 0.0005195420000001505,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.getblockchaininfo": {
+          "count": 64,
+          "total_seconds": 0.020925750000003518,
+          "min_seconds": 0.000248082999999788,
+          "p50_seconds": 0.0003167080000006095,
+          "p95_seconds": 0.00039787500000088016,
+          "p99_seconds": 0.0007283749999995592,
+          "max_seconds": 0.0007283749999995592,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.getblockhash": {
+          "count": 225,
+          "total_seconds": 0.04359695199999791,
+          "min_seconds": 0.0001487920000000642,
+          "p50_seconds": 0.00019441700000033535,
+          "p95_seconds": 0.00021800000000027353,
+          "p99_seconds": 0.00026662500000007583,
+          "max_seconds": 0.00028258300000061354,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.getsharepoolhashstatus": {
+          "count": 64,
+          "total_seconds": 0.032097913999999506,
+          "min_seconds": 0.00039695799999961423,
+          "p50_seconds": 0.0004487920000002532,
+          "p95_seconds": 0.0005051250000001062,
+          "p99_seconds": 0.003508958000000284,
+          "max_seconds": 0.003508958000000284,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.getsharepoolhashtidesbudget": {
+          "count": 22,
+          "total_seconds": 0.005894996999997737,
+          "min_seconds": 0.00023345800000029726,
+          "p50_seconds": 0.00025829099999974403,
+          "p95_seconds": 0.0003229579999999288,
+          "p99_seconds": 0.00044066700000033876,
+          "max_seconds": 0.00044066700000033876,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.preparesharepoolhashjob": {
+          "count": 11,
+          "total_seconds": 0.07141441600000054,
+          "min_seconds": 0.002384124999999848,
+          "p50_seconds": 0.006064582999999679,
+          "p95_seconds": 0.011514749999999907,
+          "p99_seconds": 0.011514749999999907,
+          "max_seconds": 0.011514749999999907,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.submitsharepoolhashsnapshot": {
+          "count": 96,
+          "total_seconds": 0.1328198310000026,
+          "min_seconds": 0.00028970799999950003,
+          "p50_seconds": 0.00034591699999975134,
+          "p95_seconds": 0.010179124999998734,
+          "p99_seconds": 0.011092083000001196,
+          "max_seconds": 0.011092083000001196,
+          "failures": 0
+        },
+        "per_ack.rpc.node0.validatesharepoolhashshare": {
+          "count": 20,
+          "total_seconds": 0.011517372000000137,
+          "min_seconds": 0.00033012499999962586,
+          "p50_seconds": 0.00046812500000026347,
+          "p95_seconds": 0.0008618750000000119,
+          "p99_seconds": 0.000884415999999888,
+          "max_seconds": 0.000884415999999888,
+          "failures": 10
+        },
+        "per_ack.rpc.node0.validatesharepoolhashtemplate": {
+          "count": 32,
+          "total_seconds": 0.14552987599999767,
+          "min_seconds": 0.0006867909999996868,
+          "p50_seconds": 0.005133458000000424,
+          "p95_seconds": 0.007619791999999848,
+          "p99_seconds": 0.00767379200000029,
+          "max_seconds": 0.00767379200000029,
+          "failures": 0
+        }
+      },
+      "initial_job_cutoff_bytes_preserved": true,
+      "total_measured_cpu_seconds": 4.267424999999999,
+      "idle_context_probe": {
+        "operations": 50,
+        "wall_seconds": 0.08490604099999999,
+        "driver_cpu_seconds": 0.03152899999999992,
+        "extra_publications": 0,
+        "rpc": {
+          "methods": {
+            "per_ack_idle_probe.rpc.node0.getblockchaininfo": {
+              "request_bytes": 2100,
+              "calls": 50,
+              "response_bytes": 24250
+            },
+            "per_ack_idle_probe.rpc.node0.getsharepoolhashstatus": {
+              "request_bytes": 2650,
+              "calls": 50,
+              "response_bytes": 50500
+            },
+            "per_ack_idle_probe.rpc.node0.getbestblockhash": {
+              "request_bytes": 4100,
+              "calls": 100,
+              "response_bytes": 6600
+            },
+            "per_ack_idle_probe.rpc.node0.getblockhash": {
+              "request_bytes": 3900,
+              "calls": 100,
+              "response_bytes": 6600
+            }
+          },
+          "totals": {
+            "calls": 300,
+            "request_bytes": 12750,
+            "response_bytes": 87950
+          }
+        },
+        "measurements": {
+          "per_ack_idle_probe.context_check": {
+            "count": 50,
+            "total_seconds": 0.08477358599999363,
+            "min_seconds": 0.0015549159999999063,
+            "p50_seconds": 0.0016625000000001222,
+            "p95_seconds": 0.0020631249999993884,
+            "p99_seconds": 0.002259666000000493,
+            "max_seconds": 0.002259666000000493,
+            "failures": 0
+          },
+          "per_ack_idle_probe.rpc.node0.getbestblockhash": {
+            "count": 100,
+            "total_seconds": 0.019039539999992527,
+            "min_seconds": 0.00016766599999940013,
+            "p50_seconds": 0.00018624999999872216,
+            "p95_seconds": 0.0002089999999999037,
+            "p99_seconds": 0.00024033400000078586,
+            "max_seconds": 0.0004875420000001185,
+            "failures": 0
+          },
+          "per_ack_idle_probe.rpc.node0.getblockchaininfo": {
+            "count": 50,
+            "total_seconds": 0.014524413999998487,
+            "min_seconds": 0.0002593749999988404,
+            "p50_seconds": 0.000278875000001122,
+            "p95_seconds": 0.0003111249999996346,
+            "p99_seconds": 0.0007293329999988885,
+            "max_seconds": 0.0007293329999988885,
+            "failures": 0
+          },
+          "per_ack_idle_probe.rpc.node0.getblockhash": {
+            "count": 100,
+            "total_seconds": 0.01926228699999122,
+            "min_seconds": 0.00017066699999901402,
+            "p50_seconds": 0.00018704100000022095,
+            "p95_seconds": 0.0002145000000002284,
+            "p99_seconds": 0.00030387500000017553,
+            "max_seconds": 0.0004957499999989068,
+            "failures": 0
+          },
+          "per_ack_idle_probe.rpc.node0.getsharepoolhashstatus": {
+            "count": 50,
+            "total_seconds": 0.020720660999995033,
+            "min_seconds": 0.00038741700000066714,
+            "p50_seconds": 0.0004083330000010932,
+            "p95_seconds": 0.00046275000000051136,
+            "p99_seconds": 0.00047574999999966394,
+            "max_seconds": 0.00047574999999966394,
+            "failures": 0
+          }
+        }
+      },
+      "settlement": {
+        "block": "170f2eb9d60b0e6321f61808b04e69aed9bf0b685e23990aa43a046f93abe5dc",
+        "parent": "192b47a3597ddf3712072be39075bba116d182ad666f6452d96189e2a246d3ed",
+        "snapshot_hash": "c0c8f2a971fe4a04a10c924ed62c2a440c19254322351424f41b1237a36b144c",
+        "all_proof_ids_preserved": true,
+        "exact_rational_payouts_verified": true,
+        "receipt_states": {
+          "confirmed_admitted": 10
+        },
+        "remaining_eligible_backlog": 0,
+        "expired_or_unknown": 0,
+        "stored_block_bytes_match": true,
+        "verifychain_level4": true
+      },
+      "populated_collector_reopen": {
+        "close_wall_seconds": 0.0018161669999994245,
+        "open_wall_seconds": 0.030457625000000377,
+        "open_driver_cpu_seconds": 0.02939399999999992,
+        "journal_events": 52,
+        "journal_bytes": 95309,
+        "exact_head_preserved": true,
+        "confirmed_receipts_preserved": 10,
+        "archive_rotation_exercised": false,
+        "rpc": {
+          "methods": {
+            "per_ack_reopen.rpc.node0.getblockchaininfo": {
+              "request_bytes": 84,
+              "calls": 2,
+              "response_bytes": 970
+            },
+            "per_ack_reopen.rpc.node0.getsharepoolhashstatus": {
+              "request_bytes": 106,
+              "calls": 2,
+              "response_bytes": 2020
+            },
+            "per_ack_reopen.rpc.node0.getbestblockhash": {
+              "request_bytes": 164,
+              "calls": 4,
+              "response_bytes": 264
+            },
+            "per_ack_reopen.rpc.node0.getblockhash": {
+              "request_bytes": 196,
+              "calls": 5,
+              "response_bytes": 330
+            },
+            "per_ack_reopen.rpc.node0.getblockheader": {
+              "request_bytes": 111,
+              "calls": 1,
+              "response_bytes": 330
+            }
+          },
+          "totals": {
+            "calls": 14,
+            "request_bytes": 661,
+            "response_bytes": 3914
+          }
+        }
+      }
+    },
+    "datum": {
+      "node": 1,
+      "result": "passed",
+      "offered": 10,
+      "acknowledged": 10,
+      "published_jobs": 2,
+      "replacement_jobs": 1,
+      "initial_preloaded_gate_open_seconds_excluded": 0.010255374999999844,
+      "published_body_bytes": {
+        "template_bytes": 2925,
+        "snapshot_bytes": 9720
+      },
+      "paced_wall_seconds": 5.987973,
+      "busy_operation_wall_seconds": 1.2510808719999957,
+      "explicit_pacing_sleep_seconds": 4.734987667000002,
+      "other_driver_wall_seconds": 0.0019044610000023,
+      "offers_to_last_ack_and_refresh_seconds": 0.4844239169999991,
+      "final_refresh_wait_and_work_seconds": 5.353256958000001,
+      "driver_cpu_seconds": 0.8499040000000004,
+      "driver_children_cpu_seconds": 0.21110699999999927,
+      "rpc_json_reencoding_cpu_seconds": 0.004003999999995234,
+      "driver_cpu_excluding_json_reencoding_seconds": 0.8459000000000052,
+      "signer_children_cpu_seconds": 0.21110699999999927,
+      "native_cpu_seconds": 0.15,
+      "rss_at_boundaries_bytes": {
+        "driver_start": 36470784,
+        "driver_end": 36519936,
+        "native_start": 61063168,
+        "native_end": 64569344
+      },
+      "logical_disk_growth_bytes": {
+        "gate_logical_bytes": 292553,
+        "native_snapshot_logical_bytes": 20443
+      },
+      "receipt_due_to_ack": {
+        "count": 10,
+        "total_seconds": 0.30002116900000075,
+        "min_seconds": 0.021107792000000458,
+        "p50_seconds": 0.0285910420000004,
+        "p95_seconds": 0.03662062499999941,
+        "p99_seconds": 0.03662062499999941,
+        "max_seconds": 0.03662062499999941
+      },
+      "receipt_service": {
+        "count": 10,
+        "total_seconds": 0.2468676270000003,
+        "min_seconds": 0.021104334000000335,
+        "p50_seconds": 0.024365332999998657,
+        "p95_seconds": 0.026780499999999208,
+        "p99_seconds": 0.026780499999999208,
+        "max_seconds": 0.026780499999999208
+      },
+      "receipt_queue_wait": {
+        "count": 10,
+        "total_seconds": 0.05315220999999504,
+        "min_seconds": 3.249999998899966e-06,
+        "p50_seconds": 0.0026708749999997394,
+        "p95_seconds": 0.010035249999999607,
+        "p99_seconds": 0.010035249999999607,
+        "max_seconds": 0.010035249999999607
+      },
+      "job_preparation": {
+        "count": 2,
+        "total_seconds": 0.9869807919999989,
+        "min_seconds": 0.1502311669999994,
+        "p50_seconds": 0.1502311669999994,
+        "p95_seconds": 0.8367496249999995,
+        "p99_seconds": 0.8367496249999995,
+        "max_seconds": 0.8367496249999995
+      },
+      "job_preparation_boundary": "entire fresh-job operation: build, sign, authorize, publish, final context checks",
+      "ack_to_first_publication": {
+        "count": 10,
+        "total_seconds": 55.800767496000006,
+        "min_seconds": 5.352429916,
+        "p50_seconds": 5.558566166,
+        "p95_seconds": 5.813970916000001,
+        "p99_seconds": 5.813970916000001,
+        "max_seconds": 5.813970916000001
+      },
+      "publication_trace": [
+        {
+          "elapsed_seconds": 0.14863816699999965,
+          "proofs": 0,
+          "snapshot_hash": "9aa5aef4a2384e4dd0681ecbaa8389c11d93569aa05918fd9ee11ff015aa616c"
+        },
+        {
+          "elapsed_seconds": 5.985369875,
+          "proofs": 10,
+          "snapshot_hash": "f7f29f6fb68be19ec54a962970c38e52a671ff9deaa06a335d1bb424e4135ccb"
+        }
+      ],
+      "refresh_due_lateness": {
+        "count": 2,
+        "total_seconds": 0.00045091600000013443,
+        "min_seconds": 0,
+        "p50_seconds": 0,
+        "p95_seconds": 0.00045091600000013443,
+        "p99_seconds": 0.00045091600000013443,
+        "max_seconds": 0.00045091600000013443
+      },
+      "rpc": {
+        "methods": {
+          "datum.rpc.node1.getblockchaininfo": {
+            "request_bytes": 1638,
+            "calls": 39,
+            "response_bytes": 18915
+          },
+          "datum.rpc.node1.getsharepoolhashstatus": {
+            "request_bytes": 2067,
+            "calls": 39,
+            "response_bytes": 39264
+          },
+          "datum.rpc.node1.getbestblockhash": {
+            "request_bytes": 4264,
+            "calls": 104,
+            "response_bytes": 6864
+          },
+          "datum.rpc.node1.getblockhash": {
+            "request_bytes": 4402,
+            "calls": 112,
+            "response_bytes": 7392
+          },
+          "datum.rpc.node1.getsharepoolhashtidesbudget": {
+            "request_bytes": 660,
+            "calls": 4,
+            "response_bytes": 1108
+          },
+          "datum.rpc.node1.preparesharepoolhashjob": {
+            "request_bytes": 18982,
+            "calls": 2,
+            "response_bytes": 27506
+          },
+          "datum.rpc.node1.finalizesharepoolhashjob": {
+            "request_bytes": 25398,
+            "calls": 2,
+            "response_bytes": 25908
+          },
+          "datum.rpc.node1.validatesharepoolhashtemplate": {
+            "request_bytes": 69036,
+            "calls": 14,
+            "response_bytes": 3878
+          },
+          "datum.rpc.node1.submitsharepoolhashsnapshot": {
+            "request_bytes": 57548,
+            "calls": 42,
+            "response_bytes": 4492
+          },
+          "datum.rpc.node1.validatesharepoolhashshare": {
+            "request_bytes": 21540,
+            "calls": 20,
+            "response_bytes": 4120
+          }
+        },
+        "totals": {
+          "calls": 378,
+          "request_bytes": 205535,
+          "response_bytes": 139447
+        }
+      },
+      "measurements": {
+        "datum.receive": {
+          "count": 10,
+          "total_seconds": 0.24669400099999983,
+          "min_seconds": 0.021099874999999102,
+          "p50_seconds": 0.02435108399999919,
+          "p95_seconds": 0.026765749999999144,
+          "p99_seconds": 0.026765749999999144,
+          "max_seconds": 0.026765749999999144,
+          "failures": 0
+        },
+        "datum.rpc.node1.finalizesharepoolhashjob": {
+          "count": 2,
+          "total_seconds": 0.011564375000000737,
+          "min_seconds": 0.0017126669999996125,
+          "p50_seconds": 0.0017126669999996125,
+          "p95_seconds": 0.009851708000001125,
+          "p99_seconds": 0.009851708000001125,
+          "max_seconds": 0.009851708000001125,
+          "failures": 0
+        },
+        "datum.rpc.node1.getbestblockhash": {
+          "count": 104,
+          "total_seconds": 0.02383483300000222,
+          "min_seconds": 0.00015312499999886597,
+          "p50_seconds": 0.00020308400000068616,
+          "p95_seconds": 0.000415667000000397,
+          "p99_seconds": 0.0006982919999991566,
+          "max_seconds": 0.000791500000000056,
+          "failures": 0
+        },
+        "datum.rpc.node1.getblockchaininfo": {
+          "count": 39,
+          "total_seconds": 0.017031127000011637,
+          "min_seconds": 0.00024908300000170414,
+          "p50_seconds": 0.0003275000000009243,
+          "p95_seconds": 0.0012884159999995148,
+          "p99_seconds": 0.0027401670000006817,
+          "max_seconds": 0.0027401670000006817,
+          "failures": 0
+        },
+        "datum.rpc.node1.getblockhash": {
+          "count": 112,
+          "total_seconds": 0.02386091900000409,
+          "min_seconds": 0.00014825000000051602,
+          "p50_seconds": 0.00020166699999890625,
+          "p95_seconds": 0.00024970800000012616,
+          "p99_seconds": 0.0005686659999994959,
+          "max_seconds": 0.0005867920000000026,
+          "failures": 0
+        },
+        "datum.rpc.node1.getsharepoolhashstatus": {
+          "count": 39,
+          "total_seconds": 0.021159291000000024,
+          "min_seconds": 0.0003787920000011269,
+          "p50_seconds": 0.0004674169999994149,
+          "p95_seconds": 0.0015652499999987413,
+          "p99_seconds": 0.001996124999999793,
+          "max_seconds": 0.001996124999999793,
+          "failures": 0
+        },
+        "datum.rpc.node1.getsharepoolhashtidesbudget": {
+          "count": 4,
+          "total_seconds": 0.002120957999999007,
+          "min_seconds": 0.00024870899999918095,
+          "p50_seconds": 0.000258207999999982,
+          "p95_seconds": 0.001302208000000249,
+          "p99_seconds": 0.001302208000000249,
+          "max_seconds": 0.001302208000000249,
+          "failures": 0
+        },
+        "datum.rpc.node1.preparesharepoolhashjob": {
+          "count": 2,
+          "total_seconds": 0.013319623999999308,
+          "min_seconds": 0.0016922079999996953,
+          "p50_seconds": 0.0016922079999996953,
+          "p95_seconds": 0.011627415999999613,
+          "p99_seconds": 0.011627415999999613,
+          "max_seconds": 0.011627415999999613,
+          "failures": 0
+        },
+        "datum.rpc.node1.submitsharepoolhashsnapshot": {
+          "count": 42,
+          "total_seconds": 0.027615789000003943,
+          "min_seconds": 0.00031683299999940573,
+          "p50_seconds": 0.00035791600000045776,
+          "p95_seconds": 0.0006073329999995991,
+          "p99_seconds": 0.008641832999998655,
+          "max_seconds": 0.008641832999998655,
+          "failures": 0
+        },
+        "datum.rpc.node1.validatesharepoolhashshare": {
+          "count": 20,
+          "total_seconds": 0.01173995800000327,
+          "min_seconds": 0.00035204199999938623,
+          "p50_seconds": 0.0004112079999991636,
+          "p95_seconds": 0.0009032080000004328,
+          "p99_seconds": 0.0009210839999997944,
+          "max_seconds": 0.0009210839999997944,
+          "failures": 10
+        },
+        "datum.rpc.node1.validatesharepoolhashtemplate": {
+          "count": 14,
+          "total_seconds": 0.07225625100000244,
+          "min_seconds": 0.0006967080000013226,
+          "p50_seconds": 0.005570125000000203,
+          "p95_seconds": 0.007726583000000176,
+          "p99_seconds": 0.007726583000000176,
+          "max_seconds": 0.007726583000000176,
+          "failures": 0
+        },
+        "datum.scheduler_poll": {
+          "count": 12,
+          "total_seconds": 1.004164627999998,
+          "min_seconds": 0.0015572089999995598,
+          "p50_seconds": 0.0017644170000004067,
+          "p95_seconds": 0.8366781249999988,
+          "p99_seconds": 0.8366781249999988,
+          "max_seconds": 0.8366781249999988,
+          "failures": 0
+        }
+      },
+      "initial_job_cutoff_bytes_preserved": true,
+      "total_measured_cpu_seconds": 1.2110109999999996,
+      "idle_context_probe": {
+        "operations": 50,
+        "wall_seconds": 0.08457437500000076,
+        "driver_cpu_seconds": 0.033014999999999795,
+        "extra_publications": 0,
+        "rpc": {
+          "methods": {
+            "datum_idle_probe.rpc.node1.getblockchaininfo": {
+              "request_bytes": 2100,
+              "calls": 50,
+              "response_bytes": 24250
+            },
+            "datum_idle_probe.rpc.node1.getsharepoolhashstatus": {
+              "request_bytes": 2650,
+              "calls": 50,
+              "response_bytes": 50550
+            },
+            "datum_idle_probe.rpc.node1.getbestblockhash": {
+              "request_bytes": 4100,
+              "calls": 100,
+              "response_bytes": 6600
+            },
+            "datum_idle_probe.rpc.node1.getblockhash": {
+              "request_bytes": 3900,
+              "calls": 100,
+              "response_bytes": 6600
+            }
+          },
+          "totals": {
+            "calls": 300,
+            "request_bytes": 12750,
+            "response_bytes": 88000
+          }
+        },
+        "measurements": {
+          "datum_idle_probe.poll": {
+            "count": 50,
+            "total_seconds": 0.08444575000000398,
+            "min_seconds": 0.001505707999999828,
+            "p50_seconds": 0.0016725839999995884,
+            "p95_seconds": 0.001965957999999546,
+            "p99_seconds": 0.0024713750000007195,
+            "max_seconds": 0.0024713750000007195,
+            "failures": 0
+          },
+          "datum_idle_probe.rpc.node1.getbestblockhash": {
+            "count": 100,
+            "total_seconds": 0.018365334999975502,
+            "min_seconds": 0.0001594159999989131,
+            "p50_seconds": 0.0001813339999987562,
+            "p95_seconds": 0.00021166700000030403,
+            "p99_seconds": 0.00022808399999973972,
+            "max_seconds": 0.00033408299999848623,
+            "failures": 0
+          },
+          "datum_idle_probe.rpc.node1.getblockchaininfo": {
+            "count": 50,
+            "total_seconds": 0.014216085999997574,
+            "min_seconds": 0.0002519999999996969,
+            "p50_seconds": 0.0002791250000004908,
+            "p95_seconds": 0.00033966599999857294,
+            "p99_seconds": 0.00046791699999992886,
+            "max_seconds": 0.00046791699999992886,
+            "failures": 0
+          },
+          "datum_idle_probe.rpc.node1.getblockhash": {
+            "count": 100,
+            "total_seconds": 0.019233872000002705,
+            "min_seconds": 0.00016154200000073615,
+            "p50_seconds": 0.00018379100000132098,
+            "p95_seconds": 0.00021270800000117163,
+            "p99_seconds": 0.0003889170000004327,
+            "max_seconds": 0.0008622079999991428,
+            "failures": 0
+          },
+          "datum_idle_probe.rpc.node1.getsharepoolhashstatus": {
+            "count": 50,
+            "total_seconds": 0.0208269979999951,
+            "min_seconds": 0.00037812499999922977,
+            "p50_seconds": 0.00041358400000035545,
+            "p95_seconds": 0.0004773749999991139,
+            "p99_seconds": 0.0005015830000001387,
+            "max_seconds": 0.0005015830000001387,
+            "failures": 0
+          }
+        }
+      },
+      "settlement": {
+        "block": "3e7759e8c81a249b46ebaff6af2c6d4432f75fc958bd53584929a4fa8bb88e02",
+        "parent": "192b47a3597ddf3712072be39075bba116d182ad666f6452d96189e2a246d3ed",
+        "snapshot_hash": "f7f29f6fb68be19ec54a962970c38e52a671ff9deaa06a335d1bb424e4135ccb",
+        "all_proof_ids_preserved": true,
+        "exact_rational_payouts_verified": true,
+        "receipt_states": {
+          "confirmed_admitted": 10
+        },
+        "remaining_eligible_backlog": 0,
+        "expired_or_unknown": 0,
+        "stored_block_bytes_match": true,
+        "verifychain_level4": true
+      },
+      "populated_collector_reopen": {
+        "close_wall_seconds": 0.0025724169999996604,
+        "open_wall_seconds": 0.015423791999999992,
+        "open_driver_cpu_seconds": 0.014534000000000269,
+        "journal_events": 34,
+        "journal_bytes": 36086,
+        "exact_head_preserved": true,
+        "confirmed_receipts_preserved": 10,
+        "archive_rotation_exercised": false,
+        "rpc": {
+          "methods": {
+            "datum_reopen.rpc.node1.getblockchaininfo": {
+              "request_bytes": 84,
+              "calls": 2,
+              "response_bytes": 970
+            },
+            "datum_reopen.rpc.node1.getsharepoolhashstatus": {
+              "request_bytes": 106,
+              "calls": 2,
+              "response_bytes": 2022
+            },
+            "datum_reopen.rpc.node1.getbestblockhash": {
+              "request_bytes": 164,
+              "calls": 4,
+              "response_bytes": 264
+            },
+            "datum_reopen.rpc.node1.getblockhash": {
+              "request_bytes": 196,
+              "calls": 5,
+              "response_bytes": 330
+            },
+            "datum_reopen.rpc.node1.getblockheader": {
+              "request_bytes": 111,
+              "calls": 1,
+              "response_bytes": 330
+            }
+          },
+          "totals": {
+            "calls": 14,
+            "request_bytes": 661,
+            "response_bytes": 3916
+          }
+        }
+      }
+    }
+  },
+  "rewards": [
+    {
+      "height": 102,
+      "commitment": "c0c8f2a971fe4a04a10c924ed62c2a440c19254322351424f41b1237a36b144c",
+      "new_admissions": 10,
+      "eligible_proofs": 10,
+      "payout_scripts": 10,
+      "reward_satoshis": 5000010000,
+      "unclaimed_rounding_satoshis": 0,
+      "whole_admission_height_cohorts_verified": true,
+      "exact_rational_window_and_coinbase_verified": true
+    },
+    {
+      "height": 102,
+      "commitment": "f7f29f6fb68be19ec54a962970c38e52a671ff9deaa06a335d1bb424e4135ccb",
+      "new_admissions": 10,
+      "eligible_proofs": 10,
+      "payout_scripts": 10,
+      "reward_satoshis": 5000010000,
+      "unclaimed_rounding_satoshis": 0,
+      "whole_admission_height_cohorts_verified": true,
+      "exact_rational_window_and_coinbase_verified": true
+    }
+  ],
+  "limitations": [
+    "One finite sequential local workload and fixed arm order; no statistical confidence interval or saturation claim",
+    "Real monotonic pacing; slow service creates a measured client queue instead of slowing offered due offsets",
+    "Two disconnected native backends share the same parent, origin bytes and mempool; separate fresh collector journals",
+    "Native validation caches are restarted, but OS file cache and thermals are not reset or controlled",
+    "All source jobs and proofs are prepared before timing; fixture cost is reported separately",
+    "This begins at activation with empty reward history; later-round accumulated history and archive rotation are unmeasured",
+    "Per-ACK rebuilding is an explicit comparator caller, not a claim that the old gate automatically rebuilt jobs",
+    "Logical publish callback stores native snapshot and retains bytes; no Stratum hardware or WAN transmission",
+    "RPC byte totals re-encode method/params and result JSON without HTTP, authentication, envelope IDs or framing",
+    "Driver CPU includes measurement overhead; separately timed JSON re-encoding cost is an approximate removable diagnostic cost",
+    "RSS is measured at boundaries only, not peak; logical disk growth is not physical allocation or fsync latency",
+    "Native CPU uses cumulative ps time; signer CPU uses reaped child rusage around individual signing calls",
+    "Regtest share difficulty does not establish mainnet sampling variance or physical mining hashrate",
+    "The final scheduled refresh can add deliberate waiting; busy work and paced wall time are reported separately",
+    "One hundred logical miner origins feed one coordinator per arm, not one hundred full validating nodes"
+  ],
+  "fixture": {
+    "native_parent": "192b47a3597ddf3712072be39075bba116d182ad666f6452d96189e2a246d3ed",
+    "height": 101,
+    "distinct_valid_origins": 10,
+    "distinct_transaction_sets": 10,
+    "payout_identities": 10,
+    "real_proofs": 10,
+    "template_bytes": {
+      "count": 10,
+      "total_bytes": 8775,
+      "min_bytes": 432,
+      "p50_bytes": 828,
+      "p95_bytes": 1323,
+      "p99_bytes": 1323,
+      "max_bytes": 1323
+    },
+    "proof_sequence_sha256": "7ad74c67d1ea02815a56ca7a6a63b1e708513996cff480994abba3388de0bb87",
+    "mempool_txids": [
+      "0ad7649f98fe512f938c882ee9533ad37811bc5d93e20da9b99cc5b408fb583b",
+      "60dc4ced2c66930d61268bb65797fad9cea51421f229b0ae83c6a36291f83de9",
+      "776481a27984e71f51a4ca6d52f8e70be7ee69a6179dddf1bdc7a30556dbe0af",
+      "947a8a7a3634c37fbbc143fd284ac4af85851426e2efd766be1997a20a379a97",
+      "a7e7293113f309bebf588ce2fda650870182b9639869f4ff3f55034c02856df5",
+      "a9379ec1dc06386bdc484e8e2fc7a855e787469c3a47ce2cd8514fc8e6bcfc23",
+      "b507d1bf819b059cfe11bab8c38b7a10f46bdaec028f795b45897ab2db5ea251",
+      "d140967746dc554dd4ec315e20142c04bc2da1b88f7f9f7c58276d6c3e93cfbd",
+      "e3105caa262eb77f88065093223bc0d3f70514d746351e02a7641650996d91eb",
+      "e47bb177fcb5335a1ae59d56cbf33f823bf765df6d5cfa0d14b95b3431049963"
+    ],
+    "mock_native_time": 1789361322,
+    "scheduler_clock": "real time.monotonic; native block time fixed equally in both arms",
+    "both_backends_restarted_after_identical_collector_preload": true,
+    "wall_seconds": 4.189785083,
+    "measurements": {
+      "fixture.origin_job": {
+        "count": 10,
+        "total_seconds": 1.4347057089999993,
+        "min_seconds": 0.1402014170000001,
+        "p50_seconds": 0.14283379200000024,
+        "p95_seconds": 0.14662024999999979,
+        "p99_seconds": 0.14662024999999979,
+        "max_seconds": 0.14662024999999979,
+        "failures": 0
+      },
+      "fixture.rpc.node0.finalizesharepoolhashjob": {
+        "count": 10,
+        "total_seconds": 0.014134417000000399,
+        "min_seconds": 0.001259582999999953,
+        "p50_seconds": 0.0014151249999998505,
+        "p95_seconds": 0.0015530840000002044,
+        "p99_seconds": 0.0015530840000002044,
+        "max_seconds": 0.0015530840000002044,
+        "failures": 0
+      },
+      "fixture.rpc.node0.getbestblockhash": {
+        "count": 181,
+        "total_seconds": 0.03810181700000226,
+        "min_seconds": 0.00014825000000007194,
+        "p50_seconds": 0.00019949999999990808,
+        "p95_seconds": 0.0003444580000002695,
+        "p99_seconds": 0.0004325830000000419,
+        "max_seconds": 0.0006009169999998676,
+        "failures": 0
+      },
+      "fixture.rpc.node0.getblockchaininfo": {
+        "count": 51,
+        "total_seconds": 0.016773089000001296,
+        "min_seconds": 0.0002813340000002995,
+        "p50_seconds": 0.0003265419999998187,
+        "p95_seconds": 0.0003707500000000863,
+        "p99_seconds": 0.00038779099999985966,
+        "max_seconds": 0.00038779099999985966,
+        "failures": 0
+      },
+      "fixture.rpc.node0.getblockhash": {
+        "count": 132,
+        "total_seconds": 0.02619220700000069,
+        "min_seconds": 0.0001519580000000076,
+        "p50_seconds": 0.00019770800000040722,
+        "p95_seconds": 0.0002176250000001101,
+        "p99_seconds": 0.00023641600000012808,
+        "max_seconds": 0.0005727909999997394,
+        "failures": 0
+      },
+      "fixture.rpc.node0.getsharepoolhashstatus": {
+        "count": 51,
+        "total_seconds": 0.022749206999999272,
+        "min_seconds": 0.00039979199999962134,
+        "p50_seconds": 0.00044395799999996655,
+        "p95_seconds": 0.0005002919999999023,
+        "p99_seconds": 0.0005152499999998561,
+        "max_seconds": 0.0005152499999998561,
+        "failures": 0
+      },
+      "fixture.rpc.node0.getsharepoolhashtidesbudget": {
+        "count": 20,
+        "total_seconds": 0.005321959999999404,
+        "min_seconds": 0.00022154199999979696,
+        "p50_seconds": 0.00026158300000034274,
+        "p95_seconds": 0.00028720800000003877,
+        "p99_seconds": 0.0004101249999999279,
+        "max_seconds": 0.0004101249999999279,
+        "failures": 0
+      },
+      "fixture.rpc.node0.preparesharepoolhashjob": {
+        "count": 10,
+        "total_seconds": 0.014129415000000423,
+        "min_seconds": 0.0012304159999998454,
+        "p50_seconds": 0.0014079580000001535,
+        "p95_seconds": 0.0015672079999999866,
+        "p99_seconds": 0.0015672079999999866,
+        "max_seconds": 0.0015672079999999866,
+        "failures": 0
+      },
+      "fixture.rpc.node0.submitsharepoolhashsnapshot": {
+        "count": 30,
+        "total_seconds": 0.05066587299999936,
+        "min_seconds": 0.0002930420000000211,
+        "p50_seconds": 0.0003268749999998377,
+        "p95_seconds": 0.00492458299999976,
+        "p99_seconds": 0.005032833000000014,
+        "max_seconds": 0.005032833000000014,
+        "failures": 0
+      },
+      "fixture.rpc.node0.validatesharepoolhashtemplate": {
+        "count": 30,
+        "total_seconds": 0.01756099899999941,
+        "min_seconds": 0.0004790829999996582,
+        "p50_seconds": 0.0005732920000003361,
+        "p95_seconds": 0.0006710419999995665,
+        "p99_seconds": 0.0006870420000000266,
+        "max_seconds": 0.0006870420000000266,
+        "failures": 0
+      },
+      "fixture.rpc.node1.getbestblockhash": {
+        "count": 31,
+        "total_seconds": 0.005590670999997549,
+        "min_seconds": 0.00016370800000053976,
+        "p50_seconds": 0.00018033300000031005,
+        "p95_seconds": 0.0001969590000001631,
+        "p99_seconds": 0.00021749999999975955,
+        "max_seconds": 0.00021749999999975955,
+        "failures": 0
+      },
+      "fixture.rpc.node1.getblockchaininfo": {
+        "count": 11,
+        "total_seconds": 0.0034432519999976208,
+        "min_seconds": 0.00027591699999973684,
+        "p50_seconds": 0.0003052920000001791,
+        "p95_seconds": 0.0004524579999998224,
+        "p99_seconds": 0.0004524579999998224,
+        "max_seconds": 0.0004524579999998224,
+        "failures": 0
+      },
+      "fixture.rpc.node1.getblockhash": {
+        "count": 32,
+        "total_seconds": 0.006106293000001983,
+        "min_seconds": 0.0001763750000005615,
+        "p50_seconds": 0.00018708300000014333,
+        "p95_seconds": 0.00021145899999996942,
+        "p99_seconds": 0.00021454200000015078,
+        "max_seconds": 0.00021454200000015078,
+        "failures": 0
+      },
+      "fixture.rpc.node1.getsharepoolhashstatus": {
+        "count": 11,
+        "total_seconds": 0.0047724589999988964,
+        "min_seconds": 0.00042170800000018716,
+        "p50_seconds": 0.00043491700000064526,
+        "p95_seconds": 0.00044408300000053913,
+        "p99_seconds": 0.00044408300000053913,
+        "max_seconds": 0.00044408300000053913,
+        "failures": 0
+      },
+      "fixture.rpc.node1.submitsharepoolhashsnapshot": {
+        "count": 20,
+        "total_seconds": 0.05342658299999847,
+        "min_seconds": 0.0002922910000000556,
+        "p50_seconds": 0.000341875000000158,
+        "p95_seconds": 0.005079541000000631,
+        "p99_seconds": 0.010335041999999461,
+        "max_seconds": 0.010335041999999461,
+        "failures": 0
+      },
+      "fixture.rpc.node1.validatesharepoolhashtemplate": {
+        "count": 10,
+        "total_seconds": 0.011209251000000364,
+        "min_seconds": 0.0009361249999999544,
+        "p50_seconds": 0.0011368750000002592,
+        "p95_seconds": 0.0012500830000004015,
+        "p99_seconds": 0.0012500830000004015,
+        "max_seconds": 0.0012500830000004015,
+        "failures": 0
+      }
+    }
+  },
+  "active_stage": "complete",
+  "comparison": {
+    "replacement_jobs": {
+      "per_ack": 10,
+      "datum": 1,
+      "reduction_fraction": 0.9
+    },
+    "busy_operation_wall_seconds": {
+      "per_ack": 4.416200333,
+      "datum": 1.2510808719999957,
+      "reduction_fraction": 0.7167064948002222
+    },
+    "paced_wall_seconds": {
+      "per_ack": 4.416945791,
+      "datum": 5.987973,
+      "reduction_fraction": -0.3556817953711673
+    },
+    "driver_cpu_seconds": {
+      "per_ack": 2.7416919999999996,
+      "datum": 0.8499040000000004,
+      "reduction_fraction": 0.690007484429323
+    },
+    "signer_children_cpu_seconds": {
+      "per_ack": 1.1557329999999997,
+      "datum": 0.21110699999999927,
+      "reduction_fraction": 0.8173392989557282
+    },
+    "native_cpu_seconds": {
+      "per_ack": 0.37,
+      "datum": 0.15,
+      "reduction_fraction": 0.5945945945945946
+    },
+    "total_measured_cpu_seconds": {
+      "per_ack": 4.267424999999999,
+      "datum": 1.2110109999999996,
+      "reduction_fraction": 0.7162197343831468
+    }
+  },
+  "wall_seconds": 15.403936208
+}

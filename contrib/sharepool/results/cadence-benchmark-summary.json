@@ -1,0 +1,229 @@
+{
+  "scope": "Two sequential paired native collector captures with real pacing; one forward and one reverse order",
+  "pairs": [
+    {
+      "label": "forward",
+      "arm_order": [
+        "per_ack",
+        "datum"
+      ],
+      "arms": {
+        "per_ack": {
+          "published_jobs": 101,
+          "replacement_jobs": 100,
+          "paced_wall_seconds": 589.184149791,
+          "busy_operation_wall_seconds": 584.296405582,
+          "driver_cpu_seconds": 542.71104,
+          "signer_children_cpu_seconds": 10.666507000000006,
+          "native_cpu_seconds": 29.35,
+          "total_measured_cpu_seconds": 582.7275470000001,
+          "rpc_json_reencoding_cpu_seconds": 0.27184899999532064,
+          "logical_disk_growth_bytes": {
+            "gate_logical_bytes": 7557843,
+            "native_snapshot_logical_bytes": 4997047
+          },
+          "rss_at_boundaries_bytes": {
+            "driver_start": 38797312,
+            "driver_end": 51216384,
+            "native_start": 61440000,
+            "native_end": 81870848
+          },
+          "measured_cpu_less_json_diagnostic_seconds": 582.4556980000048,
+          "published_body_bytes": 5844831,
+          "rpc_calls": 16341,
+          "reconstructed_rpc_body_bytes": 86007844,
+          "receive_service_p95_seconds": 0.05569720799996958,
+          "due_to_ack_p95_seconds": 422.110078458,
+          "queue_wait_p95_seconds": 422.0518643329999,
+          "ack_to_job_p95_seconds": 11.80343445799997,
+          "ack_to_job_max_seconds": 12.389044000000013,
+          "fresh_job_max_seconds": 12.39364979100003,
+          "idle_poll_mean_seconds": 0.0018564216800018585,
+          "idle_rpc_calls_per_poll": 6.0,
+          "populated_reopen_seconds": 2.065733540999986,
+          "journal_bytes": 6548879,
+          "journal_events": 502
+        },
+        "datum": {
+          "published_jobs": 4,
+          "replacement_jobs": 3,
+          "paced_wall_seconds": 147.40891079200003,
+          "busy_operation_wall_seconds": 33.97292866699854,
+          "driver_cpu_seconds": 30.102004999999963,
+          "signer_children_cpu_seconds": 0.4226859999999988,
+          "native_cpu_seconds": 3.4099999999999997,
+          "total_measured_cpu_seconds": 33.93469099999996,
+          "rpc_json_reencoding_cpu_seconds": 0.06166599999983191,
+          "logical_disk_growth_bytes": {
+            "gate_logical_bytes": 2760434,
+            "native_snapshot_logical_bytes": 496321
+          },
+          "rss_at_boundaries_bytes": {
+            "driver_start": 44826624,
+            "driver_end": 45301760,
+            "native_start": 61456384,
+            "native_end": 69255168
+          },
+          "measured_cpu_less_json_diagnostic_seconds": 33.873025000000126,
+          "published_body_bytes": 257038,
+          "rpc_calls": 3332,
+          "reconstructed_rpc_body_bytes": 6022109,
+          "receive_service_p95_seconds": 0.0864992079999638,
+          "due_to_ack_p95_seconds": 5.078445833000046,
+          "queue_wait_p95_seconds": 5.027329750000035,
+          "ack_to_job_p95_seconds": 52.11103600000001,
+          "ack_to_job_max_seconds": 52.370484499999975,
+          "fresh_job_max_seconds": 12.415649791000078,
+          "idle_poll_mean_seconds": 0.0017457591600009436,
+          "idle_rpc_calls_per_poll": 6.0,
+          "populated_reopen_seconds": 0.6140201250000246,
+          "journal_bytes": 932180,
+          "journal_events": 308
+        }
+      },
+      "reduction_fraction": {
+        "replacement_jobs": 0.97,
+        "paced_wall_seconds": 0.7498084243367883,
+        "busy_operation_wall_seconds": 0.9418566872182635,
+        "total_measured_cpu_seconds": 0.941765768282789,
+        "measured_cpu_less_json_diagnostic_seconds": 0.9418444611044051,
+        "published_body_bytes": 0.9560230227358156,
+        "rpc_calls": 0.7960957101768558,
+        "reconstructed_rpc_body_bytes": 0.9299818630496074,
+        "journal_bytes": 0.8576580816350401
+      },
+      "fixture_wall_seconds_excluded": 33.903622458,
+      "template_bytes": {
+        "count": 100,
+        "total_bytes": 533250,
+        "min_bytes": 432,
+        "p50_bytes": 5283,
+        "p95_bytes": 9738,
+        "p99_bytes": 10134,
+        "max_bytes": 10233
+      }
+    },
+    {
+      "label": "reverse",
+      "arm_order": [
+        "datum",
+        "per_ack"
+      ],
+      "arms": {
+        "datum": {
+          "published_jobs": 4,
+          "replacement_jobs": 3,
+          "paced_wall_seconds": 147.383419208,
+          "busy_operation_wall_seconds": 34.06123483500002,
+          "driver_cpu_seconds": 30.168361000000004,
+          "signer_children_cpu_seconds": 0.4221509999999995,
+          "native_cpu_seconds": 3.41,
+          "total_measured_cpu_seconds": 34.000512,
+          "rpc_json_reencoding_cpu_seconds": 0.06225300000009426,
+          "logical_disk_growth_bytes": {
+            "gate_logical_bytes": 2772794,
+            "native_snapshot_logical_bytes": 496321
+          },
+          "rss_at_boundaries_bytes": {
+            "driver_start": 38977536,
+            "driver_end": 42991616,
+            "native_start": 61456384,
+            "native_end": 69337088
+          },
+          "measured_cpu_less_json_diagnostic_seconds": 33.9382589999999,
+          "published_body_bytes": 257038,
+          "rpc_calls": 3332,
+          "reconstructed_rpc_body_bytes": 6022113,
+          "receive_service_p95_seconds": 0.08632825000000821,
+          "due_to_ack_p95_seconds": 5.043062708000008,
+          "queue_wait_p95_seconds": 4.991746457999994,
+          "ack_to_job_p95_seconds": 52.120923291,
+          "ack_to_job_max_seconds": 52.384329124999994,
+          "fresh_job_max_seconds": 12.436984917000018,
+          "idle_poll_mean_seconds": 0.0017859850000002098,
+          "idle_rpc_calls_per_poll": 6.0,
+          "populated_reopen_seconds": 0.6216674579999903,
+          "journal_bytes": 932180,
+          "journal_events": 308
+        },
+        "per_ack": {
+          "published_jobs": 101,
+          "replacement_jobs": 100,
+          "paced_wall_seconds": 588.663424583,
+          "busy_operation_wall_seconds": 583.7451477859994,
+          "driver_cpu_seconds": 542.2172589999999,
+          "signer_children_cpu_seconds": 10.688050000000004,
+          "native_cpu_seconds": 29.3,
+          "total_measured_cpu_seconds": 582.2053089999998,
+          "rpc_json_reencoding_cpu_seconds": 0.2628710000022281,
+          "logical_disk_growth_bytes": {
+            "gate_logical_bytes": 7657227,
+            "native_snapshot_logical_bytes": 4997816
+          },
+          "rss_at_boundaries_bytes": {
+            "driver_start": 42926080,
+            "driver_end": 41828352,
+            "native_start": 61440000,
+            "native_end": 50593792
+          },
+          "measured_cpu_less_json_diagnostic_seconds": 581.9424379999977,
+          "published_body_bytes": 5844831,
+          "rpc_calls": 16341,
+          "reconstructed_rpc_body_bytes": 86007909,
+          "receive_service_p95_seconds": 0.05510691599999973,
+          "due_to_ack_p95_seconds": 421.57331579099997,
+          "queue_wait_p95_seconds": 421.51836391599994,
+          "ack_to_job_p95_seconds": 11.8035605419999,
+          "ack_to_job_max_seconds": 12.419522792000066,
+          "fresh_job_max_seconds": 12.424074749999932,
+          "idle_poll_mean_seconds": 0.0018111116599993692,
+          "idle_rpc_calls_per_poll": 6.0,
+          "populated_reopen_seconds": 2.088338582999995,
+          "journal_bytes": 6548879,
+          "journal_events": 502
+        }
+      },
+      "reduction_fraction": {
+        "replacement_jobs": 0.97,
+        "paced_wall_seconds": 0.7496304117885291,
+        "busy_operation_wall_seconds": 0.9416505045666147,
+        "total_measured_cpu_seconds": 0.9416004775731098,
+        "measured_cpu_less_json_diagnostic_seconds": 0.9416810722437808,
+        "published_body_bytes": 0.9560230227358156,
+        "rpc_calls": 0.7960957101768558,
+        "reconstructed_rpc_body_bytes": 0.929981869458075,
+        "journal_bytes": 0.8576580816350401
+      },
+      "fixture_wall_seconds_excluded": 34.25425525,
+      "template_bytes": {
+        "count": 100,
+        "total_bytes": 533250,
+        "min_bytes": 432,
+        "p50_bytes": 5283,
+        "p95_bytes": 9738,
+        "p99_bytes": 10134,
+        "max_bytes": 10233
+      }
+    }
+  ],
+  "all_correctness_checks_passed": true,
+  "limitations": [
+    "Finite 100-proof stream at one proof/second, one collecting scheduler per arm.",
+    "Small cumulative transaction templates and empty initial admitted history; source jobs precomputed.",
+    "Existing Debug daemon, OS cache/thermals/other host load uncontrolled; two captures are not a confidence interval.",
+    "Logical callback publication bytes and reconstructed RPC JSON are not observed WAN or Stratum traffic.",
+    "CPU includes driver instrumentation; JSON re-encoding cost separately measured and approximately subtracted.",
+    "No concurrent 100-gateway test, mainnet difficulty, physical ASIC, new-tip interruption, long archive rollover or sustained capacity qualification."
+  ],
+  "artifact_sha256": {
+    "contrib/sharepool/results/cadence-benchmark-forward-native.txt": "bb85ae68ec13bfd115305e11092c2a2e86a17e455f39bdb3c9d244a8e7a4caa0",
+    "contrib/sharepool/results/cadence-benchmark-forward-run.json": "7ef2d3756332f93c632a38432b37fb2da346a785e94d9878049d8a610ab8a7ff",
+    "contrib/sharepool/results/cadence-benchmark-forward.json": "ee92715dc56a54d4338add82f8bead33a2dfcc315d6cb73e9bb3e087474e6379",
+    "contrib/sharepool/results/cadence-benchmark-preflight-native.txt": "2f6a9a4b04dbd1f542b7cfa2ba6cdd3193bc0c7ea7ae58eab5b28671112d66ce",
+    "contrib/sharepool/results/cadence-benchmark-preflight-run.json": "c0da027aa9c1a0cf31d46ba0396919b99bcca8397a96bf67a1d095f4302be303",
+    "contrib/sharepool/results/cadence-benchmark-preflight.json": "70fe3f4d7252bcfec6b35f4dfd39742f0fdb861ab7d79604e25e5817a424b917",
+    "contrib/sharepool/results/cadence-benchmark-reverse-native.txt": "2f1d4bb2cd30bf3fd2a3143ef4ddab74c72d7dbd47653f4aeba148812eef57e6",
+    "contrib/sharepool/results/cadence-benchmark-reverse-run.json": "dfef1a461dde17abb2c72ee303d87b0e70bca0ab3824ec59542222488bc961a1",
+    "contrib/sharepool/results/cadence-benchmark-reverse.json": "d0c06413bc8a206b01e8278edc0df9466a38c9f4fae6b96e715832ea7a1d39f3"
+  }
+}
