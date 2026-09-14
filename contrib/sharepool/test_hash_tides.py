@@ -98,7 +98,7 @@ class TidesSnapshotTests(unittest.TestCase):
             self.assertEqual(profile_snapshot_hash(raw, 5), legacy)
             self.assertEqual(profile_snapshot_hash(raw, 6), h256(b"SharePool/snapshot/v6\0", raw))
         with self.assertRaises(ValueError):
-            profile_snapshot_hash(b"raw", 8)
+            profile_snapshot_hash(b"raw", 9)
 
     def test_v6_history_commitment_binds_parent_and_original_pool_script_admissions(self):
         a, sa = codec_fixture(pool=3)

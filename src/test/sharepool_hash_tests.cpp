@@ -9,11 +9,13 @@
 #include <hash.h>
 #include <key.h>
 #include <kernel/chainparams.h>
+#include <kernel/cs_main.h>
 #include <pow.h>
 #include <pubkey.h>
 #include <script/script.h>
 #include <sharepool/hash_store.h>
 #include <sharepool/hash_validation_cache.h>
+#include <sharepool/tides_history_store.h>
 #include <streams.h>
 #include <test/util/setup_common.h>
 #include <versionbits.h>
@@ -27,6 +29,7 @@
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
 
 namespace {
 using namespace sharepool;
@@ -201,6 +204,17 @@ struct HashFixture : BasicTestingSetup {
             if (UintToArith256(share.header.GetHash()) <= arith_uint256{}.SetCompact(SHARE_BITS)) return share;
         }
         throw std::runtime_error("bounded fixture PoW failed");
+    }
+
+    Share AssignedProof(const CBlock& origin, const ho::Snapshot& snapshot, uint32_t start = 1)
+    {
+        Share share{origin.GetBlockHeader(), snapshot.binding, snapshot.authorization};
+        const auto target = UintToArith256(ho::ShareTarget(share));
+        for (uint32_t nonce{start}; nonce < start + 65536; ++nonce) {
+            share.header.nNonce = nonce;
+            if (!share.header.GetHash().IsNull() && UintToArith256(share.header.GetHash()) <= target) return share;
+        }
+        throw std::runtime_error("bounded assigned-work fixture PoW failed");
     }
 
     ho::Snapshot WithShares(size_t count = 100)
@@ -1800,6 +1814,194 @@ BOOST_AUTO_TEST_CASE(v7_compact_graph_keeps_full_share_validation_work_bound)
     const auto accepted = Check(boundary);
     BOOST_REQUIRE_MESSAGE(accepted.IsValid(), accepted.reason);
     BOOST_CHECK_EQUAL(native_checks, 4);
+}
+
+BOOST_AUTO_TEST_CASE(v8_assignment_wire_rules_and_exact_target_vectors)
+{
+    using boost::multiprecision::cpp_int;
+    BOOST_CHECK_EQUAL(ho::RulesHash(ho::VARIABLE_TIDES_VERSION).GetHex(), "173ff6fa511f227cc8d4751bb15373afdca5c8ec235dc69ca2680d7ade13ea31");
+    const cpp_int space = cpp_int{1} << 256;
+    Share share;
+    share.origin.version = ho::VARIABLE_TIDES_VERSION;
+    for (unsigned bits{0}; bits <= 255; ++bits) {
+        share.origin.share_work_bits = bits;
+        for (const uint32_t native : {0x207fffffU, 0x1d00ffffU, 0x1c0fffffU}) {
+            share.header.nBits = native;
+            const cpp_int work{"0x" + ho::TidesShareWork(share).GetHex()};
+            const cpp_int target{"0x" + ho::ShareTarget(share).GetHex()};
+            BOOST_CHECK(work == cpp_int{1} << bits);
+            BOOST_CHECK((target + 1) * work == space);
+        }
+    }
+    share.header.nBits = 0;
+    BOOST_CHECK_THROW(ho::ShareTarget(share), std::invalid_argument);
+    BOOST_CHECK_THROW(ho::TidesShareWork(share), std::invalid_argument);
+    BOOST_CHECK_THROW(ho::ShareTarget(SHARE_BITS, ho::VARIABLE_TIDES_VERSION), std::invalid_argument);
+
+    auto binding = Owner();
+    binding.version = ho::VARIABLE_TIDES_VERSION;
+    binding.rules = ho::RulesHash(binding.version);
+    binding.share_work_bits = 37;
+    DataStream encoded;
+    encoded << binding;
+    const size_t position = 1 + 32 + 32 + 4 + 32 + 32 + 32 + GetSerializeSize(binding.payout_script);
+    BOOST_CHECK_EQUAL(UCharCast(encoded.data())[position], 37);
+    Envelope decoded;
+    encoded >> decoded;
+    BOOST_CHECK_EQUAL(decoded.share_work_bits, 37);
+    binding.version = ho::COMPACT_TIDES_VERSION;
+    BOOST_CHECK_THROW(GetSerializeSize(binding), std::ios_base::failure);
+    binding.share_work_bits = 0;
+    DataStream legacy;
+    legacy << binding;
+    legacy >> decoded; // Reusing a decoder object cannot inherit an old assignment.
+    BOOST_CHECK_EQUAL(decoded.share_work_bits, 0);
+    share.origin = binding;
+    share.origin.share_work_bits = 1;
+    share.header.nBits = SHARE_BITS;
+    BOOST_CHECK_THROW(ho::TidesShareWork(share), std::invalid_argument);
+    BOOST_CHECK_THROW(ho::ShareTarget(share), std::invalid_argument);
+}
+
+BOOST_AUTO_TEST_CASE(v8_assigned_target_is_attested_and_native_candidates_remain_valid)
+{
+    consensus.SharePoolTides = consensus.SharePoolCompactTides = consensus.SharePoolVarDiff = true;
+    auto job = CompactEmpty();
+    job.binding.share_work_bits = 3;
+    const auto origin = CompactBlock(job);
+    const auto proof = AssignedProof(origin, job);
+    const auto check_proof = [&](const Share& value) {
+        return ho::CheckShareProof(value, origin, &indexes[0], origin.nTime, consensus, Lookup(), Native());
+    };
+    BOOST_REQUIRE(check_proof(proof).IsValid());
+    auto altered = proof;
+    altered.origin.share_work_bits = 0;
+    Reason(check_proof(altered), "share-binding");
+    altered = proof;
+    altered.origin.share_work_bits = 255;
+    Reason(check_proof(altered), "share-binding");
+    altered = proof;
+    altered.authorization[0] ^= 1;
+    Reason(check_proof(altered), "share-authorization");
+    altered = proof;
+    altered.origin.version = ho::COMPACT_TIDES_VERSION;
+    altered.origin.share_work_bits = 0;
+    altered.origin.rules = ho::RulesHash(ho::COMPACT_TIDES_VERSION);
+    Reason(check_proof(altered), "version");
+
+    auto reissued = job;
+    ++reissued.binding.share_work_bits;
+    auto changed = origin;
+    changed.m_mm_rhs = ho::SnapshotHash(reissued);
+    snapshots[changed.m_mm_rhs] = std::make_shared<const ho::Snapshot>(reissued);
+    Reason(Check(changed), "owner"); // Rehashing without a new attestation cannot change work.
+
+    auto hard = CompactEmpty(1, 0x63);
+    hard.binding.share_work_bits = 255;
+    const auto hard_origin = CompactBlock(hard);
+    auto candidate = hard_origin;
+    do { ++candidate.nNonce; } while (UintToArith256(candidate.GetHash()) > arith_uint256{}.SetCompact(candidate.nBits));
+    BOOST_REQUIRE(UintToArith256(candidate.GetHash()) > UintToArith256(ho::AssignedShareTarget(255)));
+    BOOST_REQUIRE(Check(candidate).IsValid());
+    const Share native_only{candidate.GetBlockHeader(), hard.binding, hard.authorization};
+    Reason(ho::CheckShareProof(native_only, hard_origin, &indexes[0], candidate.nTime, consensus, Lookup(), Native()), "share-target");
+    // Proof eligibility and native block eligibility must remain separate routes.
+    BOOST_CHECK(ho::CheckMiningJob(hard_origin, &indexes[0], consensus, Lookup(), Native(), REWARD).IsValid());
+}
+
+BOOST_AUTO_TEST_CASE(v8_mixed_work_payouts_and_persistent_history_are_exact_and_profile_scoped)
+{
+    namespace tides = sharepool::tides;
+    consensus.SharePoolTides = consensus.SharePoolCompactTides = consensus.SharePoolVarDiff = true;
+    auto alice = CompactEmpty(1, 0x71);
+    alice.binding.share_work_bits = 1; // 2 expected hashes.
+    const auto alice_job = CompactBlock(alice);
+    auto bob = CompactEmpty(1, 0x72);
+    bob.binding.share_work_bits = 3; // 8 expected hashes, same contextual native nBits.
+    const auto bob_job = CompactBlock(bob);
+    auto other = CompactEmpty(1, 0x73);
+    other.binding.pool = uint256{uint8_t{4}};
+    other.binding.share_work_bits = 2;
+    CompactState(other);
+    const auto other_job = CompactBlock(other);
+    auto settlement = CompactEmpty();
+    settlement.templates = {Record(alice_job), Record(bob_job), Record(other_job)};
+    settlement.shares = {AssignedProof(alice_job, alice), AssignedProof(bob_job, bob), AssignedProof(other_job, other)};
+    SortEvidence(settlement);
+    CompactState(settlement);
+    const auto settled = CompactBlock(settlement);
+    BOOST_REQUIRE(Check(settled).IsValid());
+    BOOST_REQUIRE_EQUAL(settlement.payouts.size(), 2);
+    BOOST_CHECK_EQUAL(settlement.payouts[0].nValue, REWARD / 5);
+    BOOST_CHECK_EQUAL(settlement.payouts[1].nValue, REWARD * 4 / 5);
+    BOOST_CHECK_EQUAL(settlement.payouts[0].nValue + settlement.payouts[1].nValue, REWARD - 1); // Existing floor residue is unclaimed.
+    std::vector<CTxOut> exact;
+    BOOST_REQUIRE(ho::CalculateTidesPayouts(settlement, &indexes[0], settled.nBits, consensus, Lookup(), 100000, exact).IsValid());
+    BOOST_REQUIRE_EQUAL(exact.size(), 2);
+    BOOST_CHECK_EQUAL(exact[0].nValue, 20000);
+    BOOST_CHECK_EQUAL(exact[1].nValue, 80000);
+    BOOST_CHECK_EQUAL(exact[0].nValue + exact[1].nValue, 100000);
+    const auto raw = ho::EncodeSnapshot(settlement);
+    const auto decoded = ho::DecodeSnapshot(raw);
+    BOOST_CHECK(ho::EncodeSnapshot(decoded) == raw);
+    BOOST_CHECK(ho::ProfileSnapshotHash(raw, ho::VARIABLE_TIDES_VERSION) == ho::SnapshotHash(settlement));
+    BOOST_CHECK(ho::ProfileSnapshotHash(raw, ho::COMPACT_TIDES_VERSION) != ho::SnapshotHash(settlement));
+    for (size_t i{0}; i < decoded.shares.size(); ++i) BOOST_CHECK_EQUAL(decoded.shares[i].origin.share_work_bits, settlement.shares[i].origin.share_work_bits);
+
+    auto forged = settlement;
+    forged.shares[0].origin.share_work_bits ^= 1;
+    CompactState(forged);
+    BOOST_CHECK(forged.history_head != settlement.history_head);
+    const auto forged_block = CompactBlock(forged);
+    BOOST_CHECK(!Check(forged_block).IsValid());
+
+    Anchor(settled);
+    { LOCK(cs_main); indexes[0].nStatus = indexes[1].nStatus = BLOCK_VALID_SCRIPTS; }
+    auto next = CompactEmpty(2);
+    const auto expected = settlement.payouts;
+    BOOST_CHECK(next.payouts == expected);
+    std::vector<CTxOut> outputs;
+    const auto calculate = [&](const ho::Lookup& lookup) {
+        return ho::CalculateTidesPayouts(next, &indexes[1], indexes[1].nBits, consensus, lookup, REWARD, outputs);
+    };
+    BOOST_REQUIRE(calculate(Lookup()).IsValid());
+    BOOST_CHECK(outputs == expected);
+    struct RestoreReader {
+        std::shared_ptr<tides::PersistentHistoryReader> previous{tides::ConfiguredPersistentHistoryReader()};
+        ~RestoreReader() { tides::ConfigurePersistentHistoryReader(previous); }
+    } restore;
+    const auto path = m_path_root / "v8-assigned-history";
+    const tides::PersistentHistoryIndex::Scope scope{consensus.hashGenesisBlock, ho::RulesHash(ho::VARIABLE_TIDES_VERSION), ho::VARIABLE_TIDES_VERSION, 1};
+    {
+        auto reader = std::make_shared<tides::PersistentHistoryIndex>(path, scope, tides::PersistentHistoryIndex::Options{});
+        tides::ConfigurePersistentHistoryReader(reader);
+        BOOST_REQUIRE(calculate(Lookup()).IsValid());
+        BOOST_CHECK(outputs == expected);
+        BOOST_CHECK_EQUAL(reader->GetStats().covered_blocks, 1);
+        tides::ConfigurePersistentHistoryReader(nullptr);
+    }
+    {
+        auto reader = std::make_shared<tides::PersistentHistoryIndex>(path, scope, tides::PersistentHistoryIndex::Options{});
+        tides::ConfigurePersistentHistoryReader(reader);
+        size_t reads{0};
+        const ho::Lookup counted = [&](const uint256& hash) { ++reads; return Lookup()(hash); };
+        BOOST_REQUIRE(calculate(counted).IsValid());
+        BOOST_CHECK(outputs == expected);
+        BOOST_CHECK(!reader->MatchesScope(consensus.hashGenesisBlock, ho::RulesHash(ho::COMPACT_TIDES_VERSION), ho::COMPACT_TIDES_VERSION, 1));
+        BOOST_REQUIRE(calculate(counted).IsValid());
+        BOOST_CHECK(outputs == expected);
+        auto other_next = next;
+        other_next.binding.pool = other.binding.pool;
+        BOOST_REQUIRE(ho::CalculateTidesPayouts(other_next, &indexes[1], indexes[1].nBits, consensus, Lookup(), REWARD, outputs).IsValid());
+        BOOST_REQUIRE_EQUAL(outputs.size(), 1);
+        BOOST_CHECK_EQUAL(outputs[0].nValue, REWARD);
+        BOOST_CHECK(std::vector<unsigned char>(outputs[0].scriptPubKey.begin(), outputs[0].scriptPubKey.end()) == other.binding.payout_script);
+        tides::ConfigurePersistentHistoryReader(nullptr);
+    }
+    auto wrong_scope = scope;
+    wrong_scope.profile = ho::COMPACT_TIDES_VERSION;
+    wrong_scope.rules = ho::RulesHash(wrong_scope.profile);
+    BOOST_CHECK_THROW(tides::PersistentHistoryIndex(path, wrong_scope, {}), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

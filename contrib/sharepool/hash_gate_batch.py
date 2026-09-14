@@ -5,7 +5,7 @@ from io import BytesIO
 
 from hash_snapshot import (MAX_SNAPSHOT_BYTES, MAX_DEPENDENCY_BYTES, MAX_DEPENDENCY_DEPTH,
                            MAX_ORIGIN_CHECKS, MAX_SHARE_AGE, CompactTemplateRecord,
-                           LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION, MAX_DEPENDENCY_SHARES,
+                           LEDGER_VERSION, is_tides_profile, is_compact_tides_profile, MAX_DEPENDENCY_SHARES,
                            origin_certificate, materialize_compact_state)
 from test_framework.messages import CBlockHeader
 
@@ -72,7 +72,7 @@ def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSH
         if identity not in snapshots:
             value = encoded.snapshot
             total += len(encoded.raw)
-            if value.envelope.version == COMPACT_TIDES_VERSION:
+            if is_compact_tides_profile(value.envelope.version):
                 proof_count += len(value.shares)
                 if proof_count > MAX_DEPENDENCY_SHARES:
                     raise BatchLimit("dependency share count")
@@ -118,7 +118,7 @@ def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSH
         if identity in native_states:
             native_states.move_to_end(identity)
             return native_states[identity]
-        if value.envelope.version == COMPACT_TIDES_VERSION:
+        if is_compact_tides_profile(value.envelope.version):
             value = materialize_compact_state(value, activation_height=activation_height,
                 parent_snapshot=lambda identity, height: load_raw_parent((identity, height)),
                 on_snapshot=lambda opening, raw: account(opening, raw), capture=capture,
@@ -134,7 +134,7 @@ def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSH
         return hydrate(parents[parent], native_parent=True)
 
     certificates = {}
-    if snapshot.envelope.version in (LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION):
+    if snapshot.envelope.version == LEDGER_VERSION or is_tides_profile(snapshot.envelope.version):
         trusted_identity = None
         if trusted_parent is None and root_origin is None and snapshot.envelope.height > activation_height:
             parent = snapshot.envelope.native_parent, snapshot.envelope.height - 1
@@ -147,7 +147,7 @@ def check_graph(snapshot, *, lookup, parent_snapshot, snapshot_budget=MAX_SNAPSH
             if trusted_identity is None:
                 trusted_identity = account(trusted_parent)
                 trusted_parent = snapshots[trusted_identity]
-            if snapshot.envelope.version == COMPACT_TIDES_VERSION:
+            if is_compact_tides_profile(snapshot.envelope.version):
                 trusted_parent = hydrate(trusted_identity, native_parent=True)
             oldest = max(activation_height, trusted_parent.envelope.height + 1 - MAX_SHARE_AGE)
             certificates = {cert.identity: cert for cert in trusted_parent.certificates if cert.origin_height >= oldest}

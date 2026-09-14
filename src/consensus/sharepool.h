@@ -29,6 +29,7 @@ inline constexpr uint32_t MAX_SHARE_AGE{3};
 inline constexpr uint32_t MAX_SHARES{32};
 inline constexpr uint32_t MAX_STATE{128};
 inline constexpr uint32_t MAX_MANIFEST{65536};
+inline constexpr uint8_t VARIABLE_SHARE_WORK_VERSION{8};
 using Signature = std::array<unsigned char, 64>;
 
 template <typename Stream, typename T>
@@ -49,19 +50,25 @@ struct Envelope {
     uint256 pool;
     std::array<unsigned char, 32> owner{};
     std::vector<unsigned char> payout_script;
+    // V8 only: assigned expected hashes are exactly 2^share_work_bits.
+    uint8_t share_work_bits{0};
     uint256 shares_root;
     uint256 state_root;
     uint256 payouts_root;
 
     template <typename Stream> void Serialize(Stream& s) const
     {
-        s << version << genesis << rules << height << native_parent << pool << owner
-          << payout_script << shares_root << state_root << payouts_root;
+        if (version != VARIABLE_SHARE_WORK_VERSION && share_work_bits != 0) throw std::ios_base::failure("legacy share work assignment");
+        s << version << genesis << rules << height << native_parent << pool << owner << payout_script;
+        if (version == VARIABLE_SHARE_WORK_VERSION) s << share_work_bits;
+        s << shares_root << state_root << payouts_root;
     }
     template <typename Stream> void Unserialize(Stream& s)
     {
         s >> version >> genesis >> rules >> height >> native_parent >> pool >> owner;
         ReadBoundedVector(s, payout_script, 34);
+        share_work_bits = 0;
+        if (version == VARIABLE_SHARE_WORK_VERSION) s >> share_work_bits;
         s >> shares_root >> state_root >> payouts_root;
     }
 };

@@ -162,8 +162,12 @@ rules.
 
 The one-day-round, 100-equal-miner, 30-second-share example above is an
 **illustrative screen, not a user-selected production contract**. It shows why
-sampling and capacity need a joint design decision. Three routes deserve
-separate evaluation; none is implemented or selected by this report.
+sampling and capacity need a joint design decision. The numbers above describe
+the unchanged v7 global target. The separate [v8 profile](sharepool-v8-vardiff.md)
+now implements assigned targets per miner gateway, with a configurable
+one-minute starting cadence. It does not inherit these global-target traffic
+projections or establish production capacity. The following routes distinguish
+the remaining sampling and resource choices.
 
 1. **Separate frequent local monitoring shares from consensus-accounted work.**
    A gateway could use a finer local target for connection health and work-rate
@@ -174,17 +178,15 @@ separate evaluation; none is implemented or selected by this report.
    This changes the sampling promise unless another settlement design accounts
    for them. It does not by itself meet a regular-pool payout-variance contract.
 
-2. **Commit an explicit per-pool or per-job assigned target.** The exact hashed
-   job and its authorization would bind that target before work starts, and
-   each accepted proof would receive its verified inverse-probability work
-   weight. The existing weighted TIDES boundary would need validation against
-   the permitted range of individual proof weights. Signatures authenticate the
-   assignment, not the fairness of choosing it. A new rules profile would need
-   unbiased eligibility, no retrospective target selection, a minimum work per
-   admitted proof and an aggregate permissionless resource policy; otherwise
-   easier assignments merely recreate unbounded traffic. It also needs paired
-   admission-aware payout analysis. This is a protocol change, not a scheduler
-   configuration switch.
+2. **Commit an explicit per-miner, per-job assigned target.** V8 binds this target
+   before work starts and credits each proof using its original assignment.
+   Native tests cover different weights, proportional TIDES boundary payouts,
+   attempted target substitution and historical recovery. Signatures
+   authenticate the assignment, not the fairness of choosing it. Production
+   still needs an aggregate permissionless admission policy and suitable minimum
+   work: allowing easier assignments does not make their traffic affordable.
+   It also needs paired admission-aware payout analysis at the selected cadence.
+   V8 is a separately versioned protocol change, not a v7 scheduler switch.
 
 3. **Increase verified native capacity and only then consider raising limits.**
    Faster and more compact processing must be measured with sustained arrivals,

@@ -409,4 +409,36 @@ BOOST_AUTO_TEST_CASE(invalid_local_options_do_not_destroy_an_existing_index)
     BOOST_CHECK(Read(reopened, tip).status == tides::HistoryStatus::Ready);
 }
 
+BOOST_AUTO_TEST_CASE(v8_zero_proof_endpoint_survives_persistent_restart_but_not_legacy_scope)
+{
+    auto zero = Admit(0);
+    auto one = Admit(1);
+    zero.work = one.work = ArithToUint256(arith_uint256{1} << 255);
+    auto* tip = Add(nodes.front().get(), {zero, one});
+    deltas.at(tip->hash)->allow_zero_proof_ids = true;
+    const auto read = [&](tides::PersistentHistoryIndex& store) {
+        return store.ReadPool(&tip->index, 1, Number(1), tides::Work{1} << 256,
+            [&](const CBlockIndex& index) { return Fetch(index); });
+    };
+    for (unsigned pass{0}; pass < 2; ++pass) {
+        tides::PersistentHistoryIndex store{path, Scope(8), {}};
+        const auto result = read(store);
+        BOOST_REQUIRE(result.status == tides::HistoryStatus::Ready);
+        BOOST_REQUIRE_EQUAL(result.entries.size(), 2);
+        BOOST_CHECK(result.entries[0].proof_id.IsNull());
+        BOOST_CHECK(result.entries[1].proof_id == Number(1));
+        BOOST_CHECK(result.entries[0].work == zero.work);
+        BOOST_CHECK(result.entries[1].work == one.work);
+        BOOST_CHECK(read(store).status == tides::HistoryStatus::Ready);
+    }
+    tides::PersistentHistoryIndex legacy{m_path_root / "legacy-zero-proof", Scope(7), {}};
+    BOOST_CHECK(read(legacy).status == tides::HistoryStatus::Invalid);
+    deltas.at(tip->hash)->allow_zero_proof_ids = false;
+    tides::PersistentHistoryIndex untrusted{m_path_root / "untrusted-zero-proof", Scope(8), {}};
+    BOOST_CHECK(read(untrusted).status == tides::HistoryStatus::Invalid);
+    deltas.at(tip->hash)->allow_zero_proof_ids = true;
+    deltas.at(tip->hash)->admissions[1] = zero;
+    BOOST_CHECK(read(untrusted).status == tides::HistoryStatus::Invalid);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -212,4 +212,37 @@ BOOST_AUTO_TEST_CASE(compact_tides_is_explicit_and_public_activation_is_rejected
     BOOST_CHECK(CChainParams::RegTest(options)->GetConsensus().SharePoolCompactTides);
 }
 
+BOOST_AUTO_TEST_CASE(v8_assigned_work_is_explicit_and_requires_a_fresh_regtest_profile)
+{
+    ArgsManager args;
+    SetupChainParamsBaseOptions(args);
+    for (const auto chain : {ChainType::MAIN, ChainType::TESTNET, ChainType::TESTNET4, ChainType::SIGNET, ChainType::REGTEST}) {
+        BOOST_CHECK(!CreateChainParams(args, chain)->GetConsensus().SharePoolVarDiff);
+    }
+    args.ForceSetArg("-sharepoolvardiff", "1");
+    BOOST_CHECK_THROW(CreateChainParams(args, ChainType::REGTEST), std::runtime_error);
+    args.ForceSetArg("-sharepoolhashonly", "1");
+    args.ForceSetArg("-sharepooltides", "1");
+    args.ForceSetArg("-sharepoolheight", "2");
+    args.ForceSetArg("-testactivationheight", "blake2b@1");
+    BOOST_CHECK_THROW(CreateChainParams(args, ChainType::REGTEST), std::runtime_error);
+    args.ForceSetArg("-sharepoolcompacttides", "1");
+    BOOST_CHECK(CreateChainParams(args, ChainType::REGTEST)->GetConsensus().SharePoolVarDiff);
+    for (const std::string value : {"0", "1"}) {
+        args.ForceSetArg("-sharepoolvardiff", value);
+        for (const auto chain : {ChainType::MAIN, ChainType::TESTNET, ChainType::TESTNET4, ChainType::SIGNET}) {
+            BOOST_CHECK_THROW(CreateChainParams(args, chain), std::runtime_error);
+        }
+    }
+    CChainParams::RegTestOptions options;
+    options.sharepool_vardiff = true;
+    options.sharepool_tides = true;
+    options.sharepool_hash_only = true;
+    options.sharepool_height = 2;
+    options.activation_heights[Consensus::BuriedDeployment::DEPLOYMENT_BLAKE2B] = 1;
+    BOOST_CHECK_THROW(CChainParams::RegTest(options), std::runtime_error);
+    options.sharepool_compact_tides = true;
+    BOOST_CHECK(CChainParams::RegTest(options)->GetConsensus().SharePoolVarDiff);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

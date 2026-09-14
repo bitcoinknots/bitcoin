@@ -62,7 +62,7 @@ Signature SignOwner(const Policy& policy, const CKey& key, const Envelope& envel
 {
     CheckPolicy(policy);
     const auto genesis = CChainParams::RegTest({})->GetConsensus().hashGenesisBlock;
-    const bool legacy = envelope.version == 1 && envelope.rules == RulesHash();
+    const bool legacy = envelope.version == 1 && envelope.share_work_bits == 0 && envelope.rules == RulesHash();
     if (!legacy || envelope.genesis != genesis ||
         envelope.height == 0 || envelope.height >= static_cast<uint32_t>(std::numeric_limits<int>::max()) ||
         envelope.native_parent.IsNull() || envelope.pool != policy.pool ||
@@ -91,6 +91,7 @@ Signature SignJob(const Policy& policy, const CKey& key, const JobStatement& sta
     const auto genesis = CChainParams::RegTest({})->GetConsensus().hashGenesisBlock;
     if ((binding.version != hashonly::VERSION && binding.version != hashonly::LEDGER_VERSION &&
          !hashonly::IsTidesVersion(binding.version)) ||
+        (binding.version != hashonly::VARIABLE_TIDES_VERSION && binding.share_work_bits != 0) ||
         binding.rules != hashonly::RulesHash(binding.version) ||
         !binding.shares_root.IsNull() || !binding.state_root.IsNull() || !binding.payouts_root.IsNull() ||
         binding.genesis != genesis || binding.height == 0 || binding.height >= uint32_t(std::numeric_limits<int>::max()) ||

@@ -189,11 +189,11 @@ bool Matches(const HistoryDelta& delta, const CBlockIndex& index)
         delta.snapshot_hash == index.m_mm_rhs && delta.height == uint32_t(index.nHeight);
 }
 
-bool ValidAdmissions(const std::vector<Admission>& admissions)
+bool ValidAdmissions(const std::vector<Admission>& admissions, bool allow_zero_proof_ids)
 {
     const Admission* previous{nullptr};
     for (const auto& entry : admissions) {
-        if (entry.proof_id.IsNull() || entry.pool.IsNull() || entry.work.IsNull() || !IsPayoutScript(entry.payout_script) ||
+        if ((!allow_zero_proof_ids && entry.proof_id.IsNull()) || entry.pool.IsNull() || entry.work.IsNull() || !IsPayoutScript(entry.payout_script) ||
             (previous && !(UintToArith256(previous->proof_id) < UintToArith256(entry.proof_id)))) return false;
         previous = &entry;
     }
@@ -489,7 +489,10 @@ HistoryWindow PersistentHistoryIndex::ReadPool(const CBlockIndex* previous, uint
             if (!value.delta || !Matches(*value.delta, index)) return DeltaResult::Missing({index.m_mm_rhs}, "tides-history-anchor-mismatch");
             if (value.delta->admissions.size() > budget.entries - result.scanned_entries ||
                 value.delta->encoded_bytes > budget.bytes - result.scanned_bytes) return DeltaResult::Limited("tides-history-delta-budget");
-            if (!ValidAdmissions(value.delta->admissions)) return DeltaResult::Invalid("tides-history-admission");
+            if (!ValidAdmissions(value.delta->admissions,
+                                 impl.scope.profile == VARIABLE_SHARE_WORK_VERSION && value.delta->allow_zero_proof_ids)) {
+                return DeltaResult::Invalid("tides-history-admission");
+            }
             ++result.scanned_blocks;
             result.scanned_entries += value.delta->admissions.size();
             result.scanned_bytes += value.delta->encoded_bytes;

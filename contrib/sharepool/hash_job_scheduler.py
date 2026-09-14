@@ -17,11 +17,14 @@ import time
 
 class HashJobScheduler:
     def __init__(self, gate, *, sign_owner, publish, withdraw,
-                 work_update_seconds=40, clock=time.monotonic):
+                 work_update_seconds=40, clock=time.monotonic, before_build=None):
         if (type(work_update_seconds) is not int or not 5 <= work_update_seconds <= 120 or
                 any(not callable(value) for value in (sign_owner, publish, withdraw, clock))):
             raise ValueError("job cadence requires 5..120 seconds and callable adapters")
+        if before_build is not None and not callable(before_build):
+            raise ValueError("scheduled before_build must be callable")
         self.gate = gate
+        self._before_build = before_build
         self._sign_owner, self._publish, self._withdraw, self._clock = sign_owner, publish, withdraw, clock
         self._interval = work_update_seconds
         self._owner = os.getpid(), threading.get_ident()
@@ -106,6 +109,10 @@ class HashJobScheduler:
             self.last_due_lateness_seconds = (max(0, now - self._next_refresh)
                 if self._next_refresh is not None else 0)
             started = now
+            # A controller may assign only the future job at this due boundary.
+            # New receipts alone never invoke this hook or move the deadline.
+            if self._before_build is not None:
+                self._before_build()
             block, snapshot = self.gate.make_native(sign_owner=self._sign_owner)
             authorization = self.gate.authorize(block.serialize(), snapshot.serialize())
             if not self.gate.ready_for_dispatch(authorization):

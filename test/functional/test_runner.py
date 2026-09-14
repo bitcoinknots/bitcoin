@@ -145,6 +145,8 @@ BASE_SCRIPTS = [
     'feature_sharepool_hash_tides_cross_pool.py',
     'feature_sharepool_hash_tides.py',
     'feature_sharepool_hash_compact.py',
+    'feature_sharepool_hash_vardiff.py',
+    'feature_sharepool_hash_vardiff_stratum.py',
     'feature_sharepool_hash_state_reuse.py',
     'feature_sharepool_hash_datum_cadence.py',
     'feature_sharepool_hash_stratum.py',

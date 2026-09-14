@@ -10,7 +10,7 @@
 
 namespace sharepool::signer {
 inline constexpr size_t MAX_POLICY_BYTES{68};
-inline constexpr size_t MAX_ENVELOPE_BYTES{296};
+inline constexpr size_t MAX_ENVELOPE_BYTES{297}; // V8 adds one assigned-work byte.
 inline constexpr size_t MAX_JOB_BYTES{MAX_ENVELOPE_BYTES + 64};
 
 struct JobStatement {

@@ -177,6 +177,7 @@ public:
         bool sharepool_admitted_ledger{false};
         bool sharepool_tides{false};
         bool sharepool_compact_tides{false};
+        bool sharepool_vardiff{false};
     };
 
     static std::unique_ptr<const CChainParams> RegTest(const RegTestOptions& options);

@@ -32,7 +32,9 @@ from hash_signature_cache import SignatureVerifyCache
 from hash_snapshot import (Snapshot, TemplateRecord, CompactTemplateRecord, Share, MAX_SNAPSHOT_BYTES,
     MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_BYTES, MAX_COMPACT_SHARES, MAX_SHARE_AGE, MAX_EXPANDED_TEMPLATE_BYTES,
     MAX_TEMPLATE_TX_REFERENCES, SHARE_BITS, parse_share, candidate, normalize_template, build_snapshot,
-    job_hash, work_outputs, credit_outputs, rules_hash, profile_snapshot_hash, LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION, is_tides_profile, materialize_compact_state)
+    job_hash, work_outputs, credit_outputs, rules_hash, profile_snapshot_hash, LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION,
+    VARIABLE_TIDES_VERSION, is_tides_profile, is_compact_tides_profile, materialize_compact_state)
+from hash_vardiff import work_bits
 from native_mining_gate import (MiningAuthorization, JobOmission, parse_block, immutable_header,
     template_id, _process_lock, fcntl, REGTEST_GENESIS)
 from native_enforcement import compact_size, is_payout_script, verify_schnorr
@@ -64,14 +66,19 @@ class HashMiningAuthorization(MiningAuthorization):
 class HashMiningGate:
     def __init__(self, path, *, rpc, pool, public_key, payout_script,
                  quota=native_archive.DEFAULT_QUOTA, trusted_head_path=None, archive_directory=None,
-                 snapshot_budget=MAX_SNAPSHOT_BYTES, profile_version=4, activation_height=1):
+                 snapshot_budget=MAX_SNAPSHOT_BYTES, profile_version=4, activation_height=1, share_work_bits=None):
         if (type(activation_height) is not int or not 1 <= activation_height <= 0x7fffffff or
-                type(profile_version) is not int or profile_version not in (4, LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION) or
+                type(profile_version) is not int or profile_version not in (4, LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION, VARIABLE_TIDES_VERSION) or
                 type(pool) is not int or not 0 < pool < 1 << 256 or type(public_key) is not bytes or
                 len(public_key) != 32 or type(payout_script) is not bytes or not is_payout_script(payout_script) or
                 type(quota) is not int or not 4096 <= quota <= native_archive.MAX_QUOTA or
                 type(snapshot_budget) is not int or not 1024 <= snapshot_budget <= MAX_SNAPSHOT_BYTES):
             raise ValueError("invalid explicit gate policy or journal quota")
+        if profile_version == VARIABLE_TIDES_VERSION:
+            work_bits(share_work_bits)
+        elif share_work_bits is not None:
+            raise ValueError("assigned share work requires the v8 profile")
+        self._share_work_bits = share_work_bits
         if fcntl is None:
             raise ValueError("exclusive process locks are required")
         self.rpc, self.pool, self.public_key, self.payout_script = rpc, pool, public_key, payout_script
@@ -80,7 +87,8 @@ class HashMiningGate:
         self.profile_version, self.rules = profile_version, rules_hash(profile_version)
         self.activation_height = activation_height
         self.mode = {4: "hash-only-v4", LEDGER_VERSION: "hash-only-v5-confirmed-ledger",
-                     TIDES_VERSION: "hash-only-v6-tides", COMPACT_TIDES_VERSION: "hash-only-v7-compact-tides"}[profile_version]
+                     TIDES_VERSION: "hash-only-v6-tides", COMPACT_TIDES_VERSION: "hash-only-v7-compact-tides",
+                     VARIABLE_TIDES_VERSION: "hash-only-v8-vardiff-tides"}[profile_version]
         self.archive_directory = None if archive_directory is None else Path(archive_directory).absolute()
         if self.archive_directory is not None:
             self.archive_directory.mkdir(mode=0o700, exist_ok=True)
@@ -138,6 +146,18 @@ class HashMiningGate:
         except BaseException:
             self.close()
             raise
+
+    @property
+    def share_work_bits(self):
+        """Assignment for the next v8 job; issued jobs retain their own bits."""
+        return self._share_work_bits
+
+    def set_share_work_bits(self, value):
+        if self.profile_version != VARIABLE_TIDES_VERSION:
+            raise ValueError("assigned share work requires the v8 profile")
+        work_bits(value)
+        self._check_seal()
+        self._share_work_bits = value
 
     def _context(self):
         info = self.rpc("getblockchaininfo")
@@ -769,7 +789,7 @@ class HashMiningGate:
         self._require_origin(share)
         staged = {}
         opening = self._snapshot(share.header.m_mm_rhs, staged)
-        parent = self._parent_snapshot(height, tip, staged) if self.profile_version in (LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION) else None
+        parent = self._parent_snapshot(height, tip, staged) if self.profile_version == LEDGER_VERSION or is_tides_profile(self.profile_version) else None
         self._provenance(opening, staged, trusted_parent=parent,
             root_origin=TemplateRecord.from_block(self._evidence(TEMPLATE, template_id(share.header))), root_depth=1)
         self._rehydrate_retained(staged)
@@ -826,7 +846,7 @@ class HashMiningGate:
 
     def _parent_snapshot(self, height, tip, staged=None):
         opening = self._block_snapshot(height, tip, staged)
-        if opening is not None and self.profile_version == COMPACT_TIDES_VERSION:
+        if opening is not None and is_compact_tides_profile(self.profile_version):
             opening = materialize_compact_state(opening, activation_height=self.activation_height,
                 state_cache=self._compact_state_cache, signature_cache=self._signature_cache,
                 parent_snapshot=lambda identity, ancestor_height: self._block_snapshot(
@@ -893,7 +913,7 @@ class HashMiningGate:
         priority = {identity: (share.envelope.height, 1, share.proof_id) for identity, share in offered.items()}
         total = len(offered)
         capacity = (min(MAX_COMPACT_SHARES + 1, self.snapshot_budget // 33 + 1)
-                    if self.profile_version == COMPACT_TIDES_VERSION else self.snapshot_budget // 512 + 1)
+                    if is_compact_tides_profile(self.profile_version) else self.snapshot_budget // 512 + 1)
         kept = 0
         order_by = "height,revision" if is_tides_profile(self.profile_version) else "height,identity"
         rows = self.db.execute("SELECT identity,height,parent,revision FROM journal WHERE kind=? AND height BETWEEN ? AND ? ORDER BY " + order_by,
@@ -951,7 +971,8 @@ class HashMiningGate:
                     height=height + 1, pool=self.pool, payout_script=self.payout_script, public_key=self.public_key,
                     sign_owner=lambda unused: None, reward=0, templates=tuple(records.values()), shares=ordered[:count],
                     parent_state=() if parent is None else parent.post_state,
-                    version=self.profile_version, parent_snapshot=parent)
+                    version=self.profile_version, parent_snapshot=parent,
+                    share_work_bits=self._share_work_bits if self.profile_version == VARIABLE_TIDES_VERSION else 0)
                 resources = hash_gate_batch.check_graph(snapshot, snapshot_budget=self.snapshot_budget,
                     mining_job=True, activation_height=self.activation_height, state_cache=self._compact_state_cache,
                     signature_cache=self._signature_cache,
@@ -1393,6 +1414,8 @@ class HashMiningGate:
         envelope = snapshot.envelope
         if (envelope.pool, envelope.public_key, envelope.payout_script) != (self.pool, self.public_key, self.payout_script):
             raise ValueError("job violates this miner's pool/key/payout policy")
+        if self.profile_version == VARIABLE_TIDES_VERSION and envelope.share_work_bits != self._share_work_bits:
+            raise ValueError("new job violates this miner's current share-work assignment")
         if len(snapshot.serialize()) > self.snapshot_budget:
             raise ValueError("job exceeds this miner's settlement byte budget")
         # Bound and retain the complete candidate's provenance in a temporary
@@ -1440,7 +1463,11 @@ class HashMiningGate:
         return replace(authorization, dispatch_seal=self._dispatch_mac(authorization))
 
     def _dispatch_policy(self):
-        """Bind the journal policy and its currently configured runtime values."""
+        """Bind stable policy, excluding the next job's mutable v8 assignment.
+
+        Exact assigned bits are already MAC-bound inside snapshot_bytes. A
+        later retarget must not revoke or rewrite an issued job's old target.
+        """
         value = {"config": self.config.hex(), "binding": self.binding, "genesis": REGTEST_GENESIS,
             "pool": self.pool, "public_key": self.public_key.hex(), "payout_script": self.payout_script.hex(),
             "snapshot_budget": self.snapshot_budget, "profile_version": self.profile_version,

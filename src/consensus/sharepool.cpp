@@ -49,7 +49,7 @@ bool CheckOwner(const Envelope& envelope, const Signature& signature)
 bool CheckEnvelope(const Envelope& envelope, const Consensus::Params& consensus,
                    uint32_t height, const uint256& parent)
 {
-    return envelope.version == 1 && envelope.genesis == consensus.hashGenesisBlock &&
+    return envelope.version == 1 && envelope.share_work_bits == 0 && envelope.genesis == consensus.hashGenesisBlock &&
            envelope.rules == RulesHash() && envelope.height == height &&
            envelope.native_parent == parent && !envelope.pool.IsNull() &&
            IsPayoutScript(envelope.payout_script) && XOnlyPubKey{Span{envelope.owner}}.IsFullyValid();

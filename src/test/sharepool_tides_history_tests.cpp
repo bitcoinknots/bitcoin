@@ -439,4 +439,36 @@ BOOST_AUTO_TEST_CASE(cached_delta_owns_bytes_and_cursor_survives_new_index_objec
     BOOST_CHECK(cached.entries[0].payout_script == Script(1));
 }
 
+BOOST_AUTO_TEST_CASE(v8_zero_endpoint_is_exact_and_cannot_enter_legacy_cached_queries)
+{
+    auto zero = Admit(0, 1);
+    auto one = Admit(1, 2);
+    zero.work = one.work = ArithToUint256(arith_uint256{1} << 255);
+    auto* tip = Add(nodes.front().get(), {zero, one});
+    auto& delta = *deltas.at(tip->hash);
+    delta.allow_zero_proof_ids = true;
+    tides::HistoryIndex history;
+    const auto read = [&](bool variable) {
+        return history.ReadPool(&tip->index, 1, Number(1), tides::Work{1} << 256,
+            [&](const CBlockIndex& index) { return Fetch(index); }, {}, variable);
+    };
+    for (unsigned pass{0}; pass < 2; ++pass) {
+        const auto result = read(true);
+        BOOST_REQUIRE(result.status == tides::HistoryStatus::Ready);
+        BOOST_REQUIRE_EQUAL(result.entries.size(), 2);
+        BOOST_CHECK(result.entries[0].proof_id.IsNull());
+        BOOST_CHECK(result.entries[1].proof_id == Number(1));
+        BOOST_CHECK(result.entries[0].work == zero.work);
+        BOOST_CHECK(result.entries[1].work == one.work);
+    }
+    BOOST_CHECK(read(false).status == tides::HistoryStatus::Invalid);
+    BOOST_CHECK(read(true).status == tides::HistoryStatus::Ready);
+    history.Clear();
+    delta.allow_zero_proof_ids = false;
+    BOOST_CHECK(read(true).status == tides::HistoryStatus::Invalid);
+    delta.allow_zero_proof_ids = true;
+    delta.admissions[1] = zero;
+    BOOST_CHECK(read(true).status == tides::HistoryStatus::Invalid); // Zero remains a unique proof identity.
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -1,0 +1,103 @@
+{
+  "network": "isolated native regtest",
+  "profile": "hash-only-v8-vardiff-tides",
+  "transport": "two independent loopback Sia listeners; one active client per identity",
+  "hardware_used": false,
+  "injected_controller_clock": true,
+  "daemon_sha256": "3817e0c9bc6f2a7f72679f6e041e5af0d7b75558b55557cb3999400450142573",
+  "source_sha256": {
+    "contrib/sharepool/hash_mining_gate.py": "25c54b1ef1bba673e26b300410a5df7979d7a54042623740a718a774848bb2fe",
+    "contrib/sharepool/hash_job_scheduler.py": "ba0118070b128c24652f6980a7ae74838f848fbf3e3199a0b76f3336eeacd0cf",
+    "contrib/sharepool/hash_stratum.py": "158b81198c23e3289aac78ef4cbe6d8199e6ce535896841936c8f168053dcfd1",
+    "contrib/sharepool/hash_vardiff.py": "a21306310c66f99c8e1b168f3d1154a856559f4d1a412b2bf312f33f52e89d92",
+    "contrib/sharepool/hash_stratum_runner.py": "162f7fb9c04e1044ab3db49469f20451cb5b5bd65b0f1097276a8397ee5dbf76",
+    "test/functional/feature_sharepool_hash_vardiff_stratum.py": "fea57db8f95bd83c284ea74c57db9b3a30cf0516be50c875ead39e1affe94610"
+  },
+  "checks": [
+    "independent_signed_assignments_and_real_notifications",
+    "wire_difficulty_matches_union_of_assigned_and_native_targets",
+    "one_active_client_per_identity",
+    "eight_native_validated_shares_without_refresh",
+    "duplicate_does_not_affect_estimator",
+    "retarget_only_on_due_refresh",
+    "other_identity_assignment_unchanged",
+    "late_old_target_share_keeps_original_work",
+    "all_gate_rpc_calls_on_owner_thread",
+    "native_only_winner_exact_bytes_accepted",
+    "native_only_winner_not_credited",
+    "exact_work_weighted_coinbase_payouts",
+    "native_verifychain",
+    "standalone_cli_startup_default_cadence_and_shutdown"
+  ],
+  "retarget": {
+    "share_work_bits": 1,
+    "target_share_seconds": 10,
+    "retarget_seconds": 40,
+    "window_elapsed_seconds": 0,
+    "window_accepted_shares": 1,
+    "window_accepted_work": 1,
+    "adjustments": 1,
+    "observations": 1,
+    "last_estimate": {
+      "elapsed_seconds": 40.0,
+      "accepted_shares": 8,
+      "accepted_work": 8,
+      "estimated_hashes_per_second": 0.2,
+      "previous_work_bits": 0,
+      "next_work_bits": 1
+    },
+    "physical_hashrate_attested": false
+  },
+  "native_only_block": "23d34e68cb5d49b62634cb32d0fff867872a4a8fd5bc0a7c11d81a02e159f053",
+  "notify_job_ids": [
+    "e86ad200ce68b774dcd528e22c7cc61a342c7ed3ca9153ad121c2b8cfb3c22c3",
+    "d2d7d1b90a959273362f47222f065af9b410007d83d23882d6afd83c2d2790c1"
+  ],
+  "initial_wire_difficulties": [
+    2.328306436538696e-10,
+    4.65661342818897e-10
+  ],
+  "initial_assignments": [
+    0,
+    6
+  ],
+  "service_stats": [
+    {
+      "published": 2,
+      "acknowledged": 9,
+      "duplicate": 1,
+      "rejected": 0,
+      "submitted_candidates": 0,
+      "accepted_candidates": 0,
+      "candidate_rpc_failures": 0,
+      "candidate_rejections": 0,
+      "native_only_candidates": 0
+    },
+    {
+      "published": 2,
+      "acknowledged": 0,
+      "duplicate": 0,
+      "rejected": 0,
+      "submitted_candidates": 1,
+      "accepted_candidates": 1,
+      "candidate_rpc_failures": 0,
+      "candidate_rejections": 0,
+      "native_only_candidates": 1
+    }
+  ],
+  "payouts": {
+    "00140101010101010101010101010101010101010101": 76923076,
+    "00140202020202020202020202020202020202020202": 4923076923
+  },
+  "native_only_receipt_revision_unchanged": true,
+  "standalone_runner": {
+    "exit_code": 0,
+    "v8_job_published": true,
+    "listener_closed": true,
+    "chain_and_network_unchanged": true,
+    "target_share_seconds": 60,
+    "retarget_seconds": 240,
+    "assigned_work_bits": 6,
+    "bitcoin_cli_sha256": "f91a8b6da17996f7166e4474418824b2db947c35ddd90cd7b059ec8f77b91b80"
+  }
+}

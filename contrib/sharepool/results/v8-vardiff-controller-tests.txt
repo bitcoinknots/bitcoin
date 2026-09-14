@@ -1,0 +1,22 @@
+test_actual_elapsed_time_and_late_poll_do_not_create_catchup_retargets (test_hash_vardiff.VardiffTests) ... ok
+test_bad_clock_and_foreign_owner_cannot_update (test_hash_vardiff.VardiffTests) ... ok
+test_controller_only_runs_at_due_scheduler_build (test_hash_vardiff.VardiffTests) ... ok
+test_deadband_and_configured_bounds (test_hash_vardiff.VardiffTests) ... ok
+test_independent_miner_controllers_do_not_share_assignment (test_hash_vardiff.VardiffTests) ... ok
+test_initial_assignment_waits_for_publication (test_hash_vardiff.VardiffTests) ... ok
+test_job_publication_does_not_reset_observation_window (test_hash_vardiff.VardiffTests) ... ok
+test_old_and_new_job_shares_keep_original_work_after_retarget (test_hash_vardiff.VardiffTests) ... ok
+test_receipts_never_retarget_or_change_old_assignment (test_hash_vardiff.VardiffTests) ... ok
+test_requires_explicit_bounded_policy (test_hash_vardiff.VardiffTests) ... ok
+test_zero_observations_ease_without_physical_idle_claim (test_hash_vardiff.VardiffTests) ... ok
+test_advertised_target_catches_both_shares_and_native_blocks (test_hash_vardiff_stratum.VardiffStratumTests) ... ok
+test_failed_native_only_submission_cannot_claim_acceptance (test_hash_vardiff_stratum.VardiffStratumTests) ... ok
+test_native_only_winner_is_submitted_without_share_ack_or_credit (test_hash_vardiff_stratum.VardiffStratumTests) ... ok
+test_native_rpc_failure_preserves_an_already_durable_share_ack (test_hash_vardiff_stratum.VardiffStratumTests) ... ok
+test_new_ack_counts_exact_old_assignment_but_duplicate_does_not (test_hash_vardiff_stratum.VardiffStratumTests) ... ok
+test_rejected_target_and_failed_ack_never_influence_controller (test_hash_vardiff_stratum.VardiffStratumTests) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.003s
+
+OK

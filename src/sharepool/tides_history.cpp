@@ -67,12 +67,12 @@ bool AnchorMatches(const HistoryDelta& delta, const CBlockIndex& index)
         delta.snapshot_hash == index.m_mm_rhs && delta.height == uint32_t(index.nHeight);
 }
 
-uint256 QueryId(const CBlockIndex& index, uint32_t activation, const uint256& pool, const Work& required)
+uint256 QueryId(const CBlockIndex& index, uint32_t activation, const uint256& pool, const Work& required, bool allow_zero_proof_ids)
 {
     HashWriter writer;
     writer << std::string{"SharePool/tides-history/query/v1"} << index.GetBlockHash()
            << index.nHeight << index.m_mm_rhs << (index.pprev ? index.pprev->GetBlockHash() : uint256{})
-           << activation << pool << required.str();
+           << activation << pool << required.str() << allow_zero_proof_ids;
     return writer.GetHash();
 }
 } // namespace
@@ -217,7 +217,7 @@ void HistoryIndex::SetCacheBudget(HistoryCacheBudget budget)
 
 HistoryWindow HistoryIndex::ReadPool(const CBlockIndex* previous, uint32_t activation_height,
                                     const uint256& pool, const Work& required_work,
-                                    const FetchHistoryDelta& fetch, HistoryBudget budget)
+                                    const FetchHistoryDelta& fetch, HistoryBudget budget, bool allow_zero_proof_ids)
 {
     HistoryWindow result;
     const auto fail = [&](HistoryStatus status, std::string reason, std::vector<uint256> missing = {}) {
@@ -242,7 +242,7 @@ HistoryWindow HistoryIndex::ReadPool(const CBlockIndex* previous, uint32_t activ
 
     auto& impl = *m_impl;
     try {
-        const auto query_id = QueryId(*previous, activation_height, pool, required_work);
+        const auto query_id = QueryId(*previous, activation_height, pool, required_work, allow_zero_proof_ids);
         auto found = impl.queries.find(query_id);
         if (found == impl.queries.end()) {
             while (impl.queries.size() >= impl.budget.queries) {
@@ -269,7 +269,8 @@ HistoryWindow HistoryIndex::ReadPool(const CBlockIndex* previous, uint32_t activ
             std::shared_ptr<const HistoryDelta> delta;
             size_t bytes{0};
             if (const auto cached = impl.deltas.find(block_id); cached != impl.deltas.end()) {
-                if (AnchorMatches(*cached->second.value, index)) {
+                if (AnchorMatches(*cached->second.value, index) &&
+                    (allow_zero_proof_ids || !cached->second.value->allow_zero_proof_ids)) {
                     delta = cached->second.value;
                     bytes = cached->second.bytes;
                     cached->second.touched = ++impl.clock;
@@ -297,7 +298,7 @@ HistoryWindow HistoryIndex::ReadPool(const CBlockIndex* previous, uint32_t activ
                 bytes = sizeof(HistoryDelta);
                 const Admission* last{nullptr};
                 for (const auto& entry : fetched.delta->admissions) {
-                    if (entry.proof_id.IsNull() || entry.pool.IsNull() || entry.work.IsNull() ||
+                    if ((!(allow_zero_proof_ids && fetched.delta->allow_zero_proof_ids) && entry.proof_id.IsNull()) || entry.pool.IsNull() || entry.work.IsNull() ||
                         !IsPayoutScript(entry.payout_script) ||
                         (last && !(UintToArith256(last->proof_id) < UintToArith256(entry.proof_id)))) {
                         return fail(HistoryStatus::Invalid, "tides-history-admission");

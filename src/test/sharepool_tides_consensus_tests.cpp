@@ -228,8 +228,8 @@ BOOST_AUTO_TEST_CASE(legacy_hash_domains_and_new_profile_remain_distinct)
     BOOST_CHECK(ho::ProfileSnapshotHash(malformed, 5) == ho::SnapshotHash(malformed));
     BOOST_CHECK_EQUAL(ho::ProfileSnapshotHash(malformed, 6).GetHex(), "e149ea7b762065059c1f7d6d74a30d3695c07b3dfd6e1368c47bd900dd651123");
     BOOST_CHECK_EQUAL(ho::SnapshotHash(std::vector<unsigned char>{5, 0}).GetHex(), "66d6850be22f3996da4f56c769e216bd81725626671b2d51b77cc59cd0da4a01");
-    BOOST_CHECK_THROW(ho::ProfileSnapshotHash(malformed, 8), std::invalid_argument);
-    BOOST_CHECK_THROW(ho::RulesHash(8), std::invalid_argument);
+    BOOST_CHECK_THROW(ho::ProfileSnapshotHash(malformed, 9), std::invalid_argument);
+    BOOST_CHECK_THROW(ho::RulesHash(9), std::invalid_argument);
 
     auto snapshot = Empty();
     const auto block = Block(snapshot);

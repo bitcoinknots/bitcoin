@@ -1,0 +1,9 @@
+2026-09-14T14:44:12.105000Z TestFramework (INFO): PRNG seed is: 7006661284169954182
+2026-09-14T14:44:12.106000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v8-native-02
+2026-09-14T14:44:13.981000Z TestFramework (INFO): Independent miners commit three different assigned targets at the same native difficulty
+2026-09-14T14:44:37.952000Z TestFramework (INFO): Assignment changes, another miner's authorization and insufficient work are rejected
+2026-09-14T14:45:14.233000Z TestFramework (INFO): A late old-target proof keeps its original credit alongside a new harder job
+2026-09-14T14:45:15.088000Z TestFramework (INFO): Persistent history, restart and competing branches preserve assigned work weights
+2026-09-14T14:45:20.131000Z TestFramework (INFO): Stopping nodes
+2026-09-14T14:45:20.311000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v8-native-02
+2026-09-14T14:45:20.311000Z TestFramework (INFO): Tests successful

@@ -1140,7 +1140,7 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
         settlement.pushKV("rules_root", (consensusParams.SharePoolHashOnly ? sharepool::hashonly::RulesHash(sharepool::hashonly::ProfileVersion(consensusParams)) : sharepool::RulesHash()).GetHex());
         settlement.pushKV("max_share_age", sharepool::MAX_SHARE_AGE);
         if (consensusParams.SharePoolHashOnly) {
-            settlement.pushKV("mode", consensusParams.SharePoolCompactTides ? "hash-only-v7-compact-tides" : consensusParams.SharePoolTides ? "hash-only-v6-tides" : consensusParams.SharePoolAdmittedLedger ? "hash-only-v5-confirmed-ledger" : "hash-only-v4");
+            settlement.pushKV("mode", consensusParams.SharePoolVarDiff ? "hash-only-v8-vardiff-tides" : consensusParams.SharePoolCompactTides ? "hash-only-v7-compact-tides" : consensusParams.SharePoolTides ? "hash-only-v6-tides" : consensusParams.SharePoolAdmittedLedger ? "hash-only-v5-confirmed-ledger" : "hash-only-v4");
             if (consensusParams.SharePoolTides) {
                 settlement.pushKV("payout_cutoff", "issued-job-history");
             }
@@ -1148,7 +1148,12 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
                 settlement.pushKV("payout_cutoff", "native-parent-block");
                 settlement.pushKV("local_receipts", "provisional-until-anchored");
             }
-            settlement.pushKV("share_target", sharepool::hashonly::ShareTarget(block_header.nBits).GetHex());
+            if (consensusParams.SharePoolVarDiff) {
+                settlement.pushKV("min_share_work_bits", sharepool::hashonly::MIN_SHARE_WORK_BITS);
+                settlement.pushKV("max_share_work_bits", sharepool::hashonly::MAX_SHARE_WORK_BITS);
+            } else {
+                settlement.pushKV("share_target", sharepool::hashonly::ShareTarget(block_header.nBits).GetHex());
+            }
             settlement.pushKV("max_snapshot_bytes", sharepool::hashonly::MAX_SNAPSHOT_BYTES);
             settlement.pushKV("max_dependency_depth", sharepool::hashonly::MAX_DEPENDENCY_DEPTH);
             settlement.pushKV("max_dependency_bytes", sharepool::hashonly::MAX_DEPENDENCY_BYTES);
@@ -1634,6 +1639,11 @@ static UniValue HashJobResult(const CBlock& block, const sharepool::hashonly::Sn
     result.pushKV("native_parent", block.hashPrevBlock.GetHex());
     result.pushKV("height", block.m_height);
     result.pushKV("reward", reward);
+    if (snapshot.binding.version == sharepool::hashonly::VARIABLE_TIDES_VERSION) {
+        result.pushKV("assigned_share_work_bits", snapshot.binding.share_work_bits);
+        result.pushKV("share_target", sharepool::hashonly::AssignedShareTarget(snapshot.binding.share_work_bits).GetHex());
+        result.pushKV("share_work", sharepool::hashonly::AssignedShareWork(snapshot.binding.share_work_bits).GetHex());
+    }
     return result;
 }
 
@@ -1647,6 +1657,9 @@ static std::vector<RPCResult> HashJobResults()
         {RPCResult::Type::STR_HEX, "native_parent", "Native parent used for construction and validation"},
         {RPCResult::Type::NUM, "height", "Native block height"},
         {RPCResult::Type::NUM, "reward", "Exact subsidy plus transaction fees, in satoshis"},
+        {RPCResult::Type::NUM, "assigned_share_work_bits", /*optional=*/true, "V8 exact assigned expected-hash exponent, bound by the owner signature"},
+        {RPCResult::Type::STR_HEX, "share_target", /*optional=*/true, "V8 assigned target; native block candidates must also be checked against contextual nBits"},
+        {RPCResult::Type::STR_HEX, "share_work", /*optional=*/true, "V8 exact expected hashes per credited proof, uint256 hexadecimal"},
     };
 }
 
@@ -1736,8 +1749,8 @@ static RPCHelpMan getsharepoolhashresources()
             limits.pushKV("dependency_bytes", ho::MAX_DEPENDENCY_BYTES);
             limits.pushKV("dependency_depth", ho::MAX_DEPENDENCY_DEPTH);
             limits.pushKV("certificate_bytes", ho::MAX_CERTIFICATE_BYTES);
-            limits.pushKV("compact_shares", version == ho::COMPACT_TIDES_VERSION ? ho::MAX_COMPACT_SHARES : 0);
-            limits.pushKV("dependency_shares", version == ho::COMPACT_TIDES_VERSION ? ho::MAX_DEPENDENCY_SHARES : 0);
+            limits.pushKV("compact_shares", ho::IsCompactTidesVersion(version) ? ho::MAX_COMPACT_SHARES : 0);
+            limits.pushKV("dependency_shares", ho::IsCompactTidesVersion(version) ? ho::MAX_DEPENDENCY_SHARES : 0);
             UniValue result{UniValue::VOBJ};
             result.pushKV("hash", ho::ProfileSnapshotHash(snapshot, version).GetHex());
             result.pushKV("version", version);
@@ -2099,7 +2112,7 @@ static RPCHelpMan getsharepoolhashstatus()
             const auto count = request.params[1].isNull() ? 1024 : request.params[1].getInt<int64_t>();
             if (count < 1 || count > 1024) throw JSONRPCError(RPC_INVALID_PARAMETER, "count must be between 1 and 1024");
             UniValue result{UniValue::VOBJ};
-            result.pushKV("mode", chainman.GetConsensus().SharePoolCompactTides ? "hash-only-v7-compact-tides" : chainman.GetConsensus().SharePoolTides ? "hash-only-v6-tides" : chainman.GetConsensus().SharePoolAdmittedLedger ? "hash-only-v5-confirmed-ledger" : "hash-only-v4");
+            result.pushKV("mode", chainman.GetConsensus().SharePoolVarDiff ? "hash-only-v8-vardiff-tides" : chainman.GetConsensus().SharePoolCompactTides ? "hash-only-v7-compact-tides" : chainman.GetConsensus().SharePoolTides ? "hash-only-v6-tides" : chainman.GetConsensus().SharePoolAdmittedLedger ? "hash-only-v5-confirmed-ledger" : "hash-only-v4");
             result.pushKV("rules", sharepool::hashonly::RulesHash(sharepool::hashonly::ProfileVersion(chainman.GetConsensus())).GetHex());
             result.pushKV("activation_height", chainman.GetConsensus().SharePoolHeight);
             result.pushKV("max_snapshot_bytes", sharepool::hashonly::MAX_SNAPSHOT_BYTES);

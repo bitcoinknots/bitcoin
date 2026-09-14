@@ -658,6 +658,9 @@ public:
             consensus.Blake2bHeadline = *opts.blake2b_headline;
         }
 
+        if (opts.sharepool_vardiff && !opts.sharepool_compact_tides) {
+            throw std::runtime_error("Assigned-work TIDES requires the explicit compact TIDES profile on a fresh regtest chain.");
+        }
         if (opts.sharepool_compact_tides && !opts.sharepool_tides) {
             throw std::runtime_error("Compact TIDES requires the explicit TIDES profile on a fresh regtest chain.");
         }
@@ -683,6 +686,7 @@ public:
             consensus.SharePoolAdmittedLedger = opts.sharepool_admitted_ledger;
             consensus.SharePoolTides = opts.sharepool_tides;
             consensus.SharePoolCompactTides = opts.sharepool_compact_tides;
+            consensus.SharePoolVarDiff = opts.sharepool_vardiff;
         }
 
         // Optionally schedule the RDTS deployment (see -rdtsexpiry). RDTS

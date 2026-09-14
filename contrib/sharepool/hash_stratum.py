@@ -26,6 +26,7 @@ import time
 
 from hash_job_scheduler import HashJobScheduler
 from hash_snapshot import MAX_SHARE_AGE, Share, Snapshot, share_target
+from hash_vardiff import VardiffController
 from native_mining_gate import REGTEST_GENESIS, parse_block
 from testnet_template import TestnetTemplate, proof_from_sia, sia_notify
 from test_framework.messages import CBlockHeader, uint256_from_compact
@@ -155,17 +156,19 @@ class HashStratumService:
     Snapshot availability is established via the gate before work is handed off.
     """
     MAX_JOBS = 32
+    PROFILE_VERSION = 7
+    MAX_CLIENTS = 4
     MAX_JOB_BYTES = 64 * 1024 * 1024
     MAX_LINE = 4096
 
     def __init__(self, gate, *, sign_owner, observer_rpc, bind=("127.0.0.1", 0),
                  work_update_seconds=40, observe_seconds=0.25,
-                 observation_timeout=2.0, clock=time.monotonic, transport_difficulty=None):
-        if (gate.profile_version != 7 or not callable(observer_rpc) or
+                 observation_timeout=2.0, clock=time.monotonic, transport_difficulty=None, before_build=None):
+        if (gate.profile_version != self.PROFILE_VERSION or not callable(observer_rpc) or
                 not ipaddress.ip_address(bind[0]).is_loopback or
                 type(observe_seconds) not in (int, float) or
                 not math.isfinite(observe_seconds) or not 0.02 <= observe_seconds < observation_timeout):
-            raise ValueError("v7, loopback bind and bounded independent observer required")
+            raise ValueError(f"v{self.PROFILE_VERSION}, loopback bind and bounded independent observer required")
         self.owner = os.getpid(), threading.get_ident()
         transport_target((1 << 256) - 1, transport_difficulty)
         self.transport_difficulty = transport_difficulty
@@ -184,7 +187,7 @@ class HashStratumService:
         self.bind = bind
         self.scheduler = HashJobScheduler(gate, sign_owner=sign_owner,
             publish=self._publish, withdraw=self.withdraw,
-            work_update_seconds=work_update_seconds, clock=clock)
+            work_update_seconds=work_update_seconds, clock=clock, before_build=before_build)
 
     def _owner(self):
         if self.owner != (os.getpid(), threading.get_ident()):
@@ -197,7 +200,7 @@ class HashStratumService:
         if (info.get("chain") != "regtest" or rpc("getblockhash", 0) != REGTEST_GENESIS or
                 network.get("networkactive") is not False or network.get("connections") != 0 or
                 (status.get("mode"), status.get("rules"), status.get("activation_height", 1)) != self.observer_policy):
-            raise ValueError("tip observer requires the same isolated v7 regtest profile")
+            raise ValueError(f"tip observer requires the same isolated v{self.PROFILE_VERSION} regtest profile")
         # The final read supplies the observation; startup flags alone are not a
         # continuing native-context check. Gate approval remains authoritative.
         self.latch.observe(rpc("getbestblockhash"))
@@ -224,9 +227,9 @@ class HashStratumService:
         template = TestnetTemplate(CBlockHeader(block).serialize(), block.vtx[0].serialize_with_witness(),
             tuple(tx.serialize_with_witness() for tx in block.vtx[1:]),
             block.m_mm_rhs.to_bytes(32, "little"), 4_000_000, 4_000_000)
-        if (template.block() != authorization.block_bytes or snapshot.envelope.version != 7 or
+        if (template.block() != authorization.block_bytes or snapshot.envelope.version != self.PROFILE_VERSION or
                 block.m_mm_rhs != snapshot.hash):
-            raise ValueError("Stratum wrapper changes the exact v7 authorized work")
+            raise ValueError(f"Stratum wrapper changes the exact v{self.PROFILE_VERSION} authorized work")
         self.gate.register_snapshot(authorization.snapshot_bytes)
         self.gate.register_template(authorization.block_bytes)
         # Registration can expose a new receipt/context. This adapter performs
@@ -244,10 +247,13 @@ class HashStratumService:
             if template.job_id not in self.jobs and (len(self.jobs) >= self.MAX_JOBS or total + charge > self.MAX_JOB_BYTES):
                 raise ValueError("unexpired Stratum work retention budget reached")
             work = Work(authorization, template, snapshot,
-                transport_target(share_target(block.nBits, 7), self.transport_difficulty), self.latch.generation)
+                self._mining_target(block, snapshot), self.latch.generation)
             self.jobs[template.job_id] = self.current = work
             self.stats["published"] += 1
             return True
+
+    def _mining_target(self, block, snapshot):
+        return transport_target(share_target(block.nBits, self.PROFILE_VERSION), self.transport_difficulty)
 
     def _enqueue(self, kind, payload):
         request = _Request(kind, payload)
@@ -401,7 +407,7 @@ class HashStratumService:
                             method, params, result = req.get("method"), req.get("params", []), True
                             if method == "mining.subscribe":
                                 subscribed = True
-                                result = [[["mining.notify", "sharepool-v7"]], prefix.hex(), 8]
+                                result = [[["mining.notify", f"sharepool-v{service.PROFILE_VERSION}"]], prefix.hex(), 8]
                             elif method == "mining.authorize":
                                 authorized = bool(params and params[0] == "sharepool.regtest")
                                 result = authorized
@@ -426,7 +432,7 @@ class HashStratumService:
             request_queue_size = 4
 
             def __init__(self, *args):
-                self.slots = threading.BoundedSemaphore(4)
+                self.slots = threading.BoundedSemaphore(service.MAX_CLIENTS)
                 super().__init__(*args)
 
             def process_request(self, request, address):
@@ -476,3 +482,94 @@ class HashStratumService:
             self._observer_thread.join(timeout=1)
         # The caller owns gate.close() and observer RPC lifecycle. A hung RPC
         # remains a daemon observer, cannot publish, and never owns gate state.
+
+
+class VardiffStratumService(HashStratumService):
+    """One v8 payout identity and one active connection per loopback listener.
+
+    Run independent gate/controller/listener instances for independent miners.
+    This bounded adapter does not combine ASICs into a global assignment, attest
+    physical identity, or configure hardware. The controller observes only new
+    durable share ACKs; a native-only candidate never earns assigned share work.
+    """
+    PROFILE_VERSION = 8
+    MAX_CLIENTS = 1
+
+    def __init__(self, gate, *, controller, **options):
+        if (not isinstance(controller, VardiffController) or
+                gate.share_work_bits != controller.current_work_bits):
+            raise ValueError("v8 gate and per-identity controller require the same initial assignment")
+        if options.get("transport_difficulty") is not None or "before_build" in options:
+            raise ValueError("v8 uses its exact assigned work and causal controller")
+        self.controller = controller
+        super().__init__(gate, before_build=self._before_vardiff_build, **options)
+        self.stats["native_only_candidates"] = 0
+
+    def _before_vardiff_build(self):
+        self._owner()
+        self.gate.set_share_work_bits(self.controller.next_assignment())
+
+    @staticmethod
+    def _native_target(bits):
+        # Called after share_target has checked canonical native nBits. The
+        # test framework's decoder only handles exponents >= 3; v8 still needs
+        # the native-winning path at every canonical difficulty.
+        exponent, mantissa = bits >> 24, bits & 0x7fffff
+        return mantissa >> (8 * (3 - exponent)) if exponent <= 3 else mantissa << (8 * (exponent - 3))
+
+    def _mining_target(self, block, snapshot):
+        assigned = share_target(block.nBits, self.PROFILE_VERSION, snapshot.envelope.share_work_bits)
+        # In easy regtest a native winner can fail a harder assigned share
+        # target. Request the union so that such a block is still submitted.
+        return max(assigned, self._native_target(block.nBits))
+
+    def _publish(self, authorization):
+        result = super()._publish(authorization)
+        self.controller.start()
+        return result
+
+    def _submit(self, prefix, params):
+        self._owner()
+        if (type(params) is not list or len(params) != 5 or params[0] != "sharepool.regtest" or
+                any(type(item) is not str or len(item) > 256 for item in params)):
+            raise ValueError("invalid authorized submission")
+        work = self.jobs.get(params[1])
+        if work is None:
+            raise ValueError("unknown or expired issued job")
+        proof = proof_from_sia(work.template, prefix, bytes.fromhex(params[2]), params[3], params[4])
+        assigned = share_target(work.template.header.nBits, self.PROFILE_VERSION,
+                                work.snapshot.envelope.share_work_bits)
+        native = self._native_target(work.template.header.nBits)
+        if proof.hash_int > max(assigned, native):
+            raise ValueError("insufficient assigned share or native block work")
+        if work.authorization.block_for_header(proof.header) != proof.block:
+            raise ValueError("proof changes its immutable authorized block")
+        is_share = proof.hash_int <= assigned
+        if is_share:
+            share = Share(proof.header, work.snapshot.envelope, work.snapshot.owner_signature)
+            accepted = self.gate.receive(share)
+            self.stats["acknowledged" if accepted else "duplicate"] += 1
+            if accepted:
+                try:
+                    self.controller.observe(share.envelope.share_work_bits)
+                except BaseException:
+                    self.withdraw()
+                    raise
+        else:
+            self.stats["native_only_candidates"] += 1
+        if proof.hash_int <= native:
+            self.stats["submitted_candidates"] += 1
+            try:
+                result = self.gate.rpc("submitblock", proof.block.hex())
+            except Exception:
+                self.stats["candidate_rpc_failures"] += 1
+                if not is_share:
+                    raise RuntimeError("native-only candidate submission was not confirmed") from None
+            else:
+                if result is None:
+                    self.stats["accepted_candidates"] += 1
+                else:
+                    self.stats["candidate_rejections"] += 1
+                    if not is_share:
+                        raise ValueError("native-only candidate was not accepted")
+        return True

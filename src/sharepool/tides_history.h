@@ -38,6 +38,9 @@ struct HistoryDelta {
     uint32_t height{0};
     size_t encoded_bytes{0};
     std::vector<Admission> admissions;
+    // Authenticated v8 context only; legacy native profiles reserve zero IDs.
+    // Local derived metadata, never serialized into the consensus history.
+    bool allow_zero_proof_ids{false};
 };
 
 enum class HistoryStatus { Ready, MissingData, Invalid, ResourceLimit };
@@ -145,7 +148,8 @@ public:
     void SetCacheBudget(HistoryCacheBudget budget);
     HistoryWindow ReadPool(const CBlockIndex* previous, uint32_t activation_height,
                            const uint256& pool, const Work& required_work,
-                           const FetchHistoryDelta& fetch, HistoryBudget budget = {});
+                           const FetchHistoryDelta& fetch, HistoryBudget budget = {},
+                           bool allow_zero_proof_ids = false);
 };
 } // namespace sharepool::tides
 

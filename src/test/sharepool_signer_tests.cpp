@@ -240,4 +240,32 @@ BOOST_AUTO_TEST_CASE(native_v6_job_signer_binds_profile_and_exact_history_conten
     }
 }
 
+BOOST_AUTO_TEST_CASE(v8_job_signer_attests_assigned_work_and_rejects_legacy_field_reuse)
+{
+    namespace ho = sharepool::hashonly;
+    auto statement = Job();
+    statement.binding.version = ho::VARIABLE_TIDES_VERSION;
+    statement.binding.rules = ho::RulesHash(ho::VARIABLE_TIDES_VERSION);
+    const XOnlyPubKey owner{Span{statement.binding.owner}};
+    for (const uint8_t bits : {uint8_t{0}, uint8_t{37}, uint8_t{255}}) {
+        statement.binding.share_work_bits = bits;
+        const auto signature = sharepool::signer::SignJob(policy, key, statement);
+        BOOST_CHECK(owner.VerifySchnorr(ho::OwnerHash(statement.binding, statement.job, statement.contents), signature));
+        DataStream stream;
+        stream << statement;
+        const auto parsed = sharepool::signer::DecodeJob({UCharCast(stream.data()), stream.size()});
+        BOOST_CHECK_EQUAL(parsed.binding.share_work_bits, bits);
+        auto changed = statement;
+        changed.binding.share_work_bits ^= 1;
+        BOOST_CHECK(!owner.VerifySchnorr(ho::OwnerHash(changed.binding, changed.job, changed.contents), signature));
+    }
+    for (const uint8_t version : {uint8_t{4}, uint8_t{5}, uint8_t{6}, uint8_t{7}}) {
+        statement.binding.version = version;
+        statement.binding.rules = ho::RulesHash(version);
+        statement.binding.share_work_bits = 1;
+        BOOST_CHECK_THROW(sharepool::signer::SignJob(policy, key, statement), std::invalid_argument);
+        BOOST_CHECK_THROW(GetSerializeSize(statement), std::ios_base::failure);
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

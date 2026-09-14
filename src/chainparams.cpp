@@ -94,6 +94,10 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
     options.sharepool_admitted_ledger = args.GetBoolArg("-sharepooladmittedledger", false);
     options.sharepool_tides = args.GetBoolArg("-sharepooltides", false);
     options.sharepool_compact_tides = args.GetBoolArg("-sharepoolcompacttides", false);
+    options.sharepool_vardiff = args.GetBoolArg("-sharepoolvardiff", false);
+    if (options.sharepool_vardiff && !options.sharepool_compact_tides) {
+        throw std::runtime_error("-sharepoolvardiff requires -sharepoolcompacttides on a fresh regtest chain.");
+    }
     if (options.sharepool_compact_tides && !options.sharepool_tides) {
         throw std::runtime_error("-sharepoolcompacttides requires -sharepooltides on a fresh regtest chain.");
     }
@@ -197,6 +201,9 @@ const CChainParams &Params() {
 
 std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, const ChainType chain)
 {
+    if (chain != ChainType::REGTEST && args.IsArgSet("-sharepoolvardiff")) {
+        throw std::runtime_error("-sharepoolvardiff is restricted to regtest; public-network activation is not supported.");
+    }
     if (chain != ChainType::REGTEST && args.IsArgSet("-sharepoolcompacttides")) {
         throw std::runtime_error("-sharepoolcompacttides is restricted to regtest; public-network activation is not supported.");
     }

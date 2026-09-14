@@ -17,7 +17,11 @@ inline constexpr uint32_t VERSION{4};
 inline constexpr uint32_t LEDGER_VERSION{5};
 inline constexpr uint32_t TIDES_VERSION{6};
 inline constexpr uint32_t COMPACT_TIDES_VERSION{7};
-inline constexpr bool IsTidesVersion(uint32_t version) { return version == TIDES_VERSION || version == COMPACT_TIDES_VERSION; }
+inline constexpr uint32_t VARIABLE_TIDES_VERSION{VARIABLE_SHARE_WORK_VERSION};
+inline constexpr uint32_t MIN_SHARE_WORK_BITS{0};
+inline constexpr uint32_t MAX_SHARE_WORK_BITS{255};
+inline constexpr bool IsCompactTidesVersion(uint32_t version) { return version == COMPACT_TIDES_VERSION || version == VARIABLE_TIDES_VERSION; }
+inline constexpr bool IsTidesVersion(uint32_t version) { return version == TIDES_VERSION || IsCompactTidesVersion(version); }
 // Vector limits include their CompactSize count prefix. Confirmed credits are
 // never truncated: fresh admissions must stop when pending capacity is full.
 inline constexpr uint32_t MAX_PENDING_BYTES{4 * 1024 * 1024};
@@ -194,6 +198,12 @@ Result MaterializeTidesState(Snapshot& snapshot, const CBlockIndex* previous,
 uint256 ShareTarget(uint32_t native_bits, uint32_t version = VERSION);
 /** v6 assigned proof work is an exact power of two in expected-hash units. */
 uint256 TidesShareWork(uint32_t native_bits);
+/** V8 assignments are independent of contextual native nBits, including on regtest. */
+uint256 AssignedShareWork(uint8_t share_work_bits);
+uint256 AssignedShareTarget(uint8_t share_work_bits);
+/** Use the authenticated origin assignment for v8; legacy native-derived work is frozen. */
+uint256 TidesShareWork(const Share& share);
+uint256 ShareTarget(const Share& share);
 /** Identical normalization and single-SHA256 display convention to RelayTemplateId. */
 std::vector<unsigned char> NormalizedHeader(const CBlockHeader& header);
 uint256 TemplateId(const CBlockHeader& header);

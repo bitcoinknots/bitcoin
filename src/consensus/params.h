@@ -113,6 +113,7 @@ struct Params {
     bool SharePoolAdmittedLedger{false}; // Explicit v5 regtest profile; no public activation.
     bool SharePoolTides{false}; // Explicit v6/v7 regtest accounting; no public activation.
     bool SharePoolCompactTides{false}; // Explicit v7 codec; requires TIDES and a fresh chain.
+    bool SharePoolVarDiff{false}; // Explicit v8 assigned work; requires compact TIDES and a fresh chain.
     std::vector<unsigned char> Blake2bHeadline;
     uint8_t Blake2bTargetShift{20};
     /**

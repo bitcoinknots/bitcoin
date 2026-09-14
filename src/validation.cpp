@@ -7681,7 +7681,7 @@ BlockManager::Options CheckSharePoolProfileDirectory(const ChainstateManager::Op
     const auto marker = options.datadir / fs::PathFromString("sharepool-profile-v" + std::to_string(profile));
     // Check both profile markers even when TIDES is disabled. A flag change
     // cannot reinterpret previously validated evidence or payout history.
-    for (const uint32_t prior : {6U, 7U}) {
+    for (const uint32_t prior : {6U, 7U, 8U}) {
         if (fs::exists(options.datadir / fs::PathFromString("sharepool-profile-v" + std::to_string(prior))) &&
             (!consensus.SharePoolTides || profile != prior)) {
             throw std::runtime_error("TIDES datadir profile mismatch; use the original configuration or a fresh datadir.");
@@ -7706,7 +7706,8 @@ BlockManager::Options CheckSharePoolProfileDirectory(const ChainstateManager::Op
         fs::exists(options.datadir / "sharepool-snapshots-v4") ||
         fs::exists(options.datadir / "sharepool-snapshots-v5") ||
         fs::exists(options.datadir / "sharepool-snapshots-v6") ||
-        fs::exists(options.datadir / "sharepool-snapshots-v7");
+        fs::exists(options.datadir / "sharepool-snapshots-v7") ||
+        fs::exists(options.datadir / "sharepool-snapshots-v8");
     if (fs::exists(options.datadir)) {
         for (const auto& entry : fs::directory_iterator(options.datadir)) {
             if (fs::PathToString(entry.path().filename()).starts_with("chainstate")) existing_history = true;

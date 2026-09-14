@@ -13,7 +13,7 @@ from collections import OrderedDict
 from dataclasses import fields
 import sys
 
-from hash_snapshot import (COMPACT_TIDES_VERSION, MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES,
+from hash_snapshot import (is_compact_tides_profile, MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES,
     CompactTemplateRecord, EnvelopeV2, OriginCertificate, Share, Snapshot,
     StateEntry, _CapturedOutput, _HeaderFacts, _TransactionBytes)
 
@@ -33,7 +33,7 @@ class _Oversized(Exception):
 def _key(key):
     if (type(key) is not tuple or len(key) != 3 or type(key[0]) is not int or
             not 1 <= key[0] <= 0x7fffffff or type(key[1]) is not int or
-            key[1] != COMPACT_TIDES_VERSION or type(key[2]) is not tuple or
+            not is_compact_tides_profile(key[1]) or type(key[2]) is not tuple or
             not 1 <= len(key[2]) <= MAX_SHARE_AGE + 1 or
             any(type(raw) is not bytes or not 1 <= len(raw) <= MAX_SNAPSHOT_BYTES for raw in key[2])):
         raise ValueError("invalid compact state cache key")

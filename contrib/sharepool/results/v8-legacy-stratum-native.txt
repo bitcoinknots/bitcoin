@@ -1,0 +1,5 @@
+2026-09-14T14:45:02.696000Z TestFramework (INFO): PRNG seed is: 5174530718505140612
+2026-09-14T14:45:02.696000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v8-legacy-stratum
+2026-09-14T14:45:08.735000Z TestFramework (INFO): Stopping nodes
+2026-09-14T14:45:08.852000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v8-legacy-stratum
+2026-09-14T14:45:08.852000Z TestFramework (INFO): Tests successful

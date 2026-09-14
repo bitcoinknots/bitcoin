@@ -40,6 +40,8 @@ RULES_HASH = h256(b"SharePool/rules/v4\0", struct.pack("<IIIIIIIIII", SHARE_BITS
 LEDGER_VERSION = 5
 TIDES_VERSION = 6
 COMPACT_TIDES_VERSION = 7
+VARIABLE_TIDES_VERSION = 8
+MIN_SHARE_WORK_BITS, MAX_SHARE_WORK_BITS = 0, 255
 MAX_LEDGER_BYTES = 4 * 1024 * 1024
 MAX_SETTLEMENT_BYTES = 1024 * 1024
 MAX_CERTIFICATE_BYTES = 4 * 1024 * 1024
@@ -55,10 +57,18 @@ COMPACT_TIDES_RULES_HASH = h256(b"SharePool/rules/v7\0", struct.pack("<15I", SHA
     MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES,
     MAX_EXPANDED_TEMPLATE_BYTES, MAX_TEMPLATE_TX_REFERENCES, MAX_ORIGIN_CHECKS,
     MAX_CERTIFICATE_BYTES, 8, 2, 1, MAX_DEPENDENCY_SHARES))
+VARIABLE_TIDES_RULES_HASH = h256(b"SharePool/rules/v8\0", struct.pack("<15I", MIN_SHARE_WORK_BITS, MAX_SHARE_WORK_BITS,
+    MAX_SHARE_AGE, MAX_SNAPSHOT_BYTES, MAX_TEMPLATE_BYTES, MAX_DEPENDENCY_DEPTH, MAX_DEPENDENCY_BYTES,
+    MAX_EXPANDED_TEMPLATE_BYTES, MAX_TEMPLATE_TX_REFERENCES, MAX_ORIGIN_CHECKS,
+    MAX_CERTIFICATE_BYTES, 8, 2, 1, MAX_DEPENDENCY_SHARES))
+
+
+def is_compact_tides_profile(version):
+    return version in (COMPACT_TIDES_VERSION, VARIABLE_TIDES_VERSION)
 
 
 def is_tides_profile(version):
-    return version in (TIDES_VERSION, COMPACT_TIDES_VERSION)
+    return version == TIDES_VERSION or is_compact_tides_profile(version)
 
 
 def rules_hash(version=4):
@@ -70,6 +80,8 @@ def rules_hash(version=4):
         return TIDES_RULES_HASH
     if version == COMPACT_TIDES_VERSION:
         return COMPACT_TIDES_RULES_HASH
+    if version == VARIABLE_TIDES_VERSION:
+        return VARIABLE_TIDES_RULES_HASH
     raise ValueError("unsupported hash-only profile")
 
 
@@ -85,7 +97,7 @@ def snapshot_hash(raw):
 
 
 def profile_snapshot_hash(raw, version):
-    """v6/v7 hash every preimage in the configured domain, before decoding."""
+    """TIDES profiles hash every preimage in their domain, before decoding."""
     rules_hash(version)
     if type(raw) is not bytes:
         raise ValueError("snapshot hash requires exact bytes")
@@ -111,18 +123,33 @@ class Reader(_Reader):
 @dataclass(frozen=True)
 class EnvelopeV2(_Envelope):
     version: int = 4
+    share_work_bits: int = 0
 
     def serialize(self):
         integers = (self.genesis, self.rules, self.native_parent, self.pool,
                     self.shares_root, self.state_root, self.payouts_root)
         if (any(type(value) is not int or not 0 <= value < 1 << 256 for value in integers) or
-                self.version not in (4, LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION) or self.rules != rules_hash(self.version) or self.pool == 0 or
+                self.version not in (4, LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION, VARIABLE_TIDES_VERSION) or self.rules != rules_hash(self.version) or self.pool == 0 or
                 type(self.height) is not int or not 0 < self.height <= 0xffffffff or
                 type(self.public_key) is not bytes or len(self.public_key) != 32 or
                 type(self.payout_script) is not bytes or not is_payout_script(self.payout_script) or
+                type(self.share_work_bits) is not int or not MIN_SHARE_WORK_BITS <= self.share_work_bits <= MAX_SHARE_WORK_BITS or
+                (self.version != VARIABLE_TIDES_VERSION and self.share_work_bits != 0) or
                 any((self.shares_root, self.state_root, self.payouts_root))):
             raise ValueError("invalid v4 envelope or nonzero reserved roots")
-        return super().serialize()
+        raw = super().serialize()
+        # Preserve every legacy byte; v8 adds its assignment after the script,
+        # immediately before the three reserved roots.
+        return raw[:-96] + bytes((self.share_work_bits,)) + raw[-96:] if self.version == VARIABLE_TIDES_VERSION else raw
+
+    @classmethod
+    def read(cls, reader):
+        version, genesis, rules = reader.uint(1), reader.uint(32), reader.uint(32)
+        height, parent, pool = reader.uint(4), reader.uint(32), reader.uint(32)
+        public, script = reader.take(32), reader.variable(34)
+        work_bits = reader.uint(1) if version == VARIABLE_TIDES_VERSION else 0
+        return cls(genesis, rules, height, parent, pool, public, script,
+                   reader.uint(32), reader.uint(32), reader.uint(32), version, work_bits)
 
     @property
     def root(self):
@@ -437,7 +464,7 @@ def apply_tides_state(snapshot, parent):
     ownership assertion is introduced.
     """
     if not is_tides_profile(snapshot.envelope.version):
-        raise ValueError("TIDES history requires v6 or v7")
+        raise ValueError("TIDES history requires v6, v7 or v8")
     if parent is not None and (parent.envelope.version != snapshot.envelope.version or
             parent.envelope.height + 1 != snapshot.envelope.height or
             parent.envelope.genesis != snapshot.envelope.genesis or parent.envelope.rules != snapshot.envelope.rules or
@@ -468,13 +495,19 @@ def apply_tides_state(snapshot, parent):
         if (share.envelope.version != snapshot.envelope.version or
                 not minimum <= share.envelope.height <= height or facts.height != share.envelope.height):
             raise ValueError("TIDES admission profile or age")
-        share_target(facts.native_bits, snapshot.envelope.version)
+        if share.proof_id == 0 and snapshot.envelope.version != VARIABLE_TIDES_VERSION:
+            raise ValueError("legacy TIDES admission cannot use a zero proof identity")
+        proof_target(share)
         if share.proof_id in seen:
             raise ValueError("duplicate admitted proof")
         seen.add(share.proof_id)
         state.append(StateEntry(share.envelope.height, share.proof_id))
-        admissions.append(LedgerCredit(height, share.envelope.height, share.proof_id,
-            share.envelope.pool, facts.native_bits, share.envelope.payout_script))
+        credit = LedgerCredit(height, share.envelope.height, share.proof_id,
+            share.envelope.pool, facts.native_bits, share.envelope.payout_script).serialize()
+        # These are v8 history admission bytes, not a change to the v5 ledger.
+        # The assignment comes from each immutable origin, never the new job.
+        admissions.append(credit + (bytes((share.envelope.share_work_bits,))
+            if snapshot.envelope.version == VARIABLE_TIDES_VERSION else b""))
         record = records.get(facts.template_id)
         if record is None:
             raise ValueError("admitted origin template missing")
@@ -489,7 +522,7 @@ def apply_tides_state(snapshot, parent):
         raise ValueError("TIDES certificate capacity; carry provisional work to a later admission")
     history = (ser_uint256(snapshot.envelope.genesis) + ser_uint256(snapshot.envelope.native_parent) +
                struct.pack("<I", height) + ser_uint256(parent.history_head if parent else 0) +
-               compact_size(len(admissions)) + b"".join(credit.serialize() for credit in admissions))
+               compact_size(len(admissions)) + b"".join(admissions))
     return replace(snapshot, certificates=certs, history_head=h256(_domain("history", snapshot.envelope.version), history),
                    post_state=tuple(sorted(state, key=lambda entry: entry.proof_id)))
 
@@ -511,7 +544,7 @@ def materialize_compact_state(snapshot, *, parent_snapshot, activation_height=1,
     without retaining alternate jobs' potentially large derived state arrays.
     """
     if (type(activation_height) is not int or not 1 <= activation_height <= 0x7fffffff or
-            snapshot.envelope.version != COMPACT_TIDES_VERSION or snapshot.envelope.height < activation_height):
+            not is_compact_tides_profile(snapshot.envelope.version) or snapshot.envelope.height < activation_height):
         raise ValueError("compact state profile or activation mismatch")
     capture = capture or (lambda value: value.capture())
     sequence, seen, total, proofs = [capture(snapshot)], set(), 0, 0
@@ -524,7 +557,7 @@ def materialize_compact_state(snapshot, *, parent_snapshot, activation_height=1,
             raise ValueError("missing compact native ancestry snapshot")
         previous_encoding = capture(previous)
         previous = previous_encoding.snapshot
-        if (previous.envelope.version != COMPACT_TIDES_VERSION or
+        if (previous.envelope.version != snapshot.envelope.version or
                 previous.envelope.height + 1 != child.envelope.height or
                 previous.envelope.genesis != snapshot.envelope.genesis or
                 previous.envelope.rules != snapshot.envelope.rules):
@@ -674,7 +707,7 @@ class Snapshot:
         template_ids = [ser_uint256(record.template_id) for record in self.templates]
         if template_ids != sorted(set(template_ids)):
             raise ValueError("templates must use unique serialized-uint256 byte order")
-        for values in ((self.shares,) if self.envelope.version == COMPACT_TIDES_VERSION else (self.shares, self.post_state)):
+        for values in ((self.shares,) if is_compact_tides_profile(self.envelope.version) else (self.shares, self.post_state)):
             ids = [item.proof_id for item in values]
             if ids != sorted(set(ids)):
                 raise ValueError("proofs and state must use unique numeric proof order")
@@ -704,7 +737,7 @@ class Snapshot:
             append(ser_uint256(record.template_id) + record.header_bytes + compact_size(len(record.transactions)))
             for tx in record.transactions:
                 append(compact_size(indexes[tx.wtxid]))
-        if self.envelope.version == COMPACT_TIDES_VERSION:
+        if is_compact_tides_profile(self.envelope.version):
             descriptors, proofs = _compact_share_jobs(records, self.shares)
             append(compact_size(len(descriptors)))
             for descriptor in descriptors:
@@ -727,7 +760,7 @@ class Snapshot:
             identities = [ser_uint256(cert.identity) for cert in self.certificates]
             if identities != sorted(set(identities)) or len(compact_size(len(self.certificates))) + sum(len(c.serialize()) for c in self.certificates) > MAX_CERTIFICATE_BYTES:
                 raise ValueError("certificate order or byte budget")
-            if self.envelope.version != COMPACT_TIDES_VERSION:
+            if not is_compact_tides_profile(self.envelope.version):
                 collections += (self.certificates,)
         for values in collections:
             append(compact_size(len(values)))
@@ -775,14 +808,14 @@ class Snapshot:
         if len(used) != len(transactions):
             raise ValueError("unused transaction table entry")
         templates = tuple(templates)
-        if envelope.version == COMPACT_TIDES_VERSION:
+        if is_compact_tides_profile(envelope.version):
             jobs, used_jobs = [], set()
             for _ in range(reader.count(349)):
                 index = reader.size(len(templates))
                 if index >= len(templates) or jobs and jobs[-1][0] >= index:
                     raise ValueError("compact job template index or order")
                 job_envelope, job_signature = EnvelopeV2.read(reader), reader.take(64)
-                if job_envelope.version != COMPACT_TIDES_VERSION:
+                if job_envelope.version != envelope.version:
                     raise ValueError("compact job profile mismatch")
                 jobs.append((index, job_envelope, job_signature))
             count = reader.count(33)
@@ -910,8 +943,13 @@ def job_hash(block):
     return h256(b"SharePool/job/v4\0", normalized.serialize())
 
 
-def share_target(native_bits, version=4):
+def share_target(native_bits, version=4, share_work_bits=None):
     rules_hash(version)
+    if version == VARIABLE_TIDES_VERSION:
+        if type(share_work_bits) is not int or not MIN_SHARE_WORK_BITS <= share_work_bits <= MAX_SHARE_WORK_BITS:
+            raise ValueError("v8 requires an explicit assigned work exponent")
+    elif share_work_bits is not None and (type(share_work_bits) is not int or share_work_bits != 0):
+        raise ValueError("legacy profiles cannot carry assigned work")
     if type(native_bits) is not int or not 0 < native_bits <= 0xffffffff or native_bits & 0x00800000:
         raise ValueError("invalid native target")
     exponent = native_bits >> 24
@@ -925,6 +963,8 @@ def share_target(native_bits, version=4):
     compact |= size << 24
     if not 0 < target < 1 << 256 or compact != native_bits:
         raise ValueError("noncanonical native target")
+    if version == VARIABLE_TIDES_VERSION:
+        return (1 << (256 - share_work_bits)) - 1
     if is_tides_profile(version):
         desired = max(1, ((1 << 256) // (target + 1)) >> SHARE_TARGET_SHIFT)
         work = 1 << (desired.bit_length() - 1)
@@ -932,15 +972,24 @@ def share_target(native_bits, version=4):
     return min(target << SHARE_TARGET_SHIFT, uint256_from_compact(SHARE_BITS))
 
 
-def share_work(native_bits, version=4):
-    return (1 << 256) // (share_target(native_bits, version) + 1)
+def share_work(native_bits, version=4, share_work_bits=None):
+    return (1 << 256) // (share_target(native_bits, version, share_work_bits) + 1)
+
+
+def proof_target(share):
+    """Assigned target from the proof's origin, not the current mining job."""
+    return share_target(share.header_facts.native_bits, share.envelope.version, share.envelope.share_work_bits)
+
+
+def proof_work(share):
+    return share_work(share.header_facts.native_bits, share.envelope.version, share.envelope.share_work_bits)
 
 
 def work_outputs(shares, reward, fallback_script):
     weights = {}
     for share in shares:
         script = share.envelope.payout_script
-        weights[script] = weights.get(script, 0) + share_work(share.header.nBits)
+        weights[script] = weights.get(script, 0) + proof_work(share)
     return weighted_outputs(weights, reward, fallback_script)
 
 
@@ -990,7 +1039,7 @@ class HashSigner(NativeSigner):
 
 def build_snapshot(*, genesis, height, native_parent, pool, payout_script, reward,
                    secret=None, public_key=None, sign_owner=None, templates=(), shares=(), parent_state=(),
-                   version=4, parent_snapshot=None):
+                   version=4, parent_snapshot=None, share_work_bits=0):
     if secret is not None:
         if public_key is not None or sign_owner is not None:
             raise ValueError("choose a fixture secret or external signer")
@@ -1000,7 +1049,8 @@ def build_snapshot(*, genesis, height, native_parent, pool, payout_script, rewar
     shares = tuple(sorted(shares, key=lambda share: share.proof_id))
     records = tuple(CompactTemplateRecord.from_record(record if isinstance(record, (TemplateRecord, CompactTemplateRecord)) else TemplateRecord.from_block(record)) for record in templates)
     records = tuple(sorted(records, key=lambda record: ser_uint256(record.template_id)))
-    envelope = EnvelopeV2(genesis, rules_hash(version), height, native_parent, pool, public_key, payout_script, version=version)
+    envelope = EnvelopeV2(genesis, rules_hash(version), height, native_parent, pool, public_key, payout_script,
+                          version=version, share_work_bits=share_work_bits)
     signature = bytes(64)
     # A v6 proposal does not claim an allocation from its own admissions. Only
     # native history-aware construction derives the actual reward and payouts.
@@ -1042,7 +1092,7 @@ def candidate(*, genesis, native_parent, height, ntime, pool, payout_script,
 
 def solve_share(block, snapshot, *, start_nonce=0, valid=True):
     header = CBlockHeader(block)
-    target = share_target(header.nBits, snapshot.envelope.version)
+    target = share_target(header.nBits, snapshot.envelope.version, snapshot.envelope.share_work_bits)
     for nonce in range(start_nonce, start_nonce + 100000):
         header.nNonce, header.m_nonce2 = nonce & 0xffffffff, nonce >> 32
         if (header.rehash() <= target) == valid:

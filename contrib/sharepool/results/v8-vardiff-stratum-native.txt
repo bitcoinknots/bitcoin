@@ -1,0 +1,12 @@
+2026-09-14T14:51:08.283000Z TestFramework (INFO): PRNG seed is: 2740506354383330525
+2026-09-14T14:51:08.284000Z TestFramework (DEBUG): Setting up network thread
+2026-09-14T14:51:08.284000Z TestFramework (INFO): Initializing test directory /private/tmp/v8stratum-04
+2026-09-14T14:51:08.286000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T14:51:08.804000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-14T14:51:10.488000Z TestFramework (INFO): Standalone v8 CLI runner publishes work and closes its listener without changing the chain
+2026-09-14T14:51:11.890000Z TestFramework (DEBUG): Closing down network thread
+2026-09-14T14:51:11.948000Z TestFramework (INFO): Stopping nodes
+2026-09-14T14:51:11.948000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-14T14:51:12.068000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-14T14:51:12.069000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/v8stratum-04
+2026-09-14T14:51:12.069000Z TestFramework (INFO): Tests successful
