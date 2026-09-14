@@ -2,9 +2,9 @@
 
 V8 gives each miner gateway its own assigned share target. Native block
 difficulty remains the Bitcoin difficulty; it no longer determines the credit
-or acceptance target of a v8 share. The gateway's starting cadence is one share
-per minute, configurable per miner. It is an expected rate, not a timer that
-requires a share every minute or every second.
+or acceptance target of a v8 share. The gateway targets **10 shares per minute
+per miner** by default: a six-second mean interval, configurable per miner.
+Proofs arrive randomly; this target does not require a submission every six seconds.
 
 This is a separately selected regtest profile. V4–v7 rules, encodings and signed
 evidence remain unchanged. Existing datadirs cannot silently switch profiles.
@@ -53,21 +53,23 @@ submissions do not contribute. Difficulty changes are bounded and wait for a
 minimum observation window. A pending change is applied when the normal job
 scheduler next builds work, rather than rebuilding a template after every share.
 Already issued jobs keep their assignment and their existing validity checks.
+The default minimum observation window is 24 seconds (four target intervals);
+normal 40-second job refreshes can delay applying an adjustment until the next job.
 
 The initial transport adapter is bounded to one active ASIC connection per v8
 miner gateway/listener. Multiple miner identities use independent instances.
 This is a test adapter, not a production multi-user pool endpoint.
 
-At an achieved mean interval of 60 seconds, 100 miners would produce about 1.67
-unique shares per second; 30 seconds would produce about 3.33. Templates,
+At an achieved mean interval of six seconds, 100 miners would produce about 16.67
+unique shares per second, or 10,000 per ten-minute block interval on average. Templates,
 transactions, relay replication and settlement processing add separate costs.
 Per-miner targets remove the old need to lower one network-wide target just to
 sample a small miner. They do not remove aggregate validation or admission limits.
 
 For steady independent work at a fixed assigned target and complete disclosure,
 the work-rate estimate is weighted proof work divided by observation time. At
-one share per minute, a day contains 1,440 expected observations and roughly
-2.64% relative Poisson count deviation. This describes sampling, not total payout
+ten shares per minute, a day contains 14,400 expected observations and roughly
+0.83% relative Poisson count deviation. This describes sampling, not total payout
 variance or an exact physical hashrate measurement. Retargeting, stale work,
 withheld proofs, TIDES windows and block luck need their own analysis.
 
@@ -87,7 +89,7 @@ measurement and native share/template validation remain separate operations.
 The native status mode is `hash-only-v8-vardiff-tides`.
 
 The loopback runner selects an independent miner with `--profile-version=8`,
-`--share-work-bits=<initial exponent>` and `--target-share-seconds=60`, together
+`--share-work-bits=<initial exponent>` and optional `--target-share-seconds=6`, together
 with its existing node, signer, journal and pool settings. Give each miner its
 own journal, signer policy and listener. Choose the initial exponent for that
 miner's expected work over the desired interval; the controller then adjusts
@@ -112,7 +114,13 @@ The [verification manifest](../contrib/sharepool/results/v8-verification.json)
 records 295 passing Python tests, 105 native C++ cases and four native scenarios,
 including the unchanged v7 compact and Stratum regressions. The 100-miner test
 settled 100 proofs into 100 direct payout outputs. The paired transport test also
-checks the standalone v8 runner's one-minute configuration and clean shutdown.
+checked the standalone v8 runner's earlier one-minute configuration and clean
+shutdown. The follow-up regression omits the cadence override and checks the
+new six-second default and 24-second observation window.
+
+The [scalability follow-up](sharepool-v8-scalability.md) measures the new offered
+cadence, reduces repeated origin processing and snapshot writes, and records a
+chain-state race found by concurrent settlement testing.
 
 ## Limits of the guarantee
 

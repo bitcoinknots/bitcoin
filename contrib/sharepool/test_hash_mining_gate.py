@@ -221,6 +221,7 @@ class HashGateTests(unittest.TestCase):
         block, snapshot = self.job(shares=[proof], templates=[self.origin, offered])
         head = self.gate.archive_head()
         native_snapshots = dict(self.rpc.snapshots)
+        native_templates = dict(self.rpc.templates)
         for failure in ("template_error", "share_error"):
             with self.subTest(failure=failure):
                 setattr(self.rpc, failure, "native validation refused")
@@ -231,6 +232,7 @@ class HashGateTests(unittest.TestCase):
                 self.assert_not_admitted(block, snapshot, [proof])
                 self.assert_not_admitted(offered, opening)
                 self.assertEqual(self.rpc.snapshots, native_snapshots)
+                self.assertEqual(self.rpc.templates, native_templates)
 
     def test_authorization_admits_complete_offer_in_one_commit(self):
         offered, opening = fixture(ntime=1700000010, secret=(2).to_bytes(32, "big"))

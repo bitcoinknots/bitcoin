@@ -127,7 +127,7 @@ class HashGateDecodeReuseTests(unittest.TestCase):
             self.gate._snapshot(requested, staged)
         self.assertEqual(staged, {})
 
-    def test_native_storage_and_proof_checks_run_after_decode_hits(self):
+    def test_fresh_native_proof_check_after_decode_hits_needs_no_storage_write(self):
         self.gate._snapshot(self.identity)
         self.gate._native_template(self.origin.serialize(), self.rpc.tip, mining=False)
         self.rpc.calls.clear()
@@ -135,13 +135,13 @@ class HashGateDecodeReuseTests(unittest.TestCase):
         proof = solve_share(self.origin, self.opening)
         self.assertTrue(self.gate.receive(proof))
         names = [name for name, _ in self.rpc.calls]
-        for method in ("submitsharepoolhashsnapshot", "validatesharepoolhashshare"):
-            self.assertIn(method, names)
+        self.assertEqual(names.count("validatesharepoolhashshare"), 1)
+        self.assertNotIn("submitsharepoolhashsnapshot", names)
         self.assertNotIn("validatesharepoolhashtemplate", names)
         self.assertGreater(self.gate._snapshot_decode_cache.stats()["hits"], before_hits)
         self.assertEqual(self.gate.archive_head()["receipt_revision"], 1)
 
-    def test_same_tip_daemon_loss_rehydrates_before_native_proof_check(self):
+    def test_same_tip_daemon_loss_rehydrates_only_after_missing_proof_verdict(self):
         tip = self.rpc.tip
         self.rpc.snapshots.clear()
         self.rpc.templates.clear()
@@ -151,6 +151,7 @@ class HashGateDecodeReuseTests(unittest.TestCase):
         self.assertLess(names.index("submitsharepoolhashsnapshot"), names.index("validatesharepoolhashtemplate"))
         proof_calls = [index for index, name in enumerate(names) if name == "validatesharepoolhashshare"]
         self.assertEqual(len(proof_calls), 2)
+        self.assertLess(proof_calls[0], names.index("submitsharepoolhashsnapshot"))
         self.assertLess(proof_calls[0], names.index("validatesharepoolhashtemplate"))
         self.assertLess(names.index("validatesharepoolhashtemplate"), proof_calls[1])
         self.assertEqual(self.rpc.tip, tip)
@@ -176,6 +177,9 @@ class HashGateDecodeReuseTests(unittest.TestCase):
         proof = solve_share(self.origin, self.opening)
         before = self.gate.archive_head()
         rpc = self.rpc
+        # Explicit registration now retains the native origin. Simulate actual
+        # loss so this test exercises required recovery storage, not warm reads.
+        rpc.templates.clear()
         def refusing(method, *args):
             if method == "submitsharepoolhashsnapshot":
                 raise ValueError("native snapshot storage unavailable")

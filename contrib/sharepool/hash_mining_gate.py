@@ -27,6 +27,7 @@ import native_archive
 import hash_gate_archive
 import hash_gate_batch
 from hash_gate_cache import SnapshotDecodeCache
+from hash_gate_origin_cache import OriginFactsCache
 from hash_state_cache import CompactStateCache
 from hash_signature_cache import SignatureVerifyCache
 from hash_snapshot import (Snapshot, TemplateRecord, CompactTemplateRecord, Share, MAX_SNAPSHOT_BYTES,
@@ -35,7 +36,7 @@ from hash_snapshot import (Snapshot, TemplateRecord, CompactTemplateRecord, Shar
     job_hash, work_outputs, credit_outputs, rules_hash, profile_snapshot_hash, LEDGER_VERSION, TIDES_VERSION, COMPACT_TIDES_VERSION,
     VARIABLE_TIDES_VERSION, is_tides_profile, is_compact_tides_profile, materialize_compact_state)
 from hash_vardiff import work_bits
-from native_mining_gate import (MiningAuthorization, JobOmission, parse_block, immutable_header,
+from native_mining_gate import (MiningAuthorization, JobOmission, parse_block,
     template_id, _process_lock, fcntl, REGTEST_GENESIS)
 from native_enforcement import compact_size, is_payout_script, verify_schnorr
 from test_framework.messages import CBlockHeader
@@ -102,6 +103,7 @@ class HashMiningGate:
         self.db, self._lock_fd, self._head_lock_fd, self._sealed_head = None, None, None, None
         self._description_cache = OrderedDict()
         self._snapshot_decode_cache = SnapshotDecodeCache()
+        self._origin_facts_cache = OriginFactsCache()
         self._compact_state_cache = CompactStateCache()
         self._signature_cache = SignatureVerifyCache()
         self._snapshot_observer = None  # Sole-owner bounded inventory ingestion only.
@@ -160,19 +162,43 @@ class HashMiningGate:
         self._share_work_bits = value
 
     def _context(self):
-        info = self.rpc("getblockchaininfo")
-        profile = self.rpc("getsharepoolhashstatus", None, 1)
-        tip = self.rpc("getbestblockhash")
-        height = info.get("blocks") if isinstance(info, dict) else None
-        if (not isinstance(info, dict) or info.get("chain") != "regtest" or type(height) is not int or height < 0 or
-                self.rpc("getblockhash", 0) != REGTEST_GENESIS or not native_archive.is_hash(tip) or
-                self.rpc("getblockhash", height) != tip or not isinstance(profile, dict) or
-                profile.get("mode") != self.mode or profile.get("rules") != f"{self.rules:064x}" or
-                type(profile.get("activation_height", 1)) is not int or
-                profile.get("activation_height", 1) != self.activation_height or
-                profile.get("max_snapshot_bytes") != MAX_SNAPSHOT_BYTES):
-            raise ValueError(f"active native regtest hash-only v{self.profile_version} profile at activation height {self.activation_height} required")
-        return height, tip
+        required = f"active native regtest hash-only v{self.profile_version} profile at activation height {self.activation_height} required"
+        # Separate RPC responses are not one chain snapshot. A block arriving
+        # between the height and hash reads requires a fresh capture, not a
+        # false profile failure. Profile/genesis failures never authorize retry.
+        for _ in range(3):
+            before = self.rpc("getbestblockhash")
+            info = self.rpc("getblockchaininfo")
+            profile = self.rpc("getsharepoolhashstatus", None, 1)
+            height = info.get("blocks") if isinstance(info, dict) else None
+            if (not native_archive.is_hash(before) or not isinstance(info, dict) or
+                    info.get("chain") != "regtest" or type(height) is not int or height < 0 or
+                    not isinstance(profile, dict) or profile.get("mode") != self.mode or
+                    profile.get("rules") != f"{self.rules:064x}" or
+                    type(profile.get("activation_height", 1)) is not int or
+                    profile.get("activation_height", 1) != self.activation_height or
+                    profile.get("max_snapshot_bytes") != MAX_SNAPSHOT_BYTES or
+                    self.rpc("getblockhash", 0) != REGTEST_GENESIS):
+                raise ValueError(required)
+            try:
+                at_height = self.rpc("getblockhash", height)
+            except Exception:
+                # A shorter reorg can remove the height just read. Only an
+                # actually observed new tip permits retry; other RPC failures
+                # retain their original failure and cannot supply a context.
+                after = self.rpc("getbestblockhash")
+                if native_archive.is_hash(after) and after != before:
+                    continue
+                raise
+            after = self.rpc("getbestblockhash")
+            if not native_archive.is_hash(after):
+                raise ValueError(required)
+            if before != after:
+                continue
+            if at_height != after:
+                raise ValueError(required)
+            return height, after
+        raise ValueError("native tip changed during context capture")
 
     def _stable(self, tip):
         if self.rpc("getbestblockhash") != tip:
@@ -693,41 +719,43 @@ class HashMiningGate:
             raise ValueError("template is outside this pool or eligible native ancestry")
         self._provenance(opening, staged, mining_job=True)
         self._rehydrate_retained(staged)
-        self._native_template(record.data, tip, opening.serialize())
+        # Explicit registration retains a fully validated native origin before
+        # its first proof. Proposal validation still uses non-admitting overlays.
+        # Native evidence storage does not grant a local journal entry or ACK;
+        # the final tip check and durable admission below can still fail.
+        self._native_template(record.data, tip)
         self._stable(tip)
         staged[TEMPLATE, f"{record.template_id:064x}"] = record.data
         self._persist([(kind, body) for (kind, unused), body in staged.items()])
         return f"{record.template_id:064x}"
 
     def _require_origin(self, share, staged=None):
-        identity = template_id(share.header)
+        identity = f"{share.header_facts.template_id:064x}"
         try:
             raw = self._evidence(TEMPLATE, identity, staged)
-            opening = self._snapshot_decode_cache.decode(
-                self._evidence(SNAPSHOT, f"{share.header.m_mm_rhs:064x}", staged), self.profile_version)
+            opening_raw = self._evidence(SNAPSHOT, f"{share.header.m_mm_rhs:064x}", staged)
+            opening = self._snapshot_decode_cache.decode(opening_raw, self.profile_version)
         except KeyError:
             raise ValueError("proof requires its durably validated full origin and snapshot") from None
-        if (immutable_header(parse_block(raw)) != immutable_header(share.header) or
+        facts = self._origin_facts_cache.describe(raw, self.profile_version)
+        if (facts.header != share.header_facts.immutable_header or
                 share.envelope.serialize() != opening.envelope.serialize() or
                 share.owner_signature != opening.owner_signature):
             raise ValueError("proof does not bind its full origin snapshot")
+        return raw, opening_raw, opening, facts
 
     def _native_share(self, share, tip, staged=None):
         from hash_gate_rpc import missing_snapshot_data
 
-        origin_id = template_id(share.header)
         snapshot_id = f"{share.header.m_mm_rhs:064x}"
 
         def exact_origin():
-            self._require_origin(share, staged)
-            raw = self._evidence(TEMPLATE, origin_id, staged)
-            opening_raw = self._evidence(SNAPSHOT, snapshot_id, staged)
-            opening = self._snapshot_decode_cache.decode(opening_raw, self.profile_version)
+            raw, opening_raw, opening, facts = self._require_origin(share, staged)
             # An immutable header/TemplateId alone cannot distinguish witness
             # variants with the same txids. Bind the supplied full body to the
             # exact signed job that the native proof endpoint will authenticate.
             if (f"{profile_snapshot_hash(opening_raw, self.profile_version):064x}" != snapshot_id or
-                    job_hash(parse_block(raw)) != opening.job_commitment):
+                    facts.job_commitment != opening.job_commitment):
                 raise ValueError("proof origin differs from its exact committed job")
             return raw, opening_raw
 
@@ -792,7 +820,9 @@ class HashMiningGate:
         parent = self._parent_snapshot(height, tip, staged) if self.profile_version == LEDGER_VERSION or is_tides_profile(self.profile_version) else None
         self._provenance(opening, staged, trusted_parent=parent,
             root_origin=TemplateRecord.from_block(self._evidence(TEMPLATE, template_id(share.header))), root_depth=1)
-        self._rehydrate_retained(staged)
+        # The native proof endpoint checks its current evidence itself. Only
+        # an exact missing-data response permits bounded retained-data replay;
+        # ordinary shares must not rewrite their whole opening graph first.
         self._native_share(share, tip, staged)
         return self._persist([(kind, body) for (kind, unused), body in staged.items()] +
                              [(PROOF, share.serialize())])[-1]
@@ -1551,6 +1581,7 @@ class HashMiningGate:
         self._dispatch_key = None
         self._description_cache.clear()
         self._snapshot_decode_cache.clear()
+        self._origin_facts_cache.clear()
         self._compact_state_cache.clear()
         self._signature_cache.clear()
         try:

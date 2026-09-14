@@ -1649,6 +1649,82 @@ BOOST_AUTO_TEST_CASE(v7_preparation_and_full_validation_reauthenticate_ancestry_
     BOOST_CHECK(payouts == expected);
 }
 
+BOOST_AUTO_TEST_CASE(compact_owner_digest_reuse_keeps_exact_openings_and_fresh_invocations)
+{
+    consensus.SharePoolTides = consensus.SharePoolCompactTides = true;
+    for (const bool variable : {false, true}) {
+        consensus.SharePoolVarDiff = variable;
+        snapshots.clear();
+        auto initial = CompactEmpty();
+        const auto base = CompactBlock(initial);
+        std::vector<ho::TemplateRecord> records{Record(base)};
+        // Every alternative job revisits the same raw parent opening through
+        // Origin and Check, with independently owned compact materializations.
+        for (size_t level{0}; level < 3; ++level) {
+            auto job = CompactEmpty();
+            job.templates = records;
+            job.shares = {Proof(base, initial, 1), Proof(base, initial, 512)};
+            SortEvidence(job);
+            CompactState(job);
+            records.push_back(Record(CompactBlock(job)));
+        }
+        auto settlement = CompactEmpty(1, 0x62);
+        settlement.templates = records;
+        SortEvidence(settlement);
+        CompactState(settlement);
+        const auto block = CompactBlock(settlement);
+        std::map<uint256, size_t> reads;
+        const ho::Lookup lookup = [&](const uint256& hash) -> std::shared_ptr<const ho::Snapshot> {
+            ++reads[hash];
+            const auto found = snapshots.find(hash);
+            return found == snapshots.end() ? nullptr : found->second;
+        };
+        const auto check = [&] {
+            reads.clear();
+            native_checks = 0;
+            return ho::CheckSnapshot(block, &indexes[0], consensus, lookup, Native(), REWARD);
+        };
+        BOOST_REQUIRE(check().IsValid());
+        BOOST_CHECK_EQUAL(native_checks, records.size());
+        BOOST_CHECK_EQUAL(reads.size(), records.size() + 1);
+        for (const auto& [hash, count] : reads) BOOST_CHECK_EQUAL(count, 1);
+
+        const auto available = snapshots.at(base.m_mm_rhs);
+        auto corrupt = *available;
+        corrupt.authorization[0] ^= 1;
+        snapshots[base.m_mm_rhs] = std::make_shared<const ho::Snapshot>(corrupt);
+        BOOST_CHECK(check().IsMissing()); // Old commitment cannot hide changed bytes.
+        snapshots.erase(base.m_mm_rhs);
+        BOOST_CHECK(check().IsMissing()); // No digest survives a fresh invocation.
+        snapshots[base.m_mm_rhs] = available;
+        BOOST_REQUIRE(check().IsValid());
+        BOOST_CHECK_EQUAL(native_checks, records.size());
+        for (const auto& [hash, count] : reads) BOOST_CHECK_EQUAL(count, 1);
+
+        // The same job body with a different signature has a different exact
+        // opening and must never borrow the good opening's authorization.
+        auto bad_origin = base;
+        bad_origin.m_mm_rhs = ho::SnapshotHash(corrupt);
+        snapshots[bad_origin.m_mm_rhs] = std::make_shared<const ho::Snapshot>(corrupt);
+        auto bad_job = CompactEmpty(1, 0x63);
+        bad_job.templates = {Record(base), Record(bad_origin)};
+        SortEvidence(bad_job);
+        CompactState(bad_job);
+        Reason(Check(CompactBlock(bad_job)), "owner");
+
+        // Witness bytes do not alter the txid Merkle root, but still belong to
+        // the exact signed job. A cached raw digest is no native-body verdict.
+        auto witness_origin = base;
+        CMutableTransaction coinbase{*witness_origin.vtx[0]};
+        coinbase.vin[0].scriptWitness.stack = {{0x42}};
+        witness_origin.vtx[0] = MakeTransactionRef(std::move(coinbase));
+        auto witness_job = CompactEmpty(1, 0x64);
+        witness_job.templates = {Record(witness_origin)};
+        CompactState(witness_job);
+        Reason(Check(CompactBlock(witness_job)), "job-commitment");
+    }
+}
+
 BOOST_AUTO_TEST_CASE(v7_shared_optional_retention_preserves_exact_validation_results)
 {
     consensus.SharePoolTides = true;

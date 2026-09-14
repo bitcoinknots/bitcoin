@@ -1,0 +1,687 @@
+{
+  "status": "confirmed_expired_unadmitted_receipts",
+  "recorded_utc": "2026-09-14T15:37:27.726864+00:00",
+  "scope": "Read-only offline inspection; SQLite mode=ro and query_only=ON. No gate construction, node restart, native RPC or source edit.",
+  "capture_result": "failed",
+  "configuration": {
+    "miners": 100,
+    "duration_seconds": 60,
+    "offer_interval_ms": 60.0,
+    "settlement_seconds": 20,
+    "work_update_seconds": 40,
+    "snapshot_budget_bytes": 65536,
+    "padding_outputs": 0,
+    "max_runtime_seconds": 1800,
+    "profile_version": 8,
+    "share_work_bits": [
+      2,
+      4,
+      6
+    ],
+    "target_share_seconds": 6.0,
+    "deduplicate_job_evidence": true
+  },
+  "counts": {
+    "offered": 1000,
+    "acknowledged": 1000,
+    "admitted": 904,
+    "peer_verified": 904,
+    "remaining": 96,
+    "remaining_expired": 96,
+    "remaining_still_age_eligible": 0,
+    "remaining_parent_matches_capture_chain": 96,
+    "journal_proofs": 1000,
+    "journal_receipt_revision": 1000
+  },
+  "age_rule": {
+    "max_share_age": 3,
+    "final_native_height": 127,
+    "attempted_settlement_height": 128,
+    "minimum_eligible_origin_height": 125,
+    "remaining_origin_height_counts": {
+      "103": 22,
+      "104": 17,
+      "105": 4,
+      "111": 8,
+      "112": 7,
+      "113": 2,
+      "115": 1,
+      "116": 3,
+      "117": 6,
+      "118": 7,
+      "119": 5,
+      "120": 5,
+      "121": 2,
+      "122": 3,
+      "123": 4
+    },
+    "last_eligible_inclusion_height_counts": {
+      "106": 22,
+      "107": 17,
+      "108": 4,
+      "114": 8,
+      "115": 7,
+      "116": 2,
+      "118": 1,
+      "119": 3,
+      "120": 6,
+      "121": 7,
+      "122": 5,
+      "123": 5,
+      "124": 2,
+      "125": 3,
+      "126": 4
+    }
+  },
+  "integrity_checks": {
+    "remaining_canonical_proof_identity_digest_metadata_and_target": 96,
+    "remaining_exact_retained_opening_and_template_bindings": 96,
+    "report_and_database_hashes_unchanged": true
+  },
+  "failed_attempt_snapshots": [
+    {
+      "snapshot_hash": "1d7e8191e90c011257eb96553acc2b78a173b08773cac411cf60ad015ba3a72d",
+      "height": 128,
+      "shares": 0,
+      "snapshot_bytes": 1069
+    }
+  ],
+  "finding": "All 96 durable receipts are absent from admission events and expired before the attempted height-128 settlement. Their origins are heights 103 through 123; even origin 123 last qualified at height 126. The empty selection is explained by the age filter, not still-eligible receipts being excluded by the final batch budget. The 64 KiB batch budget contributed to backlog pressure; this offline analysis does not isolate its complete causal contribution from service latency and fixture timing.",
+  "final_completed_block": {
+    "height": 127,
+    "admitted": 21,
+    "snapshot_bytes": 39930,
+    "native_accepted": true,
+    "peer_ready": true
+  },
+  "backpressure_recommendation": [
+    "Expose remaining admission heights and expired-unadmitted receipt counts; preserve durable journal evidence and never relabel an ACK as confirmed credit.",
+    "Use bounded oldest-deadline admission backlog and actual configured batch/dependency/recipient budgets to trigger pressure before dispatch: raise future assigned share work or temporarily stop offering new jobs when the queue cannot clear with a safety margin. Do not silently discard or reinterpret existing ACKs.",
+    "Capacity estimates are advisory: block timing, data availability and competing branches prevent a local ACK from guaranteeing future consensus inclusion. Hard payment guarantees require an explicit protocol/economic change."
+  ],
+  "sha256": {
+    "capture": "e63f22c8678072bad59af56559ae799cc26b63cc70cf7a78375edd1b02775c61",
+    "database": "4f613acd183fbe77ba4dd2f0c76b6d0676177f451a9d5603393657cbfdb91d98",
+    "hash_snapshot.py": "8cc9f1ae092cdd71b955e017181fd566c6015b7d6c6aae38104caa4c4598fa0c",
+    "native_enforcement.py": "f4fa91005e8b222915cf27fb1f272c369f18d2ea8a33074e1701d777b31d6cba",
+    "hash_mining_gate.py": "a3ef3799283cb30ccd0f156a4651f0392d1196da94754378de511b231ee31b8f"
+  },
+  "remaining_receipts": [
+    {
+      "proof_id": "001faece50f70691f278d944bc43392f6b472119bd529d6e8f9c8ea467fb24f5",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 252
+    },
+    {
+      "proof_id": "00275f79268d9ecbfa4597c19f137943e0dbd79764d14da808b9b275c8dd8976",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 254
+    },
+    {
+      "proof_id": "0028938ae94bea87b797e0ba34784aa37d433b77f7acbdec953838badd845f4c",
+      "origin_height": 118,
+      "last_eligible_inclusion_height": 121,
+      "receipt_revision": 790
+    },
+    {
+      "proof_id": "00621d9b45252485cd3afe8e02b00a69a445fb90518213c5ff1af7666204a537",
+      "origin_height": 123,
+      "last_eligible_inclusion_height": 126,
+      "receipt_revision": 978
+    },
+    {
+      "proof_id": "0068bc95ddfcd65610da48f88ff1b0980c2bc1a44e9f10acef0c940a475af326",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 287
+    },
+    {
+      "proof_id": "0091ad582c6e3307ba422a71014e4d0f5086b227214d49859ab291665026eedb",
+      "origin_height": 119,
+      "last_eligible_inclusion_height": 122,
+      "receipt_revision": 830
+    },
+    {
+      "proof_id": "009353bd018263a3a6505f93592af6b3817d9f0de70e91546168a5ea6723bf30",
+      "origin_height": 112,
+      "last_eligible_inclusion_height": 115,
+      "receipt_revision": 570
+    },
+    {
+      "proof_id": "0095bc7d719a83f76b5572593c5ad09e88e179ccf4bfffea22809bd6eab0a66c",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 277
+    },
+    {
+      "proof_id": "00c683191aa655bc2a134e15a5a7c4bce4be2cd42a081b1f91ceac3be9848903",
+      "origin_height": 118,
+      "last_eligible_inclusion_height": 121,
+      "receipt_revision": 793
+    },
+    {
+      "proof_id": "00cbc509d8edec0177b89a2b0eae93d2c90e6e899434a0814613fd36e9972506",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 247
+    },
+    {
+      "proof_id": "00d257bb661ca8f06f3fe3a48a160140d649664d1b0ca969d6648dd7c4c00c2c",
+      "origin_height": 119,
+      "last_eligible_inclusion_height": 122,
+      "receipt_revision": 832
+    },
+    {
+      "proof_id": "01602aa26400ec2ecd18624a5b17bc701f856b93dca51805db4ed7e4a2ac5b57",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 245
+    },
+    {
+      "proof_id": "0161f199517d0e8837f55b03886ea89cacd984b596c5ea3c34b747bbf5f7c6c3",
+      "origin_height": 117,
+      "last_eligible_inclusion_height": 120,
+      "receipt_revision": 754
+    },
+    {
+      "proof_id": "018345796a66fbf6d06c009a392fd63259a1a518b3613c4637da5f234a1babb4",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 236
+    },
+    {
+      "proof_id": "0183a0e02ccb97ecdacca1503968b864b77ca55d4f6b0d208abdaffeae566e26",
+      "origin_height": 120,
+      "last_eligible_inclusion_height": 123,
+      "receipt_revision": 869
+    },
+    {
+      "proof_id": "01ad36c7b1a38ea569005615c31935b9997be5388c8811ef6da9bad79dec8293",
+      "origin_height": 118,
+      "last_eligible_inclusion_height": 121,
+      "receipt_revision": 789
+    },
+    {
+      "proof_id": "01b847f8067431d1a533214c3c4ee8d0720e8ab71edc32aad6c3ec0467d95c48",
+      "origin_height": 117,
+      "last_eligible_inclusion_height": 120,
+      "receipt_revision": 757
+    },
+    {
+      "proof_id": "01bb69addbbf1802def71ee4bd5d1031854331891bfbf88f522112148f773c88",
+      "origin_height": 112,
+      "last_eligible_inclusion_height": 115,
+      "receipt_revision": 566
+    },
+    {
+      "proof_id": "01bdad6ebb79696dcbfdb37a5ae9b9cccd9c6801b7c8d201619cffaf86ae76f4",
+      "origin_height": 122,
+      "last_eligible_inclusion_height": 125,
+      "receipt_revision": 942
+    },
+    {
+      "proof_id": "01e8bfa21499553ab0d64c688655fb5f4fbaf49d1ea98516eb1167eda240a726",
+      "origin_height": 117,
+      "last_eligible_inclusion_height": 120,
+      "receipt_revision": 753
+    },
+    {
+      "proof_id": "020fa7385007309bba5744d91ac746bc8a0b7258286aa99c22c5304bd7002032",
+      "origin_height": 116,
+      "last_eligible_inclusion_height": 119,
+      "receipt_revision": 718
+    },
+    {
+      "proof_id": "021a826837126b66ee9975c8caf7e6d57ef09e02cef53fc75b216df12abff75a",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 290
+    },
+    {
+      "proof_id": "021c4c51ac698fe2eff0cd4915687d50cdf5d692386889abbb43958a587b8717",
+      "origin_height": 115,
+      "last_eligible_inclusion_height": 118,
+      "receipt_revision": 681
+    },
+    {
+      "proof_id": "0247e59400fdd64caec9371717033235bfa2e732b92dacb504399110eca7541c",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 248
+    },
+    {
+      "proof_id": "02594624066c83ff9b9a1271b6519c57785ceeb151bbe049a14a6c4be674b2dd",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 293
+    },
+    {
+      "proof_id": "025cf556b654982e55a687535ac48e783ffb285fff6f148806e9fd6d038bd772",
+      "origin_height": 112,
+      "last_eligible_inclusion_height": 115,
+      "receipt_revision": 571
+    },
+    {
+      "proof_id": "02750658cde8781c25e5ca9700ec96f0d9c281590554b0f70727f0c030395a3a",
+      "origin_height": 112,
+      "last_eligible_inclusion_height": 115,
+      "receipt_revision": 569
+    },
+    {
+      "proof_id": "0278d52a046c1fa4a71bdcc165db73bccf80a9cc6ba1d49ef7ee5c1739c6cfa7",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 239
+    },
+    {
+      "proof_id": "027b918189d1f6085314a833014887484a67948e039001d1f18b5de80d4e016e",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 233
+    },
+    {
+      "proof_id": "02ad51bf01269bf09ffe250a51b81971c6003b4e342ac9f9b6d9b3671fe823a2",
+      "origin_height": 105,
+      "last_eligible_inclusion_height": 108,
+      "receipt_revision": 318
+    },
+    {
+      "proof_id": "02b8e9d1cda9f52f79df8c59c83408f1fcc08714ea51fc8c5da06ebdee3b1f87",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 278
+    },
+    {
+      "proof_id": "02bdeaff183f2acb4b882a627ea7f2d8a5c4194e33b30720be27f3e70638c21c",
+      "origin_height": 111,
+      "last_eligible_inclusion_height": 114,
+      "receipt_revision": 533
+    },
+    {
+      "proof_id": "02d5fa014c0bfb323d64634a171b636c9edb79fe68e601bd8cf21b1da711a94a",
+      "origin_height": 111,
+      "last_eligible_inclusion_height": 114,
+      "receipt_revision": 530
+    },
+    {
+      "proof_id": "030ac6b97ed7f8eea263651a9816e4508f1d5220befc68af6b19267e31b354ff",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 242
+    },
+    {
+      "proof_id": "033dcda59b39aa054b0b8576f2ee540e28ceb717f6cdc71b07e049e7959e78ae",
+      "origin_height": 120,
+      "last_eligible_inclusion_height": 123,
+      "receipt_revision": 866
+    },
+    {
+      "proof_id": "03456bfade72c252e27e2204d3bedb49a42e3b7515527f0feff1014404e7ede4",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 281
+    },
+    {
+      "proof_id": "03650793c31447e76bc1da2d1b839de9768150a2963dd831fb82888932d9a0e9",
+      "origin_height": 112,
+      "last_eligible_inclusion_height": 115,
+      "receipt_revision": 572
+    },
+    {
+      "proof_id": "038122064f8983637600f27d3952afa9cc1aeee680d1ad75644bd4a5f3805a98",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 284
+    },
+    {
+      "proof_id": "03d41185899c80a964a78657367bb494184d21a761ca3b0ad215a15563c893f7",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 251
+    },
+    {
+      "proof_id": "040de4508fdc60bee4e56fae8369afc09069927d2eef4ad26ad545ea328282f4",
+      "origin_height": 122,
+      "last_eligible_inclusion_height": 125,
+      "receipt_revision": 941
+    },
+    {
+      "proof_id": "042e4182d7ddaafc6c583d575be7e5682d46090b105f17e10e8fcb88dbb6bd71",
+      "origin_height": 121,
+      "last_eligible_inclusion_height": 124,
+      "receipt_revision": 905
+    },
+    {
+      "proof_id": "0452b31bcd9a1129a85c5e4ce2e5af3299bc352c466a401113e94d78a8620a51",
+      "origin_height": 120,
+      "last_eligible_inclusion_height": 123,
+      "receipt_revision": 868
+    },
+    {
+      "proof_id": "04bbee7f9266571db4fe8ebcf860bb1b07cda02a635229cbdfd2576bbf75ba60",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 292
+    },
+    {
+      "proof_id": "0508dd62b23a7e572475f2f27fda9ecd0b2b28f45f92cbbfb4e723565cb15740",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 283
+    },
+    {
+      "proof_id": "057e3790855bcf36d278d9f40080831bc14209edd1e57fa1591f40982a974fd9",
+      "origin_height": 123,
+      "last_eligible_inclusion_height": 126,
+      "receipt_revision": 979
+    },
+    {
+      "proof_id": "05911bae79faa88f05e4ef8729afd41d3ffcc8f6bfb82f8960a1f3a32b54b6bb",
+      "origin_height": 118,
+      "last_eligible_inclusion_height": 121,
+      "receipt_revision": 791
+    },
+    {
+      "proof_id": "05fee521f9d7f4b98ac86cf22d7b8da27995b17336ed54f83a8962a53bb302e5",
+      "origin_height": 118,
+      "last_eligible_inclusion_height": 121,
+      "receipt_revision": 792
+    },
+    {
+      "proof_id": "060499de944d97045d0d377655220aed0fd98c699f5317eb1e65557269544839",
+      "origin_height": 117,
+      "last_eligible_inclusion_height": 120,
+      "receipt_revision": 756
+    },
+    {
+      "proof_id": "061518c54ebab85ffc99b532070e73008b8bd3d0cd3fe3e7cd6c540951e53ea4",
+      "origin_height": 111,
+      "last_eligible_inclusion_height": 114,
+      "receipt_revision": 529
+    },
+    {
+      "proof_id": "0672a9d8cc35f533b614624b30462162514c115b8ef533c75bf1cc6d97eea877",
+      "origin_height": 111,
+      "last_eligible_inclusion_height": 114,
+      "receipt_revision": 532
+    },
+    {
+      "proof_id": "0687a611282c1e32ff5234bd87a938d73f8d84897d3bf572c0cf25f2271b5a45",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 280
+    },
+    {
+      "proof_id": "070497ba6436c8a805aec37540405637f5e530570246116106ae2605058328f0",
+      "origin_height": 119,
+      "last_eligible_inclusion_height": 122,
+      "receipt_revision": 831
+    },
+    {
+      "proof_id": "0797046aed7621c080e9f10c33de60d738e4d3b93bfe082a84dd12b667bf3e8b",
+      "origin_height": 111,
+      "last_eligible_inclusion_height": 114,
+      "receipt_revision": 535
+    },
+    {
+      "proof_id": "079a03928f3a9d73d027076a313cfd25ae0b1069097fae7c293957baecbf3cb0",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 286
+    },
+    {
+      "proof_id": "079b89d47797b0eb4f67e25799e0a0a579b50eb83c8b377e0ff2fe45bff55a70",
+      "origin_height": 123,
+      "last_eligible_inclusion_height": 126,
+      "receipt_revision": 977
+    },
+    {
+      "proof_id": "07fd58e6f01371e6b4390e05f17118d2f81c0423c028f5cfde840372ced55159",
+      "origin_height": 113,
+      "last_eligible_inclusion_height": 116,
+      "receipt_revision": 608
+    },
+    {
+      "proof_id": "0816925f45668031b03a80a98835ad5ce6aa311bc8efb2bef3ea501a1c646f6c",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 279
+    },
+    {
+      "proof_id": "0872ad1cab97cf5895478b410fb5c4d17c83daf11b53e569ab5f2687c0ef3099",
+      "origin_height": 111,
+      "last_eligible_inclusion_height": 114,
+      "receipt_revision": 534
+    },
+    {
+      "proof_id": "089fbc794950a3bcab7bb75d58e497a951a27e94d40c9670fd643a29f559cd25",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 289
+    },
+    {
+      "proof_id": "0aafc8a4dc074c79d5113d48e47e58aee74ae096d67b7df13136f9fbc7334d44",
+      "origin_height": 118,
+      "last_eligible_inclusion_height": 121,
+      "receipt_revision": 795
+    },
+    {
+      "proof_id": "0acee0d1f59d28d8f18becab5b8ccef57bc9c03bbadde617884d21dfe23f3b6f",
+      "origin_height": 112,
+      "last_eligible_inclusion_height": 115,
+      "receipt_revision": 568
+    },
+    {
+      "proof_id": "0b1cc1fd78d780c60ce5164cb2c3bccd79ea882d5f5513bc727857b6dee7eca5",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 253
+    },
+    {
+      "proof_id": "0b57299e37087fd2538cc7b5e264505b6f07fbee11e69a9729a7a5c458e3fd5b",
+      "origin_height": 122,
+      "last_eligible_inclusion_height": 125,
+      "receipt_revision": 940
+    },
+    {
+      "proof_id": "0bc29047703dd414f7822304900b822db536b8e53c4be2e5ca8f11c48a4946cd",
+      "origin_height": 116,
+      "last_eligible_inclusion_height": 119,
+      "receipt_revision": 717
+    },
+    {
+      "proof_id": "0be6d4ec6e608830a3d48d0388d57d8eed8101b0373c9a124e2c1c4776434221",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 238
+    },
+    {
+      "proof_id": "0c197d21b0ca0429acee3c68514c186ddae6136f134dcf52ee2c05f6bb25fd3e",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 244
+    },
+    {
+      "proof_id": "0d3a98d7eca27bef87bf4a917d7f958f9a9db022049e52f67965fd3e1470758b",
+      "origin_height": 120,
+      "last_eligible_inclusion_height": 123,
+      "receipt_revision": 865
+    },
+    {
+      "proof_id": "0dd04dcf4e051ea8208f5ab023d9fa0f7ac1e328fc756b50bcf15a120004346e",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 250
+    },
+    {
+      "proof_id": "0df8c7e704bdb6f2a92ab2956f355be0eb04d3e28b8a1d52b7bde026dd546393",
+      "origin_height": 123,
+      "last_eligible_inclusion_height": 126,
+      "receipt_revision": 976
+    },
+    {
+      "proof_id": "0e00e87b0be322afb5a0b0bb8e025c240166c2826b754e2e1b126e9b00fb2daa",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 235
+    },
+    {
+      "proof_id": "0e2bf23888f3fd7ebdcaab2d608aad6506cdd2b8da636ef9b2abebdb7f4622d4",
+      "origin_height": 105,
+      "last_eligible_inclusion_height": 108,
+      "receipt_revision": 317
+    },
+    {
+      "proof_id": "0e66a8e1f3d812ca4d50ff17d548999fc592ed77814bbf295e956450fb4a87dc",
+      "origin_height": 119,
+      "last_eligible_inclusion_height": 122,
+      "receipt_revision": 829
+    },
+    {
+      "proof_id": "0fb37b807630d6ccdd2e660b5552978b868f989f6c3b52c75ec61b07f75a60a5",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 241
+    },
+    {
+      "proof_id": "12ff35ffb9cb0f4777c8f3806517753f408b62c97dcc06d792b89870cc5a0559",
+      "origin_height": 121,
+      "last_eligible_inclusion_height": 124,
+      "receipt_revision": 904
+    },
+    {
+      "proof_id": "14861b2b1ca389c7e2b2b9e8d971e5b4eb10adc3dca19b3de03750ccecb7399c",
+      "origin_height": 119,
+      "last_eligible_inclusion_height": 122,
+      "receipt_revision": 828
+    },
+    {
+      "proof_id": "179b5f651a2f5491ca705c87b60882f4739cd3906c8eb2f3372259a01cdb28fb",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 288
+    },
+    {
+      "proof_id": "18907facb15ee5499664a13b97d220b88e1061a8af50170af4a34788ce6ee6cb",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 249
+    },
+    {
+      "proof_id": "1b510409e9e025747d569af49233f5b449add56c3586adee4c88f90bed0cbf16",
+      "origin_height": 113,
+      "last_eligible_inclusion_height": 116,
+      "receipt_revision": 607
+    },
+    {
+      "proof_id": "1db22bca84bdd5eaa5c3a46da86d8c01899a540aad3415c9ee3fd88c832be677",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 243
+    },
+    {
+      "proof_id": "1e1533d76aa1cc49efa265b20cd74c86079642e78d35ca4caa6f8cbb9147abd8",
+      "origin_height": 112,
+      "last_eligible_inclusion_height": 115,
+      "receipt_revision": 567
+    },
+    {
+      "proof_id": "1f21ef30f284a8411ee400974be95d3853dd3ca78fba39cfe760879f0dc04d36",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 285
+    },
+    {
+      "proof_id": "26ed07faf00eaaf31660486704f5acffac63e267d3d6b778077408bf61a2d195",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 237
+    },
+    {
+      "proof_id": "2711ba1b1cd408d1f86f7faa2e8fc7935c6620ea2ab893b252a5f1014c641270",
+      "origin_height": 105,
+      "last_eligible_inclusion_height": 108,
+      "receipt_revision": 316
+    },
+    {
+      "proof_id": "2a1fd97f50bbb7da779e5727a9eff2b6f0d75c430e12df7e13b9a9c99966b5bb",
+      "origin_height": 118,
+      "last_eligible_inclusion_height": 121,
+      "receipt_revision": 794
+    },
+    {
+      "proof_id": "2a3da2503d1408b098c1bab2777b3a9adbd99fc1501f5bdf08db9586a2fbc10f",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 246
+    },
+    {
+      "proof_id": "2af2acf96ad0b34d026902789c0b3d3e732361a8cb45b937683538b6244fbdf7",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 291
+    },
+    {
+      "proof_id": "2c392ad13b50b5401ba523300430bd039cd198103ee63b4d4de9ae3e323716ad",
+      "origin_height": 117,
+      "last_eligible_inclusion_height": 120,
+      "receipt_revision": 752
+    },
+    {
+      "proof_id": "2e64179c14862b1307682752c83f6eb8d4ca538128763167e9f6d60f687c1872",
+      "origin_height": 105,
+      "last_eligible_inclusion_height": 108,
+      "receipt_revision": 319
+    },
+    {
+      "proof_id": "308c7705e0ae81a9df25dee231d27e969183fd8ca016f8ad2885060e90892004",
+      "origin_height": 116,
+      "last_eligible_inclusion_height": 119,
+      "receipt_revision": 719
+    },
+    {
+      "proof_id": "31ec447e7fc57bde06a2c33923ed1186e4b8c9fa6ab900fd9bbe5a408131a45f",
+      "origin_height": 117,
+      "last_eligible_inclusion_height": 120,
+      "receipt_revision": 755
+    },
+    {
+      "proof_id": "3268a5e8f4affeb7bbdbfa8a44be76a52c33799f922fe9659085c6ec7722f2fc",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 234
+    },
+    {
+      "proof_id": "330b2b6452427bc0cdbc1c5e4dc10f527dd364405ffeee15e0587f236a27d2a9",
+      "origin_height": 111,
+      "last_eligible_inclusion_height": 114,
+      "receipt_revision": 531
+    },
+    {
+      "proof_id": "3641bf21b5e34ac3a4571ed34d7c98685c09d97208d94ba50bb6e4da2133f41f",
+      "origin_height": 111,
+      "last_eligible_inclusion_height": 114,
+      "receipt_revision": 528
+    },
+    {
+      "proof_id": "38676d1c34ea25b727f3b5c0320980517c2136fc92957ea6b2ec6681621d5656",
+      "origin_height": 120,
+      "last_eligible_inclusion_height": 123,
+      "receipt_revision": 867
+    },
+    {
+      "proof_id": "3878289e687731bfbd335e59170922ef1052c63b315ab4eeab1127b219176440",
+      "origin_height": 103,
+      "last_eligible_inclusion_height": 106,
+      "receipt_revision": 240
+    },
+    {
+      "proof_id": "3d4531ecf0d88c3780f69c491905cdd889549c471440d1980de62cf99725cbe2",
+      "origin_height": 104,
+      "last_eligible_inclusion_height": 107,
+      "receipt_revision": 282
+    }
+  ]
+}

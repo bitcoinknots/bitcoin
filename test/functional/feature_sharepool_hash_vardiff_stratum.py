@@ -19,7 +19,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "contrib" / "sharepool"))
 from hash_mining_gate import HashMiningGate
-from hash_snapshot import HashSigner, share_target
+from hash_snapshot import HashSigner, share_target, solve_share
 from hash_stratum import VardiffStratumService
 from hash_vardiff import VardiffController
 from native_mining_gate import parse_block
@@ -27,7 +27,7 @@ from testnet_template import proof_from_sia
 from feature_sharepool_hash_datum_cadence import Clock
 from feature_sharepool_hash_stratum import Client
 from feature_sharepool_hash_vardiff import SharePoolHashVardiffTest
-from test_framework.util import assert_equal, get_rpc_proxy
+from test_framework.util import assert_equal, assert_raises_rpc_error, get_rpc_proxy
 
 
 class VardiffClient(Client):
@@ -79,15 +79,30 @@ class SharePoolHashVardiffStratumTest(SharePoolHashVardiffTest):
                 payout_script=b"\x00\x14" + bytes([index + 1]) * 20) for index, path in enumerate(paths)]
             for signer, bits in zip(signers, (0, 6)):
                 self.assignments[signer.public_key] = bits
-            origins = [self.origin(0, signer) for signer in signers]
+            # Construct and store only the openings. The usual origin() helper
+            # also registers native bodies and would mask first-proof recovery.
+            origins = []
+            for signer in signers:
+                block, snapshot, _ = self.construct(0, signer)
+                self.store(0, snapshot)
+                proof = solve_share(block, snapshot)
+                assert_raises_rpc_error(-25, "sharepool-hash-data-missing",
+                    node.validatesharepoolhashshare, proof.serialize().hex())
+                origins.append((block, snapshot, proof))
             clocks = [Clock(), Clock()]
             controllers = [VardiffController(initial_work_bits=bits, target_share_seconds=10,
                 retarget_seconds=40, clock=clock) for bits, clock in zip((0, 6), clocks)]
             owner = threading.get_ident()
+            native_calls, native_failures, registration_receives = [], [], []
 
             def rpc(method, *args):
                 assert_equal(threading.get_ident(), owner)
-                return getattr(node, method)(*args)
+                native_calls.append(method)
+                try:
+                    return getattr(node, method)(*args)
+                except Exception:
+                    native_failures.append(method)
+                    raise
 
             for index, signer in enumerate(signers):
                 gate = HashMiningGate(directory / f"vardiff-stratum-{index}.sqlite", rpc=rpc,
@@ -97,7 +112,15 @@ class SharePoolHashVardiffStratumTest(SharePoolHashVardiffTest):
                 for block, snapshot, proof in origins:
                     gate.register_snapshot(snapshot.serialize())
                     gate.register_template(block.serialize())
+                    before = len(native_calls)
                     assert gate.receive(proof)
+                    received = native_calls[before:]
+                    assert_equal(received.count("validatesharepoolhashshare"), 1)
+                    assert "validatesharepoolhashtemplate" not in received
+                    assert "submitsharepoolhashsnapshot" not in received
+                    registration_receives.append({"owner": index,
+                        "proof_id": f"{proof.proof_id:064x}", "proof_rpcs": 1,
+                        "template_recovery_rpcs": 0, "snapshot_replay_rpcs": 0})
                 observer = get_rpc_proxy(node.url, 60 + index, timeout=1)
                 service = VardiffStratumService(gate, controller=controllers[index],
                     sign_owner=signer.sign_owner,
@@ -114,6 +137,11 @@ class SharePoolHashVardiffStratumTest(SharePoolHashVardiffTest):
             assert_equal([self.payouts(parse_block(work.authorization.block_bytes)) for work in original],
                 [self.expected_payouts([origin[2] for origin in origins])] * 2)
             initial_receipts = [gate.receipt_status()["retained_receipts"] for gate in gates]
+            assert_equal(native_failures, [])
+            report["explicit_registration"] = {"initial_native_missing_origins": len(origins),
+                "first_receives": registration_receives}
+            report["checks"].append("explicit_registration_first_proof_without_missing_recovery")
+            transport_start = len(native_calls)
 
             def search(work, client, notify, predicate, start=0):
                 for nonce in range(start, start + 10000):
@@ -222,6 +250,13 @@ class SharePoolHashVardiffStratumTest(SharePoolHashVardiffTest):
             assert_equal(state["window_accepted_shares"], 1)
             assert_equal(controllers[1].status()["observations"], 0)
             assert gates[0].ready_for_continued_work(original[0].authorization)
+            # The eight new submissions, duplicate and late old-target proof
+            # all require fresh native verdicts, without missing-data retries.
+            transport_proof_rpcs = native_calls[transport_start:].count("validatesharepoolhashshare")
+            assert_equal(transport_proof_rpcs, 10)
+            assert_equal(native_failures, [])
+            report["transport_proof_rpcs"] = transport_proof_rpcs
+            report["checks"].append("wire_submissions_no_missing_origin_recovery")
             report["retarget"] = state
             report["checks"] += ["independent_signed_assignments_and_real_notifications",
                 "wire_difficulty_matches_union_of_assigned_and_native_targets", "one_active_client_per_identity",
@@ -263,7 +298,7 @@ class SharePoolHashVardiffStratumTest(SharePoolHashVardiffTest):
                 "--signer-key", str(paths[1]), "--gate", str(directory / "standalone-v8-stratum.sqlite"),
                 "--pool", f"{signers[1].pool:x}", "--payout-script", signers[1].payout_script.hex(),
                 "--seconds", "1", "--profile-version", "8", "--share-work-bits", "6",
-                "--target-share-seconds", "60", "--activation-height", "1"]
+                "--activation-height", "1"]
             standalone = subprocess.run(command, capture_output=True, text=True, timeout=20, check=False)
             assert standalone.returncode == 0, standalone.stderr
             output = [json.loads(line) for line in standalone.stdout.splitlines()]
@@ -274,13 +309,13 @@ class SharePoolHashVardiffStratumTest(SharePoolHashVardiffTest):
             assert_equal(ready["hardware_configured"], False)
             assert_equal(ready["share_work_bits"], 6)
             assert_equal(ready["active_client_limit"], 1)
-            assert_equal(ready["target_share_seconds"], 60)
+            assert_equal(ready["target_share_seconds"], 6)
             assert_equal(outcome["duration_limit_seconds"], 1)
             assert_equal(outcome["stats"]["published"], 1)
             assert_equal(outcome["stats"]["acknowledged"], 0)
             assert_equal(outcome["stats"]["submitted_candidates"], 0)
-            assert_equal(outcome["vardiff"]["target_share_seconds"], 60)
-            assert_equal(outcome["vardiff"]["retarget_seconds"], 240)
+            assert_equal(outcome["vardiff"]["target_share_seconds"], 6)
+            assert_equal(outcome["vardiff"]["retarget_seconds"], 24)
             assert_equal(outcome["vardiff"]["share_work_bits"], 6)
             assert_equal(outcome["vardiff"]["adjustments"], 0)
             assert_equal(node.getbestblockhash(), before_tip)
@@ -293,7 +328,7 @@ class SharePoolHashVardiffStratumTest(SharePoolHashVardiffTest):
                 assert closed_listener.connect_ex(tuple(ready["address"])) != 0
             report["standalone_runner"] = {"exit_code": 0, "v8_job_published": True,
                 "listener_closed": True, "chain_and_network_unchanged": True,
-                "target_share_seconds": 60, "retarget_seconds": 240, "assigned_work_bits": 6,
+                "target_share_seconds": 6, "retarget_seconds": 24, "assigned_work_bits": 6,
                 "bitcoin_cli_sha256": hashlib.sha256(cli.read_bytes()).hexdigest()}
             report["checks"].append("standalone_cli_startup_default_cadence_and_shutdown")
             (directory / "vardiff-stratum-results.json").write_text(json.dumps(report, indent=2) + "\n")

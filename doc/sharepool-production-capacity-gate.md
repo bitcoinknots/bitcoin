@@ -165,9 +165,13 @@ The one-day-round, 100-equal-miner, 30-second-share example above is an
 sampling and capacity need a joint design decision. The numbers above describe
 the unchanged v7 global target. The separate [v8 profile](sharepool-v8-vardiff.md)
 now implements assigned targets per miner gateway, with a configurable
-one-minute starting cadence. It does not inherit these global-target traffic
-projections or establish production capacity. The following routes distinguish
+six-second starting cadence (10 shares per minute per miner). It does not inherit
+these global-target traffic projections or establish production capacity. The following routes distinguish
 the remaining sampling and resource choices.
+
+The [v8 scalability follow-up](sharepool-v8-scalability.md) provides measured
+before/after service costs at that cadence and separates workload-generation
+backlog from native settlement and peer verification.
 
 1. **Separate frequent local monitoring shares from consensus-accounted work.**
    A gateway could use a finer local target for connection health and work-rate

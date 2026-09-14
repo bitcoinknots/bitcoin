@@ -142,6 +142,63 @@ class HashGateProvenanceTests(unittest.TestCase):
         self.assert_closure(gate, pairs)
         self.assertEqual(gate.archive_head()["receipt_revision"], 1)
 
+    def test_warm_native_receive_atomically_retains_fetched_graph_without_republishing(self):
+        pairs = self.chain()
+        block, opening = pairs[-1]
+        proof = solve_share(block, opening)
+        self.rpc.templates[template_id(block)] = block.serialize()
+        for succeeds in (True, False):
+            with self.subTest(succeeds=succeeds):
+                gate = self.gate(f"warm-native-{succeeds}.sqlite")
+                gate.register_snapshot(opening.serialize())
+                gate._persist([(TEMPLATE, normalize_template(block))])
+                head = gate.archive_head()
+                self.rpc.calls.clear()
+                self.rpc.share_error = None if succeeds else "native proof refused"
+                with patch.object(gate, "_persist", wraps=gate._persist) as persist, \
+                        patch.object(gate, "_rehydrate_retained", side_effect=AssertionError("unnecessary replay")):
+                    if succeeds:
+                        self.assertTrue(gate.receive(proof))
+                        self.assertEqual(persist.call_count, 1)
+                        self.assert_closure(gate, pairs)
+                        self.assertEqual(gate.archive_head()["receipt_revision"], 1)
+                    else:
+                        with self.assertRaisesRegex(ValueError, "native proof refused"):
+                            gate.receive(proof)
+                        persist.assert_not_called()
+                        self.assertEqual(gate.archive_head(), head)
+                        with self.assertRaises(KeyError):
+                            gate.snapshot_bytes(pairs[0][1].hash_hex)
+                        with self.assertRaises(KeyError):
+                            gate._read(PROOF, f"{proof.proof_id:064x}")
+                methods = [name for name, _ in self.rpc.calls]
+                self.assertEqual(methods.count("validatesharepoolhashshare"), 1)
+                self.assertNotIn("submitsharepoolhashsnapshot", methods)
+                self.assertNotIn("validatesharepoolhashtemplate", methods)
+
+    def test_warm_cache_still_rejects_corrupt_retained_dependency_before_native_write(self):
+        pairs = self.chain()
+        block, opening = pairs[-1]
+        gate = self.gate()
+        gate.register_template(block.serialize())
+        proof = solve_share(block, opening)
+        self.assertTrue(gate.receive(proof))
+        next_proof = solve_share(block, opening, start_nonce=proof.header.nNonce + 1)
+        head = gate.archive_head()
+        identity = pairs[0][1].hash_hex
+        with gate.db:
+            gate.db.execute("UPDATE journal SET data=zeroblob(length(data)) WHERE kind=? AND identity=?",
+                            (SNAPSHOT, identity))
+        self.rpc.calls.clear()
+        with self.assertRaisesRegex(ValueError, "read-time integrity"):
+            gate.receive(next_proof)
+        self.assertEqual(gate.archive_head(), head)
+        with self.assertRaises(KeyError):
+            gate._read(PROOF, f"{next_proof.proof_id:064x}")
+        methods = [name for name, _ in self.rpc.calls]
+        self.assertNotIn("submitsharepoolhashsnapshot", methods)
+        self.assertNotIn("validatesharepoolhashshare", methods)
+
     def test_rejected_registration_never_admits_foreign_or_native_invalid_openings(self):
         gate = self.gate()
         for pool, failure in ((4, None), (3, "native template refused")):

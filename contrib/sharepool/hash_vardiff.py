@@ -14,6 +14,8 @@ import os
 import threading
 import time
 
+DEFAULT_TARGET_SHARE_SECONDS = 6  # Ten accepted shares per minute, per miner.
+
 
 def work_bits(value):
     if type(value) is not int or not 0 <= value <= 255:
@@ -22,7 +24,7 @@ def work_bits(value):
 
 
 class VardiffController:
-    def __init__(self, *, initial_work_bits, target_share_seconds=60,
+    def __init__(self, *, initial_work_bits, target_share_seconds=DEFAULT_TARGET_SHARE_SECONDS,
                  retarget_seconds=None, min_work_bits=0, max_work_bits=255,
                  clock=time.monotonic):
         for value in (initial_work_bits, min_work_bits, max_work_bits):

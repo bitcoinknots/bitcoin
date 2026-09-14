@@ -1,0 +1,9 @@
+2026-09-14T15:20:26.027000Z TestFramework (INFO): User supplied random seed 102060
+2026-09-14T15:20:26.027000Z TestFramework (INFO): PRNG seed is: 102060
+2026-09-14T15:20:26.028000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v8-scale-after20-final
+2026-09-14T15:20:49.969000Z TestFramework (INFO): Live block 102 admitted 67 proofs; source continues independently
+2026-09-14T15:21:10.799000Z TestFramework (INFO): Live block 103 admitted 69 proofs; source continues independently
+2026-09-14T15:21:30.527000Z TestFramework (INFO): Live block 104 admitted 64 proofs; source continues independently
+2026-09-14T15:21:31.138000Z TestFramework (INFO): Stopping nodes
+2026-09-14T15:21:31.318000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v8-scale-after20-final
+2026-09-14T15:21:31.318000Z TestFramework (INFO): Tests successful

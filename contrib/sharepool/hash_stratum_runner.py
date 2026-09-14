@@ -17,7 +17,7 @@ import time
 from hash_mining_gate import HashMiningGate
 from hash_snapshot import HashSigner
 from hash_stratum import HashStratumService, VardiffStratumService
-from hash_vardiff import VardiffController
+from hash_vardiff import DEFAULT_TARGET_SHARE_SECONDS, VardiffController
 
 
 class RegtestCLI:
@@ -69,8 +69,8 @@ def main():
     parser.add_argument("--profile-version", type=int, choices=(7, 8), default=7)
     parser.add_argument("--share-work-bits", type=int,
         help="required initial v8 expected work exponent, 0..255; one payout identity per listener")
-    parser.add_argument("--target-share-seconds", type=float, default=60,
-        help="v8 accepted-share cadence target; not a physical hashrate cap")
+    parser.add_argument("--target-share-seconds", type=float, default=DEFAULT_TARGET_SHARE_SECONDS,
+        help="v8 accepted-share cadence target; default 6 seconds (10/minute) per miner; not a physical hashrate cap")
     parser.add_argument("--vardiff-retarget-seconds", type=float,
         help="v8 minimum observation window; default four target intervals")
     parser.add_argument("--transport-difficulty", type=int,
@@ -81,7 +81,7 @@ def main():
     if options.profile_version == 8:
         if options.share_work_bits is None or options.transport_difficulty is not None:
             parser.error("v8 requires --share-work-bits and does not use --transport-difficulty")
-    elif options.share_work_bits is not None or options.vardiff_retarget_seconds is not None or options.target_share_seconds != 60:
+    elif options.share_work_bits is not None or options.vardiff_retarget_seconds is not None or options.target_share_seconds != DEFAULT_TARGET_SHARE_SECONDS:
         parser.error("adaptive share-work options require --profile-version=8")
     gate = service = None
     try:

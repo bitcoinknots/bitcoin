@@ -521,7 +521,12 @@ class Checker {
     const Consensus::Params& m_consensus;
     const Lookup& m_lookup;
     const ValidateOrigin& m_validate_origin;
-    std::map<uint256, std::shared_ptr<const Snapshot>> m_snapshots;
+    struct SnapshotEvidence {
+        std::shared_ptr<const Snapshot> snapshot;
+        uint256 owner_digest;
+        bool authorized{false};
+    };
+    std::map<uint256, SnapshotEvidence> m_snapshots;
     // Retain actual native states; release alternative job states after their
     // recursive validation completes rather than storing one copy per origin.
     std::map<uint256, std::shared_ptr<const Snapshot>> m_materialized;
@@ -531,29 +536,23 @@ class Checker {
     size_t m_dependency_shares{0};
     std::set<uint256> m_visiting;
     std::set<uint256> m_unique_origins;
-    std::set<const Snapshot*> m_authorized;
-    std::set<std::pair<uint256, Signature>> m_compact_authorized;
     bool m_certificates_initialized{false};
     Result m_certificate_context{Result::Valid()};
     std::map<uint256, OriginCertificate> m_parent_certificates;
 
-    bool Authorized(const Snapshot& snapshot)
+    bool Authorized(const uint256& hash)
     {
-        if (IsCompactTidesVersion(snapshot.binding.version)) {
-            // Alternative materializations have weak lifetimes. Pointer
-            // memoization would be unsafe if an allocator reused an address.
-            const auto digest = hashonly::OwnerHash(snapshot);
-            const auto identity = std::make_pair(digest, snapshot.authorization);
-            if (m_compact_authorized.count(identity)) return true;
-            const XOnlyPubKey owner{Span{snapshot.binding.owner}};
-            if (snapshot.job_commitment.IsNull() || !owner.IsFullyValid() ||
-                !owner.VerifySchnorr(digest, snapshot.authorization)) return false;
-            m_compact_authorized.insert(identity);
-            return true;
-        }
-        if (m_authorized.count(&snapshot)) return true;
-        if (!OwnerValid(snapshot)) return false;
-        m_authorized.insert(&snapshot);
+        // FetchRaw authenticated the complete canonical opening before adding
+        // this entry. Compact materialization changes only omitted state fields
+        // and verifies the unchanged history commitment. Its authorization is
+        // therefore the raw opening's, independent of transient object addresses.
+        auto& evidence = m_snapshots.at(hash);
+        if (evidence.authorized) return true;
+        const auto& snapshot = *evidence.snapshot;
+        const XOnlyPubKey owner{Span{snapshot.binding.owner}};
+        if (snapshot.job_commitment.IsNull() || !owner.IsFullyValid()) return false;
+        if (!owner.VerifySchnorr(evidence.owner_digest, snapshot.authorization)) return false;
+        evidence.authorized = true;
         return true;
     }
     struct CheckedOrigin {
@@ -580,7 +579,7 @@ class Checker {
         const uint256 EMPTY_HASH{ProfileSnapshotHash(Span<const unsigned char>{}, ProfileVersion(m_consensus))};
         if (hash == EMPTY_HASH) return Bad("snapshot-encoding");
         if (const auto found = m_snapshots.find(hash); found != m_snapshots.end()) {
-            result = found->second;
+            result = found->second.snapshot;
             return Result::Valid();
         }
         try { result = m_lookup(hash); }
@@ -588,16 +587,20 @@ class Checker {
         catch (const std::exception&) { return Result::Missing({hash}); }
         if (!result) return Result::Missing({hash});
         size_t size;
+        uint256 owner_digest;
         try {
             const auto prepared = PrepareSnapshot(*result);
             size = prepared.usage.encoded_bytes;
             if (PreparedProfileHash(*result, ProfileVersion(m_consensus), prepared) != hash) return Result::Missing({hash});
+            if (size > MAX_DEPENDENCY_BYTES - m_dependency_bytes) return Bad("dependency-bytes");
+            if (m_consensus.SharePoolCompactTides && result->shares.size() > MAX_DEPENDENCY_SHARES - m_dependency_shares) return Bad("dependency-shares");
+            // Reuse these exact tables while they are live; retain only the
+            // small digest, not another copy of transaction/job dictionaries.
+            owner_digest = hashonly::OwnerHash(result->binding, result->job_commitment, PreparedContentsHash(*result, prepared));
         } catch (const std::ios_base::failure&) { return Bad("snapshot-encoding"); }
-        if (size > MAX_DEPENDENCY_BYTES - m_dependency_bytes) return Bad("dependency-bytes");
-        if (m_consensus.SharePoolCompactTides && result->shares.size() > MAX_DEPENDENCY_SHARES - m_dependency_shares) return Bad("dependency-shares");
         m_dependency_bytes += size;
         m_dependency_shares += result->shares.size();
-        m_snapshots.emplace(hash, result);
+        m_snapshots.emplace(hash, SnapshotEvidence{result, owner_digest});
         return Result::Valid();
     }
 
@@ -670,7 +673,7 @@ class Checker {
             const auto available = Fetch(previous->m_mm_rhs, parent);
             if (!available.IsValid()) return available;
             if (!CheckBinding(parent->binding, m_consensus, previous->nHeight, previous->pprev->GetBlockHash()).IsValid() ||
-                !Authorized(*parent) || !CertificatesOrdered(parent->certificates)) return Bad("parent");
+                !Authorized(previous->m_mm_rhs) || !CertificatesOrdered(parent->certificates)) return Bad("parent");
             const int64_t parent_oldest = std::max<int64_t>(m_consensus.SharePoolHeight, int64_t{previous->nHeight} - MAX_SHARE_AGE);
             const int64_t oldest = std::max<int64_t>(m_consensus.SharePoolHeight, int64_t{previous->nHeight} + 1 - MAX_SHARE_AGE);
             for (const auto& certificate : parent->certificates) {
@@ -715,7 +718,7 @@ class Checker {
         if (!available.IsValid()) return available;
         const auto binding = CheckBinding(snapshot->binding, m_consensus, block.m_height, block.hashPrevBlock);
         if (!binding.IsValid()) return binding;
-        if (!Authorized(*snapshot)) return Bad("owner");
+        if (!Authorized(block.m_mm_rhs)) return Bad("owner");
         if (snapshot->job_commitment != JobHash(block)) return Bad("job-commitment");
         if (m_consensus.SharePoolAdmittedLedger || m_consensus.SharePoolTides) {
             const auto certificate = m_parent_certificates.find(OriginCertificateId(block));
@@ -839,7 +842,7 @@ public:
         if (!result.IsValid()) return result;
         result = CheckBinding(snapshot->binding, m_consensus, height, previous->GetBlockHash());
         if (!result.IsValid()) return result;
-        if (!allow_unsigned && !Authorized(*snapshot)) return Bad("owner");
+        if (!allow_unsigned && !Authorized(block.m_mm_rhs)) return Bad("owner");
         if (allow_unsigned && snapshot->authorization != Signature{}) return Bad("unsigned-authorization");
         if (snapshot->job_commitment != JobHash(block)) return Bad("job-commitment");
         if (!StateOrdered(snapshot->post_state)) return Bad("state-order");
@@ -867,7 +870,7 @@ public:
             else if (!result.IsValid()) return result;
             else {
                 const auto context = CheckBinding(parent->binding, m_consensus, previous->nHeight, previous->pprev->GetBlockHash());
-                if (!context.IsValid() || !Authorized(*parent) || !StateOrdered(parent->post_state)) return Bad("parent");
+                if (!context.IsValid() || !Authorized(previous->m_mm_rhs) || !StateOrdered(parent->post_state)) return Bad("parent");
                 if (m_consensus.SharePoolAdmittedLedger) {
                     if (!CreditsOrdered(parent->pending)) return Bad("parent-ledger");
                     for (const auto& credit : parent->pending) paid.insert(UintToArith256(credit.proof_id));

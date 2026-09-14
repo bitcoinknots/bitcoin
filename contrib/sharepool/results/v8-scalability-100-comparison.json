@@ -1,0 +1,96 @@
+{
+  "inputs": [
+    {
+      "path": "contrib/sharepool/results/v8-scalability-100-large-budget-before-registration.json",
+      "sha256": "2605c1749c133709d40f57aa08ccce8d68d33b57142302f1062ecfe8d0207d5d"
+    },
+    {
+      "path": "contrib/sharepool/results/v8-scalability-100-final.json",
+      "sha256": "fd404db729784b257a8346d2608a4973485414664036a15a3fd854369a1bb46f"
+    }
+  ],
+  "checks": [
+    {
+      "capture": "before",
+      "stages_unique_ordered_complete": true,
+      "phase_counts_from_events": true,
+      "all_blocks_native_and_peer": true,
+      "all_acknowledged_work_settled": true
+    },
+    {
+      "capture": "after",
+      "stages_unique_ordered_complete": true,
+      "phase_counts_from_events": true,
+      "all_blocks_native_and_peer": true,
+      "all_acknowledged_work_settled": true
+    }
+  ],
+  "identical_configuration": true,
+  "identical_native_binary": true,
+  "changed_recorded_sources": [
+    "contrib/sharepool/hash_mining_gate.py"
+  ],
+  "measurements": {
+    "live_and_drain_seconds": {
+      "before": 617.8834158330001,
+      "after": 594.958582125,
+      "absolute_change": -22.92483370800005,
+      "percent_change": -3.710219941264148
+    },
+    "capture_including_setup_seconds": {
+      "before": 629.525182375,
+      "after": 606.596611167,
+      "absolute_change": -22.928571207999994,
+      "percent_change": -3.6422007967175762
+    },
+    "collector_rpc_seconds": {
+      "before": 381.1365966250031,
+      "after": 248.3848592149999,
+      "absolute_change": -132.75173741000322,
+      "percent_change": -34.83048822535834
+    },
+    "collector_register_and_ack_seconds": {
+      "before": 445.88041675799855,
+      "after": 309.14681810399964,
+      "absolute_change": -136.7335986539989,
+      "percent_change": -30.665979826651824
+    },
+    "collector_register_and_ack_p95_seconds": {
+      "before": 0.7149068329999864,
+      "after": 0.5005290000000002,
+      "absolute_change": -0.21437783299998614,
+      "percent_change": -29.986821093929905
+    },
+    "source_service_seconds": {
+      "before": 593.9027941379998,
+      "after": 572.8777968089987,
+      "absolute_change": -21.024997329001053,
+      "percent_change": -3.5401411706636354
+    },
+    "native_node0_cpu_seconds": {
+      "before": 594.48,
+      "after": 465.21,
+      "absolute_change": -129.27000000000004,
+      "percent_change": -21.74505450141301
+    },
+    "collector_proof_rpcs": {
+      "before": 1903,
+      "after": 1000,
+      "absolute_change": -903,
+      "percent_change": -47.451392538097735
+    },
+    "collector_proof_rpc_failures": {
+      "before": 903,
+      "after": 0,
+      "absolute_change": -903,
+      "percent_change": -100.0
+    }
+  },
+  "limits": [
+    "One sequential before/after pair; no repeated-run confidence interval.",
+    "Workload configuration is identical, but actual native settlement timing and block composition differ (27 vs26 blocks).",
+    "Same60s phase produced236 offers and229 admissions in both runs;16.67scheduled shares/s was not maintained.",
+    "Aggregate RPC intervals include phase+drain; concurrent source/collector and nested outer/RPC times must not be added as wall time or labeled CPU.",
+    "Removed fast missing failures change the proof-RPC latency sample population, so raw per-attempt p50 is not a like-for-like successful-validation comparison."
+  ]
+}

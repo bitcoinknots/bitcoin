@@ -11,6 +11,7 @@ drain. This is two loopback native nodes, not a WAN or ASIC saturation claim.
 """
 from collections import Counter
 from datetime import datetime, timezone
+from fractions import Fraction
 import hashlib
 import math
 from pathlib import Path
@@ -28,7 +29,7 @@ from native_mining_gate import parse_block
 from feature_sharepool_hash_capacity import SharePoolHashCapacityTest
 from feature_sharepool_hash_tides_100_miners import SharePoolHashTides100MinersTest
 from test_framework.address import script_to_p2wsh
-from test_framework.messages import CBlock, CBlockHeader, CTxOut, from_hex
+from test_framework.messages import CBlock, CBlockHeader, CTxOut, from_hex, uint256_from_compact
 from test_framework.script import CScript, OP_TRUE
 from test_framework.util import assert_equal, get_rpc_proxy, rpc_url
 
@@ -37,12 +38,68 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
     PROFILE_VERSION = 7
     ITEM_WIRE_LIMIT = 2 * 1024 * 1024
     QUEUE_ITEMS = 8
+    MAX_PLANNED = 10000
+
+    @staticmethod
+    def parse_assignments(value):
+        values = tuple(int(item) for item in value.split(','))
+        if not 1 <= len(values) <= 100 or any(not 0 <= item <= 12 for item in values):
+            raise ValueError('finite synthetic assignments require 1..100 exponents in 0..12')
+        return values
+
+    @staticmethod
+    def schedule(miners, seconds, *, offer_interval_ms=None, target_share_seconds=None, profile=7):
+        if type(miners) is not int or not 2 <= miners <= 100 or type(seconds) is not int or not 10 <= seconds <= 600:
+            raise ValueError('finite workload requires 2..100 miners over 10..600 seconds')
+        if offer_interval_ms is not None and target_share_seconds is not None:
+            raise ValueError('select aggregate offer interval or per-miner cadence, not both')
+        if offer_interval_ms is None and target_share_seconds is None:
+            if profile == 8:
+                target_share_seconds = 6
+            else:
+                offer_interval_ms = 500
+        if target_share_seconds is not None:
+            if not math.isfinite(target_share_seconds) or not 1 <= target_share_seconds <= 600:
+                raise ValueError('finite target cadence must be 1..600 seconds')
+            offer_interval_ms = 1000 * target_share_seconds / miners
+        if not math.isfinite(offer_interval_ms) or not 10 <= offer_interval_ms <= 10000:
+            raise ValueError('finite aggregate offer interval must be 10..10000 milliseconds')
+        planned = math.ceil(Fraction(seconds * 1000) / Fraction(str(offer_interval_ms)))
+        return offer_interval_ms, target_share_seconds, planned
+
+    @staticmethod
+    def queue_accounting(transfers, *, seconds):
+        selected = []
+        for row in transfers:
+            assert math.isfinite(row['seconds']) and row['seconds'] >= 0
+            for name in ('origin_bytes', 'origin_bytes_without_deduplication', 'proof_bytes', 'logical_payload_bytes'):
+                assert type(row[name]) is int and row[name] >= 0
+            assert type(row['full_origin']) is bool
+            assert row['proof_bytes'] > 0 and row['origin_bytes_without_deduplication'] > 0
+            assert_equal(row['origin_bytes'], row['origin_bytes_without_deduplication'] if row['full_origin'] else 0)
+            assert_equal(row['logical_payload_bytes'], row['origin_bytes'] + row['proof_bytes'] + 68)
+            if row['seconds'] <= seconds:
+                selected.append(row)
+        result = {name: sum(row[name] for row in selected) for name in
+            ('origin_bytes', 'origin_bytes_without_deduplication', 'proof_bytes', 'logical_payload_bytes')}
+        return dict(result, transferred_items=len(selected),
+            full_origin_items=sum(row['full_origin'] for row in selected),
+            reference_items=sum(not row['full_origin'] for row in selected),
+            origin_bytes_avoided=result['origin_bytes_without_deduplication'] - result['origin_bytes'])
 
     def add_options(self, parser):
         super().add_options(parser)
         parser.add_argument('--miners', type=int, default=100)
+        parser.add_argument('--profile-version', type=int, choices=(7, 8), default=7)
+        parser.add_argument('--share-work-bits', type=self.parse_assignments,
+            help='v8 only: explicit cycling per-miner assigned exponents, e.g. 2,4,6; bounded to 0..12')
         parser.add_argument('--duration-seconds', type=int, default=120)
-        parser.add_argument('--offer-interval-ms', type=int, default=500)
+        parser.add_argument('--offer-interval-ms', type=float,
+            help='aggregate schedule; defaults to 500ms for v7, or six seconds per miner for v8')
+        parser.add_argument('--target-share-seconds', type=float,
+            help='derive aggregate schedule from this per-miner cadence; v8 default 6 seconds')
+        parser.add_argument('--deduplicate-job-evidence', action='store_true',
+            help='fixture FIFO queue sends each exact miner/job origin once, then references it')
         parser.add_argument('--settlement-seconds', type=int, default=20)
         parser.add_argument('--work-update-seconds', type=int, default=40)
         parser.add_argument('--snapshot-budget-bytes', type=int, default=65536)
@@ -51,14 +108,65 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
 
     def set_test_params(self):
         super().set_test_params()
+        self.PROFILE_VERSION = self.options.profile_version
         for args in self.extra_args:
             args.append('-sharepoolcompacttides=1')
+            if self.PROFILE_VERSION == 8:
+                args.append('-sharepoolvardiff=1')
 
     def open(self, name, signer, rpc):
         return HashMiningGate(self.directory / (name + '.sqlite'), rpc=rpc,
             pool=signer.pool, public_key=signer.public_key, payout_script=signer.payout_script,
-            profile_version=7, activation_height=102,
+            profile_version=self.PROFILE_VERSION, activation_height=102,
+            share_work_bits=self.assignments[signer.public_key] if self.PROFILE_VERSION == 8 else None,
             snapshot_budget=self.options.snapshot_budget_bytes)
+
+    def check_payouts(self, block, snapshot, history, *, reward):
+        if self.PROFILE_VERSION == 7:
+            return super().check_payouts(block, snapshot, history, reward=reward)
+        # Independent arithmetic: exact signed exponents, never current gateway
+        # policy or equal-share counts. The native-height boundary cohort is
+        # proportionally clipped using rational arithmetic, as in the v7 oracle.
+        remaining = Fraction(8 << 256, uint256_from_compact(block.nBits) + 1)
+        cohorts, weights, selected = {}, {}, []
+        for height, proof in history:
+            if proof.envelope.pool == snapshot.envelope.pool:
+                assert_equal(proof.envelope.version, 8)
+                assert 0 <= proof.envelope.share_work_bits <= 255
+                cohorts.setdefault(height, []).append(proof)
+        for height in sorted(cohorts, reverse=True):
+            if remaining == 0:
+                break
+            cohort = cohorts[height]
+            total_work = sum(1 << proof.envelope.share_work_bits for proof in cohort)
+            included = min(remaining, Fraction(total_work))
+            for proof in cohort:
+                script = proof.envelope.payout_script
+                contribution = Fraction(1 << proof.envelope.share_work_bits) * included / total_work
+                weights[script] = weights.get(script, Fraction(0)) + contribution
+                selected.append(proof.proof_id)
+            remaining -= included
+        assert weights
+        total = sum(weights.values())
+        expected = {script: int(reward * work / total) for script, work in weights.items()
+                    if int(reward * work / total)}
+        assert_equal(self.payouts(block), expected)
+        assert_equal({bytes(output.scriptPubKey): output.nValue for output in snapshot.payouts}, expected)
+        assert_equal([output.serialize() for output in block.vtx[0].vout[:len(snapshot.payouts)]],
+            [output.serialize() for output in snapshot.payouts])
+        assert len(block.vtx[0].vout) - len(snapshot.payouts) in (0, 1)
+        for output in block.vtx[0].vout[len(snapshot.payouts):]:
+            assert_equal(output.nValue, 0)
+            assert bytes(output.scriptPubKey).startswith(bytes.fromhex('6a24aa21a9ed'))
+        assert_equal(block.m_mm_rhs, snapshot.hash)
+        assert_equal((snapshot.pending, snapshot.settled), ((), ()))
+        self.report['rewards'].append({'height': block.m_height, 'commitment': snapshot.hash_hex,
+            'new_admissions': len(snapshot.shares), 'eligible_proofs': len(selected),
+            'payout_scripts': len(expected), 'reward_satoshis': reward,
+            'unclaimed_rounding_satoshis': reward - sum(expected.values()),
+            'whole_admission_height_cohorts_verified': True,
+            'exact_rational_window_and_coinbase_verified': True, 'assigned_work_weighting_verified': True})
+        return selected
 
     def bounded(self):
         if time.monotonic() - self.started > self.options.max_runtime_seconds:
@@ -75,7 +183,7 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
         proxy = get_rpc_proxy(rpc_url(node.datadir_path, node.index, node.chain, node.rpchost), 0, timeout=60)
         tag = [b'initial']
         def rpc(method, *args):
-            result = getattr(proxy, method)(*args)
+            result = self.source_metrics.call('rpc.' + method, getattr(proxy, method), *args)
             return (SharePoolHashCapacityTest.tag_unsigned_job(result, tag[0])
                     if method == 'preparesharepoolhashjob' else result)
         try:
@@ -83,7 +191,7 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                 gates.append(self.open(f'live-miner-{index:03}', signer, rpc))
             self.ready.set()
             self.begin.wait()
-            active, nonces, refreshed = {}, {}, {}
+            active, nonces, refreshed, origin_keys, sent = {}, {}, {}, {}, {}
             for slot in range(self.planned):
                 due = self.phase_start + slot * self.options.offer_interval_ms / 1000
                 if self.stop.wait(max(0, due - time.monotonic())):
@@ -114,6 +222,8 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                                 raise ValueError('native context changed before dispatch')
                             gate.register_snapshot(snapshot.serialize())
                             active[index], nonces[index] = authorization, 0
+                            origin_keys[index] = (hashlib.sha256(authorization.block_bytes).digest(),
+                                                  hashlib.sha256(authorization.snapshot_bytes).digest())
                             refreshed[index] = time.monotonic()
                             with self.lock:
                                 self.jobs.append({'slot': slot, 'miner': index,
@@ -124,6 +234,7 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                                     'transaction_ids': [tx.rehash() for tx in block.vtx[1:]],
                                     'template_bytes': len(authorization.block_bytes),
                                     'snapshot_bytes': len(authorization.snapshot_bytes),
+                                    'assigned_work_bits': snapshot.envelope.share_work_bits if self.PROFILE_VERSION == 8 else None,
                                     'native_weight': block.get_weight()})
                             break
                         except Exception:
@@ -138,17 +249,30 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                 proof = solve_share(parse_block(authorization.block_bytes), snapshot, start_nonce=nonces[index])
                 nonces[index] = proof.header.nNonce + 1
                 assert_equal(CBlockHeader(parse_block(authorization.block_for_header(proof.header_bytes))).serialize(), proof.header_bytes)
-                wire = len(authorization.block_bytes) + len(authorization.snapshot_bytes) + len(proof.serialize())
+                key = origin_keys[index]
+                full_origin = not self.options.deduplicate_job_evidence or sent.get(index) != key
+                origin_bytes = len(authorization.block_bytes) + len(authorization.snapshot_bytes)
+                proof_bytes = len(proof.serialize())
+                wire = (origin_bytes if full_origin else 0) + proof_bytes + 68
                 assert wire <= self.ITEM_WIRE_LIMIT, 'fixture queue item exceeds explicit wire budget'
                 self.event('offered', [proof])
                 with self.lock:
                     self.source_lateness.append(max(0, started - due))
                     self.source_service.append(time.monotonic() - started)
+                queue_started = time.monotonic()
                 while not self.stop.is_set():
                     try:
-                        self.inbox.put((authorization.block_bytes, authorization.snapshot_bytes, proof), timeout=.1)
+                        self.inbox.put((index, key,
+                            authorization.block_bytes if full_origin else None,
+                            authorization.snapshot_bytes if full_origin else None, proof), timeout=.1)
+                        sent[index] = key
                         with self.lock:
                             self.queue_high_water = max(self.queue_high_water, self.inbox.qsize())
+                            self.source_queue_wait.append(time.monotonic() - queue_started)
+                            self.queue_transfers.append({'seconds': time.monotonic() - self.phase_start,
+                                'full_origin': full_origin, 'origin_bytes': origin_bytes if full_origin else 0,
+                                'origin_bytes_without_deduplication': origin_bytes,
+                                'proof_bytes': proof_bytes, 'logical_payload_bytes': wire})
                         break
                     except queue.Full:
                         self.bounded()
@@ -181,6 +305,9 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                'local_seconds': time.monotonic() - self.phase_start,
                'snapshot_bytes': len(snapshot.serialize()), 'payout_recipients': len(snapshot.payouts),
                'coinbase_weight': block.vtx[0].get_weight(), 'native_weight': block.get_weight()}
+        if self.PROFILE_VERSION == 8:
+            row['admitted_assigned_work'] = sum(1 << proof.envelope.share_work_bits for proof in snapshot.shares)
+            row['assigned_work_bits_counts'] = dict(Counter(proof.envelope.share_work_bits for proof in snapshot.shares))
         self.report['blocks'].append(row)
         self.wait_tip(block)
         self.event('peer_verified', snapshot.shares)
@@ -194,9 +321,12 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
             opts.results = Path(opts.tmpdir) / 'live-capacity-results.json'
         self.MINERS = opts.miners
         self.FEE = 1000 + 50 * opts.padding_outputs
-        self.planned = math.ceil(opts.duration_seconds * 1000 / opts.offer_interval_ms)
-        assert 2 <= opts.miners <= 100 and opts.miners <= self.planned <= 1000
-        assert 10 <= opts.duration_seconds <= 600 and 50 <= opts.offer_interval_ms <= 10000
+        assert 2 <= opts.miners <= 100 and 10 <= opts.duration_seconds <= 600
+        opts.offer_interval_ms, opts.target_share_seconds, self.planned = self.schedule(opts.miners,
+            opts.duration_seconds, offer_interval_ms=opts.offer_interval_ms,
+            target_share_seconds=opts.target_share_seconds, profile=self.PROFILE_VERSION)
+        assert opts.miners <= self.planned <= self.MAX_PLANNED
+        assert (self.PROFILE_VERSION == 8) == (opts.share_work_bits is not None), 'only v8 requires explicit assignments'
         assert 5 <= opts.work_update_seconds <= 120 and 5 <= opts.settlement_seconds <= 120
         assert 4096 <= opts.snapshot_budget_bytes <= 16 * 1024 * 1024
         assert 0 <= opts.padding_outputs <= 100 and 60 <= opts.max_runtime_seconds <= 7200
@@ -206,19 +336,27 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
         self.lock, self.inbox = threading.Lock(), queue.Queue(maxsize=self.QUEUE_ITEMS)
         self.ready, self.begin, self.stop, self.finished = (threading.Event() for _ in range(4))
         self.events, self.jobs, self.source_lateness, self.source_service = [], [], [], []
+        self.source_queue_wait, self.queue_transfers = [], []
         self.source_error, self.tip_retries, self.queue_high_water = None, 0, 0
-        self.metrics, self.phase_start = Measurements(), time.monotonic()
-        self.report = {'schema': 1, 'result': 'running', 'profile': 'hash-only-v7-compact-tides',
+        self.metrics, self.source_metrics, self.phase_start = Measurements(), Measurements(), time.monotonic()
+        self.report = {'schema': 2, 'result': 'running',
+            'profile': 'hash-only-v8-vardiff-tides' if self.PROFILE_VERSION == 8 else 'hash-only-v7-compact-tides',
             'network': 'isolated native regtest', 'started_utc': datetime.now(timezone.utc).isoformat(),
             'configuration': {name: getattr(opts, name) for name in ('miners','duration_seconds','offer_interval_ms',
-                'settlement_seconds','work_update_seconds','snapshot_budget_bytes','padding_outputs','max_runtime_seconds')},
+                'settlement_seconds','work_update_seconds','snapshot_budget_bytes','padding_outputs','max_runtime_seconds',
+                'profile_version','share_work_bits','target_share_seconds','deduplicate_job_evidence')},
+            'scheduled_share_interval_per_miner_seconds': opts.offer_interval_ms * opts.miners / 1000,
+            'scheduled_aggregate_shares_per_second': 1000 / opts.offer_interval_ms,
             'scheduled_requests': self.planned, 'native_nodes': 2, 'physical_miners_used': 0,
             'blocks': [], 'rewards': [], 'command': [sys.executable, *sys.argv],
             'limitations': ['One source thread serially services logical miners; source scheduling backlog is reported.',
                 'Source offers continue during settlement on separate owner gates and an independent RPC connection.',
                 'Finite scheduled phase followed by explicit catch-up/drain; only timestamped phase completions count toward phase rates.',
                 'Two loopback Debug native nodes, easy proofs and controlled block opportunities; no WAN, ASIC or production variance claim.',
-                'Serialized queue has eight items of at most two MiB, plus one producer and one consumer item; Python object overhead is not bounded by this wire charge.']}
+                'Queue has eight items of at most two MiB logical payload, plus one producer and one consumer item; Python object overhead is not bounded by this charge.',
+                'Optional origin deduplication applies only to this single-producer FIFO fixture; logical payload accounting is not measured network traffic.',
+                'Each source gate retains its current job; collector deduplication retains at most one origin key/envelope/signature per logical miner, with full evidence in the durable gate.',
+                'V8 assignments are explicit fixed synthetic work exponents; cadence is an offered workload schedule, not an adaptive-controller or physical-hashrate measurement.']}
         keys, producer, collector, sampler = [], None, None, None
         try:
             node, follower = self.nodes
@@ -233,11 +371,15 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
             node.sendrawtransaction(funding.serialize().hex())
             self.generatetoaddress(node,1,script_to_p2wsh(redeem)); self.sync_blocks()
             signers = []
+            self.assignments = {}
             for index in range(self.MINERS):
                 path = self.directory / f'owner-{index:03}.key'; keys.append(path)
                 signers.append(HashSigner.create(self.signer_binary,path,pool=0x11C0,
                     payout_script=b'\x00\x14'+(index+1).to_bytes(20,'big')))
-            collector = self.open('live-collector',signers[0],lambda method,*args:getattr(node,method)(*args))
+                if self.PROFILE_VERSION == 8:
+                    self.assignments[signers[-1].public_key] = opts.share_work_bits[index % len(opts.share_work_bits)]
+            collector = self.open('live-collector',signers[0],lambda method,*args:
+                self.metrics.call('collector.rpc.' + method,getattr(node,method),*args))
             producer = threading.Thread(target=self.produce, args=(signers,[(funding.sha256,index,value)
                 for index in range(self.MINERS)],redeem,script), name='live-native-source')
             producer.start()
@@ -250,20 +392,35 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
             self.phase_start = time.monotonic(); self.begin.set()
             next_block = self.phase_start + opts.settlement_seconds
             acknowledged, admitted, history, rejected = set(), set(), [], 0
+            seen_origins = {}
             phase_end = self.phase_start + opts.duration_seconds
             while (time.monotonic() < phase_end or not self.finished.is_set() or
                    not self.inbox.empty() or acknowledged != admitted):
                 self.bounded()
                 if self.source_error: raise self.source_error
                 try:
-                    raw, opening, proof = self.inbox.get(timeout=.02)
+                    index, key, raw, opening, proof = self.inbox.get(timeout=.02)
+                    assert 0 <= index < self.MINERS
+                    if raw is not None:
+                        assert opening is not None
+                        assert_equal(key, (hashlib.sha256(raw).digest(), hashlib.sha256(opening).digest()))
+                        origin = Snapshot.deserialize(opening)
+                        seen_origins[index] = (key, origin.envelope, origin.owner_signature)
+                    else:
+                        assert opening is None and opts.deduplicate_job_evidence
+                    assert index in seen_origins
+                    assert_equal(seen_origins[index], (key, proof.envelope, proof.owner_signature))
+                    assert_equal(proof.envelope.public_key, signers[index].public_key)
+                    if self.PROFILE_VERSION == 8:
+                        assert_equal(proof.envelope.share_work_bits, self.assignments[signers[index].public_key])
                     if proof.envelope.height < node.getblockcount() + 1 - MAX_SHARE_AGE:
                         self.event('rejected',[proof]); rejected += 1
                     else:
                         with self.metrics.measure('collector.register_and_ack'):
-                            collector.register_snapshot(opening)
-                            collector.register_template(raw)
-                            collector.receive(proof)
+                            if raw is not None:
+                                collector.register_snapshot(opening)
+                                collector.register_template(raw)
+                            assert collector.receive(proof)
                         assert proof.proof_id not in acknowledged
                         acknowledged.add(proof.proof_id); self.event('acknowledged',[proof])
                 except queue.Empty:
@@ -284,14 +441,26 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
             assert_equal(len({row['miner'] for row in self.jobs}),self.MINERS)
             assert node.verifychain(4,0) and follower.verifychain(4,0)
             counts, cursor = Counter(),0
-            for _ in range(16):
+            for _ in range(math.ceil(self.MAX_PLANNED / 256)):
                 page = collector.receipt_status(after_revision=cursor,limit=256)
                 assert not page['history_limited']
                 counts.update(row['status'] for row in page['receipts'])
                 if page['next_revision'] is None:break
                 cursor = page['next_revision']
+            else:
+                raise AssertionError('bounded receipt pagination did not reach the end')
             assert_equal(counts.get('confirmed_admitted',0),len(acknowledged))
             assert_equal(counts.get('expired_unanchored',0),0)
+            with self.lock:
+                complete = phase_counts(self.events, seconds=time.monotonic() - self.phase_start)
+                transfers = self.queue_accounting(self.queue_transfers, seconds=time.monotonic() - self.phase_start)
+            assert_equal(complete['offered'], self.planned)
+            assert_equal(complete['acknowledged'] + complete['rejected'], self.planned)
+            assert_equal(complete['admitted'], len(acknowledged))
+            assert_equal(complete['peer_verified'], len(acknowledged))
+            assert_equal(transfers['transferred_items'], self.planned)
+            assert_equal(transfers['full_origin_items'], len(self.jobs) if opts.deduplicate_job_evidence else self.planned)
+            assert len(seen_origins) <= self.MINERS
             self.report.update(result='passed',receipt_states=dict(counts),expired_acknowledged=0,
                                rejected_before_ack=rejected,payout_oracle_verified=True,peer_verified=True)
             self.report['native_p2p_bytes'] = [{key:peer.getnettotals()[key]-start[key]
@@ -315,11 +484,16 @@ class SharePoolHashLiveCapacityTest(SharePoolHashTides100MinersTest):
                     completed_run=phase_counts(self.events,seconds=max(elapsed,opts.duration_seconds)),
                     source_scheduling_lateness=distribution(self.source_lateness),
                     source_service=distribution(self.source_service),native_tip_retries=self.tip_retries,
+                    source_queue_put_wait=distribution(self.source_queue_wait),
+                    queue_transfers=list(self.queue_transfers),
+                    measured_phase_queue_payload=self.queue_accounting(self.queue_transfers, seconds=opts.duration_seconds),
+                    completed_queue_payload=self.queue_accounting(self.queue_transfers, seconds=elapsed),
                     queue_high_water_items=self.queue_high_water)
             self.report['measured_phase']['scheduled_requests_due'] = self.planned
             self.report['measured_phase']['source_unfulfilled_requests'] = self.planned - self.report['measured_phase']['offered']
             self.report.update(seconds=time.monotonic()-self.started,live_and_drain_seconds=elapsed,
                 catchup_and_drain_seconds=max(0,elapsed-opts.duration_seconds),measurements=self.metrics.report(),
+                source_rpc_measurements=self.source_metrics.report() if producer is None or not producer.is_alive() else None,
                 source_sha256={str(path.relative_to(Path(__file__).resolve().parents[2])):hashlib.sha256(path.read_bytes()).hexdigest()
                     for path in [Path(__file__).resolve(),*sorted((Path(__file__).resolve().parents[2]/'contrib/sharepool').glob('hash_*.py')),
                                  Path(__file__).resolve().parents[2]/'contrib/sharepool/live_capacity_metrics.py']},
