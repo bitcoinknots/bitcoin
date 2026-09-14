@@ -12,6 +12,7 @@
 #include <primitives/transaction.h>
 #include <script/interpreter.h>
 #include <util/check.h>
+#include <uint256.h>
 #include <util/moneystr.h>
 
 bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime)
@@ -172,7 +173,31 @@ bool Consensus::CheckOutputSizes(const CTransaction& tx, TxValidationState& stat
     return true;
 }
 
-bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, const CheckTxInputsRules rules)
+int Consensus::CoinbaseHashMod6(const uint256& creating_block_hash)
+{
+    // Low 64 bits of the uint256 (tail of the displayed hash), not the
+    // PoW-zeroed high word. GetUint64(3) cannot produce residues 4 or 5
+    // at current mainnet difficulty; GetUint64(0) stays uniform.
+    return static_cast<int>(creating_block_hash.GetUint64(0) % 6);
+}
+
+int Consensus::RequiredCoinbaseMaturity(int coinbase_height, int ext_start_height, int ext_expiry_height, int hash_mod6)
+{
+    if (coinbase_height < ext_start_height || coinbase_height >= ext_expiry_height) {
+        return COINBASE_MATURITY;
+    }
+    // ~1/6 of window blocks: 2016; ~2/6: 4032; ~1/2: 8064. Residue is
+    // the creating block's hash (GetUint64(0) % 6), unknown until PoW.
+    const int batch = hash_mod6 % 6;
+    if (batch < 0) {
+        return EXTENDED_COINBASE_MATURITY_LONG;
+    }
+    if (batch == 0) return EXTENDED_COINBASE_MATURITY_SHORT;
+    if (batch == 1 || batch == 2) return EXTENDED_COINBASE_MATURITY_MID;
+    return EXTENDED_COINBASE_MATURITY_LONG;
+}
+
+bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, const CheckTxInputsRules rules, int ext_start_height, int ext_expiry_height, const CBlockIndex* hash_tip)
 {
     // are the actual inputs available?
     if (!inputs.HaveInputs(tx)) {
@@ -192,9 +217,19 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, 
         assert(!coin.IsSpent());
 
         // If prev is coinbase, check that it's matured
-        if (coin.IsCoinBase() && nSpendHeight - coin.nHeight < COINBASE_MATURITY) {
-            return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, "bad-txns-premature-spend-of-coinbase",
-                strprintf("tried to spend coinbase at depth %d", nSpendHeight - coin.nHeight));
+        if (coin.IsCoinBase()) {
+            int hash_mod6 = 5;
+            if (coin.nHeight >= ext_start_height && coin.nHeight < ext_expiry_height) {
+                // No silent "long tranche" fallback: a missing tip would
+                // reject spends that the rest of the network accepts.
+                const CBlockIndex* created{Assert(hash_tip)->GetAncestor(coin.nHeight)};
+                hash_mod6 = CoinbaseHashMod6(Assert(created)->GetBlockHash());
+            }
+            const int maturity = RequiredCoinbaseMaturity(coin.nHeight, ext_start_height, ext_expiry_height, hash_mod6);
+            if (nSpendHeight - coin.nHeight < maturity) {
+                return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, "bad-txns-premature-spend-of-coinbase",
+                    strprintf("tried to spend coinbase at depth %d (maturity %d)", nSpendHeight - coin.nHeight, maturity));
+            }
         }
 
         // Check for negative or overflow input values

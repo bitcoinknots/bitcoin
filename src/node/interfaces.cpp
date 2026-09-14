@@ -10,6 +10,8 @@
 #include <chainparamsbase.h>
 #include <common/args.h>
 #include <common/pcp.h>
+#include <consensus/consensus.h>
+#include <consensus/tx_verify.h>
 #include <consensus/merkle.h>
 #include <consensus/validation.h>
 #include <deploymentstatus.h>
@@ -580,6 +582,24 @@ public:
         LOCK(::cs_main);
         const CBlockIndex* block{chainman().ActiveChain()[height]};
         return block && ((block->nStatus & BLOCK_HAVE_DATA) != 0) && block->nTx > 0;
+    }
+    int coinbaseMaturity(int coinbase_height) override
+    {
+        LOCK(::cs_main);
+        const CBlockIndex* tip{chainman().ActiveChain().Tip()};
+        if (!tip) return COINBASE_MATURITY;
+        int ext_start, ext_expiry;
+        ExtendedCoinbaseMaturityBounds(chainman().GetConsensus(), *tip, ext_start, ext_expiry);
+        int hash_mod6 = 5;
+        if (coinbase_height >= ext_start && coinbase_height < ext_expiry) {
+            // Height comes from a wallet TxStateConfirmed. ActiveChain()[h]
+            // is the creating block while that coin still exists. A miss is a
+            // disconnect race (entry about to be dropped); do not crash RPC.
+            const CBlockIndex* created{chainman().ActiveChain()[coinbase_height]};
+            if (!created) return COINBASE_MATURITY;
+            hash_mod6 = Consensus::CoinbaseHashMod6(created->GetBlockHash());
+        }
+        return Consensus::RequiredCoinbaseMaturity(coinbase_height, ext_start, ext_expiry, hash_mod6);
     }
     bool pruneLockExists(const std::string& name) const override
     {

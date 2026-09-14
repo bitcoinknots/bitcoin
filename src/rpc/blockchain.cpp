@@ -1913,10 +1913,11 @@ RPCHelpMan getblockchaininfo()
 namespace {
 const std::vector<RPCResult> RPCHelpForDeployment{
     {RPCResult::Type::STR, "type", "one of \"buried\", \"bip9\", \"flagday\""},
-    {RPCResult::Type::NUM, "height", /*optional=*/true, "height of the first block which enforces the rules (only for \"buried\" and \"flagday\" types, or \"bip9\" type with \"active\" status; for \"flagday\" this is the BLAKE2b hardfork height)"},
+    {RPCResult::Type::NUM, "height", /*optional=*/true, "height of the first block which enforces the rules (only for \"buried\" and \"flagday\" types, or \"bip9\" type with \"active\" status; for \"reduced_data\" this is the BLAKE2b hardfork height; for \"extended_coinbase_maturity\" it is the activation height on the queried block's chain, present once that chain's median time past has reached start_time)"},
     {RPCResult::Type::NUM, "height_end", /*optional=*/true, "height of the last block which enforces the rules (only for \"bip9\" type with \"active\" status and temporary deployments)"},
     {RPCResult::Type::BOOL, "active", "true if the rules are enforced for the mempool and the next block (the mempool applies the RDTS rules regardless of this flag)"},
-    {RPCResult::Type::NUM_TIME, "expiry_time", /*optional=*/true, "median time past at and after which the rules are no longer enforced (only for \"flagday\" type; a block is past expiry when its parent's median time past has reached this value)"},
+    {RPCResult::Type::NUM_TIME, "start_time", /*optional=*/true, "median time past at and after which the rules are enforced (only for the \"extended_coinbase_maturity\" flag-day deployment)"},
+    {RPCResult::Type::NUM_TIME, "expiry_time", /*optional=*/true, "median time past at and after which new coinbases stop using the extended schedule (only for \"flagday\" type; window-created coins keep their lock)"},
     {RPCResult::Type::OBJ, "bip9", /*optional=*/true, "status of bip9 softforks (only for \"bip9\" type)",
     {
         {RPCResult::Type::NUM, "bit", /*optional=*/true, "the bit (0-28) in the block version field used to signal this softfork (only for \"started\" and \"locked_in\" status)"},
@@ -1945,21 +1946,38 @@ const std::vector<RPCResult> RPCHelpForDeployment{
 // median-time-past reaches RdtsExpiryTime. Reported as-of the queried block,
 // with "active" meaning the next block, like the versionbits entries. Omitted
 // entirely when unscheduled (plain regtest), as NEVER_ACTIVE deployments are.
+void FlagDayDescPushBack(UniValue& softforks, const std::string& name, std::optional<int> height, std::optional<int64_t> start_time, int64_t expiry_time, bool active_next)
+{
+    if (expiry_time == std::numeric_limits<int64_t>::min()) return;
+    UniValue rv(UniValue::VOBJ);
+    rv.pushKV("type", "flagday");
+    if (height) rv.pushKV("height", *height);
+    if (start_time) rv.pushKV("start_time", *start_time);
+    rv.pushKV("expiry_time", expiry_time);
+    rv.pushKV("active", active_next);
+    softforks.pushKV(name, std::move(rv));
+}
+
 void RdtsFlagDayDescPushBack(const CBlockIndex* blockindex, UniValue& softforks, const ChainstateManager& chainman)
 {
     const Consensus::Params& params{chainman.GetConsensus()};
-    if (params.Blake2bHeight == std::numeric_limits<int>::max() ||
-        params.RdtsExpiryTime == std::numeric_limits<int64_t>::min()) return;
+    if (params.Blake2bHeight == std::numeric_limits<int>::max()) return;
+    FlagDayDescPushBack(softforks, "reduced_data", params.RdtsActivationHeight(), std::nullopt, params.RdtsExpiryTime,
+                        params.RdtsActiveAt(blockindex->nHeight + 1, blockindex->GetMedianTimePast()));
+}
 
-    UniValue rv(UniValue::VOBJ);
-    rv.pushKV("type", "flagday");
-    rv.pushKV("height", params.RdtsActivationHeight());
-    rv.pushKV("expiry_time", params.RdtsExpiryTime);
-    // "active" describes the NEXT block, as the versionbits entries do, so the
-    // queried block is that block's parent and its median-time-past is exactly
-    // the parent median-time-past RdtsActiveAt expects.
-    rv.pushKV("active", params.RdtsActiveAt(blockindex->nHeight + 1, blockindex->GetMedianTimePast()));
-    softforks.pushKV("reduced_data", std::move(rv));
+void ExtendedCoinbaseMaturityDescPushBack(const CBlockIndex* blockindex, UniValue& softforks, const ChainstateManager& chainman)
+{
+    const Consensus::Params& params{chainman.GetConsensus()};
+    if (params.ExtendedCoinbaseMaturityStartTime == std::numeric_limits<int64_t>::max()) return;
+    const int64_t mtp{blockindex->GetMedianTimePast()};
+    std::optional<int> height;
+    if (mtp >= params.ExtendedCoinbaseMaturityStartTime) {
+        height = FirstHeightWithParentMtpAtLeast(*blockindex, params.ExtendedCoinbaseMaturityStartTime);
+        if (height == std::numeric_limits<int>::max()) height = std::nullopt;
+    }
+    FlagDayDescPushBack(softforks, "extended_coinbase_maturity", height, params.ExtendedCoinbaseMaturityStartTime, params.RdtsExpiryTime,
+                        params.ExtendedCoinbaseMaturityCreatedAt(mtp));
 }
 
 UniValue DeploymentInfo(const CBlockIndex* blockindex, const ChainstateManager& chainman)
@@ -1973,6 +1991,7 @@ UniValue DeploymentInfo(const CBlockIndex* blockindex, const ChainstateManager& 
     SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_TESTDUMMY);
     SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_TAPROOT);
     RdtsFlagDayDescPushBack(blockindex, softforks, chainman);
+    ExtendedCoinbaseMaturityDescPushBack(blockindex, softforks, chainman);
     return softforks;
 }
 } // anon namespace

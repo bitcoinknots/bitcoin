@@ -123,6 +123,15 @@ struct Params {
      * behaviour is unchanged on chains that do not set it.
      */
     int64_t RdtsExpiryTime{std::numeric_limits<int64_t>::min()};
+    /**
+     * Batched extended coinbase maturity. Coinbase outputs created in a
+     * block whose parent's median-time-past has reached this start time
+     * and has not yet reached RdtsExpiryTime keep a longer maturity
+     * (see RequiredCoinbaseMaturity) even after RDTS expires. Coinbases
+     * created after expiry use COINBASE_MATURITY again.
+     * Default leaves the deployment unscheduled.
+     */
+    int64_t ExtendedCoinbaseMaturityStartTime{std::numeric_limits<int64_t>::max()};
     /** Don't warn about unknown BIP 9 activations below this height.
      * This prevents us from warning about the CSV and segwit activations. */
     int MinBIP9WarningHeight;
@@ -194,6 +203,14 @@ struct Params {
     bool RdtsActiveAt(int height, int64_t mtp_prev) const
     {
         return IsBlake2bHeight(height) && mtp_prev < RdtsExpiryTime;
+    }
+
+    /** Whether a coinbase created in a block with this parent MTP is
+     *  subject to the batched extended-maturity schedule. The schedule
+     *  sticks to those coins after expiry. */
+    bool ExtendedCoinbaseMaturityCreatedAt(int64_t mtp_prev) const
+    {
+        return mtp_prev >= ExtendedCoinbaseMaturityStartTime && mtp_prev < RdtsExpiryTime;
     }
 };
 
