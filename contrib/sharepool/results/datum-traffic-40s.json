@@ -1,0 +1,303 @@
+{
+  "default_comparisons": [
+    {
+      "batching": {
+        "full_100_job_batches": 0,
+        "residual_jobs_costed_as_separate_one_job_snapshots": 1
+      },
+      "block_interval_seconds": 600,
+      "duration_seconds": 86400,
+      "expected_network_blocks": 144.0,
+      "gateways": 1,
+      "illustrative_submissions": {
+        "changes_active_share_difficulty": false,
+        "included_in_payload_estimate": false,
+        "note": "Hypothetical client submission cadence; not active SHIFT10 proof arrivals. Payload fixture contains only one proof record per job.",
+        "per_minute_per_miner": 8,
+        "total_count": 1152000.0
+      },
+      "miners_per_gateway": 100,
+      "plans": {
+        "conservative_additive_allowance": {
+          "changed_jobs_per_second": 0.02666666666666667,
+          "optimistic_shared_batches": {
+            "mean_inbound_Mbps": 0.3550651733333333,
+            "payload_bytes_per_refresh_wave": 1664368,
+            "received_payload_GB": 3.834703872,
+            "received_payload_bytes": 3834703872.0
+          },
+          "refreshes_per_gateway": 2304.0,
+          "separate_full_templates": {
+            "mean_inbound_Mbps": 0.35090794666666664,
+            "payload_bytes_per_refresh_wave": 1644881,
+            "received_payload_GB": 3.789805824,
+            "received_payload_bytes": 3789805824.0
+          }
+        },
+        "steady_state_expected": {
+          "changed_jobs_per_second": 0.025842591906794107,
+          "optimistic_shared_batches": {
+            "mean_inbound_Mbps": 0.34409266405381667,
+            "payload_bytes_per_refresh_wave": 1664368,
+            "received_payload_GB": 3.7162007717812204,
+            "received_payload_bytes": 3716200771.7812204
+          },
+          "refreshes_per_gateway": 2232.7999407470106,
+          "separate_full_templates": {
+            "mean_inbound_Mbps": 0.34006390734591513,
+            "payload_bytes_per_refresh_wave": 1644881,
+            "received_payload_GB": 3.6726901993358836,
+            "received_payload_bytes": 3672690199.3358836
+          }
+        }
+      },
+      "refresh_seconds": 40,
+      "total_miners": 100
+    },
+    {
+      "batching": {
+        "full_100_job_batches": 1,
+        "residual_jobs_costed_as_separate_one_job_snapshots": 0
+      },
+      "block_interval_seconds": 600,
+      "duration_seconds": 86400,
+      "expected_network_blocks": 144.0,
+      "gateways": 100,
+      "illustrative_submissions": {
+        "changes_active_share_difficulty": false,
+        "included_in_payload_estimate": false,
+        "note": "Hypothetical client submission cadence; not active SHIFT10 proof arrivals. Payload fixture contains only one proof record per job.",
+        "per_minute_per_miner": 8,
+        "total_count": 1152000.0
+      },
+      "miners_per_gateway": 1,
+      "plans": {
+        "conservative_additive_allowance": {
+          "changed_jobs_per_second": 2.666666666666667,
+          "optimistic_shared_batches": {
+            "mean_inbound_Mbps": 0.6520334933333333,
+            "payload_bytes_per_refresh_wave": 3056407,
+            "received_payload_GB": 7.041961728,
+            "received_payload_bytes": 7041961728.0
+          },
+          "refreshes_per_gateway": 2304.0,
+          "separate_full_templates": {
+            "mean_inbound_Mbps": 35.09079466666666,
+            "payload_bytes_per_refresh_wave": 164488100,
+            "received_payload_GB": 378.9805824,
+            "received_payload_bytes": 378980582400.0
+          }
+        },
+        "steady_state_expected": {
+          "changed_jobs_per_second": 2.584259190679411,
+          "optimistic_shared_batches": {
+            "mean_inbound_Mbps": 0.6318838304165508,
+            "payload_bytes_per_refresh_wave": 3056407,
+            "received_payload_GB": 6.824345368498749,
+            "received_payload_bytes": 6824345368.498749
+          },
+          "refreshes_per_gateway": 2232.7999407470106,
+          "separate_full_templates": {
+            "mean_inbound_Mbps": 34.00639073459151,
+            "payload_bytes_per_refresh_wave": 164488100,
+            "received_payload_GB": 367.26901993358837,
+            "received_payload_bytes": 367269019933.5884
+          }
+        }
+      },
+      "refresh_seconds": 40,
+      "total_miners": 100
+    },
+    {
+      "batching": {
+        "full_100_job_batches": 1,
+        "residual_jobs_costed_as_separate_one_job_snapshots": 0
+      },
+      "block_interval_seconds": 600,
+      "duration_seconds": 86400,
+      "expected_network_blocks": 144.0,
+      "gateways": 100,
+      "illustrative_submissions": {
+        "changes_active_share_difficulty": false,
+        "included_in_payload_estimate": false,
+        "note": "Hypothetical client submission cadence; not active SHIFT10 proof arrivals. Payload fixture contains only one proof record per job.",
+        "per_minute_per_miner": 8,
+        "total_count": 11520000.0
+      },
+      "miners_per_gateway": 10,
+      "plans": {
+        "conservative_additive_allowance": {
+          "changed_jobs_per_second": 2.666666666666667,
+          "optimistic_shared_batches": {
+            "mean_inbound_Mbps": 0.6520334933333333,
+            "payload_bytes_per_refresh_wave": 3056407,
+            "received_payload_GB": 7.041961728,
+            "received_payload_bytes": 7041961728.0
+          },
+          "refreshes_per_gateway": 2304.0,
+          "separate_full_templates": {
+            "mean_inbound_Mbps": 35.09079466666666,
+            "payload_bytes_per_refresh_wave": 164488100,
+            "received_payload_GB": 378.9805824,
+            "received_payload_bytes": 378980582400.0
+          }
+        },
+        "steady_state_expected": {
+          "changed_jobs_per_second": 2.584259190679411,
+          "optimistic_shared_batches": {
+            "mean_inbound_Mbps": 0.6318838304165508,
+            "payload_bytes_per_refresh_wave": 3056407,
+            "received_payload_GB": 6.824345368498749,
+            "received_payload_bytes": 6824345368.498749
+          },
+          "refreshes_per_gateway": 2232.7999407470106,
+          "separate_full_templates": {
+            "mean_inbound_Mbps": 34.00639073459151,
+            "payload_bytes_per_refresh_wave": 164488100,
+            "received_payload_GB": 367.26901993358837,
+            "received_payload_bytes": 367269019933.5884
+          }
+        }
+      },
+      "refresh_seconds": 40,
+      "total_miners": 1000
+    },
+    {
+      "batching": {
+        "full_100_job_batches": 10,
+        "residual_jobs_costed_as_separate_one_job_snapshots": 0
+      },
+      "block_interval_seconds": 600,
+      "duration_seconds": 86400,
+      "expected_network_blocks": 144.0,
+      "gateways": 1000,
+      "illustrative_submissions": {
+        "changes_active_share_difficulty": false,
+        "included_in_payload_estimate": false,
+        "note": "Hypothetical client submission cadence; not active SHIFT10 proof arrivals. Payload fixture contains only one proof record per job.",
+        "per_minute_per_miner": 8,
+        "total_count": 11520000.0
+      },
+      "miners_per_gateway": 1,
+      "plans": {
+        "conservative_additive_allowance": {
+          "changed_jobs_per_second": 26.666666666666668,
+          "optimistic_shared_batches": {
+            "mean_inbound_Mbps": 6.520334933333333,
+            "payload_bytes_per_refresh_wave": 30564070,
+            "received_payload_GB": 70.41961728,
+            "received_payload_bytes": 70419617280.0
+          },
+          "refreshes_per_gateway": 2304.0,
+          "separate_full_templates": {
+            "mean_inbound_Mbps": 350.90794666666665,
+            "payload_bytes_per_refresh_wave": 1644881000,
+            "received_payload_GB": 3789.805824,
+            "received_payload_bytes": 3789805824000.0
+          }
+        },
+        "steady_state_expected": {
+          "changed_jobs_per_second": 25.842591906794105,
+          "optimistic_shared_batches": {
+            "mean_inbound_Mbps": 6.318838304165507,
+            "payload_bytes_per_refresh_wave": 30564070,
+            "received_payload_GB": 68.24345368498749,
+            "received_payload_bytes": 68243453684.98749
+          },
+          "refreshes_per_gateway": 2232.7999407470106,
+          "separate_full_templates": {
+            "mean_inbound_Mbps": 340.06390734591514,
+            "payload_bytes_per_refresh_wave": 1644881000,
+            "received_payload_GB": 3672.690199335884,
+            "received_payload_bytes": 3672690199335.884
+          }
+        }
+      },
+      "refresh_seconds": 40,
+      "total_miners": 1000
+    }
+  ],
+  "limitations": [
+    "All noncoinbase transactions shared; 100 recipients and one synthetic proof record per job.",
+    "100-job batching is optimistic across independently refreshed gateways; no cross-version deltas.",
+    "Residual gateways are conservatively charged using measured one-job snapshots.",
+    "Excludes dependencies/history, extra share records, protocol framing, request duplication and outbound relay.",
+    "Poisson average block interval is a scenario, not a hard arrival bound; additive allowance counts timer resets twice.",
+    "Refreshing local jobs does not mean every unworked job is relayed by the current evidence protocol.",
+    "No CPU, RAM, disk retention or sustained capacity minimum follows from these payload bytes."
+  ],
+  "measurement": {
+    "batch_jobs": 100,
+    "batch_snapshot_bytes": 3056407,
+    "full_template_bytes": 1644881,
+    "one_job_snapshot_bytes": 1664368,
+    "proof_records_per_job": 1,
+    "recipients_per_job": 100,
+    "sha256": "0e164539aca524b279cb0dde830393cd454b3042d8df740651d4041eba02bdc0",
+    "source": {
+      "block_bytes": 1641689,
+      "block_hash": "00000000000000000002343c98a0a0fe829590dd95565138f56ac940bf36f940",
+      "noncoinbase_raw_bytes": 1641380,
+      "original_coinbase_raw_bytes": 226,
+      "raw_sha256": "d11c21c3d2cdc528c492f89eb57a472ba4a453555ee818ef6dcb4bf58b878df9",
+      "transaction_count": 3547,
+      "url": "https://mempool.space/api/block/00000000000000000002343c98a0a0fe829590dd95565138f56ac940bf36f940/raw"
+    }
+  },
+  "scope": "Analytical payload projection using preserved encoder measurements; not live traffic, throughput, validation, retention or mainnet activation evidence.",
+  "selected_scenario": {
+    "batching": {
+      "full_100_job_batches": 1,
+      "residual_jobs_costed_as_separate_one_job_snapshots": 0
+    },
+    "block_interval_seconds": 600,
+    "duration_seconds": 86400,
+    "expected_network_blocks": 144.0,
+    "gateways": 100,
+    "illustrative_submissions": {
+      "changes_active_share_difficulty": false,
+      "included_in_payload_estimate": false,
+      "note": "Hypothetical client submission cadence; not active SHIFT10 proof arrivals. Payload fixture contains only one proof record per job.",
+      "per_minute_per_miner": 8,
+      "total_count": 1152000.0
+    },
+    "miners_per_gateway": 1,
+    "plans": {
+      "conservative_additive_allowance": {
+        "changed_jobs_per_second": 2.666666666666667,
+        "optimistic_shared_batches": {
+          "mean_inbound_Mbps": 0.6520334933333333,
+          "payload_bytes_per_refresh_wave": 3056407,
+          "received_payload_GB": 7.041961728,
+          "received_payload_bytes": 7041961728.0
+        },
+        "refreshes_per_gateway": 2304.0,
+        "separate_full_templates": {
+          "mean_inbound_Mbps": 35.09079466666666,
+          "payload_bytes_per_refresh_wave": 164488100,
+          "received_payload_GB": 378.9805824,
+          "received_payload_bytes": 378980582400.0
+        }
+      },
+      "steady_state_expected": {
+        "changed_jobs_per_second": 2.584259190679411,
+        "optimistic_shared_batches": {
+          "mean_inbound_Mbps": 0.6318838304165508,
+          "payload_bytes_per_refresh_wave": 3056407,
+          "received_payload_GB": 6.824345368498749,
+          "received_payload_bytes": 6824345368.498749
+        },
+        "refreshes_per_gateway": 2232.7999407470106,
+        "separate_full_templates": {
+          "mean_inbound_Mbps": 34.00639073459151,
+          "payload_bytes_per_refresh_wave": 164488100,
+          "received_payload_GB": 367.26901993358837,
+          "received_payload_bytes": 367269019933.5884
+        }
+      }
+    },
+    "refresh_seconds": 40,
+    "total_miners": 100
+  },
+  "source_sha256": "7bfc05d9e6f623ed9c99605d1bcdf5fb82dfed38257a35279de1c445d4772855"
+}

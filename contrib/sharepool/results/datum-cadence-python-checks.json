@@ -1,0 +1,102 @@
+[
+  {
+    "name": "hash",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "contrib/sharepool",
+      "-p",
+      "test_hash*.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 21.76920325,
+    "cases_run": 226,
+    "skipped": 0,
+    "log": "contrib/sharepool/results/datum-cadence-python-hash.txt"
+  },
+  {
+    "name": "tides",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "contrib/sharepool",
+      "-p",
+      "test_tides*.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.416290042,
+    "cases_run": 83,
+    "skipped": 0,
+    "log": "contrib/sharepool/results/datum-cadence-python-tides.txt"
+  },
+  {
+    "name": "capacity",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "contrib/sharepool",
+      "-p",
+      "test_capacity*.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.13781454199999743,
+    "cases_run": 15,
+    "skipped": 0,
+    "log": "contrib/sharepool/results/datum-cadence-python-capacity.txt"
+  },
+  {
+    "name": "compact-model",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "contrib/sharepool",
+      "-p",
+      "test_compact_resource_model.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.3899832080000003,
+    "cases_run": 7,
+    "skipped": 0,
+    "log": "contrib/sharepool/results/datum-cadence-python-compact-model.txt"
+  },
+  {
+    "name": "traffic-model",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "contrib/sharepool",
+      "-p",
+      "test_datum_traffic_model.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.034118750000001086,
+    "cases_run": 11,
+    "skipped": 0,
+    "log": "contrib/sharepool/results/datum-cadence-python-traffic-model.txt"
+  }
+]

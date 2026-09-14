@@ -1,0 +1,38 @@
+{
+  "result": "passed",
+  "scope": "Native isolated regtest correctness with an injected monotonic refresh clock; no public network, ASIC, latency or capacity claim",
+  "runs": [
+    {
+      "command": "python3 -B test/functional/feature_sharepool_hash_datum_cadence.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-datum-cadence-native-1 --portseed=1510 --nocleanup",
+      "exit_code": 1,
+      "log": "contrib/sharepool/results/datum-cadence-native-initial.txt",
+      "reason": "Fixture publication callback recorded authorization but did not announce its exact snapshot to the native backend. The solved block correctly remained pending with sharepool-hash-data-missing. Corrected callback calls gate.register_snapshot before simulated transport handoff; runtime unchanged."
+    },
+    {
+      "command": "python3 -B test/functional/feature_sharepool_hash_datum_cadence.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-datum-cadence-native-2 --portseed=1511 --nocleanup",
+      "exit_code": 0,
+      "log": "contrib/sharepool/results/datum-cadence-native-second.txt",
+      "report": "contrib/sharepool/results/datum-cadence-native-second-results.json"
+    }
+  ],
+  "verified_source_sha256": {
+    "contrib/sharepool/hash_job_scheduler.py": "3893a55d5c55b677d09f6fa24d88acddbc76d0f833612ca5e008695ca3144d53",
+    "contrib/sharepool/hash_mining_gate.py": "fb317723022963485cdf4ac5c7497c3dc8c4bb44c17a570c974d10434e6b1596",
+    "test/functional/feature_sharepool_hash_datum_cadence.py": "03d07ebedea04fbd7909059786fd075584152ae046f8417e31a3b77dd5e2fcb0"
+  },
+  "daemon_sha256": "2f06596d94347f8491c6506d8474e4ffbfc44243fd41f0bcb884957e108d5365",
+  "signer_sha256": "bbb7b90309010477f0e13866671c84cd05ddb4699c087d55897d6cf10cc169f3",
+  "artifact_sha256": {
+    "contrib/sharepool/results/datum-cadence-native-initial.txt": "ed1b9cd1483dc93283ddb185b2e27aab7d31d9be27a590c73142a1a5ff957772",
+    "contrib/sharepool/results/datum-cadence-native-second.txt": "b996bb499790ae03cdd974c34e0c03132b2df27effb7334de90afefb691b21ed",
+    "contrib/sharepool/results/datum-cadence-native-second-results.json": "1bba1ffb6eac872cfe39ea5406dcf69be89170e7e0374fb5c7976a76e3396d45"
+  },
+  "nodes_stopped": true,
+  "historical_source_notice": "Successful intermediate scheduler before the withdrawal failure latch; superseded by final native verification. Historical source hashes intentionally describe that earlier run.",
+  "superseded_by": "contrib/sharepool/results/datum-cadence-native-verification.json",
+  "log_normalization": {
+    "log": "contrib/sharepool/results/datum-cadence-native-initial.txt",
+    "change": "Removed trailing whitespace from three blank error-log lines; substantive output unchanged",
+    "raw_sha256": "da1bee0e6c47003067fc15034e95980c3ee99d6bb4a4bb558e350f7cd389453e"
+  }
+}

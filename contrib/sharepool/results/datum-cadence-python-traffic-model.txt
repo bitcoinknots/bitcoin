@@ -1,0 +1,16 @@
+test_asic_count_does_not_multiply_template_streams (test_datum_traffic_model.DatumTrafficModelTests) ... ok
+test_default_additive_payload (test_datum_traffic_model.DatumTrafficModelTests) ... ok
+test_duration_scales_bytes_not_average_bandwidth (test_datum_traffic_model.DatumTrafficModelTests) ... ok
+test_extreme_finite_inputs_fail_before_reporting_overflow (test_datum_traffic_model.DatumTrafficModelTests) ... ok
+test_independent_gateways_multiply_template_streams (test_datum_traffic_model.DatumTrafficModelTests) ... ok
+test_invalid_parameters (test_datum_traffic_model.DatumTrafficModelTests) ... ok
+test_preserved_measurements (test_datum_traffic_model.DatumTrafficModelTests) ... ok
+test_refresh_bounds_and_rare_block_limit (test_datum_traffic_model.DatumTrafficModelTests) ... ok
+test_remainder_does_not_invent_unmeasured_compression (test_datum_traffic_model.DatumTrafficModelTests) ... ok
+test_report_preserves_scope_and_selected_inputs (test_datum_traffic_model.DatumTrafficModelTests) ... ok
+test_timer_resets_reduce_expected_refreshes (test_datum_traffic_model.DatumTrafficModelTests) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.003s
+
+OK

@@ -1,0 +1,84 @@
+{
+  "scope": "Exact current v7 encoder bytes using a downloaded real mainnet transaction set and synthetic unique coinbases/headers/one proof record per job. Encoding only; not valid mining jobs, signatures, proof of work, payout accounting or throughput verification. Does not implement a live template-update relay.",
+  "source": {
+    "url": "https://mempool.space/api/block/00000000000000000002343c98a0a0fe829590dd95565138f56ac940bf36f940/raw",
+    "block_hash": "00000000000000000002343c98a0a0fe829590dd95565138f56ac940bf36f940",
+    "block_bytes": 1641689,
+    "transaction_count": 3547,
+    "noncoinbase_raw_bytes": 1641380,
+    "original_coinbase_raw_bytes": 226,
+    "raw_sha256": "d11c21c3d2cdc528c492f89eb57a472ba4a453555ee818ef6dcb4bf58b878df9"
+  },
+  "fixture": {
+    "recipients": 100,
+    "script_kind": "P2WPKH",
+    "unique_coinbase_script_sig_bytes": 100,
+    "original_witness_commitment_output_retained": true,
+    "signature_bytes": "zero placeholders; not authenticated",
+    "hashrate_or_share_difficulty_workload": false,
+    "dependencies_and_previous_history": "excluded",
+    "recipient_values": "one satoshi each, synthetic, not payout correctness"
+  },
+  "rows": [
+    {
+      "jobs": 1,
+      "recipients_per_job": 100,
+      "proof_records": 1,
+      "snapshot_bytes": 1664368,
+      "snapshot_sha256": "6348142229881ab51092b66ec23856707342fac240df968a5e71af32092f8944",
+      "transaction_dictionary_raw_bytes": 1644714,
+      "transaction_dictionary_wire_bytes": 1650136,
+      "transaction_dictionary_count": 3547,
+      "template_records_wire_bytes": 10335,
+      "transaction_reference_bytes": 10135,
+      "transaction_reference_count": 3547,
+      "job_dictionary_wire_bytes": 350,
+      "compact_proof_vector_bytes": 34,
+      "payout_vector_bytes": 3101,
+      "binding_signature_job_history_bytes": 412,
+      "expanded_template_bytes": 1644881,
+      "individual_template_bytes": [
+        1644881
+      ],
+      "coinbase_bytes": [
+        3334
+      ],
+      "all_noncoinbase_transactions_exactly_shared": true,
+      "snapshot_16MiB_limit": true,
+      "expanded_512MiB_limit": true
+    },
+    {
+      "jobs": 100,
+      "recipients_per_job": 100,
+      "proof_records": 100,
+      "snapshot_bytes": 3056407,
+      "snapshot_sha256": "3bd3e659bb53c94f04e9cdcbfecb45367c3195159b9f3b9763762607532398d1",
+      "transaction_dictionary_raw_bytes": 1974780,
+      "transaction_dictionary_wire_bytes": 1980499,
+      "transaction_dictionary_count": 3646,
+      "template_records_wire_bytes": 1034193,
+      "transaction_reference_bytes": 1014292,
+      "transaction_reference_count": 354700,
+      "job_dictionary_wire_bytes": 34901,
+      "compact_proof_vector_bytes": 3301,
+      "payout_vector_bytes": 3101,
+      "binding_signature_job_history_bytes": 412,
+      "expanded_template_bytes": 164488100,
+      "individual_template_bytes": [
+        1644881
+      ],
+      "coinbase_bytes": [
+        3334
+      ],
+      "all_noncoinbase_transactions_exactly_shared": true,
+      "snapshot_16MiB_limit": true,
+      "expanded_512MiB_limit": true
+    }
+  ],
+  "measurement_wall_seconds": 0.6978410829999999,
+  "source_sha256": {
+    "contrib/sharepool/hash_snapshot.py": "075ac241ba3f90517df8521967509df3b9af4d29351bc2ff51bb60c121417492",
+    "contrib/sharepool/native_enforcement.py": "f4fa91005e8b222915cf27fb1f272c369f18d2ea8a33074e1701d777b31d6cba",
+    "test/functional/test_framework/messages.py": "8aca767f013379400e2bf59ddb4cf030a8aa967044155a99932d59410bc9aca2"
+  }
+}

@@ -39,8 +39,12 @@ snapshot, unique dependency bytes, origin count and graph-depth limits. A new
 settlement reserves one additional dependency edge above its selected origins.
 It includes exactly the full origin templates of the selected proofs. Unworked
 issued templates stay archived locally and do not create mandatory refresh
-chains. New acknowledged work or a tip change requires refresh; unrelated
-unworked inventory and archive rotation do not invalidate frozen jobs.
+chains. New acknowledged work prevents initial dispatch using an older
+authorization. An already dispatched job keeps its exact issued cutoff and can
+continue until its scheduled replacement while the native context remains
+current. A tip change requires immediate withdrawal when observed; unrelated
+unworked inventory and archive rotation do not invalidate frozen jobs. The
+[DATUM-style scheduler](sharepool-datum-cadence.md) applies this distinction.
 
 Deferred receipts retain their exact evidence and receipt revision. Creating or
 authorizing a job does not mark its work paid. `batch_status()` reports the next

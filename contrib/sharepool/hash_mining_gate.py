@@ -1485,16 +1485,32 @@ class HashMiningGate:
             # altered with object.__setattr__. They are data, not authority.
             return False
 
-    def needs_refresh(self, authorization):
+    def _dispatch_context_current(self, authorization, *, newer_receipts=False):
         if not self._issued_authorization(authorization):
-            return True
+            return False
         self._check_seal()
         height, tip = self._context()
         head = self._head()
         self._stable(tip)
-        return (tip != authorization.native_parent or height != authorization.native_height or
-                head["receipt_revision"] != authorization.receipt_sequence or
-                head["events"] < authorization.evidence_sequence)
+        receipts = head["receipt_revision"]
+        return (tip == authorization.native_parent and height == authorization.native_height and
+                (receipts >= authorization.receipt_sequence if newer_receipts else
+                 receipts == authorization.receipt_sequence) and
+                head["events"] >= authorization.evidence_sequence)
+
+    def needs_refresh(self, authorization):
+        return not self._dispatch_context_current(authorization)
+
+    def ready_for_continued_work(self, authorization):
+        """Check context for an already dispatched job with its fixed cutoff.
+
+        Later acknowledged receipts belong to a subsequent job; they cannot
+        rewrite the bytes already being hashed. This is not initial dispatch
+        approval or evidence that a caller actually dispatched the capability.
+        A scheduler must track that handoff itself and still use the strict
+        ready_for_dispatch fence for every new job. No validity is cached here.
+        """
+        return self._dispatch_context_current(authorization, newer_receipts=True)
 
     def ready_for_dispatch(self, authorization):
         """Fence initial dispatch of a job issued by this open gate instance.
