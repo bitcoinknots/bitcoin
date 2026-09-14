@@ -1,0 +1,17 @@
+[  0%] Generating bitcoin-build-info.h
+[  1%] Built target crc32c
+[ 14%] Built target leveldb
+[ 14%] Built target generate_build_info
+[ 18%] Built target bitcoin_consensus
+[ 20%] Built target univalue
+[ 21%] Built target secp256k1_precomputed
+[ 29%] Built target bitcoin_crypto
+[ 30%] Built target bitcoin_clientversion
+[ 43%] Built target bitcoin_util
+[ 63%] Built target bitcoin_common
+[ 63%] Built target secp256k1
+[ 65%] Building CXX object src/CMakeFiles/bitcoin_node.dir/validation.cpp.o
+[ 65%] Linking CXX static library ../lib/libbitcoin_node.a
+[ 98%] Built target bitcoin_node
+[100%] Linking CXX executable ../bin/bitcoind
+[100%] Built target bitcoind

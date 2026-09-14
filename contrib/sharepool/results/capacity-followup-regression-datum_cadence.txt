@@ -1,0 +1,12 @@
+2026-09-14T08:06:06.352000Z TestFramework (INFO): PRNG seed is: 4093004501579794082
+2026-09-14T08:06:06.352000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-capacity-followup-regression-datum_cadence
+2026-09-14T08:06:07.871000Z TestFramework (INFO): The first job freezes its exact snapshot and one-recipient coinbase
+2026-09-14T08:06:08.028000Z TestFramework (INFO): A real mempool transaction and late ACK do not rewrite or repeatedly rebuild active work
+2026-09-14T08:06:08.054000Z TestFramework (INFO): At the 40-second deadline the next native job includes the transaction and both ACKs
+2026-09-14T08:06:08.217000Z TestFramework (INFO): A solved older job remains valid with its original commitment and original payout
+2026-09-14T08:06:08.225000Z TestFramework (INFO): A new native block bypasses the interval and retains the late work for the next block
+2026-09-14T08:06:08.575000Z TestFramework (INFO): Actual native rollback and restoration each replace stale work immediately
+2026-09-14T08:06:08.904000Z TestFramework (INFO): Invalid signing and a real tip change during signing never publish replacement work
+2026-09-14T08:06:09.789000Z TestFramework (INFO): Stopping nodes
+2026-09-14T08:06:09.961000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-capacity-followup-regression-datum_cadence
+2026-09-14T08:06:09.961000Z TestFramework (INFO): Tests successful

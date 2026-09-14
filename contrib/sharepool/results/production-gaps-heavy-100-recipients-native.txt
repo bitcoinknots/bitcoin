@@ -1,0 +1,11 @@
+2026-09-14T07:39:40.988000Z TestFramework (INFO): PRNG seed is: 883919137233554561
+2026-09-14T07:39:40.989000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-gaps-heavy-100-recipients
+2026-09-14T07:39:53.364000Z TestFramework (INFO): Capacity epoch 1/1: 100 distinct native origins, layout=shared, padding outputs=0, witness-heavy=True
+2026-09-14T07:41:21.054000Z TestFramework (INFO): Epoch 1: 25/100 native origins ready
+2026-09-14T07:42:48.506000Z TestFramework (INFO): Epoch 1: 50/100 native origins ready
+2026-09-14T07:44:16.311000Z TestFramework (INFO): Epoch 1: 75/100 native origins ready
+2026-09-14T07:45:44.410000Z TestFramework (INFO): Epoch 1: 100/100 native origins ready
+2026-09-14T07:56:43.801000Z TestFramework (INFO): Epoch 1: 100 offers admitted in 1 blocks; zero expired
+2026-09-14T07:56:48.620000Z TestFramework (INFO): Stopping nodes
+2026-09-14T07:56:48.856000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-gaps-heavy-100-recipients
+2026-09-14T07:56:48.856000Z TestFramework (INFO): Tests successful

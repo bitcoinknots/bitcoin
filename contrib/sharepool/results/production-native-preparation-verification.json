@@ -1,0 +1,268 @@
+{
+  "schema": 1,
+  "created_utc": "2026-09-14T07:08:00.621638+00:00",
+  "result": "passed",
+  "base_commit": "c94b5cbc90db3c6b76b9fed5adbc316b91d5f36e",
+  "scope": "Native operation-local canonical preparation reuse and bounded per-invocation decoded evidence; unchanged consensus, wire, activation, ancestry, UTXOs and payouts.",
+  "source_sha256": {
+    "src/consensus/sharepool_hash.cpp": "eef5ff846677ed7f87596123cbf5b39b8c4046f57849fb08a6345b5225d070c0",
+    "src/validation.cpp": "4fd600e2a8eccde918cd11809034056d2fb2f3aca7faf7479e3ae7d785715864",
+    "src/sharepool/hash_validation_cache.h": "262f7a96b5fe864575b5b431eef28c5dd4bd7879a2048290f1b2a49bcb650f9f",
+    "src/test/sharepool_hash_tests.cpp": "b28834ce639d95ad7063dd99814263957f42e57972dea6fc2e5c3e6493125883",
+    "src/test/sharepool_retry_worker_tests.cpp": "7cd35dea9a6f3b528cb0ebbc5470fa9fef09982ea7f8d6b02de20403516799b6"
+  },
+  "binary_sha256": {
+    "bitcoind": "51eb7431fe7dd24dbf2c9ac0435250efa83e74ebf4271e05f489eadad0c5a22f",
+    "test_bitcoin": "97787f6245bf8d72a8b1b3abeb27f42e2f430b1a6160d6a68c2551890a2eee45",
+    "bitcoin-sharepool-signer": "f15733df130248e8eaaab9d97ac22073138b628b8232b66d4dd9aaac5021e9c9",
+    "bitcoin-cli": "209be0ccea742ef5b4510c770fb112c462240b3846ae54ea38325f617167109b"
+  },
+  "build": {
+    "path": "/private/tmp/sharepool-native-build",
+    "type": "Debug",
+    "exit_code": 0,
+    "targets": [
+      "bitcoind",
+      "test_bitcoin",
+      "bitcoin-sharepool-signer",
+      "bitcoin-cli"
+    ]
+  },
+  "cpp": {
+    "cases": 57,
+    "new_cases": 2,
+    "exit_code": 0,
+    "command": [
+      "/private/tmp/sharepool-native-build/bin/test_bitcoin",
+      "--run_test=sharepool_hash_tests,sharepool_retry_worker_tests,sharepool_tides_consensus_tests",
+      "--log_level=test_suite"
+    ],
+    "log": "contrib/sharepool/results/production-native-preparation-cpp.txt",
+    "sha256": "c32d52f3f774573d7e733d3f9bcd26ccfb40b721fd95105ef7fb9f770e0f4a5a"
+  },
+  "capacity": {
+    "configuration": {
+      "profile_version": 7,
+      "miners": 30,
+      "epochs": 3,
+      "shares_per_origin": 3,
+      "padding_outputs": 0,
+      "template_layout": "cumulative",
+      "witness_heavy": false,
+      "resource_diagnostics": false,
+      "snapshot_budget_bytes": 0,
+      "batch_fraction": 0.75,
+      "offer_interval_ms": 0,
+      "settle_every": 0,
+      "max_runtime_seconds": 600
+    },
+    "arms": [
+      {
+        "arm": "before",
+        "path": "contrib/sharepool/results/production-native-preparation-before.json",
+        "sha256": "525c357913b79669813bdbc7b894624da7ece624290b10e148384303f71fb30e",
+        "binary_sha256": "4cf54b5fadd3d4cee0354feb609508d0cf1107c7d0ccdf3935f862a15717678d",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "test/functional/feature_sharepool_hash_capacity.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-native-sample-before",
+          "--portseed=1691",
+          "--nocleanup",
+          "--profile-version=7",
+          "--miners=30",
+          "--epochs=3",
+          "--shares-per-origin=3",
+          "--template-layout=cumulative",
+          "--max-runtime-seconds=600",
+          "--results=/private/tmp/sharepool-native-sample-before.json"
+        ],
+        "result": "passed",
+        "offered": 270,
+        "acknowledged": 270,
+        "admitted": 270,
+        "blocks": 7,
+        "expired": 0,
+        "payout_oracle_verified": true,
+        "peer_recovery_verified": true
+      },
+      {
+        "arm": "after",
+        "path": "contrib/sharepool/results/production-native-preparation-after.json",
+        "sha256": "1c0dd231e6c69c87032726fb0b6c56c13bb244bf830b6fa4dcb5d37cc0b38e31",
+        "binary_sha256": "51eb7431fe7dd24dbf2c9ac0435250efa83e74ebf4271e05f489eadad0c5a22f",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "test/functional/feature_sharepool_hash_capacity.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-native-preparation-after",
+          "--portseed=1692",
+          "--nocleanup",
+          "--profile-version=7",
+          "--miners=30",
+          "--epochs=3",
+          "--shares-per-origin=3",
+          "--template-layout=cumulative",
+          "--max-runtime-seconds=600",
+          "--results=/private/tmp/sharepool-native-preparation-after.json"
+        ],
+        "result": "passed",
+        "offered": 270,
+        "acknowledged": 270,
+        "admitted": 270,
+        "blocks": 7,
+        "expired": 0,
+        "payout_oracle_verified": true,
+        "peer_recovery_verified": true
+      }
+    ],
+    "seconds": {
+      "before": 89.33104470900001,
+      "after": 82.965155875,
+      "reduction_percent": 7.126177528469746
+    },
+    "node0_cpu_seconds": {
+      "before": 38.17,
+      "after": 33.190000000000005,
+      "reduction_percent": 13.046895467644736
+    },
+    "epochs": [
+      {
+        "epoch": 1,
+        "origin_preparation_seconds": {
+          "before": 5.100561042,
+          "after": 5.08950275,
+          "reduction_percent": 0.21680540452200248
+        },
+        "admission_seconds": {
+          "before": 1.3327792909999996,
+          "after": 1.2892589999999995,
+          "reduction_percent": 3.2653786935229356
+        }
+      },
+      {
+        "epoch": 2,
+        "origin_preparation_seconds": {
+          "before": 12.587856082999998,
+          "after": 11.359356875,
+          "reduction_percent": 9.759399852522122
+        },
+        "admission_seconds": {
+          "before": 7.376052334000001,
+          "after": 6.594826458,
+          "reduction_percent": 10.591381956428513
+        }
+      },
+      {
+        "epoch": 3,
+        "origin_preparation_seconds": {
+          "before": 18.387082917,
+          "after": 16.968030250000005,
+          "reduction_percent": 7.717660671927429
+        },
+        "admission_seconds": {
+          "before": 13.321230208000003,
+          "after": 11.937265374999996,
+          "reduction_percent": 10.38916685163862
+        }
+      }
+    ],
+    "rpc_total_seconds": {
+      "rpc.node0.preparesharepoolhashjob": {
+        "before": 5.092101871999963,
+        "after": 4.215300331000002,
+        "reduction_percent": 17.21885309917397
+      },
+      "rpc.node0.finalizesharepoolhashjob": {
+        "before": 3.272238664000075,
+        "after": 2.700313499999991,
+        "reduction_percent": 17.478100552144525
+      },
+      "rpc.node0.validatesharepoolhashtemplate": {
+        "before": 11.651446967000027,
+        "after": 9.462307496999973,
+        "reduction_percent": 18.78856313898415
+      },
+      "rpc.node0.validatesharepoolhashshare": {
+        "before": 7.4998865030001,
+        "after": 5.992568884000036,
+        "reduction_percent": 20.09787239309698
+      },
+      "rpc.node1.validatesharepoolhashshare": {
+        "before": 2.697391623000012,
+        "after": 2.20775925100002,
+        "reduction_percent": 18.152068384324103
+      }
+    }
+  },
+  "diagnostic_sample": {
+    "command": [
+      "sample",
+      "47812",
+      "20",
+      "1",
+      "-file",
+      "/private/tmp/sharepool-native-sample-before.txt"
+    ],
+    "sha256": "035330212e47e7863855001de59bd873f668090cf1a8e7432dff68fb76a968cc",
+    "finding": "Repeated PrepareSnapshot construction appears within compact-state commitment and owner-signature digest validation."
+  },
+  "limitations": [
+    "One sequential 30-miner pair, random keys/proofs, 270 proofs/seven forced settlement blocks. No confidence interval, isolated-host, hardware, WAN or sustained saturation guarantee.",
+    "Baseline had a 20-second CPU sampler attached; after did not. Sampling overhead and competing host load can affect timings.",
+    "The original 100-miner later-round 137-second workload was not rerun by this subtask.",
+    "New invocations call GetShared, which may retain authenticated raw bytes; cache hits within an invocation reuse immutable decoded evidence.",
+    "The existing owned TIDES admission-summary cache remains unchanged. A standalone warm payout query may reuse its summary; full validation still requires recent snapshot dependencies.",
+    "Decoded caches are bounded per invocation, not across concurrent RPCs or whole-process RSS.",
+    "Cross-RPC canonical hashes, native checks, durable I/O and index work under cs_main remain; no lock-latency guarantee."
+  ],
+  "development_notes": [
+    "Initial new-test assertions overrequired standalone warm payout queries to refetch retained authenticated summaries. Corrected two assertions to test full CheckSnapshot availability; runtime code unchanged.",
+    "A targeted Boost filter matched no tests. Final complete 57-case suite passed with corrected source.",
+    "Independent read-only review by archive_bound found no blocking correctness issue."
+  ],
+  "publication": {
+    "original_manifest_sha256": "dfe8dcf72caf5f00e6bd4540caaab9aac5c65f141ae5427ef048abb6e2ce7a24",
+    "changes": "Only artifact path references were changed; capture measurements, commands, source and binary hashes are preserved. Added this publication inventory. CPU sampler raw stays private.",
+    "artifacts": [
+      {
+        "path": "contrib/sharepool/results/production-native-preparation-before.json",
+        "source_capture": "/private/tmp/sharepool-native-sample-before.json",
+        "sha256": "525c357913b79669813bdbc7b894624da7ece624290b10e148384303f71fb30e",
+        "copy": "byte-identical"
+      },
+      {
+        "path": "contrib/sharepool/results/production-native-preparation-before-native.txt",
+        "source_capture": "/private/tmp/sharepool-native-sample-before/test_framework.log",
+        "sha256": "0134d019e5641dfeba70538e24606a35a1e1b0153980727eb75852f84d33d9e4",
+        "copy": "byte-identical"
+      },
+      {
+        "path": "contrib/sharepool/results/production-native-preparation-after.json",
+        "source_capture": "/private/tmp/sharepool-native-preparation-after.json",
+        "sha256": "1c0dd231e6c69c87032726fb0b6c56c13bb244bf830b6fa4dcb5d37cc0b38e31",
+        "copy": "byte-identical"
+      },
+      {
+        "path": "contrib/sharepool/results/production-native-preparation-after-native.txt",
+        "source_capture": "/private/tmp/sharepool-native-preparation-after.txt",
+        "sha256": "b74d85f28a2f9637395f0010dbaa48fbe9df5a7a17775b17ed8bb7229c8ee01e",
+        "copy": "byte-identical"
+      },
+      {
+        "path": "contrib/sharepool/results/production-native-preparation-cpp.txt",
+        "source_capture": "/private/tmp/sharepool-native-preparation-cpp-final-clean.txt",
+        "sha256": "c32d52f3f774573d7e733d3f9bcd26ccfb40b721fd95105ef7fb9f770e0f4a5a",
+        "copy": "byte-identical"
+      }
+    ]
+  },
+  "reconstructable_native_source": {
+    "base_commit": "c94b5cbc90db3c6b76b9fed5adbc316b91d5f36e",
+    "path": "contrib/sharepool/results/production-native-preparation-source.diff",
+    "sha256": "7099d6fc89a6780ea57a700fcdc95fa145bf8132e4b8a16a122d4ce7b9fd7f85",
+    "apply_check": true,
+    "applied_file_sha256_matches": true,
+    "scope": "Exact pre-shared-budget native sources used for 51eb7431fe7dd24dbf2c9ac0435250efa83e74ebf4271e05f489eadad0c5a22f; no deterministic binary reproduction claim."
+  }
+}

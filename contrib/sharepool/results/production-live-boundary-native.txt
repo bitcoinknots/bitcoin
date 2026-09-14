@@ -1,0 +1,6 @@
+2026-09-14T07:01:22.086000Z TestFramework (INFO): PRNG seed is: 8764911586256310238
+2026-09-14T07:01:22.086000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-live-boundary
+2026-09-14T07:01:34.740000Z TestFramework (INFO): Live block 102 admitted 20 proofs; source continues independently
+2026-09-14T07:01:35.183000Z TestFramework (INFO): Stopping nodes
+2026-09-14T07:01:35.350000Z TestFramework (INFO): Cleaning up /private/tmp/sharepool-production-live-boundary on exit
+2026-09-14T07:01:35.350000Z TestFramework (INFO): Tests successful

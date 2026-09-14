@@ -1,0 +1,2634 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "started_utc": "2026-09-14T07:31:53.920450+00:00",
+  "command": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/private/tmp/sharepool-native-retention-ab-r2/benchmark_retention.py",
+    "--repo",
+    "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool",
+    "--source-node",
+    "/private/tmp/sharepool-production-gaps-native-followup-capacity-100/node0",
+    "--journal",
+    "/private/tmp/sharepool-production-gaps-native-followup-capacity-100/capacity-gates/collector.sqlite",
+    "--workdir",
+    "/private/tmp/sharepool-native-retention-ab-r2",
+    "--results",
+    "/private/tmp/sharepool-native-retention-ab-r2/results.json"
+  ],
+  "script_sha256": "9cc5bc969dda832d26e806ccddfe47ccc59d558254dcaf4ee1cc3bf1e2aa0a1b",
+  "requests_sha256": "a49f1b5fb641e6202dfc6ae67460503c5cc7f8d9829fe3fa15ba275a1926e473",
+  "request_count": 100,
+  "warmup_passes": 1,
+  "measured_passes": 1,
+  "rpc_threads": 1,
+  "order": [
+    "on-first",
+    "off",
+    "on-second"
+  ],
+  "profile_marker_sha256": "0dcdd18ae17692047ee6b116580fdfe3144b4a846309d87720643be79263499a",
+  "source_tree_sha256": "360d6ee3de48e755bb0a0dbc58aa2c20c242e2a03161a7bf246fd71419a0e728",
+  "arms": [
+    {
+      "arm": "on-first",
+      "binary_sha256": "51eb7431fe7dd24dbf2c9ac0435250efa83e74ebf4271e05f489eadad0c5a22f",
+      "command": [
+        "/private/tmp/sharepool-native-retention-ab-r2/bitcoind-retention-on",
+        "-datadir=/private/tmp/sharepool-production-gaps-native-followup-capacity-100/node0",
+        "-regtest",
+        "-sharepoolheight=102",
+        "-sharepoolhashonly=1",
+        "-sharepooltides=1",
+        "-sharepoolcompacttides=1",
+        "-testactivationheight=blake2b@1",
+        "-disablewallet",
+        "-corepolicy",
+        "-softwareexpiry=0",
+        "-walletimplicitsegwit",
+        "-networkactive=0",
+        "-maxconnections=0",
+        "-connect=0",
+        "-rpcthreads=1",
+        "-rpcport=26743",
+        "-rpcbind=127.0.0.1",
+        "-printtoconsole=0"
+      ],
+      "native_tip": "169ec0733b2e15c8259db658c2dbc1330b7c16e8ec22e45441f313a9fe549170",
+      "native_height": 109,
+      "wall_seconds": 24.252492417000003,
+      "cpu_seconds": 24.19,
+      "response_sha256": "c0b196d5311c4193f92730b55a9adb836dc6e054639ed867c4214344f20f4ed8",
+      "controls": [
+        {
+          "error": {
+            "code": -26,
+            "message": "bad-sharepool-hash-share-authorization"
+          }
+        },
+        {
+          "error": {
+            "code": -25,
+            "message": "sharepool-hash-data-missing"
+          }
+        }
+      ],
+      "responses_match": true,
+      "samples": [
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11977237500000015
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11923254199999889
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12322616700000211
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1220791659999989
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12075008400000087
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12069874999999897
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12059112500000069
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12005674999999982
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12367924999999858
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12202366700000056
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11874916700000071
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11636624999999867
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1246294170000013
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12263537499999799
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11814250000000115
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11635812499999787
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1200268340000008
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1200801250000012
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12009354199999933
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11988708399999837
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12450137500000125
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12287212499999711
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1243399580000002
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12264133300000069
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12544408299999787
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12391604100000109
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12237125000000049
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12207233300000198
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12166741699999761
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12134624999999843
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12155945800000012
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11880633300000198
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12055608300000031
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11992695900000072
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1202787499999971
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11982316699999984
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12088337500000179
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12008699999999806
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12208379200000152
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12157345900000038
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12399412500000295
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12199783299999822
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12327395799999863
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12170883299999957
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12339079199999858
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1217701670000011
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12260762500000055
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12187208299999952
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12130791700000287
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12087433300000328
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11887837499999421
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11673687500000085
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12044470899999737
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12060787499999748
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1210750000000047
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12077979200000044
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1208037920000038
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12018970799999806
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12001654099999826
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11992908299999527
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12466437500000183
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12428541700000295
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11999699999999791
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12031429200000332
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1181198330000015
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11679466700000063
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11827345800000444
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11619508299999382
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12391479200000077
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12251612499999709
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12042608299999813
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12030083399999825
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12443879199999941
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12193191700000483
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12339599999999962
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12241862499999456
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12076408299999741
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12039033299999602
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12305308299999496
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12211004199999564
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11824170899999586
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11612075000000033
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12091858400000177
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12226312500000347
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1242737500000004
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12307158299999799
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12043637500000415
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12027295800000104
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11889200000000244
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11679008299999794
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12361383300000028
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12252387499999884
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11954704100000413
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11929804199999694
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11815974999999668
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1163972909999984
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11986012499999532
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12011220899999842
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11997874999999425
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11912208399999713
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12349933399999458
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12183266599999598
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1231034159999993
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12141391600000162
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11842224999999473
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1156992499999987
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12310945799999473
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12212820799999946
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11803349999999568
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11618474999999506
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12048062499999901
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1202700830000012
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12130354100000318
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12215337500000345
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12023233299999703
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12029216700000234
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12478041600000012
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12290920799999583
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12352083300000061
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12380720899999886
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12236370800000174
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12146375000000376
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11924833399999812
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11690941700000224
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12027954199999868
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11992074999999858
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12132400000000132
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12014674999999642
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12329420900000088
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12255875000000316
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12053741599999768
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11994629200000162
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11995654100000053
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12154491600000483
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12074791700000276
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11968837500000262
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.14759349999999927
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.13276954100000182
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12383958299999875
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12268779200000068
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.123862625000001
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12224395799999854
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1208388749999969
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12033679199999625
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12372620800000078
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12269866699999454
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12317725000000479
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12198941699999466
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12150891699999988
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12078875000000266
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12609462500000035
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12364600000000081
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1246002500000003
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12342670799999667
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12584541700000074
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1226524160000011
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11868845899999769
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11656904200000184
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12111895799999672
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12007154199999803
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11848475000000036
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11650420799999495
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12118629199999731
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11986816699999991
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12298004200000179
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12218825000000066
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.123436875000003
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12182862500000624
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12428374999999647
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12266008299999953
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11981629099999935
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11963870800000365
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1235349160000041
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1224719169999986
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11810995900000165
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1169930830000041
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12463966700000384
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1220629160000044
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12413466699999987
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12382479099999699
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11880137499999677
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11721941599999752
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12033704099999909
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12013599999999514
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12078691700000377
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12059212499999461
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11945216600000208
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11860291600000039
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12193570900000594
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12038237499999838
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12341370800000107
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12216033400000015
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11855624999999748
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11636675000000452
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12065016600000433
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12077820799999728
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12436637500000103
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12203329100000104
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12058787499999823
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12022537499999686
+        }
+      ],
+      "methods": {
+        "validatesharepoolhashshare": {
+          "count": 100,
+          "total_seconds": 12.067466745999951,
+          "p50_seconds": 0.12069874999999897,
+          "p95_seconds": 0.12364600000000081,
+          "maximum_seconds": 0.13276954100000182
+        },
+        "validatesharepoolhashtemplate": {
+          "count": 100,
+          "total_seconds": 12.184735082999993,
+          "p50_seconds": 0.12111895799999672,
+          "p95_seconds": 0.12466437500000183,
+          "maximum_seconds": 0.14759349999999927
+        }
+      },
+      "result": "passed"
+    },
+    {
+      "arm": "off",
+      "binary_sha256": "1afc73663c50a64045f946157de5ba51d627712a6d9265497139d4fdc7b81c07",
+      "command": [
+        "/private/tmp/sharepool-native-retention-ab-r2/bitcoind-retention-off",
+        "-datadir=/private/tmp/sharepool-production-gaps-native-followup-capacity-100/node0",
+        "-regtest",
+        "-sharepoolheight=102",
+        "-sharepoolhashonly=1",
+        "-sharepooltides=1",
+        "-sharepoolcompacttides=1",
+        "-testactivationheight=blake2b@1",
+        "-disablewallet",
+        "-corepolicy",
+        "-softwareexpiry=0",
+        "-walletimplicitsegwit",
+        "-networkactive=0",
+        "-maxconnections=0",
+        "-connect=0",
+        "-rpcthreads=1",
+        "-rpcport=26743",
+        "-rpcbind=127.0.0.1",
+        "-printtoconsole=0"
+      ],
+      "native_tip": "169ec0733b2e15c8259db658c2dbc1330b7c16e8ec22e45441f313a9fe549170",
+      "native_height": 109,
+      "wall_seconds": 24.107183875000004,
+      "cpu_seconds": 24.040000000000003,
+      "response_sha256": "c0b196d5311c4193f92730b55a9adb836dc6e054639ed867c4214344f20f4ed8",
+      "controls": [
+        {
+          "error": {
+            "code": -26,
+            "message": "bad-sharepool-hash-share-authorization"
+          }
+        },
+        {
+          "error": {
+            "code": -25,
+            "message": "sharepool-hash-data-missing"
+          }
+        }
+      ],
+      "responses_match": true,
+      "samples": [
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11949620800000105
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11828154100000177
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12219637500000147
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12070945799999322
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11914887500000759
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11908620900000244
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11837029199999449
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11869020899999327
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12193045899999788
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12090591700000175
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11743191699999045
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11508591700000181
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12326029199999766
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12122941700000922
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11789008400000967
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11576154200000133
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11937058299999137
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11937279199999296
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11922908300000756
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1190706250000062
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12388324999999156
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12205741600000408
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12303229100000124
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12200729199999216
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12309645899999566
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12150191700000335
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11918566600000702
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11886320799999339
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11856145800000206
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1182741669999956
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1170189999999991
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11496787500000494
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11949733400000184
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11905737499999702
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11898850000000039
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12016870899999788
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1199427079999964
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11925891699999625
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12195824999999161
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12146333300000833
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12288012499999468
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12206395799999825
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12253850000000455
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12280066700000702
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12363337499999716
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12172616600000197
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1261671669999913
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12426800000000071
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12043387500000335
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1201484999999991
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1194435000000027
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11621933399999307
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11926041600000303
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1201707080000034
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12120408299999497
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12193695900000989
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12224795799998844
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1189862909999988
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1201403750000054
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1195107090000107
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12586995799999556
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12153666700000088
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12073937499999943
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11942683299999146
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11761508400000764
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11638200000000154
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11769737500000588
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11542270900000062
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12244162499999334
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1212694170000077
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11941408299999523
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11933970799999827
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12182708299999945
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12110625000001107
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12246079100000884
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12188358400000254
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12088087499999745
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11947983299999976
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12190387499998678
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12087550000001102
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11708333400000015
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1150598340000073
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11909395799999345
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11933429100000126
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1225927079999991
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1217992090000024
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11914458299999353
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11915074999998865
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11829774999999643
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11608754200000249
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12347887500000354
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12166100000000313
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11888300000001095
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11872829200000012
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11772212500000023
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11540241600000911
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11961695800000882
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11877941699999894
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11999479199999996
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11956541600000037
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12325729199999103
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12292779099999507
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12271841599999789
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12106145799999979
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1172825419999981
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11527854199999865
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12213008400000547
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12124191600000245
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11698437500000125
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11580308300000297
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12194033400000137
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12082045799999719
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12203216700000041
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12112429200000463
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12298908300000733
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1285977499999973
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.13168233300000054
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12446475000000135
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12531054199999403
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12171458299999927
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12008074999999963
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11984837500000367
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11784433399999727
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11580170800000644
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11972799999999495
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12340479099999868
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.121748249999996
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1197167090000022
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12291029200000025
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12126729199999886
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11911291599999174
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11889383399999076
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11886870800000793
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11914525000000253
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11917449999999974
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11894537499999558
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.13597066600000574
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.14097016700000609
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1230304169999954
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12160333300001014
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12306512499999656
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12108616700000141
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12030091599999082
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11960316600000453
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12391495900000393
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1215315419999996
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12233079199999963
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12054833300000212
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11916775000000257
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11992883300000301
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12336441600000114
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12193908400000453
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12314416699999242
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12201979200000324
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1222997079999999
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12275062499999478
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11760187500000541
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11548779199999615
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11957837500000323
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12072299999999814
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11817437499999528
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11541862500000377
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11915329099998928
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11879916600000229
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12208558400000413
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12178608300000349
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12192416700000308
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12126283399999238
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12328470799999991
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12251654099999598
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11882016600000611
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1186694579999994
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1232684579999983
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12343354200000078
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11694041700000923
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11534375000000807
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12163916699999788
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12108199999998703
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12290645800000277
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12129887500000791
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1175227920000026
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11551108400000487
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11944191700000317
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11920449999999505
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12034766599998648
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11972537500000158
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11764220800000658
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11571112500000424
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12073908300000369
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.119659249999998
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1266577079999962
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12292941599999097
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11707316700000092
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11529858400000137
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11953808399999843
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11947662500000433
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12284645799999794
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12143875000001003
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1234922500000124
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12286270799999954
+        }
+      ],
+      "methods": {
+        "validatesharepoolhashshare": {
+          "count": 100,
+          "total_seconds": 12.00561387800009,
+          "p50_seconds": 0.11992883300000301,
+          "p95_seconds": 0.12340479099999868,
+          "maximum_seconds": 0.14097016700000609
+        },
+        "validatesharepoolhashtemplate": {
+          "count": 100,
+          "total_seconds": 12.101258872999964,
+          "p50_seconds": 0.12043387500000335,
+          "p95_seconds": 0.12531054199999403,
+          "maximum_seconds": 0.13597066600000574
+        }
+      },
+      "result": "passed"
+    },
+    {
+      "arm": "on-second",
+      "binary_sha256": "51eb7431fe7dd24dbf2c9ac0435250efa83e74ebf4271e05f489eadad0c5a22f",
+      "command": [
+        "/private/tmp/sharepool-native-retention-ab-r2/bitcoind-retention-on",
+        "-datadir=/private/tmp/sharepool-production-gaps-native-followup-capacity-100/node0",
+        "-regtest",
+        "-sharepoolheight=102",
+        "-sharepoolhashonly=1",
+        "-sharepooltides=1",
+        "-sharepoolcompacttides=1",
+        "-testactivationheight=blake2b@1",
+        "-disablewallet",
+        "-corepolicy",
+        "-softwareexpiry=0",
+        "-walletimplicitsegwit",
+        "-networkactive=0",
+        "-maxconnections=0",
+        "-connect=0",
+        "-rpcthreads=1",
+        "-rpcport=26743",
+        "-rpcbind=127.0.0.1",
+        "-printtoconsole=0"
+      ],
+      "native_tip": "169ec0733b2e15c8259db658c2dbc1330b7c16e8ec22e45441f313a9fe549170",
+      "native_height": 109,
+      "wall_seconds": 23.840480083000017,
+      "cpu_seconds": 23.820000000000004,
+      "response_sha256": "c0b196d5311c4193f92730b55a9adb836dc6e054639ed867c4214344f20f4ed8",
+      "controls": [
+        {
+          "error": {
+            "code": -26,
+            "message": "bad-sharepool-hash-share-authorization"
+          }
+        },
+        {
+          "error": {
+            "code": -25,
+            "message": "sharepool-hash-data-missing"
+          }
+        }
+      ],
+      "responses_match": true,
+      "samples": [
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11826737500000206
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11802395899999851
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12127100000000723
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12160212500000966
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12093808400000228
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11789424999999198
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11921916599999349
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12054924999999628
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12314474999999447
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12026870799999756
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11824820800001135
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11496679100000051
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.122560749999991
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1206145839999948
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11806395800000757
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11709308300000032
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11811612500000024
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11818470800000114
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11763712500000167
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11770674999999642
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12257745800000919
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12138416700000221
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1218561660000006
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12120045799998991
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12196945899999889
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12027237499999899
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11848562499999105
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1177376670000001
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11753475000000435
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11763600000000451
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11614329200000384
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11422145899999236
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11868350000000305
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1185944579999898
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11882495900002255
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11854716700000267
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11900575000001368
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11826087500000426
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12088508400000819
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12023991699999215
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12200479099999484
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12066291600001477
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12154466699999489
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12055866700001161
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12125004199998557
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12124633299998777
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12198679100001186
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12072733299999072
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11971104200000582
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11990995900001167
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11630858399999511
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11457441600001061
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11809637499999326
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11758058300000584
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11788191700000539
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1182115420000116
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11812025000000403
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1177716660000101
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11851554199998304
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11803566699998669
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12227225000000885
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12154795800000784
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11926754199998868
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11864600000001246
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11688499999999635
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11521929200000613
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11722499999999059
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11460770900001194
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12208425000000034
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12060595799999874
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11867308300000445
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11854120800001056
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1213186659999792
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12037716599999726
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1216024999999945
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11986812500001065
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12053866700000526
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11947125000000369
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12108187499998735
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12014637499999026
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11680587499998296
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11430362499999092
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11838166600000477
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11772683299997766
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12177083399998878
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11990591700001119
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1179492919999916
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11901549999998906
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11828962499998852
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11508666699998571
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12265070899999841
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12402950000000601
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11825154199999588
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11755812499998797
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11658045900000502
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11406712499999117
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1181102909999936
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1176580420000164
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11813633299999537
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11768129100002511
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1227695409999967
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1215618749999976
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12216662500000552
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12080925000000775
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11640170800001215
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11456724999999324
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1215490409999802
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12118466600000488
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11662754200000336
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11564195800002608
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12357416599999738
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11840358399999218
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11919070799999076
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11824408299997913
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11896266700000524
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11817766600000823
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12235170800002493
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12078854199998545
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12193233299998951
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12003266600001439
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11882633400000486
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11867862500000115
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1168138329999806
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.1149371670000221
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11871345800000199
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11776212500001293
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11944016699999338
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11859129200001917
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12177149999999415
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12117800000001466
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11939366600000767
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11847320900000113
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1181250419999742
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11841191700000309
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11867900000001441
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11795991699997899
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11819291599999815
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11803583300002174
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12235899999998878
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12103899999999612
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12119291600001247
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12071554199999923
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11918958400002566
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11869062499999927
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12252799999998842
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12074974999998744
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12170495800000936
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11991366699999162
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11885462500001154
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11870237499999803
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12210595800002011
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12011050000000978
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12356424999998694
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12125516700001526
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12131875000000036
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11954675000001203
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1168516660000023
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11407870900001171
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.119951833000016
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11905691699999466
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11636608300000262
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11468645800002264
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11926304200000004
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11790883300000132
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12156358300001102
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12025795799999628
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12189258399999403
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11996412499999565
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12308587500001522
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12124462500000277
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11798337499999434
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11853320900002018
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12226079199999162
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12030970899999716
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11586808399999882
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11494341599998847
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12121154100000808
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12007783399999994
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12194662499999254
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12050637500001926
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11655983299999662
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11501408300000548
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11828625000001125
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11817612499999086
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11865483299999369
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11805654200000504
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11716008400000533
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11709579199998643
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1204611249999914
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12133254200000465
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.12234766600002445
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12074329199998601
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11633716700001173
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11435608399997932
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.11863420899999255
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11794920899998829
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1218168329999969
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.12055829199999835
+        },
+        {
+          "method": "validatesharepoolhashtemplate",
+          "seconds": 0.1189902909999887
+        },
+        {
+          "method": "validatesharepoolhashshare",
+          "seconds": 0.11839691700001254
+        }
+      ],
+      "methods": {
+        "validatesharepoolhashshare": {
+          "count": 100,
+          "total_seconds": 11.867751546000136,
+          "p50_seconds": 0.11859129200001917,
+          "p95_seconds": 0.12133254200000465,
+          "maximum_seconds": 0.12402950000000601
+        },
+        "validatesharepoolhashtemplate": {
+          "count": 100,
+          "total_seconds": 11.972521414,
+          "p50_seconds": 0.11919070799999076,
+          "p95_seconds": 0.12265070899999841,
+          "maximum_seconds": 0.12357416599999738
+        }
+      },
+      "result": "passed"
+    }
+  ],
+  "limitations": [
+    "Controlled serial RPC microbenchmark on one retained native tip, not sustained or end-to-end miner throughput.",
+    "One RPC worker fixes thread-local history routing; production defaults to16 workers.",
+    "One alternating on/off/on sequence, no isolated-host or statistical confidence guarantee.",
+    "Only two newly introduced optional decoded-retention routes differ; canonical preparation reuse and job-preparation retention remain enabled."
+  ],
+  "original_state_restored": true,
+  "finished_utc": "2026-09-14T07:34:22.075682+00:00"
+}

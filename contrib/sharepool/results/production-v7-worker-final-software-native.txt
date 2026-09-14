@@ -1,0 +1,5 @@
+2026-09-14T08:04:22.858000Z TestFramework (INFO): PRNG seed is: 155429132310960409
+2026-09-14T08:04:22.858000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v7-hardware-worker-software-02
+2026-09-14T08:04:25.908000Z TestFramework (INFO): Stopping nodes
+2026-09-14T08:04:26.136000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v7-hardware-worker-software-02
+2026-09-14T08:04:26.136000Z TestFramework (INFO): Tests successful

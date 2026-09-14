@@ -65,6 +65,8 @@ def main():
     parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--seconds", type=int, default=60)
     parser.add_argument("--work-update-seconds", type=int, default=40)
+    parser.add_argument("--transport-difficulty", type=int,
+        help="optional harder ASIC traffic target, power of two in 1..2^24; native work credit is unchanged")
     options = parser.parse_args()
     if not 1 <= options.seconds <= 600 or not 0 <= options.port <= 65535:
         parser.error("test duration must be 1..600 seconds and port 0..65535")
@@ -79,10 +81,12 @@ def main():
             public_key=signer.public_key, payout_script=signer.payout_script,
             profile_version=7, activation_height=options.activation_height)
         service = HashStratumService(gate, sign_owner=signer.sign_owner, observer_rpc=observer,
-            bind=("127.0.0.1", options.port), work_update_seconds=options.work_update_seconds)
+            bind=("127.0.0.1", options.port), work_update_seconds=options.work_update_seconds,
+            transport_difficulty=options.transport_difficulty)
         service.start()
         print(json.dumps({"address": list(service.address), "network": "regtest", "profile": 7,
-                          "user": "sharepool.regtest", "hardware_configured": False}), flush=True)
+                          "user": "sharepool.regtest", "hardware_configured": False,
+                          "transport_difficulty": options.transport_difficulty}), flush=True)
         deadline = time.monotonic() + options.seconds
         while time.monotonic() < deadline:
             service.service_once()

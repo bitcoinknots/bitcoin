@@ -418,6 +418,9 @@ class SharePoolHashCapacityTest(SharePoolHashTides100MinersTest):
                     admitted.update(new_ids)
                     entry = {"height": block.m_height, "hash": block.hash,
                         "admitted": len(new_ids), "snapshot_bytes": len(snapshot.serialize()),
+                        "native_weight": block.get_weight(),
+                        "coinbase_weight": block.vtx[0].get_weight(),
+                        "payout_recipients": len(snapshot.payouts),
                         "native_accepted": True, "peer_ready": False,
                         "planned_resources": planned_resources,
                         "eligible_backlog": None, "deferred_backlog": None,

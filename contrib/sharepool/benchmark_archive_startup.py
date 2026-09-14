@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Finite same-evidence archive verification/rollover comparison.
 
-Supply the pre-change hash_mining_gate.py as --baseline-source. Only its three
-archive methods are compiled; no top-level code in that file is executed.
+Supply a pre-change hash_mining_gate.py as --baseline-source, or its extracted
+hash_gate_startup.py as --baseline-startup-source. Only the selected verification
+functions are compiled; no top-level code in that file is executed.
 This measures local archive I/O and canonical authentication, not native mining.
 """
 import argparse
@@ -22,6 +23,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "test" / "functional"))
 from capacity_metrics import distribution
 import hash_mining_gate
+import hash_gate_startup
 from hash_mining_gate import HashMiningGate, PROOF
 from hash_snapshot import solve_share
 from test_hash_mining_gate import FakeRPC
@@ -38,6 +40,16 @@ def baseline_methods(source):
     namespace = dict(vars(hash_mining_gate))
     exec(compile(ast.Module(body=selected, type_ignores=[]), "<baseline archive methods>", "exec"), namespace)
     return {name: namespace[name] for name in names}
+
+
+def baseline_startup_method(source):
+    parsed = ast.parse(source)
+    selected = [node for node in parsed.body if isinstance(node, ast.FunctionDef) and node.name == "verify_store"]
+    if len(selected) != 1:
+        raise ValueError("baseline startup source must contain exactly one verify_store function")
+    namespace = dict(vars(hash_gate_startup))
+    exec(compile(ast.Module(body=selected, type_ignores=[]), "<baseline archive startup>", "exec"), namespace)
+    return {"_verify_store": namespace["verify_store"]}
 
 
 def measure(gate, function, cold_path):
@@ -68,14 +80,17 @@ def measure(gate, function, cold_path):
     return counts
 
 
-def run_case(directory, count, methods, repeats):
-    origin, opening = fixture()
-    proofs, nonce = [], 0
-    for _ in range(count):
+def run_case(directory, count, methods, repeats, origins=1):
+    templates = [fixture(ntime=1700000001 + index) for index in range(origins)]
+    proofs, nonces = [], [0] * origins
+    for index in range(count):
+        which = index % origins
+        origin, opening = templates[which]
+        nonce = nonces[which]
         proof = solve_share(origin, opening, start_nonce=nonce)
-        nonce = proof.header.nNonce + 1
+        nonces[which] = proof.header.nNonce + 1
         proofs.append(proof)
-    result = {"receipts": count, "modes": {}}
+    result = {"receipts": count, "distinct_origins": origins, "modes": {}}
     head = None
     for mode in ("legacy", "streaming"):
         rpc = FakeRPC()
@@ -83,9 +98,10 @@ def run_case(directory, count, methods, repeats):
             pool=3, public_key=opening.envelope.public_key, payout_script=SCRIPT)
         rpc.gate = gate
         try:
-            gate.register_snapshot(opening.serialize())
-            gate.register_template(origin.serialize())
-            # Exact valid PoW proof bodies, one common valid canonical origin.
+            for origin, opening in templates:
+                gate.register_snapshot(opening.serialize())
+                gate.register_template(origin.serialize())
+            # Exact valid PoW proof bodies and canonical same-owner origins.
             # Fixture admission is outside measurement and bypasses RPC so this
             # remains an archive benchmark, with no native-validity assertion.
             gate._persist([(PROOF, proof.serialize()) for proof in proofs])
@@ -119,34 +135,40 @@ def run_case(directory, count, methods, repeats):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--baseline-source", type=Path, required=True)
+    baseline = parser.add_mutually_exclusive_group(required=True)
+    baseline.add_argument("--baseline-source", type=Path)
+    baseline.add_argument("--baseline-startup-source", type=Path)
     parser.add_argument("--counts", type=int, nargs="+", default=[100, 1000, 5000])
     parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument("--origins", type=int, default=1,
+        help="distinct same-owner templates, with proofs interleaved in fixed round-robin order")
     parser.add_argument("--results", type=Path, required=True)
     options = parser.parse_args()
     if (not 1 <= len(options.counts) <= 6 or any(not 1 <= count <= 20_000 for count in options.counts)
-            or not 1 <= options.repeats <= 5):
-        parser.error("use one to six sizes of 1..20000 receipts and one to five repeats")
-    source = options.baseline_source.read_text()
-    methods = baseline_methods(source)
+            or not 1 <= options.repeats <= 5 or not 1 <= options.origins <= min(options.counts)):
+        parser.error("use one to six sizes of 1..20000 receipts, one to five repeats, and origins in 1..min(counts)")
+    source = (options.baseline_source or options.baseline_startup_source).read_text()
+    methods = baseline_methods(source) if options.baseline_source else baseline_startup_method(source)
     report = {"schema": 1, "result": "running", "started_utc": datetime.now(timezone.utc).isoformat(),
         "command": [sys.executable, *sys.argv], "platform": platform.platform(),
         "baseline_source_sha256": hashlib.sha256(source.encode()).hexdigest(),
+        "baseline_kind": "three gate archive methods" if options.baseline_source else "streaming startup helper only",
         "current_source_sha256": {name: hashlib.sha256((Path(__file__).parent / name).read_bytes()).hexdigest()
             for name in ("hash_mining_gate.py", "hash_gate_startup.py", "hash_gate_archive.py", "benchmark_archive_startup.py")},
         "cases": [], "limitations": [
             "Archive-only canonical/hash-chain benchmark; native validity, Stratum, mainnet difficulty and payouts are outside its scope",
-            "Exact solved regtest proof bodies share one origin; setup directly persists these fixture bodies outside measurement",
+            "Exact solved regtest proof bodies use the requested number of small same-owner origins, interleaved round-robin; setup directly persists proof fixtures outside measurement",
             "Every verification still reads all lifetime bytes and authenticates proof origins; no incremental skip or trusted timestamp",
             "Methods are compared on identical checkpoint/evidence with fresh bounded metadata caches, but OS file cache remains warm",
             "Fixed legacy-first order and finite repeats are descriptive measurements, not statistical confidence intervals",
-            "Local filesystem and small shared-origin proofs do not characterize large snapshots, many origins or WAN archive recovery",
+            "Local filesystem and small origins do not characterize full-size snapshots or WAN archive recovery",
+            "Legacy and streaming are report field labels; baseline_kind identifies the exact code compared against the current implementation",
             "Point-read and file-open accounting adds a small amount of Python overhead proportional to those operations"]}
     started = time.monotonic()
     try:
         with tempfile.TemporaryDirectory(prefix="sharepool-archive-scaling-") as temporary:
             for count in options.counts:
-                report["cases"].append(run_case(Path(temporary), count, methods, options.repeats))
+                report["cases"].append(run_case(Path(temporary), count, methods, options.repeats, options.origins))
         report["result"] = "passed"
     finally:
         report["wall_seconds"] = time.monotonic() - started

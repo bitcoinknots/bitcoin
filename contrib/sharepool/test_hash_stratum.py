@@ -4,9 +4,11 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Transport freshness invariants; native Sia handoff is tested by regtest."""
 import threading
+from types import SimpleNamespace
 import unittest
+from unittest.mock import Mock, patch
 
-from hash_stratum import TipLatch
+from hash_stratum import HashStratumService, TipLatch, transport_target
 
 
 class Client:
@@ -111,6 +113,39 @@ class HashStratumTests(unittest.TestCase):
             self.latch.observe("a" * 64)
         self.assertTrue(self.client.closed.is_set())
         self.assertFalse(self.latch.check())
+
+    def test_optional_transport_target_preserves_default_and_cannot_weaken_native_work(self):
+        native = (1 << 256) - 1
+        harder = ((1 << 224) - 1) // 4096
+        self.assertEqual(transport_target(native), native)
+        self.assertEqual(transport_target(native, 4096), harder)
+        self.assertEqual(transport_target(harder // 2, 4096), harder // 2)
+        for difficulty in (True, 0, -1, 3, 4096.0, 1 << 25, "4096"):
+            with self.subTest(difficulty=difficulty), self.assertRaises(ValueError):
+                transport_target(native, difficulty)
+        for target in (True, 0, -1, 1 << 256, 1.0):
+            with self.subTest(target=target), self.assertRaises(ValueError):
+                transport_target(target, 4096)
+
+    def test_lower_than_assigned_work_never_reaches_native_gate_or_ack(self):
+        gate = SimpleNamespace(profile_version=7, mode="test", rules=1, activation_height=1,
+                               receive=Mock(), rpc=Mock())
+        service = HashStratumService(gate, sign_owner=lambda unused: None,
+                                    observer_rpc=lambda unused: None, transport_difficulty=4096)
+        work = SimpleNamespace(template=object(), target=transport_target((1 << 256) - 1, 4096),
+                               authorization=Mock())
+        service.jobs["test-job"] = work
+        params = ["sharepool.regtest", "test-job", "00" * 8, "00" * 8, "00" * 8]
+        # This is a rejection/traffic-budget test, not a claim that mocked work
+        # has a valid native header or qualifies for any coinbase payment.
+        with patch("hash_stratum.proof_from_sia", return_value=SimpleNamespace(hash_int=work.target + 1)):
+            with self.assertRaisesRegex(ValueError, "assigned share work"):
+                service._submit(bytes(4), params)
+        gate.receive.assert_not_called()
+        gate.rpc.assert_not_called()
+        work.authorization.block_for_header.assert_not_called()
+        self.assertEqual(service.stats["acknowledged"], 0)
+        service.close()
 
 
 if __name__ == "__main__":

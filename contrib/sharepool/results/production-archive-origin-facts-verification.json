@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "verified_utc": "2026-09-14T06:58:15.661133+00:00",
+  "baseline_git_commit": "c94b5cbc90db3c6b76b9fed5adbc316b91d5f36e",
+  "baseline_startup_sha256": "6707b348d2fe846baf8add953b09c819aa0fe009ba6f8a918ca9b5a82c1ffe6e",
+  "source_sha256": {
+    "contrib/sharepool/hash_gate_startup.py": "9ee4e4b994d0c7da288b1a002f3abf93ae1a9a65a15cba704a59009084845bd2",
+    "contrib/sharepool/hash_gate_archive.py": "60cb4e585c6f33c5f45d47a419c6cf8ccfd5b1781381a60a3ddbb2c48b244bca",
+    "contrib/sharepool/benchmark_archive_startup.py": "49e6a2fb7917bbb2bf9bf61beead2fc977a2e2e18474864f79a23a249bc7cf25",
+    "contrib/sharepool/test_hash_gate_startup.py": "2a49430e86a2f77b2a0d8c9c3202ac05ffe91535bc16fdef68dc88b84d7aef24",
+    "contrib/sharepool/test_hash_gate_archive.py": "7143537622f3ff9691bf60bd2c02fe9e8ebcd25b49ab59d35f33d6b29ba03525",
+    "contrib/sharepool/hash_mining_gate.py": "0e2b1375b0b582eeb1ce42912c09abe5f41d10ecb15ee494e8c58d9abcc51d3d"
+  },
+  "focused_tests": {
+    "command": [
+      "python3",
+      "-B",
+      "-m",
+      "unittest",
+      "test_hash_gate_startup",
+      "test_hash_gate_archive",
+      "-v"
+    ],
+    "working_directory": "contrib/sharepool",
+    "passed": 24
+  },
+  "benchmark_checks": {
+    "single": {
+      "passed": true,
+      "source_hashes_match_current": true,
+      "exact_head_preserved": true
+    },
+    "many": {
+      "passed": true,
+      "source_hashes_match_current": true,
+      "exact_head_preserved": true
+    }
+  },
+  "artifact_sha256": {
+    "contrib/sharepool/results/production-archive-origin-facts-many.json": "d7ff4994dd4cb597d4e8fe2d297ac8c03c50b09f27d2bc865beba97fce7803f5",
+    "contrib/sharepool/results/production-archive-origin-facts-many.txt": "bf6cfe2074ffde9eb1393b17ae1aee556a6fa761e6f283b372f43bc9ff6bf736",
+    "contrib/sharepool/results/production-archive-origin-facts-single.json": "d1ee39f7988da2d5a584fb8888db0e8a720e603bfe51e6ab6586dd79eb13ccbf",
+    "contrib/sharepool/results/production-archive-origin-facts-single.txt": "3045457585ef9632726bce25ae664a54e968a2ac2e346aece65cb1f045bc05fe",
+    "contrib/sharepool/results/production-archive-origin-facts-tests.txt": "6d65491be43fef0eb0a12d04ebf7db4904fa4ba0d394b86069afa2bf4cbad382"
+  },
+  "limitations": [
+    "Local canonical/archive authentication only; no native validity claim",
+    "Every verification still reads lifetime journal history",
+    "Bounded per-pass origin reuse does not persist verification verdicts or change retention policy"
+  ]
+}

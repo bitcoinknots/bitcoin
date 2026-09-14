@@ -1,0 +1,49 @@
+{
+  "retention-stress-tsan": {
+    "build_command": [
+      "/usr/bin/c++",
+      "-std=c++20",
+      "-O1",
+      "-g",
+      "-fno-omit-frame-pointer",
+      "-pthread",
+      "-fsanitize=thread",
+      "-I/private/tmp/sharepool-native-build/src",
+      "-I/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/src",
+      "/private/tmp/sharepool-native-shared-budget/retention_stress.cpp",
+      "-o",
+      "/private/tmp/sharepool-native-shared-budget/retention-stress-tsan"
+    ],
+    "build_exit_code": 0,
+    "build_seconds": 0.9180042079999999,
+    "run_command": [
+      "/private/tmp/sharepool-native-shared-budget/retention-stress-tsan"
+    ],
+    "run_exit_code": 0,
+    "run_seconds": 0.8987927920000001,
+    "binary_sha256": "ae3a94db05ef14f547f161a19b03c6a2768451a6e73ad6db672bc2861def8fcc"
+  },
+  "retention-stress-plain": {
+    "build_command": [
+      "/usr/bin/c++",
+      "-std=c++20",
+      "-O1",
+      "-g",
+      "-fno-omit-frame-pointer",
+      "-pthread",
+      "-I/private/tmp/sharepool-native-build/src",
+      "-I/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/src",
+      "/private/tmp/sharepool-native-shared-budget/retention_stress.cpp",
+      "-o",
+      "/private/tmp/sharepool-native-shared-budget/retention-stress-plain"
+    ],
+    "build_exit_code": 0,
+    "build_seconds": 0.7136351249999999,
+    "run_command": [
+      "/private/tmp/sharepool-native-shared-budget/retention-stress-plain"
+    ],
+    "run_exit_code": 0,
+    "run_seconds": 0.29201558299999997,
+    "binary_sha256": "560b07bf2dcd3439c49ed50126f37ff5acec2356445462fe07bd5860229b5761"
+  }
+}

@@ -7,7 +7,8 @@ import unittest
 from unittest.mock import patch
 
 import hash_gate_archive
-from hash_mining_gate import HashMiningGate, PROOF
+import hash_gate_startup
+from hash_mining_gate import HashMiningGate, PROOF, SNAPSHOT, TEMPLATE
 from hash_snapshot import solve_share
 import native_archive
 from test_hash_mining_gate import FakeRPC
@@ -47,7 +48,7 @@ class HashGateStartupTests(unittest.TestCase):
             self.gate._verify_store(first)
         self.assertEqual(streams.call_count, 2)
         self.assertFalse(any(call.args[0] == PROOF for call in reads.call_args_list))
-        self.assertEqual(len(reads.call_args_list), 2 * len(proofs))
+        self.assertEqual(len(reads.call_args_list), 2)
         self.assertEqual(self.gate.archive_head(), head)
         self.gate.close()
         self.gate = HashMiningGate(self.directory / "source.sqlite", **self.options)
@@ -118,6 +119,69 @@ class HashGateStartupTests(unittest.TestCase):
         self.gate._persist([(PROOF, bad.serialize())])
         with self.assertRaisesRegex(ValueError, "proof does not bind"):
             self.gate._verify_store(self.gate.archive_head())
+
+    def test_warm_origin_facts_still_compare_each_proof_signature_and_envelope(self):
+        proof = self.proof()
+        for bad in (replace(proof, owner_signature=bytes(64)),
+                    replace(proof, envelope=replace(proof.envelope, pool=4))):
+            facts = hash_gate_startup._OriginFacts()
+            with patch.object(self.gate, "_read", wraps=self.gate._read) as reads:
+                facts.require(self.gate, proof)
+                with self.assertRaisesRegex(ValueError, "proof does not bind"):
+                    facts.require(self.gate, bad)
+            self.assertEqual(reads.call_count, 2)
+
+    def test_origin_facts_are_bounded_and_eviction_reauthenticates_dependencies(self):
+        first = self.proof()
+        origin, opening = fixture(ntime=1700000002)
+        self.gate.register_snapshot(opening.serialize())
+        self.gate.register_template(origin.serialize())
+        second = solve_share(origin, opening)
+        facts = hash_gate_startup._OriginFacts(max_entries=1)
+        with patch.object(self.gate, "_read", wraps=self.gate._read) as reads:
+            for proof in (first, first, second, first):
+                facts.require(self.gate, proof)
+                self.assertEqual(len(facts.entries), 1)
+                self.assertLessEqual(facts.bytes, facts.max_bytes)
+        self.assertEqual(reads.call_count, 6)
+        for limits in ({"max_entries": 0}, {"max_bytes": 1}):
+            facts = hash_gate_startup._OriginFacts(**limits)
+            with patch.object(self.gate, "_read", wraps=self.gate._read) as reads:
+                facts.require(self.gate, first)
+                facts.require(self.gate, first)
+            self.assertEqual(reads.call_count, 4)
+            self.assertEqual((len(facts.entries), facts.bytes), (0, 0))
+
+    def test_origin_facts_never_survive_a_full_pass_or_hide_changed_origin(self):
+        self.proof()
+        head = self.gate.archive_head()
+        self.gate._verify_store(head)
+        with patch.object(self.gate, "_read", wraps=self.gate._read) as reads:
+            self.gate._verify_store(head)
+        self.assertEqual(reads.call_count, 2)
+        raw = self.origin.serialize()
+        with self.gate.db:
+            self.gate.db.execute("UPDATE journal SET data=? WHERE kind=?",
+                (raw[:-1] + bytes([raw[-1] ^ 1]), TEMPLATE))
+        with self.assertRaises(ValueError):
+            self.gate._verify_store(head)
+        self.assertEqual(hash_gate_archive.read_head(self.gate.head_path), head)
+
+    def test_proof_can_precede_origin_but_entire_later_origin_is_checked(self):
+        gate = HashMiningGate(self.directory / "late.sqlite", **self.options)
+        self.addCleanup(gate.close)
+        proof = solve_share(self.origin, self.opening)
+        gate._persist([(PROOF, proof.serialize()), (SNAPSHOT, self.opening.serialize()),
+                      (TEMPLATE, self.origin.serialize())])
+        head = gate.archive_head()
+        with patch.object(gate, "_next", wraps=gate._next) as events:
+            gate._verify_store(head)
+        self.assertEqual(events.call_count, 3)
+        with gate.db:
+            gate.db.execute("UPDATE journal SET root=? WHERE kind=?", ("01" * 32, TEMPLATE))
+        with self.assertRaisesRegex(ValueError, "missing or corrupt"):
+            gate._verify_store(head)
+        self.assertEqual(hash_gate_archive.read_head(gate.head_path), head)
 
     def test_rollover_performs_one_full_verification_and_preserves_head(self):
         self.proof()

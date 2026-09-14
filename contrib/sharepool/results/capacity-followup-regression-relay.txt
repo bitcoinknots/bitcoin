@@ -1,0 +1,8 @@
+2026-09-14T08:06:10.032000Z TestFramework (INFO): PRNG seed is: 7427573335906479606
+2026-09-14T08:06:10.036000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-capacity-followup-regression-relay
+2026-09-14T08:06:10.562000Z TestFramework (INFO): Empty inventory stays quiet; changes and new connections discover existing objects
+2026-09-14T08:06:19.872000Z TestFramework (INFO): Four active downloads cannot repeatedly overtake an already waiting fifth peer
+2026-09-14T08:06:21.456000Z TestFramework (INFO): Malformed inventory is refused before any download is scheduled
+2026-09-14T08:06:22.359000Z TestFramework (INFO): Stopping nodes
+2026-09-14T08:06:22.577000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-capacity-followup-regression-relay
+2026-09-14T08:06:22.577000Z TestFramework (INFO): Tests successful

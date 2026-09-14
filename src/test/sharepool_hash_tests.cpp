@@ -13,6 +13,7 @@
 #include <pubkey.h>
 #include <script/script.h>
 #include <sharepool/hash_store.h>
+#include <sharepool/hash_validation_cache.h>
 #include <streams.h>
 #include <test/util/setup_common.h>
 #include <versionbits.h>
@@ -1579,6 +1580,157 @@ BOOST_AUTO_TEST_CASE(v7_bounded_native_suffix_reconstructs_expiry_and_repeat_sta
     next = CompactEmpty(10);
     next.binding.native_parent = uint256{uint8_t{0xee}};
     BOOST_CHECK(ho::MaterializeTidesState(next, &indexes[9], consensus, Lookup()).status == ho::Status::Invalid);
+}
+
+BOOST_AUTO_TEST_CASE(v7_preparation_and_full_validation_reauthenticate_ancestry_evidence)
+{
+    consensus.SharePoolTides = true;
+    consensus.SharePoolCompactTides = true;
+    auto initial = CompactEmpty();
+    const auto origin = CompactBlock(initial);
+    auto first = CompactEmpty();
+    first.templates = {Record(origin)};
+    first.shares = {Proof(origin, initial, 1)};
+    CompactState(first);
+    const auto settled = CompactBlock(first);
+    BOOST_REQUIRE(Check(settled).IsValid());
+    Anchor(settled);
+    auto child = CompactEmpty(2);
+    const auto child_block = CompactBlock(child);
+    const auto parent_hash = indexes[1].m_mm_rhs;
+    const auto parent = snapshots.at(parent_hash);
+    const auto materialize = [&] { return ho::MaterializeTidesState(child, &indexes[1], consensus, Lookup()); };
+    std::vector<CTxOut> payouts;
+    const auto account = [&] { return ho::CalculateTidesPayouts(child, &indexes[1], indexes[1].nBits,
+                                                              consensus, Lookup(), REWARD, payouts); };
+    BOOST_REQUIRE(materialize().IsValid());
+    BOOST_REQUIRE(account().IsValid());
+    const auto expected = payouts;
+    // A previously seen address cannot authenticate changed canonical bytes.
+    auto corrupt = *parent;
+    corrupt.authorization[0] ^= 1;
+    snapshots[parent_hash] = std::make_shared<const ho::Snapshot>(corrupt);
+    BOOST_CHECK(materialize().IsMissing());
+    BOOST_CHECK(Check(child_block).IsMissing());
+    // Correctly rehashing the corrupted signature still cannot authenticate it.
+    const auto bad_hash = ho::SnapshotHash(corrupt);
+    snapshots[bad_hash] = std::make_shared<const ho::Snapshot>(corrupt);
+    indexes[1].m_mm_rhs = bad_hash;
+    Reason(materialize(), "compact-state-parent");
+    BOOST_CHECK(account().status == ho::Status::Invalid);
+    // A warm payout cursor owns an already authenticated admission summary;
+    // full validation must nevertheless reopen its required recent ancestry.
+    // Restoring that evidence recovers both reconstruction and accounting.
+    indexes[1].m_mm_rhs = parent_hash;
+    snapshots[parent_hash] = parent;
+    BOOST_REQUIRE(materialize().IsValid());
+    BOOST_REQUIRE(account().IsValid());
+    BOOST_CHECK(payouts == expected);
+    snapshots.erase(parent_hash);
+    BOOST_CHECK(materialize().IsMissing());
+    BOOST_CHECK(Check(child_block).IsMissing());
+    snapshots[parent_hash] = parent;
+    BOOST_REQUIRE(materialize().IsValid());
+    BOOST_REQUIRE(account().IsValid());
+    BOOST_CHECK(payouts == expected);
+}
+
+BOOST_AUTO_TEST_CASE(v7_shared_optional_retention_preserves_exact_validation_results)
+{
+    consensus.SharePoolTides = true;
+    consensus.SharePoolCompactTides = true;
+    auto initial = CompactEmpty();
+    const auto origin = CompactBlock(initial);
+    auto first = CompactEmpty();
+    first.templates = {Record(origin)};
+    first.shares = {Proof(origin, initial, 1)};
+    CompactState(first);
+    const auto settled = CompactBlock(first);
+    BOOST_REQUIRE(Check(settled).IsValid());
+    Anchor(settled);
+    auto child = CompactEmpty(2);
+    const auto block = CompactBlock(child);
+    auto proof = Proof(origin, initial, first.shares.front().header.nNonce + 1);
+    auto bad_proof = proof;
+    bad_proof.authorization[0] ^= 1;
+    auto wrong_payout = block;
+    CMutableTransaction coinbase{*wrong_payout.vtx.front()};
+    --coinbase.vout.front().nValue;
+    wrong_payout.vtx.front() = MakeTransactionRef(std::move(coinbase));
+    wrong_payout.hashMerkleRoot = BlockMerkleRoot(wrong_payout);
+    Reseal(wrong_payout);
+    auto bad_owner = block;
+    auto unauthorized = *snapshots.at(block.m_mm_rhs);
+    unauthorized.authorization[0] ^= 1;
+    bad_owner.m_mm_rhs = ho::SnapshotHash(unauthorized);
+    snapshots[bad_owner.m_mm_rhs] = std::make_shared<const ho::Snapshot>(unauthorized);
+
+    const auto validate = [&](size_t maximum, const auto& evaluate,
+                              std::optional<uint256> missing = {}, bool malformed = false) {
+        auto budget = std::make_shared<DecodedSnapshotRetentionBudget>(maximum);
+        ho::Result result;
+        {
+            DecodedSnapshotCache cache{ho::MAX_DEPENDENCY_BYTES, 1024, budget};
+            const ho::Lookup lookup = [&](const uint256& hash) -> std::shared_ptr<const ho::Snapshot> {
+                if (malformed) throw ho::MalformedSnapshot("authenticated malformed bytes");
+                if (missing && hash == *missing) return {};
+                if (auto retained = cache.Get(hash)) return retained;
+                const auto found = snapshots.find(hash);
+                if (found == snapshots.end()) return {};
+                const auto raw = ho::EncodeSnapshot(*found->second);
+                auto decoded = std::make_shared<const ho::Snapshot>(ho::DecodeSnapshot(raw));
+                cache.Put(hash, decoded, raw.size());
+                // Same availability rule as the native store lookup: denied
+                // optional retention never hides this freshly decoded value.
+                return decoded;
+            };
+            result = evaluate(lookup);
+            BOOST_CHECK_LE(budget->Bytes(), maximum);
+            if (maximum <= 1) BOOST_CHECK_EQUAL(cache.Bytes(), 0);
+        }
+        BOOST_CHECK_EQUAL(budget->Bytes(), 0);
+        return result;
+    };
+    std::vector<ho::Result> expected;
+    const auto& origin_snapshot = *snapshots.at(origin.m_mm_rhs);
+    const size_t one_record = DecodedSnapshotCacheCharge(origin_snapshot, ho::EncodeSnapshot(origin_snapshot).size());
+    for (const size_t maximum : {DEFAULT_DECODED_SNAPSHOT_RETENTION_BYTES, one_record, size_t{1}, size_t{0}}) {
+        const auto check = [&](const CBlock& value, std::optional<uint256> missing = {}, bool malformed = false) {
+            return validate(maximum, [&](const ho::Lookup& lookup) {
+                return ho::CheckSnapshot(value, &indexes[1], consensus, lookup, Native(), REWARD);
+            }, missing, malformed);
+        };
+        std::vector<ho::Result> results;
+        results.push_back(check(block));
+        results.push_back(validate(maximum, [&](const ho::Lookup& lookup) {
+            return ho::CheckHistoricalTemplate(origin, &indexes[1], indexes[1].nTime + 1, consensus, lookup, Native());
+        }));
+        const auto check_proof = [&](const Share& value) {
+            return validate(maximum, [&](const ho::Lookup& lookup) {
+                return ho::CheckShareProof(value, origin, &indexes[1], indexes[1].nTime + 1, consensus, lookup, Native());
+            });
+        };
+        results.push_back(check_proof(proof));
+        results.push_back(validate(maximum, [&](const ho::Lookup& lookup) {
+            return ho::CheckMiningJob(block, &indexes[1], consensus, lookup, Native(), REWARD);
+        }));
+        results.push_back(check(wrong_payout));
+        results.push_back(check(bad_owner));
+        results.push_back(check_proof(bad_proof));
+        results.push_back(check(block, {}, true));
+        results.push_back(check(block, indexes[1].m_mm_rhs));
+        for (size_t i{0}; i < 4; ++i) BOOST_REQUIRE_MESSAGE(results[i].IsValid(), results[i].reason);
+        for (size_t i{4}; i < 8; ++i) BOOST_CHECK(results[i].status == ho::Status::Invalid);
+        BOOST_REQUIRE(results[8].IsMissing());
+        BOOST_CHECK(!results[8].missing.empty());
+        if (expected.empty()) expected = results;
+        else for (size_t i{0}; i < results.size(); ++i) {
+            BOOST_CHECK(results[i].status == expected[i].status);
+            BOOST_CHECK_EQUAL(results[i].reason, expected[i].reason);
+            BOOST_CHECK(results[i].missing == expected[i].missing);
+            BOOST_CHECK(results[i].expected_reward == expected[i].expected_reward);
+        }
+    }
 }
 
 BOOST_AUTO_TEST_CASE(v7_compact_dictionary_and_proof_indexes_cross_compactsize_boundaries)

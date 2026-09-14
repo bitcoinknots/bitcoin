@@ -277,7 +277,36 @@ PreparedSnapshot PrepareSnapshot(const Snapshot& snapshot)
     return PreparedSnapshot{snapshot};
 }
 
-size_t EncodedSize(const Snapshot& snapshot) { return PrepareSnapshot(snapshot).usage.encoded_bytes; }
+// These helpers share a single operation-local preparation. They retain no
+// snapshot pointers or validation verdicts across calls. The caller must pass
+// the exact unchanged snapshot from which the tables were prepared.
+uint256 PreparedProfileHash(const Snapshot& snapshot, uint32_t version, const PreparedSnapshot& prepared)
+{
+    static constexpr char old_domain[]{"SharePool/snapshot/v4"};
+    static constexpr char new_domain[]{"SharePool/snapshot/v5"};
+    static constexpr char tides_domain[]{"SharePool/snapshot/v6"};
+    static constexpr char compact_domain[]{"SharePool/snapshot/v7"};
+    HashWriter writer;
+    writer.write(AsBytes(version == COMPACT_TIDES_VERSION ? Span{compact_domain} :
+                        version == TIDES_VERSION ? Span{tides_domain} :
+                        snapshot.binding.version == LEDGER_VERSION ? Span{new_domain} : Span{old_domain}));
+    WriteSnapshot(writer, snapshot, prepared.table, prepared.jobs);
+    return writer.GetHash();
+}
+
+uint256 PreparedContentsHash(const Snapshot& snapshot, const PreparedSnapshot& prepared)
+{
+    HashWriter writer;
+    static constexpr char old_domain[]{"SharePool/contents/v4"};
+    static constexpr char new_domain[]{"SharePool/contents/v5"};
+    static constexpr char tides_domain[]{"SharePool/contents/v6"};
+    static constexpr char compact_domain[]{"SharePool/contents/v7"};
+    writer.write(AsBytes(snapshot.binding.version == COMPACT_TIDES_VERSION ? Span{compact_domain} :
+                        snapshot.binding.version == TIDES_VERSION ? Span{tides_domain} :
+                        snapshot.binding.version == LEDGER_VERSION ? Span{new_domain} : Span{old_domain}));
+    WriteSnapshot(writer, snapshot, prepared.table, prepared.jobs, true);
+    return writer.GetHash();
+}
 
 /** Compare the canonical serialization in place, without allocating a second
  * complete transaction or snapshot byte buffer. */
@@ -417,11 +446,12 @@ CBlock ReadBlock(Span<const unsigned char> bytes, bool normalized)
 
 CBlock ReadTemplate(Span<const unsigned char> bytes) { return ReadBlock(bytes, true); }
 
-bool OwnerValid(const Snapshot& snapshot)
+bool OwnerValid(const Snapshot& snapshot, const PreparedSnapshot* prepared = nullptr)
 {
     const XOnlyPubKey owner{Span{snapshot.binding.owner}};
     return !snapshot.job_commitment.IsNull() && owner.IsFullyValid() &&
-        owner.VerifySchnorr(hashonly::OwnerHash(snapshot), snapshot.authorization);
+        owner.VerifySchnorr(prepared ? hashonly::OwnerHash(snapshot.binding, snapshot.job_commitment, PreparedContentsHash(snapshot, *prepared))
+                                    : hashonly::OwnerHash(snapshot), snapshot.authorization);
 }
 
 Result CheckBinding(const Envelope& binding, const Consensus::Params& consensus,
@@ -548,8 +578,9 @@ class Checker {
         if (!result) return Result::Missing({hash});
         size_t size;
         try {
-            size = EncodedSize(*result);
-            if (ProfileSnapshotHash(*result, ProfileVersion(m_consensus)) != hash) return Result::Missing({hash});
+            const auto prepared = PrepareSnapshot(*result);
+            size = prepared.usage.encoded_bytes;
+            if (PreparedProfileHash(*result, ProfileVersion(m_consensus), prepared) != hash) return Result::Missing({hash});
         } catch (const std::ios_base::failure&) { return Bad("snapshot-encoding"); }
         if (size > MAX_DEPENDENCY_BYTES - m_dependency_bytes) return Bad("dependency-bytes");
         if (m_consensus.SharePoolCompactTides && result->shares.size() > MAX_DEPENDENCY_SHARES - m_dependency_shares) return Bad("dependency-shares");
@@ -1137,16 +1168,7 @@ uint256 ProfileSnapshotHash(const Snapshot& snapshot, uint32_t version)
         throw std::invalid_argument("unknown snapshot hash profile");
     }
     const auto prepared = PrepareSnapshot(snapshot);
-    static constexpr char old_domain[]{"SharePool/snapshot/v4"};
-    static constexpr char new_domain[]{"SharePool/snapshot/v5"};
-    static constexpr char tides_domain[]{"SharePool/snapshot/v6"};
-    static constexpr char compact_domain[]{"SharePool/snapshot/v7"};
-    HashWriter writer;
-    writer.write(AsBytes(version == COMPACT_TIDES_VERSION ? Span{compact_domain} :
-                        version == TIDES_VERSION ? Span{tides_domain} :
-                        snapshot.binding.version == LEDGER_VERSION ? Span{new_domain} : Span{old_domain}));
-    WriteSnapshot(writer, snapshot, prepared.table, prepared.jobs);
-    return writer.GetHash();
+    return PreparedProfileHash(snapshot, version, prepared);
 }
 
 uint32_t ProfileVersion(const Consensus::Params& consensus)
@@ -1184,16 +1206,7 @@ uint256 SnapshotContentsHash(const Snapshot& snapshot)
 {
     // Stream rather than copying a potentially 16 MiB snapshot.
     const auto prepared = PrepareSnapshot(snapshot);
-    HashWriter writer;
-    static constexpr char old_domain[]{"SharePool/contents/v4"};
-    static constexpr char new_domain[]{"SharePool/contents/v5"};
-    static constexpr char tides_domain[]{"SharePool/contents/v6"};
-    static constexpr char compact_domain[]{"SharePool/contents/v7"};
-    writer.write(AsBytes(snapshot.binding.version == COMPACT_TIDES_VERSION ? Span{compact_domain} :
-                        snapshot.binding.version == TIDES_VERSION ? Span{tides_domain} :
-                        snapshot.binding.version == LEDGER_VERSION ? Span{new_domain} : Span{old_domain}));
-    WriteSnapshot(writer, snapshot, prepared.table, prepared.jobs, true);
-    return writer.GetHash();
+    return PreparedContentsHash(snapshot, prepared);
 }
 
 uint256 OwnerHash(const Envelope& binding, const uint256& job, const uint256& contents)
@@ -1493,9 +1506,12 @@ Result MaterializeTidesState(Snapshot& snapshot, const CBlockIndex* previous,
             catch (const MalformedSnapshot&) { return Bad("snapshot-encoding"); }
             catch (const std::exception&) { return Result::Missing({index->m_mm_rhs}); }
             if (!raw) return Result::Missing({index->m_mm_rhs});
-            if (ProfileSnapshotHash(*raw, COMPACT_TIDES_VERSION) != index->m_mm_rhs) return Result::Missing({index->m_mm_rhs});
-            if (!CheckBinding(raw->binding, consensus, height, index->pprev->GetBlockHash()).IsValid() ||
-                !OwnerValid(*raw) || raw->history_head.IsNull()) return Bad("compact-state-parent");
+            {
+                const auto prepared = PrepareSnapshot(*raw);
+                if (PreparedProfileHash(*raw, COMPACT_TIDES_VERSION, prepared) != index->m_mm_rhs) return Result::Missing({index->m_mm_rhs});
+                if (!CheckBinding(raw->binding, consensus, height, index->pprev->GetBlockHash()).IsValid() ||
+                    !OwnerValid(*raw, &prepared) || raw->history_head.IsNull()) return Bad("compact-state-parent");
+            }
             Snapshot current{*raw};
             // ApplyTidesState ignores these inputs; clear explicitly so no
             // caller-supplied derived cache can accidentally become evidence.
@@ -1551,15 +1567,20 @@ Result CalculateTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previo
         catch (const MalformedSnapshot&) { return tides::DeltaResult::Invalid("tides-history-encoding"); }
         catch (const std::exception&) { return tides::DeltaResult::Missing({index.m_mm_rhs}); }
         if (!old) return tides::DeltaResult::Missing({index.m_mm_rhs});
-        if (ProfileSnapshotHash(*old, ProfileVersion(consensus)) != index.m_mm_rhs) return tides::DeltaResult::Missing({index.m_mm_rhs});
-        if (!index.pprev || !CheckBinding(old->binding, consensus, index.nHeight, index.pprev->GetBlockHash()).IsValid() ||
-            !OwnerValid(*old) || old->history_head.IsNull()) return tides::DeltaResult::Invalid("tides-history-binding");
+        size_t encoded_bytes;
+        {
+            const auto prepared = PrepareSnapshot(*old);
+            if (PreparedProfileHash(*old, ProfileVersion(consensus), prepared) != index.m_mm_rhs) return tides::DeltaResult::Missing({index.m_mm_rhs});
+            if (!index.pprev || !CheckBinding(old->binding, consensus, index.nHeight, index.pprev->GetBlockHash()).IsValid() ||
+                !OwnerValid(*old, &prepared) || old->history_head.IsNull()) return tides::DeltaResult::Invalid("tides-history-binding");
+            encoded_bytes = prepared.usage.encoded_bytes;
+        }
         auto delta = std::make_shared<tides::HistoryDelta>();
         delta->block_hash = index.GetBlockHash();
         delta->parent_hash = index.pprev->GetBlockHash();
         delta->snapshot_hash = index.m_mm_rhs;
         delta->height = index.nHeight;
-        delta->encoded_bytes = EncodedSize(*old);
+        delta->encoded_bytes = encoded_bytes;
         // These summaries belong to the candidate's exact native ancestry.
         // On an unconnected competing branch they remain CONDITIONAL on native
         // validation of every ancestor during activation. Requiring connected

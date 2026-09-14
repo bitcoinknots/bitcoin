@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "scope": "Temporary historical-template and share-proof retention-only A/B/A on the exact same path-bound regtest state. This predates the separate shared-retention-budget implementation.",
+  "source_on_sha256": "4fd600e2a8eccde918cd11809034056d2fb2f3aca7faf7479e3ae7d785715864",
+  "source_off_sha256": "e6098f7c3f2fa49147aa048ca9474afd6dde719500e1d5b51951d5c469b7fe75",
+  "binary_on_sha256": "51eb7431fe7dd24dbf2c9ac0435250efa83e74ebf4271e05f489eadad0c5a22f",
+  "binary_off_sha256": "1afc73663c50a64045f946157de5ba51d627712a6d9265497139d4fdc7b81c07",
+  "source_restored_sha256": "4fd600e2a8eccde918cd11809034056d2fb2f3aca7faf7479e3ae7d785715864",
+  "node_tree_restored": true,
+  "profile_marker_sha256": "0dcdd18ae17692047ee6b116580fdfe3144b4a846309d87720643be79263499a",
+  "results_identical": true,
+  "measured_requests_per_arm": 200,
+  "valid_template_requests_per_arm": 100,
+  "valid_proof_requests_per_arm": 100,
+  "warmup_requests_per_arm": 200,
+  "invalid_or_missing_controls_per_arm": 2,
+  "wall_seconds": [
+    24.252492417000003,
+    24.107183875000004,
+    23.840480083000017
+  ],
+  "cpu_seconds": [
+    24.19,
+    24.040000000000003,
+    23.820000000000004
+  ],
+  "off_wall_vs_on_mean_percent": 0.25241785585199406,
+  "on_first_to_second_drift_percent": -1.6988453265577852,
+  "conclusion": "No measurable retention-off benefit in this controlled fixture. Leave the tested retention behavior unchanged; the result does not explain the slower full100-miner repeat.",
+  "limitations": [
+    "Controlled serial RPC microbenchmark on one retained native tip, not sustained or end-to-end miner throughput.",
+    "One RPC worker fixes thread-local history routing; production defaults to16 workers.",
+    "One alternating on/off/on sequence, no isolated-host or statistical confidence guarantee.",
+    "Only two newly introduced optional decoded-retention routes differ; canonical preparation reuse and job-preparation retention remain enabled.",
+    "The exact preserved A binary was used twice. Rebuilding unchanged source produced a different executable hash, recorded in the build report; the shared binary was restored from its preserved exact copy.",
+    "The original path-bound node directory was backed up, each stopped arm moved aside, and the untouched backup copied back between arms. Profile markers and activation metadata were never edited.",
+    "Initial missing-origin control changed a detached Python header and left its bytes unchanged. Assertion stopped before measurement; state was restored and the corrected fixture used for all reported arms.",
+    "The initially executed build helper ended at a reproducibility-hash assertion. Subsequent explicit restoration is recorded; the published restoration helper includes that correction."
+  ],
+  "artifacts": [
+    {
+      "path": "contrib/sharepool/results/production-native-retention-ab-benchmark.py",
+      "sha256": "9cc5bc969dda832d26e806ccddfe47ccc59d558254dcaf4ee1cc3bf1e2aa0a1b"
+    },
+    {
+      "path": "contrib/sharepool/results/production-native-retention-ab-build-executed.py",
+      "sha256": "136180889db6caea1808f75b756e335a04806db8fbd98da8835dddbc0e23cf13"
+    },
+    {
+      "path": "contrib/sharepool/results/production-native-retention-ab-build-off.txt",
+      "sha256": "9de6eee577acf99bb2070aa59732faf8e7fbc627618e6f2d343f87dacfa03622"
+    },
+    {
+      "path": "contrib/sharepool/results/production-native-retention-ab-build-restoration-helper.py",
+      "sha256": "df4af159345f05622064c6e47bd8383fd540c6a59ac4b005dfd00faa6e98f4f9"
+    },
+    {
+      "path": "contrib/sharepool/results/production-native-retention-ab-build-restore.txt",
+      "sha256": "64003a2d3de2b85b574336734ff81cedce3e7c588a0d7b29d358948486446b75"
+    },
+    {
+      "path": "contrib/sharepool/results/production-native-retention-ab-build.json",
+      "sha256": "b0070e7aa13ab55b791fc506d02380cc0ba80948e00df5f962eb7bf2a2ba28ed"
+    },
+    {
+      "path": "contrib/sharepool/results/production-native-retention-ab-native.txt",
+      "sha256": "f85bb357a3b6b35248bd37c896b8061312d760d3099372d4d499f758b52a907d"
+    },
+    {
+      "path": "contrib/sharepool/results/production-native-retention-ab-requests.json",
+      "sha256": "a49f1b5fb641e6202dfc6ae67460503c5cc7f8d9829fe3fa15ba275a1926e473"
+    },
+    {
+      "path": "contrib/sharepool/results/production-native-retention-ab-responses.json",
+      "sha256": "0c9b821dac0217c361b590da5b483ebe4178e2fdc1a77eecd4cfe76c769ad198"
+    },
+    {
+      "path": "contrib/sharepool/results/production-native-retention-ab-results.json",
+      "sha256": "b875fb08fbb44ba0f07750007c3b7cf05bc6acc5b22f94d5eb2991aa109ac71e"
+    },
+    {
+      "path": "contrib/sharepool/results/production-native-retention-ab-variant.diff",
+      "sha256": "d9570b54d07d03f320cd8a4aac51a767d2668b28e2636802838015c7f871763c"
+    }
+  ],
+  "reconstructable_native_source": {
+    "base_commit": "c94b5cbc90db3c6b76b9fed5adbc316b91d5f36e",
+    "path": "contrib/sharepool/results/production-native-preparation-source.diff",
+    "sha256": "7099d6fc89a6780ea57a700fcdc95fa145bf8132e4b8a16a122d4ce7b9fd7f85",
+    "apply_check": true,
+    "applied_file_sha256_matches": true,
+    "scope": "Exact pre-shared-budget native sources used for 51eb7431fe7dd24dbf2c9ac0435250efa83e74ebf4271e05f489eadad0c5a22f; no deterministic binary reproduction claim."
+  }
+}

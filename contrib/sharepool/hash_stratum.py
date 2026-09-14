@@ -31,6 +31,22 @@ from testnet_template import TestnetTemplate, proof_from_sia, sia_notify
 from test_framework.messages import CBlockHeader, uint256_from_compact
 
 
+def transport_target(native_target, difficulty=None):
+    """Optional ASIC traffic sampling; never weaken the native proof target.
+
+    This changes only what the test transport requests/accepts. Template bytes,
+    header nBits and the native payout work assigned to a proof stay unchanged.
+    """
+    if type(native_target) is not int or not 1 <= native_target < 1 << 256:
+        raise ValueError("bounded native share target required")
+    if difficulty is None:
+        return native_target
+    if (type(difficulty) is not int or not 1 <= difficulty <= 1 << 24 or
+            difficulty & (difficulty - 1)):
+        raise ValueError("transport difficulty must be a power of two in 1..2^24")
+    return min(native_target, ((1 << 224) - 1) // difficulty)
+
+
 @dataclass
 class _Request:
     kind: str
@@ -144,13 +160,15 @@ class HashStratumService:
 
     def __init__(self, gate, *, sign_owner, observer_rpc, bind=("127.0.0.1", 0),
                  work_update_seconds=40, observe_seconds=0.25,
-                 observation_timeout=2.0, clock=time.monotonic):
+                 observation_timeout=2.0, clock=time.monotonic, transport_difficulty=None):
         if (gate.profile_version != 7 or not callable(observer_rpc) or
                 not ipaddress.ip_address(bind[0]).is_loopback or
                 type(observe_seconds) not in (int, float) or
                 not math.isfinite(observe_seconds) or not 0.02 <= observe_seconds < observation_timeout):
             raise ValueError("v7, loopback bind and bounded independent observer required")
         self.owner = os.getpid(), threading.get_ident()
+        transport_target((1 << 256) - 1, transport_difficulty)
+        self.transport_difficulty = transport_difficulty
         self.gate, self.observer_rpc = gate, observer_rpc
         self.observer_policy = gate.mode, f"{gate.rules:064x}", gate.activation_height
         self.observe_seconds = observe_seconds
@@ -225,7 +243,8 @@ class HashStratumService:
             total = sum(len(w.authorization.block_bytes) + len(w.authorization.snapshot_bytes) for w in self.jobs.values())
             if template.job_id not in self.jobs and (len(self.jobs) >= self.MAX_JOBS or total + charge > self.MAX_JOB_BYTES):
                 raise ValueError("unexpired Stratum work retention budget reached")
-            work = Work(authorization, template, snapshot, share_target(block.nBits, 7), self.latch.generation)
+            work = Work(authorization, template, snapshot,
+                transport_target(share_target(block.nBits, 7), self.transport_difficulty), self.latch.generation)
             self.jobs[template.job_id] = self.current = work
             self.stats["published"] += 1
             return True
@@ -256,7 +275,8 @@ class HashStratumService:
             raise ValueError("unknown or expired issued job")
         proof = proof_from_sia(work.template, prefix, bytes.fromhex(params[2]), params[3], params[4])
         if proof.hash_int > work.target:
-            raise ValueError("insufficient native share work")
+            raise ValueError("insufficient assigned share work" if self.transport_difficulty is not None
+                             else "insufficient native share work")
         if work.authorization.block_for_header(proof.header) != proof.block:
             raise ValueError("proof changes its immutable authorized block")
         share = Share(proof.header, work.snapshot.envelope, work.snapshot.owner_signature)
@@ -358,6 +378,8 @@ class HashStratumService:
                                     if work is not service.current or not service.latch.check(work.authorization.native_parent, work.generation):
                                         return
                                     difficulty = math.nextafter(((1 << 224) - 1) / (work.target + 1), 0.0)
+                                    if service.transport_difficulty is not None:
+                                        difficulty = max(service.transport_difficulty, difficulty)
                                     send({"id": None, "method": "mining.set_difficulty", "params": [difficulty]})
                                     send({"id": None, "method": "mining.notify", "params": sia_notify(work.template, prefix, clean=True)})
                                     sent = work.template.job_id

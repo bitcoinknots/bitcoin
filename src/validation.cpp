@@ -5413,6 +5413,24 @@ bool TestSharePoolTemplateOnAncestor(BlockValidationState& state,
 }
 
 namespace {
+std::shared_ptr<const sharepool::hashonly::Snapshot> LookupHashPoolSnapshot(
+    ChainstateManager& chainman, const uint256& hash, sharepool::DecodedSnapshotCache& snapshots)
+{
+    AssertLockNotHeld(cs_main);
+    if (auto cached = snapshots.Get(hash)) return cached;
+    const auto raw = WITH_LOCK(cs_main, return chainman.m_sharepool_hash_store->GetShared(hash));
+    if (!raw) return {};
+    std::shared_ptr<const sharepool::hashonly::Snapshot> decoded;
+    try { decoded = std::make_shared<const sharepool::hashonly::Snapshot>(sharepool::hashonly::DecodeSnapshot(*raw)); }
+    catch (const std::ios_base::failure&) { throw sharepool::hashonly::MalformedSnapshot("hash-verified snapshot encoding is invalid"); }
+    // Only this validation invocation retains immutable decoded evidence. Each
+    // new invocation reads through the store again; no cached ancestry, payout
+    // or native verdict can substitute for a missing preimage. Oversized values
+    // remain available to the verifier even when the retention LRU cannot fit.
+    snapshots.Put(hash, decoded, raw->size());
+    return decoded;
+}
+
 uint256 HashPoolNativeBody(const CBlock& block)
 {
     return sharepool::NativeBodyCacheKey(block);
@@ -5569,22 +5587,10 @@ sharepool::hashonly::Result PrepareSharePoolHashOrigins(ChainstateManager& chain
     // Decode/hash/signature work executes outside cs_main. Only owned byte
     // references and small native cache lookups cross the mutex boundary.
     std::map<uint256, Result> prepared;
-    sharepool::DecodedSnapshotCache snapshots{hashonly::MAX_DEPENDENCY_BYTES};
+    sharepool::DecodedSnapshotCache snapshots{hashonly::MAX_DEPENDENCY_BYTES, 1024, chainman.m_sharepool_decoded_retention};
     const hashonly::Lookup lookup = [&](const uint256& hash) -> std::shared_ptr<const hashonly::Snapshot> {
         if (overlay && hash == overlay_hash) return overlay;
-        if (auto cached = snapshots.Get(hash)) return cached;
-        const auto raw = WITH_LOCK(cs_main, return chainman.m_sharepool_hash_store->GetShared(hash));
-        if (!raw) return {};
-        std::shared_ptr<const hashonly::Snapshot> decoded;
-        try { decoded = std::make_shared<const hashonly::Snapshot>(hashonly::DecodeSnapshot(*raw)); }
-        catch (const std::ios_base::failure&) { throw hashonly::MalformedSnapshot("hash-verified snapshot encoding is invalid"); }
-        // Eviction is only a local optimization. Never hide an available
-        // preimage and thereby turn a consensus dependency budget failure into
-        // indefinitely missing data; the pure checker owns that rule.
-        // Charge reconstructed shares and template references as well as raw
-        // bytes. A v7 proof's small wire record is not its decoded memory cost.
-        snapshots.Put(hash, decoded, raw->size());
-        return decoded;
+        return LookupHashPoolSnapshot(chainman, hash, snapshots);
     };
     for (uint32_t pass = 0; pass <= hashonly::MAX_ORIGIN_CHECKS; ++pass) {
         if (chainman.m_interrupt || (stop && *stop)) return Result::Missing({}, "sharepool-hash-validation-interrupted");
@@ -5660,13 +5666,11 @@ sharepool::hashonly::Result ValidateSharePoolHashHistoricalTemplateUnlocked(Chai
     const auto time = std::max<int64_t>(tip->GetMedianTimePast() + 1, GetTime());
     if (time < 0 || time > std::numeric_limits<uint32_t>::max()) return Result::Missing({}, "sharepool-hash-native-time-range");
     const auto overlay_hash = overlay ? hashonly::ProfileSnapshotHash(*overlay, hashonly::ProfileVersion(chainman.GetConsensus())) : uint256{};
+    sharepool::DecodedSnapshotCache snapshots{hashonly::MAX_DEPENDENCY_BYTES, 1024, chainman.m_sharepool_decoded_retention};
     const auto checked = hashonly::CheckHistoricalTemplate(block, tip, static_cast<uint32_t>(time), chainman.GetConsensus(),
         [&](const uint256& hash) -> std::shared_ptr<const hashonly::Snapshot> {
             if (overlay && hash == overlay_hash) return overlay;
-            const auto raw = WITH_LOCK(cs_main, return chainman.m_sharepool_hash_store->GetShared(hash));
-            if (!raw) return {};
-            try { return std::make_shared<const hashonly::Snapshot>(hashonly::DecodeSnapshot(*raw)); }
-            catch (const std::ios_base::failure&) { throw hashonly::MalformedSnapshot("hash-verified snapshot encoding is invalid"); }
+            return LookupHashPoolSnapshot(chainman, hash, snapshots);
         },
         [&](const CBlock& origin, const CBlockIndex* parent) {
             if (!parent) return Result::Missing({}, "sharepool-hash-native-ancestor-missing");
@@ -5704,12 +5708,10 @@ sharepool::hashonly::Result ValidateSharePoolHashProofUnlocked(ChainstateManager
     }
     const auto time = std::max<int64_t>(tip->GetMedianTimePast() + 1, GetTime());
     if (time < 0 || time > std::numeric_limits<uint32_t>::max()) return Result::Missing({}, "sharepool-hash-native-time-range");
+    sharepool::DecodedSnapshotCache snapshots{hashonly::MAX_DEPENDENCY_BYTES, 1024, chainman.m_sharepool_decoded_retention};
     const auto checked = hashonly::CheckShareProof(share, *full_origin, tip, static_cast<uint32_t>(time), chainman.GetConsensus(),
         [&](const uint256& hash) -> std::shared_ptr<const hashonly::Snapshot> {
-            const auto raw = WITH_LOCK(cs_main, return chainman.m_sharepool_hash_store->GetShared(hash));
-            if (!raw) return {};
-            try { return std::make_shared<const hashonly::Snapshot>(hashonly::DecodeSnapshot(*raw)); }
-            catch (const std::ios_base::failure&) { throw hashonly::MalformedSnapshot("hash-verified snapshot encoding is invalid"); }
+            return LookupHashPoolSnapshot(chainman, hash, snapshots);
         },
         [&](const CBlock& origin, const CBlockIndex* parent) {
             if (!parent) return Result::Missing({}, "sharepool-hash-native-ancestor-missing");
@@ -7742,6 +7744,7 @@ ChainstateManager::ChainstateManager(const util::SignalInterrupt& interrupt, Opt
       m_interrupt{interrupt},
       m_options{Flatten(std::move(options))},
       m_blockman{interrupt, CheckSharePoolProfileDirectory(m_options, std::move(blockman_options))},
+      m_sharepool_decoded_retention{std::make_shared<sharepool::DecodedSnapshotRetentionBudget>(sharepool::DEFAULT_DECODED_SNAPSHOT_RETENTION_BYTES)},
       m_validation_cache{m_options.script_execution_cache_bytes, m_options.signature_cache_bytes}
 {
     if (GetConsensus().SharePoolHashOnly) {

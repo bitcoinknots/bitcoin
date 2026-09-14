@@ -1,0 +1,1 @@
+passed: actual Put allocation failure releases lease and retains caller value; 8 threads x 10000 insert/evict attempts; aggregate ceiling respected; final charge zero

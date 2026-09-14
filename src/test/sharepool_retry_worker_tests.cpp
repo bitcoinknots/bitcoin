@@ -11,6 +11,7 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <future>
@@ -255,6 +256,33 @@ BOOST_AUTO_TEST_CASE(compact_decoded_snapshot_lru_charges_expansion_and_preserve
                       std::numeric_limits<size_t>::max());
 }
 
+BOOST_AUTO_TEST_CASE(decoded_snapshot_entry_budget_is_independent_of_bytes_and_session)
+{
+    auto snapshot = std::make_shared<const sharepool::hashonly::Snapshot>();
+    const size_t charge = sharepool::DecodedSnapshotCacheCharge(*snapshot, 512);
+    const uint256 first{uint8_t{1}}, second{uint8_t{2}}, third{uint8_t{3}};
+    sharepool::DecodedSnapshotCache cache{10 * charge, 2};
+    BOOST_REQUIRE(cache.Put(first, snapshot, 512));
+    BOOST_REQUIRE(cache.Put(second, snapshot, 512));
+    BOOST_REQUIRE(cache.Get(first));
+    BOOST_REQUIRE(cache.Put(third, snapshot, 512));
+    BOOST_CHECK(!cache.Get(second));
+    BOOST_CHECK(cache.Get(first) == snapshot);
+    BOOST_CHECK(cache.Get(third) == snapshot);
+    BOOST_CHECK_EQUAL(cache.Size(), 2);
+    BOOST_CHECK_EQUAL(cache.Bytes(), 2 * charge);
+    // Replacing an entry neither evicts another value nor double-charges it.
+    BOOST_REQUIRE(cache.Put(first, snapshot, 512));
+    BOOST_CHECK(cache.Get(third) == snapshot);
+    BOOST_CHECK_EQUAL(cache.Bytes(), 2 * charge);
+    sharepool::DecodedSnapshotCache following{10 * charge, 2};
+    BOOST_CHECK(!following.Get(first));
+    sharepool::DecodedSnapshotCache disabled{10 * charge, 0};
+    BOOST_CHECK(!disabled.Put(first, snapshot, 512));
+    BOOST_CHECK_EQUAL(disabled.Size(), 0);
+    BOOST_CHECK_EQUAL(disabled.Bytes(), 0);
+}
+
 BOOST_AUTO_TEST_CASE(decoded_snapshot_cache_counts_nested_witnesses_outputs_and_shared_transaction_objects)
 {
     namespace ho = sharepool::hashonly;
@@ -291,6 +319,115 @@ BOOST_AUTO_TEST_CASE(decoded_snapshot_cache_counts_nested_witnesses_outputs_and_
                        memusage::DynamicUsage(snapshot.pending) + memusage::DynamicUsage(snapshot.settled) +
                        memusage::DynamicUsage(snapshot.payouts);
     BOOST_CHECK_GT(sharepool::DecodedSnapshotCacheCharge(snapshot, wire), first + metadata + added);
+}
+
+BOOST_AUTO_TEST_CASE(decoded_snapshot_shared_budget_releases_on_eviction_replacement_and_destruction)
+{
+    using namespace sharepool;
+    const auto snapshot = std::make_shared<const hashonly::Snapshot>();
+    const size_t charge = DecodedSnapshotCacheCharge(*snapshot, 512);
+    const auto budget = std::make_shared<DecodedSnapshotRetentionBudget>(2 * charge);
+    const uint256 first{uint8_t{1}}, second{uint8_t{2}}, third{uint8_t{3}};
+    {
+        DecodedSnapshotCache one{10 * charge, 1, budget};
+        DecodedSnapshotCache two{10 * charge, 1, budget};
+        DecodedSnapshotCache three{10 * charge, 1, budget};
+        BOOST_REQUIRE(one.Put(first, snapshot, 512));
+        // Conservative duplicate charging applies even to the same object/hash.
+        BOOST_REQUIRE(two.Put(first, snapshot, 512));
+        BOOST_CHECK_EQUAL(budget->Bytes(), 2 * charge);
+        BOOST_CHECK(!three.Put(third, snapshot, 512));
+        BOOST_CHECK_EQUAL(three.Bytes(), 0);
+        BOOST_REQUIRE(one.Put(second, snapshot, 512)); // Eviction releases its lease.
+        BOOST_CHECK(!one.Get(first));
+        BOOST_CHECK_EQUAL(budget->Bytes(), 2 * charge);
+        BOOST_REQUIRE(two.Put(first, snapshot, 512)); // Replacement releases its lease.
+        BOOST_CHECK_EQUAL(budget->Bytes(), 2 * charge);
+        BOOST_CHECK(!three.Put(third, snapshot, 513));
+        BOOST_CHECK_EQUAL(budget->Bytes(), 2 * charge);
+        BOOST_CHECK(snapshot == one.Get(second)); // Denial did not hide caller-owned data.
+    }
+    BOOST_CHECK_EQUAL(budget->Bytes(), 0);
+    for (const size_t maximum : {size_t{0}, charge - 1}) {
+        const auto denied = std::make_shared<DecodedSnapshotRetentionBudget>(maximum);
+        DecodedSnapshotCache cache{10 * charge, 1024, denied};
+        BOOST_CHECK(!cache.Put(first, snapshot, 512));
+        BOOST_CHECK_EQUAL(cache.Size(), 0);
+        BOOST_CHECK_EQUAL(denied->Bytes(), 0);
+    }
+    DecodedSnapshotCache disabled{10 * charge, 0, budget};
+    BOOST_CHECK(!disabled.Put(first, snapshot, 512));
+    BOOST_CHECK(!disabled.Put(first, nullptr, 512));
+    BOOST_CHECK_EQUAL(budget->Bytes(), 0);
+}
+
+BOOST_AUTO_TEST_CASE(decoded_snapshot_shared_leases_are_overflow_safe_and_exception_safe)
+{
+    using Budget = sharepool::DecodedSnapshotRetentionBudget;
+    const auto maximum = std::numeric_limits<size_t>::max();
+    auto budget = std::make_shared<Budget>(maximum);
+    auto all = budget->TryAcquire(maximum);
+    BOOST_REQUIRE(all);
+    BOOST_CHECK(!budget->TryAcquire(1));
+    BOOST_CHECK_EQUAL(budget->Bytes(), maximum);
+    auto zero = budget->TryAcquire(0);
+    BOOST_REQUIRE(zero);
+    *zero = std::move(*all); // Move assignment releases its prior reservation.
+    all.reset(); // Moved-from destruction cannot double release.
+    BOOST_CHECK_EQUAL(budget->Bytes(), maximum);
+    zero.reset();
+    BOOST_CHECK_EQUAL(budget->Bytes(), 0);
+    const auto fail_after_reservation = [&] {
+        auto lease = budget->TryAcquire(100);
+        if (!lease) throw std::runtime_error("reservation unexpectedly failed");
+        std::vector<Budget::Lease> insertion;
+        insertion.push_back(std::move(*lease));
+        throw std::bad_alloc{};
+    };
+    BOOST_CHECK_THROW(fail_after_reservation(), std::bad_alloc);
+    BOOST_CHECK_EQUAL(budget->Bytes(), 0);
+    auto remaining = budget->TryAcquire(maximum);
+    BOOST_REQUIRE(remaining);
+    const std::weak_ptr<Budget> owner{budget};
+    budget.reset();
+    BOOST_CHECK(owner.expired());
+    // The reservation owns its accounting state independently of the service.
+    remaining.reset();
+}
+
+BOOST_AUTO_TEST_CASE(decoded_snapshot_shared_budget_concurrent_sessions_never_exceed_limit)
+{
+    using namespace sharepool;
+    const auto snapshot = std::make_shared<const hashonly::Snapshot>();
+    const size_t charge = DecodedSnapshotCacheCharge(*snapshot, 512);
+    constexpr size_t THREADS{8};
+    const size_t maximum = 3 * charge;
+    const auto budget = std::make_shared<DecodedSnapshotRetentionBudget>(maximum);
+    std::promise<void> release;
+    const auto released = release.get_future().share();
+    std::array<std::promise<void>, THREADS> entered;
+    std::vector<std::future<void>> workers;
+    std::atomic<size_t> admitted{0}, violations{0};
+    for (size_t thread{0}; thread < THREADS; ++thread) {
+        workers.push_back(std::async(std::launch::async, [&, thread] {
+            DecodedSnapshotCache cache{2 * charge, 1, budget};
+            if (cache.Put(uint256{uint8_t{1}}, snapshot, 512)) ++admitted;
+            entered[thread].set_value();
+            released.wait();
+            for (size_t i{0}; i < 1000; ++i) {
+                cache.Put(uint256{static_cast<uint8_t>(i % 3 + 1)}, snapshot, 512);
+                if (budget->Bytes() > maximum || cache.Bytes() > charge) ++violations;
+                if (i % 16 == 0) std::this_thread::yield();
+            }
+        }));
+    }
+    for (auto& ready : entered) ready.get_future().wait();
+    BOOST_CHECK_EQUAL(admitted.load(), 3);
+    BOOST_CHECK_EQUAL(budget->Bytes(), maximum);
+    release.set_value();
+    for (auto& worker : workers) worker.get();
+    BOOST_CHECK_EQUAL(violations.load(), 0);
+    BOOST_CHECK_EQUAL(budget->Bytes(), 0);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

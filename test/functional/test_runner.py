@@ -84,6 +84,8 @@ EXTENDED_SCRIPTS = [
     # These tests are not run by default.
     # Longest test should go first, to favor running tests in parallel
     'feature_sharepool_hash_capacity.py',
+    'feature_sharepool_hash_live_capacity.py',
+    'feature_sharepool_hash_hardware_worker.py --software-test --seconds=15',
     'feature_sharepool_hash_cadence_benchmark.py',
     'feature_sharepool_hash_job_profile.py',
     'feature_sharepool_hash_100_miners.py',
