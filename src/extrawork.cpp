@@ -77,6 +77,30 @@ arith_uint256 ExtraWorkCache::RollForward(const Consensus::Params& params, std::
     return extra;
 }
 
+/**
+ * The first height on this chain at which the rule applies: the lowest ancestor whose
+ * median-time-past has reached the deployment's start time. The deployment activates on a
+ * median-time-past threshold -- a flag day in TIME -- while the windows were clipped only at
+ * the BLAKE2b fork HEIGHT, so for the first window-length of active blocks the fast
+ * estimate read timestamps made before the flag day, when nothing this rule can see bound
+ * them. Median-time-past is non-decreasing along a chain, so the predicate is monotone in
+ * height and a binary search over ancestors is exact.
+ */
+static int ExtraWorkFirstActiveHeight(const Consensus::Params& params, const CBlockIndex* pindexPrev)
+{
+    int lo{0}, hi{pindexPrev->nHeight};
+    while (lo < hi) {
+        const int mid{lo + (hi - lo) / 2};
+        const CBlockIndex* const ancestor{pindexPrev->GetAncestor(mid)};
+        if (ancestor != nullptr && ancestor->GetMedianTimePast() >= params.ExtraWorkStartTime) {
+            hi = mid;
+        } else {
+            lo = mid + 1;
+        }
+    }
+    return lo;
+}
+
 uint64_t ExtraWorkCache::FactorInternal(const Consensus::Params& params, const CBlockIndex* pindexPrev)
 {
     if (pindexPrev == nullptr || !params.ExtraWorkActiveAt(pindexPrev->GetMedianTimePast())) return EXTRA_WORK_FACTOR_ONE;
@@ -85,7 +109,15 @@ uint64_t ExtraWorkCache::FactorInternal(const Consensus::Params& params, const C
     const int floor_height{params.Blake2bHeight == std::numeric_limits<int>::max() ? 0 : params.Blake2bHeight};
     const int height{pindexPrev->nHeight};
     if (height - floor_height < 2) return EXTRA_WORK_FACTOR_ONE;
-    const CBlockIndex* fast_start{Assert(pindexPrev->GetAncestor(std::max(floor_height, height - EXTRA_WORK_FAST_WINDOW)))};
+    // The fast window is floored at the first active height as well, and it must FIT above
+    // that floor: a truncated fast window judges a handful of blocks against the full band,
+    // and the pace of a one-block window is unbounded -- in the activation harness that
+    // pinned 57 of 300 honest chains at the cap. Until it fits, the rule is simply asleep.
+    // The slow window keeps only the fork floor: the same allowance is ~1 % of its span, and
+    // inflating it moves the factor in the attacker's disfavour.
+    const int fast_floor{std::max(floor_height, ExtraWorkFirstActiveHeight(params, pindexPrev))};
+    if (height - EXTRA_WORK_FAST_WINDOW < fast_floor) return EXTRA_WORK_FACTOR_ONE;
+    const CBlockIndex* fast_start{Assert(pindexPrev->GetAncestor(height - EXTRA_WORK_FAST_WINDOW))};
     const CBlockIndex* slow_start{Assert(pindexPrev->GetAncestor(std::max(floor_height, height - EXTRA_WORK_SLOW_WINDOW)))};
     if (fast_start == pindexPrev || slow_start == fast_start) return EXTRA_WORK_FACTOR_ONE;
 

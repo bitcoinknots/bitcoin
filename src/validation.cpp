@@ -7105,6 +7105,7 @@ ChainstateManager::~ChainstateManager()
     LOCK(::cs_main);
 
     m_versionbitscache.Clear();
+    m_extra_work_cache.Clear();
 }
 
 bool ChainstateManager::DetectSnapshotChainstate()
