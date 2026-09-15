@@ -2430,6 +2430,205 @@ static inline bool SetHasKeys(const std::set<T>& set, const Tk& key, const Args&
 // outpoint (needed for the utxo index) + nHeight + fCoinBase
 static constexpr size_t PER_UTXO_OVERHEAD = sizeof(COutPoint) + sizeof(uint32_t) + sizeof(bool);
 
+//! Printable text of at least 5 characters inside the coinbase scriptSig's
+//! pushes after the BIP34 height. Only push data is scanned, so push-length
+//! bytes that happen to be printable never leak into the tag.
+static std::string CoinbaseTag(const CScript& script_sig)
+{
+    std::string tag;
+    const auto add_run{[&](std::string& run) {
+        if (run.size() >= 5) tag += (tag.empty() ? "" : " ") + run;
+        run.clear();
+    }};
+    CScript::const_iterator pc{script_sig.begin()};
+    opcodetype op;
+    std::vector<unsigned char> data;
+    bool first{true};
+    while (pc < script_sig.end() && script_sig.GetOp(pc, op, data)) {
+        if (first) {
+            first = false;
+            continue;
+        }
+        std::string run;
+        for (const unsigned char c : data) {
+            if (c >= 0x20 && c < 0x7f) {
+                run += char(c);
+            } else {
+                add_run(run);
+            }
+        }
+        add_run(run);
+    }
+    return tag;
+}
+
+static RPCHelpMan getcoinbasepayouts()
+{
+    return RPCHelpMan{"getcoinbasepayouts",
+        "\nSummarize how recent blocks paid out their coinbase: how much value went to coinbases with one payout\n"
+        "output versus many, and how concentrated blocks are on each primary payout script (the script of the\n"
+        "largest-value coinbase output). This is measurement only. A payout script is not an identity: one\n"
+        "operator can use many scripts, and a coinbase can pay any script regardless of who mined the block.\n",
+        {
+            {"nblocks", RPCArg::Type::NUM, RPCArg::Default{144}, "Number of most recent blocks to analyze (capped at 2016 and at the chain length)"},
+        },
+        RPCResult{
+            RPCResult::Type::OBJ, "", "",
+            {
+                {RPCResult::Type::NUM, "blocks", "Blocks analyzed"},
+                {RPCResult::Type::NUM, "first_height", "Lowest height analyzed"},
+                {RPCResult::Type::NUM, "last_height", "Highest height analyzed"},
+                {RPCResult::Type::NUM, "total_value", "Sum of all coinbase outputs, in satoshis"},
+                {RPCResult::Type::ARR, "by_output_count", "Coinbase value grouped by the number of non-zero-value coinbase outputs",
+                {
+                    {RPCResult::Type::OBJ, "", "",
+                    {
+                        {RPCResult::Type::STR, "outputs", "\"0-1\", \"2-9\", \"10-49\" or \"50+\""},
+                        {RPCResult::Type::NUM, "blocks", "Blocks in this group"},
+                        {RPCResult::Type::NUM, "value", "Coinbase value in this group, in satoshis"},
+                        {RPCResult::Type::NUM, "value_share_pct", "Percentage of total_value"},
+                    }},
+                }},
+                {RPCResult::Type::NUM, "distinct_primary_scripts", "Number of distinct primary payout scripts"},
+                {RPCResult::Type::NUM, "effective_primary_scripts", "Inverse Simpson index over the block shares of primary payout scripts"},
+                {RPCResult::Type::NUM, "largest_primary_share_pct", "Percentage of blocks whose primary payout script is the most common one"},
+                {RPCResult::Type::ARR, "primary_scripts", "Primary payout scripts, most blocks first",
+                {
+                    {RPCResult::Type::OBJ, "", "",
+                    {
+                        {RPCResult::Type::STR_HEX, "script", "The output script"},
+                        {RPCResult::Type::STR, "address", /*optional=*/true, "The address, if the script has one"},
+                        {RPCResult::Type::NUM, "blocks", "Blocks with this primary payout script"},
+                        {RPCResult::Type::NUM, "share_pct", "Percentage of blocks analyzed"},
+                        {RPCResult::Type::NUM, "value", "Total coinbase value of those blocks, in satoshis"},
+                        {RPCResult::Type::NUM, "mean_outputs", "Mean number of non-zero-value coinbase outputs in those blocks"},
+                        {RPCResult::Type::STR, "top_tag", "Most common coinbase tag text in those blocks, empty if none. A claim, not verified"},
+                    }},
+                }},
+            }},
+        RPCExamples{
+            HelpExampleCli("getcoinbasepayouts", "")
+            + HelpExampleCli("getcoinbasepayouts", "2016")
+            + HelpExampleRpc("getcoinbasepayouts", "144")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    int nblocks{request.params[0].isNull() ? 144 : request.params[0].getInt<int>()};
+    if (nblocks < 1) throw JSONRPCError(RPC_INVALID_PARAMETER, "nblocks must be at least 1");
+    nblocks = std::min(nblocks, 2016);
+
+    ChainstateManager& chainman = EnsureAnyChainman(request.context);
+    std::vector<const CBlockIndex*> indexes;
+    {
+        LOCK(cs_main);
+        for (const CBlockIndex* pindex{chainman.ActiveChain().Tip()}; pindex && int(indexes.size()) < nblocks; pindex = pindex->pprev) {
+            indexes.push_back(pindex);
+        }
+    }
+
+    struct Bucket {
+        const char* label;
+        int64_t blocks{0};
+        CAmount value{0};
+    };
+    Bucket buckets[4]{{"0-1"}, {"2-9"}, {"10-49"}, {"50+"}};
+
+    struct Primary {
+        int64_t blocks{0};
+        CAmount value{0};
+        int64_t outputs{0};
+        std::map<std::string, int64_t> tags;
+    };
+    std::map<CScript, Primary> primaries;
+
+    CAmount total_value{0};
+    for (const CBlockIndex* pindex : indexes) {
+        const CBlock block{GetBlockChecked(chainman.m_blockman, *pindex)};
+        const CTransaction& coinbase{*block.vtx[0]};
+        CAmount value{0};
+        int64_t outputs{0};
+        const CTxOut* primary{nullptr};
+        for (const CTxOut& out : coinbase.vout) {
+            value += out.nValue;
+            if (out.nValue > 0) ++outputs;
+            if (!primary || out.nValue > primary->nValue) primary = &out;
+        }
+        total_value += value;
+        Bucket& bucket{buckets[outputs <= 1 ? 0 : outputs <= 9 ? 1 : outputs <= 49 ? 2 : 3]};
+        ++bucket.blocks;
+        bucket.value += value;
+        if (!primary) continue;
+        Primary& entry{primaries[primary->scriptPubKey]};
+        ++entry.blocks;
+        entry.value += value;
+        entry.outputs += outputs;
+        ++entry.tags[CoinbaseTag(coinbase.vin[0].scriptSig)];
+    }
+
+    const auto pct{[](int64_t part, int64_t whole) { return whole > 0 ? (part * 10000 / whole) / 100.0 : 0.0; }};
+    const int64_t nblocks_analyzed{int64_t(indexes.size())};
+
+    UniValue by_output_count(UniValue::VARR);
+    for (const Bucket& bucket : buckets) {
+        UniValue obj(UniValue::VOBJ);
+        obj.pushKV("outputs", bucket.label);
+        obj.pushKV("blocks", bucket.blocks);
+        obj.pushKV("value", bucket.value);
+        obj.pushKV("value_share_pct", pct(bucket.value, total_value));
+        by_output_count.push_back(std::move(obj));
+    }
+
+    std::vector<std::pair<const CScript*, const Primary*>> sorted;
+    for (const auto& [script, entry] : primaries) sorted.emplace_back(&script, &entry);
+    std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+        return a.second->blocks != b.second->blocks ? a.second->blocks > b.second->blocks : *a.first < *b.first;
+    });
+
+    double simpson{0};
+    UniValue primary_scripts(UniValue::VARR);
+    for (const auto& [script, entry] : sorted) {
+        const double share{double(entry->blocks) / double(nblocks_analyzed)};
+        simpson += share * share;
+
+        std::string top_tag;
+        int64_t top_tag_blocks{0};
+        for (const auto& [tag, count] : entry->tags) {
+            if (count > top_tag_blocks) {
+                top_tag = tag;
+                top_tag_blocks = count;
+            }
+        }
+
+        UniValue obj(UniValue::VOBJ);
+        obj.pushKV("script", HexStr(*script));
+        CTxDestination dest;
+        if (ExtractDestination(*script, dest)) {
+            const std::string address{EncodeDestination(dest)};
+            if (!address.empty()) obj.pushKV("address", address);
+        }
+        obj.pushKV("blocks", entry->blocks);
+        obj.pushKV("share_pct", pct(entry->blocks, nblocks_analyzed));
+        obj.pushKV("value", entry->value);
+        obj.pushKV("mean_outputs", int64_t(100.0 * entry->outputs / entry->blocks + 0.5) / 100.0);
+        obj.pushKV("top_tag", top_tag);
+        primary_scripts.push_back(std::move(obj));
+    }
+
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("blocks", nblocks_analyzed);
+    result.pushKV("first_height", indexes.back()->nHeight);
+    result.pushKV("last_height", indexes.front()->nHeight);
+    result.pushKV("total_value", total_value);
+    result.pushKV("by_output_count", std::move(by_output_count));
+    result.pushKV("distinct_primary_scripts", uint64_t(sorted.size()));
+    result.pushKV("effective_primary_scripts", simpson > 0 ? int64_t(100.0 / simpson + 0.5) / 100.0 : 0.0);
+    result.pushKV("largest_primary_share_pct", sorted.empty() ? 0.0 : pct(sorted.front().second->blocks, nblocks_analyzed));
+    result.pushKV("primary_scripts", std::move(primary_scripts));
+    return result;
+},
+    };
+}
+
 static RPCHelpMan getblockstats()
 {
     return RPCHelpMan{"getblockstats",
@@ -4249,6 +4448,7 @@ void RegisterBlockchainRPCCommands(CRPCTable& t)
         {"blockchain", &getblockchaininfo},
         {"blockchain", &getchaintxstats},
         {"blockchain", &getblockstats},
+        {"blockchain", &getcoinbasepayouts},
         {"blockchain", &getbestblockhash},
         {"blockchain", &getblockcount},
         {"blockchain", &getblock},

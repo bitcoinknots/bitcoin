@@ -52,15 +52,6 @@ void ReadSigNetArgs(const ArgsManager& args, CChainParams::SigNetOptions& option
 
 void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& options)
 {
-    if (const auto height{args.GetIntArg("-blocklistheight")}) {
-        if (*height < 0) throw std::runtime_error("-blocklistheight cannot be negative.");
-        options.blocklist_height = (int)*height;
-    }
-    for (const std::string& script_hex : args.GetArgs("-blocklistscript")) {
-        const auto bytes{TryParseHex<unsigned char>(script_hex)};
-        if (!bytes) throw std::runtime_error(strprintf("-blocklistscript must be hex, not '%s'.", script_hex));
-        options.blocklisted_scripts.push_back(*bytes);
-    }
     if (auto value = args.GetBoolArg("-fastprune")) options.fastprune = *value;
     if (HasTestOption(args, "bip94")) options.enforce_bip94 = true;
 
