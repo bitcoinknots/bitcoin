@@ -342,6 +342,7 @@ BASE_SCRIPTS = [
     'mining_basic.py',
     'mining_mainnet.py',
     'feature_signet.py',
+    'feature_proof_of_datum.py',
     'p2p_mutated_blocks.py',
     'wallet_implicitsegwit.py --legacy-wallet',
     'rpc_named_arguments.py',

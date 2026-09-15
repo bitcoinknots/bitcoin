@@ -7,6 +7,7 @@
 
 #include <chain.h>
 #include <chainparams.h>
+#include <datum.h>
 #include <chainparamsbase.h>
 #include <clientversion.h>
 #include <common/system.h>
@@ -52,9 +53,11 @@ using interfaces::BlockRef;
 using interfaces::BlockTemplate;
 using interfaces::Mining;
 using node::BlockAssembler;
+using node::DatumTracker;
 using node::GetMinimumTime;
 using node::NodeContext;
 using node::RegenerateCommitments;
+using node::StripDatumPort;
 using node::UpdateTime;
 using util::ToString;
 
@@ -721,6 +724,22 @@ static RPCHelpMan getblocktemplate()
     NodeContext& node = EnsureAnyNodeContext(request.context);
     ChainstateManager& chainman = EnsureChainman(node);
     Mining& miner = EnsureMining(node);
+
+    // Proof of Datum: refuse to hand out a template to a connection this node
+    // has flagged, heuristically or by hand. This withholds a voluntary
+    // service only; it has no bearing on whether any block is valid. See
+    // src/datum.h.
+    const std::string datum_addr{StripDatumPort(request.peerAddr)};
+    if (!datum_addr.empty()) {
+        DatumTracker& datum{EnsureAnyDatumTracker(request.context)};
+        if (const auto ban{datum.IsBanned(datum_addr)}) {
+            throw JSONRPCError(RPC_MISC_ERROR,
+                strprintf("This connection is on this node's Proof of Datum list and will not be served a "
+                         "block template: %s", ban->reason));
+        }
+        datum.RecordTemplateRequest(datum_addr);
+    }
+
     LOCK(cs_main);
     uint256 tip{CHECK_NONFATAL(miner.getTip()).value().hash};
 
@@ -1185,6 +1204,17 @@ static RPCHelpMan submitblock()
     CHECK_NONFATAL(chainman.m_options.signals)->RegisterSharedValidationInterface(sc);
     bool accepted = chainman.ProcessNewBlock(blockptr, /*force_processing=*/true, /*min_pow_checked=*/true, /*new_block=*/&new_block);
     CHECK_NONFATAL(chainman.m_options.signals)->UnregisterSharedValidationInterface(sc);
+
+    // Proof of Datum: record this submission for scoring, regardless of the
+    // outcome above. A submitted block is never refused over a Datum flag --
+    // only template service is withheld -- because refusing to relay an
+    // already-valid block helps no one and only risks delaying its
+    // propagation. See src/datum.h.
+    const std::string datum_addr{StripDatumPort(request.peerAddr)};
+    if (!datum_addr.empty() && !block.vtx.empty() && !block.vtx[0]->vout.empty()) {
+        EnsureAnyDatumTracker(request.context).RecordSubmission(datum_addr, block.vtx[0]->vout[0].scriptPubKey);
+    }
+
     if (!new_block && accepted) {
         return "duplicate";
     }
@@ -1235,6 +1265,158 @@ static RPCHelpMan submitheader()
     };
 }
 
+static UniValue DatumVerdictToJSON(const std::string& addr, const node::DatumVerdict& verdict)
+{
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("address", addr);
+    obj.pushKV("gbt_calls", verdict.stats.gbt_calls);
+    obj.pushKV("blocks_submitted", verdict.stats.blocks_submitted);
+    obj.pushKV("coinbase_reuse_pct", verdict.coinbase_reuse_pct);
+    obj.pushKV("gbt_starved", verdict.gbt_starved);
+    obj.pushKV("coinbase_stale", verdict.coinbase_stale);
+    obj.pushKV("heuristic_match", verdict.heuristic_match);
+    obj.pushKV("flagged", verdict.flagged);
+    obj.pushKV("manually_flagged", verdict.manually_flagged);
+    if (verdict.stats.first_seen) obj.pushKV("first_seen", verdict.stats.first_seen);
+    if (verdict.stats.last_gbt_call_time) obj.pushKV("last_gbt_call_time", verdict.stats.last_gbt_call_time);
+    return obj;
+}
+
+static RPCHelpMan getdatuminfo()
+{
+    return RPCHelpMan{"getdatuminfo",
+        "\nProof of Datum: this node's read on how a connection has been using its mining RPCs.\n"
+        "This is a local, advisory heuristic, not a claim of certainty: it distinguishes a client that\n"
+        "builds its own block templates from one that only ever submits an already-built block, by how\n"
+        "often it calls getblocktemplate relative to what it submits, and how often its submitted blocks\n"
+        "reuse the same coinbase payout script, over a fairly large sample (see DATUM_MIN_SUBMISSIONS).\n"
+        "\"heuristic_match\" reports whether the pattern matched; it is informational only and never by\n"
+        "itself withholds anything. \"flagged\" reports whether this node is actually refusing this\n"
+        "address a template right now, which only happens by an explicit adddatumban call, or (only\n"
+        "with -datumautoban enabled) once heuristic_match has held. See doc/proof-of-datum.md.\n"
+        "With no address given, returns every address this node has recorded activity for.\n",
+        {
+            {"address", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "Look up a single address (as shown by getpeerinfo, without a port)"},
+        },
+        RPCResult{
+            RPCResult::Type::ARR, "", "",
+            {
+                {RPCResult::Type::OBJ, "", "",
+                {
+                    {RPCResult::Type::STR, "address", "the address"},
+                    {RPCResult::Type::NUM, "gbt_calls", "getblocktemplate calls recorded from this address"},
+                    {RPCResult::Type::NUM, "blocks_submitted", "blocks accepted by submitblock from this address"},
+                    {RPCResult::Type::NUM, "coinbase_reuse_pct", "share (0-100) of recent submitted blocks sharing this address's single most common coinbase payout script"},
+                    {RPCResult::Type::BOOL, "gbt_starved", "true if blocks are being submitted with too few getblocktemplate calls behind them"},
+                    {RPCResult::Type::BOOL, "coinbase_stale", "true if one payout script dominates this address's recent submitted blocks"},
+                    {RPCResult::Type::BOOL, "heuristic_match", "true if this address's pattern matches the built-in heuristic; informational, never enforced by itself"},
+                    {RPCResult::Type::BOOL, "flagged", "true if this node is actually refusing this address a block template right now"},
+                    {RPCResult::Type::BOOL, "manually_flagged", "true if the active flag came from a human decision (adddatumban) rather than -datumautoban"},
+                    {RPCResult::Type::NUM_TIME, "first_seen", /*optional=*/true, "when this address was first recorded"},
+                    {RPCResult::Type::NUM_TIME, "last_gbt_call_time", /*optional=*/true, "the most recent getblocktemplate call from this address"},
+                }},
+            }
+        },
+        RPCExamples{
+            HelpExampleCli("getdatuminfo", "")
+            + HelpExampleCli("getdatuminfo", "\"203.0.113.5\"")
+            + HelpExampleRpc("getdatuminfo", "")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    DatumTracker& datum{EnsureAnyDatumTracker(request.context)};
+    UniValue result(UniValue::VARR);
+    if (!request.params[0].isNull()) {
+        const std::string addr{request.params[0].get_str()};
+        result.push_back(DatumVerdictToJSON(addr, datum.GetVerdict(addr)));
+        return result;
+    }
+    for (const std::string& addr : datum.GetTrackedAddresses()) {
+        result.push_back(DatumVerdictToJSON(addr, datum.GetVerdict(addr)));
+    }
+    return result;
+},
+    };
+}
+
+static RPCHelpMan adddatumban()
+{
+    return RPCHelpMan{"adddatumban",
+        "\nManually flag an address as a Proof of Datum offender: this node will stop serving it block\n"
+        "templates. Use this for a connection you have reason to believe is a bare pool relay that the\n"
+        "heuristic in getdatuminfo did not catch on its own -- a public disclosure, someone telling you\n"
+        "directly, whatever the evidence is doesn't have to fit the heuristic's shape. Persisted across\n"
+        "restarts. Never affects whether a block from this address is accepted or relayed.\n",
+        {
+            {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The address to flag (as shown by getpeerinfo, without a port)"},
+            {"reason", RPCArg::Type::STR, RPCArg::Optional::NO, "Why: recorded for your own future reference and shown by listdatumbans"},
+        },
+        RPCResult{RPCResult::Type::NONE, "", ""},
+        RPCExamples{
+            HelpExampleCli("adddatumban", "\"203.0.113.5\" \"known SV1-only bridge, reported by operator\"")
+            + HelpExampleRpc("adddatumban", "\"203.0.113.5\", \"known SV1-only bridge, reported by operator\"")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    EnsureAnyDatumTracker(request.context).AddManualBan(request.params[0].get_str(), request.params[1].get_str());
+    return UniValue::VNULL;
+},
+    };
+}
+
+static RPCHelpMan removedatumban()
+{
+    return RPCHelpMan{"removedatumban",
+        "\nRemove a Proof of Datum flag from an address, whether it was set manually or by the heuristic.\n",
+        {
+            {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The address to unflag"},
+        },
+        RPCResult{RPCResult::Type::BOOL, "", "Whether a flag was removed"},
+        RPCExamples{
+            HelpExampleCli("removedatumban", "\"203.0.113.5\"")
+            + HelpExampleRpc("removedatumban", "\"203.0.113.5\"")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    return EnsureAnyDatumTracker(request.context).RemoveBan(request.params[0].get_str());
+},
+    };
+}
+
+static RPCHelpMan listdatumbans()
+{
+    return RPCHelpMan{"listdatumbans",
+        "\nList every address this node currently refuses a block template, manual and heuristic alike.\n",
+        {},
+        RPCResult{
+            RPCResult::Type::ARR, "", "",
+            {
+                {RPCResult::Type::OBJ, "", "",
+                {
+                    {RPCResult::Type::STR, "address", "the flagged address"},
+                    {RPCResult::Type::STR, "reason", "why it was flagged"},
+                    {RPCResult::Type::STR, "source", "\"manual\" (adddatumban) or \"heuristic\" (crossed the automatic thresholds)"},
+                    {RPCResult::Type::NUM_TIME, "time", "when the flag was set"},
+                }},
+            }
+        },
+        RPCExamples{HelpExampleCli("listdatumbans", "") + HelpExampleRpc("listdatumbans", "")},
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    UniValue result(UniValue::VARR);
+    for (const auto& [addr, entry] : EnsureAnyDatumTracker(request.context).ListBans()) {
+        UniValue obj(UniValue::VOBJ);
+        obj.pushKV("address", addr);
+        obj.pushKV("reason", entry.reason);
+        obj.pushKV("source", entry.source);
+        obj.pushKV("time", entry.time);
+        result.push_back(std::move(obj));
+    }
+    return result;
+},
+    };
+}
+
 void RegisterMiningRPCCommands(CRPCTable& t)
 {
     static const CRPCCommand commands[]{
@@ -1245,6 +1427,10 @@ void RegisterMiningRPCCommands(CRPCTable& t)
         {"mining", &getblocktemplate},
         {"mining", &submitblock},
         {"mining", &submitheader},
+        {"mining", &getdatuminfo},
+        {"mining", &adddatumban},
+        {"mining", &removedatumban},
+        {"mining", &listdatumbans},
 
         {"hidden", &generatetoaddress},
         {"hidden", &generatetodescriptor},

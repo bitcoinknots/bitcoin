@@ -40,6 +40,7 @@ class SignalInterrupt;
 }
 
 namespace node {
+class DatumTracker;
 class KernelNotifications;
 class Warnings;
 
@@ -71,6 +72,10 @@ struct NodeContext {
     std::unique_ptr<PeerManager> peerman;
     std::unique_ptr<ChainstateManager> chainman;
     std::unique_ptr<BanMan> banman;
+    //! Proof of Datum: per-address mining-RPC usage tracking and the
+    //! persistent list of addresses this node has stopped serving templates
+    //! to. See src/datum.h.
+    std::unique_ptr<DatumTracker> datum_tracker;
     ArgsManager* args{nullptr}; // Currently a raw pointer because the memory is not managed by this struct
     std::vector<BaseIndex*> indexes; // raw pointers because memory is not managed by this struct
     std::unique_ptr<interfaces::Chain> chain;

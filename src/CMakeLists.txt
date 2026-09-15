@@ -236,6 +236,7 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   addrdb.cpp
   addrman.cpp
   banman.cpp
+  datum.cpp
   bip324.cpp
   blockencodings.cpp
   blockfilter.cpp
