@@ -48,6 +48,7 @@
 #include <vector>
 
 class Chainstate;
+class CScript;
 class CTxMemPool;
 class ChainstateManager;
 struct ChainTxData;
@@ -102,6 +103,11 @@ extern SpkReuseModes SpkReuseMode;
 extern const std::vector<std::string> CHECKLEVEL_DOC;
 
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams);
+
+/** Forward Reward Share: the script a forwarded share must be paid to. Anyone can spend it once the coinbase is mature. */
+const CScript& ForwardShareScript();
+/** Forward Reward Share: the minimum a coinbase at nHeight must pay to ForwardShareScript(); zero before activation. */
+CAmount GetForwardShare(int nHeight, const Consensus::Params& consensusParams);
 
 bool FatalError(kernel::Notifications& notifications, BlockValidationState& state, const bilingual_str& message);
 

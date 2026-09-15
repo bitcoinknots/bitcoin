@@ -31,6 +31,10 @@
 
 namespace node {
 
+//! How many recently matured blocks' forward shares a template tries to claim,
+//! so a share one miner failed to claim is picked up by the next few.
+static constexpr int FORWARD_SHARE_CLAIM_LOOKBACK{6};
+
 int64_t GetMinimumTime(const CBlockIndex* pindexPrev, const int64_t difficulty_adjustment_interval)
 {
     int64_t min_time{pindexPrev->GetMedianTimePast() + 1};
@@ -185,6 +189,42 @@ std::shared_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     pblock->nTime = TicksSinceEpoch<std::chrono::seconds>(NodeClock::now());
     m_lock_time_cutoff = pindexPrev->GetMedianTimePast();
 
+    // Forward Reward Share: claim shares forwarded by recent blocks that have
+    // just matured, so their value reaches this block's coinbase as fees.
+    // Added before mempool packages so block limits account for them and no
+    // mempool transaction can conflict with them.
+    if (nHeight - COINBASE_MATURITY >= chainparams.GetConsensus().forward_share_height) {
+        const CCoinsViewCache& coins{m_chainstate.CoinsTip()};
+        const int newest{nHeight - COINBASE_MATURITY};
+        for (int created{newest}; created > newest - FORWARD_SHARE_CLAIM_LOOKBACK &&
+                                  created >= chainparams.GetConsensus().forward_share_height; --created) {
+            CBlock source;
+            if (!m_chainstate.m_blockman.ReadBlock(source, *m_chainstate.m_chain[created])) continue;
+            const CTransaction& source_coinbase{*source.vtx[0]};
+            CMutableTransaction claim;
+            claim.version = 2;
+            CAmount claimed{0};
+            for (uint32_t n{0}; n < source_coinbase.vout.size(); ++n) {
+                const COutPoint outpoint{source_coinbase.GetHash(), n};
+                if (source_coinbase.vout[n].scriptPubKey != ForwardShareScript() || !coins.HaveCoin(outpoint)) continue;
+                if (m_mempool && m_mempool->isSpent(outpoint)) continue;
+                claim.vin.emplace_back(outpoint);
+                claimed += source_coinbase.vout[n].nValue;
+            }
+            if (claim.vin.empty()) continue;
+            claim.vout.emplace_back(0, CScript() << OP_RETURN);
+            const CTransactionRef claim_tx{MakeTransactionRef(std::move(claim))};
+            pblock->vtx.push_back(claim_tx);
+            pblocktemplate->vTxFees.push_back(claimed);
+            pblocktemplate->vTxSigOpsCost.push_back(0);
+            if (m_options.print_modified_fee) pblocktemplate->vTxPriorities.push_back(0);
+            if (fNeedSizeAccounting) nBlockSize += ::GetSerializeSize(TX_WITH_WITNESS(*claim_tx));
+            nBlockWeight += GetTransactionWeight(*claim_tx);
+            ++nBlockTx;
+            nFees += claimed;
+        }
+    }
+
     int nPackagesSelected = 0;
     int nDescendantsUpdated = 0;
     if (m_mempool) {
@@ -210,16 +250,9 @@ std::shared_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     coinbaseTx.vout.resize(1);
     coinbaseTx.vout[0].scriptPubKey = m_options.coinbase_output_script;
     coinbaseTx.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
-    if (nHeight >= chainparams.GetConsensus().loyalty_height) {
-        // Loyalty Tax: pay the treasury its share and signal loyalty, so the
-        // remainder may still go to the requested payout script.
-        const Consensus::Params& lp{chainparams.GetConsensus()};
-        const CScript treasury_script(lp.loyalty_treasury_script.begin(), lp.loyalty_treasury_script.end());
-        const CAmount reward = coinbaseTx.vout[0].nValue;
-        const CAmount tax = (reward * lp.loyalty_tax_bps) / 10000;
-        coinbaseTx.vout[0].nValue = reward - tax;
-        coinbaseTx.vout.emplace_back(tax, treasury_script);
-        coinbaseTx.vout.emplace_back(0, CScript() << OP_RETURN << std::vector<unsigned char>{'L', 'O', 'Y', '1'});
+    if (const CAmount forward_share{GetForwardShare(nHeight, chainparams.GetConsensus())}; forward_share > 0) {
+        coinbaseTx.vout[0].nValue -= forward_share;
+        coinbaseTx.vout.emplace_back(forward_share, ForwardShareScript());
     }
     coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
     if (nHeight == chainparams.GetConsensus().DeploymentHeight(Consensus::DEPLOYMENT_BLAKE2B)) {

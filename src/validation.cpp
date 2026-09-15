@@ -2254,6 +2254,18 @@ PackageMempoolAcceptResult ProcessNewPackage(Chainstate& active_chainstate, CTxM
     return result;
 }
 
+const CScript& ForwardShareScript()
+{
+    static const CScript script{CScript() << std::vector<unsigned char>{'F', 'W', 'D', '1'} << OP_DROP << OP_TRUE};
+    return script;
+}
+
+CAmount GetForwardShare(int nHeight, const Consensus::Params& consensusParams)
+{
+    if (nHeight < consensusParams.forward_share_height) return 0;
+    return GetBlockSubsidy(nHeight, consensusParams) * consensusParams.forward_share_bps / 10000;
+}
+
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
 {
     int halvings = nHeight / consensusParams.nSubsidyHalvingInterval;
@@ -3098,29 +3110,21 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
                       strprintf("coinbase pays too much (actual=%d vs limit=%d)", block.vtx[0]->GetValueOut(), blockReward));
     }
 
-    // Loyalty Tax: from loyalty_height, a fixed share of the reward is owed to
-    // the treasury; a coinbase that does not also carry the loyalty signal
-    // owes the treasury the entire reward instead.
-    if (state.IsValid() && pindex->nHeight >= params.GetConsensus().loyalty_height) {
-        const CScript treasury_script(params.GetConsensus().loyalty_treasury_script.begin(),
-                                      params.GetConsensus().loyalty_treasury_script.end());
-        static const CScript LOYALTY_SIGNAL = CScript() << OP_RETURN << std::vector<unsigned char>{'L', 'O', 'Y', '1'};
-
-        CAmount treasury_paid{0};
-        bool signaled{false};
-        for (const CTxOut& out : block.vtx[0]->vout) {
-            if (out.scriptPubKey == treasury_script) treasury_paid += out.nValue;
-            if (out.scriptPubKey == LOYALTY_SIGNAL) signaled = true;
-        }
-
-        const CAmount required = signaled
-            ? (blockReward * params.GetConsensus().loyalty_tax_bps) / 10000
-            : blockReward; // unsignaled: the whole reward is confiscated
-
-        if (treasury_paid < required) {
-            state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-loyalty-tax",
-                          strprintf("coinbase paid %d to the treasury, %d required (signaled=%d)",
-                                   treasury_paid, required, signaled));
+    // Forward Reward Share: from forward_share_height, the coinbase must pay a
+    // share of the subsidy to ForwardShareScript(), which any block can spend
+    // once coinbase maturity has passed. The rule is the same for every miner
+    // and pays no party that is not mining.
+    if (state.IsValid()) {
+        const CAmount required{GetForwardShare(pindex->nHeight, params.GetConsensus())};
+        if (required > 0) {
+            CAmount forwarded{0};
+            for (const CTxOut& out : block.vtx[0]->vout) {
+                if (out.scriptPubKey == ForwardShareScript()) forwarded += out.nValue;
+            }
+            if (forwarded < required) {
+                state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-cb-forward-share",
+                              strprintf("coinbase forwarded %d, %d required", forwarded, required));
+            }
         }
     }
 

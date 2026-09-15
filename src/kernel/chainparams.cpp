@@ -656,9 +656,8 @@ public:
         if (opts.blake2b_headline) {
             consensus.Blake2bHeadline = *opts.blake2b_headline;
         }
-        if (opts.loyalty_height) consensus.loyalty_height = *opts.loyalty_height;
-        if (opts.loyalty_tax_bps) consensus.loyalty_tax_bps = *opts.loyalty_tax_bps;
-        if (opts.loyalty_treasury_script) consensus.loyalty_treasury_script = *opts.loyalty_treasury_script;
+        if (opts.forward_share_height) consensus.forward_share_height = *opts.forward_share_height;
+        if (opts.forward_share_bps) consensus.forward_share_bps = *opts.forward_share_bps;
 
         // Optionally schedule the RDTS deployment (see -rdtsexpiry). RDTS
         // activates at the BLAKE2b fork height scheduled above; only the

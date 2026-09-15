@@ -52,18 +52,13 @@ void ReadSigNetArgs(const ArgsManager& args, CChainParams::SigNetOptions& option
 
 void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& options)
 {
-    if (const auto height{args.GetIntArg("-loyaltyheight")}) {
-        if (*height < 0) throw std::runtime_error("-loyaltyheight cannot be negative.");
-        options.loyalty_height = (int)*height;
+    if (const auto height{args.GetIntArg("-forwardshareheight")}) {
+        if (*height < 0) throw std::runtime_error("-forwardshareheight cannot be negative.");
+        options.forward_share_height = (int)*height;
     }
-    if (const auto bps{args.GetIntArg("-loyaltytaxbps")}) {
-        if (*bps < 0 || *bps > 10000) throw std::runtime_error("-loyaltytaxbps must be between 0 and 10000.");
-        options.loyalty_tax_bps = (int)*bps;
-    }
-    if (const auto script{args.GetArg("-loyaltytreasury")}) {
-        const auto bytes{TryParseHex<unsigned char>(*script)};
-        if (!bytes) throw std::runtime_error(strprintf("-loyaltytreasury must be hex, not '%s'.", *script));
-        options.loyalty_treasury_script = *bytes;
+    if (const auto bps{args.GetIntArg("-forwardsharebps")}) {
+        if (*bps < 0 || *bps > 10000) throw std::runtime_error("-forwardsharebps must be between 0 and 10000.");
+        options.forward_share_bps = (int)*bps;
     }
     if (auto value = args.GetBoolArg("-fastprune")) options.fastprune = *value;
     if (HasTestOption(args, "bip94")) options.enforce_bip94 = true;

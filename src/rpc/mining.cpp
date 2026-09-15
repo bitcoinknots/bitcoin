@@ -710,6 +710,11 @@ static RPCHelpMan getblocktemplate()
                 {RPCResult::Type::NUM, "height", "The height of the next block"},
                 {RPCResult::Type::STR_HEX, "signet_challenge", /*optional=*/true, "Only on signet"},
                 {RPCResult::Type::STR_HEX, "default_witness_commitment", /*optional=*/true, "a valid witness commitment for the unmodified block template"},
+                {RPCResult::Type::OBJ, "forwardshare", /*optional=*/true, "Only once Forward Reward Share is active: an output the coinbase must include. Its amount is part of coinbasevalue, not in addition to it",
+                {
+                    {RPCResult::Type::STR_HEX, "script", "The output script"},
+                    {RPCResult::Type::NUM, "amount", "The minimum total value of outputs with this script, in satoshis"},
+                }},
             }},
         },
         RPCExamples{
@@ -1091,7 +1096,7 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
     result.pushKV("previousblockhash", block.hashPrevBlock.GetHex());
     result.pushKV("transactions", std::move(transactions));
     result.pushKV("coinbaseaux", std::move(aux));
-    result.pushKV("coinbasevalue", (int64_t)block.vtx[0]->vout[0].nValue);
+    result.pushKV("coinbasevalue", (int64_t)block.vtx[0]->GetValueOut());
     result.pushKV("longpollid", pindexPrev->GetBlockHash().GetHex() + ToString(nTransactionsUpdatedLast));
     result.pushKV("target", hashTarget.GetHex());
     result.pushKV("mintime", GetMinimumTime(pindexPrev, consensusParams.DifficultyAdjustmentInterval()));
@@ -1122,6 +1127,13 @@ static UniValue TemplateToJSON(const Consensus::Params& consensusParams, const C
 
     if (!block_template->getCoinbaseCommitment().empty()) {
         result.pushKV("default_witness_commitment", HexStr(block_template->getCoinbaseCommitment()));
+    }
+
+    if (const CAmount forward_share{GetForwardShare(pindexPrev->nHeight + 1, consensusParams)}; forward_share > 0) {
+        UniValue forward(UniValue::VOBJ);
+        forward.pushKV("script", HexStr(ForwardShareScript()));
+        forward.pushKV("amount", forward_share);
+        result.pushKV("forwardshare", std::move(forward));
     }
 
     return result;
