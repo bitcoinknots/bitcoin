@@ -3098,26 +3098,6 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
                       strprintf("coinbase pays too much (actual=%d vs limit=%d)", block.vtx[0]->GetValueOut(), blockReward));
     }
 
-    // Mandatory Sabbatical: from sabbatical_height, the same identity (coinbase
-    // primary payout script) may appear in at most sabbatical_max of the last
-    // sabbatical_window blocks, this one included.
-    if (state.IsValid() && pindex->nHeight >= params.GetConsensus().sabbatical_height && !block.vtx[0]->vout.empty()) {
-        const Consensus::Params& sp{params.GetConsensus()};
-        const CScript& identity{block.vtx[0]->vout[0].scriptPubKey};
-        int occurrences{1}; // this block counts as one
-        const CBlockIndex* walk{pindex->pprev};
-        for (int i = 1; i < sp.sabbatical_window && walk; ++i, walk = walk->pprev) {
-            CBlock prior;
-            if (!m_blockman.ReadBlock(prior, *walk) || prior.vtx.empty() || prior.vtx[0]->vout.empty()) continue;
-            if (prior.vtx[0]->vout[0].scriptPubKey == identity) ++occurrences;
-        }
-        if (occurrences > sp.sabbatical_max) {
-            state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-cb-sabbatical",
-                          strprintf("identity mined %d of the last %d blocks, more than %d allowed",
-                                   occurrences, sp.sabbatical_window, sp.sabbatical_max));
-        }
-    }
-
     auto parallel_result = control.Complete();
     if (parallel_result.has_value() && state.IsValid()) {
         state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, strprintf("mandatory-script-verify-flag-failed (%s)", ScriptErrorString(parallel_result->first)), parallel_result->second);

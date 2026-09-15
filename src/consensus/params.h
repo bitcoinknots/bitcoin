@@ -107,12 +107,6 @@ struct Params {
     int SegwitHeight;
     /** Block height at which BLAKE2b hardfork becomes active */
     int Blake2bHeight{std::numeric_limits<int>::max()};
-    //! From this height, an identity (a coinbase's primary payout script)
-    //! may appear in at most sabbatical_max of the last sabbatical_window
-    //! blocks (Mandatory Sabbatical), forcing frequent miners to rest.
-    int sabbatical_height{std::numeric_limits<int>::max()};
-    int sabbatical_window{10};
-    int sabbatical_max{3};
     std::vector<unsigned char> Blake2bHeadline;
     uint8_t Blake2bTargetShift{20};
     /**

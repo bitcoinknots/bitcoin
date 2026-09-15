@@ -656,9 +656,6 @@ public:
         if (opts.blake2b_headline) {
             consensus.Blake2bHeadline = *opts.blake2b_headline;
         }
-        if (opts.sabbatical_height) consensus.sabbatical_height = *opts.sabbatical_height;
-        if (opts.sabbatical_window) consensus.sabbatical_window = *opts.sabbatical_window;
-        if (opts.sabbatical_max) consensus.sabbatical_max = *opts.sabbatical_max;
 
         // Optionally schedule the RDTS deployment (see -rdtsexpiry). RDTS
         // activates at the BLAKE2b fork height scheduled above; only the
