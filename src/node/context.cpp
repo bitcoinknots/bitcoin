@@ -18,6 +18,7 @@
 #include <node/warnings.h>
 #include <policy/fees.h>
 #include <scheduler.h>
+#include <templatediversity.h>
 #include <txmempool.h>
 #include <validation.h>
 #include <validationinterface.h>

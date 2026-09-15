@@ -54,6 +54,34 @@ This asymmetry -- easy to see, hard to trigger automatically -- is deliberate.
 An automated system that can lock a node out of its own mining service on a
 weak sample is a worse problem than the one it is trying to solve.
 
+## Template structure of submitted blocks
+
+Proof of Datum also fingerprints every block a connection submits, using the
+same structure key as `gettemplatediversity`: coinbase output layout, witness
+commitment placement, scriptSig push layout and version-bit use, never the
+coinbase tag text. The node keeps a rolling count of the structures of the last
+2016 blocks it connected. Blocks submitted through its own RPC are left out, so
+a connection's own blocks never count as evidence against it.
+
+`pool_structure_match` is set once a connection has submitted at least 50
+blocks, at least 80% of them share one structure, the node has seen at least
+144 network blocks, and that structure built at least 5% of them. That is the
+profile of a connection relaying blocks a large pool's software built. It feeds
+`heuristic_match` like the other two signals, so it is advisory unless
+`-datumautoban` is on.
+
+Limits:
+
+- A structure identifies software and configuration, not an operator. If a
+  popular self-templating release, such as a DATUM gateway, builds a large share
+  of network blocks, its users match too. `-datumallowstructure=<structure>`
+  exempts a structure you have verified; `getdatuminfo` shows each connection's
+  `dominant_structure`.
+- A relay can change the coinbase layout of blocks it forwards to avoid a match.
+  That is cheap, so a match is evidence and its absence proves nothing.
+- The network counts are kept in memory and reset on restart. No connection can
+  match until 144 blocks have connected since startup.
+
 ## What being flagged actually does
 
 A flagged address (manual, or auto-promoted with `-datumautoban`) is refused a

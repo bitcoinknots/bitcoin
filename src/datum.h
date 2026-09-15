@@ -10,8 +10,10 @@
 #include <util/fs.h>
 
 #include <cstdint>
+#include <deque>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -65,6 +67,8 @@ class JSONRPCRequest;
 
 namespace node {
 
+class TemplateDiversityTracker;
+
 //! Strip the ":port" (or "]:port" for a bracketed IPv6 literal) from an
 //! address string in the form produced by CService::ToStringAddrPort(), so a
 //! caller reconnecting on a new ephemeral port is still recognised as the same
@@ -77,9 +81,13 @@ struct DatumPeerStats {
     int64_t blocks_submitted{0};
     int64_t last_gbt_call_time{0};
     int64_t first_seen{0};
-    //! How many of the recent submitted blocks (capped window) paid each
-    //! coinbase output script, keyed by the raw script bytes.
+    //! Sliding window of the last DATUM_COINBASE_WINDOW submitted blocks'
+    //! first coinbase output scripts, and how often each appears in it.
+    std::deque<std::vector<unsigned char>> recent_scripts;
     std::map<std::vector<unsigned char>, int64_t> coinbase_script_counts;
+    //! The same window for template structure keys (see src/templatediversity.h).
+    std::deque<std::string> recent_structures;
+    std::map<std::string, int64_t> structure_counts;
 };
 
 //! How this node currently reads one address's behaviour.
@@ -96,7 +104,23 @@ struct DatumVerdict {
     //! profile of a connection that never chooses its own payout, because an
     //! upstream pool already fixed it.
     bool coinbase_stale{false};
-    //! gbt_starved || coinbase_stale. This is an opinion, not an enforcement
+    //! Share (0-100) of recent submitted blocks sharing the single most common template structure.
+    int structure_reuse_pct{0};
+    //! That most common structure; empty if nothing was submitted.
+    std::string dominant_structure;
+    //! Share (0-100) of recent network blocks, excluding blocks submitted to
+    //! this node, built with that structure. Unset until DATUM_MIN_CHAIN_SAMPLE
+    //! blocks have connected.
+    std::optional<int> structure_chain_share_pct;
+    //! Whether that structure is exempted with -datumallowstructure.
+    bool structure_allowed{false};
+    //! True once blocks_submitted has crossed DATUM_MIN_SUBMISSIONS, the
+    //! dominant structure crosses DATUM_REUSE_THRESHOLD_PCT, is not allowed,
+    //! and built at least DATUM_POOL_STRUCTURE_SHARE_PCT of recent network
+    //! blocks: the profile of a connection relaying blocks that a large pool's
+    //! software built.
+    bool pool_structure_match{false};
+    //! gbt_starved || coinbase_stale || pool_structure_match. This is an opinion, not an enforcement
     //! decision: a handful of manually-submitted blocks sharing one payout
     //! script looks identical to this heuristic whether it came from a bare
     //! pool relay or from a debug script and a slow week, and low submission
@@ -142,20 +166,25 @@ public:
     static constexpr int64_t DATUM_MIN_GBT_RATIO_PCT{25}; // gbt_calls >= 25% of blocks_submitted
     static constexpr int DATUM_REUSE_THRESHOLD_PCT{80};
     static constexpr size_t DATUM_COINBASE_WINDOW{50}; // recent blocks considered per address
+    static constexpr int64_t DATUM_MIN_CHAIN_SAMPLE{144}; // network blocks seen before structure shares count
+    static constexpr int DATUM_POOL_STRUCTURE_SHARE_PCT{5};
 
     //! `auto_ban` controls whether crossing the thresholds above actually adds
     //! a persistent, enforced ban (source "heuristic") on its own. Off by
     //! default: the heuristic is always visible through GetVerdict either way,
     //! but with this off it never itself withholds service, it only ever
     //! informs an operator's own adddatumban decision.
-    DatumTracker(fs::path ban_file, bool auto_ban);
+    //! `template_diversity` supplies network structure shares and may be null,
+    //! which disables pool_structure_match. `allowed_structures` never match.
+    DatumTracker(fs::path ban_file, bool auto_ban, const TemplateDiversityTracker* template_diversity,
+                 std::set<std::string> allowed_structures);
 
     //! Record a getblocktemplate call from `addr` (already stripped of port).
     void RecordTemplateRequest(const std::string& addr) EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
     //! Record a block submitted from `addr`, and re-run its classification.
     //! Returns the updated verdict, and adds a heuristic ban entry the moment
     //! the thresholds above are first crossed.
-    DatumVerdict RecordSubmission(const std::string& addr, const CScript& coinbase_script) EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
+    DatumVerdict RecordSubmission(const std::string& addr, const CScript& coinbase_script, const std::string& structure_key) EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
 
     //! Current verdict for `addr`, without recording anything.
     DatumVerdict GetVerdict(const std::string& addr) const EXCLUSIVE_LOCKS_REQUIRED(!m_mutex);
@@ -178,6 +207,8 @@ private:
 
     const fs::path m_ban_file;
     const bool m_auto_ban;
+    const TemplateDiversityTracker* const m_template_diversity;
+    const std::set<std::string> m_allowed_structures;
     mutable Mutex m_mutex;
     std::map<std::string, DatumPeerStats> m_stats GUARDED_BY(m_mutex);
     std::map<std::string, DatumBanEntry> m_bans GUARDED_BY(m_mutex);

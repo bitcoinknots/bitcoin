@@ -5,9 +5,11 @@
 #include <datum.h>
 
 #include <logging.h>
+#include <templatediversity.h>
 #include <tinyformat.h>
 #include <univalue.h>
 #include <util/strencodings.h>
+#include <util/string.h>
 #include <util/time.h>
 
 #include <fstream>
@@ -27,7 +29,45 @@ std::string StripDatumPort(const std::string& addr_port)
     return addr_port.substr(0, colon);
 }
 
-DatumTracker::DatumTracker(fs::path ban_file, bool auto_ban) : m_ban_file{std::move(ban_file)}, m_auto_ban{auto_ban}
+namespace {
+
+template <typename Key>
+void AddToWindow(std::deque<Key>& recent, std::map<Key, int64_t>& counts, const Key& key)
+{
+    recent.push_back(key);
+    ++counts[key];
+    if (recent.size() > DatumTracker::DATUM_COINBASE_WINDOW) {
+        const auto it{counts.find(recent.front())};
+        if (--it->second == 0) counts.erase(it);
+        recent.pop_front();
+    }
+}
+
+//! The most common key in a window, and its share (0-100) of the window.
+template <typename Key>
+std::pair<std::optional<Key>, int> Dominant(const std::map<Key, int64_t>& counts)
+{
+    std::optional<Key> best;
+    int64_t best_count{0};
+    int64_t total{0};
+    for (const auto& [key, count] : counts) {
+        total += count;
+        if (count > best_count) {
+            best = key;
+            best_count = count;
+        }
+    }
+    return {best, total > 0 ? int(best_count * 100 / total) : 0};
+}
+
+} // namespace
+
+DatumTracker::DatumTracker(fs::path ban_file, bool auto_ban, const TemplateDiversityTracker* template_diversity,
+                           std::set<std::string> allowed_structures)
+    : m_ban_file{std::move(ban_file)},
+      m_auto_ban{auto_ban},
+      m_template_diversity{template_diversity},
+      m_allowed_structures{std::move(allowed_structures)}
 {
     LOCK(m_mutex);
     Load();
@@ -42,33 +82,30 @@ void DatumTracker::RecordTemplateRequest(const std::string& addr)
     stats.last_gbt_call_time = GetTime();
 }
 
-DatumVerdict DatumTracker::RecordSubmission(const std::string& addr, const CScript& coinbase_script)
+DatumVerdict DatumTracker::RecordSubmission(const std::string& addr, const CScript& coinbase_script, const std::string& structure_key)
 {
     LOCK(m_mutex);
     DatumPeerStats& stats{m_stats[addr]};
     if (stats.first_seen == 0) stats.first_seen = GetTime();
     ++stats.blocks_submitted;
 
-    const std::vector<unsigned char> script_bytes(coinbase_script.begin(), coinbase_script.end());
-    ++stats.coinbase_script_counts[script_bytes];
-    // Keep only a bounded window's worth of distinct scripts' worth of signal:
-    // once a connection has accumulated enough total submissions, halve every
-    // count so old behaviour fades and the ratio still reflects recent activity
-    // without the map growing without bound for a long-lived connection.
-    int64_t total{0};
-    for (const auto& [script, count] : stats.coinbase_script_counts) total += count;
-    if (total > (int64_t)DATUM_COINBASE_WINDOW) {
-        for (auto& [script, count] : stats.coinbase_script_counts) count = (count + 1) / 2;
-        std::erase_if(stats.coinbase_script_counts, [](const auto& kv) { return kv.second <= 0; });
-    }
+    AddToWindow(stats.recent_scripts, stats.coinbase_script_counts,
+                std::vector<unsigned char>(coinbase_script.begin(), coinbase_script.end()));
+    AddToWindow(stats.recent_structures, stats.structure_counts, structure_key);
 
     DatumVerdict verdict{ComputeVerdict(addr)};
     if (verdict.heuristic_match && !m_bans.contains(addr)) {
+        std::vector<std::string> signals;
+        if (verdict.gbt_starved) signals.emplace_back("too few getblocktemplate calls behind submitted blocks");
+        if (verdict.coinbase_stale) signals.emplace_back("one payout script dominates recent submitted blocks");
+        if (verdict.pool_structure_match) {
+            signals.emplace_back(strprintf("submitted blocks share a template structure that built %d%% of recent network blocks",
+                                           *verdict.structure_chain_share_pct));
+        }
         const std::string reason{strprintf(
-            "heuristic match: %s (gbt_calls=%d, blocks_submitted=%d, coinbase_reuse=%d%%)",
-            verdict.gbt_starved ? "too few getblocktemplate calls behind submitted blocks"
-                                : "one payout script dominates recent submitted blocks",
-            verdict.stats.gbt_calls, verdict.stats.blocks_submitted, verdict.coinbase_reuse_pct)};
+            "heuristic match: %s (gbt_calls=%d, blocks_submitted=%d, coinbase_reuse=%d%%, structure_reuse=%d%%)",
+            util::Join(signals, "; "), verdict.stats.gbt_calls, verdict.stats.blocks_submitted,
+            verdict.coinbase_reuse_pct, verdict.structure_reuse_pct)};
         if (m_auto_ban) {
             DatumBanEntry entry;
             entry.source = "heuristic";
@@ -97,20 +134,29 @@ DatumVerdict DatumTracker::ComputeVerdict(const std::string& addr) const
     // manual ban must apply to exactly that case, since it exists for
     // addresses the heuristic below has nothing to go on.
 
-    int64_t most_common{0};
-    for (const auto& [script, count] : verdict.stats.coinbase_script_counts) {
-        most_common = std::max(most_common, count);
+    verdict.coinbase_reuse_pct = Dominant(verdict.stats.coinbase_script_counts).second;
+    const auto [structure, structure_pct] = Dominant(verdict.stats.structure_counts);
+    verdict.structure_reuse_pct = structure_pct;
+    if (structure) {
+        verdict.dominant_structure = *structure;
+        verdict.structure_allowed = m_allowed_structures.contains(*structure);
+        if (m_template_diversity) {
+            const auto share{m_template_diversity->GetChainStructureShare(*structure)};
+            if (share.sample >= DATUM_MIN_CHAIN_SAMPLE) {
+                verdict.structure_chain_share_pct = int(share.blocks * 100 / share.sample);
+            }
+        }
     }
-    int64_t total{0};
-    for (const auto& [script, count] : verdict.stats.coinbase_script_counts) total += count;
-    if (total > 0) verdict.coinbase_reuse_pct = (int)((most_common * 100) / total);
 
     if (verdict.stats.blocks_submitted >= DatumTracker::DATUM_MIN_SUBMISSIONS) {
         const int64_t gbt_ratio_pct{(verdict.stats.gbt_calls * 100) / verdict.stats.blocks_submitted};
         verdict.gbt_starved = gbt_ratio_pct < DatumTracker::DATUM_MIN_GBT_RATIO_PCT;
         verdict.coinbase_stale = verdict.coinbase_reuse_pct >= DatumTracker::DATUM_REUSE_THRESHOLD_PCT;
+        verdict.pool_structure_match = !verdict.structure_allowed &&
+                                       verdict.structure_reuse_pct >= DatumTracker::DATUM_REUSE_THRESHOLD_PCT &&
+                                       verdict.structure_chain_share_pct.value_or(0) >= DatumTracker::DATUM_POOL_STRUCTURE_SHARE_PCT;
     }
-    verdict.heuristic_match = verdict.gbt_starved || verdict.coinbase_stale;
+    verdict.heuristic_match = verdict.gbt_starved || verdict.coinbase_stale || verdict.pool_structure_match;
 
     // `flagged` reflects only what is actually being enforced right now: real
     // membership in the ban list, whether it got there by a human's own

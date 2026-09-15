@@ -15,14 +15,23 @@ import json
 import base64
 from urllib.parse import urlparse
 
-from test_framework.blocktools import create_block, create_coinbase
-from test_framework.script import CScript, OP_TRUE
+from test_framework.blocktools import create_block, create_coinbase, script_BIP34_coinbase_height
+from test_framework.messages import CTxOut
+from test_framework.p2p import P2PDataStore
+from test_framework.script import CScript, OP_DROP, OP_RETURN, OP_TRUE
 from test_framework.authproxy import JSONRPCException
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, assert_raises_rpc_error, get_auth_cookie
 
 # Must stay in sync with DatumTracker::DATUM_MIN_SUBMISSIONS in src/datum.h.
 DATUM_MIN_SUBMISSIONS = 50
+
+
+def payout_script(i):
+    """A distinct payout per i whose output type never changes. payout_script(i)
+    becomes a 4-byte witness program once i >= 128, which is a different output
+    type and so a different template structure."""
+    return CScript([OP_TRUE, OP_DROP, i.to_bytes(4, "little")])
 
 
 class RawRpcClient:
@@ -74,6 +83,54 @@ class ProofOfDatumTest(BitcoinTestFramework):
         block.solve()
         return block
 
+    def build_block(self, prev_hash, height, prev_time, script_pubkey, kind):
+        """kind "pool": a large pool's template structure; "own": a distinct
+        self-templating client's; "plain": everything else on the network."""
+        coinbase = create_coinbase(height, script_pubkey=script_pubkey)
+        version = None
+        if kind == "pool":
+            coinbase.vout.append(CTxOut(0, CScript([OP_RETURN, b"\x01\x02\x03\x04"])))
+            extra = CScript([b"/BigPool/"])
+            version = 0x20000004
+        elif kind == "own":
+            extra = CScript([b"/solo-gateway/", b"\x00" * 8])
+        else:
+            extra = CScript()
+        coinbase.vin[0].scriptSig = CScript(bytes(script_BIP34_coinbase_height(height)) + bytes(extra))
+        if hasattr(coinbase, "rehash"):
+            coinbase.rehash()
+        block = create_block(prev_hash, coinbase, prev_time + 1, version=version)
+        block.solve()
+        return block
+
+    def tip(self, node):
+        tip = node.getbestblockhash()
+        return int(tip, 16), node.getblockcount(), node.getblock(tip)["time"]
+
+    def send_network_blocks(self, node, count=150):
+        """Blocks arriving over P2P, every fifth one built with the pool structure."""
+        p2p = node.add_p2p_connection(P2PDataStore())
+        prev_hash, height, prev_time = self.tip(node)
+        blocks = []
+        for i in range(count):
+            block = self.build_block(prev_hash, height + 1, prev_time, payout_script(i),
+                                     "pool" if i % 5 == 0 else "plain")
+            blocks.append(block)
+            prev_hash = int(getattr(block, "hash_hex", None) or block.hash, 16)
+            height += 1
+            prev_time = block.nTime
+        p2p.send_blocks_and_test(blocks, node, success=True)
+        node.syncwithvalidationinterfacequeue()
+        node.disconnect_p2ps()
+
+    def submit_blocks(self, node, client, kind, count=DATUM_MIN_SUBMISSIONS):
+        """A well-behaved client: a template request before every block, and a new payout each time."""
+        for i in range(count):
+            client.call("getblocktemplate", {"rules": ["segwit"]})
+            prev_hash, height, prev_time = self.tip(node)
+            block = self.build_block(prev_hash, height + 1, prev_time, payout_script(i), kind)
+            assert client.call("submitblock", block.serialize().hex()) is None
+
     def run_test(self):
         node = self.nodes[0]
 
@@ -90,13 +147,14 @@ class ProofOfDatumTest(BitcoinTestFramework):
             "address": good_addr, "gbt_calls": 0, "blocks_submitted": 0,
             "coinbase_reuse_pct": 0, "gbt_starved": False, "coinbase_stale": False,
             "heuristic_match": False, "flagged": False, "manually_flagged": False,
+            "structure_reuse_pct": 0, "structure_allowed": False, "pool_structure_match": False,
         }])
 
         self.log.info("a client that pulls templates and varies its payout looks fine")
         for i in range(5):
             good_client.call("getblocktemplate", {"rules": ["segwit"]})
             height = node.getblockcount() + 1
-            script = CScript([OP_TRUE, i])  # a distinct "payout" each time
+            script = payout_script(i)  # a distinct "payout" each time
             block = self.submit_block(node, height, script)
             result = good_client.call("submitblock", block.serialize().hex())
             assert result is None
@@ -208,6 +266,48 @@ class ProofOfDatumTest(BitcoinTestFramework):
         bans = {b["address"]: b for b in node.listdatumbans()}
         assert bad_addr in bans
         assert third_addr not in bans
+
+        self.log.info("a connection submitting blocks built with a large pool's template structure is matched")
+        self.send_network_blocks(node)
+        relay_addr = "127.0.0.5"
+        self.submit_blocks(node, RawRpcClient(node, relay_addr), "pool")
+        info = node.getdatuminfo(relay_addr)[0]
+        assert_equal(info["gbt_starved"], False)
+        assert_equal(info["coinbase_stale"], False)
+        assert_equal(info["structure_reuse_pct"], 100)
+        self.log.info("its own 50 submissions are excluded from the network share: 30 of 150 network blocks")
+        assert_equal(info["structure_chain_share_pct"], 20)
+        assert_equal(info["pool_structure_match"], True)
+        assert_equal(info["heuristic_match"], True)
+        self.log.info("with -datumautoban on, that signal alone stops template service")
+        assert_equal(info["flagged"], True)
+        bans = {b["address"]: b for b in node.listdatumbans()}
+        assert "template structure" in bans[relay_addr]["reason"]
+        pool_structure = info["dominant_structure"]
+
+        self.log.info("a client building its own, uncommon structure is not matched")
+        own_addr = "127.0.0.6"
+        self.submit_blocks(node, RawRpcClient(node, own_addr), "own")
+        info = node.getdatuminfo(own_addr)[0]
+        assert_equal(info["structure_reuse_pct"], 100)
+        assert_equal(info["structure_chain_share_pct"], 0)
+        assert info["dominant_structure"] != pool_structure
+        assert_equal(info["pool_structure_match"], False)
+        assert_equal(info["heuristic_match"], False)
+        assert_equal(info["flagged"], False)
+
+        self.log.info("a structure exempted with -datumallowstructure is never matched")
+        self.restart_node(0, extra_args=self.extra_args[0] + ["-datumautoban=1", f"-datumallowstructure={pool_structure}"])
+        node = self.nodes[0]
+        self.send_network_blocks(node)
+        allowed_addr = "127.0.0.7"
+        self.submit_blocks(node, RawRpcClient(node, allowed_addr), "pool")
+        info = node.getdatuminfo(allowed_addr)[0]
+        assert_equal(info["dominant_structure"], pool_structure)
+        assert_equal(info["structure_chain_share_pct"], 20)
+        assert_equal(info["structure_allowed"], True)
+        assert_equal(info["pool_structure_match"], False)
+        assert_equal(info["flagged"], False)
 
 
 if __name__ == '__main__':
