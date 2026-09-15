@@ -52,10 +52,6 @@ void ReadSigNetArgs(const ArgsManager& args, CChainParams::SigNetOptions& option
 
 void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& options)
 {
-    if (const auto height{args.GetIntArg("-austerityheight")}) {
-        if (*height < 0) throw std::runtime_error("-austerityheight cannot be negative.");
-        options.austerity_height = (int)*height;
-    }
     if (auto value = args.GetBoolArg("-fastprune")) options.fastprune = *value;
     if (HasTestOption(args, "bip94")) options.enforce_bip94 = true;
 

@@ -656,7 +656,6 @@ public:
         if (opts.blake2b_headline) {
             consensus.Blake2bHeadline = *opts.blake2b_headline;
         }
-        if (opts.austerity_height) consensus.austerity_height = *opts.austerity_height;
 
         // Optionally schedule the RDTS deployment (see -rdtsexpiry). RDTS
         // activates at the BLAKE2b fork height scheduled above; only the

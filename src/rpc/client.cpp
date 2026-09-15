@@ -285,6 +285,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "verifychain", 1, "nblocks" },
     { "getblockstats", 0, "hash_or_height", /*also_string=*/true },
     { "getblockstats", 1, "stats" },
+    { "getminerrevenue", 0, "nblocks" },
     { "getblockfileinfo", 0, "file_number" },
     { "setprunelock", 1, "lock_info" },
     { "pruneblockchain", 0, "height" },

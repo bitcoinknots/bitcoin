@@ -2430,6 +2430,109 @@ static inline bool SetHasKeys(const std::set<T>& set, const Tk& key, const Args&
 // outpoint (needed for the utxo index) + nHeight + fCoinBase
 static constexpr size_t PER_UTXO_OVERHEAD = sizeof(COutPoint) + sizeof(uint32_t) + sizeof(bool);
 
+static RPCHelpMan getminerrevenue()
+{
+    return RPCHelpMan{"getminerrevenue",
+        "\nSummarize how miners were paid over recent blocks: how much of the reward came from the block subsidy\n"
+        "and how much from transaction fees. Fees are computed from undo data, so the blocks analyzed must not be\n"
+        "pruned.\n",
+        {
+            {"nblocks", RPCArg::Type::NUM, RPCArg::Default{144}, "Number of most recent blocks to analyze (capped at 2016 and at the chain length)"},
+        },
+        RPCResult{
+            RPCResult::Type::OBJ, "", "",
+            {
+                {RPCResult::Type::NUM, "blocks", "Blocks analyzed"},
+                {RPCResult::Type::NUM, "first_height", "Lowest height analyzed"},
+                {RPCResult::Type::NUM, "last_height", "Highest height analyzed"},
+                {RPCResult::Type::NUM, "total_subsidy", "Sum of the block subsidies, in satoshis"},
+                {RPCResult::Type::NUM, "total_fees", "Sum of the transaction fees, in satoshis"},
+                {RPCResult::Type::NUM, "total_claimed", "Sum of the coinbase outputs, in satoshis"},
+                {RPCResult::Type::NUM, "unclaimed", "total_subsidy + total_fees - total_claimed, in satoshis"},
+                {RPCResult::Type::NUM, "fee_share_pct", "total_fees as a percentage of total_subsidy + total_fees"},
+                {RPCResult::Type::OBJ, "per_block_fee_share_pct", "Each block's fees as a percentage of its own subsidy + fees",
+                {
+                    {RPCResult::Type::NUM, "min", "Lowest"},
+                    {RPCResult::Type::NUM, "median", "Median"},
+                    {RPCResult::Type::NUM, "max", "Highest"},
+                }},
+                {RPCResult::Type::NUM, "blocks_fees_exceed_subsidy", "Blocks whose fees were larger than their subsidy"},
+            }},
+        RPCExamples{
+            HelpExampleCli("getminerrevenue", "")
+            + HelpExampleCli("getminerrevenue", "2016")
+            + HelpExampleRpc("getminerrevenue", "144")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    int nblocks{request.params[0].isNull() ? 144 : request.params[0].getInt<int>()};
+    if (nblocks < 1) throw JSONRPCError(RPC_INVALID_PARAMETER, "nblocks must be at least 1");
+    nblocks = std::min(nblocks, 2016);
+
+    ChainstateManager& chainman = EnsureAnyChainman(request.context);
+    std::vector<const CBlockIndex*> indexes;
+    {
+        LOCK(cs_main);
+        for (const CBlockIndex* pindex{chainman.ActiveChain().Tip()}; pindex && int(indexes.size()) < nblocks; pindex = pindex->pprev) {
+            indexes.push_back(pindex);
+        }
+    }
+
+    const Consensus::Params& consensus{chainman.GetParams().GetConsensus()};
+    CAmount total_subsidy{0};
+    CAmount total_fees{0};
+    CAmount total_claimed{0};
+    int64_t fees_exceed_subsidy{0};
+    std::vector<int64_t> share_bps;
+    share_bps.reserve(indexes.size());
+    for (const CBlockIndex* pindex : indexes) {
+        const CBlock block{GetBlockChecked(chainman.m_blockman, *pindex)};
+        const CBlockUndo undo{GetUndoChecked(chainman.m_blockman, *pindex)};
+        const CAmount subsidy{GetBlockSubsidy(pindex->nHeight, consensus)};
+        CAmount fees{0};
+        for (size_t i{1}; i < block.vtx.size(); ++i) {
+            CAmount value_in{0};
+            for (const Coin& coin : undo.vtxundo.at(i - 1).vprevout) value_in += coin.out.nValue;
+            fees += value_in - block.vtx[i]->GetValueOut();
+        }
+        total_subsidy += subsidy;
+        total_fees += fees;
+        total_claimed += block.vtx[0]->GetValueOut();
+        if (fees > subsidy) ++fees_exceed_subsidy;
+        const CAmount reward{subsidy + fees};
+        share_bps.push_back(reward > 0 ? fees * 10000 / reward : 0);
+    }
+
+    int64_t min_bps{share_bps.front()};
+    int64_t max_bps{share_bps.front()};
+    for (const int64_t bps : share_bps) {
+        min_bps = std::min(min_bps, bps);
+        max_bps = std::max(max_bps, bps);
+    }
+    const int64_t median_bps{CalculateTruncatedMedian(share_bps)};
+
+    UniValue distribution(UniValue::VOBJ);
+    distribution.pushKV("min", min_bps / 100.0);
+    distribution.pushKV("median", median_bps / 100.0);
+    distribution.pushKV("max", max_bps / 100.0);
+
+    const CAmount total_reward{total_subsidy + total_fees};
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("blocks", uint64_t(indexes.size()));
+    result.pushKV("first_height", indexes.back()->nHeight);
+    result.pushKV("last_height", indexes.front()->nHeight);
+    result.pushKV("total_subsidy", total_subsidy);
+    result.pushKV("total_fees", total_fees);
+    result.pushKV("total_claimed", total_claimed);
+    result.pushKV("unclaimed", total_reward - total_claimed);
+    result.pushKV("fee_share_pct", total_reward > 0 ? (total_fees * 10000 / total_reward) / 100.0 : 0.0);
+    result.pushKV("per_block_fee_share_pct", std::move(distribution));
+    result.pushKV("blocks_fees_exceed_subsidy", fees_exceed_subsidy);
+    return result;
+},
+    };
+}
+
 static RPCHelpMan getblockstats()
 {
     return RPCHelpMan{"getblockstats",
@@ -4249,6 +4352,7 @@ void RegisterBlockchainRPCCommands(CRPCTable& t)
         {"blockchain", &getblockchaininfo},
         {"blockchain", &getchaintxstats},
         {"blockchain", &getblockstats},
+        {"blockchain", &getminerrevenue},
         {"blockchain", &getbestblockhash},
         {"blockchain", &getblockcount},
         {"blockchain", &getblock},
