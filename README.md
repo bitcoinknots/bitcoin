@@ -1,55 +1,80 @@
-Coinbase Curfew
-===============
+Bitcoin Knots
+=============
 
-A fork of [Bitcoin Knots](https://github.com/bitcoinknots/bitcoin) that extends
-how long a coinbase output must wait before it can be spent. From a configured
-height, spending any coinbase requires additional confirmations beyond
-ordinary 100-block maturity. Proof of work and block validity are otherwise
-unchanged; miners are paid the same amount, just later.
+https://bitcoinknots.org
 
-Why
----
+For an immediately usable, binary version of the Bitcoin Knots software, see
+the website.
 
-Coinbase maturity already exists to stop a reorg from unwinding an already-spent
-block reward. This fork asks a different question: what if the delay were long
-enough to matter economically, not just to prevent double-spends? A miner who
-mines only to immediately sell the reward behaves differently than one willing
-to wait months to receive it. A long curfew doesn't stop anyone from being paid
-— it just separates miners willing to hold from miners who are not.
+What is Bitcoin Knots?
+----------------------
 
-How it works
-------------
+Bitcoin Knots connects to the Bitcoin peer-to-peer network to download and fully
+validate blocks and transactions. It also includes a wallet and graphical user
+interface, which can be optionally built.
 
-Two consensus parameters control the change:
-
-- `curfew_height` — the height from which the rule applies. Defaults to unset
-  ("never") on every network.
-- `curfew_depth` — additional confirmations required beyond the ordinary
-  100-block `COINBASE_MATURITY`, defaulting to 25,200 (roughly six months at
-  ten minutes per block).
-
-Once `curfew_height` is reached, spending any coinbase output requires
-`COINBASE_MATURITY + curfew_depth` confirmations, checked both in mempool
-acceptance and in block validation, so a curfew-violating spend cannot sit in
-the mempool waiting to be mined, and cannot be smuggled into a block either.
-
-Exercised on regtest for testing:
-
-    bitcoind -regtest -curfewheight=<height> -curfewdepth=<n>
-
-Activating this on a live network — choosing a real `curfew_height` — is a
-separate, deliberate decision left to that network's operators. This build does
-not set one for mainnet, testnet, testnet4, or signet.
-
-Testing
--------
-
-`test/functional/feature_coinbase_curfew.py` mines across the activation
-height, confirms a coinbase mature under ordinary rules is still locked, checks
-the one-block-short boundary, and confirms the same coinbase spends normally
-once the full curfew depth has passed.
+Further information about Bitcoin Knots is available in the [doc folder](/doc).
 
 License
 -------
 
-MIT. See [COPYING](COPYING).
+Bitcoin Knots is released under the terms of the MIT license. See [COPYING](COPYING) for more
+information or see https://opensource.org/licenses/MIT.
+
+Development Process
+-------------------
+
+Development generally takes place as part of [Bitcoin Core](https://github.com/bitcoin/bitcoin), and is merged into
+Knots for each release.
+
+Even if your pull request to Core is closed, or if your feature is not
+suitable for Core (eg, because it builds on a feature not supported in Core;
+relies on centralised services; etc), it may still be eligible for inclusion
+in Bitcoin Knots. In this case, a pull request may be opened on the
+[Knots GitHub](https://github.com/bitcoinknots/bitcoin) for review and consideration.
+When accepted, you are expected to maintain the submitted branch in your own
+repository, and it will be automatically merged into new releases of Knots.
+
+Developer IRC can be found on Freenode at #bitcoin-dev.
+
+Testing
+-------
+
+Testing and code review is the bottleneck for development; we get more pull
+requests than we can review and test on short notice. Please be patient and help out by testing
+other people's pull requests, and remember this is a security-critical project where any mistake might cost people
+lots of money.
+
+### Automated Testing
+
+Developers are strongly encouraged to write [unit tests](src/test/README.md) for new code, and to
+submit new unit tests for old code. Unit tests can be compiled and run
+(assuming they weren't disabled during the generation of the build system) with: `ctest`. Further details on running
+and extending unit tests can be found in [/src/test/README.md](/src/test/README.md).
+
+There are also [regression and integration tests](/test), written
+in Python.
+These tests can be run (if the [test dependencies](/test) are installed) with: `build/test/functional/test_runner.py`
+(assuming `build` is your build directory).
+
+The CI (Continuous Integration) systems make sure that every pull request is built for Windows, Linux, and macOS,
+and that unit/sanity tests are run automatically.
+
+### Manual Quality Assurance (QA) Testing
+
+Changes should be tested by somebody other than the developer who wrote the
+code. This is especially important for large or high-risk changes. It is useful
+to add a test plan to the pull request description if testing the changes is
+not straightforward.
+
+Translations
+------------
+
+Changes to translations as well as new translations can be submitted to
+[Bitcoin Core's Transifex page](https://explore.transifex.com/bitcoin/bitcoin/).
+
+Translations are periodically pulled from Transifex and merged into the git repository. See the
+[translation process](doc/translation_process.md) for details on how this works.
+
+**Important**: We do not accept translation changes as GitHub pull requests because the next
+pull from Transifex would automatically overwrite them again.

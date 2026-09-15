@@ -657,7 +657,7 @@ public:
             consensus.Blake2bHeadline = *opts.blake2b_headline;
         }
         if (opts.curfew_height) consensus.curfew_height = *opts.curfew_height;
-        if (opts.curfew_depth) consensus.curfew_depth = *opts.curfew_depth;
+        if (opts.curfew_seconds) consensus.curfew_seconds = *opts.curfew_seconds;
 
         // Optionally schedule the RDTS deployment (see -rdtsexpiry). RDTS
         // activates at the BLAKE2b fork height scheduled above; only the

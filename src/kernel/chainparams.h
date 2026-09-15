@@ -171,7 +171,7 @@ public:
         //! value (see -rdtsexpiry). Requires a blake2b activation height.
         std::optional<int64_t> rdts_expiry_time{};
         std::optional<int> curfew_height{};
-        std::optional<int> curfew_depth{};
+        std::optional<int64_t> curfew_seconds{};
         std::optional<std::vector<unsigned char>> blake2b_headline{};
     };
 

@@ -357,6 +357,16 @@ static bool IsCurrentForFeeEstimation(Chainstate& active_chainstate) EXCLUSIVE_L
     return true;
 }
 
+//! Coinbase Curfew: whether `coin` is a coinbase created at or after
+//! curfew_height that may not yet be spent in a block whose parent is
+//! `spend_parent`.
+static bool IsCoinbaseCurfewLocked(const Coin& coin, const CBlockIndex& spend_parent, const Consensus::Params& consensus)
+{
+    if (!coin.IsCoinBase() || consensus.curfew_seconds <= 0 || int(coin.nHeight) < consensus.curfew_height) return false;
+    const CBlockIndex* created{spend_parent.GetAncestor(coin.nHeight)};
+    return created != nullptr && spend_parent.GetMedianTimePast() < created->GetMedianTimePast() + consensus.curfew_seconds;
+}
+
 void Chainstate::MaybeUpdateMempoolForReorg(
     DisconnectedBlockTransactions& disconnectpool,
     bool fAddToMempool)
@@ -439,6 +449,10 @@ void Chainstate::MaybeUpdateMempoolForReorg(
                 assert(!coin.IsSpent());
                 const auto mempool_spend_height{m_chain.Tip()->nHeight + 1};
                 if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < COINBASE_MATURITY) {
+                    return true;
+                }
+                // A reorg can lower the tip's median-time-past back under a curfew.
+                if (IsCoinbaseCurfewLocked(coin, *m_chain.Tip(), m_chainman.GetConsensus())) {
                     return true;
                 }
             }
@@ -1030,19 +1044,13 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
         }
     }
 
-    // Coinbase Curfew: past curfew_height, a coinbase output stays locked for
-    // curfew_depth blocks, on top of ordinary coinbase maturity. Enforced here
-    // too (not just in ConnectBlock) so a curfew-violating spend cannot sit in
-    // the mempool waiting to be mined.
-    const Consensus::Params& curfew_params{m_active_chainstate.m_chainman.GetConsensus()};
-    if (block_height_next >= curfew_params.curfew_height) {
-        const int required_depth = COINBASE_MATURITY + curfew_params.curfew_depth;
-        for (const CTxIn& txin : tx.vin) {
-            const Coin& coin = m_view.AccessCoin(txin.prevout);
-            if (coin.IsCoinBase() && block_height_next - coin.nHeight < required_depth) {
-                return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, "bad-txns-coinbase-curfew",
-                                     "tried to spend coinbase before the curfew depth");
-            }
+    // Coinbase Curfew: also enforced here, not just in ConnectBlock, so a spend
+    // that cannot be mined yet does not sit in the mempool.
+    for (const CTxIn& txin : tx.vin) {
+        if (IsCoinbaseCurfewLocked(m_view.AccessCoin(txin.prevout), *m_active_chainstate.m_chain.Tip(),
+                                   m_active_chainstate.m_chainman.GetConsensus())) {
+            return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, "bad-txns-coinbase-curfew",
+                                 "tried to spend coinbase before its curfew ended");
         }
     }
 
@@ -3043,23 +3051,17 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
                               tx_state.GetDebugMessage() + " in transaction " + tx.GetHash().ToString());
                 break;
             }
-            // Coinbase Curfew: past curfew_height, a coinbase output stays locked
-            // for curfew_depth blocks, beyond ordinary coinbase maturity.
-            if (pindex->nHeight >= params.GetConsensus().curfew_height) {
-                const int required_depth = COINBASE_MATURITY + params.GetConsensus().curfew_depth;
-                bool curfew_violation{false};
-                for (const CTxIn& txin : tx.vin) {
-                    const Coin& coin = view.AccessCoin(txin.prevout);
-                    if (coin.IsCoinBase() && pindex->nHeight - coin.nHeight < required_depth) {
-                        curfew_violation = true;
-                        break;
-                    }
-                }
-                if (curfew_violation) {
-                    state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-txns-coinbase-curfew",
-                                  "tried to spend coinbase before the curfew depth in transaction " + tx.GetHash().ToString());
+            bool curfew_violation{false};
+            for (const CTxIn& txin : tx.vin) {
+                if (IsCoinbaseCurfewLocked(view.AccessCoin(txin.prevout), *pindex->pprev, params.GetConsensus())) {
+                    curfew_violation = true;
                     break;
                 }
+            }
+            if (curfew_violation) {
+                state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-txns-coinbase-curfew",
+                              "tried to spend coinbase before its curfew ended in transaction " + tx.GetHash().ToString());
+                break;
             }
             nFees += txfee;
             if (!MoneyRange(nFees)) {

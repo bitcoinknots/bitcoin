@@ -56,9 +56,9 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         if (*height < 0) throw std::runtime_error("-curfewheight cannot be negative.");
         options.curfew_height = (int)*height;
     }
-    if (const auto depth{args.GetIntArg("-curfewdepth")}) {
-        if (*depth < 1) throw std::runtime_error("-curfewdepth must be at least 1.");
-        options.curfew_depth = (int)*depth;
+    if (const auto seconds{args.GetIntArg("-curfewseconds")}) {
+        if (*seconds < 1) throw std::runtime_error("-curfewseconds must be at least 1.");
+        options.curfew_seconds = *seconds;
     }
     if (auto value = args.GetBoolArg("-fastprune")) options.fastprune = *value;
     if (HasTestOption(args, "bip94")) options.enforce_bip94 = true;
