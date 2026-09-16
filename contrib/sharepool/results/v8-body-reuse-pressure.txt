@@ -1,0 +1,8 @@
+2026-09-16T01:07:25.403000Z TestFramework (INFO): PRNG seed is: 906316281111281846
+2026-09-16T01:07:25.403000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-body-reuse-pressure
+2026-09-16T01:07:26.965000Z TestFramework (INFO): Real native-verified nonwinning shares fill the local next-batch credit budget
+2026-09-16T01:07:27.115000Z TestFramework (INFO): A duplicate is still exact, while a refused winning proof submits its original block
+2026-09-16T01:07:27.118000Z TestFramework (INFO): Only native missing data permits retained recovery; a later credit refusal still writes no receipt
+2026-09-16T01:07:27.243000Z TestFramework (INFO): Stopping nodes
+2026-09-16T01:07:27.365000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-body-reuse-pressure
+2026-09-16T01:07:27.365000Z TestFramework (INFO): Tests successful

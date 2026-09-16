@@ -521,6 +521,19 @@ class Checker {
     const Consensus::Params& m_consensus;
     const Lookup& m_lookup;
     const ValidateOrigin& m_validate_origin;
+    const CapturedTemplate* const m_captured_template;
+    // Only byte-derived digests, never a context/native/availability verdict.
+    // Origin budget bounds this map, plus the containing block.
+    std::map<uint256, uint256> m_job_hashes;
+    uint256 BodyJobHash(const CBlock& block)
+    {
+        if (m_captured_template && &block == &m_captured_template->Block()) return m_captured_template->JobCommitment();
+        const auto identity = OriginMemoId(block);
+        if (const auto found = m_job_hashes.find(identity); found != m_job_hashes.end()) return found->second;
+        const auto digest = JobHash(block);
+        m_job_hashes.emplace(identity, digest);
+        return digest;
+    }
     struct SnapshotEvidence {
         std::shared_ptr<const Snapshot> snapshot;
         uint256 owner_digest;
@@ -706,8 +719,9 @@ class Checker {
         // Decoded records have already passed this check. Keep it for pure
         // verifier callers constructing snapshots directly, but only once per
         // exact body. Header or witness changes cannot reuse the memo above.
-        if (!block.m_header_v2 || !SearchFieldsZero(block) || block.vtx.empty() ||
-            block.m_txcount != block.vtx.size() || BlockMerkleRoot(block) != block.hashMerkleRoot) return Bad("template-encoding");
+        if ((!m_captured_template || &block != &m_captured_template->Block()) &&
+            (!block.m_header_v2 || !SearchFieldsZero(block) || block.vtx.empty() ||
+             block.m_txcount != block.vtx.size() || BlockMerkleRoot(block) != block.hashMerkleRoot)) return Bad("template-encoding");
         // Do not spend native script-validation work before the origin's own
         // snapshot is locally available and authenticates its expected hash.
         std::shared_ptr<const Snapshot> snapshot;
@@ -719,7 +733,7 @@ class Checker {
         const auto binding = CheckBinding(snapshot->binding, m_consensus, block.m_height, block.hashPrevBlock);
         if (!binding.IsValid()) return binding;
         if (!Authorized(block.m_mm_rhs)) return Bad("owner");
-        if (snapshot->job_commitment != JobHash(block)) return Bad("job-commitment");
+        if (snapshot->job_commitment != BodyJobHash(block)) return Bad("job-commitment");
         if (m_consensus.SharePoolAdmittedLedger || m_consensus.SharePoolTides) {
             const auto certificate = m_parent_certificates.find(OriginCertificateId(block));
             if (certificate != m_parent_certificates.end() && int64_t{certificate->second.origin_height} == block.m_height &&
@@ -769,8 +783,9 @@ class Checker {
     }
 
 public:
-    Checker(const Consensus::Params& consensus, const Lookup& lookup, const ValidateOrigin& validate_origin)
-        : m_consensus{consensus}, m_lookup{lookup}, m_validate_origin{validate_origin} {}
+    Checker(const Consensus::Params& consensus, const Lookup& lookup, const ValidateOrigin& validate_origin,
+            const CapturedTemplate* captured_template = nullptr)
+        : m_consensus{consensus}, m_lookup{lookup}, m_validate_origin{validate_origin}, m_captured_template{captured_template} {}
 
     Result MiningJob(const CBlock& block, const CBlockIndex* previous,
                      std::optional<CAmount> expected_reward, bool allow_unsigned)
@@ -844,7 +859,7 @@ public:
         if (!result.IsValid()) return result;
         if (!allow_unsigned && !Authorized(block.m_mm_rhs)) return Bad("owner");
         if (allow_unsigned && snapshot->authorization != Signature{}) return Bad("unsigned-authorization");
-        if (snapshot->job_commitment != JobHash(block)) return Bad("job-commitment");
+        if (snapshot->job_commitment != BodyJobHash(block)) return Bad("job-commitment");
         if (!StateOrdered(snapshot->post_state)) return Bad("state-order");
         if (!(m_consensus.SharePoolTides && snapshot->payouts.empty()) && !PayoutsOrdered(snapshot->payouts)) return Bad("payout-order");
         for (size_t i{1}; i < snapshot->shares.size(); ++i) {
@@ -985,6 +1000,25 @@ SnapshotResourceUsage MeasureSnapshotResources(const Snapshot& snapshot) { retur
 
 CBlock DecodeTemplate(Span<const unsigned char> bytes) { return ReadTemplate(bytes); }
 CBlock DecodeBlock(Span<const unsigned char> bytes) { return ReadBlock(bytes, false); }
+
+CapturedTemplate::CapturedTemplate(CBlock block)
+    : m_block{std::move(block)}, m_job_hash{JobHash(m_block)} {}
+
+std::shared_ptr<const CapturedTemplate> CapturedTemplate::Capture(const CBlock& block)
+{
+    // Check null references before serialization dereferences them. Keep the
+    // wire decoder as the canonicality oracle, including unusual empty-input
+    // transaction encodings and header fields normalized by deserialization.
+    if (std::any_of(block.vtx.begin(), block.vtx.end(), [](const auto& tx) { return !tx; })) {
+        throw std::ios_base::failure("null template transaction");
+    }
+    const auto size = GetSerializeSize(TX_WITH_WITNESS(block));
+    if (size < MIN_TEMPLATE_BYTES || size > MAX_TEMPLATE_BYTES) throw std::ios_base::failure("template byte bound");
+    std::vector<unsigned char> raw;
+    raw.reserve(size);
+    VectorWriter{raw, 0} << TX_WITH_WITNESS(block);
+    return std::shared_ptr<const CapturedTemplate>{new CapturedTemplate{ReadTemplate(raw)}};
+}
 
 CTransactionRef DecodeTransaction(Span<const unsigned char> bytes)
 {
@@ -1850,14 +1884,19 @@ Result CheckHistoricalTemplate(const CBlock& full_origin, const CBlockIndex* pre
     if (!consensus.SharePoolHashOnly || !previous || consensus.SharePoolHeight == std::numeric_limits<int>::max() ||
         int64_t{previous->nHeight} + 1 < consensus.SharePoolHeight) return Bad("inactive");
     try {
-        SizeComputer size;
-        size << TX_WITH_WITNESS(full_origin);
-        if (size.size() > MAX_TEMPLATE_BYTES) return Bad("template-encoding");
-        std::vector<unsigned char> raw;
-        raw.reserve(size.size());
-        VectorWriter{raw, 0} << TX_WITH_WITNESS(full_origin);
-        const auto canonical = ReadTemplate(raw);
-        return Checker{consensus, lookup, validate_origin}.HistoricalTemplate(canonical, previous, time);
+        return CheckHistoricalTemplate(*CapturedTemplate::Capture(full_origin), previous, time, consensus, lookup, validate_origin);
+    } catch (const std::ios_base::failure&) { return Bad("template-encoding"); }
+    catch (const std::invalid_argument&) { return Bad("template-encoding"); }
+}
+
+Result CheckHistoricalTemplate(const CapturedTemplate& full_origin, const CBlockIndex* previous, uint32_t time,
+                               const Consensus::Params& consensus, const Lookup& lookup,
+                               const ValidateOrigin& validate_origin)
+{
+    if (!consensus.SharePoolHashOnly || !previous || consensus.SharePoolHeight == std::numeric_limits<int>::max() ||
+        int64_t{previous->nHeight} + 1 < consensus.SharePoolHeight) return Bad("inactive");
+    try {
+        return Checker{consensus, lookup, validate_origin, &full_origin}.HistoricalTemplate(full_origin.Block(), previous, time);
     } catch (const std::ios_base::failure&) { return Bad("template-encoding"); }
     catch (const std::invalid_argument&) { return Bad("template-encoding"); }
 }
@@ -1869,15 +1908,19 @@ Result CheckShareProof(const Share& share, const CBlock& full_origin, const CBlo
     if (!consensus.SharePoolHashOnly || !previous || consensus.SharePoolHeight == std::numeric_limits<int>::max() ||
         int64_t{previous->nHeight} + 1 < consensus.SharePoolHeight) return Bad("inactive");
     try {
-        // Enforce the same canonical full-body byte bound as snapshot records.
-        SizeComputer size;
-        size << TX_WITH_WITNESS(full_origin);
-        if (size.size() > MAX_TEMPLATE_BYTES) return Bad("template-encoding");
-        std::vector<unsigned char> raw;
-        raw.reserve(size.size());
-        VectorWriter{raw, 0} << TX_WITH_WITNESS(full_origin);
-        const auto canonical = ReadTemplate(raw);
-        return Checker{consensus, lookup, validate_origin}.ShareProof(share, canonical, previous, time, 1);
+        return CheckShareProof(share, *CapturedTemplate::Capture(full_origin), previous, time, consensus, lookup, validate_origin);
+    } catch (const std::ios_base::failure&) { return Bad("template-encoding"); }
+    catch (const std::invalid_argument&) { return Bad("template-encoding"); }
+}
+
+Result CheckShareProof(const Share& share, const CapturedTemplate& full_origin, const CBlockIndex* previous,
+                       uint32_t time, const Consensus::Params& consensus, const Lookup& lookup,
+                       const ValidateOrigin& validate_origin)
+{
+    if (!consensus.SharePoolHashOnly || !previous || consensus.SharePoolHeight == std::numeric_limits<int>::max() ||
+        int64_t{previous->nHeight} + 1 < consensus.SharePoolHeight) return Bad("inactive");
+    try {
+        return Checker{consensus, lookup, validate_origin, &full_origin}.ShareProof(share, full_origin.Block(), previous, time, 1);
     } catch (const std::ios_base::failure&) { return Bad("template-encoding"); }
     catch (const std::invalid_argument&) { return Bad("template-encoding"); }
 }

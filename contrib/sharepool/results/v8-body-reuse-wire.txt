@@ -1,0 +1,6 @@
+2026-09-16T01:07:54.326000Z TestFramework (INFO): PRNG seed is: 7359001571836679049
+2026-09-16T01:07:54.327000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-body-reuse-wire
+2026-09-16T01:07:56.567000Z TestFramework (INFO): Standalone v8 CLI runner publishes work and closes its listener without changing the chain
+2026-09-16T01:07:58.018000Z TestFramework (INFO): Stopping nodes
+2026-09-16T01:07:58.139000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-body-reuse-wire
+2026-09-16T01:07:58.139000Z TestFramework (INFO): Tests successful

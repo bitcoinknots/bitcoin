@@ -10,6 +10,7 @@
 #include <util/strencodings.h>
 #include <validation.h>
 #include <random.h>
+#include <sharepool/hash_validation_cache.h>
 
 #include <algorithm>
 #include <array>
@@ -19,6 +20,8 @@ namespace sharepool {
 namespace {
 constexpr size_t MAX_CACHE_BYTES{64 * 1024 * 1024};
 constexpr size_t MAX_CACHE_OBJECTS{4096};
+constexpr size_t MAX_CAPTURED_TEMPLATE_BYTES{32 * 1024 * 1024};
+constexpr size_t MAX_CAPTURED_TEMPLATES{256};
 constexpr size_t MAX_PENDING_BYTES{64 * 1024 * 1024};
 constexpr size_t MAX_PENDING_BLOCKS{HashRequestQueue<uint256>::MAX_BLOCKS};
 constexpr size_t MAX_TEMPLATE_INDEX{65536};
@@ -1104,6 +1107,40 @@ std::optional<CAmount> HashSnapshotStore::NativeValidated(const uint256& id)
     m_native_touched[id] = ++m_clock;
     return found->second;
 }
+
+std::shared_ptr<const hashonly::CapturedTemplate> HashSnapshotStore::FindCapturedTemplate(const CBlock& block)
+{
+    AssertLockHeld(cs_main);
+    const auto found = m_captured_templates.find(NativeBodyCacheKey(block));
+    if (found == m_captured_templates.end()) return {};
+    found->second.touched = ++m_clock;
+    return found->second.body;
+}
+
+void HashSnapshotStore::RememberCapturedTemplate(std::shared_ptr<const hashonly::CapturedTemplate> body) try
+{
+    AssertLockHeld(cs_main);
+    if (!body) return;
+    const auto charge = CapturedTemplateCacheCharge(*body);
+    if (charge > MAX_CAPTURED_TEMPLATE_BYTES) return;
+    const auto identity = NativeBodyCacheKey(body->Block());
+    if (const auto found = m_captured_templates.find(identity); found != m_captured_templates.end()) {
+        found->second.touched = ++m_clock;
+        return;
+    }
+    while (!m_captured_templates.empty() &&
+           (m_captured_templates.size() >= MAX_CAPTURED_TEMPLATES || charge > MAX_CAPTURED_TEMPLATE_BYTES - m_captured_template_bytes)) {
+        const auto oldest = std::min_element(m_captured_templates.begin(), m_captured_templates.end(),
+            [](const auto& a, const auto& b) { return a.second.touched < b.second.touched; });
+        m_captured_template_bytes -= oldest->second.charge;
+        m_captured_templates.erase(oldest);
+    }
+    m_captured_templates.emplace(identity, CapturedEntry{std::move(body), charge, ++m_clock});
+    m_captured_template_bytes += charge;
+} catch (const std::bad_alloc&) {
+    // Optional retention failure cannot hide the caller's available capture.
+}
+
 void HashSnapshotStore::SetNativeValidated(const uint256& id, CAmount reward)
 {
     AssertLockHeld(cs_main);

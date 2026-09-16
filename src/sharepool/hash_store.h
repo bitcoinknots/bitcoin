@@ -119,6 +119,13 @@ private:
     std::set<uint256> m_quarantined_templates GUARDED_BY(cs_main);
     std::map<uint256, CAmount> m_native_validated GUARDED_BY(cs_main);
     std::map<uint256, uint64_t> m_native_touched GUARDED_BY(cs_main);
+    struct CapturedEntry {
+        std::shared_ptr<const hashonly::CapturedTemplate> body;
+        size_t charge;
+        uint64_t touched;
+    };
+    std::map<uint256, CapturedEntry> m_captured_templates GUARDED_BY(cs_main);
+    size_t m_captured_template_bytes GUARDED_BY(cs_main){0};
     HashRequestQueue<uint256> m_requests GUARDED_BY(cs_main);
     size_t m_bytes GUARDED_BY(cs_main){0};
     uint64_t m_charged_bytes GUARDED_BY(cs_main){0};
@@ -204,6 +211,11 @@ public:
     size_t TemplateCount() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_template_sizes.size() - m_quarantined_templates.size(); }
     void RememberTemplate(const CBlock& block) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::shared_ptr<const CBlock> Template(const uint256& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    /** Byte-derived reuse only. The caller must obtain currently available
+     * evidence through Template first; this cache never supplies availability,
+     * ancestry, proof, authorization, native validity or settlement verdicts. */
+    std::shared_ptr<const hashonly::CapturedTemplate> FindCapturedTemplate(const CBlock& block) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    void RememberCapturedTemplate(std::shared_ptr<const hashonly::CapturedTemplate> body) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     std::optional<CAmount> NativeValidated(const uint256& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void SetNativeValidated(const uint256& id, CAmount reward) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     bool QueueBlock(std::shared_ptr<const CBlock> block) EXCLUSIVE_LOCKS_REQUIRED(cs_main);

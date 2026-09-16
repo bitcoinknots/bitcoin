@@ -1,0 +1,19 @@
+[  1%] Built target crc32c
+[  4%] Built target test_util
+[  4%] Generating bitcoin-build-info.h
+[ 12%] Built target leveldb
+[ 15%] Built target bitcoin_consensus
+[ 15%] Built target bitcoin_cli
+[ 15%] Built target generate_build_info
+[ 16%] Built target univalue
+[ 17%] Built target secp256k1_precomputed
+[ 22%] Built target bitcoin_crypto
+[ 23%] Built target bitcoin_clientversion
+[ 31%] Built target bitcoin_util
+[ 44%] Built target bitcoin_common
+[ 44%] Built target secp256k1
+[ 67%] Built target bitcoin_node
+[ 68%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/sharepool_hash_store_tests.cpp.o
+[ 68%] Linking CXX executable ../../bin/test_bitcoin
+ld: warning: ignoring duplicate libraries: '../../lib/libbitcoin_consensus.a', '../secp256k1/lib/libsecp256k1.a'
+[100%] Built target test_bitcoin

@@ -1,0 +1,136 @@
+{
+  "baseline": {
+    "saved_python_files_match_manifest": true,
+    "runtime_report_matches_saved_sources": true,
+    "configuration": {
+      "miners": 20,
+      "duration_seconds": 60,
+      "offer_interval_ms": 300.0,
+      "settlement_seconds": 20,
+      "work_update_seconds": 40,
+      "snapshot_budget_bytes": 1048576,
+      "padding_outputs": 0,
+      "max_runtime_seconds": 900,
+      "profile_version": 8,
+      "share_work_bits": [
+        2,
+        4,
+        6
+      ],
+      "target_share_seconds": 6.0,
+      "deduplicate_job_evidence": true,
+      "source_workers": 4
+    },
+    "phase": {
+      "offered": 200,
+      "acknowledged": 200,
+      "admitted": 136,
+      "peer_verified": 136,
+      "rejected": 0,
+      "admission_refused": 0,
+      "seconds": 60,
+      "capacity_refused": 0,
+      "unacknowledged_queue": 0,
+      "acknowledged_backlog": 64,
+      "peer_backlog": 0,
+      "observed_admitted_per_second": 2.2666666666666666,
+      "observed_peer_verified_per_second": 2.2666666666666666,
+      "scheduled_requests_due": 200,
+      "source_unfulfilled_requests": 0
+    },
+    "drain_seconds": 61.534290792,
+    "resources": {
+      "node0": {
+        "cpu_seconds": 11.1,
+        "average_cpu_cores": 0.18042151109724688,
+        "max_sampled_rss_bytes": 70238208
+      },
+      "node1": {
+        "cpu_seconds": 0.9299999999999999,
+        "average_cpu_cores": 0.015116396875715279,
+        "max_sampled_rss_bytes": 68141056
+      },
+      "driver": {
+        "cpu_seconds": 10.18,
+        "average_cpu_cores": 0.16546765612342101,
+        "max_sampled_rss_bytes": 64339968
+      }
+    },
+    "queue_full_reference": {
+      "full_origin_items": 60,
+      "reference_items": 140
+    },
+    "blocks": [
+      67,
+      69,
+      64
+    ]
+  },
+  "final": {
+    "saved_python_files_match_manifest": true,
+    "runtime_report_matches_saved_sources": true,
+    "configuration": {
+      "miners": 20,
+      "duration_seconds": 60,
+      "offer_interval_ms": 300.0,
+      "settlement_seconds": 20,
+      "work_update_seconds": 40,
+      "snapshot_budget_bytes": 1048576,
+      "padding_outputs": 0,
+      "max_runtime_seconds": 900,
+      "profile_version": 8,
+      "share_work_bits": [
+        2,
+        4,
+        6
+      ],
+      "target_share_seconds": 6.0,
+      "deduplicate_job_evidence": true,
+      "source_workers": 4
+    },
+    "phase": {
+      "offered": 200,
+      "acknowledged": 200,
+      "admitted": 136,
+      "peer_verified": 136,
+      "rejected": 0,
+      "admission_refused": 0,
+      "seconds": 60,
+      "capacity_refused": 0,
+      "unacknowledged_queue": 0,
+      "acknowledged_backlog": 64,
+      "peer_backlog": 0,
+      "observed_admitted_per_second": 2.2666666666666666,
+      "observed_peer_verified_per_second": 2.2666666666666666,
+      "scheduled_requests_due": 200,
+      "source_unfulfilled_requests": 0
+    },
+    "drain_seconds": 61.523403415999994,
+    "resources": {
+      "node0": {
+        "cpu_seconds": 11.100000000000001,
+        "average_cpu_cores": 0.1804437930965387,
+        "max_sampled_rss_bytes": 70664192
+      },
+      "node1": {
+        "cpu_seconds": 0.9199999999999999,
+        "average_cpu_cores": 0.014955701770163567,
+        "max_sampled_rss_bytes": 68222976
+      },
+      "driver": {
+        "cpu_seconds": 9.61,
+        "average_cpu_cores": 0.1562220587079042,
+        "max_sampled_rss_bytes": 64307200
+      }
+    },
+    "queue_full_reference": {
+      "full_origin_items": 60,
+      "reference_items": 140
+    },
+    "blocks": [
+      67,
+      69,
+      64
+    ]
+  }
+}

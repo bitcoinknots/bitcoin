@@ -727,6 +727,91 @@ BOOST_AUTO_TEST_CASE(unused_full_templates_also_require_native_validation)
     Reason(no_reward, "origin-reward");
 }
 
+BOOST_AUTO_TEST_CASE(captured_template_owns_canonical_bytes_without_caching_verdicts)
+{
+    auto opening = Empty();
+    auto origin = Block(opening);
+    const auto proof = Proof(origin, opening, 1);
+    const auto captured = ho::CapturedTemplate::Capture(origin);
+    BOOST_CHECK_EQUAL(captured->JobCommitment(), ho::JobHash(origin));
+    BOOST_CHECK(captured->Block().vtx[0] != origin.vtx[0]);
+    const auto check = [&](const Share& share, const ho::Lookup& lookup, const ho::ValidateOrigin& native) {
+        return ho::CheckShareProof(share, *captured, &indexes[0], captured->Block().nTime, consensus, lookup, native);
+    };
+    BOOST_REQUIRE(check(proof, Lookup(), Native()).IsValid());
+    const auto before = native_checks;
+    BOOST_REQUIRE(check(proof, Lookup(), Native()).IsValid());
+    BOOST_CHECK_EQUAL(native_checks, before + 1); // Capture is not native success.
+    const ho::ValidateOrigin reject = [](const CBlock&, const CBlockIndex*) {
+        return ho::Result::Invalid("fixture-reject");
+    };
+    Reason(check(proof, Lookup(), reject), "origin-body: fixture-reject");
+
+    // The caller's header and transaction container cannot modify captured facts.
+    origin.nTime++;
+    origin.vtx[0].reset();
+    BOOST_REQUIRE(check(proof, Lookup(), Native()).IsValid());
+    auto changed = proof;
+    changed.header.nTime++;
+    Reason(check(changed, Lookup(), Native()), "share-template");
+    changed = proof;
+    changed.authorization[0] ^= 1;
+    Reason(check(changed, Lookup(), Native()), "share-authorization");
+    changed = proof;
+    while (UintToArith256(changed.header.GetHash()) <= arith_uint256{}.SetCompact(SHARE_BITS)) ++changed.header.nNonce;
+    Reason(check(changed, Lookup(), Native()), "share-target");
+    snapshots.clear();
+    BOOST_CHECK(check(proof, Lookup(), Native()).IsMissing());
+    BOOST_CHECK(ho::CheckHistoricalTemplate(*captured, &indexes[0], captured->Block().nTime,
+        consensus, Lookup(), Native()).IsMissing());
+}
+
+BOOST_AUTO_TEST_CASE(captured_template_cannot_bless_changed_witness_or_malformed_bodies)
+{
+    auto origin = Block(Empty());
+    CMutableTransaction coinbase{*origin.vtx[0]};
+    coinbase.vin[0].scriptWitness.stack = {std::vector<unsigned char>(32)};
+    origin.vtx[0] = MakeTransactionRef(coinbase);
+    Reseal(origin);
+    const auto proof = Proof(origin, *snapshots.at(origin.m_mm_rhs), 1);
+    const auto captured = ho::CapturedTemplate::Capture(origin);
+    BOOST_REQUIRE(ho::CheckShareProof(proof, *captured, &indexes[0], origin.nTime, consensus, Lookup(), Native()).IsValid());
+    coinbase.vin[0].scriptWitness.stack[0][0] = 1;
+    auto changed = origin;
+    changed.vtx[0] = MakeTransactionRef(coinbase);
+    const auto other = ho::CapturedTemplate::Capture(changed);
+    BOOST_CHECK_EQUAL(ho::TemplateId(other->Block()), ho::TemplateId(captured->Block()));
+    BOOST_CHECK(other->JobCommitment() != captured->JobCommitment());
+    Reason(ho::CheckShareProof(proof, *other, &indexes[0], origin.nTime, consensus, Lookup(), Native()), "job-commitment");
+
+    const auto malformed = [&](auto mutate) {
+        auto bad = origin;
+        mutate(bad);
+        BOOST_CHECK_THROW(ho::CapturedTemplate::Capture(bad), std::ios_base::failure);
+        Reason(ho::CheckShareProof(proof, bad, &indexes[0], origin.nTime, consensus, Lookup(), Native()), "template-encoding");
+        Reason(ho::CheckHistoricalTemplate(bad, &indexes[0], origin.nTime, consensus, Lookup(), Native()), "template-encoding");
+    };
+    malformed([](CBlock& b) { b.vtx[0].reset(); });
+    malformed([](CBlock& b) { b.m_txcount++; });
+    malformed([](CBlock& b) { b.hashMerkleRoot = uint256::ONE; });
+    malformed([](CBlock& b) { b.nNonce = 1; });
+    malformed([](CBlock& b) { b.m_nonce2 = 1; });
+    malformed([](CBlock& b) { b.m_time_offset = 1; });
+    malformed([](CBlock& b) { b.m_extranonce.begin()[0] = 1; });
+    malformed([](CBlock& b) { b.m_header_v2 = false; });
+    malformed([](CBlock& b) {
+        CMutableTransaction tx{*b.vtx[0]};
+        tx.vin.clear(); // Ambiguous witness-marker encoding must still use the wire oracle.
+        b.vtx[0] = MakeTransactionRef(tx);
+        b.hashMerkleRoot = BlockMerkleRoot(b);
+    });
+    malformed([](CBlock& b) {
+        CMutableTransaction tx{*b.vtx[0]};
+        tx.vin[0].scriptWitness.stack = {std::vector<unsigned char>(ho::MAX_TEMPLATE_BYTES)};
+        b.vtx[0] = MakeTransactionRef(tx);
+    });
+}
+
 BOOST_AUTO_TEST_CASE(origin_memo_includes_exact_witness_body)
 {
     // Both base bodies have identical normalized headers/txids; only witness

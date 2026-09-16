@@ -7,6 +7,13 @@ recorded source revisions.
 
 ## Current follow-up
 
+The [template-body and dependency reuse change](sharepool-v8-body-reuse.md)
+avoids repeated canonical body decoding for known exact templates and removes
+the second dependency walk used to initialize admission accounting. Its caches
+retain immutable byte-derived data only. Per-request evidence authentication,
+native proof/context checks, cross-request dependency checks and durable storage
+remain, along with the capacity and availability requirements below.
+
 The latest [v8 admission-pressure change](sharepool-v8-admission-pressure.md)
 adds local next-batch resource and deadline checks before new ACKs, with bounded
 incremental accounting and continued settlement during overload. It also removes

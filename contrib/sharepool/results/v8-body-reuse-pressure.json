@@ -1,0 +1,52 @@
+{
+  "network": "two disconnected native regtest nodes",
+  "profile": 8,
+  "local_snapshot_budget": 2048,
+  "hardware_used": false,
+  "transport": "real Sia proofs through owner-side Stratum submit path; no socket framing",
+  "daemon_sha256": "f889cf8d0e4108a8e40aea7174109d3c6fec14e0713521493e5309cc301346db",
+  "source_sha256": {
+    "contrib/sharepool/hash_mining_gate.py": "bcf2f8a26a0159af7dfc54e372174da0c6bb78a83d32d61760df4f0c3a421ed0",
+    "contrib/sharepool/hash_gate_admission.py": "b1adeda57c859e8b0ec61ceb518e91de2f41ce25d5a987e5748e7d80dbc4d83f",
+    "contrib/sharepool/hash_admission_accounting.py": "fc0742fc5058dce6fedb973622a50bf5fd0802416c75ace1c9704259cbbabdeb",
+    "contrib/sharepool/hash_stratum.py": "c58408b43ba7270f312be19f01a7f43b222f5f2d145581d776f5dc50c9ecf4d3",
+    "contrib/sharepool/hash_vardiff.py": "a2f855cc5f89748f622b1b59ea4d2435efaba38edbc7d561bb69079622086e3d",
+    "test/functional/feature_sharepool_hash_stratum_pressure.py": "ac30576c8477677fa7a04a4771e492431a4ca79c7c1bb8fb8d34f1d6ad2f1c2e"
+  },
+  "accepted_before_pressure": 25,
+  "refusal_reasons": [
+    "pending-prefix-does-not-fit",
+    "offered-proof-not-selected"
+  ],
+  "missing_only_recovery": {
+    "proof_rpcs": 2,
+    "template_rpcs": 1,
+    "snapshot_replay_rpcs": 2,
+    "journal_unchanged_after_recovery_and_refusal": true
+  },
+  "block": "52b630b570be385dba4cdc9ee1a36f88c0f5826afadcd8bc61a7fc0c090bf465",
+  "stats": {
+    "published": 1,
+    "acknowledged": 25,
+    "duplicate": 1,
+    "rejected": 0,
+    "capacity_refused": 3,
+    "submitted_candidates": 1,
+    "accepted_candidates": 1,
+    "candidate_rpc_failures": 0,
+    "candidate_rejections": 0,
+    "native_only_candidates": 0
+  },
+  "checks": [
+    "actual_gate_budget_refuses_native_valid_share",
+    "refused_proofs_not_journaled",
+    "warm_proofs_no_template_or_snapshot_replay",
+    "exact_duplicate_not_recredited",
+    "missing_only_recovery_into_empty_native_peer",
+    "recovered_refusal_not_journaled",
+    "native_winner_submitted_with_exact_old_bytes",
+    "native_block_accepted",
+    "pressure_pauses_estimator_without_credit",
+    "native_verifychain"
+  ]
+}

@@ -1,0 +1,27 @@
+[  0%] Generating bitcoin-build-info.h
+[  1%] Built target crc32c
+[ 14%] Built target leveldb
+[ 14%] Built target generate_build_info
+[ 18%] Built target bitcoin_consensus
+[ 20%] Built target secp256k1_precomputed
+[ 21%] Built target univalue
+[ 29%] Built target bitcoin_crypto
+[ 30%] Built target bitcoin_clientversion
+[ 43%] Built target bitcoin_util
+[ 63%] Built target bitcoin_common
+[ 63%] Built target secp256k1
+[ 98%] Built target bitcoin_node
+[100%] Linking CXX executable ../bin/bitcoind
+[100%] Built target bitcoind
+[  0%] Generating bitcoin-build-info.h
+[  7%] Built target bitcoin_consensus
+[ 11%] Built target univalue
+[ 14%] Built target secp256k1_precomputed
+[ 14%] Built target generate_build_info
+[ 29%] Built target bitcoin_crypto
+[ 33%] Built target bitcoin_clientversion
+[ 59%] Built target bitcoin_util
+[ 59%] Built target secp256k1
+[100%] Built target bitcoin_common
+[100%] Linking CXX executable ../bin/bitcoin-sharepool-signer
+[100%] Built target bitcoin-sharepool-signer

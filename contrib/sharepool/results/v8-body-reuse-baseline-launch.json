@@ -1,0 +1,58 @@
+{
+  "stage": "baseline",
+  "command": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "-B",
+    "/private/tmp/sharepool-repeated-body-ab-20260915-o73ifr4p/baseline/source/test/functional/feature_sharepool_hash_live_capacity.py",
+    "--configfile=/private/tmp/sharepool-repeated-body-ab-20260915-o73ifr4p/baseline/native/test/config.ini",
+    "--profile-version=8",
+    "--share-work-bits=2,4,6",
+    "--miners=20",
+    "--source-workers=4",
+    "--duration-seconds=60",
+    "--target-share-seconds=6",
+    "--snapshot-budget-bytes=1048576",
+    "--settlement-seconds=20",
+    "--work-update-seconds=40",
+    "--deduplicate-job-evidence",
+    "--max-runtime-seconds=900",
+    "--results=/private/tmp/sharepool-repeated-body-ab-20260915-o73ifr4p/baseline/run-1/results.json",
+    "--tmpdir=/private/tmp/sharepool-repeated-body-ab-20260915-o73ifr4p/baseline/run-1/nodes",
+    "--portseed=925",
+    "--randomseed=20260915",
+    "--nocleanup",
+    "--loglevel=DEBUG"
+  ],
+  "cwd": "/private/tmp/sharepool-repeated-body-ab-20260915-o73ifr4p/baseline/source",
+  "started_utc": "2026-09-16T00:56:51.407963+00:00",
+  "binary_sha256_before": {
+    "bitcoind": "e2e1bf00b31ec06ae173b799337d4a6a75a567ef2e0fd508e26a05d6646ac364",
+    "bitcoin-sharepool-signer": "6c0cfaed537b99c687e002b4248c4717419415e6b845d1a5c7ee633855ab60a0",
+    "bitcoin-cli": "f91a8b6da17996f7166e4474418824b2db947c35ddd90cd7b059ec8f77b91b80"
+  },
+  "source_manifest_sha256": "9cad49e0bc2b111ee38681300b25fc12092e9011d65ffa967b3bbac95e1eacb1",
+  "timing_lane": "Root explicitly released lane; all build/test agents paused; source editing may continue",
+  "limits": [
+    "One finite 20-miner/4-owner/200-proof capture; not saturation or production qualification",
+    "Same configuration, fresh synthetic keys/jobs; scheduling can change job and settlement counts",
+    "Nested operation durations overlap and are not additive CPU or elapsed costs"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 66.06504320799999,
+  "finished_utc": "2026-09-16T00:57:57.473783+00:00",
+  "binary_sha256_after": {
+    "bitcoind": "e2e1bf00b31ec06ae173b799337d4a6a75a567ef2e0fd508e26a05d6646ac364",
+    "bitcoin-sharepool-signer": "6c0cfaed537b99c687e002b4248c4717419415e6b845d1a5c7ee633855ab60a0",
+    "bitcoin-cli": "f91a8b6da17996f7166e4474418824b2db947c35ddd90cd7b059ec8f77b91b80"
+  },
+  "artifacts": {
+    "console.txt": {
+      "bytes": 1753,
+      "sha256": "b7aa429eeec53fa513a2ba487e8a99c11c74d028a6425aa9008b3aae7e84df82"
+    },
+    "results.json": {
+      "bytes": 313010,
+      "sha256": "78a8cb1ff31e460620704fdd416abf48aeb39e3415d491cb808b92e2f2fa8d89"
+    }
+  }
+}

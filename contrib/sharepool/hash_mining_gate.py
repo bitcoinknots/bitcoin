@@ -28,6 +28,7 @@ import hash_gate_archive
 import hash_gate_batch
 from hash_gate_cache import SnapshotDecodeCache
 from hash_gate_origin_cache import OriginFactsCache
+from hash_gate_body_cache import OriginBodyCache
 from hash_state_cache import CompactStateCache
 from hash_signature_cache import SignatureVerifyCache
 from hash_snapshot import (Snapshot, TemplateRecord, CompactTemplateRecord, Share, MAX_SNAPSHOT_BYTES,
@@ -111,6 +112,7 @@ class HashMiningGate:
         self._description_cache = OrderedDict()
         self._snapshot_decode_cache = SnapshotDecodeCache()
         self._origin_facts_cache = OriginFactsCache()
+        self._origin_body_cache = OriginBodyCache()
         self._compact_state_cache = CompactStateCache()
         self._signature_cache = SignatureVerifyCache()
         self._snapshot_observer = None  # Sole-owner bounded inventory ingestion only.
@@ -846,7 +848,7 @@ class HashMiningGate:
         height, tip = self._context()
         if not self._relay_pool(share.envelope.pool) or not self._eligible(share.envelope.height, f"{share.envelope.native_parent:064x}", height):
             raise ValueError("proof is outside this pool or eligible native ancestry")
-        self._require_origin(share)
+        origin_raw, opening_raw, unused_opening, unused_facts = self._require_origin(share)
         known = False
         try:
             retained = self._read(PROOF, f"{share.proof_id:064x}")
@@ -855,11 +857,14 @@ class HashMiningGate:
             known = True
         except KeyError:
             pass
-        staged = {}
+        # Reuse the exact evidence just read and authenticated for this offer.
+        # This map lives only through this receive operation; later offers read
+        # the journal again, and _persist still checks retained byte equality.
+        staged = {(TEMPLATE, f"{share.header_facts.template_id:064x}"): origin_raw,
+                  (SNAPSHOT, f"{share.header.m_mm_rhs:064x}"): opening_raw}
         opening = self._snapshot(share.header.m_mm_rhs, staged)
         parent = self._parent_snapshot(height, tip, staged) if self.profile_version == LEDGER_VERSION or is_tides_profile(self.profile_version) else None
-        origin = CompactTemplateRecord.from_record(
-            TemplateRecord.from_block(self._evidence(TEMPLATE, template_id(share.header))))
+        origin = self._origin_body_cache.capture(origin_raw, self.profile_version)
         captures = [] if self._admission_budget is not None and not known else None
         provenance = self._provenance(opening, staged, trusted_parent=parent,
             root_origin=origin, root_depth=1, captures=captures)
@@ -980,7 +985,7 @@ class HashMiningGate:
         self._stable(tip)
         return value
 
-    def _batch(self, height, tip, parent, *, staged=None, offered=(), templates=()):
+    def _batch(self, height, tip, parent, *, staged=None, offered=(), templates=(), capture_dependencies=False):
         """Choose the maximal fitting prefix under this gate's pinned policy.
 
         V6 orders by origin height, then durable receipt revision. An offered
@@ -992,6 +997,9 @@ class HashMiningGate:
 
         Only a byte-bounded prefix's bodies are materialized. Deferred receipt
         IDs remain in the indexed journal; counting them streams scalar rows.
+        Admission may retain the successful trial's immutable canonical graph
+        captures until its accountant is initialized in this same operation.
+        Every trial still fetches its own evidence and checks every limit.
         """
         staged = {} if staged is None else staged
         paid = self._admitted_ids(parent)
@@ -1037,6 +1045,7 @@ class HashMiningGate:
             # A rejected larger prefix must not retain its fetched dependency
             # bodies across subsequent binary-search attempts.
             trial_staged = dict(staged)
+            captures = [] if capture_dependencies else None
             records, transactions = {}, set()
             expanded = references = wire_lower_bound = 0
             try:
@@ -1072,6 +1081,7 @@ class HashMiningGate:
                 resources = hash_gate_batch.check_graph(snapshot, snapshot_budget=self.snapshot_budget,
                     mining_job=True, activation_height=self.activation_height, state_cache=self._compact_state_cache,
                     signature_cache=self._signature_cache,
+                    on_capture=None if captures is None else captures.append,
                     lookup=lambda identity: self._snapshot(identity, trial_staged),
                     parent_snapshot=lambda identity, origin_height: self._block_snapshot(origin_height, f"{identity:064x}", trial_staged))
                 resources.update(expanded_template_bytes=expanded, template_references=references,
@@ -1109,40 +1119,43 @@ class HashMiningGate:
                         raise hash_gate_batch.BatchLimit("dependency payout reservation budget")
                     if output_bytes > payout_budget["max_output_bytes"]:
                         raise hash_gate_batch.BatchLimit("native coinbase payout reservation budget")
-                return snapshot, resources
+                return snapshot, resources, None if captures is None else tuple(captures)
             except ValueError as error:
                 if (isinstance(error, hash_gate_batch.BatchLimit) or "budget" in str(error) or "exceeds byte bound" in str(error) or
                         str(error).startswith(("confirmed ledger capacity;", "TIDES certificate capacity;",
                                                "compact share count exceeds original work bound"))):
-                    return None, str(error)
+                    return None, str(error), None
                 raise
 
         low, high, best, reason = 0, len(ordered), None, None
-        empty, resources = trial(0)
-        if empty is None:
-            raise hash_gate_batch.EmptyBatchCapacity(resources, eligible_count=total,
+        best = trial(0)
+        if best[0] is None:
+            raise hash_gate_batch.EmptyBatchCapacity(best[1], eligible_count=total,
                 oldest_origin_height=oldest, resources=empty_resources)
-        best = empty, resources
         # Normal uncongested jobs fit their complete bounded receipt prefix.
         # Avoid rebuilding and traversing every binary-search prefix in that
         # case. A failed full trial still falls back to the same maximal-prefix
         # policy, retaining neither that trial's fetched bodies nor a verdict.
         if high:
-            snapshot, resources = trial(high)
-            if snapshot is not None:
-                low, best = high, (snapshot, resources)
+            candidate = trial(high)
+            if candidate[0] is not None:
+                low, best = high, candidate
             else:
-                high, reason = high - 1, resources
+                high, reason = high - 1, candidate[1]
+            del candidate
         while low < high:
             middle = (low + high + 1) // 2
-            snapshot, resources = trial(middle)
-            if snapshot is None:
-                high, reason = middle - 1, resources
+            candidate = trial(middle)
+            if candidate[0] is None:
+                high, reason = middle - 1, candidate[1]
             else:
-                low, best = middle, (snapshot, resources)
+                low, best = middle, candidate
+            del candidate
         result = {"snapshot": best[0], "resources": best[1], "eligible_count": total,
                   "deferred_count": total - low, "limit_reason": reason,
                   "oldest_origin_height": oldest}
+        if capture_dependencies:
+            result["_dependency_captures"] = best[2]
         if payout_budget is not None:
             result["native_bits"] = payout_budget["native_bits"]
         return result
@@ -1735,6 +1748,7 @@ class HashMiningGate:
         self._description_cache.clear()
         self._snapshot_decode_cache.clear()
         self._origin_facts_cache.clear()
+        self._origin_body_cache.clear()
         self._compact_state_cache.clear()
         self._signature_cache.clear()
         try:

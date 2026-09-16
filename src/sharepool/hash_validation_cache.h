@@ -206,6 +206,17 @@ inline uint256 NativeBodyCacheKey(const CBlock& block)
     }
     return writer.GetHash();
 }
+
+/** Optional canonical-template retention. Charge nested transactions even when
+ * shared elsewhere; the wire-size bound alone misses witness/vector overhead. */
+inline size_t CapturedTemplateCacheCharge(const hashonly::CapturedTemplate& captured)
+{
+    return memusage::MallocUsage(sizeof(hashonly::CapturedTemplate)) +
+        memusage::MallocUsage(sizeof(memusage::stl_shared_counter)) +
+        memusage::MallocUsage(sizeof(uint256) + sizeof(std::shared_ptr<const hashonly::CapturedTemplate>) +
+                             sizeof(size_t) + sizeof(uint64_t) + 4 * sizeof(void*)) +
+        RecursiveDynamicUsage(captured.Block());
+}
 } // namespace sharepool
 
 #endif // BITCOIN_SHAREPOOL_HASH_VALIDATION_CACHE_H

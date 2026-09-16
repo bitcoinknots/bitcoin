@@ -82,13 +82,19 @@ def _quote(gate, height, tip, batch, *, offered=()):
         native_payout_capacity_bytes=batch["resources"]["native_payout_capacity_bytes"])
 
 
-def _accountant(gate, batch, staged):
-    captured = []
-    usage = gate._provenance(batch["snapshot"], staged, mining_job=True, captures=captured)
-    return CompactAdmissionAccountant(batch["snapshot"],
+def _accountant(batch, staged):
+    from hash_mining_gate import SNAPSHOT
+
+    # These captures belong only to the successful trial in this operation.
+    # Preserve its complete evidence for the caller's eventual atomic commit,
+    # including when the optional scalar accountant exceeds its own capacity.
+    # No body, capture or native verdict survives in the accountant itself.
+    captured = batch.pop("_dependency_captures")
+    staged.update(((SNAPSHOT, f"{value.hash:064x}"), value.raw) for value in captured)
+    return CompactAdmissionAccountant(captured[0],
         historical_recipient_count=batch["resources"]["historical_recipient_count"],
         historical_recipient_bytes=batch["resources"]["historical_recipient_bytes"],
-        dependencies=tuple(captured), depth=usage["dependency_depth"] - 1,
+        dependencies=captured, depth=batch["resources"]["dependency_depth"] - 1,
         certificate_bytes=batch["resources"]["historical_certificate_bytes"])
 
 
@@ -97,12 +103,12 @@ def _refresh(gate, height, tip, parent, staged):
     state = gate._admission_state
     if state is not None and state.key == key:
         return state
-    batch = select_batch(gate, height, tip, parent, staged=staged)
+    batch = select_batch(gate, height, tip, parent, staged=staged, capture_dependencies=True)
     quote = _quote(gate, height, tip, batch)
     accountant = None
     if quote.selected_count == quote.eligible_count:
         try:
-            accountant = _accountant(gate, batch, staged)
+            accountant = _accountant(batch, staged)
         except MetadataCapacity:
             pass  # Optional metadata must not replace the exact resource check.
     gate._stable(tip)
@@ -165,12 +171,13 @@ def pre_ack(gate, share, record, *, height, tip, parent, staged, captures, prove
             # Tight CompactSize/recipient budgets can fit more than the safe
             # upper estimate. Only a fresh exact prefix may override refusal.
             pass
-    batch = select_batch(gate, height, tip, parent, staged=staged, offered=(share,), templates=(record,))
+    batch = select_batch(gate, height, tip, parent, staged=staged, offered=(share,), templates=(record,),
+                         capture_dependencies=True)
     quote = _quote(gate, height, tip, batch, offered=(share,))
     gate._admission_budget.require_ack(quote)
     accountant = None
     try:
-        accountant = _accountant(gate, batch, staged)
+        accountant = _accountant(batch, staged)
     except MetadataCapacity:
         pass
     gate._stable(tip)

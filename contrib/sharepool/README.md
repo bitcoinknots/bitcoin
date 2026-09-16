@@ -1,5 +1,10 @@
 # Share-pool settlement experiments
 
+The [template-body and dependency reuse follow-up](../../doc/sharepool-v8-body-reuse.md)
+retains bounded immutable template decodes and passes successful graph captures
+directly into admission accounting. Fresh evidence, native proof validation and
+durable acknowledgements remain required.
+
 The latest [v8 admission-pressure follow-up](../../doc/sharepool-v8-admission-pressure.md)
 checks local next-batch capacity before new acknowledgements, preserves mining
 of retained work during congestion, and reuses local selection and native

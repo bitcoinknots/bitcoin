@@ -165,6 +165,19 @@ Snapshot DecodeSnapshot(Span<const unsigned char> bytes);
 CBlock DecodeTemplate(Span<const unsigned char> bytes);
 CBlock DecodeBlock(Span<const unsigned char> bytes);
 CTransactionRef DecodeTransaction(Span<const unsigned char> bytes);
+/** Owned canonical normalized body and immutable byte-derived facts. Capture
+ * performs the bounded wire round trip once; callers cannot supply a digest or
+ * replace the owned header/transactions. This is not a native, authorization,
+ * evidence-availability or settlement verdict. */
+class CapturedTemplate {
+    const CBlock m_block;
+    const uint256 m_job_hash;
+    explicit CapturedTemplate(CBlock block);
+public:
+    static std::shared_ptr<const CapturedTemplate> Capture(const CBlock& block);
+    const CBlock& Block() const { return m_block; }
+    const uint256& JobCommitment() const { return m_job_hash; }
+};
 uint256 SnapshotHash(const Snapshot& snapshot);
 /** Hash exact bytes without decoding; callers must enforce canonical decoding. */
 uint256 SnapshotHash(Span<const unsigned char> bytes);
@@ -268,9 +281,16 @@ Result CheckMiningJob(const CBlock& block, const CBlockIndex* previous,
 Result CheckHistoricalTemplate(const CBlock& full_origin, const CBlockIndex* settlement_parent,
                                uint32_t settlement_time, const Consensus::Params& consensus,
                                const Lookup& lookup, const ValidateOrigin& validate_origin);
+Result CheckHistoricalTemplate(const CapturedTemplate& full_origin, const CBlockIndex* settlement_parent,
+                               uint32_t settlement_time, const Consensus::Params& consensus,
+                               const Lookup& lookup, const ValidateOrigin& validate_origin);
 /** Standalone proof admission reserves its future settlement embedding edge;
  * paid-state/repeat-payment checks remain settlement rules. */
 Result CheckShareProof(const Share& share, const CBlock& full_origin,
+                       const CBlockIndex* settlement_parent, uint32_t settlement_time,
+                       const Consensus::Params& consensus, const Lookup& lookup,
+                       const ValidateOrigin& validate_origin);
+Result CheckShareProof(const Share& share, const CapturedTemplate& full_origin,
                        const CBlockIndex* settlement_parent, uint32_t settlement_time,
                        const Consensus::Params& consensus, const Lookup& lookup,
                        const ValidateOrigin& validate_origin);

@@ -1,0 +1,279 @@
+{
+  "generated_utc": "2026-09-16T01:12:51.897094+00:00",
+  "base_commit": "1f7b010e425186800bc65472062e03007c5a1f87",
+  "profile": "hash-only-v8-vardiff-tides",
+  "rules_hash": "173ff6fa511f227cc8d4751bb15373afdca5c8ec235dc69ca2680d7ade13ea31",
+  "default_target_shares_per_minute_per_miner": 10,
+  "mainnet_enabled": false,
+  "physical_hardware_used": false,
+  "consensus_limits_changed": false,
+  "correctness_result": "passed",
+  "production_capacity": "not_qualified",
+  "verification": {
+    "python_gateway_tests": 403,
+    "python_gateway_seconds": 28.305,
+    "python_fixture_tests": 10,
+    "python_fixture_seconds": 0.05,
+    "python_total": 413,
+    "new_python_cases": 17,
+    "python_command": "PYTHONPATH=contrib/sharepool:test/functional python3 -B -m unittest discover -s contrib/sharepool -p 'test_hash_*.py' -v",
+    "fixture_command": "PYTHONPATH=contrib/sharepool:test/functional python3 -B -m unittest test_live_capacity_metrics test_live_capacity_workers -v",
+    "command_cwd": "repository root",
+    "native_cpp_distinct_passing_cases": 158,
+    "new_native_cpp_cases": 4,
+    "native_manifest": "contrib/sharepool/results/v8-body-reuse-native-manifest.json",
+    "native_initial_fixture_failure": "One new changed-parent cache-miss test initially assigned the same parent already in the fixture. The test was corrected and its focused rerun passed; no production-code change. Initial run had 83 passes and one failure, followed by the corrected pass and 74 additional cases. The full initial log was not saved; its actual completion chunk is retained.",
+    "native_scenarios": [
+      {
+        "name": "feature_sharepool_hash_stratum_pressure",
+        "passed": true,
+        "exit_code": 0,
+        "command": "python3 -B test/functional/feature_sharepool_hash_stratum_pressure.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-body-reuse-pressure --nocleanup > /private/tmp/sharepool-body-reuse-pressure.txt 2>&1",
+        "log": "contrib/sharepool/results/v8-body-reuse-pressure.txt",
+        "report": "contrib/sharepool/results/v8-body-reuse-pressure.json",
+        "checks": [
+          "actual_gate_budget_refuses_native_valid_share",
+          "refused_proofs_not_journaled",
+          "warm_proofs_no_template_or_snapshot_replay",
+          "exact_duplicate_not_recredited",
+          "missing_only_recovery_into_empty_native_peer",
+          "recovered_refusal_not_journaled",
+          "native_winner_submitted_with_exact_old_bytes",
+          "native_block_accepted",
+          "pressure_pauses_estimator_without_credit",
+          "native_verifychain"
+        ]
+      },
+      {
+        "name": "feature_sharepool_hash_vardiff_stratum",
+        "passed": true,
+        "exit_code": 0,
+        "command": "python3 -B test/functional/feature_sharepool_hash_vardiff_stratum.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-body-reuse-wire --nocleanup > /private/tmp/sharepool-body-reuse-wire.txt 2>&1",
+        "log": "contrib/sharepool/results/v8-body-reuse-wire.txt",
+        "report": "contrib/sharepool/results/v8-body-reuse-wire.json",
+        "checks": [
+          "explicit_registration_first_proof_without_missing_recovery",
+          "wire_submissions_no_missing_origin_recovery",
+          "independent_signed_assignments_and_real_notifications",
+          "wire_difficulty_matches_union_of_assigned_and_native_targets",
+          "one_active_client_per_identity",
+          "eight_native_validated_shares_without_refresh",
+          "duplicate_does_not_affect_estimator",
+          "retarget_only_on_due_refresh",
+          "other_identity_assignment_unchanged",
+          "late_old_target_share_keeps_original_work",
+          "all_gate_rpc_calls_on_owner_thread",
+          "native_only_winner_exact_bytes_accepted",
+          "native_only_winner_not_credited",
+          "exact_work_weighted_coinbase_payouts",
+          "native_verifychain",
+          "standalone_cli_startup_default_cadence_and_shutdown"
+        ]
+      },
+      {
+        "name": "feature_sharepool_hash_gate_provenance",
+        "passed": true,
+        "exit_code": 0,
+        "command": "python3 -B test/functional/feature_sharepool_hash_gate_provenance.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-body-reuse-provenance --nocleanup > /private/tmp/sharepool-body-reuse-provenance.txt 2>&1",
+        "log": "contrib/sharepool/results/v8-body-reuse-provenance.txt"
+      },
+      {
+        "name": "feature_sharepool_hash_vardiff",
+        "passed": true,
+        "exit_code": 0,
+        "command": "python3 -B test/functional/feature_sharepool_hash_vardiff.py --miners=100 --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-body-reuse-vardiff --nocleanup > /private/tmp/sharepool-body-reuse-vardiff.txt 2>&1",
+        "log": "contrib/sharepool/results/v8-body-reuse-vardiff.txt",
+        "report": "contrib/sharepool/results/v8-body-reuse-vardiff.json",
+        "checks": [
+          "assigned_target_bound_before_work",
+          "miner_relabel_rejected",
+          "insufficient_share_work_rejected",
+          "exact_weighted_payouts",
+          "retarget_only_future_jobs",
+          "old_authorization_keeps_assigned_target",
+          "late_proof_original_weight",
+          "actual_coinbase_payout_mutation_rejected",
+          "p2p_peer_validation",
+          "persistent_history_restart",
+          "competing_fork_reorg_weights",
+          "v7_v8_datadir_separation",
+          "offline_reindex_weight_recovery"
+        ]
+      }
+    ]
+  },
+  "measurement": {
+    "comparison": "contrib/sharepool/results/v8-body-reuse-comparison.json",
+    "configuration_equal": true,
+    "runner_sha256": "89697d97b76b6e909826c755f8da433a3e27fbd66e9966e886c43779cadbd8ca",
+    "no_build_or_other_test_overlap": true,
+    "scope": "Single finite before/after capture with same configuration, not saturation or production qualification",
+    "limitations": [
+      "Synthetic proof bytes and signing keys differ; common deterministic schedule and fixture code, not byte-identical replay",
+      "Protocol-driven job refresh and block membership may vary with timing",
+      "Nested RPC intervals are included in caller service time and must not be added",
+      "Aggregate owner RPC intervals can overlap; CPU samples are separate",
+      "No repeat distribution or confidence interval is claimed",
+      "Tiny templates and loopback peers do not establish heavy-template/WAN performance"
+    ]
+  },
+  "source_sha256": {
+    "src/consensus/sharepool_hash.cpp": "f821ea56f685f08010e9a98e391ce83399d9c7dd1ef07d41381c3fb60e77b977",
+    "src/consensus/sharepool_hash.h": "9297958afc93fa774910c8c002c5334b412c04ca8621cdd3eab3fe2fae5de63a",
+    "src/sharepool/hash_store.cpp": "422978a38ba589db39ec44426458939b91d270a9882deecc99ea54dd16ee53e7",
+    "src/sharepool/hash_store.h": "0ddebdf9633cf6d85f8bbad9449b821470cf3b1ef44262362c15d479d0795408",
+    "src/sharepool/hash_validation_cache.h": "2fe3435ef181061f6d0ccf13cb682c4b3fc8e56099272f9c3656d69d2f55ffdd",
+    "src/validation.cpp": "c10cae0775b49c2711f765c3a1f5d27be5f4e6480df10b675eb5990a151ae908",
+    "src/test/sharepool_hash_tests.cpp": "68c457205b4339ee66a7a6fcd8a4a12484378bddfd6d1350911c2d132fc7ea5f",
+    "src/test/sharepool_hash_store_tests.cpp": "485fede9e82770c90b6ae2e285bc30e343bd6c91d6bb3213e8dc78c43f1edf80",
+    "contrib/sharepool/hash_gate_admission.py": "b1adeda57c859e8b0ec61ceb518e91de2f41ce25d5a987e5748e7d80dbc4d83f",
+    "contrib/sharepool/hash_gate_archive.py": "60cb4e585c6f33c5f45d47a419c6cf8ccfd5b1781381a60a3ddbb2c48b244bca",
+    "contrib/sharepool/hash_gate_batch.py": "8edfd9ed2748bdcf960cfebfbc424c7bd3564cde9bb644b86fe0380bfe0e4f78",
+    "contrib/sharepool/hash_gate_body_cache.py": "312676f86c49a409bd053119ae538fa289318507cc87c09b39e4669261036f0a",
+    "contrib/sharepool/hash_gate_cache.py": "49408d7b9144198591eeb36a803f6e129aacd121a14d4e5c7547d453f24fb6f5",
+    "contrib/sharepool/hash_gate_inventory.py": "0703914865c75a2ebd18b97c170ddbbc5e3b895053c1540369bd44b7ad4bafe9",
+    "contrib/sharepool/hash_gate_origin_cache.py": "26261d55be2b34ecbc719e588769be1f704f0a1705bad519ae77e5981dab7b90",
+    "contrib/sharepool/hash_gate_rpc.py": "9731a831c263f2d6e8aef6581454e748892a53c52a1f958cc66a3c62dd846c5a",
+    "contrib/sharepool/hash_gate_startup.py": "9ee4e4b994d0c7da288b1a002f3abf93ae1a9a65a15cba704a59009084845bd2",
+    "contrib/sharepool/hash_mining_gate.py": "bcf2f8a26a0159af7dfc54e372174da0c6bb78a83d32d61760df4f0c3a421ed0",
+    "contrib/sharepool/test_hash_batch_capture_reuse.py": "8866c35ed195e66b7125cf4a9c40bd7d654b1f4afc029a4506aac16f89353344",
+    "contrib/sharepool/test_hash_gate_body_cache.py": "7c11525843b4df7b049c80b4866144bc13ced73321b2d676254614c9d927b12b",
+    "test/functional/feature_sharepool_hash_live_capacity.py": "89697d97b76b6e909826c755f8da433a3e27fbd66e9966e886c43779cadbd8ca"
+  },
+  "binary_sha256": {
+    "/private/tmp/sharepool-native-build/bin/bitcoind": "f889cf8d0e4108a8e40aea7174109d3c6fec14e0713521493e5309cc301346db",
+    "/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer": "3f75f3829a1976b5c2b8f0f87caae6e5e044af0ee64577737006f9739684b5ff",
+    "/private/tmp/sharepool-native-build/bin/test_bitcoin": "dbe17e13b2417702f02c37981dd2c0bc3cd1b8c78fdd8e87407e9edb73951f68"
+  },
+  "remaining_work": [
+    "Fresh native evidence reconstruction/authentication and per-request dependency verification remain.",
+    "No cross-request recursive validity cache was added; proof, authorization and current native context still run.",
+    "Sustained miner capacity, large real transaction bodies, WAN availability, lifetime archive scaling and production payout variance remain unqualified."
+  ],
+  "artifacts": {
+    "contrib/sharepool/results/v8-body-reuse-python-tests.txt": {
+      "sha256": "4a5b15f06fc8f559adb3666462924be3bae6e9489e3c4fe2c9e4ecfe280a5e6d",
+      "bytes": 46576
+    },
+    "contrib/sharepool/results/v8-body-reuse-fixture-tests.txt": {
+      "sha256": "dbb2f6b0e11462b0811e0ac20857894945dc35e491761f593799ae5f6a7df349",
+      "bytes": 1313
+    },
+    "contrib/sharepool/results/v8-body-reuse-native-manifest.json": {
+      "sha256": "ee271a61e7b9d1b21c17ab099b4d58b39edda37a11faf317f908d3863ff67884",
+      "bytes": 4679
+    },
+    "contrib/sharepool/results/v8-body-reuse-native-primary-completion.txt": {
+      "sha256": "d75c42355907d23a2028b3656f2bde55ee6e04d08a3cdb3bfa779fb37815acc5",
+      "bytes": 19145
+    },
+    "contrib/sharepool/results/v8-body-reuse-native-focused.txt": {
+      "sha256": "8b0d9c4191a3db5ccca93d8515a9c08c86057988d08bc921f655064016160615",
+      "bytes": 19693
+    },
+    "contrib/sharepool/results/v8-body-reuse-native-remaining.txt": {
+      "sha256": "7189288aba7350fa7eda0794cc33f5e522264b5562cbc4751412c8ec5c648752",
+      "bytes": 38086
+    },
+    "contrib/sharepool/results/v8-body-reuse-native-test-build.txt": {
+      "sha256": "1220ae593e09cd0563c79d444790e5d5847809387c9123d5d376afe2c07dde46",
+      "bytes": 809
+    },
+    "contrib/sharepool/results/v8-body-reuse-native-daemon-build.txt": {
+      "sha256": "955389bf3d64e91a9e4b19d05c3ab9f5af72608f52fa050a85458e369ebbcf7c",
+      "bytes": 996
+    },
+    "contrib/sharepool/results/v8-body-reuse-pressure.txt": {
+      "sha256": "8b70cedc472856498c41aec6f9fb8bcac1d6c9a836aedc1d404e64936950d66a",
+      "bytes": 865
+    },
+    "contrib/sharepool/results/v8-body-reuse-pressure.json": {
+      "sha256": "c163ff26428e5472f1124a326dddcbab115af5d7d187fd9eefe4a3edb2c51aaf",
+      "bytes": 2141
+    },
+    "contrib/sharepool/results/v8-body-reuse-wire.txt": {
+      "sha256": "203cb66045d9557693b57cf4badf16eb1ef121462f5c8142ddddf6f3026dc8af",
+      "bytes": 586
+    },
+    "contrib/sharepool/results/v8-body-reuse-wire.json": {
+      "sha256": "e222c1309ccb1b2c4780c956fc6ce287edb499a650c25b59a7916e596f8b9295",
+      "bytes": 4925
+    },
+    "contrib/sharepool/results/v8-body-reuse-provenance.txt": {
+      "sha256": "e11af5f23705f42afa444f6ab30705896020a5f0a31597351c1cb723ee1490d5",
+      "bytes": 863
+    },
+    "contrib/sharepool/results/v8-body-reuse-vardiff.txt": {
+      "sha256": "54a778ca6968e35b55482805551bb2cd33643f2e4327ebc9c9fab1db39dce073",
+      "bytes": 984
+    },
+    "contrib/sharepool/results/v8-body-reuse-vardiff.json": {
+      "sha256": "a0b57bbb5e231a30784337e6df3344c8646349f199cc91b7f173fe3b6b60f4c5",
+      "bytes": 943
+    },
+    "contrib/sharepool/results/v8-body-reuse-baseline-launch.json": {
+      "sha256": "0dbb4adf572f03b411edba0f2f7adb5286a7a7605c775f4bedbd947310de78c2",
+      "bytes": 2636
+    },
+    "contrib/sharepool/results/v8-body-reuse-baseline-results.json": {
+      "sha256": "78a8cb1ff31e460620704fdd416abf48aeb39e3415d491cb808b92e2f2fa8d89",
+      "bytes": 313010
+    },
+    "contrib/sharepool/results/v8-body-reuse-baseline-console.txt": {
+      "sha256": "b7aa429eeec53fa513a2ba487e8a99c11c74d028a6425aa9008b3aae7e84df82",
+      "bytes": 1753
+    },
+    "contrib/sharepool/results/v8-body-reuse-baseline-summary.json": {
+      "sha256": "ed4ec79a9061b50396ac57ef3c6f38591d8a2903a2e557945d7a9667a849a9d6",
+      "bytes": 11293
+    },
+    "contrib/sharepool/results/v8-body-reuse-baseline-manifest.json": {
+      "sha256": "9cad49e0bc2b111ee38681300b25fc12092e9011d65ffa967b3bbac95e1eacb1",
+      "bytes": 62306
+    },
+    "contrib/sharepool/results/v8-body-reuse-final-launch.json": {
+      "sha256": "8c37838c710b8bc5feef148501e48219d40ae3ebf878adf859f11bfdfde6a680",
+      "bytes": 2613
+    },
+    "contrib/sharepool/results/v8-body-reuse-final-results.json": {
+      "sha256": "b0e9a467b3e41b87f5458bf082e110739c632a1ccd40680353fa6cfd367b4e22",
+      "bytes": 313161
+    },
+    "contrib/sharepool/results/v8-body-reuse-final-console.txt": {
+      "sha256": "17bee5e816d67fb776caaced0574067c78bca8262574e94b8006981c9c08abdb",
+      "bytes": 1747
+    },
+    "contrib/sharepool/results/v8-body-reuse-final-summary.json": {
+      "sha256": "f80a3ce51af8d7d94d4cd77eb4fde814dea089c2649308ec765a5088218fca02",
+      "bytes": 11297
+    },
+    "contrib/sharepool/results/v8-body-reuse-final-manifest.json": {
+      "sha256": "8f01dc9e4ddad36e5cd0fe28092cb18df0e80653a98fe81dba1917412c9f46e3",
+      "bytes": 62405
+    },
+    "contrib/sharepool/results/v8-body-reuse-comparison.json": {
+      "sha256": "6981df1f23dd8ccc7fb0fbd87eccfda4ac87bb5932d9622111bfbcc9de6be47d",
+      "bytes": 25720
+    },
+    "contrib/sharepool/results/v8-body-reuse-benchmark-provenance.json": {
+      "sha256": "8d75002b4e98a8d25de8e1a1dec573c05812f8d7ccb1126db877eb2b83b08c4a",
+      "bytes": 3565
+    },
+    "contrib/sharepool/results/v8-body-reuse-measured-source.diff": {
+      "sha256": "f2e267b866130df104fdcf1abff2c55c66790ce50888986a10837964a339dcb4",
+      "bytes": 45178
+    },
+    "contrib/sharepool/results/v8-body-reuse-helper-stage_final.py.txt": {
+      "sha256": "58e171ce708b5a1eb0b8d7f8a211acc3d159be12e4dae54092ceeb2385564450",
+      "bytes": 2583
+    },
+    "contrib/sharepool/results/v8-body-reuse-helper-launch.py.txt": {
+      "sha256": "01e2067c6071687784007a2fa628685c23c889526154c65af842a5b93318d37a",
+      "bytes": 2762
+    },
+    "contrib/sharepool/results/v8-body-reuse-helper-summarize.py.txt": {
+      "sha256": "6f2aa140b38dfbcb228e562e9e37ca9501332b3c93ee507fb13c2e5f3e2321c3",
+      "bytes": 4877
+    }
+  }
+}

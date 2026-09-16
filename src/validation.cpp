@@ -5692,6 +5692,7 @@ sharepool::hashonly::Result ValidateSharePoolHashProofUnlocked(ChainstateManager
     Chainstate* captured_chainstate;
     const CBlockIndex* tip;
     std::shared_ptr<const CBlock> full_origin;
+    std::shared_ptr<const hashonly::CapturedTemplate> captured_origin;
     {
         LOCK(cs_main);
         captured_chainstate = &chainman.ActiveChainstate();
@@ -5700,8 +5701,19 @@ sharepool::hashonly::Result ValidateSharePoolHashProofUnlocked(ChainstateManager
             return Result::Invalid("bad-sharepool-hash-inactive");
         }
         full_origin = chainman.m_sharepool_hash_store->Template(hashonly::TemplateId(share.header));
+        if (full_origin) captured_origin = chainman.m_sharepool_hash_store->FindCapturedTemplate(*full_origin);
     }
     if (!full_origin) return Result::Missing({}, "sharepool-hash-data-missing");
+    if (!captured_origin) {
+        // Canonical decoding and full job hashing run outside cs_main. The
+        // capture owns its header/container and cannot borrow mutable caller
+        // state. Every invocation still obtains evidence through Template above.
+        try { captured_origin = hashonly::CapturedTemplate::Capture(*full_origin); }
+        catch (const std::ios_base::failure&) { return Result::Invalid("bad-sharepool-hash-template-encoding"); }
+        catch (const std::invalid_argument&) { return Result::Invalid("bad-sharepool-hash-template-encoding"); }
+        LOCK(cs_main);
+        if (chainman.m_sharepool_hash_store) chainman.m_sharepool_hash_store->RememberCapturedTemplate(captured_origin);
+    }
     if (!chainman.GetConsensus().SharePoolAdmittedLedger && !chainman.GetConsensus().SharePoolTides) {
         const auto prepared = PrepareSharePoolHashOrigins(chainman, *full_origin, nullptr, stop);
         if (!prepared.IsValid()) return prepared;
@@ -5709,7 +5721,7 @@ sharepool::hashonly::Result ValidateSharePoolHashProofUnlocked(ChainstateManager
     const auto time = std::max<int64_t>(tip->GetMedianTimePast() + 1, GetTime());
     if (time < 0 || time > std::numeric_limits<uint32_t>::max()) return Result::Missing({}, "sharepool-hash-native-time-range");
     sharepool::DecodedSnapshotCache snapshots{hashonly::MAX_DEPENDENCY_BYTES, 1024, chainman.m_sharepool_decoded_retention};
-    const auto checked = hashonly::CheckShareProof(share, *full_origin, tip, static_cast<uint32_t>(time), chainman.GetConsensus(),
+    const auto checked = hashonly::CheckShareProof(share, *captured_origin, tip, static_cast<uint32_t>(time), chainman.GetConsensus(),
         [&](const uint256& hash) -> std::shared_ptr<const hashonly::Snapshot> {
             return LookupHashPoolSnapshot(chainman, hash, snapshots);
         },

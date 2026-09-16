@@ -8,6 +8,7 @@
 #include <hash.h>
 #include <script/script.h>
 #include <sharepool/hash_store.h>
+#include <sharepool/hash_validation_cache.h>
 #include <streams.h>
 #include <test/util/setup_common.h>
 #include <versionbits.h>
@@ -26,6 +27,12 @@ namespace sharepool {
 struct HashSnapshotStoreTest {
     static void ClearSources(HashSnapshotStore& store) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { store.m_template_sources.clear(); }
     static size_t CacheCount(const HashSnapshotStore& store) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.m_cache.size(); }
+    static size_t CaptureCount(const HashSnapshotStore& store) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.m_captured_templates.size(); }
+    static size_t CaptureBytes(const HashSnapshotStore& store) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.m_captured_template_bytes; }
+    static void DamageTemplate(HashSnapshotStore& store, const uint256& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+    {
+        BOOST_REQUIRE(store.m_db.Write(std::make_pair(uint8_t{'t'}, id), std::vector<unsigned char>{0}, true));
+    }
     static void DamageMetadata(HashSnapshotStore& store, const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
     {
         BOOST_REQUIRE(store.m_db.Write(std::make_pair(uint8_t{'m'}, hash), std::vector<unsigned char>{0}, true));
@@ -232,6 +239,87 @@ struct StoreFixture : BasicTestingSetup {
 } // namespace
 
 BOOST_FIXTURE_TEST_SUITE(sharepool_hash_store_tests, StoreFixture)
+
+BOOST_AUTO_TEST_CASE(captured_template_cache_binds_body_and_never_supplies_evidence)
+{
+    sharepool::HashSnapshotStore store{m_path_root / "captured-body", true};
+    CMutableTransaction coinbase{*block.vtx[0]};
+    coinbase.vin[0].scriptWitness.stack = {{1, 2, 3}};
+    block.vtx[0] = MakeTransactionRef(coinbase);
+    const auto captured = ho::CapturedTemplate::Capture(block);
+    LOCK(cs_main);
+    store.RememberTemplate(block);
+    store.RememberCapturedTemplate(captured);
+    BOOST_CHECK(store.FindCapturedTemplate(block) == captured);
+    BOOST_CHECK_EQUAL(sharepool::HashSnapshotStoreTest::CaptureBytes(store), sharepool::CapturedTemplateCacheCharge(*captured));
+    const auto changed = [&](auto mutate) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
+        auto other = block;
+        mutate(other);
+        BOOST_CHECK(!store.FindCapturedTemplate(other));
+    };
+    changed([](CBlock& b) { b.nTime++; });
+    changed([](CBlock& b) { b.nNonce++; });
+    changed([](CBlock& b) { b.hashPrevBlock = uint256{uint8_t{99}}; });
+    changed([](CBlock& b) { b.m_mm_rhs = uint256::ONE; });
+    changed([](CBlock& b) { b.m_extranonce.begin()[0] = 1; });
+    auto witness_changed = block;
+    coinbase.vin[0].scriptWitness.stack[0][0] ^= 1;
+    witness_changed.vtx[0] = MakeTransactionRef(coinbase);
+    BOOST_CHECK_EQUAL(ho::TemplateId(witness_changed), ho::TemplateId(block));
+    BOOST_CHECK(!store.FindCapturedTemplate(witness_changed));
+    const auto other_capture = ho::CapturedTemplate::Capture(witness_changed);
+    store.RememberCapturedTemplate(other_capture);
+    BOOST_CHECK(store.FindCapturedTemplate(witness_changed) == other_capture);
+    BOOST_CHECK(store.FindCapturedTemplate(block) == captured);
+
+    // A warm capture must not satisfy the RPC's preceding evidence lookup.
+    sharepool::HashSnapshotStoreTest::DamageTemplate(store, ho::TemplateId(block));
+    BOOST_CHECK(!store.Template(ho::TemplateId(block)));
+    BOOST_CHECK(store.FindCapturedTemplate(block) == captured);
+    BOOST_CHECK(!store.NativeValidated(sharepool::NativeBodyCacheKey(block)));
+}
+
+BOOST_AUTO_TEST_CASE(captured_template_cache_bounds_entries_memory_and_lifetime)
+{
+    using Test = sharepool::HashSnapshotStoreTest;
+    sharepool::HashSnapshotStore store{m_path_root / "captured-bounds", true};
+    const auto first = ho::CapturedTemplate::Capture(block);
+    LOCK(cs_main);
+    store.RememberCapturedTemplate(first);
+    for (size_t i{0}; i < 255; ++i) {
+        auto other = block;
+        other.nTime += i + 1;
+        store.RememberCapturedTemplate(ho::CapturedTemplate::Capture(other));
+    }
+    BOOST_CHECK_EQUAL(Test::CaptureCount(store), 256);
+    auto second = block;
+    second.nTime++;
+    std::weak_ptr<const ho::CapturedTemplate> evicted = store.FindCapturedTemplate(second);
+    BOOST_REQUIRE(store.FindCapturedTemplate(block) == first);
+    auto next = block;
+    next.nTime += 256;
+    store.RememberCapturedTemplate(ho::CapturedTemplate::Capture(next));
+    // The recently touched second entry remains; the third was oldest.
+    auto third = block;
+    third.nTime += 2;
+    BOOST_CHECK(!store.FindCapturedTemplate(third));
+    BOOST_CHECK(!evicted.expired());
+    BOOST_CHECK(store.FindCapturedTemplate(block) == first);
+
+    CMutableTransaction large{*block.vtx[0]};
+    large.vin[0].scriptWitness.stack = {std::vector<unsigned char>(1'000'000)};
+    auto large_body = block;
+    large_body.vtx[0] = MakeTransactionRef(large);
+    for (size_t i{0}; i < 40; ++i) {
+        large_body.nTime++;
+        store.RememberCapturedTemplate(ho::CapturedTemplate::Capture(large_body));
+        BOOST_CHECK_LE(Test::CaptureBytes(store), 32 * 1024 * 1024);
+    }
+    BOOST_CHECK_LT(Test::CaptureCount(store), 40);
+    BOOST_CHECK(evicted.expired());
+    BOOST_CHECK(!store.FindCapturedTemplate(block));
+    BOOST_CHECK_EQUAL(first->JobCommitment(), ho::JobHash(block)); // External owner survives eviction.
+}
 
 BOOST_AUTO_TEST_CASE(prepared_snapshot_owns_bytes_and_does_not_require_the_chain_lock)
 {
