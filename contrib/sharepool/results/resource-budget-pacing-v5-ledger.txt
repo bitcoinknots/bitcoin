@@ -1,0 +1,13 @@
+2026-09-13T17:29:01.529000Z TestFramework (INFO): PRNG seed is: 870449640885890542
+2026-09-13T17:29:01.530000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-resource-budget-pacing-regressions/v5-ledger
+2026-09-13T17:29:03.009000Z TestFramework (INFO): Pool C anchors fresh valid A/B receipts without paying those receipts in its own block
+2026-09-13T17:29:03.519000Z TestFramework (INFO): Missing committed data stays pending through restart, then ordinary P2P supplies the complete state
+2026-09-13T17:29:05.124000Z TestFramework (INFO): A pays its parent's two A credits; newly received work on the previous job is admitted for a later block
+2026-09-13T17:29:05.258000Z TestFramework (INFO): Even fresh valid owner signatures cannot omit credits, change their recipient/work, or choose a shorter payout prefix
+2026-09-13T17:29:06.241000Z TestFramework (INFO): Confirmed A/B credits survive unrelated-pool blocks beyond the fresh-proof age limit
+2026-09-13T17:29:07.763000Z TestFramework (INFO): A longer nonpaying branch restores credits removed by orphaned B/A payouts
+2026-09-13T17:29:09.237000Z TestFramework (INFO): Selected-branch credits pay their original recipients once after the reorganization
+2026-09-13T17:29:09.682000Z TestFramework (INFO): Offline chainstate reindex and level-four verification reconstruct the selected ledger history
+2026-09-13T17:29:10.500000Z TestFramework (INFO): Stopping nodes
+2026-09-13T17:29:10.621000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-resource-budget-pacing-regressions/v5-ledger
+2026-09-13T17:29:10.621000Z TestFramework (INFO): Tests successful

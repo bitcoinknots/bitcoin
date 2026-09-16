@@ -1,0 +1,6 @@
+2026-09-13T17:29:20.116000Z TestFramework (INFO): PRNG seed is: 379890417241360681
+2026-09-13T17:29:20.116000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-resource-budget-pacing-regressions/v6-cpu-transport
+2026-09-13T17:29:21.959000Z TestFramework (INFO): Native Sia CPU preflight and independent replay: {'capture': {'profile': 'v6-tides', 'rules_revision': 2, 'jobs': 4, 'proofs': 3, 'blocks': 2, 'native_replay': True, 'physical_provenance_verified': False, 'last_native_tip': '7baa90096f17e56b327acabdde722afcb94985bc8b2e582839d443622f7bb825'}, 'fake_guard_restored': True, 'physical_device_used': False}
+2026-09-13T17:29:22.013000Z TestFramework (INFO): Stopping nodes
+2026-09-13T17:29:22.195000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-resource-budget-pacing-regressions/v6-cpu-transport
+2026-09-13T17:29:22.195000Z TestFramework (INFO): Tests successful

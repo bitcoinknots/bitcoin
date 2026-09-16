@@ -1,0 +1,7 @@
+2026-09-14T04:48:22.421000Z TestFramework (INFO): PRNG seed is: 3103213806565290044
+2026-09-14T04:48:22.422000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-cadence-benchmark-preflight
+2026-09-14T04:48:27.215000Z TestFramework (INFO): Starting per_ack: 10 proofs at 0.050 second offered intervals
+2026-09-14T04:48:32.021000Z TestFramework (INFO): Starting datum: 10 proofs at 0.050 second offered intervals
+2026-09-14T04:48:38.430000Z TestFramework (INFO): Stopping nodes
+2026-09-14T04:48:38.612000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-cadence-benchmark-preflight
+2026-09-14T04:48:38.612000Z TestFramework (INFO): Tests successful

@@ -24,6 +24,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <stdexcept>
 #include <type_traits>
 
 using namespace util::hex_literals;
@@ -655,6 +656,37 @@ public:
 
         if (opts.blake2b_headline) {
             consensus.Blake2bHeadline = *opts.blake2b_headline;
+        }
+
+        if (opts.sharepool_vardiff && !opts.sharepool_compact_tides) {
+            throw std::runtime_error("Assigned-work TIDES requires the explicit compact TIDES profile on a fresh regtest chain.");
+        }
+        if (opts.sharepool_compact_tides && !opts.sharepool_tides) {
+            throw std::runtime_error("Compact TIDES requires the explicit TIDES profile on a fresh regtest chain.");
+        }
+        if (opts.sharepool_tides && opts.sharepool_admitted_ledger) {
+            throw std::runtime_error("TIDES and confirmed-work ledger are separate regtest profiles; no implicit migration is supported.");
+        }
+        if (opts.sharepool_tides && !opts.sharepool_hash_only) {
+            throw std::runtime_error("TIDES requires the explicit hash-only profile on a fresh regtest chain.");
+        }
+        if (opts.sharepool_admitted_ledger && !opts.sharepool_hash_only) {
+            throw std::runtime_error("Confirmed-work ledger requires the explicit hash-only regtest profile.");
+        }
+        if (opts.sharepool_hash_only && !opts.sharepool_height) {
+            throw std::runtime_error("Hash-only sharepool requires an explicit regtest activation height.");
+        }
+        if (opts.sharepool_height) {
+            if (*opts.sharepool_height < 1 || *opts.sharepool_height >= std::numeric_limits<int>::max() ||
+                *opts.sharepool_height < consensus.Blake2bHeight) {
+                throw std::runtime_error("Regtest sharepool activation must be at least 1 and at or after an explicitly scheduled BLAKE2b activation.");
+            }
+            consensus.SharePoolHeight = *opts.sharepool_height;
+            consensus.SharePoolHashOnly = opts.sharepool_hash_only;
+            consensus.SharePoolAdmittedLedger = opts.sharepool_admitted_ledger;
+            consensus.SharePoolTides = opts.sharepool_tides;
+            consensus.SharePoolCompactTides = opts.sharepool_compact_tides;
+            consensus.SharePoolVarDiff = opts.sharepool_vardiff;
         }
 
         // Optionally schedule the RDTS deployment (see -rdtsexpiry). RDTS

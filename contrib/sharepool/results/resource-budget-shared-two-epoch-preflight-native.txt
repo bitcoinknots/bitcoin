@@ -1,0 +1,9 @@
+2026-09-13T16:54:26.862000Z TestFramework (INFO): PRNG seed is: 2583073506981174073
+2026-09-13T16:54:26.862000Z TestFramework (INFO): Initializing test directory /private/tmp/resource-budget-shared-two-epoch-preflight
+2026-09-13T16:54:30.812000Z TestFramework (INFO): Capacity epoch 1/2: 2 distinct native origins, layout=shared, padding outputs=24, witness-heavy=True
+2026-09-13T16:54:34.312000Z TestFramework (INFO): Epoch 1: 6 offers admitted in 2 blocks; zero expired
+2026-09-13T16:54:34.315000Z TestFramework (INFO): Capacity epoch 2/2: 2 distinct native origins, layout=shared, padding outputs=24, witness-heavy=True
+2026-09-13T16:54:36.871000Z TestFramework (INFO): Epoch 2: 6 offers admitted in 2 blocks; zero expired
+2026-09-13T16:54:37.349000Z TestFramework (INFO): Stopping nodes
+2026-09-13T16:54:37.518000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/resource-budget-shared-two-epoch-preflight
+2026-09-13T16:54:37.518000Z TestFramework (INFO): Tests successful

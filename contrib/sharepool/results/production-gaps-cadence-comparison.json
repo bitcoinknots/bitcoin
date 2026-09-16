@@ -1,0 +1,86 @@
+{
+  "scope": "One hardened A/B capture; comparison to earlier DATUM capture is historical, not a simultaneous controlled A/B",
+  "input": "100 precomputed real origins/proofs, one offered proof per second, initial native height101",
+  "checks": {
+    "per_ack": "passed",
+    "datum": "passed"
+  },
+  "datum_before_after": {
+    "total_measured_cpu_seconds": {
+      "before": 33.93469099999996,
+      "after": 10.573173000000004,
+      "reduction_fraction": 0.6884258353789042
+    },
+    "paced_wall_seconds": {
+      "before": 147.40891079200003,
+      "after": 123.901897083,
+      "reduction_fraction": 0.15946806460139573
+    },
+    "busy_operation_wall_seconds": {
+      "before": 33.97292866699854,
+      "after": 10.649502297999618,
+      "reduction_fraction": 0.6865297542526974
+    }
+  },
+  "job_max_seconds": {
+    "before": 12.415649791000078,
+    "after": 1.7226287079999452
+  },
+  "offer_to_ack_p95_seconds": {
+    "before": 5.078445833000046,
+    "after": 0.09404216599997994
+  },
+  "ack_to_job_p95_seconds": {
+    "before": 52.11103600000001,
+    "after": 40.58992441699999
+  },
+  "hardened_per_ack_vs_datum": {
+    "replacement_jobs": {
+      "per_ack": 100,
+      "datum": 3,
+      "reduction_fraction": 0.97
+    },
+    "busy_operation_wall_seconds": {
+      "per_ack": 87.2544000420002,
+      "datum": 10.649502297999618,
+      "reduction_fraction": 0.8779488221468092
+    },
+    "paced_wall_seconds": {
+      "per_ack": 113.99138516699999,
+      "datum": 123.901897083,
+      "reduction_fraction": -0.08694088506320785
+    },
+    "driver_cpu_seconds": {
+      "per_ack": 45.872049999999994,
+      "datum": 6.761696000000001,
+      "reduction_fraction": 0.8525966029423145
+    },
+    "signer_children_cpu_seconds": {
+      "per_ack": 10.656783,
+      "datum": 0.421477000000003,
+      "reduction_fraction": 0.960449884360036
+    },
+    "native_cpu_seconds": {
+      "per_ack": 29.16,
+      "datum": 3.39,
+      "reduction_fraction": 0.8837448559670782
+    },
+    "total_measured_cpu_seconds": {
+      "per_ack": 85.68883299999999,
+      "datum": 10.573173000000004,
+      "reduction_fraction": 0.8766096744484779
+    }
+  },
+  "source_artifacts": {
+    "contrib/sharepool/results/production-gaps-cadence-forward.json": "bb9f51babb9c9068d4091af6849aeb44a6d572a1cd4b06c959ee4cb9301458dc",
+    "contrib/sharepool/results/cadence-benchmark-forward.json": "ee92715dc56a54d4338add82f8bead33a2dfcc315d6cb73e9bb3e087474e6379"
+  },
+  "limitations": [
+    "Small templates and initial history only; later-round capacity is separate",
+    "Debug native binary also changed; signature and batch changes are not separately timed here",
+    "Some independent build/transport checks ran during the capture; host was not isolated",
+    "Native height fixed while monotonic offer clock advances; final block forced after inclusion",
+    "Cadence now takes longer to final publication than per-ACK at this finite offered rate, while using less CPU",
+    "No ASIC efficiency, WAN bandwidth or production difficulty/variance claim"
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "kind": "v7-hardware-worker-software-integration",
+  "hardware_used": false,
+  "bridge_contacted": false,
+  "native_network": "regtest; networkactive=false; zero peers",
+  "result": "passed",
+  "command": [
+    "python3",
+    "-B",
+    "test/functional/feature_sharepool_hash_hardware_worker.py",
+    "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+    "--tmpdir=/private/tmp/sharepool-v7-hardware-worker-software-01",
+    "--portseed=1724",
+    "--nocleanup",
+    "--software-test",
+    "--seconds=15",
+    "--capture-file=contrib/sharepool/results/production-v7-worker-software-capture.jsonl",
+    "--results=contrib/sharepool/results/production-v7-worker-software.json"
+  ],
+  "native_before": {
+    "src/validation.cpp": "4fd600e2a8eccde918cd11809034056d2fb2f3aca7faf7479e3ae7d785715864",
+    "src/consensus/sharepool_hash.cpp": "eef5ff846677ed7f87596123cbf5b39b8c4046f57849fb08a6345b5225d070c0",
+    "src/sharepool/hash_validation_cache.h": "262f7a96b5fe864575b5b431eef28c5dd4bd7879a2048290f1b2a49bcb650f9f",
+    "/private/tmp/sharepool-native-build/bin/bitcoind": "51eb7431fe7dd24dbf2c9ac0435250efa83e74ebf4271e05f489eadad0c5a22f",
+    "test/functional/feature_sharepool_hash_hardware_worker.py": "863e8a0ddae28d6969a6d29aba7c698092f5fc9d013f4ef13ab26fae51c8cf9c"
+  },
+  "native_after": {
+    "src/validation.cpp": "4fd600e2a8eccde918cd11809034056d2fb2f3aca7faf7479e3ae7d785715864",
+    "src/consensus/sharepool_hash.cpp": "eef5ff846677ed7f87596123cbf5b39b8c4046f57849fb08a6345b5225d070c0",
+    "src/sharepool/hash_validation_cache.h": "262f7a96b5fe864575b5b431eef28c5dd4bd7879a2048290f1b2a49bcb650f9f",
+    "/private/tmp/sharepool-native-build/bin/bitcoind": "51eb7431fe7dd24dbf2c9ac0435250efa83e74ebf4271e05f489eadad0c5a22f",
+    "test/functional/feature_sharepool_hash_hardware_worker.py": "863e8a0ddae28d6969a6d29aba7c698092f5fc9d013f4ef13ab26fae51c8cf9c"
+  },
+  "native_unchanged": true,
+  "captured_python_source_hashes_match": true,
+  "software_suite": {
+    "tests": 74,
+    "seconds": 4.982,
+    "result": "OK"
+  },
+  "artifact_sha256": {
+    "production-v7-worker-software.json": "2f71d1bb883fbaa6ed6ae2aa8add097407a4ec37d962f0ebf5d6fbbf01dbdce3",
+    "production-v7-worker-software-capture.jsonl": "36d6d811751ba22127f9ac4f59d8b25487edb75cc8beaea9730da089f046fde4",
+    "production-v7-worker-software-native.txt": "96edcf825bdd89fba049b21472fd32b84723911979d284bbb58cdd239e5a12ba",
+    "v7-hardware-preparation-tests.txt": "2517d9c15e1fc607f6c13b7c21e566aa6e2f375602dcd7e2fcaff3abebd2b35b"
+  },
+  "limitations": [
+    "One payout owner, coinbase-only jobs and synthetic client with native easy transport target",
+    "No ASIC compatibility or calibrated hashrate evidence",
+    "No physical routing/restoration or fresh production-pool work verification"
+  ]
+}

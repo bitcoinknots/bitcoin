@@ -1,0 +1,15 @@
+{
+  "temporary_source_change": "Disable only historical-template and share-proof optional decoded retention; keep preparation-job cache and all validation rules.",
+  "source_on_sha256": "4fd600e2a8eccde918cd11809034056d2fb2f3aca7faf7479e3ae7d785715864",
+  "binary_on_sha256": "51eb7431fe7dd24dbf2c9ac0435250efa83e74ebf4271e05f489eadad0c5a22f",
+  "source_off_sha256": "e6098f7c3f2fa49147aa048ca9474afd6dde719500e1d5b51951d5c469b7fe75",
+  "off_build_exit_code": 0,
+  "binary_off_sha256": "1afc73663c50a64045f946157de5ba51d627712a6d9265497139d4fdc7b81c07",
+  "restore_build_exit_code": 0,
+  "source_restored": true,
+  "rebuilt_on_sha256": "a185801fa949bac691309451fcd2e04b654a8342c05b3fa6c9e579bf58b01a2f",
+  "restored_binary_matches_original": false,
+  "shared_binary_restored_sha256": "51eb7431fe7dd24dbf2c9ac0435250efa83e74ebf4271e05f489eadad0c5a22f",
+  "shared_binary_restored_from_preserved_original": true,
+  "note": "Native source and build objects restored by successful rebuild. Relinked output was not byte-identical, so the shared executable was restored from the preserved exact original. Both A arms use that original."
+}

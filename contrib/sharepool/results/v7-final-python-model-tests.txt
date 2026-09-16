@@ -1,0 +1,12 @@
+test_cold_closure_charges_prior_cohorts_and_distinct_exact_openings (test_compact_resource_model.CompactResourceModelTests) ... ok
+test_compact_wire_fit_does_not_remove_proof_work_or_recipient_ceiling (test_compact_resource_model.CompactResourceModelTests) ... ok
+test_empty_opening_exact_wire_across_recipient_compactsize_boundaries (test_compact_resource_model.CompactResourceModelTests) ... ok
+test_historical_inputs_remain_unchanged_and_comparisons_are_explicit (test_compact_resource_model.CompactResourceModelTests) ... ok
+test_index_boundaries_and_invalid_assumptions (test_compact_resource_model.CompactResourceModelTests) ... ok
+test_real_shared_disjoint_tables_and_compact_job_boundaries (test_compact_resource_model.CompactResourceModelTests) ... ok
+test_repeated_coinbase_outputs_and_expanded_work_are_not_compressed (test_compact_resource_model.CompactResourceModelTests) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.569s
+
+OK

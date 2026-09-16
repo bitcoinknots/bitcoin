@@ -96,6 +96,17 @@ add_executable(test_bitcoin
   serfloat_tests.cpp
   serialize_tests.cpp
   settings_tests.cpp
+  sharepool_params_tests.cpp
+  sharepool_signer_tests.cpp
+  sharepool_tests.cpp
+  sharepool_hash_tests.cpp
+  sharepool_hash_store_tests.cpp
+  sharepool_hash_relay_tests.cpp
+  sharepool_retry_worker_tests.cpp
+  sharepool_tides_tests.cpp
+  sharepool_tides_history_tests.cpp
+  sharepool_tides_history_store_tests.cpp
+  sharepool_tides_consensus_tests.cpp
   sighash_tests.cpp
   sigopcount_tests.cpp
   skiplist_tests.cpp
@@ -140,6 +151,7 @@ target_json_data_sources(test_bitcoin
   data/key_io_invalid.json
   data/key_io_valid.json
   data/script_tests.json
+  data/sharepool_tides.json
   data/unified_sighash.json
   data/sighash.json
   data/tx_invalid.json

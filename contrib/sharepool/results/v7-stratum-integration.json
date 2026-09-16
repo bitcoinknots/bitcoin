@@ -1,0 +1,59 @@
+{
+  "blocked_observer_watchdog": {
+    "disconnect_seconds": 0.9545787500000005,
+    "observation_timeout_seconds": 1,
+    "observer_still_blocked_at_withdrawal": true,
+    "owner_service_not_required": true
+  },
+  "blocked_owner_tip_change": {
+    "construction_cancelled": false,
+    "disconnect_seconds": 0.05020174999999982,
+    "stale_job_not_published": true,
+    "withdrawal_before_owner_release": true
+  },
+  "fresh_context_recovered": true,
+  "hardware_used": false,
+  "network": "isolated regtest",
+  "pipeline": {
+    "accepted_block": "4fc001422ee22a54a349de8e769d1c75c04af4a625254306468f07e455568491",
+    "all_gate_rpc_calls_on_owner_thread": true,
+    "direct_payouts_verified": true,
+    "exact_native_block_bytes": true,
+    "full_snapshot_published": true,
+    "invalid_client_did_not_retire_healthy_work": true,
+    "new_client_stale_dispatch_refused": true,
+    "proof_acknowledged": "d98117559a502ef7d070d0d1e8a23db561d2d581cb0abd6188f5820e6fa24740",
+    "share_did_not_force_refresh": true
+  },
+  "post_handoff_ack_before_socket_write": {
+    "continued_native_context_valid": true,
+    "exact_issued_bytes_unchanged": true,
+    "issued_notify_received": true,
+    "linearization_point": "successful owner approval before the later ACK",
+    "subsequent_approval_refused": true
+  },
+  "profile": "hash-only-v7-compact-tides",
+  "source_sha256": {
+    "contrib/sharepool/hash_job_scheduler.py": "e4c19eff41b4c7ca94c3bdb44669c1e1048e3b5d3454fe4d71bf5f748dbc95e0",
+    "contrib/sharepool/hash_stratum.py": "20d37af630a941065116290ec20df19453e66820955673fc895288eef2475317",
+    "contrib/sharepool/hash_stratum_runner.py": "cfbdf7230f5fb1435c22ad18373be6a923ef49d8a8df799ec743958b1b60be1a",
+    "test/functional/feature_sharepool_hash_stratum.py": "9aa99ea13409426a278064c42582211374d27a26ae3ab8f9ff8de404c93ed54f"
+  },
+  "standalone_runner": {
+    "duration_limit_seconds": 1,
+    "exit_code": 0,
+    "loopback_listener": true,
+    "v7_job_published": true
+  },
+  "stats": {
+    "accepted_candidates": 1,
+    "acknowledged": 2,
+    "candidate_rejections": 0,
+    "candidate_rpc_failures": 0,
+    "duplicate": 0,
+    "published": 4,
+    "rejected": 2,
+    "submitted_candidates": 1
+  },
+  "transport": "loopback Sia Stratum with synthetic nonce search"
+}

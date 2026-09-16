@@ -1,0 +1,30 @@
+2026-09-14T15:14:04.995000Z TestFramework (INFO): User supplied random seed 102060
+2026-09-14T15:14:04.995000Z TestFramework (INFO): PRNG seed is: 102060
+2026-09-14T15:14:04.995000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v8-scale-after20
+2026-09-14T15:14:29.384000Z TestFramework (INFO): Live block 102 admitted 67 proofs; source continues independently
+2026-09-14T15:14:29.417000Z TestFramework (ERROR): Unexpected exception
+Traceback (most recent call last):
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_framework.py", line 136, in main
+    self.run_test()
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_live_capacity.py", line 400, in run_test
+    if self.source_error: raise self.source_error
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_live_capacity.py", line 204, in produce
+    not gate.ready_for_continued_work(active[index]))
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_mining_gate.py", line 1538, in ready_for_continued_work
+    return self._dispatch_context_current(authorization, newer_receipts=True)
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_mining_gate.py", line 1517, in _dispatch_context_current
+    height, tip = self._context()
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_mining_gate.py", line 176, in _context
+    raise ValueError(f"active native regtest hash-only v{self.profile_version} profile at activation height {self.activation_height} required")
+ValueError: active native regtest hash-only v8 profile at activation height 102 required
+2026-09-14T15:14:29.476000Z TestFramework (INFO): Not stopping nodes as test failed. The dangling processes will be cleaned up later.
+2026-09-14T15:14:29.476000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v8-scale-after20
+2026-09-14T15:14:29.476000Z TestFramework (ERROR): Test failed. Test logging available at /private/tmp/sharepool-v8-scale-after20/test_framework.log
+2026-09-14T15:14:29.476000Z TestFramework (ERROR):
+2026-09-14T15:14:29.476000Z TestFramework (ERROR): Hint: Call /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/combine_logs.py '/private/tmp/sharepool-v8-scale-after20' to consolidate all logs
+2026-09-14T15:14:29.476000Z TestFramework (ERROR):
+2026-09-14T15:14:29.476000Z TestFramework (ERROR): If this failure happened unexpectedly or intermittently, please file a bug and provide a link or upload of the combined log.
+2026-09-14T15:14:29.476000Z TestFramework (ERROR): https://github.com/bitcoinknots/bitcoin/issues
+2026-09-14T15:14:29.476000Z TestFramework (ERROR):
+[node 0] Cleaning up leftover process
+[node 1] Cleaning up leftover process

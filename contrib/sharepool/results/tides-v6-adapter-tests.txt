@@ -1,0 +1,27 @@
+{
+  "command": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "-B",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "contrib/sharepool",
+    "-p",
+    "test_tides_hardware_capture.py"
+  ],
+  "working_directory": "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool",
+  "exit_code": 0,
+  "source_sha256": {
+    "contrib/sharepool/tides_hardware_capture.py": "77630445a73fe7b7a2ffbfacca6792976581b5443170c4b543ec4ad014cfb40a",
+    "contrib/sharepool/verify_tides_hardware_capture.py": "686d8831975015406e3a170abbc995b3958375265ea3bfe92c346b3643ebd297",
+    "contrib/sharepool/test_tides_hardware_capture.py": "64c84482262239a0c3bb82d1d83169003c24de31b07ff7d4d5d21830aaeae79e"
+  },
+  "scope": "Four CPU-only adapter fault and owner-queue tests; this run uses a test RPC double."
+}
+
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.320s
+
+OK

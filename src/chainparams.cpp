@@ -75,6 +75,45 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         }
     }
 
+    if (const auto arg{args.GetArg("-sharepoolheight")}; arg) {
+        if (args.GetArgs("-sharepoolheight").size() != 1) {
+            throw std::runtime_error("-sharepoolheight must be specified exactly once.");
+        }
+        int32_t height;
+        if (!ParseInt32(*arg, &height) || height < 1 || height >= std::numeric_limits<int>::max()) {
+            throw std::runtime_error("-sharepoolheight must be a positive height below INT_MAX.");
+        }
+        const auto blake2b = options.activation_heights.find(Consensus::BuriedDeployment::DEPLOYMENT_BLAKE2B);
+        if (blake2b == options.activation_heights.end() || height < blake2b->second) {
+            throw std::runtime_error("-sharepoolheight requires -testactivationheight=blake2b@<height> at or before sharepool activation.");
+        }
+        options.sharepool_height = height;
+    }
+
+    options.sharepool_hash_only = args.GetBoolArg("-sharepoolhashonly", false);
+    options.sharepool_admitted_ledger = args.GetBoolArg("-sharepooladmittedledger", false);
+    options.sharepool_tides = args.GetBoolArg("-sharepooltides", false);
+    options.sharepool_compact_tides = args.GetBoolArg("-sharepoolcompacttides", false);
+    options.sharepool_vardiff = args.GetBoolArg("-sharepoolvardiff", false);
+    if (options.sharepool_vardiff && !options.sharepool_compact_tides) {
+        throw std::runtime_error("-sharepoolvardiff requires -sharepoolcompacttides on a fresh regtest chain.");
+    }
+    if (options.sharepool_compact_tides && !options.sharepool_tides) {
+        throw std::runtime_error("-sharepoolcompacttides requires -sharepooltides on a fresh regtest chain.");
+    }
+    if (options.sharepool_tides && options.sharepool_admitted_ledger) {
+        throw std::runtime_error("-sharepooltides and -sharepooladmittedledger are mutually exclusive; use a fresh regtest chain for each profile.");
+    }
+    if (options.sharepool_tides && !options.sharepool_hash_only) {
+        throw std::runtime_error("-sharepooltides requires -sharepoolhashonly on a fresh regtest chain.");
+    }
+    if (options.sharepool_admitted_ledger && !options.sharepool_hash_only) {
+        throw std::runtime_error("-sharepooladmittedledger requires -sharepoolhashonly on a fresh regtest chain.");
+    }
+    if (options.sharepool_hash_only && !options.sharepool_height) {
+        throw std::runtime_error("-sharepoolhashonly requires an explicit -sharepoolheight on regtest.");
+    }
+
     if (const auto arg{args.GetArg("-rdtsexpiry", "")}; !arg.empty()) {
         // RDTS activates at the BLAKE2b fork height: one fork instant, as on
         // mainnet. Only the deployment's expiry is schedulable here; a
@@ -162,6 +201,24 @@ const CChainParams &Params() {
 
 std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, const ChainType chain)
 {
+    if (chain != ChainType::REGTEST && args.IsArgSet("-sharepoolvardiff")) {
+        throw std::runtime_error("-sharepoolvardiff is restricted to regtest; public-network activation is not supported.");
+    }
+    if (chain != ChainType::REGTEST && args.IsArgSet("-sharepoolcompacttides")) {
+        throw std::runtime_error("-sharepoolcompacttides is restricted to regtest; public-network activation is not supported.");
+    }
+    if (chain != ChainType::REGTEST && args.IsArgSet("-sharepooltides")) {
+        throw std::runtime_error("-sharepooltides is restricted to regtest; public-network activation is not supported.");
+    }
+    if (chain != ChainType::REGTEST && args.IsArgSet("-sharepooladmittedledger")) {
+        throw std::runtime_error("-sharepooladmittedledger is restricted to regtest; public-network activation is not supported.");
+    }
+    if (chain != ChainType::REGTEST && args.IsArgSet("-sharepoolhashonly")) {
+        throw std::runtime_error("-sharepoolhashonly is restricted to regtest; public-network activation is not supported.");
+    }
+    if (chain != ChainType::REGTEST && args.IsArgSet("-sharepoolheight")) {
+        throw std::runtime_error("-sharepoolheight is restricted to regtest; public-network activation is not supported.");
+    }
     switch (chain) {
     case ChainType::MAIN:
         return CChainParams::Main();

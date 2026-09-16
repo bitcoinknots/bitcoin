@@ -1,0 +1,19 @@
+2026-09-14T06:17:55.452000Z TestFramework (INFO): PRNG seed is: 7609084610561080500
+2026-09-14T06:17:55.452000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-gaps-cadence-forward
+2026-09-14T06:18:03.359000Z TestFramework (INFO): Prepared 25/100 distinct native origins
+2026-09-14T06:18:10.311000Z TestFramework (INFO): Prepared 50/100 distinct native origins
+2026-09-14T06:18:17.585000Z TestFramework (INFO): Prepared 75/100 distinct native origins
+2026-09-14T06:18:25.218000Z TestFramework (INFO): Prepared 100/100 distinct native origins
+2026-09-14T06:18:30.161000Z TestFramework (INFO): Starting per_ack: 100 proofs at 1.000 second offered intervals
+2026-09-14T06:18:55.292000Z TestFramework (INFO): per_ack acknowledged 25/100; published 26 jobs
+2026-09-14T06:19:20.627000Z TestFramework (INFO): per_ack acknowledged 50/100; published 51 jobs
+2026-09-14T06:19:47.126000Z TestFramework (INFO): per_ack acknowledged 75/100; published 76 jobs
+2026-09-14T06:20:24.601000Z TestFramework (INFO): per_ack acknowledged 100/100; published 101 jobs
+2026-09-14T06:20:27.486000Z TestFramework (INFO): Starting datum: 100 proofs at 1.000 second offered intervals
+2026-09-14T06:20:52.216000Z TestFramework (INFO): datum acknowledged 25/100; published 1 jobs
+2026-09-14T06:21:17.224000Z TestFramework (INFO): datum acknowledged 50/100; published 2 jobs
+2026-09-14T06:21:42.232000Z TestFramework (INFO): datum acknowledged 75/100; published 2 jobs
+2026-09-14T06:22:07.242000Z TestFramework (INFO): datum acknowledged 100/100; published 3 jobs
+2026-09-14T06:22:33.316000Z TestFramework (INFO): Stopping nodes
+2026-09-14T06:22:33.494000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-gaps-cadence-forward
+2026-09-14T06:22:33.494000Z TestFramework (INFO): Tests successful

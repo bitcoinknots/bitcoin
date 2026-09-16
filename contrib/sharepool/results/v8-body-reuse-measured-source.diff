@@ -1,0 +1,798 @@
+diff --git a/contrib/sharepool/README.md b/contrib/sharepool/README.md
+index f1bfdf4..e52aa8c 100644
+--- a/contrib/sharepool/README.md
++++ b/contrib/sharepool/README.md
+@@ -1,5 +1,10 @@
+ # Share-pool settlement experiments
+ 
++The [template-body and dependency reuse follow-up](../../doc/sharepool-v8-body-reuse.md)
++retains bounded immutable template decodes and passes successful graph captures
++directly into admission accounting. Fresh evidence, native proof validation and
++durable acknowledgements remain required.
++
+ The latest [v8 admission-pressure follow-up](../../doc/sharepool-v8-admission-pressure.md)
+ checks local next-batch capacity before new acknowledgements, preserves mining
+ of retained work during congestion, and reuses local selection and native
+diff --git a/contrib/sharepool/hash_gate_admission.py b/contrib/sharepool/hash_gate_admission.py
+index e556c32..72728a1 100644
+--- a/contrib/sharepool/hash_gate_admission.py
++++ b/contrib/sharepool/hash_gate_admission.py
+@@ -82,13 +82,19 @@ def _quote(gate, height, tip, batch, *, offered=()):
+         native_payout_capacity_bytes=batch["resources"]["native_payout_capacity_bytes"])
+ 
+ 
+-def _accountant(gate, batch, staged):
+-    captured = []
+-    usage = gate._provenance(batch["snapshot"], staged, mining_job=True, captures=captured)
+-    return CompactAdmissionAccountant(batch["snapshot"],
++def _accountant(batch, staged):
++    from hash_mining_gate import SNAPSHOT
++
++    # These captures belong only to the successful trial in this operation.
++    # Preserve its complete evidence for the caller's eventual atomic commit,
++    # including when the optional scalar accountant exceeds its own capacity.
++    # No body, capture or native verdict survives in the accountant itself.
++    captured = batch.pop("_dependency_captures")
++    staged.update(((SNAPSHOT, f"{value.hash:064x}"), value.raw) for value in captured)
++    return CompactAdmissionAccountant(captured[0],
+         historical_recipient_count=batch["resources"]["historical_recipient_count"],
+         historical_recipient_bytes=batch["resources"]["historical_recipient_bytes"],
+-        dependencies=tuple(captured), depth=usage["dependency_depth"] - 1,
++        dependencies=captured, depth=batch["resources"]["dependency_depth"] - 1,
+         certificate_bytes=batch["resources"]["historical_certificate_bytes"])
+ 
+ 
+@@ -97,12 +103,12 @@ def _refresh(gate, height, tip, parent, staged):
+     state = gate._admission_state
+     if state is not None and state.key == key:
+         return state
+-    batch = select_batch(gate, height, tip, parent, staged=staged)
++    batch = select_batch(gate, height, tip, parent, staged=staged, capture_dependencies=True)
+     quote = _quote(gate, height, tip, batch)
+     accountant = None
+     if quote.selected_count == quote.eligible_count:
+         try:
+-            accountant = _accountant(gate, batch, staged)
++            accountant = _accountant(batch, staged)
+         except MetadataCapacity:
+             pass  # Optional metadata must not replace the exact resource check.
+     gate._stable(tip)
+@@ -165,12 +171,13 @@ def pre_ack(gate, share, record, *, height, tip, parent, staged, captures, prove
+             # Tight CompactSize/recipient budgets can fit more than the safe
+             # upper estimate. Only a fresh exact prefix may override refusal.
+             pass
+-    batch = select_batch(gate, height, tip, parent, staged=staged, offered=(share,), templates=(record,))
++    batch = select_batch(gate, height, tip, parent, staged=staged, offered=(share,), templates=(record,),
++                         capture_dependencies=True)
+     quote = _quote(gate, height, tip, batch, offered=(share,))
+     gate._admission_budget.require_ack(quote)
+     accountant = None
+     try:
+-        accountant = _accountant(gate, batch, staged)
++        accountant = _accountant(batch, staged)
+     except MetadataCapacity:
+         pass
+     gate._stable(tip)
+diff --git a/contrib/sharepool/hash_mining_gate.py b/contrib/sharepool/hash_mining_gate.py
+index ec4ad57..9aa7785 100644
+--- a/contrib/sharepool/hash_mining_gate.py
++++ b/contrib/sharepool/hash_mining_gate.py
+@@ -28,6 +28,7 @@ import hash_gate_archive
+ import hash_gate_batch
+ from hash_gate_cache import SnapshotDecodeCache
+ from hash_gate_origin_cache import OriginFactsCache
++from hash_gate_body_cache import OriginBodyCache
+ from hash_state_cache import CompactStateCache
+ from hash_signature_cache import SignatureVerifyCache
+ from hash_snapshot import (Snapshot, TemplateRecord, CompactTemplateRecord, Share, MAX_SNAPSHOT_BYTES,
+@@ -111,6 +112,7 @@ class HashMiningGate:
+         self._description_cache = OrderedDict()
+         self._snapshot_decode_cache = SnapshotDecodeCache()
+         self._origin_facts_cache = OriginFactsCache()
++        self._origin_body_cache = OriginBodyCache()
+         self._compact_state_cache = CompactStateCache()
+         self._signature_cache = SignatureVerifyCache()
+         self._snapshot_observer = None  # Sole-owner bounded inventory ingestion only.
+@@ -846,7 +848,7 @@ class HashMiningGate:
+         height, tip = self._context()
+         if not self._relay_pool(share.envelope.pool) or not self._eligible(share.envelope.height, f"{share.envelope.native_parent:064x}", height):
+             raise ValueError("proof is outside this pool or eligible native ancestry")
+-        self._require_origin(share)
++        origin_raw, opening_raw, unused_opening, unused_facts = self._require_origin(share)
+         known = False
+         try:
+             retained = self._read(PROOF, f"{share.proof_id:064x}")
+@@ -855,11 +857,14 @@ class HashMiningGate:
+             known = True
+         except KeyError:
+             pass
+-        staged = {}
++        # Reuse the exact evidence just read and authenticated for this offer.
++        # This map lives only through this receive operation; later offers read
++        # the journal again, and _persist still checks retained byte equality.
++        staged = {(TEMPLATE, f"{share.header_facts.template_id:064x}"): origin_raw,
++                  (SNAPSHOT, f"{share.header.m_mm_rhs:064x}"): opening_raw}
+         opening = self._snapshot(share.header.m_mm_rhs, staged)
+         parent = self._parent_snapshot(height, tip, staged) if self.profile_version == LEDGER_VERSION or is_tides_profile(self.profile_version) else None
+-        origin = CompactTemplateRecord.from_record(
+-            TemplateRecord.from_block(self._evidence(TEMPLATE, template_id(share.header))))
++        origin = self._origin_body_cache.capture(origin_raw, self.profile_version)
+         captures = [] if self._admission_budget is not None and not known else None
+         provenance = self._provenance(opening, staged, trusted_parent=parent,
+             root_origin=origin, root_depth=1, captures=captures)
+@@ -980,7 +985,7 @@ class HashMiningGate:
+         self._stable(tip)
+         return value
+ 
+-    def _batch(self, height, tip, parent, *, staged=None, offered=(), templates=()):
++    def _batch(self, height, tip, parent, *, staged=None, offered=(), templates=(), capture_dependencies=False):
+         """Choose the maximal fitting prefix under this gate's pinned policy.
+ 
+         V6 orders by origin height, then durable receipt revision. An offered
+@@ -992,6 +997,9 @@ class HashMiningGate:
+ 
+         Only a byte-bounded prefix's bodies are materialized. Deferred receipt
+         IDs remain in the indexed journal; counting them streams scalar rows.
++        Admission may retain the successful trial's immutable canonical graph
++        captures until its accountant is initialized in this same operation.
++        Every trial still fetches its own evidence and checks every limit.
+         """
+         staged = {} if staged is None else staged
+         paid = self._admitted_ids(parent)
+@@ -1037,6 +1045,7 @@ class HashMiningGate:
+             # A rejected larger prefix must not retain its fetched dependency
+             # bodies across subsequent binary-search attempts.
+             trial_staged = dict(staged)
++            captures = [] if capture_dependencies else None
+             records, transactions = {}, set()
+             expanded = references = wire_lower_bound = 0
+             try:
+@@ -1072,6 +1081,7 @@ class HashMiningGate:
+                 resources = hash_gate_batch.check_graph(snapshot, snapshot_budget=self.snapshot_budget,
+                     mining_job=True, activation_height=self.activation_height, state_cache=self._compact_state_cache,
+                     signature_cache=self._signature_cache,
++                    on_capture=None if captures is None else captures.append,
+                     lookup=lambda identity: self._snapshot(identity, trial_staged),
+                     parent_snapshot=lambda identity, origin_height: self._block_snapshot(origin_height, f"{identity:064x}", trial_staged))
+                 resources.update(expanded_template_bytes=expanded, template_references=references,
+@@ -1109,40 +1119,43 @@ class HashMiningGate:
+                         raise hash_gate_batch.BatchLimit("dependency payout reservation budget")
+                     if output_bytes > payout_budget["max_output_bytes"]:
+                         raise hash_gate_batch.BatchLimit("native coinbase payout reservation budget")
+-                return snapshot, resources
++                return snapshot, resources, None if captures is None else tuple(captures)
+             except ValueError as error:
+                 if (isinstance(error, hash_gate_batch.BatchLimit) or "budget" in str(error) or "exceeds byte bound" in str(error) or
+                         str(error).startswith(("confirmed ledger capacity;", "TIDES certificate capacity;",
+                                                "compact share count exceeds original work bound"))):
+-                    return None, str(error)
++                    return None, str(error), None
+                 raise
+ 
+         low, high, best, reason = 0, len(ordered), None, None
+-        empty, resources = trial(0)
+-        if empty is None:
+-            raise hash_gate_batch.EmptyBatchCapacity(resources, eligible_count=total,
++        best = trial(0)
++        if best[0] is None:
++            raise hash_gate_batch.EmptyBatchCapacity(best[1], eligible_count=total,
+                 oldest_origin_height=oldest, resources=empty_resources)
+-        best = empty, resources
+         # Normal uncongested jobs fit their complete bounded receipt prefix.
+         # Avoid rebuilding and traversing every binary-search prefix in that
+         # case. A failed full trial still falls back to the same maximal-prefix
+         # policy, retaining neither that trial's fetched bodies nor a verdict.
+         if high:
+-            snapshot, resources = trial(high)
+-            if snapshot is not None:
+-                low, best = high, (snapshot, resources)
++            candidate = trial(high)
++            if candidate[0] is not None:
++                low, best = high, candidate
+             else:
+-                high, reason = high - 1, resources
++                high, reason = high - 1, candidate[1]
++            del candidate
+         while low < high:
+             middle = (low + high + 1) // 2
+-            snapshot, resources = trial(middle)
+-            if snapshot is None:
+-                high, reason = middle - 1, resources
++            candidate = trial(middle)
++            if candidate[0] is None:
++                high, reason = middle - 1, candidate[1]
+             else:
+-                low, best = middle, (snapshot, resources)
++                low, best = middle, candidate
++            del candidate
+         result = {"snapshot": best[0], "resources": best[1], "eligible_count": total,
+                   "deferred_count": total - low, "limit_reason": reason,
+                   "oldest_origin_height": oldest}
++        if capture_dependencies:
++            result["_dependency_captures"] = best[2]
+         if payout_budget is not None:
+             result["native_bits"] = payout_budget["native_bits"]
+         return result
+@@ -1735,6 +1748,7 @@ class HashMiningGate:
+         self._description_cache.clear()
+         self._snapshot_decode_cache.clear()
+         self._origin_facts_cache.clear()
++        self._origin_body_cache.clear()
+         self._compact_state_cache.clear()
+         self._signature_cache.clear()
+         try:
+diff --git a/doc/sharepool-production-gaps.md b/doc/sharepool-production-gaps.md
+index d42b2d2..37d9eb0 100644
+--- a/doc/sharepool-production-gaps.md
++++ b/doc/sharepool-production-gaps.md
+@@ -7,6 +7,13 @@ recorded source revisions.
+ 
+ ## Current follow-up
+ 
++The [template-body and dependency reuse change](sharepool-v8-body-reuse.md)
++avoids repeated canonical body decoding for known exact templates and removes
++the second dependency walk used to initialize admission accounting. Its caches
++retain immutable byte-derived data only. Per-request evidence authentication,
++native proof/context checks, cross-request dependency checks and durable storage
++remain, along with the capacity and availability requirements below.
++
+ The latest [v8 admission-pressure change](sharepool-v8-admission-pressure.md)
+ adds local next-batch resource and deadline checks before new ACKs, with bounded
+ incremental accounting and continued settlement during overload. It also removes
+diff --git a/src/consensus/sharepool_hash.cpp b/src/consensus/sharepool_hash.cpp
+index cb2c7a2..67beca8 100644
+--- a/src/consensus/sharepool_hash.cpp
++++ b/src/consensus/sharepool_hash.cpp
+@@ -521,6 +521,19 @@ class Checker {
+     const Consensus::Params& m_consensus;
+     const Lookup& m_lookup;
+     const ValidateOrigin& m_validate_origin;
++    const CapturedTemplate* const m_captured_template;
++    // Only byte-derived digests, never a context/native/availability verdict.
++    // Origin budget bounds this map, plus the containing block.
++    std::map<uint256, uint256> m_job_hashes;
++    uint256 BodyJobHash(const CBlock& block)
++    {
++        if (m_captured_template && &block == &m_captured_template->Block()) return m_captured_template->JobCommitment();
++        const auto identity = OriginMemoId(block);
++        if (const auto found = m_job_hashes.find(identity); found != m_job_hashes.end()) return found->second;
++        const auto digest = JobHash(block);
++        m_job_hashes.emplace(identity, digest);
++        return digest;
++    }
+     struct SnapshotEvidence {
+         std::shared_ptr<const Snapshot> snapshot;
+         uint256 owner_digest;
+@@ -706,8 +719,9 @@ class Checker {
+         // Decoded records have already passed this check. Keep it for pure
+         // verifier callers constructing snapshots directly, but only once per
+         // exact body. Header or witness changes cannot reuse the memo above.
+-        if (!block.m_header_v2 || !SearchFieldsZero(block) || block.vtx.empty() ||
+-            block.m_txcount != block.vtx.size() || BlockMerkleRoot(block) != block.hashMerkleRoot) return Bad("template-encoding");
++        if ((!m_captured_template || &block != &m_captured_template->Block()) &&
++            (!block.m_header_v2 || !SearchFieldsZero(block) || block.vtx.empty() ||
++             block.m_txcount != block.vtx.size() || BlockMerkleRoot(block) != block.hashMerkleRoot)) return Bad("template-encoding");
+         // Do not spend native script-validation work before the origin's own
+         // snapshot is locally available and authenticates its expected hash.
+         std::shared_ptr<const Snapshot> snapshot;
+@@ -719,7 +733,7 @@ class Checker {
+         const auto binding = CheckBinding(snapshot->binding, m_consensus, block.m_height, block.hashPrevBlock);
+         if (!binding.IsValid()) return binding;
+         if (!Authorized(block.m_mm_rhs)) return Bad("owner");
+-        if (snapshot->job_commitment != JobHash(block)) return Bad("job-commitment");
++        if (snapshot->job_commitment != BodyJobHash(block)) return Bad("job-commitment");
+         if (m_consensus.SharePoolAdmittedLedger || m_consensus.SharePoolTides) {
+             const auto certificate = m_parent_certificates.find(OriginCertificateId(block));
+             if (certificate != m_parent_certificates.end() && int64_t{certificate->second.origin_height} == block.m_height &&
+@@ -769,8 +783,9 @@ class Checker {
+     }
+ 
+ public:
+-    Checker(const Consensus::Params& consensus, const Lookup& lookup, const ValidateOrigin& validate_origin)
+-        : m_consensus{consensus}, m_lookup{lookup}, m_validate_origin{validate_origin} {}
++    Checker(const Consensus::Params& consensus, const Lookup& lookup, const ValidateOrigin& validate_origin,
++            const CapturedTemplate* captured_template = nullptr)
++        : m_consensus{consensus}, m_lookup{lookup}, m_validate_origin{validate_origin}, m_captured_template{captured_template} {}
+ 
+     Result MiningJob(const CBlock& block, const CBlockIndex* previous,
+                      std::optional<CAmount> expected_reward, bool allow_unsigned)
+@@ -844,7 +859,7 @@ public:
+         if (!result.IsValid()) return result;
+         if (!allow_unsigned && !Authorized(block.m_mm_rhs)) return Bad("owner");
+         if (allow_unsigned && snapshot->authorization != Signature{}) return Bad("unsigned-authorization");
+-        if (snapshot->job_commitment != JobHash(block)) return Bad("job-commitment");
++        if (snapshot->job_commitment != BodyJobHash(block)) return Bad("job-commitment");
+         if (!StateOrdered(snapshot->post_state)) return Bad("state-order");
+         if (!(m_consensus.SharePoolTides && snapshot->payouts.empty()) && !PayoutsOrdered(snapshot->payouts)) return Bad("payout-order");
+         for (size_t i{1}; i < snapshot->shares.size(); ++i) {
+@@ -986,6 +1001,25 @@ SnapshotResourceUsage MeasureSnapshotResources(const Snapshot& snapshot) { retur
+ CBlock DecodeTemplate(Span<const unsigned char> bytes) { return ReadTemplate(bytes); }
+ CBlock DecodeBlock(Span<const unsigned char> bytes) { return ReadBlock(bytes, false); }
+ 
++CapturedTemplate::CapturedTemplate(CBlock block)
++    : m_block{std::move(block)}, m_job_hash{JobHash(m_block)} {}
++
++std::shared_ptr<const CapturedTemplate> CapturedTemplate::Capture(const CBlock& block)
++{
++    // Check null references before serialization dereferences them. Keep the
++    // wire decoder as the canonicality oracle, including unusual empty-input
++    // transaction encodings and header fields normalized by deserialization.
++    if (std::any_of(block.vtx.begin(), block.vtx.end(), [](const auto& tx) { return !tx; })) {
++        throw std::ios_base::failure("null template transaction");
++    }
++    const auto size = GetSerializeSize(TX_WITH_WITNESS(block));
++    if (size < MIN_TEMPLATE_BYTES || size > MAX_TEMPLATE_BYTES) throw std::ios_base::failure("template byte bound");
++    std::vector<unsigned char> raw;
++    raw.reserve(size);
++    VectorWriter{raw, 0} << TX_WITH_WITNESS(block);
++    return std::shared_ptr<const CapturedTemplate>{new CapturedTemplate{ReadTemplate(raw)}};
++}
++
+ CTransactionRef DecodeTransaction(Span<const unsigned char> bytes)
+ {
+     if (bytes.size() < 10 || bytes.size() > MAX_TEMPLATE_BYTES) throw std::ios_base::failure("transaction byte bound");
+@@ -1850,14 +1884,19 @@ Result CheckHistoricalTemplate(const CBlock& full_origin, const CBlockIndex* pre
+     if (!consensus.SharePoolHashOnly || !previous || consensus.SharePoolHeight == std::numeric_limits<int>::max() ||
+         int64_t{previous->nHeight} + 1 < consensus.SharePoolHeight) return Bad("inactive");
+     try {
+-        SizeComputer size;
+-        size << TX_WITH_WITNESS(full_origin);
+-        if (size.size() > MAX_TEMPLATE_BYTES) return Bad("template-encoding");
+-        std::vector<unsigned char> raw;
+-        raw.reserve(size.size());
+-        VectorWriter{raw, 0} << TX_WITH_WITNESS(full_origin);
+-        const auto canonical = ReadTemplate(raw);
+-        return Checker{consensus, lookup, validate_origin}.HistoricalTemplate(canonical, previous, time);
++        return CheckHistoricalTemplate(*CapturedTemplate::Capture(full_origin), previous, time, consensus, lookup, validate_origin);
++    } catch (const std::ios_base::failure&) { return Bad("template-encoding"); }
++    catch (const std::invalid_argument&) { return Bad("template-encoding"); }
++}
++
++Result CheckHistoricalTemplate(const CapturedTemplate& full_origin, const CBlockIndex* previous, uint32_t time,
++                               const Consensus::Params& consensus, const Lookup& lookup,
++                               const ValidateOrigin& validate_origin)
++{
++    if (!consensus.SharePoolHashOnly || !previous || consensus.SharePoolHeight == std::numeric_limits<int>::max() ||
++        int64_t{previous->nHeight} + 1 < consensus.SharePoolHeight) return Bad("inactive");
++    try {
++        return Checker{consensus, lookup, validate_origin, &full_origin}.HistoricalTemplate(full_origin.Block(), previous, time);
+     } catch (const std::ios_base::failure&) { return Bad("template-encoding"); }
+     catch (const std::invalid_argument&) { return Bad("template-encoding"); }
+ }
+@@ -1869,15 +1908,19 @@ Result CheckShareProof(const Share& share, const CBlock& full_origin, const CBlo
+     if (!consensus.SharePoolHashOnly || !previous || consensus.SharePoolHeight == std::numeric_limits<int>::max() ||
+         int64_t{previous->nHeight} + 1 < consensus.SharePoolHeight) return Bad("inactive");
+     try {
+-        // Enforce the same canonical full-body byte bound as snapshot records.
+-        SizeComputer size;
+-        size << TX_WITH_WITNESS(full_origin);
+-        if (size.size() > MAX_TEMPLATE_BYTES) return Bad("template-encoding");
+-        std::vector<unsigned char> raw;
+-        raw.reserve(size.size());
+-        VectorWriter{raw, 0} << TX_WITH_WITNESS(full_origin);
+-        const auto canonical = ReadTemplate(raw);
+-        return Checker{consensus, lookup, validate_origin}.ShareProof(share, canonical, previous, time, 1);
++        return CheckShareProof(share, *CapturedTemplate::Capture(full_origin), previous, time, consensus, lookup, validate_origin);
++    } catch (const std::ios_base::failure&) { return Bad("template-encoding"); }
++    catch (const std::invalid_argument&) { return Bad("template-encoding"); }
++}
++
++Result CheckShareProof(const Share& share, const CapturedTemplate& full_origin, const CBlockIndex* previous,
++                       uint32_t time, const Consensus::Params& consensus, const Lookup& lookup,
++                       const ValidateOrigin& validate_origin)
++{
++    if (!consensus.SharePoolHashOnly || !previous || consensus.SharePoolHeight == std::numeric_limits<int>::max() ||
++        int64_t{previous->nHeight} + 1 < consensus.SharePoolHeight) return Bad("inactive");
++    try {
++        return Checker{consensus, lookup, validate_origin, &full_origin}.ShareProof(share, full_origin.Block(), previous, time, 1);
+     } catch (const std::ios_base::failure&) { return Bad("template-encoding"); }
+     catch (const std::invalid_argument&) { return Bad("template-encoding"); }
+ }
+diff --git a/src/consensus/sharepool_hash.h b/src/consensus/sharepool_hash.h
+index 50f1578..39bce9c 100644
+--- a/src/consensus/sharepool_hash.h
++++ b/src/consensus/sharepool_hash.h
+@@ -165,6 +165,19 @@ Snapshot DecodeSnapshot(Span<const unsigned char> bytes);
+ CBlock DecodeTemplate(Span<const unsigned char> bytes);
+ CBlock DecodeBlock(Span<const unsigned char> bytes);
+ CTransactionRef DecodeTransaction(Span<const unsigned char> bytes);
++/** Owned canonical normalized body and immutable byte-derived facts. Capture
++ * performs the bounded wire round trip once; callers cannot supply a digest or
++ * replace the owned header/transactions. This is not a native, authorization,
++ * evidence-availability or settlement verdict. */
++class CapturedTemplate {
++    const CBlock m_block;
++    const uint256 m_job_hash;
++    explicit CapturedTemplate(CBlock block);
++public:
++    static std::shared_ptr<const CapturedTemplate> Capture(const CBlock& block);
++    const CBlock& Block() const { return m_block; }
++    const uint256& JobCommitment() const { return m_job_hash; }
++};
+ uint256 SnapshotHash(const Snapshot& snapshot);
+ /** Hash exact bytes without decoding; callers must enforce canonical decoding. */
+ uint256 SnapshotHash(Span<const unsigned char> bytes);
+@@ -268,12 +281,19 @@ Result CheckMiningJob(const CBlock& block, const CBlockIndex* previous,
+ Result CheckHistoricalTemplate(const CBlock& full_origin, const CBlockIndex* settlement_parent,
+                                uint32_t settlement_time, const Consensus::Params& consensus,
+                                const Lookup& lookup, const ValidateOrigin& validate_origin);
++Result CheckHistoricalTemplate(const CapturedTemplate& full_origin, const CBlockIndex* settlement_parent,
++                               uint32_t settlement_time, const Consensus::Params& consensus,
++                               const Lookup& lookup, const ValidateOrigin& validate_origin);
+ /** Standalone proof admission reserves its future settlement embedding edge;
+  * paid-state/repeat-payment checks remain settlement rules. */
+ Result CheckShareProof(const Share& share, const CBlock& full_origin,
+                        const CBlockIndex* settlement_parent, uint32_t settlement_time,
+                        const Consensus::Params& consensus, const Lookup& lookup,
+                        const ValidateOrigin& validate_origin);
++Result CheckShareProof(const Share& share, const CapturedTemplate& full_origin,
++                       const CBlockIndex* settlement_parent, uint32_t settlement_time,
++                       const Consensus::Params& consensus, const Lookup& lookup,
++                       const ValidateOrigin& validate_origin);
+ } // namespace sharepool::hashonly
+ 
+ #endif // BITCOIN_CONSENSUS_SHAREPOOL_HASH_H
+diff --git a/src/sharepool/hash_store.cpp b/src/sharepool/hash_store.cpp
+index eed5c8c..04107e8 100644
+--- a/src/sharepool/hash_store.cpp
++++ b/src/sharepool/hash_store.cpp
+@@ -10,6 +10,7 @@
+ #include <util/strencodings.h>
+ #include <validation.h>
+ #include <random.h>
++#include <sharepool/hash_validation_cache.h>
+ 
+ #include <algorithm>
+ #include <array>
+@@ -19,6 +20,8 @@ namespace sharepool {
+ namespace {
+ constexpr size_t MAX_CACHE_BYTES{64 * 1024 * 1024};
+ constexpr size_t MAX_CACHE_OBJECTS{4096};
++constexpr size_t MAX_CAPTURED_TEMPLATE_BYTES{32 * 1024 * 1024};
++constexpr size_t MAX_CAPTURED_TEMPLATES{256};
+ constexpr size_t MAX_PENDING_BYTES{64 * 1024 * 1024};
+ constexpr size_t MAX_PENDING_BLOCKS{HashRequestQueue<uint256>::MAX_BLOCKS};
+ constexpr size_t MAX_TEMPLATE_INDEX{65536};
+@@ -1104,6 +1107,40 @@ std::optional<CAmount> HashSnapshotStore::NativeValidated(const uint256& id)
+     m_native_touched[id] = ++m_clock;
+     return found->second;
+ }
++
++std::shared_ptr<const hashonly::CapturedTemplate> HashSnapshotStore::FindCapturedTemplate(const CBlock& block)
++{
++    AssertLockHeld(cs_main);
++    const auto found = m_captured_templates.find(NativeBodyCacheKey(block));
++    if (found == m_captured_templates.end()) return {};
++    found->second.touched = ++m_clock;
++    return found->second.body;
++}
++
++void HashSnapshotStore::RememberCapturedTemplate(std::shared_ptr<const hashonly::CapturedTemplate> body) try
++{
++    AssertLockHeld(cs_main);
++    if (!body) return;
++    const auto charge = CapturedTemplateCacheCharge(*body);
++    if (charge > MAX_CAPTURED_TEMPLATE_BYTES) return;
++    const auto identity = NativeBodyCacheKey(body->Block());
++    if (const auto found = m_captured_templates.find(identity); found != m_captured_templates.end()) {
++        found->second.touched = ++m_clock;
++        return;
++    }
++    while (!m_captured_templates.empty() &&
++           (m_captured_templates.size() >= MAX_CAPTURED_TEMPLATES || charge > MAX_CAPTURED_TEMPLATE_BYTES - m_captured_template_bytes)) {
++        const auto oldest = std::min_element(m_captured_templates.begin(), m_captured_templates.end(),
++            [](const auto& a, const auto& b) { return a.second.touched < b.second.touched; });
++        m_captured_template_bytes -= oldest->second.charge;
++        m_captured_templates.erase(oldest);
++    }
++    m_captured_templates.emplace(identity, CapturedEntry{std::move(body), charge, ++m_clock});
++    m_captured_template_bytes += charge;
++} catch (const std::bad_alloc&) {
++    // Optional retention failure cannot hide the caller's available capture.
++}
++
+ void HashSnapshotStore::SetNativeValidated(const uint256& id, CAmount reward)
+ {
+     AssertLockHeld(cs_main);
+diff --git a/src/sharepool/hash_store.h b/src/sharepool/hash_store.h
+index 9b0028b..ecbea50 100644
+--- a/src/sharepool/hash_store.h
++++ b/src/sharepool/hash_store.h
+@@ -119,6 +119,13 @@ private:
+     std::set<uint256> m_quarantined_templates GUARDED_BY(cs_main);
+     std::map<uint256, CAmount> m_native_validated GUARDED_BY(cs_main);
+     std::map<uint256, uint64_t> m_native_touched GUARDED_BY(cs_main);
++    struct CapturedEntry {
++        std::shared_ptr<const hashonly::CapturedTemplate> body;
++        size_t charge;
++        uint64_t touched;
++    };
++    std::map<uint256, CapturedEntry> m_captured_templates GUARDED_BY(cs_main);
++    size_t m_captured_template_bytes GUARDED_BY(cs_main){0};
+     HashRequestQueue<uint256> m_requests GUARDED_BY(cs_main);
+     size_t m_bytes GUARDED_BY(cs_main){0};
+     uint64_t m_charged_bytes GUARDED_BY(cs_main){0};
+@@ -204,6 +211,11 @@ public:
+     size_t TemplateCount() const EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return m_template_sizes.size() - m_quarantined_templates.size(); }
+     void RememberTemplate(const CBlock& block) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+     std::shared_ptr<const CBlock> Template(const uint256& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
++    /** Byte-derived reuse only. The caller must obtain currently available
++     * evidence through Template first; this cache never supplies availability,
++     * ancestry, proof, authorization, native validity or settlement verdicts. */
++    std::shared_ptr<const hashonly::CapturedTemplate> FindCapturedTemplate(const CBlock& block) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
++    void RememberCapturedTemplate(std::shared_ptr<const hashonly::CapturedTemplate> body) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+     std::optional<CAmount> NativeValidated(const uint256& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+     void SetNativeValidated(const uint256& id, CAmount reward) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+     bool QueueBlock(std::shared_ptr<const CBlock> block) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+diff --git a/src/sharepool/hash_validation_cache.h b/src/sharepool/hash_validation_cache.h
+index 670d69c..a490f69 100644
+--- a/src/sharepool/hash_validation_cache.h
++++ b/src/sharepool/hash_validation_cache.h
+@@ -206,6 +206,17 @@ inline uint256 NativeBodyCacheKey(const CBlock& block)
+     }
+     return writer.GetHash();
+ }
++
++/** Optional canonical-template retention. Charge nested transactions even when
++ * shared elsewhere; the wire-size bound alone misses witness/vector overhead. */
++inline size_t CapturedTemplateCacheCharge(const hashonly::CapturedTemplate& captured)
++{
++    return memusage::MallocUsage(sizeof(hashonly::CapturedTemplate)) +
++        memusage::MallocUsage(sizeof(memusage::stl_shared_counter)) +
++        memusage::MallocUsage(sizeof(uint256) + sizeof(std::shared_ptr<const hashonly::CapturedTemplate>) +
++                             sizeof(size_t) + sizeof(uint64_t) + 4 * sizeof(void*)) +
++        RecursiveDynamicUsage(captured.Block());
++}
+ } // namespace sharepool
+ 
+ #endif // BITCOIN_SHAREPOOL_HASH_VALIDATION_CACHE_H
+diff --git a/src/test/sharepool_hash_store_tests.cpp b/src/test/sharepool_hash_store_tests.cpp
+index e7687fd..7c75099 100644
+--- a/src/test/sharepool_hash_store_tests.cpp
++++ b/src/test/sharepool_hash_store_tests.cpp
+@@ -8,6 +8,7 @@
+ #include <hash.h>
+ #include <script/script.h>
+ #include <sharepool/hash_store.h>
++#include <sharepool/hash_validation_cache.h>
+ #include <streams.h>
+ #include <test/util/setup_common.h>
+ #include <versionbits.h>
+@@ -26,6 +27,12 @@ namespace sharepool {
+ struct HashSnapshotStoreTest {
+     static void ClearSources(HashSnapshotStore& store) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { store.m_template_sources.clear(); }
+     static size_t CacheCount(const HashSnapshotStore& store) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.m_cache.size(); }
++    static size_t CaptureCount(const HashSnapshotStore& store) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.m_captured_templates.size(); }
++    static size_t CaptureBytes(const HashSnapshotStore& store) EXCLUSIVE_LOCKS_REQUIRED(cs_main) { return store.m_captured_template_bytes; }
++    static void DamageTemplate(HashSnapshotStore& store, const uint256& id) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
++    {
++        BOOST_REQUIRE(store.m_db.Write(std::make_pair(uint8_t{'t'}, id), std::vector<unsigned char>{0}, true));
++    }
+     static void DamageMetadata(HashSnapshotStore& store, const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+     {
+         BOOST_REQUIRE(store.m_db.Write(std::make_pair(uint8_t{'m'}, hash), std::vector<unsigned char>{0}, true));
+@@ -233,6 +240,87 @@ struct StoreFixture : BasicTestingSetup {
+ 
+ BOOST_FIXTURE_TEST_SUITE(sharepool_hash_store_tests, StoreFixture)
+ 
++BOOST_AUTO_TEST_CASE(captured_template_cache_binds_body_and_never_supplies_evidence)
++{
++    sharepool::HashSnapshotStore store{m_path_root / "captured-body", true};
++    CMutableTransaction coinbase{*block.vtx[0]};
++    coinbase.vin[0].scriptWitness.stack = {{1, 2, 3}};
++    block.vtx[0] = MakeTransactionRef(coinbase);
++    const auto captured = ho::CapturedTemplate::Capture(block);
++    LOCK(cs_main);
++    store.RememberTemplate(block);
++    store.RememberCapturedTemplate(captured);
++    BOOST_CHECK(store.FindCapturedTemplate(block) == captured);
++    BOOST_CHECK_EQUAL(sharepool::HashSnapshotStoreTest::CaptureBytes(store), sharepool::CapturedTemplateCacheCharge(*captured));
++    const auto changed = [&](auto mutate) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
++        auto other = block;
++        mutate(other);
++        BOOST_CHECK(!store.FindCapturedTemplate(other));
++    };
++    changed([](CBlock& b) { b.nTime++; });
++    changed([](CBlock& b) { b.nNonce++; });
++    changed([](CBlock& b) { b.hashPrevBlock = uint256{uint8_t{99}}; });
++    changed([](CBlock& b) { b.m_mm_rhs = uint256::ONE; });
++    changed([](CBlock& b) { b.m_extranonce.begin()[0] = 1; });
++    auto witness_changed = block;
++    coinbase.vin[0].scriptWitness.stack[0][0] ^= 1;
++    witness_changed.vtx[0] = MakeTransactionRef(coinbase);
++    BOOST_CHECK_EQUAL(ho::TemplateId(witness_changed), ho::TemplateId(block));
++    BOOST_CHECK(!store.FindCapturedTemplate(witness_changed));
++    const auto other_capture = ho::CapturedTemplate::Capture(witness_changed);
++    store.RememberCapturedTemplate(other_capture);
++    BOOST_CHECK(store.FindCapturedTemplate(witness_changed) == other_capture);
++    BOOST_CHECK(store.FindCapturedTemplate(block) == captured);
++
++    // A warm capture must not satisfy the RPC's preceding evidence lookup.
++    sharepool::HashSnapshotStoreTest::DamageTemplate(store, ho::TemplateId(block));
++    BOOST_CHECK(!store.Template(ho::TemplateId(block)));
++    BOOST_CHECK(store.FindCapturedTemplate(block) == captured);
++    BOOST_CHECK(!store.NativeValidated(sharepool::NativeBodyCacheKey(block)));
++}
++
++BOOST_AUTO_TEST_CASE(captured_template_cache_bounds_entries_memory_and_lifetime)
++{
++    using Test = sharepool::HashSnapshotStoreTest;
++    sharepool::HashSnapshotStore store{m_path_root / "captured-bounds", true};
++    const auto first = ho::CapturedTemplate::Capture(block);
++    LOCK(cs_main);
++    store.RememberCapturedTemplate(first);
++    for (size_t i{0}; i < 255; ++i) {
++        auto other = block;
++        other.nTime += i + 1;
++        store.RememberCapturedTemplate(ho::CapturedTemplate::Capture(other));
++    }
++    BOOST_CHECK_EQUAL(Test::CaptureCount(store), 256);
++    auto second = block;
++    second.nTime++;
++    std::weak_ptr<const ho::CapturedTemplate> evicted = store.FindCapturedTemplate(second);
++    BOOST_REQUIRE(store.FindCapturedTemplate(block) == first);
++    auto next = block;
++    next.nTime += 256;
++    store.RememberCapturedTemplate(ho::CapturedTemplate::Capture(next));
++    // The recently touched second entry remains; the third was oldest.
++    auto third = block;
++    third.nTime += 2;
++    BOOST_CHECK(!store.FindCapturedTemplate(third));
++    BOOST_CHECK(!evicted.expired());
++    BOOST_CHECK(store.FindCapturedTemplate(block) == first);
++
++    CMutableTransaction large{*block.vtx[0]};
++    large.vin[0].scriptWitness.stack = {std::vector<unsigned char>(1'000'000)};
++    auto large_body = block;
++    large_body.vtx[0] = MakeTransactionRef(large);
++    for (size_t i{0}; i < 40; ++i) {
++        large_body.nTime++;
++        store.RememberCapturedTemplate(ho::CapturedTemplate::Capture(large_body));
++        BOOST_CHECK_LE(Test::CaptureBytes(store), 32 * 1024 * 1024);
++    }
++    BOOST_CHECK_LT(Test::CaptureCount(store), 40);
++    BOOST_CHECK(evicted.expired());
++    BOOST_CHECK(!store.FindCapturedTemplate(block));
++    BOOST_CHECK_EQUAL(first->JobCommitment(), ho::JobHash(block)); // External owner survives eviction.
++}
++
+ BOOST_AUTO_TEST_CASE(prepared_snapshot_owns_bytes_and_does_not_require_the_chain_lock)
+ {
+     using Store = sharepool::HashSnapshotStore;
+diff --git a/src/test/sharepool_hash_tests.cpp b/src/test/sharepool_hash_tests.cpp
+index 35a9e75..a8b7ae1 100644
+--- a/src/test/sharepool_hash_tests.cpp
++++ b/src/test/sharepool_hash_tests.cpp
+@@ -727,6 +727,91 @@ BOOST_AUTO_TEST_CASE(unused_full_templates_also_require_native_validation)
+     Reason(no_reward, "origin-reward");
+ }
+ 
++BOOST_AUTO_TEST_CASE(captured_template_owns_canonical_bytes_without_caching_verdicts)
++{
++    auto opening = Empty();
++    auto origin = Block(opening);
++    const auto proof = Proof(origin, opening, 1);
++    const auto captured = ho::CapturedTemplate::Capture(origin);
++    BOOST_CHECK_EQUAL(captured->JobCommitment(), ho::JobHash(origin));
++    BOOST_CHECK(captured->Block().vtx[0] != origin.vtx[0]);
++    const auto check = [&](const Share& share, const ho::Lookup& lookup, const ho::ValidateOrigin& native) {
++        return ho::CheckShareProof(share, *captured, &indexes[0], captured->Block().nTime, consensus, lookup, native);
++    };
++    BOOST_REQUIRE(check(proof, Lookup(), Native()).IsValid());
++    const auto before = native_checks;
++    BOOST_REQUIRE(check(proof, Lookup(), Native()).IsValid());
++    BOOST_CHECK_EQUAL(native_checks, before + 1); // Capture is not native success.
++    const ho::ValidateOrigin reject = [](const CBlock&, const CBlockIndex*) {
++        return ho::Result::Invalid("fixture-reject");
++    };
++    Reason(check(proof, Lookup(), reject), "origin-body: fixture-reject");
++
++    // The caller's header and transaction container cannot modify captured facts.
++    origin.nTime++;
++    origin.vtx[0].reset();
++    BOOST_REQUIRE(check(proof, Lookup(), Native()).IsValid());
++    auto changed = proof;
++    changed.header.nTime++;
++    Reason(check(changed, Lookup(), Native()), "share-template");
++    changed = proof;
++    changed.authorization[0] ^= 1;
++    Reason(check(changed, Lookup(), Native()), "share-authorization");
++    changed = proof;
++    while (UintToArith256(changed.header.GetHash()) <= arith_uint256{}.SetCompact(SHARE_BITS)) ++changed.header.nNonce;
++    Reason(check(changed, Lookup(), Native()), "share-target");
++    snapshots.clear();
++    BOOST_CHECK(check(proof, Lookup(), Native()).IsMissing());
++    BOOST_CHECK(ho::CheckHistoricalTemplate(*captured, &indexes[0], captured->Block().nTime,
++        consensus, Lookup(), Native()).IsMissing());
++}
++
++BOOST_AUTO_TEST_CASE(captured_template_cannot_bless_changed_witness_or_malformed_bodies)
++{
++    auto origin = Block(Empty());
++    CMutableTransaction coinbase{*origin.vtx[0]};
++    coinbase.vin[0].scriptWitness.stack = {std::vector<unsigned char>(32)};
++    origin.vtx[0] = MakeTransactionRef(coinbase);
++    Reseal(origin);
++    const auto proof = Proof(origin, *snapshots.at(origin.m_mm_rhs), 1);
++    const auto captured = ho::CapturedTemplate::Capture(origin);
++    BOOST_REQUIRE(ho::CheckShareProof(proof, *captured, &indexes[0], origin.nTime, consensus, Lookup(), Native()).IsValid());
++    coinbase.vin[0].scriptWitness.stack[0][0] = 1;
++    auto changed = origin;
++    changed.vtx[0] = MakeTransactionRef(coinbase);
++    const auto other = ho::CapturedTemplate::Capture(changed);
++    BOOST_CHECK_EQUAL(ho::TemplateId(other->Block()), ho::TemplateId(captured->Block()));
++    BOOST_CHECK(other->JobCommitment() != captured->JobCommitment());
++    Reason(ho::CheckShareProof(proof, *other, &indexes[0], origin.nTime, consensus, Lookup(), Native()), "job-commitment");
++
++    const auto malformed = [&](auto mutate) {
++        auto bad = origin;
++        mutate(bad);
++        BOOST_CHECK_THROW(ho::CapturedTemplate::Capture(bad), std::ios_base::failure);
++        Reason(ho::CheckShareProof(proof, bad, &indexes[0], origin.nTime, consensus, Lookup(), Native()), "template-encoding");
++        Reason(ho::CheckHistoricalTemplate(bad, &indexes[0], origin.nTime, consensus, Lookup(), Native()), "template-encoding");
++    };
++    malformed([](CBlock& b) { b.vtx[0].reset(); });
++    malformed([](CBlock& b) { b.m_txcount++; });
++    malformed([](CBlock& b) { b.hashMerkleRoot = uint256::ONE; });
++    malformed([](CBlock& b) { b.nNonce = 1; });
++    malformed([](CBlock& b) { b.m_nonce2 = 1; });
++    malformed([](CBlock& b) { b.m_time_offset = 1; });
++    malformed([](CBlock& b) { b.m_extranonce.begin()[0] = 1; });
++    malformed([](CBlock& b) { b.m_header_v2 = false; });
++    malformed([](CBlock& b) {
++        CMutableTransaction tx{*b.vtx[0]};
++        tx.vin.clear(); // Ambiguous witness-marker encoding must still use the wire oracle.
++        b.vtx[0] = MakeTransactionRef(tx);
++        b.hashMerkleRoot = BlockMerkleRoot(b);
++    });
++    malformed([](CBlock& b) {
++        CMutableTransaction tx{*b.vtx[0]};
++        tx.vin[0].scriptWitness.stack = {std::vector<unsigned char>(ho::MAX_TEMPLATE_BYTES)};
++        b.vtx[0] = MakeTransactionRef(tx);
++    });
++}
++
+ BOOST_AUTO_TEST_CASE(origin_memo_includes_exact_witness_body)
+ {
+     // Both base bodies have identical normalized headers/txids; only witness
+diff --git a/src/validation.cpp b/src/validation.cpp
+index ef15bf1..e753f8c 100644
+--- a/src/validation.cpp
++++ b/src/validation.cpp
+@@ -5692,6 +5692,7 @@ sharepool::hashonly::Result ValidateSharePoolHashProofUnlocked(ChainstateManager
+     Chainstate* captured_chainstate;
+     const CBlockIndex* tip;
+     std::shared_ptr<const CBlock> full_origin;
++    std::shared_ptr<const hashonly::CapturedTemplate> captured_origin;
+     {
+         LOCK(cs_main);
+         captured_chainstate = &chainman.ActiveChainstate();
+@@ -5700,8 +5701,19 @@ sharepool::hashonly::Result ValidateSharePoolHashProofUnlocked(ChainstateManager
+             return Result::Invalid("bad-sharepool-hash-inactive");
+         }
+         full_origin = chainman.m_sharepool_hash_store->Template(hashonly::TemplateId(share.header));
++        if (full_origin) captured_origin = chainman.m_sharepool_hash_store->FindCapturedTemplate(*full_origin);
+     }
+     if (!full_origin) return Result::Missing({}, "sharepool-hash-data-missing");
++    if (!captured_origin) {
++        // Canonical decoding and full job hashing run outside cs_main. The
++        // capture owns its header/container and cannot borrow mutable caller
++        // state. Every invocation still obtains evidence through Template above.
++        try { captured_origin = hashonly::CapturedTemplate::Capture(*full_origin); }
++        catch (const std::ios_base::failure&) { return Result::Invalid("bad-sharepool-hash-template-encoding"); }
++        catch (const std::invalid_argument&) { return Result::Invalid("bad-sharepool-hash-template-encoding"); }
++        LOCK(cs_main);
++        if (chainman.m_sharepool_hash_store) chainman.m_sharepool_hash_store->RememberCapturedTemplate(captured_origin);
++    }
+     if (!chainman.GetConsensus().SharePoolAdmittedLedger && !chainman.GetConsensus().SharePoolTides) {
+         const auto prepared = PrepareSharePoolHashOrigins(chainman, *full_origin, nullptr, stop);
+         if (!prepared.IsValid()) return prepared;
+@@ -5709,7 +5721,7 @@ sharepool::hashonly::Result ValidateSharePoolHashProofUnlocked(ChainstateManager
+     const auto time = std::max<int64_t>(tip->GetMedianTimePast() + 1, GetTime());
+     if (time < 0 || time > std::numeric_limits<uint32_t>::max()) return Result::Missing({}, "sharepool-hash-native-time-range");
+     sharepool::DecodedSnapshotCache snapshots{hashonly::MAX_DEPENDENCY_BYTES, 1024, chainman.m_sharepool_decoded_retention};
+-    const auto checked = hashonly::CheckShareProof(share, *full_origin, tip, static_cast<uint32_t>(time), chainman.GetConsensus(),
++    const auto checked = hashonly::CheckShareProof(share, *captured_origin, tip, static_cast<uint32_t>(time), chainman.GetConsensus(),
+         [&](const uint256& hash) -> std::shared_ptr<const hashonly::Snapshot> {
+             return LookupHashPoolSnapshot(chainman, hash, snapshots);
+         },

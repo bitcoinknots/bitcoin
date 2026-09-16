@@ -1,0 +1,309 @@
+{
+  "base_commit": "32665e195d2b9240199024d244bdc202c1dc66a6",
+  "binaries": {
+    "bitcoin-sharepool-signer": "10422765627e197eb3ab9730320be28f2285b84097659b2fac0ae7f153df1178",
+    "bitcoind": "bfd41c0173bbeffdf24f5a719f5e48a448c37ea0f5bd4d9bc3974f3ca36079b4",
+    "test_bitcoin": "5cb907a85ccb37e048df0eeadce1f0fffbc519ec65e1509845fc3e6459279405"
+  },
+  "final_source_sha256": {
+    "contrib/sharepool/hash_gate_archive.py": "60cb4e585c6f33c5f45d47a419c6cf8ccfd5b1781381a60a3ddbb2c48b244bca",
+    "contrib/sharepool/hash_gate_batch.py": "9566b4beb6bb34e5090addff175da1d087a9494aa64867791b43c8b9bbc2d44a",
+    "contrib/sharepool/hash_mining_gate.py": "e9052e421eb095ff877c0107ca2c751fb998501899b1639dbe649ff7dd1f1a83",
+    "contrib/sharepool/hash_snapshot.py": "7b74bf4156a210e22d3deef53d285f1b70d9fdb076e57689be8990d52dd7fe57",
+    "contrib/sharepool/native_signer.py": "a63a5594e371e211634205b13384d272ffefd9b32ca2f0d03b1db49b53ec6856",
+    "contrib/sharepool/payout_variance_comparison.py": "d639a1d0442e7718c2cc128c6f69338c32cfaaf98f80b8ed7ba0a9e60d6cb84a",
+    "contrib/sharepool/share_difficulty_capacity.py": "9ba729142dd10c68ced0fe386640992cce8b4b3faaa9276fa96c053cb259ce5f",
+    "contrib/sharepool/test_hash_gate_archive.py": "92cdea33daa4f99a450d7149202d7eb3868b14efc6ebd0775ac44e7a30bc3dc1",
+    "contrib/sharepool/test_hash_gate_batch.py": "f45b2603aa3d0c8bb079afd4ba7489793a8903010b8033e41e143d00aff35b0e",
+    "contrib/sharepool/test_hash_mining_gate.py": "2223ae4865e14c91703f36c3c49e36547bd3cff4fb3fbe5201bd13423334ff70",
+    "contrib/sharepool/test_hash_snapshot.py": "10acdbfa21b9db00db304bce8920051ebff5e347fba92977b05ed6f409a03d67",
+    "contrib/sharepool/test_native_signer.py": "08c03f0af16a93af23570b9c5510be5aa5378c8a03276682de2e5e0d61a47922",
+    "contrib/sharepool/test_payout_variance_comparison.py": "2b8e86dbda2738d3f0fcdd4d6dd32e7e8b78928a7f3f7023d0a078149c4fe9d2",
+    "contrib/sharepool/test_share_difficulty_capacity.py": "09cb2bccb5491eff8273f9d1b5f5cfd9325743ba77de6017f1f553b8c9ab0c51",
+    "src/bitcoin-sharepool-signer.cpp": "c982aa4769537244fbfe7d8baee235ba42b348ba475c35fc1fe77bdfcc345b99",
+    "src/consensus/sharepool_hash.cpp": "b9e5ae8a260d1ade50bcc307131bd60843e4f2a2423acd0103e3c3181616736e",
+    "src/consensus/sharepool_hash.h": "762174c7ebe1415d7394e8988ef259d97f8167da5909155b38e8f75df7b1746f",
+    "src/httpserver.cpp": "5925025e99007f7a2a7d47aff442f041797576bdc8e9a8fec1cee75af1c6021c",
+    "src/init.cpp": "a2ae994c36cf77366cfe4e3553c811acd863f01d4dbc5359204058e6f41021bc",
+    "src/net_processing.cpp": "10acf16d96656bedf0984520b489adc74870897564a833c0276a5fec500af4e8",
+    "src/rpc/mining.cpp": "f5580b40ad2aa6dbdaa56c70d8a611cfff58828b6d2ea801bff672577a524aff",
+    "src/sharepool/hash_store.cpp": "c9a9a3938d4eb723a9e5633f932f6d4f6a3e51b692c9e11c6f87e17d27e5da29",
+    "src/sharepool/hash_store.h": "99eebfaac665f89e6d78e41be7cb9b2ef2301cf7cd31b79e13e57aa0aa15f9f0",
+    "src/sharepool/retry_worker.h": "29ced4c4f7f46a13877bdceb0bfe329c8d39a6264e074fca46fff1bd87a31d60",
+    "src/test/CMakeLists.txt": "f958dde87eca6df24cca1ccd16e14b5021600e4b653ce41a54a7176ef9325a83",
+    "src/test/sharepool_hash_store_tests.cpp": "b640d6f1e0aefba9abec71a9e05c09e4c0cc7d63a8bef717f81fc954e5be9580",
+    "src/test/sharepool_hash_tests.cpp": "7c00801a0d1b5527a5d3f2732c06dfed1d2c57a5eb0ef1d5bbdf5394164f3839",
+    "src/test/sharepool_retry_worker_tests.cpp": "6cbb3c5c40d15894daa6fec8c34c3aff036b2a93c89ddf63dc5ab3b80a0f0629",
+    "src/test/sharepool_signer_tests.cpp": "7627f2c4d0bf0f35a1eb4c0246e212b73e3b1d096cbc60925352305590f48fe5",
+    "src/test/util/setup_common.cpp": "a8e89358c663497b8e3ea36f5aa94f3e33c8d971e7162e236684fbfaa56b50f3",
+    "src/validation.cpp": "2db0a85a26985dccd27e5bb8b281c357f0e0f8eb9cecbd7765854058c01664ac",
+    "src/validation.h": "e31b87ec11c56c33eeb90fa9dc8de3b0b7a9be24bda4cd5185a9f4e11b6d850e",
+    "test/functional/feature_sharepool_hash_100_miners.py": "41f5e98a0c26bfa7478511e8bc2234d36d632444e700a089ddb8bc90ece9ae71",
+    "test/functional/feature_sharepool_hash_attestation.py": "0ca5b1b0b6866f1f4f480351cc537f42acc2b6180529091e92f3b8d25c4d9d30",
+    "test/functional/feature_sharepool_hash_builder.py": "71b4189f1017609be1844ebb232fb269af5e5f8fbb49c04247a95f828ac2aedc",
+    "test/functional/feature_sharepool_hash_http.py": "b018c2c16326d39dbc799e3a4572dc9eeddc908d7b2c1e723f0f514e98ca63b2",
+    "test/functional/feature_sharepool_hash_lifecycle.py": "465f17e1f139517880f911b3e52b6b50dbb22c986f0e8072c5e741644eb20672",
+    "test/functional/feature_sharepool_hash_rules.py": "d39c7c0bc2a6b3e47e51015b2605220a412f5babf98a4ac4ea89056f1f63adf5",
+    "test/functional/feature_sharepool_hash_worker.py": "7c864a7835fb74d5e3e355ab66e6a2c8721112cca3a4e51ebd07771bb84b3de2",
+    "test/functional/test_runner.py": "d7891b35cec73e022b03b201f2f13ad0b5ff3c4a66957053e9b352ed0f546a06"
+  },
+  "functional_log": "hash-only-v4-functional-tests.txt",
+  "functional_tests": [
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_worker.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-worker-v4-609",
+        "--portseed=609",
+        "--nocleanup"
+      ],
+      "exit_code": 0,
+      "name": "worker",
+      "original_framework_log_sha256": "c3889dbbb16851b4d8adc00d60f1a02f8591cbfa5fc780f93c69d84e50b4ddee",
+      "result": "passed",
+      "script": "feature_sharepool_hash_worker.py",
+      "seconds_including_startup_shutdown": 13.22,
+      "source_sha256": "7c864a7835fb74d5e3e355ab66e6a2c8721112cca3a4e51ebd07771bb84b3de2"
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_http.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-http-v4-610",
+        "--portseed=610",
+        "--nocleanup"
+      ],
+      "exit_code": 0,
+      "name": "http",
+      "original_framework_log_sha256": "3afd3ed5365f37027dea88c5629f1694e47a5bb4c43236b658c20b9b53367f55",
+      "result": "passed",
+      "script": "feature_sharepool_hash_http.py",
+      "seconds_including_startup_shutdown": 1.225,
+      "source_sha256": "b018c2c16326d39dbc799e3a4572dc9eeddc908d7b2c1e723f0f514e98ca63b2"
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_lifecycle.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-lifecycle-v4-611",
+        "--portseed=611",
+        "--nocleanup"
+      ],
+      "exit_code": 0,
+      "name": "lifecycle-v1",
+      "original_framework_log_sha256": "f4abe9d1ed512833b292ed10e3b677fbafbadbb78d9b1dd3dd9eaca4c3e1c338",
+      "result": "passed",
+      "script": "feature_sharepool_hash_lifecycle.py",
+      "seconds_including_startup_shutdown": 15.291,
+      "source_sha256": "465f17e1f139517880f911b3e52b6b50dbb22c986f0e8072c5e741644eb20672"
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_lifecycle.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-lifecycle-v4-612",
+        "--portseed=612",
+        "--nocleanup",
+        "--v2transport"
+      ],
+      "exit_code": 0,
+      "name": "lifecycle-v2",
+      "original_framework_log_sha256": "9549abe875cbe8bc1dc96dd28e9b060a14167f61c086928981402c85869ab81a",
+      "result": "passed",
+      "script": "feature_sharepool_hash_lifecycle.py",
+      "seconds_including_startup_shutdown": 15.39,
+      "source_sha256": "465f17e1f139517880f911b3e52b6b50dbb22c986f0e8072c5e741644eb20672"
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_relay.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-integration-v4-613",
+        "--portseed=613",
+        "--nocleanup"
+      ],
+      "exit_code": 0,
+      "name": "relay",
+      "original_framework_log_sha256": "e851a9418e920da20b513466daf5876271b4e73528669b8d3b6c4424790be727",
+      "result": "passed",
+      "script": "feature_sharepool_hash_relay.py",
+      "seconds_including_startup_shutdown": 6.87,
+      "source_sha256": "63743be8456a43f4e645dc3e807eb1a6ef7f87cb85320edc2f3d7cb8f189a3da"
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_attestation.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-integration-v4-614",
+        "--portseed=614",
+        "--nocleanup"
+      ],
+      "exit_code": 0,
+      "name": "attestation",
+      "original_framework_log_sha256": "8ef6ff03c1d93c3f46b099019c318d667d6639238963ec4884703625f3ea2b4b",
+      "result": "passed",
+      "script": "feature_sharepool_hash_attestation.py",
+      "seconds_including_startup_shutdown": 1.38,
+      "source_sha256": "0ca5b1b0b6866f1f4f480351cc537f42acc2b6180529091e92f3b8d25c4d9d30"
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_builder.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-builder-v4-711",
+        "--portseed=711",
+        "--nocleanup"
+      ],
+      "exit_code": 0,
+      "name": "builder",
+      "original_framework_log_sha256": "6071c30c9314d14fa24b4b1d31eec0c2efd8fcf344ab99ed12910cb034c2832d",
+      "result": "passed",
+      "script": "feature_sharepool_hash_builder.py",
+      "seconds_including_startup_shutdown": 3.846,
+      "source_sha256": "71b4189f1017609be1844ebb232fb269af5e5f8fbb49c04247a95f828ac2aedc"
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_rules.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-rules-v4-712",
+        "--portseed=712",
+        "--nocleanup"
+      ],
+      "exit_code": 0,
+      "name": "rules",
+      "original_framework_log_sha256": "4ce515441d9c0e1e025861c78cee4ce4bf76383f31029e8a7f25a645e9922f33",
+      "result": "passed",
+      "script": "feature_sharepool_hash_rules.py",
+      "seconds_including_startup_shutdown": 0.677,
+      "source_sha256": "d39c7c0bc2a6b3e47e51015b2605220a412f5babf98a4ac4ea89056f1f63adf5"
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_100_miners.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-100-v4-713",
+        "--portseed=713",
+        "--nocleanup",
+        "--results=contrib/sharepool/results/hash-only-v4-100-miners.json"
+      ],
+      "exit_code": 0,
+      "name": "100-miners",
+      "original_framework_log_sha256": "06a72595d217f0c9670ce9ee6172250799eac7a89c4cbc73808f7a31527aa9de",
+      "result": "passed",
+      "script": "feature_sharepool_hash_100_miners.py",
+      "seconds_including_startup_shutdown": 516.484,
+      "source_sha256": "41f5e98a0c26bfa7478511e8bc2234d36d632444e700a089ddb8bc90ece9ae71"
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_rule_cases.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-legacy-v4-715",
+        "--portseed=715",
+        "--nocleanup"
+      ],
+      "exit_code": 0,
+      "name": "legacy-rule-cases",
+      "original_framework_log_sha256": "60c582710b081a4b0ce50b54baa544af4e4fadbdf98d882165720e8f46eba290",
+      "result": "passed",
+      "script": "feature_sharepool_rule_cases.py",
+      "seconds_including_startup_shutdown": 5.046,
+      "source_sha256": "b87436433d2834292885852d38fde87b4b7b792a33d753b54432bc22a4b269cd"
+    }
+  ],
+  "hundred_miners": {
+    "exit_code": 0,
+    "gate_bypasses": 0,
+    "logical_miners": 100,
+    "native_builder_used": true,
+    "native_nodes": 5,
+    "native_owner_keys_removed": true,
+    "nodes_stopped": true,
+    "physical_miners_used": 0,
+    "report": "hash-only-v4-100-miners.json",
+    "seconds": 515.055,
+    "solved_commitments_modified": false
+  },
+  "native_tests": {
+    "cases": 59,
+    "command": "test_bitcoin '--run_test=sharepool_*' --log_level=message --report_level=detailed --report_format=XML",
+    "exit_code": 0,
+    "report": "hash-only-v4-native-tests.xml",
+    "suites": {
+      "sharepool_hash_relay_tests": 6,
+      "sharepool_hash_store_tests": 5,
+      "sharepool_hash_tests": 22,
+      "sharepool_params_tests": 4,
+      "sharepool_retry_worker_tests": 5,
+      "sharepool_signer_tests": 7,
+      "sharepool_tests": 10
+    },
+    "unrelated_cases_outside_filter": 695
+  },
+  "profile": "hash-only-v4-regtest",
+  "python_tests": {
+    "archive": 13,
+    "batch_and_builder_adapter": 10,
+    "capacity_model": 7,
+    "cases": 102,
+    "codec": 15,
+    "exit_code": 0,
+    "gate": 26,
+    "native_signer": 22,
+    "notes": [
+      "Gate RPC-double cases are policy/storage tests, not substitutes for native transaction validation.",
+      "The capacity and payout cases test analytical models, not production mining or measured payout variance."
+    ],
+    "payout_comparison_model": 9,
+    "runs": [
+      {
+        "cases": 64,
+        "command": "python3 -B -m unittest discover -s contrib/sharepool -p 'test_hash_*.py' -q",
+        "seconds": 8.527
+      },
+      {
+        "cases": 29,
+        "command": "SHAREPOOL_SIGNER_BINARY=/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer python3 -B -m unittest test_native_signer test_share_difficulty_capacity -q",
+        "seconds": 8.737,
+        "working_directory": "contrib/sharepool"
+      },
+      {
+        "cases": 9,
+        "command": "python3 -B -m unittest discover -s contrib/sharepool -p test_payout_variance_comparison.py -v"
+      }
+    ],
+    "skipped": 0
+  },
+  "result": "passed",
+  "scope": "Focused hardening tests; production readiness and payout-variance equivalence are not established.",
+  "scope_notes": [
+    "Fresh opt-in regtest only; public-network activation remains disabled.",
+    "All final native functional runs used the same bitcoind and signer executables. After those runs, only test_bitcoin was rebuilt to add two witness storage cases and rename a fixture.",
+    "100 logical miners use small native-valid templates. Separate 100 overlapping 3.85 MB wire/storage fixtures do not prove 100 near-limit native-valid blocks or worst-case WAN throughput.",
+    "No ASIC, GPU or public network used; the Goldshell configuration was not changed by these runs.",
+    "Deterministic batching and durable evidence retention do not extend origin payment eligibility beyond j+3. Indefinite admitted-credit carry is still unimplemented.",
+    "The regular-pool comparison is conditional analysis. Current one-time settlement, short payment age, sparse proof rate and empty-owner fallback do not establish matching PPLNS/TIDES payout distributions."
+  ],
+  "worker_measurement": "hash-only-v4-worker.json"
+}

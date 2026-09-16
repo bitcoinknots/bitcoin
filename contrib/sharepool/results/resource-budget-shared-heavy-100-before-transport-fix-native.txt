@@ -1,0 +1,38 @@
+2026-09-13T16:56:27.157000Z TestFramework (INFO): PRNG seed is: 7200291869891047227
+2026-09-13T16:56:27.157000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-resource-budget-shared-heavy-100
+2026-09-13T16:56:39.475000Z TestFramework (INFO): Capacity epoch 1/1: 100 distinct native origins, layout=shared, padding outputs=24, witness-heavy=True
+2026-09-13T16:58:24.805000Z TestFramework (INFO): Epoch 1: 25/100 native origins ready
+2026-09-13T17:00:09.140000Z TestFramework (INFO): Epoch 1: 50/100 native origins ready
+2026-09-13T17:01:53.409000Z TestFramework (INFO): Epoch 1: 75/100 native origins ready
+2026-09-13T17:03:37.671000Z TestFramework (INFO): Epoch 1: 100/100 native origins ready
+2026-09-13T17:16:37.359000Z TestFramework.utils (ERROR): wait_until() failed. Predicate: ''''
+        self.wait_until(lambda: all(node.getbestblockhash() == block.hash for node in self.nodes), timeout=120)
+'''
+2026-09-13T17:16:38.130000Z TestFramework (ERROR): Unexpected exception
+Traceback (most recent call last):
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_framework.py", line 136, in main
+    self.run_test()
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_capacity.py", line 464, in run_test
+    batch = settle(batch)
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_capacity.py", line 403, in settle
+    self.wait_tip(block)
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_tides.py", line 120, in wait_tip
+    self.wait_until(lambda: all(node.getbestblockhash() == block.hash for node in self.nodes), timeout=120)
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_framework.py", line 792, in wait_until
+    return wait_until_helper_internal(test_function, timeout=timeout, timeout_factor=self.options.timeout_factor, check_interval=check_interval)
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/util.py", line 352, in wait_until_helper_internal
+    raise AssertionError("Predicate {} not true after {} seconds".format(predicate_source, timeout))
+AssertionError: Predicate ''''
+        self.wait_until(lambda: all(node.getbestblockhash() == block.hash for node in self.nodes), timeout=120)
+''' not true after 120 seconds
+2026-09-13T17:16:38.239000Z TestFramework (INFO): Not stopping nodes as test failed. The dangling processes will be cleaned up later.
+2026-09-13T17:16:38.239000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-resource-budget-shared-heavy-100
+2026-09-13T17:16:38.239000Z TestFramework (ERROR): Test failed. Test logging available at /private/tmp/sharepool-resource-budget-shared-heavy-100/test_framework.log
+2026-09-13T17:16:38.239000Z TestFramework (ERROR): 
+2026-09-13T17:16:38.240000Z TestFramework (ERROR): Hint: Call /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/combine_logs.py '/private/tmp/sharepool-resource-budget-shared-heavy-100' to consolidate all logs
+2026-09-13T17:16:38.240000Z TestFramework (ERROR): 
+2026-09-13T17:16:38.240000Z TestFramework (ERROR): If this failure happened unexpectedly or intermittently, please file a bug and provide a link or upload of the combined log.
+2026-09-13T17:16:38.240000Z TestFramework (ERROR): https://github.com/bitcoinknots/bitcoin/issues
+2026-09-13T17:16:38.240000Z TestFramework (ERROR): 
+[node 1] Cleaning up leftover process
+[node 0] Cleaning up leftover process

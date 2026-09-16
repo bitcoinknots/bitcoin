@@ -1,0 +1,59 @@
+{
+  "base_revision": "d6c9fb9e8552f77d151fbd1d1fabe9f7fa3be039",
+  "build_command": "/private/tmp/sharepool-build-tools-20260912/cmake/data/bin/cmake --build /private/tmp/sharepool-native-build -j 4 --target test_bitcoin",
+  "checks": {
+    "historical_model": {
+      "cases_passed": 18,
+      "command": "python3 -B -m unittest discover -s contrib/sharepool -p test_production_protocol_model.py -v",
+      "exit_code": 0,
+      "log": "tides-accounting-historical-model-tests.txt",
+      "log_sha256": "76a3cb1d6ef5671144e436c302cb7e6926b5ccf205568d5dab8b708e30fdce0a"
+    },
+    "native": {
+      "assertions_passed": 9846,
+      "cases_passed": 92,
+      "command": "/private/tmp/sharepool-native-build/bin/test_bitcoin --run_test='sharepool*' --report_level=detailed --log_level=message --color_output=no",
+      "exit_code": 0,
+      "log": "tides-accounting-native-tests.txt",
+      "log_sha256": "90797a1d20ae4987f9e09b4d2df2e173131572d503af3f099dd25d6ee92ce271",
+      "shared_vectors": 11,
+      "tides_cases": 12
+    },
+    "python": {
+      "cases_passed": 24,
+      "command": "python3 -B -m unittest discover -s contrib/sharepool -p 'test_tides*.py' -v",
+      "exit_code": 0,
+      "independent_oracle_evaluations": 2720,
+      "log": "tides-accounting-python-tests.txt",
+      "log_sha256": "56a17f8eee02e994f314e5132ebadb61d09ce6394afde3284e01147afbaae7e1"
+    }
+  },
+  "conventions": [
+    "caller-authenticated ordered prefix and issued-job cutoff",
+    "common exact integer difficulty scale supplied by caller, no target conversion",
+    "clip oldest contribution, retain original proof",
+    "floor by payout script, leave rounding residue unclaimed",
+    "zero operator fee in native calculator and shared vectors",
+    "empty history requires bootstrap; output budget fails without truncation"
+  ],
+  "limitations": [
+    "arithmetic parity is not native TIDES consensus enforcement",
+    "no share difficulty or payout variance calibration",
+    "no new functional-network, ASIC, WAN, public testnet or mainnet run",
+    "membership authentication, branch history, canonical admission order, job construction, target units, bootstrap and output policies remain native integration work",
+    "v4/v5 pending credits and malformed-preimage hashing remain unchanged"
+  ],
+  "scope": "native and Python accounting libraries; no active consensus, wire, mining gate or public activation change",
+  "selected_contract": "separate pool rewards; TIDES eight-current-difficulty work window",
+  "source": "https://ocean.xyz/docs/tides",
+  "source_sha256": {
+    "contrib/sharepool/test_tides_accounting.py": "a58b060e3f8daa9573869b85ef5434d4ec2253e279d1bb0d4d8ef4b131abc0aa",
+    "contrib/sharepool/test_tides_accounting_oracle.py": "a91abf9e7b23fe0db5670cf7a4c39b338e1437694b0271d245e20590454f18d4",
+    "contrib/sharepool/tides_accounting.py": "0c6a135770bfae52f6cf174499fc0dadda50a2f8fb826761265e181086a5710f",
+    "src/sharepool/tides.cpp": "e6711b52d13e671ceaa1e70bc68469a962b5f2b0c912164021abe5f9257325ea",
+    "src/sharepool/tides.h": "0c0808cafb83f734a6d9ef2d1db9600086cf1fbad944200f2c3c7ab3e37606ab",
+    "src/test/data/sharepool_tides.json": "8b4b9296b00ab21db114795e058b0e3bc895b9e8630d6f038de9d2e49a909115",
+    "src/test/sharepool_tides_tests.cpp": "77a90fa94e5f8fa63341d003467f1c89694dfe01442e5aa1d464003a95d607b2"
+  },
+  "test_binary_sha256": "2426d7b111a9c667ab73ae395d98ae26a9dfd52df62e94131ca3ce19c6478306"
+}

@@ -1,0 +1,257 @@
+{
+  "schema": 2,
+  "kind": "Resource accounting, codec/cache optimizations and reproduced native request-budget failure/fix",
+  "base_commit": "12067610cfd57f23a692f19353f70a590ab79916",
+  "publication_identity": "The enclosing commit records these source and artifact hashes.",
+  "profile": "v6 rules revision 2; native SHIFT10 and all consensus limits unchanged",
+  "source_sha256": {
+    "contrib/sharepool/README.md": "8dc90fac711598446dd5309dabf6fc6552b716ed30a3d366c56f2654c36bc9ca",
+    "contrib/sharepool/capacity_metrics.py": "4c5d2534c45bdee99f12e653ec46e010f4ab6aba6108914015bc8e08498a25db",
+    "contrib/sharepool/test_capacity_fixture.py": "17bf1846ae7ea2b407cceead5a8461a6717be233bcc8ea134ab5ddeed2f1784a",
+    "contrib/sharepool/test_capacity_metrics.py": "721075e9d9d8bb3ca6d8d8366efdb03456a497d52d70304ff94040a307311d69",
+    "contrib/sharepool/test_tides_service_contract.py": "527986941eef62632c388046ad16d5737b73fd5cd20360019e51f6106b072c42",
+    "contrib/sharepool/tides_service_contract.py": "97440e8f1bd17e950d879cf3f8d7bf285ce6401706fb0165ab92820f0e73566e",
+    "doc/sharepool-production-gaps.md": "0868432753349c0015aaf40fe9a4d345d9e575342fea80fdba03c326ae39e3ca",
+    "doc/sharepool-resource-budget-report.md": "4c19f99e89d4aeae681ad08a14e33579c98483cd7739ba10add60e13760a08ec",
+    "doc/sharepool-resource-model.md": "ac4ed5793646b2aa3ba97307d4331ebe449975822d315d621c69514895f664a8",
+    "src/consensus/sharepool_hash.cpp": "dd74c6f960a0f200bcfa870b05eb7488ecc7b0164618636925e9dd7463dc77c7",
+    "src/consensus/sharepool_hash.h": "2326c32363f52fbfc8369600a1e81ee083945a11da7f627a4837464883d4bba6",
+    "src/net_processing.cpp": "69bc2425c16b05d4d4c5d69c66ba5f967d52b7ffc3c8ea9e22c096774c56a073",
+    "src/rpc/mining.cpp": "fb82b7b5483623d2c179bcade6fbf6d99f5e3f9fb3051758669079ad18a5e061",
+    "src/sharepool/hash_relay.h": "55b0779e6bdf8b74004e7c8ae5b7bd06e638a8fb15adea25e20c193c852b62f4",
+    "src/sharepool/hash_validation_cache.h": "717e6ace15693e60572d3a1d10f140519b4abded603838c354753aa5d926f996",
+    "src/sharepool/mining_budget.h": "3f2e64b166a1633a5c041eeebfea55373a613a43c0ccfd397c89dc32d1a1c65b",
+    "src/test/sharepool_hash_relay_tests.cpp": "b97812fa4e407eda76bbbd3397cf90093fdf47ab8a79088b9361ef4b78a09f08",
+    "src/test/sharepool_hash_tests.cpp": "971236ae9129c201651bfed680965f014984682ca4aae3ce7f74e1bef0020f22",
+    "src/test/sharepool_retry_worker_tests.cpp": "9b2d87a8aa67ed1cf2d9c56c2a45c4a8d63a8147b67a5905704607c2add31d9d",
+    "src/validation.cpp": "58bd54705d50e06107d727d6a7b3b268ca97f01428197b78e0310aa8e84d4482",
+    "test/functional/feature_sharepool_hash_capacity.py": "f612f466bb80d11e195d60b8b87224449ef6cee7b43829e0ba1a8cd75ac134d9",
+    "test/functional/feature_sharepool_hash_capacity_replay.py": "7e1bc6c355c5e08204879a9e84ffea66dfd58c6286053408706f60262cc3e647",
+    "test/functional/feature_sharepool_hash_tides.py": "2860c6916f21b2f8007599e21171be5fc0c342f179ab6453428e07ae074f45c6",
+    "test/functional/test_runner.py": "590d313745f2fb7dd38da7b71d70eccd90e2238075a6ab97acb3335c1ff99a7f"
+  },
+  "build": {
+    "type": "Debug",
+    "binary_sha256": {
+      "bitcoind": "7356a4948dd4ee2a1e9dbd222f7c9524a61a145d09b0ca95cfb2658bf694236c",
+      "bitcoin-sharepool-signer": "70f6c7c438d237796705f429bad64b017ad798d110b2cfac845a1b4cb1640494",
+      "test_bitcoin": "18839388e79149e2fd0130184e72e91158b2027672113a1f87f8bd37bf4d67fe"
+    },
+    "exit_code": 0,
+    "command": [
+      "/private/tmp/sharepool-build-tools-20260912/cmake/data/bin/cmake",
+      "--build",
+      "/private/tmp/sharepool-native-build",
+      "--target",
+      "bitcoind",
+      "bitcoin-sharepool-signer",
+      "test_bitcoin",
+      "--parallel",
+      "2"
+    ]
+  },
+  "cpp": {
+    "command": [
+      "/private/tmp/sharepool-native-build/bin/test_bitcoin",
+      "--run_test=sharepool*",
+      "--log_level=test_suite",
+      "--report_level=detailed"
+    ],
+    "exit_code": 0,
+    "cases_passed": 154,
+    "assertions_passed": 142203,
+    "log": "resource-budget-pacing-cpp-tests.txt"
+  },
+  "python_suites": [
+    {
+      "name": "hash",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "contrib/sharepool",
+        "-p",
+        "test_hash*.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "cases_passed": 135,
+      "skipped": 0,
+      "elapsed_seconds": 12.680368792000001,
+      "environment": {
+        "SHAREPOOL_SIGNER_BINARY": "/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer"
+      },
+      "test_sha256": {
+        "contrib/sharepool/test_hash_gate_archive.py": "7143537622f3ff9691bf60bd2c02fe9e8ebcd25b49ab59d35f33d6b29ba03525",
+        "contrib/sharepool/test_hash_gate_batch.py": "e260237636996e3441dc49cb766858518753c2210864501076d37d5b8ac2c903",
+        "contrib/sharepool/test_hash_gate_dispatch.py": "1eadfb713eedda128d16af003fa80bc242065eee6a68102b9282997d89f80d56",
+        "contrib/sharepool/test_hash_gate_ledger.py": "e5057ca75faa411d0ed925a8e7d3c37b1a29274631189697a542f3a4c5edd90b",
+        "contrib/sharepool/test_hash_gate_provenance.py": "10cdbe488c4e2837d2a32d5f87a0b219825f07b85b30d48cff09a0496974b3ba",
+        "contrib/sharepool/test_hash_ledger.py": "9253172df1131aacc19763f51c52714da5ac992791da4b0ada0ecb0926095624",
+        "contrib/sharepool/test_hash_mining_gate.py": "41ef360eab29a5ef36f90208828611f2fae9a8ad53c8cd114fcaf4f503964d14",
+        "contrib/sharepool/test_hash_snapshot.py": "10acdbfa21b9db00db304bce8920051ebff5e347fba92977b05ed6f409a03d67",
+        "contrib/sharepool/test_hash_tides.py": "6eed3b4f2b94459d21f5e81f3173f6d06c3c7c977f63fd14584a0856cea0cfb8",
+        "contrib/sharepool/test_hash_tides_cross_pool.py": "0d08f0f7e2209d099c453ddf461a33b6025a22f8f95812c4864c8c7a2a275b25"
+      },
+      "signer_binary_sha256": "70f6c7c438d237796705f429bad64b017ad798d110b2cfac845a1b4cb1640494",
+      "log": "resource-budget-python-hash-tests.txt"
+    },
+    {
+      "name": "tides",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "contrib/sharepool",
+        "-p",
+        "test_tides*.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "cases_passed": 83,
+      "skipped": 0,
+      "elapsed_seconds": 1.499709875,
+      "environment": {
+        "SHAREPOOL_SIGNER_BINARY": "/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer"
+      },
+      "test_sha256": {
+        "contrib/sharepool/test_tides_accounting.py": "a58b060e3f8daa9573869b85ef5434d4ec2253e279d1bb0d4d8ef4b131abc0aa",
+        "contrib/sharepool/test_tides_accounting_oracle.py": "a91abf9e7b23fe0db5670cf7a4c39b338e1437694b0271d245e20590454f18d4",
+        "contrib/sharepool/test_tides_admission_audit.py": "38c3d94db47f39274f693121df585eaf962959fcd3ecdeb8177dce03c20374ef",
+        "contrib/sharepool/test_tides_calibration.py": "cb3d082c4dfb8369475f8e349a1f5d741916721278155f6e92e294db3d019147",
+        "contrib/sharepool/test_tides_conditional_variance.py": "17185b4fd298093c37bfb8636e808ff9ceb54aa68b3bf271e63806863f56fbc8",
+        "contrib/sharepool/test_tides_hardware_capture.py": "64c84482262239a0c3bb82d1d83169003c24de31b07ff7d4d5d21830aaeae79e",
+        "contrib/sharepool/test_tides_service_contract.py": "527986941eef62632c388046ad16d5737b73fd5cd20360019e51f6106b072c42"
+      },
+      "signer_binary_sha256": "70f6c7c438d237796705f429bad64b017ad798d110b2cfac845a1b4cb1640494",
+      "log": "resource-budget-python-tides-tests.txt"
+    },
+    {
+      "name": "capacity",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "contrib/sharepool",
+        "-p",
+        "test_capacity*.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "cases_passed": 15,
+      "skipped": 0,
+      "elapsed_seconds": 0.144723666,
+      "environment": {
+        "SHAREPOOL_SIGNER_BINARY": "/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer"
+      },
+      "test_sha256": {
+        "contrib/sharepool/test_capacity_fixture.py": "17bf1846ae7ea2b407cceead5a8461a6717be233bcc8ea134ab5ddeed2f1784a",
+        "contrib/sharepool/test_capacity_metrics.py": "721075e9d9d8bb3ca6d8d8366efdb03456a497d52d70304ff94040a307311d69"
+      },
+      "signer_binary_sha256": "70f6c7c438d237796705f429bad64b017ad798d110b2cfac845a1b4cb1640494",
+      "log": "resource-budget-python-capacity-tests.txt"
+    }
+  ],
+  "python_cases_passed": 233,
+  "native_regressions": {
+    "logical_scenarios_passed": 6,
+    "artifact": "resource-budget-native-checks-final.json"
+  },
+  "native_capacity": {
+    "failed_shared_before_transport_fix": "resource-budget-shared-heavy-100-before-transport-fix.json",
+    "captured_failure_analysis": "resource-budget-shared-heavy-transport-failure-trace.json",
+    "fresh_disjoint_after_fix": "resource-budget-disjoint-heavy-100.json",
+    "fresh_native_revalidation_and_remaining_work_replay": "resource-budget-heavy-replay.json",
+    "shared_case_is_not_reclassified_as_a_passed_fresh_capacity_run": true
+  },
+  "preflight_manifest": "resource-budget-capacity-preflight-verification.json",
+  "resource_model_manifest": "tides-v6-resource-model-verification.json",
+  "historical_checks_this_followup": {
+    "before_transport_fix_native_binary_sha256": "120fd9ee24d7f53de8f6dee754a4ebdea3aa535a696ce59f05d99fedf19c9459",
+    "initial_cpp": {
+      "cases_passed": 151,
+      "assertions_passed": 141734,
+      "log": "resource-budget-cpp-tests.txt"
+    },
+    "initial_native": "resource-budget-native-checks-initial.json",
+    "initial_fixture_failure": "A new Python legacy-profile fixture retained the wrong rules hash; corrected and all six native scenarios rerun on final build. Initial logs remain.",
+    "rejected_datadir_relocation": "resource-budget-heavy-replay-profile-relocation-rejected-native.txt",
+    "relocation_scope": "The existing absolute block-directory profile binding refused a copied datadir. No marker was rewritten. Final replay starts fresh chains from public captured records."
+  },
+  "limitations": [
+    "Finite local regtest with controlled settlement timing is not sustained WAN or production-difficulty throughput.",
+    "Heavy origins use the recorded ordinary4M-WU context and regtest-only nonstandard witness scripts. Contextual reduced-data payout reservation is separately unit-tested.",
+    "Earlier preflights retain their recorded older binaries; they are not final-build benchmarks.",
+    "The shared original run failed. Recovery revalidates captured ancestry/proofs on fresh nodes, but does not regenerate100 origins or provide a quiet before/after throughput comparison.",
+    "Replay needs the locally retained public capture identified by file hashes. Raw capture databases and private signer keys are not included in Git.",
+    "Debug timings are finite observations, not maximum production rates.",
+    "Resource diagnostics validate encoding only; they do not authorize a template or check its dependency graph.",
+    "Codec/cache changes do not increase consensus budgets. Transport service allowances are unchanged.",
+    "The general SHIFT14 production envelope fails corrected resource predicates; easier difficulty remains inactive.",
+    "No hardware rerouting, public network activation or coverage-guided fuzz campaign occurred."
+  ],
+  "raw_log_preservation": {
+    "byte_exact": true,
+    "source_whitespace_check": "git diff --cached --check -- . :(exclude)contrib/sharepool/results/** passed",
+    "note": "Raw test logs retain runner-emitted trailing whitespace and terminal blank lines; they are intentionally not normalized. Their exact bytes are pinned below."
+  },
+  "production_ready": false,
+  "artifact_sha256": {
+    "contrib/sharepool/results/resource-budget-capacity-preflight-verification.json": "e66fd38bfd9fa8e8d511e7c84461b443620830faed7900448ea9dd1cae03f292",
+    "contrib/sharepool/results/resource-budget-capacity-python-tests.txt": "3f45aabdbfde3adb656e778e76682b1df807a235156fe35401a55ad20f671b5e",
+    "contrib/sharepool/results/resource-budget-cpp-tests.txt": "0589df479e5e012c09009f51d28e4fb04e66cace418b21787d2b48d77ec5f312",
+    "contrib/sharepool/results/resource-budget-disjoint-heavy-100-native.txt": "dd7a7498da55e09df583613655ef28d85ea825e072660e04bb035c47d6a0354c",
+    "contrib/sharepool/results/resource-budget-disjoint-heavy-100.json": "a1fe9a95b75a08e3c0ddc44255a5946ce9afa66780a0eba45360dbdc912fbf71",
+    "contrib/sharepool/results/resource-budget-heavy-replay-native.txt": "5a1d8eaa3ea7f45aa633aad72b0c27b196a07a26ff8a55fe4fce4d960113f4ea",
+    "contrib/sharepool/results/resource-budget-heavy-replay-profile-relocation-rejected-native.txt": "a644580fd831f5a72256aa10b00f120e19cf161207129f3216d2e6e4c5ee24c1",
+    "contrib/sharepool/results/resource-budget-heavy-replay-verification.json": "ef45cb91f799c84b22440e264ca8ae1ba1334660a3508a6ec102ebdc4bfccfcb",
+    "contrib/sharepool/results/resource-budget-heavy-replay.json": "eaba620ec1542ae2c573e4e1575b739d9a37151b4b7341ec87b39ec235431a01",
+    "contrib/sharepool/results/resource-budget-layout-preflight-disjoint-native.txt": "ba3304785d04aa9fa4d2a6e05ea77aeae8a4cbeef07b75c33f61f278137f9f1a",
+    "contrib/sharepool/results/resource-budget-layout-preflight-disjoint.json": "49a5329044bda4c567be2b33ccf27dd38b544392ae3976b81b9beb620b6d5070",
+    "contrib/sharepool/results/resource-budget-layout-preflight-shared-native.txt": "2170baaddff7e72f2a56ce4d11d9476fbeda3a699b4628cafb11a9a357bebca4",
+    "contrib/sharepool/results/resource-budget-layout-preflight-shared.json": "9feb02e7d7d8b59c7a7af22e417c84772c9b34ec8bbea13f2e11df784b8a9baf",
+    "contrib/sharepool/results/resource-budget-layout-preflight-witness-element-size-failed-native.txt": "2adf7ceee7932dc8af77c60efed006b887d624a2bc003ddf636e2708423a1b2e",
+    "contrib/sharepool/results/resource-budget-layout-preflight-witness-element-size-failed.json": "ff5b02c50cd10dd3b2299be64423b227a3ef51ff515693a95d926ff04e5440c4",
+    "contrib/sharepool/results/resource-budget-layout-preflight-witness-native.txt": "4444b35e609ed0c8646a943a3061493e758778e94f1eb809bcc09019ce7b5c1e",
+    "contrib/sharepool/results/resource-budget-layout-preflight-witness.json": "dd5b02a485f97c249a4771233f8ad3b591c6e9ef46949d59fa8419ca48f23f6d",
+    "contrib/sharepool/results/resource-budget-native-checks-final.json": "5d5838723f0822683fad1899dea679a1924f6d37868a1b5c01773a16acb8d3ac",
+    "contrib/sharepool/results/resource-budget-native-checks-final.txt": "99a9f86b852c5eb51511e9368df865398d1b9d3401171f2a91040c9b23faf644",
+    "contrib/sharepool/results/resource-budget-native-checks-initial.json": "faea467ddccc799028a5350a7b8f25c05365e64bd790ab8fc64f1d8f16f8f2e4",
+    "contrib/sharepool/results/resource-budget-native-checks-initial.txt": "28c73aaacf030c7ed40f3fbcb3e9bc63902b5b9052cd847de825aef60d924642",
+    "contrib/sharepool/results/resource-budget-pacing-cpp-tests.txt": "ad210ff1496a78fb5f643059005ea997bb5d7085cfbef21f04c29c0457371de9",
+    "contrib/sharepool/results/resource-budget-pacing-v4-builder.txt": "dc54f4a623bd7fc492fa1143d3e2ac0468f7416281b0287818f5eb84acea7362",
+    "contrib/sharepool/results/resource-budget-pacing-v4-worker.txt": "d0acd8f297bb32013cb2af4a13583b16bef138790acb93b162e04ba1d4a58661",
+    "contrib/sharepool/results/resource-budget-pacing-v5-ledger.txt": "992a30b4712a8d0624148d4837575fca369e3a82df616012beabe6d4fa5ed485",
+    "contrib/sharepool/results/resource-budget-pacing-v6-archive.txt": "08b5d5ec6180a35fc8453fb3c3e0056b4c26eea4d0fcb3d405d4d99b1fe7ee65",
+    "contrib/sharepool/results/resource-budget-pacing-v6-cpu-transport.txt": "6e58923f0c63247e7749929a5ca956305f538fca6d2ba6614fd97ee177b58f97",
+    "contrib/sharepool/results/resource-budget-pacing-v6-tides.txt": "b6839eb61975fe97526ec7d7eef61ba56df2c2747e40a7f17b2362fd935044a2",
+    "contrib/sharepool/results/resource-budget-python-capacity-tests.txt": "1ac62f1da4e5e6d7eba3fd4c49ab1680aeddca096050d6625da9734a00633410",
+    "contrib/sharepool/results/resource-budget-python-checks.json": "7c9fdcb4f75b153191ab855a9752f3228fac494dbeee3aefd68c716b9b86d7e1",
+    "contrib/sharepool/results/resource-budget-python-hash-tests.txt": "ab2432506163c2368720d431b2a61999b29b91fd24800d93200d1447903a9884",
+    "contrib/sharepool/results/resource-budget-python-tides-tests.txt": "6cd89047472848325fd8f6fdbbd647012723a44eda66c7294cf4bd239d2694bb",
+    "contrib/sharepool/results/resource-budget-shared-heavy-100-before-transport-fix-native.txt": "a0df0bbfb1ef127bef541bad00c7182dfb439edca51ec1f58c8761285fe39a48",
+    "contrib/sharepool/results/resource-budget-shared-heavy-100-before-transport-fix.json": "093294a64f7d20889a41147b755d364c187959544cde910792b9f610f3686f4c",
+    "contrib/sharepool/results/resource-budget-shared-heavy-transport-failure-trace.json": "533622c911c5586e894023e6be7a9d967b58897f56f3516ebc8e7b200f0755d2",
+    "contrib/sharepool/results/resource-budget-shared-two-epoch-preflight-native.txt": "dedb8f437a4006b4cafc00535abd7a560cfb73e615f104e612542deabcac7323",
+    "contrib/sharepool/results/resource-budget-shared-two-epoch-preflight.json": "8f8d90cb981fc96c771556ffe9edf0ca22cff427dac76be395281654dad5c6b4",
+    "contrib/sharepool/results/resource-budget-tides-final.txt": "c7468087148297e2f9bf6b139d7aad0a657ea34a9f4cebee151d822ef745e6c4",
+    "contrib/sharepool/results/resource-budget-v4-builder.txt": "efa2de04a1e70e0136055df861869b1c2b439a57c7e464df15e5af0e5b6ff9b8",
+    "contrib/sharepool/results/resource-budget-v5-ledger.txt": "cc4bb5769713b2bb01c76e12de6dcd310254afe92c6569c6cb94a6d53e570b40",
+    "contrib/sharepool/results/resource-budget-v6-archive.txt": "b67ad9e25bdc889995a22b4d45855c4a53d6d4bc4480cf11c82c09c03ecb98f9",
+    "contrib/sharepool/results/resource-budget-v6-cpu-transport.txt": "789db4a93ac797395ac9d62e9790c744ebb4112c1aae9ad29e1090e06cee4e24",
+    "contrib/sharepool/results/resource-budget-v6-tides.txt": "7fefa259e902e5380075839b86ee76ed8485d495cb804838664f417b11358507",
+    "contrib/sharepool/results/resource-budget-v6-worker.txt": "5148b3762c2fc4a28d5bef613fab8b321c0a08498a3fefce797a959cd2160de8",
+    "contrib/sharepool/results/tides-v6-resource-budget.json": "f99993dd454b637519d86756b67c2ba94676c72bad226d817592d6464cd9d8a5",
+    "contrib/sharepool/results/tides-v6-resource-model-tests.txt": "d741908ff13afcb826c8d2322a6e20cb530db8c19513cf90a6b1aa4b68aa2218",
+    "contrib/sharepool/results/tides-v6-resource-model-verification.json": "970556e0cd8b5e56269083b258deedde1e6d7dd5a244a3880c2b2ec753e8c685"
+  }
+}

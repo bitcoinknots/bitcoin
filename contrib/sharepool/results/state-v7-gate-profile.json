@@ -1,0 +1,26 @@
+{
+  "scope": "Python gate synthetic fixtures with RPC double; no native performance claim",
+  "history_proofs": 100,
+  "new_proofs": 20,
+  "unique_incoming_origins": 1,
+  "source_sha256": {
+    "hash_mining_gate.py": "10246e4061acdc6e28abde6ac45ffecebba17fc09ef333ebf1f382c38d5639c1",
+    "hash_gate_inventory.py": "a95827a8b52243811f05d4cb97a0cb603f2e783271d9be2d04e1af0ac2d36ff6",
+    "hash_gate_batch.py": "9cbbe4bcb32d353811cbbd555aae70c9d86b155c1ba296f09094c7adbc47663c",
+    "hash_snapshot.py": "075ac241ba3f90517df8521967509df3b9af4d29351bc2ff51bb60c121417492",
+    "hash_gate_cache.py": "49408d7b9144198591eeb36a803f6e129aacd121a14d4e5c7547d453f24fb6f5",
+    "hash_state_cache.py": "827a2a4afdea24c14781c39a91904785943dc880d35c00ba706a9cbaabf646f1",
+    "hash_gate_rpc.py": "9731a831c263f2d6e8aef6581454e748892a53c52a1f958cc66a3c62dd846c5a"
+  },
+  "rpc_calls": {
+    "getblockchaininfo": 21,
+    "getsharepoolhashstatus": 21,
+    "getbestblockhash": 62,
+    "getblockhash": 63,
+    "getblockheader": 40,
+    "submitsharepoolhashsnapshot": 43,
+    "validatesharepoolhashshare": 21,
+    "validatesharepoolhashtemplate": 1
+  },
+  "profile_total_seconds": 0.3411614250000001
+}

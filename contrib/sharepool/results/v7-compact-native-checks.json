@@ -1,0 +1,92 @@
+[
+  {
+    "name": "v4-builder",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_builder.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-v7-native-regressions/v4-builder",
+      "--portseed=1210",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 4.019558084,
+    "binary_sha256": "6b83af631e78f68305ca973fb4bef50b16fff1dfdc19302cfa7302394877e242",
+    "signer_binary_sha256": "bbb7b90309010477f0e13866671c84cd05ddb4699c087d55897d6cf10cc169f3",
+    "test_sha256": "71b4189f1017609be1844ebb232fb269af5e5f8fbb49c04247a95f828ac2aedc",
+    "log": "contrib/sharepool/results/v7-compact-v4-builder-native.txt"
+  },
+  {
+    "name": "v5-ledger",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_ledger.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-v7-native-regressions/v5-ledger",
+      "--portseed=1211",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 8.138296707999999,
+    "binary_sha256": "6b83af631e78f68305ca973fb4bef50b16fff1dfdc19302cfa7302394877e242",
+    "signer_binary_sha256": "bbb7b90309010477f0e13866671c84cd05ddb4699c087d55897d6cf10cc169f3",
+    "test_sha256": "da43f90a01a25c2a0b750dac4e681d982959c1d3275603fd64831f990187e162",
+    "log": "contrib/sharepool/results/v7-compact-v5-ledger-native.txt"
+  },
+  {
+    "name": "v6-tides",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_tides.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-v7-native-regressions/v6-tides",
+      "--portseed=1212",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 14.234263208,
+    "binary_sha256": "6b83af631e78f68305ca973fb4bef50b16fff1dfdc19302cfa7302394877e242",
+    "signer_binary_sha256": "bbb7b90309010477f0e13866671c84cd05ddb4699c087d55897d6cf10cc169f3",
+    "test_sha256": "098dc2b32792d4b2cef5252c45ceb16700dfe79a5c93550e103117323c3da8f8",
+    "log": "contrib/sharepool/results/v7-compact-v6-tides-native.txt"
+  },
+  {
+    "name": "v4-worker",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_worker.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-v7-native-regressions/v4-worker",
+      "--portseed=1213",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 12.113989458999999,
+    "binary_sha256": "6b83af631e78f68305ca973fb4bef50b16fff1dfdc19302cfa7302394877e242",
+    "signer_binary_sha256": "bbb7b90309010477f0e13866671c84cd05ddb4699c087d55897d6cf10cc169f3",
+    "test_sha256": "7c864a7835fb74d5e3e355ab66e6a2c8721112cca3a4e51ebd07771bb84b3de2",
+    "log": "contrib/sharepool/results/v7-compact-v4-worker-native.txt"
+  },
+  {
+    "name": "v6-archive",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_archive.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-v7-native-regressions/v6-archive",
+      "--portseed=1214",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 28.79674604200001,
+    "binary_sha256": "6b83af631e78f68305ca973fb4bef50b16fff1dfdc19302cfa7302394877e242",
+    "signer_binary_sha256": "bbb7b90309010477f0e13866671c84cd05ddb4699c087d55897d6cf10cc169f3",
+    "test_sha256": "ffe1655520f4a046434c4882b47b4b424e5620f8bcc5e04d5c7cffa0f6a47158",
+    "log": "contrib/sharepool/results/v7-compact-v6-archive-native.txt"
+  }
+]

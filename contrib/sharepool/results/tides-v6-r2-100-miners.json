@@ -1,0 +1,67 @@
+{
+  "schema": 2,
+  "profile": "hash-only-v6-tides",
+  "rules_revision": 2,
+  "result": "passed",
+  "started_utc": "2026-09-13T07:54:38.331998+00:00",
+  "network": "isolated native regtest",
+  "logical_miners": 100,
+  "native_nodes": 2,
+  "physical_miners_used": 0,
+  "transport": "v1",
+  "rewards": [
+    {
+      "height": 102,
+      "commitment": "dff529c2659b666aa839d8e52712145ecad1c1440967256f3b761139e3e03b5c",
+      "new_admissions": 100,
+      "eligible_proofs": 100,
+      "payout_scripts": 100,
+      "reward_satoshis": 5000100000,
+      "unclaimed_rounding_satoshis": 0,
+      "whole_admission_height_cohorts_verified": true,
+      "exact_rational_window_and_coinbase_verified": true
+    },
+    {
+      "height": 103,
+      "commitment": "e6af34bdbb1dc6ad16bef48683056f4709c5ab3765e7e495e80c5404493204c3",
+      "new_admissions": 2,
+      "eligible_proofs": 102,
+      "payout_scripts": 100,
+      "reward_satoshis": 5000000000,
+      "unclaimed_rounding_satoshis": 74,
+      "whole_admission_height_cohorts_verified": true,
+      "exact_rational_window_and_coinbase_verified": true
+    },
+    {
+      "height": 104,
+      "commitment": "ccd46a31c6b1b25ad660d6c31a8abc6f7f9a6d9efba02ea1b46ca949a4b637e1",
+      "new_admissions": 0,
+      "eligible_proofs": 102,
+      "payout_scripts": 100,
+      "reward_satoshis": 5000000000,
+      "unclaimed_rounding_satoshis": 74,
+      "whole_admission_height_cohorts_verified": true,
+      "exact_rational_window_and_coinbase_verified": true
+    }
+  ],
+  "native_binary_sha256": "ebf5acc747e5bc7d51b928ada4d14232b5d43a8f7ba948b1799a688c1b391cb8",
+  "limitations": [
+    "100 logical gates use one validating node; a second node validates through P2P",
+    "The coordinator collects all proofs; full 100-by-100 gate replication is not simulated",
+    "Regtest proves protocol behavior, not mainnet capacity, sampling variance or WAN performance",
+    "Proof target is deliberately easy; approximately 16 units of work are proportionally drawn from complete admission-height cohorts",
+    "Only acknowledged work admitted into canonical history becomes recurring reward-eligible"
+  ],
+  "distinct_valid_native_templates": 100,
+  "independent_valid_transactions": 100,
+  "authorized_initial_jobs": 100,
+  "initial_shares_admitted": 100,
+  "carried_late_and_winning_shares": 2,
+  "proof_binding_rejections": 2,
+  "invalid_payout_rejections": 1,
+  "frozen_late_work_verified": true,
+  "same_address_separate_pool_accepted": true,
+  "native_and_gate_restart_verified": true,
+  "full_snapshot_p2p_follower_verified": true,
+  "seconds": 71.185
+}

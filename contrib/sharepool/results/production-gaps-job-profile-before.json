@@ -1,0 +1,202 @@
+{
+  "result": "passed",
+  "rewards": [],
+  "source_sha256": {
+    "hash_mining_gate.py": "fb317723022963485cdf4ac5c7497c3dc8c4bb44c17a570c974d10434e6b1596",
+    "hash_snapshot.py": "075ac241ba3f90517df8521967509df3b9af4d29351bc2ff51bb60c121417492",
+    "hash_gate_batch.py": "9cbbe4bcb32d353811cbbd555aae70c9d86b155c1ba296f09094c7adbc47663c",
+    "hash_state_cache.py": "827a2a4afdea24c14781c39a91904785943dc880d35c00ba706a9cbaabf646f1"
+  },
+  "fixture": {
+    "native_parent": "0cd2b460e6c1d455194e9ba6aa84c4fe2e7fe73601747305d0cadec6d888279f",
+    "height": 101,
+    "distinct_valid_origins": 100,
+    "distinct_transaction_sets": 100,
+    "payout_identities": 100,
+    "real_proofs": 100,
+    "template_bytes": {
+      "count": 100,
+      "total_bytes": 533250,
+      "min_bytes": 432,
+      "p50_bytes": 5283,
+      "p95_bytes": 9738,
+      "p99_bytes": 10134,
+      "max_bytes": 10233
+    },
+    "proof_sequence_sha256": "e61d1b270e3a442c5607211fd1aca34f4775d8c2eb1a88ed292f67038e76fa72",
+    "mempool_txids": [
+      "009900a5f3d127bf2096d7d29d0583826f013ed65ac9963b646ec73a86de8c94",
+      "033b21f881ea5b43486d4f60d5fb392880c436bc9bb1eac76de7993bb83381ba",
+      "04bd7ba283da64127f5a6fe1192e985d0a3efac3e8816c238dbeb5daff21b2be",
+      "06df886cf904be0b31c7a807b4771c688634a908edb3c1180b59c12c5f4b9c2f",
+      "093614e97b0317b2745af89f383516c3f8f5b8074d59221cfeaf100468318396",
+      "097631b144d467f2ed6adefc7fcf482701f61ddb8c25deb52da2b4058677265f",
+      "09dc02f18258be173cec71fbb635289b4c2a7fa46adde7f0fd733e48f4e89f06",
+      "100c25f466f42553e8223d910f2636a5b595bbf2c0951bdfb6f98ebfa7c29637",
+      "10fd401e13be448f88a90870108d99ae4f0c3c9d9610c91f656b5dbf93f90ffd",
+      "12198b5d0107dafcd3307d5702129e212b190951ce2f8259fcba3e90c0a69b5b",
+      "12b691fd77e21b72a366374d5a9bbd2e6dfee0892f6b271211fc3008aebf1f57",
+      "157d24bb54e21e2031d8db88f846880c98ad50aa91534fe6985977083d44dc7b",
+      "1698b265334be446564190de847b9d810e74689f82ab2a7030ede4dbd2af7c72",
+      "1789e521a158fb48dedd78090f07bd039f9fcaa75f67dd93ce82994aaf4e70ee",
+      "17dcf2186aefaa48c8b6bb6d20aed35da034f200983f755715b5f7b7629eb34a",
+      "1dad5453d34f9cb2a22a96797069fdb81daa2739bca00956361809d74d36b1b9",
+      "1e8602f2600b3e8e7bf9f37936143b9daa290b9cd04da03f868aa1ef8d4b4bd4",
+      "24c29e11986778c1cce7bb2d89a77ce605ed1e3ed135a4f84f76132182e5cb4b",
+      "28dbb455fdb9b1d805cc51b88ca1793796260e094d046d442262913727e2f876",
+      "2ba9bb72e2accdf8507cce4fa17f7555eb3297c30c19ab108630ff7b6b3b02ff",
+      "328db20df5f24e83f2b7d7306c1845dc38a430d8d90c7d5c9aaeb1dca42bbd15",
+      "3396df01faf3cd98573057ee36b7eabf1815ea48b3ec9f7e97e93af01e5446d3",
+      "33c78f3f44b02e7d9e6e996c3163cebaf76b2ac8abc0ef4414fbd384b72c8d1e",
+      "38e7df72c5c05415d9685bea58511c9be319846b5590e3d8279588f0949d44d9",
+      "3ab70632e5d3376bede160858cdcd70cda5a8453b8aeb339cf62c2d5930de720",
+      "3bde7136d0cdd7bba16d41cfad97e17b90381573dd8e0ff925dac0233a0ca6d2",
+      "3d7ce2576070f0be17204a91294cb1195a864a4a5a6a88a061ea870ff338c619",
+      "3dfc811fd585213aab730e6f53d473a7d76bdc112576d3dcfc3c83b3ddd1527b",
+      "3f9a6b2530d1bc85e95ce3b4c976541120271033dbced132727da95bc18725f1",
+      "4086f8aa82a4f0771e66f35e76c3190b0936d486baccf55d985653cefc4bb460",
+      "44358a673e02210aca3fc5bf5b03552cf6bdab2aa5befe53ddfec22ac05a4dbb",
+      "443f7159b4dcb279276a1efd7bb563634711acf4fe7cc22e3a43f63d526828a2",
+      "4850064700296ccbc4efc03170603d7962283aebf67a47f3bb597acee2832bcd",
+      "508160efb8742a3be09ba1a64d658cdc026df7865c09fce1c054e3dc3029d79f",
+      "50c3e6a69cd9c707ff29105c9ab687664f265a98b29a099291c4c4caa793c2b1",
+      "515d820f7879a1127085eaaffd9ef7ff61946e30407ed93436d71844745277b1",
+      "526ac1349cb0aeaf8a24500b8829721c1c1dc2ffee01d9359855c51f06b245b6",
+      "53d860e60e6e7897c63eb07634292f25794f31e8743661797ac0e12a905bf507",
+      "54aed601e751694009ed2643bb54fe86690fce90087d0b0651e1ef5e2cfd2c3a",
+      "55d4a437b8d8ef87f0741fae4370fa1dfa96f151d357dbdd178aa482badf4e94",
+      "566f4c49e9d668a4c242d20a71b980bab35e769b1213f09aead7fed6c0fa0e23",
+      "56cf7aad87e4a210392b20d1ac7fc1982ff1ebcb6ac83289311a3ea9cef3d2e9",
+      "5ad4883c17ab9f86abc799d8a1b5d8cb9237d2c836d47bafc5f882fc79eae1ec",
+      "5f103622be48cf71acbe25b0ad0b1ab28442dca27e534adf39872e0c1e8c0b57",
+      "6018b25e01bd23db73f457cbc477fe2707d1e13c30c2444e23482ab694ceadd3",
+      "64edb23cf7516dbc37e67590b50983debc49f891b86f067c2f5dbe57887ba7c5",
+      "65515632173870fdb69b37eee2f4db2c6c3dff6a2a184bf9f08b73dd32f9fdb2",
+      "67c37974f926b4433604aaae9e1f0be22971ec2b1d80676f40a89fae843303d9",
+      "68f2adab6bd0ce3a7fef098d51cf64869c07078344aed9184f96e69c6b780e8b",
+      "6be748cbc995c040be0af4b81a4e1020e26549e3fce18842ff01708d3c298972",
+      "6e8205e64e9d56da98d3f252cce02de36f9033129a128012f8476522c7895a59",
+      "704f967bc64d3962c618a1dbd5c71cb1e5f77e1e8091956b23eff9d093e10e55",
+      "71e19eab45bbc1acbb9e4f1bf5666dcc46c5767823780ae7913a2fbd329d2157",
+      "7559d4bbf4f4e8d1b94196aab3c8aeb6a52b44a3a0331e95d07e810f418de578",
+      "7992ab8e703c36be50e1fe56c14a0ecc94bb2a8aecd368a4fca3c30cd3b65d7b",
+      "7f75b780f687e91aaf53cf8a27724cc5b67ca69e1753c39426deeff11e73a127",
+      "7ffa2e210867848886970b1b511d221f6c62f94636350464c3435da85b3dd7ac",
+      "858ef64ff8e8f6aabee0ba296e50ae83b19abcef54e29de4868be4c784077c48",
+      "8de4e4708717fe4476ba1f22285b55896fa722aff832be69bc78494ed639eacc",
+      "905be302a88d97e91e24f10d8665322ec66eddf1b992b5dda0fb671e95df3946",
+      "93a5feb328ddfb05f6c2ede1cbb39315813d930fdbf4fd666f9b447f3e0fbe8d",
+      "9885e809dda9542a6b35fa67c84d8872fca0172bed0384866052ebe7a6444856",
+      "9af35e368b9d569265a85a533eef3ac578814b4a85a8e7c46f163af906fcc702",
+      "9bdc422edb02f67083ac1b34695fb39091f0c75a141d755b055dbdf3c9c54b04",
+      "9f0ea32b1d472e258fd286c4d57266b5f5af96cb85f388e88476397d43798188",
+      "aac24921ebd8271ca87dd1302ca385f4afccd6afb1a5dcdfd963cafd3df70d64",
+      "aea8dbabd3bc261a4893e391c8fc48dc5905010c5499d2f211364244df917679",
+      "b0a11d6311ea488e6e4f4143965d3385d631815300e567103a9ff3e3639fa035",
+      "b20f5aa3dbd0682b3980e503dde691008c708202b67a2da459645089378cd4eb",
+      "b38370f7c5367f144b9c6f9fc6c156a24b656ed158ed89298c494b3a1e31ac98",
+      "b4b322282a964dbde750c116f63d0ed2bb164eb609d144891fc93335bb401159",
+      "b770472c2cbd58cf58afe56a1b23bb2559cba874849e4bf2a2f826e70cd25b49",
+      "b9b759cb2fb49191ae04582f586b7ac244176655a9ac6c0ad728fb5aa6909135",
+      "ba62780e96a7764ea10daf06e67e56284c07f18d0a509de95f0b6a7a852d96c9",
+      "bb903542a8767268cd9f16a7de08e4ec47aa8518b9486c9d274b21303aa9943c",
+      "bc85c2ea8f47608682c60b174d7c7a0cf2dcafd53259c12db460716da5ba7f35",
+      "bf400e5094f4d9f30e984ab95d890a909eb9728133213c9ffe794ac4929254d3",
+      "c8d2186bbed8cfc9018db4c495e464cddff3fc5d24835509333de409c2576866",
+      "c900f200cfdad18cabdff3115dd68e065048209a577fde6e49f787807146eaa5",
+      "c9ec33cbe87c89a337661619c7a6b5417cb1fc2936b76f20284a840cb03a4d97",
+      "ca3d80e8bee173b989abd05b4ac1f6a7a7ecc74e5012ce441513017f1c2c49a6",
+      "ca853ab22687ac98f2f3d9f8df84b07b20fb586889d7613bb27c15175321214d",
+      "cef1d5130ca317414d2e7fe23f59abbbeae66b8b22a37000f20e3fc2531849f2",
+      "d2a82a76638ffca56f62f24a266a84cf54ef84e647246f64d9f50c87b5a4e744",
+      "d77c7c256feb15c5818e3e71b301bd60f2379613369220382c8722d08849b73a",
+      "d790295f6a5acff5d477590299b5529c051340f9e58560592d89e9ef31c7316e",
+      "df1ca3424986dfd7c4c5c17bed1ce26b05fb6805df62986957c8ca81df6bb1d4",
+      "e1f1b2a84a4708a7accc61dce9732175464e220bd91c54cda7250ecd0818b419",
+      "e2c4a261a916dc71d08395e5aece615877cee8eccf2d2491b2fde960c3b18701",
+      "e3676332bb77be25a79bd05ef4c2ad2002e02e3443d4fbc01d36134e63d9e1d9",
+      "e46f705f1a89e5d7bda6db5aca3f01884bbd1f3952d72ed6bf81284fba45969f",
+      "e7c3fee61fedcc40b3254a72cabfefe7470049725a3bd36e31cd1b522e65ef8c",
+      "e98ec24d177233037b2939b390e8df5fef8881502c610c987e50e12b4a1dc6ed",
+      "ed60e778fde284617c32862b683d2ed302696c20cde0404f0549bee3e5c69d29",
+      "f07c1832d4c5c044d9a7b324990b6dd97c03885522c717a05199c0e010defbd1",
+      "f270a068f54b277f12b0397cb91fffd400de98d535a8abe0d8e02d184a8c3ea4",
+      "f2d429fed9dcdbeec69efc78fa81c062d5b7f958381f796c87092e0c0e713eca",
+      "f4af8bfaf8706f3b32ff4b7da4ed3cc8c59247f99d8b3bb96671bc62eb93b124",
+      "f89de18d1b4cd56b2566a266022bb356604b1c94fc8ca1db2f2ddca709bf955a",
+      "fe4ef4c351ad90316cf7d35e39d02548d4ca5be0faea935cf0d17e1ebceb7666"
+    ],
+    "mock_native_time": 1789365675,
+    "scheduler_clock": "real time.monotonic; native block time fixed equally in both arms",
+    "both_backends_restarted_after_identical_collector_preload": true
+  },
+  "timings": {
+    "construct_wall_seconds": 8.157926792000005,
+    "authorize_wall_seconds": 8.234527582999995,
+    "publish_wall_seconds": 0.11780208399999736
+  },
+  "profile_seconds": 16.491953725000002,
+  "state_cache": {
+    "entries": 4,
+    "bytes": 16368,
+    "shares": 0,
+    "hits": 0,
+    "misses": 1406,
+    "oversized": 0
+  },
+  "rpc": {
+    "methods": {
+      "profile.rpc.node0.getblockchaininfo": {
+        "request_bytes": 168,
+        "calls": 4,
+        "response_bytes": 1940
+      },
+      "profile.rpc.node0.getsharepoolhashstatus": {
+        "request_bytes": 212,
+        "calls": 4,
+        "response_bytes": 4057
+      },
+      "profile.rpc.node0.getbestblockhash": {
+        "request_bytes": 656,
+        "calls": 16,
+        "response_bytes": 1056
+      },
+      "profile.rpc.node0.getblockhash": {
+        "request_bytes": 4392,
+        "calls": 110,
+        "response_bytes": 7260
+      },
+      "profile.rpc.node0.getsharepoolhashtidesbudget": {
+        "request_bytes": 330,
+        "calls": 2,
+        "response_bytes": 554
+      },
+      "profile.rpc.node0.preparesharepoolhashjob": {
+        "request_bytes": 180846,
+        "calls": 1,
+        "response_bytes": 214646
+      },
+      "profile.rpc.node0.finalizesharepoolhashjob": {
+        "request_bytes": 213592,
+        "calls": 1,
+        "response_bytes": 213847
+      },
+      "profile.rpc.node0.validatesharepoolhashtemplate": {
+        "request_bytes": 427194,
+        "calls": 2,
+        "response_bytes": 554
+      },
+      "profile.rpc.node0.submitsharepoolhashsnapshot": {
+        "request_bytes": 281988,
+        "calls": 101,
+        "response_bytes": 10806
+      }
+    },
+    "totals": {
+      "calls": 241,
+      "request_bytes": 1109378,
+      "response_bytes": 454720
+    }
+  },
+  "wall_seconds": 54.930952458
+}

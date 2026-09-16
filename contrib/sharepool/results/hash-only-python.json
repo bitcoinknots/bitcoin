@@ -1,0 +1,43 @@
+{
+  "generated_utc": "2026-09-12T18:33:29.448875+00:00",
+  "command": [
+    "python3",
+    "-B",
+    "-m",
+    "unittest",
+    "-v",
+    "test_hash_snapshot",
+    "test_hash_mining_gate"
+  ],
+  "cwd": "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool",
+  "exit_code": 0,
+  "tests_passed": 25,
+  "unittest_reported_seconds": 2.525,
+  "log": {
+    "path": "/private/tmp/sharepool-hash-python-tests.log",
+    "sha256": "f6f11b0cea6c1b82ef3399e32a387925fb59a692d2fc7585848941f319dcfb4e"
+  },
+  "scope": "Deterministic codec/gate tests; native RPC doubled. Includes scalar metadata length preflight added after native integration process started.",
+  "sources": [
+    {
+      "path": "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_snapshot.py",
+      "sha256": "b50167045f21816d444e778b79fe4cce2a447bd7e695bac9cb0a33e581130812"
+    },
+    {
+      "path": "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_mining_gate.py",
+      "sha256": "3c997ed81540459c67a09ebf1aa61eb47c468e8bca723866f459055efd8a1581"
+    },
+    {
+      "path": "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/test_hash_snapshot.py",
+      "sha256": "ac967744ed1ef963ed524f1c3af7b502ee2dba47df093fc9b269799635465a80"
+    },
+    {
+      "path": "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/test_hash_mining_gate.py",
+      "sha256": "b20b12161b08a222d025946346d73c7c26c7c24834c285b6d34f6715a8797a78"
+    },
+    {
+      "path": "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_100_miners.py",
+      "sha256": "857139289706a0bd9da36cae472263c3f4b697fed3a605ada14efcd20482b3ee"
+    }
+  ]
+}

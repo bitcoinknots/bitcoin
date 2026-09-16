@@ -1,0 +1,47 @@
+{
+  "result": "passed",
+  "command": "python3 -B test/functional/feature_sharepool_hash_state_reuse.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-v7-state-focused-3 --portseed=1360 --nocleanup > /private/tmp/sharepool-v7-state-focused-3-native.txt 2>&1",
+  "working_directory": "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool",
+  "source_unchanged_during_successful_run": true,
+  "source_sha256": {
+    "contrib/sharepool/hash_snapshot.py": "075ac241ba3f90517df8521967509df3b9af4d29351bc2ff51bb60c121417492",
+    "contrib/sharepool/hash_state_cache.py": "827a2a4afdea24c14781c39a91904785943dc880d35c00ba706a9cbaabf646f1",
+    "contrib/sharepool/hash_gate_batch.py": "9cbbe4bcb32d353811cbbd555aae70c9d86b155c1ba296f09094c7adbc47663c",
+    "contrib/sharepool/hash_mining_gate.py": "10246e4061acdc6e28abde6ac45ffecebba17fc09ef333ebf1f382c38d5639c1",
+    "contrib/sharepool/hash_gate_rpc.py": "9731a831c263f2d6e8aef6581454e748892a53c52a1f958cc66a3c62dd846c5a",
+    "test/functional/feature_sharepool_hash_state_reuse.py": "ed10fd0d4c0badf52da2c27bba57ef855b53121d65d1bbb6f86ae189f0f3bc1e"
+  },
+  "daemon_sha256": "2f06596d94347f8491c6506d8474e4ffbfc44243fd41f0bcb884957e108d5365",
+  "signer_sha256": "bbb7b90309010477f0e13866671c84cd05ddb4699c087d55897d6cf10cc169f3",
+  "result_artifact": {
+    "path": "/private/tmp/sharepool-v7-state-focused-3/state-reuse-results.json",
+    "sha256": "89502e84fad0b040182f1cb8378ef077ccd34e7483da27a7348ddee8bbed1bff"
+  },
+  "logs": [
+    {
+      "path": "/private/tmp/sharepool-v7-state-focused-native.txt",
+      "sha256": "3a8519834dd02af41902147e921882b38d9f83d0d663435994807fa588da7e8c"
+    },
+    {
+      "path": "/private/tmp/sharepool-v7-state-focused-2-native.txt",
+      "sha256": "44a7df272028f1eb226f2eead276aae0e5aea12d1e6ab76130e2880175b87bed"
+    },
+    {
+      "path": "/private/tmp/sharepool-v7-state-focused-3-native.txt",
+      "sha256": "a87055467bec62a0f62537523c2e2ae5cca33be94aa48d0d8637dd3fabd1cce4"
+    }
+  ],
+  "historical_bringup": [
+    {
+      "run": 1,
+      "result": "failed fixture assertion",
+      "cause": "assert_raises returns None; test incorrectly inspected that return for exception text. Corrected to a direct ValueError catch; no runtime change."
+    },
+    {
+      "run": 2,
+      "result": "incomplete fixture native backend recovery",
+      "cause": "The replacement same-tip backend had recovered B but not A. Native settlement correctly failed missing-data. Final test asserts that refusal and recovers the retained A receipt explicitly before payout settlement."
+    }
+  ],
+  "scope": "Two local disposable native regtest nodes; correctness/RPC call counts only; no timing or capacity claim"
+}

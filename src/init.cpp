@@ -74,6 +74,7 @@
 #include <rpc/util.h>
 #include <scheduler.h>
 #include <script/sigcache.h>
+#include <sharepool/tides_history.h>
 #include <stats/stats.h>
 #include <sync.h>
 #include <torcontrol.h>
@@ -334,6 +335,9 @@ void Shutdown(NodeContext& node)
     StopTorControl();
 
     if (node.background_init_thread.joinable()) node.background_init_thread.join();
+    // Retry work may wait for validation callbacks. Join it while the scheduler
+    // still services those callbacks, and without holding cs_main.
+    if (node.chainman) node.chainman->StopSharePoolHashWorker();
     // After everything has been shut down, but before things get flushed, stop the
     // the scheduler. After this point, SyncWithValidationInterfaceQueue() should not be called anymore
     // as this would prevent the shutdown from completing.
@@ -475,11 +479,14 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     const auto testnet4BaseParams = CreateBaseChainParams(ChainType::TESTNET4);
     const auto signetBaseParams = CreateBaseChainParams(ChainType::SIGNET);
     const auto regtestBaseParams = CreateBaseChainParams(ChainType::REGTEST);
-    const auto defaultChainParams = CreateChainParams(argsman, ChainType::MAIN);
-    const auto testnetChainParams = CreateChainParams(argsman, ChainType::TESTNET);
-    const auto testnet4ChainParams = CreateChainParams(argsman, ChainType::TESTNET4);
-    const auto signetChainParams = CreateChainParams(argsman, ChainType::SIGNET);
-    const auto regtestChainParams = CreateChainParams(argsman, ChainType::REGTEST);
+    // These parameters supply help-text defaults for every network. Do not
+    // apply a selected network's test overrides to the other networks here.
+    const ArgsManager default_args;
+    const auto defaultChainParams = CreateChainParams(default_args, ChainType::MAIN);
+    const auto testnetChainParams = CreateChainParams(default_args, ChainType::TESTNET);
+    const auto testnet4ChainParams = CreateChainParams(default_args, ChainType::TESTNET4);
+    const auto signetChainParams = CreateChainParams(default_args, ChainType::SIGNET);
+    const auto regtestChainParams = CreateChainParams(default_args, ChainType::REGTEST);
 
     // Hidden Options
     std::vector<std::string> hidden_args = {
@@ -518,6 +525,12 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-datadir=<dir>", "Specify data directory", ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION, OptionsCategory::OPTIONS);
     argsman.AddArg("-dbbatchsize", strprintf("Maximum database write batch size in bytes (default: %u)", nDefaultDbBatchSize), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::OPTIONS);
     argsman.AddArg("-dbcache=<n>", strprintf("Maximum database cache size <n> MiB (minimum %s, default is platform dependent, between %s and %s). Make sure you have enough RAM. In addition, unused memory allocated to the mempool is shared with this cache (see -maxmempool).", MIN_DBCACHE_BYTES / 1_MiB, MIN_DEFAULT_DBCACHE / 1_MiB, MAX_DEFAULT_DBCACHE / 1_MiB), ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-sharepooltideshistorycachemib=<n>", "Local TIDES v6 history delta cache budget per validation/RPC thread, in positive whole MiB (default: 64). Does not change consensus rules; requires -sharepooltides.", ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION | ArgsManager::DISALLOW_ELISION, OptionsCategory::DEBUG_TEST);
+    argsman.AddArg("-sharepooltideshistoryquerymib=<n>", "Local TIDES v6 retained history query budget per validation/RPC thread, in positive whole MiB (default: 64). Increase and restart if a valid window remains pending at the query budget. Physical RAM and additional decoding/output memory are required; this is not a process memory limit. Requires -sharepooltides.", ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION | ArgsManager::DISALLOW_ELISION, OptionsCategory::DEBUG_TEST);
+    argsman.AddArg("-sharepoolarchivemib=<n>", "Positive local charged snapshot archive quota in MiB (default: 1024). There is no snapshot-count ceiling. Database overhead and temporary compaction need additional disk space. Requires the explicit regtest hash-only profile.", ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION | ArgsManager::DISALLOW_ELISION, OptionsCategory::DEBUG_TEST);
+    argsman.AddArg("-sharepoolarchiveindexrebuild=<0|1>", "Rebuild the disposable snapshot archive index from authenticated payloads (default: 0). Interrupted rebuilds resume automatically; normal startup uses an atomic index checkpoint. Requires the explicit regtest hash-only profile.", ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION | ArgsManager::DISALLOW_ELISION, OptionsCategory::DEBUG_TEST);
+    argsman.AddArg("-sharepooltidesindexmib=<n>", "Positive local charged TIDES history index quota in MiB (default: 1024), excluding database compaction. Missing or full indexes fall back to authenticated history scans. Requires the explicit regtest TIDES profile.", ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION | ArgsManager::DISALLOW_ELISION, OptionsCategory::DEBUG_TEST);
+    argsman.AddArg("-sharepooltidesindexrebuild=<0|1>", "Discard and rebuild only the derived local TIDES history index (default: 0). Native blocks and snapshot evidence are retained. Rebuild advances through bounded payout queries. Requires the explicit regtest TIDES profile.", ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION | ArgsManager::DISALLOW_ELISION, OptionsCategory::DEBUG_TEST);
     argsman.AddArg("-dbfilesize",
                    strprintf("Target size of files within databases, in MiB (%u to %u, default: %u).",
                              1, 1024,
@@ -1069,6 +1082,19 @@ bool AppInitParameterInteraction(const ArgsManager& args)
 
     if (!errors.empty()) {
         return InitError(errors);
+    }
+
+    for (const char* option : {"-sharepooltideshistorycachemib", "-sharepooltideshistoryquerymib"}) {
+        if (args.GetArgs(option).size() > 1) return InitError(Untranslated(std::string{option} + " may be specified only once"));
+        if (args.IsArgSet(option) && !chainparams.GetConsensus().SharePoolTides) {
+            return InitError(Untranslated(std::string{option} + " requires the opt-in regtest TIDES profile"));
+        }
+    }
+    try {
+        sharepool::tides::ConfigureHistoryCache(sharepool::tides::HistoryCacheBudgetFromMiB(
+            args.GetArg("-sharepooltideshistorycachemib", "64"), args.GetArg("-sharepooltideshistoryquerymib", "64")));
+    } catch (const std::invalid_argument& error) {
+        return InitError(Untranslated(error.what()));
     }
 
     // Testnet3 deprecation warning
@@ -2212,6 +2238,7 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
         ScheduleBatchPriority();
         // Import blocks and ActivateBestChain()
         ImportBlocks(chainman, vImportFiles);
+        chainman.StartSharePoolHashWorker();
         WITH_LOCK(::cs_main, chainman.UpdateIBDStatus());
         if (args.GetBoolArg("-stopafterblockimport", DEFAULT_STOPAFTERBLOCKIMPORT)) {
             LogPrintf("Stopping after block import\n");

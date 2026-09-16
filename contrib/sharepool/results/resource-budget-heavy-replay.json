@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "kind": "Captured native heavy-pipeline recovery/replay; not a fresh capacity benchmark",
+  "result": "passed",
+  "started_utc": "2026-09-13T17:33:31.245990+00:00",
+  "source_dir": "/private/tmp/sharepool-resource-budget-shared-heavy-100",
+  "source_files_sha256": {
+    "node0/regtest/blocks/blk00000.dat": "b9a5681a2f8164b33461d7b2d1f431cfa7ace8db789a479cc3cc56295af75527",
+    "node0/regtest/blocks/xor.dat": "4e8182d4b33912e97b4fd8cfa27634d9de216feaa5fa1c1f3218b1c086ee434b",
+    "capacity-gates/collector.sqlite": "849b8449135dde8ae16380871a8db57d22fd37b63eb5879df63a6968fde32a1e",
+    "capacity-gates/collector.sqlite.archive-head.json": "6058bfcd4fd508542ded473c79b25a511bcd2b8be5fc64d398ee21a66de9df0f"
+  },
+  "command": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "test/functional/feature_sharepool_hash_capacity_replay.py",
+    "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+    "--source-dir=/private/tmp/sharepool-resource-budget-shared-heavy-100",
+    "--tmpdir=/private/tmp/sharepool-resource-budget-heavy-replay-fresh",
+    "--portseed=1080",
+    "--max-runtime-seconds=900",
+    "--nocleanup",
+    "--results=contrib/sharepool/results/resource-budget-heavy-replay.json"
+  ],
+  "rewards": [
+    {
+      "height": 102,
+      "commitment": "12cce52c20d9c9c7f44a24f273b6c5d68f631b15a4d197492e40bc6770e94bd2",
+      "new_admissions": 201,
+      "eligible_proofs": 201,
+      "payout_scripts": 67,
+      "reward_satoshis": 5001220000,
+      "unclaimed_rounding_satoshis": 42,
+      "whole_admission_height_cohorts_verified": true,
+      "exact_rational_window_and_coinbase_verified": true
+    },
+    {
+      "height": 103,
+      "commitment": "7a8261d9f131c96810d116daedc786050a47b23c13cccfca7d6fd379df15300b",
+      "new_admissions": 99,
+      "eligible_proofs": 99,
+      "payout_scripts": 33,
+      "reward_satoshis": 5000000000,
+      "unclaimed_rounding_satoshis": 17,
+      "whole_admission_height_cohorts_verified": true,
+      "exact_rational_window_and_coinbase_verified": true
+    }
+  ],
+  "native_binary_sha256": "7356a4948dd4ee2a1e9dbd222f7c9524a61a145d09b0ca95cfb2658bf694236c",
+  "signer_binary_sha256": "70f6c7c438d237796705f429bad64b017ad798d110b2cfac845a1b4cb1640494",
+  "harness_sha256": "7e1bc6c355c5e08204879a9e84ffea66dfd58c6286053408706f60262cc3e647",
+  "source_initial_heights": [
+    102,
+    101
+  ],
+  "fresh_replay_initial_heights": [
+    0,
+    0
+  ],
+  "captured_acknowledgements": 300,
+  "snapshot_budget_bytes": 3593859,
+  "rules_hash": "9050ab43fa5feddb7f0659abc4ca43f596d4465f93535f3b9ab37449397e6edd",
+  "original_signing_keys_used": false,
+  "physical_miners_used": 0,
+  "limitations": [
+    "Fresh nodes revalidate captured public blocks and existing acknowledged proof bytes; no profile marker is rewritten",
+    "Two loopback native nodes; no new100-job run, WAN throughput, production difficulty or mainnet claim",
+    "Replay timings include native cache warming and historical revalidation and are not throughput estimates",
+    "All newly dispatched work requires a fresh external signature and gate authorization",
+    "Original source capture and its acknowledged proof/recipient identities remain unchanged"
+  ],
+  "captured_blocks_freshly_revalidated_on_producer": 102,
+  "initial_block": "170a0bc93b3d1bd269bd2fee8ac46062ec1025458514ea04e680e58eab9df303",
+  "initial_snapshot": "12cce52c20d9c9c7f44a24f273b6c5d68f631b15a4d197492e40bc6770e94bd2",
+  "original_admitted": 201,
+  "initial_p2p_convergence_seconds": 35.247735041999995,
+  "initial_p2p_exact_snapshot_converged": true,
+  "original_proof_id_set_sha256": "183d09e765367e4b33b619385bce3626aad6b44943ed14bd99f12de274a318b8",
+  "original_unadmitted_receipts": 99,
+  "fresh_job_public_key": "cc0cf638162c07682e03a820f75815bfe9c92c1023601048e87c2b043e2be47b",
+  "replayed_receipts": 99,
+  "registered_remaining_origins": 33,
+  "final_tip": "3ca4195527c780c3e7dc205a24a7d08b9fd2b216b7d99f87af8a8d0fecd507fb",
+  "final_height": 103,
+  "final_snapshot": "7a8261d9f131c96810d116daedc786050a47b23c13cccfca7d6fd379df15300b",
+  "admitted_original_ids_per_node": [
+    300,
+    300
+  ],
+  "eligible_backlog": 0,
+  "replay_receipts_confirmed_admitted": 99,
+  "original_receipt_order_preserved": true,
+  "original_pool_and_recipient_bytes_preserved": true,
+  "original_capture_unchanged": true,
+  "seconds": 417.765094792
+}

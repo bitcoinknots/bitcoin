@@ -1,0 +1,15 @@
+test_fixed_cutoff_excludes_drain_and_keeps_each_queue_separate (test_live_capacity_metrics.LiveCapacityMetricsTest) ... ok
+test_independent_owner_schedule_progresses_while_another_owner_is_blocked (test_live_capacity_metrics.LiveCapacityMetricsTest) ... ok
+test_invalid_accounting_is_rejected (test_live_capacity_metrics.LiveCapacityMetricsTest) ... ok
+test_merged_rpc_percentile_uses_actual_samples (test_live_capacity_metrics.LiveCapacityMetricsTest) ... ok
+test_owner_partition_preserves_absolute_schedule_and_identity_affinity (test_live_capacity_metrics.LiveCapacityMetricsTest) ... ok
+test_pre_dispatch_capacity_refusal_is_not_an_offer_or_ack (test_live_capacity_metrics.LiveCapacityMetricsTest) ... ok
+test_rejection_is_not_durable_work_and_boundary_completion_counts (test_live_capacity_metrics.LiveCapacityMetricsTest) ... ok
+test_valid_offered_work_refused_for_capacity_never_becomes_ack_or_invalid (test_live_capacity_metrics.LiveCapacityMetricsTest) ... ok
+test_drain_status_keeps_retained_prefix_buildable_without_ack_permission (test_live_capacity_workers.LiveOwnerTests) ... ok
+test_slow_owner_does_not_block_another_identity_or_cross_gate_threads (test_live_capacity_workers.LiveOwnerTests) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.050s
+
+OK

@@ -1,0 +1,377 @@
+{
+  "schema": 1,
+  "base_commit": "b1d69343bd07218f01918e2aa96d3600c182a467",
+  "scope": "F7 bounded-record recovery, F8 exact dispatch binding, and two reproduced pending-body eviction fixes. Separate design-only payout model. No native payout/wire/activation change.",
+  "binaries": {
+    "bitcoind": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+    "bitcoin-sharepool-signer": "8d6effc30a2e171e254b2bf70a0b4984d5064a49f2386af8c066e16c22765755",
+    "test_bitcoin": "694673f4a57017980a8758f4ed8e61c2bcbdb30c1de75f241a0de821364773fe"
+  },
+  "source_sha256": {
+    "contrib/sharepool/hash_gate_archive.py": "60cb4e585c6f33c5f45d47a419c6cf8ccfd5b1781381a60a3ddbb2c48b244bca",
+    "contrib/sharepool/hash_mining_gate.py": "1efe8efe9e9a95a046eee260f36c040c9acee29dcf2409e6b053343a952c79fd",
+    "contrib/sharepool/hash_snapshot.py": "b982e0d3b17bf50d13e0e8fba5981fa69fd9493f2ae72c1fa0018bd73eaaeb62",
+    "contrib/sharepool/production_protocol_model.py": "9da393f64d4f567bfa22e49e3c956bd9dfcd1d69699c8e6a52f9a5400dc08703",
+    "contrib/sharepool/test_hash_gate_archive.py": "7143537622f3ff9691bf60bd2c02fe9e8ebcd25b49ab59d35f33d6b29ba03525",
+    "contrib/sharepool/test_hash_gate_dispatch.py": "1eadfb713eedda128d16af003fa80bc242065eee6a68102b9282997d89f80d56",
+    "contrib/sharepool/test_hash_mining_gate.py": "53b351c2313b6f12c8b3e3b91287c20ae5c24da0b1ed06335ac5602db9506cbb",
+    "contrib/sharepool/test_production_protocol_model.py": "674c189e7254c4106d17274beb8db9a8672141c605b3f4d10f74bec2e58234ec",
+    "src/consensus/sharepool_hash.cpp": "e8309a52adde173cd272492940e6662d23daa51ad5219680696d9f8e492e5779",
+    "src/consensus/sharepool_hash.h": "b693ef0c95deac16623a331da5bdf84d32c92117bd3fc31a35d5b8da6fb269bb",
+    "src/sharepool/hash_store.cpp": "c53891b393483ec7e29ef94582eb89f48246a70c2b9a8bbf07ef829843b88128",
+    "src/sharepool/hash_store.h": "0de9572e8f88c508ebaef19fb82b09789738559be108bc5788ccb090c337815c",
+    "src/test/sharepool_hash_store_tests.cpp": "da01341ca1eb9ac2596bcc626d5ba12d8653b1882cb6cbb1ed7570cae588acfe",
+    "src/validation.cpp": "537e0e6de9c75b3ca93b847c761a9c2c148365a1a42310ac3ca833522df4cfbb",
+    "test/functional/feature_sharepool_hash_gate_ledger.py": "cc3cd50581a3c9d2b744d98134cab878722772611d38c88b57959c459e2ca81a",
+    "test/functional/feature_sharepool_hash_pending.py": "b32625528bfc6812a0153f077813459d3066c003bd9895bc4a35535f65900218"
+  },
+  "build": {
+    "command": "/private/tmp/sharepool-build-tools-20260912/cmake/data/bin/cmake --build /private/tmp/sharepool-native-build -j 4 --target bitcoind bitcoin-sharepool-signer test_bitcoin",
+    "result": "passed",
+    "warnings": [
+      "Existing duplicate-library linker warning; no source warnings."
+    ]
+  },
+  "unit_tests": {
+    "cpp_cases": 80,
+    "cpp_assertions": 9635,
+    "cpp_command": "test_bitcoin --run_test='sharepool*' --report_level=detailed --log_level=test_suite",
+    "python_hash_cases": 93,
+    "python_signer_cases": 22,
+    "python_signer_skips": 0,
+    "design_model_cases": 18,
+    "passed": true,
+    "python_commands": [
+      "SHAREPOOL_SIGNER_BINARY=/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s contrib/sharepool -p 'test_hash*.py'",
+      "SHAREPOOL_SIGNER_BINARY=/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s contrib/sharepool -p test_native_signer.py",
+      "python3 -B -m unittest discover -s contrib/sharepool -p test_production_protocol_model.py -v"
+    ]
+  },
+  "functional_scenarios": [
+    {
+      "test": "worker",
+      "code": 0,
+      "seconds": 15.428,
+      "log": "/private/tmp/sharepool-production-final-worker.log",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_worker.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-production-final-690",
+        "--portseed=690",
+        "--nocleanup"
+      ],
+      "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+      "original_log_sha256": "98684776aa0aadbb99929a2fac9dbe21834d5261b7edaf5765b46b17fe686015"
+    },
+    {
+      "test": "http",
+      "code": 0,
+      "seconds": 2.132,
+      "log": "/private/tmp/sharepool-production-final-http.log",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_http.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-production-final-691",
+        "--portseed=691",
+        "--nocleanup"
+      ],
+      "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+      "original_log_sha256": "fed768e81eeec77fd8cdb4bf8760b8ebd524dca32888392df1b71ead48b6cfbb"
+    },
+    {
+      "test": "lifecycle-v1",
+      "code": 0,
+      "seconds": 15.891,
+      "log": "/private/tmp/sharepool-production-final-lifecycle-v1.log",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_lifecycle.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-production-final-692",
+        "--portseed=692",
+        "--nocleanup"
+      ],
+      "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+      "original_log_sha256": "aab985d5e5bb7b5e8e61ac0200c018e6fa2695b602d41ec53cc56baeb502be5b"
+    },
+    {
+      "test": "lifecycle-v2",
+      "code": 0,
+      "seconds": 15.898,
+      "log": "/private/tmp/sharepool-production-final-lifecycle-v2.log",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_lifecycle.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-production-final-693",
+        "--portseed=693",
+        "--nocleanup",
+        "--v2transport"
+      ],
+      "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+      "original_log_sha256": "d3afdfb604e7b150ff00657967c063e682fa28bc1d6af5490b84f1e63dda48b3"
+    },
+    {
+      "test": "relay",
+      "code": 0,
+      "seconds": 6.701,
+      "log": "/private/tmp/sharepool-production-final-relay.log",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_relay.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-production-final-694",
+        "--portseed=694",
+        "--nocleanup"
+      ],
+      "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+      "original_log_sha256": "4e9793bbc64f4b823f419eee30cef8ec2fa4049234069893daa8f6ed10f27688"
+    },
+    {
+      "test": "attestation",
+      "code": 0,
+      "seconds": 1.392,
+      "log": "/private/tmp/sharepool-production-final-attestation.log",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_attestation.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-production-final-695",
+        "--portseed=695",
+        "--nocleanup"
+      ],
+      "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+      "original_log_sha256": "5ed23f510b27ac420a5f186c44a0255e54d89ee90c7869ce873cfa96adc2fa6e"
+    },
+    {
+      "test": "builder",
+      "code": 0,
+      "seconds": 3.516,
+      "log": "/private/tmp/sharepool-production-final-builder.log",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_builder.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-production-final-696",
+        "--portseed=696",
+        "--nocleanup"
+      ],
+      "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+      "original_log_sha256": "0d62cb74f75f0c6c51a529b399617ff767167ede3eab23611d5689d5da6a479e"
+    },
+    {
+      "test": "rules",
+      "code": 0,
+      "seconds": 0.76,
+      "log": "/private/tmp/sharepool-production-final-rules.log",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_rules.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-production-final-697",
+        "--portseed=697",
+        "--nocleanup"
+      ],
+      "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+      "original_log_sha256": "dc52ce950e093af40f654bc4104e0eb637ac858781e1047066a0706275e11a5c"
+    },
+    {
+      "test": "legacy-rules",
+      "code": 0,
+      "seconds": 5.29,
+      "log": "/private/tmp/sharepool-production-final-legacy-rules.log",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_rule_cases.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-production-final-698",
+        "--portseed=698",
+        "--nocleanup"
+      ],
+      "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+      "original_log_sha256": "b9cec3394fba4827d8910edc772f85eefb6f9bd2829322303e6b8a28c7194e05"
+    },
+    {
+      "test": "v5-ledger",
+      "code": 0,
+      "seconds": 8.426,
+      "log": "/private/tmp/sharepool-production-final-v5-ledger.log",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_ledger.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-production-final-699",
+        "--portseed=699",
+        "--nocleanup"
+      ],
+      "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+      "original_log_sha256": "af5d0d91b13dacdce56abbacab5edaf2fdeec6436c05da22ed3d8d829199e403"
+    },
+    {
+      "test": "pending-body",
+      "code": 0,
+      "seconds": 10.877,
+      "log": "/private/tmp/sharepool-production-final-pending-body.log",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_pending.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-production-final-700",
+        "--portseed=700",
+        "--nocleanup"
+      ],
+      "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+      "original_log_sha256": "39d011ef575101862b03d5a3e876ce50db6d4ff9fac7324cd07adc4c8e12df70"
+    },
+    {
+      "test": "gate-provenance",
+      "code": 0,
+      "seconds": 1.017,
+      "log": "/private/tmp/sharepool-production-final-gate-provenance.log",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_gate_provenance.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-production-final-701",
+        "--portseed=701",
+        "--nocleanup"
+      ],
+      "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+      "original_log_sha256": "e69f47d3c95d8acde67994266a358e50a12a4faa03eaf54401e4197766d8906f"
+    },
+    {
+      "test": "gate-ledger-1",
+      "code": 0,
+      "seconds": 11.35,
+      "log": "/private/tmp/sharepool-production-final-gate-ledger-1.log",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_gate_ledger.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-production-final-702",
+        "--portseed=702",
+        "--nocleanup",
+        "--activation-height=1"
+      ],
+      "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+      "original_log_sha256": "806e5122c74a69f84a347b1cb5ea044a04eaa12eb3fcd29e74c1d329de763152"
+    },
+    {
+      "test": "gate-ledger-102",
+      "code": 0,
+      "seconds": 12.288,
+      "log": "/private/tmp/sharepool-production-final-gate-ledger-102.log",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_gate_ledger.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-production-final-703",
+        "--portseed=703",
+        "--nocleanup",
+        "--activation-height=102"
+      ],
+      "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+      "original_log_sha256": "eb3df4961024a55557a8c993e2a7c79044c72c7719cd5065bf58dd6b4736a3ed"
+    },
+    {
+      "test": "v5-100-miners",
+      "code": 0,
+      "seconds": 48.35,
+      "log": "/private/tmp/sharepool-production-final-v5-100-miners.log",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_ledger_100_miners.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-production-final-704",
+        "--portseed=704",
+        "--nocleanup"
+      ],
+      "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+      "original_log_sha256": "19e4418e9a0b2c125546368f82478b2c33f41fb7c726022c38003d5bd2b06374"
+    },
+    {
+      "test": "v4-100-miners",
+      "code": 0,
+      "seconds": 515.063,
+      "log": "/private/tmp/sharepool-production-final-v4-100-miners.log",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_100_miners.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-production-final-705",
+        "--portseed=705",
+        "--nocleanup",
+        "--results=/private/tmp/sharepool-production-v4-100-miners.json"
+      ],
+      "binary_sha256": "f89fe07ecb026dd870608344a4db0bca597ed564c73dfadce8dca8a4093d4031",
+      "original_log_sha256": "16cef66cb1a18aa330f294b9b279964e0e041da1388907580b3995b430545056"
+    }
+  ],
+  "reproduced_pre_fix_failures": [
+    {
+      "description": "RPC rejection of a different malformed body with the same header discarded the retained pending body.",
+      "binary_sha256": "8c4b2b29b71176e87b676a6ecbac43853784eca960cfa6410088ffe967aa196e",
+      "log": "/private/tmp/sharepool-pending-eviction-before-680.log",
+      "log_sha256": "dff66086b373b319770f1ed443d53542d39c58acde5c7f650be7341408b39ab6",
+      "observed": "pending_blocks changed from1 to0; expected1",
+      "final_result": "Final pending-body functional passed with both regression cases."
+    },
+    {
+      "description": "An unsolicited lower-work P2P duplicate was ignored successfully, then its pending body was discarded.",
+      "binary_sha256": "ad7e99c4d8fa47a7345b81c43ed82023d7434dbd28486ab294b45e95e78aaa4c",
+      "log": "/private/tmp/sharepool-pending-unsolicited-before-682.log",
+      "log_sha256": "781a891fe0b28f65a88a160f895c4addd5421b524d55a014b892907a5845896f",
+      "observed": "pending_blocks changed from1 to0; expected1",
+      "final_result": "Final pending-body functional passed with both regression cases."
+    }
+  ],
+  "model": {
+    "command": "python3 -B contrib/sharepool/production_protocol_model.py --trials 64 --intervals 64 --base-resolution 128 --seed 7300 --output /private/tmp/sharepool-production-model-final.json",
+    "output_sha256": "30ff8c145fca58b6b3534fd86e5756841b29a69d3e299c122050e6bdb4741d54",
+    "simulated_blocks": 15457,
+    "same_admitted_cutoff_matches": 15457,
+    "live_cutoff_different_payouts": 14693,
+    "production_variance_equivalence": false
+  },
+  "review": {
+    "kind": "Scoped automated read-only reviews",
+    "external_security_audit": false,
+    "additional_fuzzing": "Delegated coverage-guided fuzz-testing task blocked by automated safety screening as possible cybersecurity risk; no new campaign or sanitizer result claimed."
+  },
+  "limitations": [
+    "Funding scope and rolling contract choices remain pending; native v5 contract unchanged.",
+    "Pool continuation/exit, abandoned-pool capacity, admission promises and output/dust policy remain unspecified for production.",
+    "Corruption handling covers bounded decoded-key records, not LevelDB structural corruption, malformed keys, missing databases or exhausted quota.",
+    "Template fallback retains at most4 independently verified snapshot sources.",
+    "Dispatch capability is not an in-process sandbox; tip changes after the check still require refresh.",
+    "No physical miner rerouting or new ASIC test; previous hardware evidence belongs to older profiles.",
+    "WAN/slow-disk capacity, archival bootstrap, independent review and compatible public activation remain required."
+  ],
+  "evidence_sha256": {
+    "production-hardening-functional-tests.txt": "aad981edc1e57556efd1c751194d682d0f2268a4bdbbba52626832ff88687848",
+    "production-hardening-model-tests.txt": "7d37d1a1b145b5ca63166b0c6eb32dd2908ea5610d8ccc9008b690b7d6aee8be",
+    "production-hardening-native-tests.txt": "b7db9a5ab123908779c2f7bc54f330d65570d4c0e80a96b8a29e067faa5b48aa",
+    "production-hardening-python-tests.txt": "81aaac8dbd8eddba64704d9e40c65d0a3d3cf522e0a249a5d4c2af103c0f72b0",
+    "production-hardening-signer-tests.txt": "18ad707ce259a01913d70b09d08ec86e4fdb82af25b12b3f8b95a8c5f1f6c59a",
+    "production-hardening-v4-100-miners.json": "d15ded8d89c39dea9a24731f323bd958ca6c8fbba27602bb8639079833a849b2",
+    "production-protocol-model.json": "30ff8c145fca58b6b3534fd86e5756841b29a69d3e299c122050e6bdb4741d54"
+  }
+}

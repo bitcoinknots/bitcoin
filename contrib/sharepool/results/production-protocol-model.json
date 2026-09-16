@@ -1,0 +1,420 @@
+{
+  "cases": [
+    {
+      "admission_limit_per_native_block": null,
+      "live_cutoff_different_block_payouts": 3873,
+      "max_unanchored_at_end": 518,
+      "miner_share_work": {
+        "alice": 1,
+        "bob": 1,
+        "carol": 1,
+        "dave": 1
+      },
+      "name": "equal_target_complete_admission",
+      "native_difficulty_doubles_at_seconds": null,
+      "parent_cutoff_empty_window_blocks": 66,
+      "payout_distributions": {
+        "live_cutoff": {
+          "alice": {
+            "mean_satoshis": 3971275.828125,
+            "population_variance_satoshis_squared": 863975093148.0486,
+            "relative_standard_deviation": 0.2340564205229004,
+            "zero_payout_trials": 0
+          },
+          "bob": {
+            "mean_satoshis": 9325599.171875,
+            "population_variance_satoshis_squared": 4828983100472.268,
+            "relative_standard_deviation": 0.2356411306395507,
+            "zero_payout_trials": 0
+          },
+          "carol": {
+            "mean_satoshis": 19255505.265625,
+            "population_variance_satoshis_squared": 6983750545129.07,
+            "relative_standard_deviation": 0.1372427589969586,
+            "zero_payout_trials": 0
+          },
+          "dave": {
+            "mean_satoshis": 32010119.734375,
+            "population_variance_satoshis_squared": 19956531983117.35,
+            "relative_standard_deviation": 0.1395581608739339,
+            "zero_payout_trials": 0
+          }
+        },
+        "parent_cutoff": {
+          "alice": {
+            "mean_satoshis": 4002231.015625,
+            "population_variance_satoshis_squared": 789665581119.2966,
+            "relative_standard_deviation": 0.22203398380321712,
+            "zero_payout_trials": 0
+          },
+          "bob": {
+            "mean_satoshis": 9294643.984375,
+            "population_variance_satoshis_squared": 5182074981021.641,
+            "relative_standard_deviation": 0.24491708780818347,
+            "zero_payout_trials": 0
+          },
+          "carol": {
+            "mean_satoshis": 19256515.703125,
+            "population_variance_satoshis_squared": 6878987018164.084,
+            "relative_standard_deviation": 0.13620232991240108,
+            "zero_payout_trials": 0
+          },
+          "dave": {
+            "mean_satoshis": 32009109.296875,
+            "population_variance_satoshis_squared": 20720510438574.242,
+            "relative_standard_deviation": 0.14220885362948726,
+            "zero_payout_trials": 0
+          }
+        },
+        "same_cutoff_reference": {
+          "alice": {
+            "mean_satoshis": 4002231.015625,
+            "population_variance_satoshis_squared": 789665581119.2966,
+            "relative_standard_deviation": 0.22203398380321712,
+            "zero_payout_trials": 0
+          },
+          "bob": {
+            "mean_satoshis": 9294643.984375,
+            "population_variance_satoshis_squared": 5182074981021.641,
+            "relative_standard_deviation": 0.24491708780818347,
+            "zero_payout_trials": 0
+          },
+          "carol": {
+            "mean_satoshis": 19256515.703125,
+            "population_variance_satoshis_squared": 6878987018164.084,
+            "relative_standard_deviation": 0.13620232991240108,
+            "zero_payout_trials": 0
+          },
+          "dave": {
+            "mean_satoshis": 32009109.296875,
+            "population_variance_satoshis_squared": 20720510438574.242,
+            "relative_standard_deviation": 0.14220885362948726,
+            "zero_payout_trials": 0
+          }
+        }
+      },
+      "same_cutoff_mismatched_block_payouts": 0,
+      "total_accepted_proofs": 524391,
+      "total_anchored_proofs": 517814,
+      "total_native_blocks": 4132,
+      "total_unanchored_at_end": 6577
+    },
+    {
+      "admission_limit_per_native_block": null,
+      "live_cutoff_different_block_payouts": 3800,
+      "max_unanchored_at_end": 196,
+      "miner_share_work": {
+        "alice": 1,
+        "bob": 4,
+        "carol": 2,
+        "dave": 4
+      },
+      "name": "unequal_targets_complete_admission",
+      "native_difficulty_doubles_at_seconds": null,
+      "parent_cutoff_empty_window_blocks": 67,
+      "payout_distributions": {
+        "live_cutoff": {
+          "alice": {
+            "mean_satoshis": 3964054.140625,
+            "population_variance_satoshis_squared": 871940067802.2771,
+            "relative_standard_deviation": 0.2355611902741405,
+            "zero_payout_trials": 0
+          },
+          "bob": {
+            "mean_satoshis": 9332820.859375,
+            "population_variance_satoshis_squared": 5065000354423.371,
+            "relative_standard_deviation": 0.24114419419783042,
+            "zero_payout_trials": 0
+          },
+          "carol": {
+            "mean_satoshis": 19329282.78125,
+            "population_variance_satoshis_squared": 7242055448382.14,
+            "relative_standard_deviation": 0.13922434492021205,
+            "zero_payout_trials": 0
+          },
+          "dave": {
+            "mean_satoshis": 31936342.21875,
+            "population_variance_satoshis_squared": 19982899785296.203,
+            "relative_standard_deviation": 0.1399729390865949,
+            "zero_payout_trials": 0
+          }
+        },
+        "parent_cutoff": {
+          "alice": {
+            "mean_satoshis": 3997892.71875,
+            "population_variance_satoshis_squared": 777865692725.6709,
+            "relative_standard_deviation": 0.2206079570954512,
+            "zero_payout_trials": 0
+          },
+          "bob": {
+            "mean_satoshis": 9298982.28125,
+            "population_variance_satoshis_squared": 5407003541358.483,
+            "relative_standard_deviation": 0.2500592399554731,
+            "zero_payout_trials": 0
+          },
+          "carol": {
+            "mean_satoshis": 19322882.203125,
+            "population_variance_satoshis_squared": 7182515126157.318,
+            "relative_standard_deviation": 0.1386967767283287,
+            "zero_payout_trials": 0
+          },
+          "dave": {
+            "mean_satoshis": 31942742.796875,
+            "population_variance_satoshis_squared": 20630280218442.477,
+            "relative_standard_deviation": 0.1421937012655726,
+            "zero_payout_trials": 0
+          }
+        },
+        "same_cutoff_reference": {
+          "alice": {
+            "mean_satoshis": 3997892.71875,
+            "population_variance_satoshis_squared": 777865692725.6709,
+            "relative_standard_deviation": 0.2206079570954512,
+            "zero_payout_trials": 0
+          },
+          "bob": {
+            "mean_satoshis": 9298982.28125,
+            "population_variance_satoshis_squared": 5407003541358.483,
+            "relative_standard_deviation": 0.2500592399554731,
+            "zero_payout_trials": 0
+          },
+          "carol": {
+            "mean_satoshis": 19322882.203125,
+            "population_variance_satoshis_squared": 7182515126157.318,
+            "relative_standard_deviation": 0.1386967767283287,
+            "zero_payout_trials": 0
+          },
+          "dave": {
+            "mean_satoshis": 31942742.796875,
+            "population_variance_satoshis_squared": 20630280218442.477,
+            "relative_standard_deviation": 0.1421937012655726,
+            "zero_payout_trials": 0
+          }
+        }
+      },
+      "same_cutoff_mismatched_block_payouts": 0,
+      "total_accepted_proofs": 194474,
+      "total_anchored_proofs": 191984,
+      "total_native_blocks": 4132,
+      "total_unanchored_at_end": 2490
+    },
+    {
+      "admission_limit_per_native_block": 32,
+      "live_cutoff_different_block_payouts": 4106,
+      "max_unanchored_at_end": 6744,
+      "miner_share_work": {
+        "alice": 1,
+        "bob": 1,
+        "carol": 1,
+        "dave": 1
+      },
+      "name": "equal_target_capacity_backlog",
+      "native_difficulty_doubles_at_seconds": null,
+      "parent_cutoff_empty_window_blocks": 66,
+      "payout_distributions": {
+        "live_cutoff": {
+          "alice": {
+            "mean_satoshis": 3971275.828125,
+            "population_variance_satoshis_squared": 863975093148.0486,
+            "relative_standard_deviation": 0.2340564205229004,
+            "zero_payout_trials": 0
+          },
+          "bob": {
+            "mean_satoshis": 9325599.171875,
+            "population_variance_satoshis_squared": 4828983100472.268,
+            "relative_standard_deviation": 0.2356411306395507,
+            "zero_payout_trials": 0
+          },
+          "carol": {
+            "mean_satoshis": 19255505.265625,
+            "population_variance_satoshis_squared": 6983750545129.07,
+            "relative_standard_deviation": 0.1372427589969586,
+            "zero_payout_trials": 0
+          },
+          "dave": {
+            "mean_satoshis": 32010119.734375,
+            "population_variance_satoshis_squared": 19956531983117.35,
+            "relative_standard_deviation": 0.1395581608739339,
+            "zero_payout_trials": 0
+          }
+        },
+        "parent_cutoff": {
+          "alice": {
+            "mean_satoshis": 3999953.640625,
+            "population_variance_satoshis_squared": 1043360541062.824,
+            "relative_standard_deviation": 0.2553655133155426,
+            "zero_payout_trials": 0
+          },
+          "bob": {
+            "mean_satoshis": 9296921.359375,
+            "population_variance_satoshis_squared": 5305650030808.918,
+            "relative_standard_deviation": 0.24775940109841682,
+            "zero_payout_trials": 0
+          },
+          "carol": {
+            "mean_satoshis": 19370426.0625,
+            "population_variance_satoshis_squared": 7198082805106.152,
+            "relative_standard_deviation": 0.1385062100535354,
+            "zero_payout_trials": 0
+          },
+          "dave": {
+            "mean_satoshis": 31895198.9375,
+            "population_variance_satoshis_squared": 21060407697684.277,
+            "relative_standard_deviation": 0.1438825320093939,
+            "zero_payout_trials": 0
+          }
+        },
+        "same_cutoff_reference": {
+          "alice": {
+            "mean_satoshis": 3999953.640625,
+            "population_variance_satoshis_squared": 1043360541062.824,
+            "relative_standard_deviation": 0.2553655133155426,
+            "zero_payout_trials": 0
+          },
+          "bob": {
+            "mean_satoshis": 9296921.359375,
+            "population_variance_satoshis_squared": 5305650030808.918,
+            "relative_standard_deviation": 0.24775940109841682,
+            "zero_payout_trials": 0
+          },
+          "carol": {
+            "mean_satoshis": 19370426.0625,
+            "population_variance_satoshis_squared": 7198082805106.152,
+            "relative_standard_deviation": 0.1385062100535354,
+            "zero_payout_trials": 0
+          },
+          "dave": {
+            "mean_satoshis": 31895198.9375,
+            "population_variance_satoshis_squared": 21060407697684.277,
+            "relative_standard_deviation": 0.1438825320093939,
+            "zero_payout_trials": 0
+          }
+        }
+      },
+      "same_cutoff_mismatched_block_payouts": 0,
+      "total_accepted_proofs": 524391,
+      "total_anchored_proofs": 131941,
+      "total_native_blocks": 4132,
+      "total_unanchored_at_end": 392450
+    },
+    {
+      "admission_limit_per_native_block": null,
+      "live_cutoff_different_block_payouts": 2914,
+      "max_unanchored_at_end": 1059,
+      "miner_share_work": {
+        "alice": 1,
+        "bob": 1,
+        "carol": 1,
+        "dave": 1
+      },
+      "name": "equal_target_native_difficulty_doubles",
+      "native_difficulty_doubles_at_seconds": 19200,
+      "parent_cutoff_empty_window_blocks": 66,
+      "payout_distributions": {
+        "live_cutoff": {
+          "alice": {
+            "mean_satoshis": 3040767.078125,
+            "population_variance_satoshis_squared": 787363695409.1345,
+            "relative_standard_deviation": 0.2918129348309073,
+            "zero_payout_trials": 0
+          },
+          "bob": {
+            "mean_satoshis": 7131107.921875,
+            "population_variance_satoshis_squared": 3910702925389.603,
+            "relative_standard_deviation": 0.2773131116974408,
+            "zero_payout_trials": 0
+          },
+          "carol": {
+            "mean_satoshis": 14142040.265625,
+            "population_variance_satoshis_squared": 5366462687078.695,
+            "relative_standard_deviation": 0.16380682309003305,
+            "zero_payout_trials": 0
+          },
+          "dave": {
+            "mean_satoshis": 23514209.734375,
+            "population_variance_satoshis_squared": 14809638254461.508,
+            "relative_standard_deviation": 0.1636597327489163,
+            "zero_payout_trials": 0
+          }
+        },
+        "parent_cutoff": {
+          "alice": {
+            "mean_satoshis": 3069347.96875,
+            "population_variance_satoshis_squared": 715422525563.0615,
+            "relative_standard_deviation": 0.2755720571857224,
+            "zero_payout_trials": 0
+          },
+          "bob": {
+            "mean_satoshis": 7102527.03125,
+            "population_variance_satoshis_squared": 4276518311695.874,
+            "relative_standard_deviation": 0.2911603767896047,
+            "zero_payout_trials": 0
+          },
+          "carol": {
+            "mean_satoshis": 14141227.640625,
+            "population_variance_satoshis_squared": 5283277931191.199,
+            "relative_standard_deviation": 0.1625416317863482,
+            "zero_payout_trials": 0
+          },
+          "dave": {
+            "mean_satoshis": 23515022.359375,
+            "population_variance_satoshis_squared": 15469996334511.512,
+            "relative_standard_deviation": 0.16726293353162178,
+            "zero_payout_trials": 0
+          }
+        },
+        "same_cutoff_reference": {
+          "alice": {
+            "mean_satoshis": 3069347.96875,
+            "population_variance_satoshis_squared": 715422525563.0615,
+            "relative_standard_deviation": 0.2755720571857224,
+            "zero_payout_trials": 0
+          },
+          "bob": {
+            "mean_satoshis": 7102527.03125,
+            "population_variance_satoshis_squared": 4276518311695.874,
+            "relative_standard_deviation": 0.2911603767896047,
+            "zero_payout_trials": 0
+          },
+          "carol": {
+            "mean_satoshis": 14141227.640625,
+            "population_variance_satoshis_squared": 5283277931191.199,
+            "relative_standard_deviation": 0.1625416317863482,
+            "zero_payout_trials": 0
+          },
+          "dave": {
+            "mean_satoshis": 23515022.359375,
+            "population_variance_satoshis_squared": 15469996334511.512,
+            "relative_standard_deviation": 0.16726293353162178,
+            "zero_payout_trials": 0
+          }
+        }
+      },
+      "same_cutoff_mismatched_block_payouts": 0,
+      "total_accepted_proofs": 524391,
+      "total_anchored_proofs": 510042,
+      "total_native_blocks": 3061,
+      "total_unanchored_at_end": 14349
+    }
+  ],
+  "funding": "separate pools A and B; no cross-pool reward redistribution",
+  "independent_trials_per_case": 64,
+  "initial_history": "empty; no warmup; empty window pays winning identity as an illustrative rule",
+  "initial_network_work_in_easiest_share_units": 128,
+  "kind": "design-only coupled marked-Poisson model; no native node or ASIC",
+  "limits": [
+    "Synthetic constant hashrates, not real hash computation or network validation.",
+    "Immediate relay and job refresh; no stale blocks, withheld data, or reorgs.",
+    "Bounded full-history retention; neither 4 MiB state nor native 16 MiB snapshots are modeled.",
+    "No provisional-proof expiry; backlog is shown, not promised service.",
+    "Admission ordering assumes each earlier accepted event is available at job construction.",
+    "No proof of control, authorization, serialization, payout output-size limit, or fees.",
+    "Finite sample moments include startup; they are not a production variance guarantee.",
+    "Equal same-cutoff payouts test accounting, not equality with a live regular pool."
+  ],
+  "ordering": "anchor interval then proof hash; live comparator uses submission order",
+  "reward_satoshis_per_block": 1000000,
+  "rolling_network_work_units": 8,
+  "seed": 7300,
+  "wall_time_horizon_seconds_per_trial": 38400
+}

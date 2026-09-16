@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "profile": "v6 rules revision 2; opt-in regtest only",
+  "command": "python3 -B test/functional/feature_sharepool_hash_archive.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-v6-r2-archive-917 --portseed=917 --nocleanup",
+  "portseed": 917,
+  "test_source": "test/functional/feature_sharepool_hash_archive.py",
+  "test_source_sha256": "3aa473f68201e7f4ec5ec1bb3f3f141e3f669617857017d60c276d6df96e197b",
+  "daemon_sha256": "ebf5acc747e5bc7d51b928ada4d14232b5d43a8f7ba948b1799a688c1b391cb8",
+  "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+  "log": "tides-v6-r2-archive-native.txt",
+  "log_sha256": "07770d96273f06f0a06ab49e61be7eb05ce0e2f8b07850156377824d06f0555c",
+  "result": "tides-v6-r2-archive-native.json",
+  "result_sha256": "4e70ce29595ebee12268c27c4318d48335833a58d0e8047315ff1ad6b92bdf1c",
+  "prior_attempts": "tides-v6-r2-archive-attempts.json",
+  "limits": [
+    "Nine actual native blocks and eleven signed snapshots; the 1030 additional five-byte preimages are deliberately invalid, unreferenced transport fixtures.",
+    "The first 1024 inventory records were preloaded and the source restarted to require persistent archive pagination for the missing tail.",
+    "Observed worker timing is for this small native recovery fixture, not a production throughput or archival-capacity guarantee.",
+    "No public network or physical miner was used."
+  ]
+}

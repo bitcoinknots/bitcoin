@@ -1,0 +1,141 @@
+{
+  "result": "passed",
+  "scope": "Final contextual coinbase-output guard integration smoke only; not a sustained throughput or variance measurement",
+  "configuration": {
+    "miners": 8,
+    "duration_seconds": 12,
+    "offer_interval_ms": 750.0,
+    "settlement_seconds": 20,
+    "work_update_seconds": 40,
+    "snapshot_budget_bytes": 1048576,
+    "padding_outputs": 0,
+    "max_runtime_seconds": 900,
+    "profile_version": 8,
+    "share_work_bits": [
+      2,
+      4,
+      6
+    ],
+    "target_share_seconds": 6.0,
+    "deduplicate_job_evidence": true,
+    "source_workers": 8
+  },
+  "measured_phase": {
+    "offered": 16,
+    "acknowledged": 16,
+    "admitted": 0,
+    "peer_verified": 0,
+    "rejected": 0,
+    "admission_refused": 0,
+    "seconds": 12,
+    "capacity_refused": 0,
+    "unacknowledged_queue": 0,
+    "acknowledged_backlog": 16,
+    "peer_backlog": 0,
+    "observed_admitted_per_second": 0.0,
+    "observed_peer_verified_per_second": 0.0,
+    "scheduled_requests_due": 16,
+    "source_unfulfilled_requests": 0
+  },
+  "completed_run": {
+    "offered": 16,
+    "acknowledged": 16,
+    "admitted": 16,
+    "peer_verified": 16,
+    "rejected": 0,
+    "admission_refused": 0,
+    "seconds": 12.713718958000001,
+    "capacity_refused": 0,
+    "unacknowledged_queue": 0,
+    "acknowledged_backlog": 0,
+    "peer_backlog": 0,
+    "observed_admitted_per_second": 1.2584830648574417,
+    "observed_peer_verified_per_second": 1.2584830648574417
+  },
+  "live_and_drain_seconds": 12.713718958000001,
+  "seconds_including_setup": 14.169573792000001,
+  "receipt_states": {
+    "confirmed_admitted": 16
+  },
+  "expired_acknowledged": 0,
+  "jobs": 8,
+  "blocks": [
+    {
+      "height": 102,
+      "hash": "787303461806ba9ca6700490c72360c3f5422ab8e85f56e7546858a889ef77e6",
+      "admitted": 16,
+      "native_accepted": true,
+      "peer_ready": true,
+      "local_seconds": 12.245563208,
+      "snapshot_bytes": 7886,
+      "payout_recipients": 8,
+      "coinbase_weight": 1432,
+      "native_weight": 5140,
+      "admitted_assigned_work": 376,
+      "assigned_work_bits_counts": {
+        "6": 4,
+        "4": 6,
+        "2": 6
+      },
+      "peer_seconds": 12.362612333000001,
+      "service_seconds": 0.3437970410000002
+    }
+  ],
+  "payout_oracle_verified": true,
+  "independent_event_accounting_verified": true,
+  "source_and_binary_hashes_unchanged": true,
+  "distinct_owner_threads": 8,
+  "nodes_stopped": true,
+  "collector_proof_rpc": {
+    "count": 16,
+    "total_seconds": 0.024322498999999276,
+    "min_seconds": 0.0006635830000001341,
+    "p50_seconds": 0.0009172920000004581,
+    "p95_seconds": 0.0029234580000014887,
+    "p99_seconds": 0.0029234580000014887,
+    "max_seconds": 0.0029234580000014887,
+    "failures": 0
+  },
+  "pressure_decisions": 9,
+  "command": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "test/functional/feature_sharepool_hash_live_capacity.py",
+    "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+    "--profile-version=8",
+    "--share-work-bits=2,4,6",
+    "--miners=8",
+    "--source-workers=8",
+    "--duration-seconds=12",
+    "--target-share-seconds=6",
+    "--snapshot-budget-bytes=1048576",
+    "--settlement-seconds=20",
+    "--work-update-seconds=40",
+    "--deduplicate-job-evidence",
+    "--max-runtime-seconds=900",
+    "--results=/private/tmp/sharepool-v8-final-guard-smoke.json",
+    "--tmpdir=/private/tmp/sharepool-v8-final-guard-smoke-r2",
+    "--portseed=921",
+    "--nocleanup",
+    "--loglevel=DEBUG"
+  ],
+  "cwd": "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool",
+  "artifacts": {
+    "/private/tmp/sharepool-v8-final-guard-smoke.json": {
+      "bytes": 84790,
+      "sha256": "ce0ed8a9e78b4ec219b2b3cb47fca00bc94ed0420db9766c60e0d422cf06991d"
+    },
+    "/private/tmp/sharepool-v8-final-guard-smoke.txt": {
+      "bytes": 1383,
+      "sha256": "2a711802be23bac41aebdb5c39349bec2ddc92c64ced535f8f736ddb02ede44f"
+    },
+    "/private/tmp/sharepool-v8-final-guard-smoke-prelaunch-manifest.json": {
+      "bytes": 3647,
+      "sha256": "2308ac41b14ec24b13822c770e69946302583e22d1e8822140036fcbc3cc053b"
+    },
+    "/private/tmp/sharepool-v8-final-guard-smoke-postlaunch-manifest.json": {
+      "bytes": 3447,
+      "sha256": "9b34acd495b5ba7e4654a7280eb5156ff6c6968a984e782d9c40eec472fc7449"
+    }
+  },
+  "startup_note": "Initial sandboxed launch was denied loopback socket binding before workload setup; separate failure log retained. Authorized isolated-server rerun passed in fresh r2 directory."
+}

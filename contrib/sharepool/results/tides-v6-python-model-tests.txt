@@ -1,0 +1,23 @@
+test_abandoned_pool_can_saturate_fixed_state_indefinitely (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_capacity_backpressure_preserves_old_and_defers_canonical_prefix (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_capacity_carry_uses_earlier_interval_before_later_hash_order (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_difficulty_increase_can_require_previously_outside_history (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_invalid_batch_does_not_partially_mutate (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_invalid_targets_duplicates_and_budgets (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_native_parent_and_live_cutoffs_are_not_conflated (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_native_winners_are_same_hash_events_at_every_easier_share_target (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_pool_a_admission_in_b_block_does_not_spend_b_reward (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_report_labels_backlog_and_variance_evidence_limits (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_reward_rounding_conserves_every_satoshi_without_cross_pool_payment (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_rolling_entitlement_can_leave_window_without_ever_being_paid (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_same_admitted_cutoff_has_exact_per_block_parity_on_coupled_traces (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_same_member_cannot_relabel_or_redirect_job_scope (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_settlement_only_spends_selected_pool_prefix_and_never_readmits (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_stable_script_scope_and_cross_chain_separation (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_weighted_windows_match_expanded_unit_oracle (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+test_winning_work_is_not_in_own_block_or_next_parent_cutoff (test_production_protocol_model.ProductionProtocolModelTest) ... ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 0.017s
+
+OK

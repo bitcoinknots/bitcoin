@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "profile": "v4 default and optional v5 confirmed ledger",
+  "claim_scope": "Local journal closure, deterministic resource preflight, and canonical receipt status. Native functionals additionally verify actual consensus acceptance, coinbase payout and reorg. No hardware, public testnet, mainnet, or production-capacity claim.",
+  "binaries": {
+    "bitcoind": {
+      "path": "/private/tmp/sharepool-native-build/bin/bitcoind",
+      "sha256": "e3dc27955989e4bc61eb6c2e884ef85268c9bdc7d8dad1056e9677dc8fb883e8"
+    },
+    "bitcoin-sharepool-signer": {
+      "path": "/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer",
+      "sha256": "65d9801b82e5c4f8e0a8de5c87e5a038620549ddc5d3d6e4cda091f6d0686526"
+    }
+  },
+  "source_sha256": {
+    "contrib/sharepool/hash_mining_gate.py": "7e02b660f10e788749230f34d4bb2f193c26b99d89fc6df23e0d65635def4658",
+    "contrib/sharepool/hash_gate_batch.py": "688562c0a23bbc15dd3d42af3a8582f40c7fdc37832c8a23ff87f9ac7db91690",
+    "contrib/sharepool/hash_gate_archive.py": "60cb4e585c6f33c5f45d47a419c6cf8ccfd5b1781381a60a3ddbb2c48b244bca",
+    "contrib/sharepool/hash_snapshot.py": "b982e0d3b17bf50d13e0e8fba5981fa69fd9493f2ae72c1fa0018bd73eaaeb62",
+    "contrib/sharepool/test_hash_gate_provenance.py": "10cdbe488c4e2837d2a32d5f87a0b219825f07b85b30d48cff09a0496974b3ba",
+    "contrib/sharepool/test_hash_gate_ledger.py": "e5057ca75faa411d0ed925a8e7d3c37b1a29274631189697a542f3a4c5edd90b",
+    "test/functional/feature_sharepool_hash_gate_provenance.py": "86bfd53fed9dc75dfe3d0e6407253690c2ffd7c50a59b72be847383176b8a5e0",
+    "test/functional/feature_sharepool_hash_gate_ledger.py": "fa16ad1975a787fcc6f3524bbe10abecca2cbeb2b8a70bf0328045e9b92d4061"
+  },
+  "unit_tests": {
+    "passed": true,
+    "count": 64,
+    "failures": 0,
+    "errors": 0,
+    "log": "/private/tmp/sharepool-gate-v5-units-final.log",
+    "modules": {
+      "test_hash_mining_gate": 26,
+      "test_hash_gate_archive": 13,
+      "test_hash_gate_batch": 12,
+      "test_hash_gate_provenance": 6,
+      "test_hash_gate_ledger": 7
+    },
+    "validation": "Strict RPC adapter doubles; native UTXO/script validity is exercised by separate functional tests."
+  },
+  "functional_tests": [
+    {
+      "test": "feature_sharepool_hash_gate_provenance.py",
+      "command": "/usr/bin/python3 -B test/functional/feature_sharepool_hash_gate_provenance.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-gate-provenance-v4-623 --portseed=623 --nocleanup",
+      "log": "/private/tmp/sharepool-gate-provenance-v4-623/test_framework.log",
+      "passed": true,
+      "evidence": [
+        "Three-opening native dependency graph; atomic journal admission",
+        "Archive restoration with disconnected native snapshot store initially empty",
+        "Duplicate receipt remains idempotent",
+        "Actual solved block, direct coinbase amount and verifychain level 4"
+      ],
+      "validation": "Real native regtest RPC, proof of work, and native coinbase validation; no RPC double.",
+      "bitcoind_sha256": "e3dc27955989e4bc61eb6c2e884ef85268c9bdc7d8dad1056e9677dc8fb883e8"
+    },
+    {
+      "test": "feature_sharepool_hash_gate_ledger.py",
+      "command": "/usr/bin/python3 -B test/functional/feature_sharepool_hash_gate_ledger.py --activation-height=1 --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-gate-ledger-v5-621 --portseed=621 --nocleanup",
+      "log": "/private/tmp/sharepool-gate-ledger-v5-621/test_framework.log",
+      "passed": true,
+      "evidence": [
+        "Native external owner signing and job preparation/finalization",
+        "Provisional ACK and duplicate receipt after empty-node archive restore",
+        "Anchor confirms pending credit while its coinbase pays fallback",
+        "Five other-pool native blocks preserve pending credit beyond original proof age",
+        "Later same-pool block pays exact 50 BTC directly to proof payout script",
+        "Historical status lookup finds actual payment",
+        "Invalidate/reconsider changes pending/settled status on canonical branch",
+        "Two nodes both pass verifychain(4,0)"
+      ],
+      "validation": "Real native regtest RPC, proof of work, and native coinbase validation; no RPC double.",
+      "bitcoind_sha256": "e3dc27955989e4bc61eb6c2e884ef85268c9bdc7d8dad1056e9677dc8fb883e8",
+      "activation_height": 1
+    },
+    {
+      "test": "feature_sharepool_hash_gate_ledger.py",
+      "command": "/usr/bin/python3 -B test/functional/feature_sharepool_hash_gate_ledger.py --activation-height=102 --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-gate-ledger-v5-622 --portseed=622 --nocleanup",
+      "log": "/private/tmp/sharepool-gate-ledger-v5-622/test_framework.log",
+      "passed": true,
+      "evidence": [
+        "Native external owner signing and job preparation/finalization",
+        "Provisional ACK and duplicate receipt after empty-node archive restore",
+        "Anchor confirms pending credit while its coinbase pays fallback",
+        "Five other-pool native blocks preserve pending credit beyond original proof age",
+        "Later same-pool block pays exact 50 BTC directly to proof payout script",
+        "Historical status lookup finds actual payment",
+        "Invalidate/reconsider changes pending/settled status on canonical branch",
+        "Two nodes both pass verifychain(4,0)",
+        "101 ordinary native blocks precede activation102; no preactivation settlement opening is required"
+      ],
+      "validation": "Real native regtest RPC, proof of work, and native coinbase validation; no RPC double.",
+      "bitcoind_sha256": "e3dc27955989e4bc61eb6c2e884ef85268c9bdc7d8dad1056e9677dc8fb883e8",
+      "activation_height": 102
+    }
+  ],
+  "limitations": [
+    "Activation-height policy is explicit and must match the native node; default activation1 leaves old v4 journal configuration unchanged.",
+    "Receipt historical lookups are bounded to64 snapshots/64MiB per page; missing/over-budget history reports unknown.",
+    "The local ACK is provisional until canonical admission. Confirmed credit can remain pending until its pool produces a settling block.",
+    "The binaries recorded here precede the separate pending-block duplicate-download optimization; report per-run hash must be preserved."
+  ]
+}

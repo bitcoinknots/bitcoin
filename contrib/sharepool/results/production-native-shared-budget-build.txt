@@ -1,0 +1,127 @@
+[  0%] Generating bitcoin-build-info.h
+[  1%] Built target crc32c
+[ 14%] Built target leveldb
+[ 14%] Built target generate_build_info
+[ 18%] Built target bitcoin_consensus
+[ 20%] Built target secp256k1_precomputed
+[ 21%] Built target univalue
+[ 29%] Built target bitcoin_crypto
+[ 30%] Built target bitcoin_clientversion
+[ 43%] Built target bitcoin_util
+[ 43%] Building CXX object src/CMakeFiles/bitcoin_common.dir/policy/coin_age_priority.cpp.o
+[ 43%] Building CXX object src/CMakeFiles/bitcoin_node.dir/blockencodings.cpp.o
+[ 43%] Linking CXX static library ../lib/libbitcoin_common.a
+[ 63%] Built target bitcoin_common
+[ 63%] Building CXX object src/CMakeFiles/bitcoin_node.dir/index/base.cpp.o
+[ 63%] Built target secp256k1
+[ 63%] Building CXX object src/CMakeFiles/bitcoin_node.dir/index/blockfilterindex.cpp.o
+[ 65%] Building CXX object src/CMakeFiles/bitcoin_node.dir/index/coinstatsindex.cpp.o
+[ 65%] Building CXX object src/CMakeFiles/bitcoin_node.dir/index/txindex.cpp.o
+[ 65%] Building CXX object src/CMakeFiles/bitcoin_node.dir/init.cpp.o
+[ 65%] Building CXX object src/CMakeFiles/bitcoin_node.dir/kernel/coinstats.cpp.o
+[ 65%] Building CXX object src/CMakeFiles/bitcoin_node.dir/net_processing.cpp.o
+[ 65%] Building CXX object src/CMakeFiles/bitcoin_node.dir/node/blockmanager_args.cpp.o
+[ 67%] Building CXX object src/CMakeFiles/bitcoin_node.dir/node/blockstorage.cpp.o
+[ 67%] Building CXX object src/CMakeFiles/bitcoin_node.dir/node/chainstate.cpp.o
+[ 67%] Building CXX object src/CMakeFiles/bitcoin_node.dir/node/chainstatemanager_args.cpp.o
+[ 69%] Building CXX object src/CMakeFiles/bitcoin_node.dir/node/coin.cpp.o
+[ 69%] Building CXX object src/CMakeFiles/bitcoin_node.dir/node/context.cpp.o
+[ 69%] Building CXX object src/CMakeFiles/bitcoin_node.dir/node/interfaces.cpp.o
+[ 69%] Building CXX object src/CMakeFiles/bitcoin_node.dir/node/mempool_persist.cpp.o
+[ 70%] Building CXX object src/CMakeFiles/bitcoin_node.dir/node/mempool_persist_args.cpp.o
+[ 70%] Building CXX object src/CMakeFiles/bitcoin_node.dir/node/miner.cpp.o
+[ 70%] Building CXX object src/CMakeFiles/bitcoin_node.dir/node/transaction.cpp.o
+[ 70%] Building CXX object src/CMakeFiles/bitcoin_node.dir/node/txdownloadman_impl.cpp.o
+[ 70%] Building CXX object src/CMakeFiles/bitcoin_node.dir/node/utxo_snapshot.cpp.o
+[ 70%] Building CXX object src/CMakeFiles/bitcoin_node.dir/rest.cpp.o
+[ 72%] Building CXX object src/CMakeFiles/bitcoin_node.dir/rpc/blockchain.cpp.o
+[ 72%] Building CXX object src/CMakeFiles/bitcoin_node.dir/rpc/mempool.cpp.o
+[ 72%] Building CXX object src/CMakeFiles/bitcoin_node.dir/rpc/mining.cpp.o
+[ 72%] Building CXX object src/CMakeFiles/bitcoin_node.dir/rpc/net.cpp.o
+[ 72%] Building CXX object src/CMakeFiles/bitcoin_node.dir/rpc/rawtransaction.cpp.o
+[ 72%] Building CXX object src/CMakeFiles/bitcoin_node.dir/rpc/server.cpp.o
+[ 72%] Building CXX object src/CMakeFiles/bitcoin_node.dir/rpc/server_util.cpp.o
+[ 72%] Building CXX object src/CMakeFiles/bitcoin_node.dir/rpc/txoutproof.cpp.o
+[ 72%] Building CXX object src/CMakeFiles/bitcoin_node.dir/sharepool/relay.cpp.o
+[ 72%] Building CXX object src/CMakeFiles/bitcoin_node.dir/sharepool/hash_store.cpp.o
+[ 74%] Building CXX object src/CMakeFiles/bitcoin_node.dir/validation.cpp.o
+[ 74%] Linking CXX static library ../lib/libbitcoin_node.a
+[ 98%] Built target bitcoin_node
+[100%] Linking CXX executable ../bin/bitcoind
+[100%] Built target bitcoind
+[  1%] Built target crc32c
+[  2%] Building CXX object src/test/util/CMakeFiles/test_util.dir/blockfilter.cpp.o
+[ 10%] Built target leveldb
+[ 10%] Generating bitcoin-build-info.h
+[ 10%] Built target generate_build_info
+[ 12%] Built target bitcoin_consensus
+[ 25%] Built target bitcoin_common
+[ 25%] Building CXX object src/test/util/CMakeFiles/test_util.dir/mining.cpp.o
+[ 48%] Built target bitcoin_node
+[ 48%] Built target bitcoin_cli
+[ 49%] Built target univalue
+[ 49%] Building CXX object src/test/util/CMakeFiles/test_util.dir/setup_common.cpp.o
+[ 50%] Built target secp256k1_precomputed
+[ 50%] Building CXX object src/test/util/CMakeFiles/test_util.dir/txmempool.cpp.o
+[ 50%] Building CXX object src/test/util/CMakeFiles/test_util.dir/validation.cpp.o
+[ 55%] Built target bitcoin_crypto
+[ 63%] Built target bitcoin_util
+[ 64%] Built target bitcoin_clientversion
+[ 64%] Built target secp256k1
+[ 64%] Linking CXX static library ../../../lib/libtest_util.a
+[ 67%] Built target test_util
+[ 67%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/blockchain_tests.cpp.o
+[ 67%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/blockfilter_index_tests.cpp.o
+[ 67%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/blockmanager_tests.cpp.o
+[ 68%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/chainstate_write_tests.cpp.o
+[ 68%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/coinstatsindex_tests.cpp.o
+[ 68%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/denialofservice_tests.cpp.o
+[ 69%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/headers_sync_chainwork_tests.cpp.o
+[ 69%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/interfaces_tests.cpp.o
+[ 70%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/miner_tests.cpp.o
+[ 70%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/net_tests.cpp.o
+[ 70%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/peerman_tests.cpp.o
+[ 71%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/rpc_tests.cpp.o
+[ 71%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/script_p2sh_tests.cpp.o
+[ 71%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/sharepool_hash_tests.cpp.o
+[ 71%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/sharepool_retry_worker_tests.cpp.o
+[ 71%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/transaction_tests.cpp.o
+[ 71%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/txdownload_tests.cpp.o
+[ 72%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/txindex_tests.cpp.o
+[ 72%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/txpackage_tests.cpp.o
+[ 72%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/txvalidation_tests.cpp.o
+[ 74%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/txvalidationcache_tests.cpp.o
+[ 74%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/validation_block_tests.cpp.o
+[ 74%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/validation_chainstate_tests.cpp.o
+[ 74%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/validation_chainstatemanager_tests.cpp.o
+[ 74%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/validation_flush_tests.cpp.o
+[ 75%] Building CXX object src/test/CMakeFiles/test_bitcoin.dir/validation_tests.cpp.o
+[ 75%] Linking CXX executable ../../bin/test_bitcoin
+ld: warning: ignoring duplicate libraries: '../../lib/libbitcoin_consensus.a', '../secp256k1/lib/libsecp256k1.a'
+[100%] Built target test_bitcoin
+[  0%] Generating bitcoin-build-info.h
+[  7%] Built target bitcoin_consensus
+[ 11%] Built target univalue
+[ 14%] Built target secp256k1_precomputed
+[ 29%] Built target bitcoin_crypto
+[ 29%] Built target generate_build_info
+[ 29%] Built target secp256k1
+[ 33%] Built target bitcoin_clientversion
+[ 59%] Built target bitcoin_util
+[100%] Built target bitcoin_common
+[100%] Linking CXX executable ../bin/bitcoin-sharepool-signer
+[100%] Built target bitcoin-sharepool-signer
+[  0%] Generating bitcoin-build-info.h
+[  7%] Built target bitcoin_consensus
+[  7%] Built target bitcoin_cli
+[ 11%] Built target univalue
+[ 14%] Built target secp256k1_precomputed
+[ 14%] Built target generate_build_info
+[ 29%] Built target bitcoin_crypto
+[ 33%] Built target bitcoin_clientversion
+[ 59%] Built target bitcoin_util
+[ 59%] Built target secp256k1
+[100%] Built target bitcoin_common
+[100%] Linking CXX executable ../bin/bitcoin-cli
+ld: warning: ignoring duplicate libraries: '/private/tmp/knots-relock-deps/lib/libevent_core.a'
+[100%] Built target bitcoin-cli

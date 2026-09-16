@@ -1,0 +1,20 @@
+test_heavy_witness_respects_existing_element_opcode_and_stack_bounds (test_capacity_fixture.CapacityFixtureTests) ... ok
+test_tag_cannot_modify_an_already_signed_job_or_overrun_coinbase (test_capacity_fixture.CapacityFixtureTests) ... ok
+test_tag_changes_exact_root_and_signing_payload_preserves_payout_and_witness (test_capacity_fixture.CapacityFixtureTests) ... ok
+test_cpu_formats (test_capacity_metrics.CapacityMetricsTests) ... ok
+test_disk_does_not_follow_symlink (test_capacity_metrics.CapacityMetricsTests) ... ok
+test_failed_peer_recovery_preserves_actual_local_admission (test_capacity_metrics.CapacityMetricsTests) ... ok
+test_failed_start_cannot_prevent_final_cleanup (test_capacity_metrics.CapacityMetricsTests) ... ok
+test_failures_remain_timed (test_capacity_metrics.CapacityMetricsTests) ... ok
+test_final_sample_failure_preserves_report_and_cleanup (test_capacity_metrics.CapacityMetricsTests) ... ok
+test_geometry_stops_at_finite_limits (test_capacity_metrics.CapacityMetricsTests) ... ok
+test_geometry_uses_full_witness_bytes_and_separates_coinbase (test_capacity_metrics.CapacityMetricsTests) ... ok
+test_nearest_rank_and_empty (test_capacity_metrics.CapacityMetricsTests) ... ok
+test_proposed_or_rejected_blocks_are_not_counted_as_native_admission (test_capacity_metrics.CapacityMetricsTests) ... ok
+test_resource_dimensions_are_not_clamped_or_combined (test_capacity_metrics.CapacityMetricsTests) ... ok
+test_shared_and_disjoint_transactions_have_distinct_geometry (test_capacity_metrics.CapacityMetricsTests) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.035s
+
+OK

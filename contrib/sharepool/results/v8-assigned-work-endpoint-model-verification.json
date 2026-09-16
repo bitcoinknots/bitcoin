@@ -1,0 +1,21 @@
+{
+  "kind": "v8-zero-target-endpoint-model-tests",
+  "result": "passed",
+  "tests": 82,
+  "native_execution": false,
+  "rules_hash_unchanged": "173ff6fa511f227cc8d4751bb15373afdca5c8ec235dc69ca2680d7ade13ea31",
+  "source_sha256": {
+    "contrib/sharepool/hash_snapshot.py": "8cc9f1ae092cdd71b955e017181fd566c6015b7d6c6aae38104caa4c4598fa0c",
+    "contrib/sharepool/test_hash_variable.py": "be4c8d372962936334b12f4044403b513cef5494317b99a5b93216aa2f02005e",
+    "contrib/sharepool/test_hash_tides.py": "ef73a6d8f3ed0c7896bcf74dc4705b98369e8813e855b2dc58345f04d898db96"
+  },
+  "artifact_sha256": {
+    "contrib/sharepool/results/v8-assigned-work-endpoint-model-tests.txt": "cf6a81b410d7f0a3ba8ca13720eba45147d642388ea1a4aa54751bf6be784681"
+  },
+  "endpoint_test_scope": "Synthetic CBlockHeader.rehash return values 0 and 1 exercise target/codec/history/cache endpoints; no real 255-bit work claimed",
+  "legacy": "Signed v4-v7 byte vectors unchanged; v6/v7 zero admission rejected consistently with native legacy rules",
+  "limitations": [
+    "Model tests do not establish native consensus validity",
+    "Standalone nonnative legacy TIDES oracle is unchanged"
+  ]
+}

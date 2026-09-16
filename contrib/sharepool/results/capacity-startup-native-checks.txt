@@ -1,0 +1,79 @@
+CASE v4-builder
+2026-09-13T08:33:52.704000Z TestFramework (INFO): PRNG seed is: 5283993056056425492
+2026-09-13T08:33:52.705000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-capacity-startup-regressions/v4-builder
+2026-09-13T08:33:55.949000Z TestFramework (INFO): Native construction creates distinct fully validated externally signed origins
+2026-09-13T08:33:56.256000Z TestFramework (INFO): The native mempool supplies a valid witness transaction and exact fee
+2026-09-13T08:33:56.417000Z TestFramework (INFO): A changed job or forged payout cannot reuse the exact owner authorization
+2026-09-13T08:33:56.559000Z TestFramework (INFO): Full snapshot relay permits the follower to verify and accept the winning block
+2026-09-13T08:33:58.405000Z TestFramework (INFO): Stopping nodes
+2026-09-13T08:33:58.571000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-capacity-startup-regressions/v4-builder
+2026-09-13T08:33:58.571000Z TestFramework (INFO): Tests successful
+
+CASE v5-ledger
+2026-09-13T08:33:52.704000Z TestFramework (INFO): PRNG seed is: 4695425744885953049
+2026-09-13T08:33:52.705000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-capacity-startup-regressions/v5-ledger
+2026-09-13T08:33:54.723000Z TestFramework (INFO): Pool C anchors fresh valid A/B receipts without paying those receipts in its own block
+2026-09-13T08:33:55.348000Z TestFramework (INFO): Missing committed data stays pending through restart, then ordinary P2P supplies the complete state
+2026-09-13T08:33:57.211000Z TestFramework (INFO): A pays its parent's two A credits; newly received work on the previous job is admitted for a later block
+2026-09-13T08:33:57.361000Z TestFramework (INFO): Even fresh valid owner signatures cannot omit credits, change their recipient/work, or choose a shorter payout prefix
+2026-09-13T08:33:58.609000Z TestFramework (INFO): Confirmed A/B credits survive unrelated-pool blocks beyond the fresh-proof age limit
+2026-09-13T08:33:59.934000Z TestFramework (INFO): A longer nonpaying branch restores credits removed by orphaned B/A payouts
+2026-09-13T08:34:01.672000Z TestFramework (INFO): Selected-branch credits pay their original recipients once after the reorganization
+2026-09-13T08:34:02.235000Z TestFramework (INFO): Offline chainstate reindex and level-four verification reconstruct the selected ledger history
+2026-09-13T08:34:03.169000Z TestFramework (INFO): Stopping nodes
+2026-09-13T08:34:03.340000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-capacity-startup-regressions/v5-ledger
+2026-09-13T08:34:03.340000Z TestFramework (INFO): Tests successful
+
+CASE v6-tides
+2026-09-13T08:33:58.739000Z TestFramework (INFO): PRNG seed is: 144317963064664062
+2026-09-13T08:33:58.740000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-capacity-startup-regressions/v6-tides
+2026-09-13T08:34:01.160000Z TestFramework (INFO): Empty-pool bootstrap jobs need only a recipient script and a separate owner signer
+2026-09-13T08:34:02.981000Z TestFramework (INFO): Paid shares remain in the rolling history; late submissions cannot change an issued job
+2026-09-13T08:34:03.650000Z TestFramework (INFO): Missing older history leaves a known native tip pending until its exact opening is restored
+2026-09-13T08:34:06.533000Z TestFramework (INFO): Competing native forks select their own admitted history and recurring payout ratios
+2026-09-13T08:34:08.947000Z TestFramework (INFO): New work fills the finite TIDES work window without deleting older historical snapshots
+2026-09-13T08:34:10.155000Z TestFramework (INFO): Offline reindex reconstructs the selected history; profile changes cannot overwrite its block database
+2026-09-13T08:34:17.372000Z TestFramework (INFO): Local history budgets reject invalid settings and can change without changing the chain profile
+2026-09-13T08:34:20.249000Z TestFramework (INFO): Stopping nodes
+2026-09-13T08:34:20.368000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-capacity-startup-regressions/v6-tides
+2026-09-13T08:34:20.368000Z TestFramework (INFO): Tests successful
+
+CASE v6-zero-rounded
+2026-09-13T08:34:03.528000Z TestFramework (INFO): PRNG seed is: 4789795533012318449
+2026-09-13T08:34:03.529000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-capacity-startup-regressions/v6-zero-rounded
+2026-09-13T08:34:04.201000Z TestFramework (INFO): Generate ordinary preactivation blocks to a 1-satoshi subsidy
+2026-09-13T08:37:32.302000Z TestFramework (INFO): Native builder and gate approve a witness-only coinbase with empty monetary payouts
+2026-09-13T08:37:33.079000Z TestFramework (INFO): Repeating the rolling window preserves the empty payout vector through restart/reindex
+2026-09-13T08:38:10.185000Z TestFramework (INFO): Stopping nodes
+2026-09-13T08:38:10.464000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-capacity-startup-regressions/v6-zero-rounded
+2026-09-13T08:38:10.464000Z TestFramework (INFO): Tests successful
+
+CASE v6-zero-subsidy
+2026-09-13T08:34:20.604000Z TestFramework (INFO): PRNG seed is: 2189418692347504325
+2026-09-13T08:34:20.605000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-capacity-startup-regressions/v6-zero-subsidy
+2026-09-13T08:34:21.267000Z TestFramework (INFO): Generate ordinary preactivation blocks to a 0-satoshi subsidy
+2026-09-13T08:37:50.059000Z TestFramework (INFO): Native builder and gate approve a witness-only coinbase with empty monetary payouts
+2026-09-13T08:37:50.926000Z TestFramework (INFO): Repeating the rolling window preserves the empty payout vector through restart/reindex
+2026-09-13T08:38:33.000000Z TestFramework (INFO): Stopping nodes
+2026-09-13T08:38:33.519000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-capacity-startup-regressions/v6-zero-subsidy
+2026-09-13T08:38:33.519000Z TestFramework (INFO): Tests successful
+
+CASE v6-cpu-transport
+2026-09-13T08:38:10.647000Z TestFramework (INFO): PRNG seed is: 2133354669886436052
+2026-09-13T08:38:10.648000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-capacity-startup-regressions/v6-cpu-transport
+2026-09-13T08:38:13.106000Z TestFramework (INFO): Native Sia CPU preflight and independent replay: {'capture': {'profile': 'v6-tides', 'rules_revision': 2, 'jobs': 4, 'proofs': 3, 'blocks': 2, 'native_replay': True, 'physical_provenance_verified': False, 'last_native_tip': '2ba48112d2dc1041af05d4ce75b71f1b8eb334f4669a665391d109425743bba0'}, 'fake_guard_restored': True, 'physical_device_used': False}
+2026-09-13T08:38:13.167000Z TestFramework (INFO): Stopping nodes
+2026-09-13T08:38:13.284000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-capacity-startup-regressions/v6-cpu-transport
+2026-09-13T08:38:13.284000Z TestFramework (INFO): Tests successful
+
+CASE v6-archive
+2026-09-13T08:38:13.480000Z TestFramework (INFO): PRNG seed is: 7887518415733656638
+2026-09-13T08:38:13.481000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-capacity-startup-regressions/v6-archive
+2026-09-13T08:38:19.183000Z TestFramework (INFO): Paged inventory crosses several cursors without omissions or duplicates
+2026-09-13T08:38:19.400000Z TestFramework (INFO): A missing historical snapshot archive leaves the next exact-payout block pending
+2026-09-13T08:38:20.697000Z TestFramework (INFO): Damaged imports retain only individually authenticated record prefixes
+2026-09-13T08:38:26.558000Z TestFramework (INFO): P2P inventory crosses its first 1,024 records using bounded untrusted preimages
+2026-09-13T08:38:45.994000Z TestFramework (INFO): Native archive recovery passed: {'kind': 'native v6-r2 paged snapshot archive recovery; disposable regtest', 'height': 9, 'tip': '0ccde11c7fdf9460c70e7b33fa383ebbdfb96eb2a8efe7d95341b312c3cc6dce', 'snapshots': 11, 'chunks': 6, 'payout_satoshis': [2500000000, 2500000000], 'elapsed_seconds': 31.972, 'pending_recovery_worker_observed': {'started': True, 'active': False, 'pending': False, 'stopping': False, 'requests': 13, 'passes': 4, 'failures': 0, 'last_micros': 20119, 'max_micros': 20119, 'outside_script_checks': 0, 'locked_fallbacks': 0, 'context_retries': 0}, 'p2p_inventory': {'opaque_records': 1030, 'total_records': 1041, 'records_beyond_first_page': 17, 'records_fetched_from_later_archive_pages': 17, 'preloaded_inventory_records': 1024, 'source_recent_announcements_cleared_by_restart': True, 'kind': 'Untrusted hash-addressed transport, not validated mining evidence'}, 'timing_scope': 'Small disposable native recovery fixture; not sustained validation throughput', 'archive_startup': {'normal_restart': {'fast_path': True, 'resumed_rebuild': False, 'records_scanned': 0, 'bytes_scanned': 0, 'batches': 0}, 'explicit_rebuild': {'fast_path': False, 'resumed_rebuild': False, 'records_scanned': 11, 'bytes_scanned': 8064, 'batches': 3}, 'preserved_snapshot_count': 11, 'preserved_charged_bytes': 9920}, 'checks': ['zero-payload-scan restart', 'explicit resumable index rebuild', 'paged RPC inventory', 'exclusive 0600 export', 'hash/profile/truncation rejection', 'authenticated partial retention', 'pending-block import recovery', 'restart', 'reindex-chainstate', 'full reindex', 'finite quota option validation', 'P2P inventory beyond 1,024 records']}
+2026-09-13T08:38:46.052000Z TestFramework (INFO): Stopping nodes
+2026-09-13T08:38:46.226000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-capacity-startup-regressions/v6-archive
+2026-09-13T08:38:46.226000Z TestFramework (INFO): Tests successful

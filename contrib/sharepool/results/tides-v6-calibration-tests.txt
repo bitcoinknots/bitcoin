@@ -1,0 +1,22 @@
+test_long_refresh_explicitly_loses_pool_solutions (test_tides_calibration.CoupledSimulationTests) ... ok
+test_native_find_is_same_share_event_and_excluded_from_frozen_job (test_tides_calibration.CoupledSimulationTests) ... ok
+test_nonfinite_duration_and_invalid_budget_are_rejected (test_tides_calibration.CoupledSimulationTests) ... ok
+test_pool_only_expiry_is_not_hidden_by_reference (test_tides_calibration.CoupledSimulationTests) ... ok
+test_saturated_queue_records_backpressure_and_expiry (test_tides_calibration.CoupledSimulationTests) ... ok
+test_seed_replay_conserves_admitted_expired_and_pending_work (test_tides_calibration.CoupledSimulationTests) ... ok
+test_summary_resamples_independent_runs_and_keeps_covariance (test_tides_calibration.CoupledSimulationTests) ... ok
+test_variance_decomposition_retains_nonzero_covariance (test_tides_calibration.CoupledSimulationTests) ... ok
+test_converter_and_exact_sizes_match_independent_native_codec (test_tides_calibration.ExactWorkTests) ... ok
+test_invalid_and_noncanonical_compacts (test_tides_calibration.ExactWorkTests) ... ok
+test_known_bitcoin_compact_and_exact_power_assignment (test_tides_calibration.ExactWorkTests) ... ok
+test_profile_knob_is_explicit_and_resource_cost_scales (test_tides_calibration.ExactWorkTests) ... ok
+test_sampling_variance_matches_exhaustive_bernoulli_labels (test_tides_calibration.ExactWorkTests) ... ok
+test_bootstrap_and_zero_floor (test_tides_calibration.WindowTests) ... ok
+test_independent_arrival_oracle_and_rounding (test_tides_calibration.WindowTests) ... ok
+test_numeric_boundary_and_proportional_comparator (test_tides_calibration.WindowTests) ... ok
+test_singleton_batches_equal_arrival_oracle_for_every_cutoff (test_tides_calibration.WindowTests) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.324s
+
+OK

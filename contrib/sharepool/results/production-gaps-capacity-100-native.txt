@@ -1,0 +1,23 @@
+2026-09-14T06:23:35.277000Z TestFramework (INFO): PRNG seed is: 1055204181898553347
+2026-09-14T06:23:35.278000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-production-gaps-capacity-100
+2026-09-14T06:23:47.665000Z TestFramework (INFO): Capacity epoch 1/3: 100 distinct native origins, layout=cumulative, padding outputs=0, witness-heavy=False
+2026-09-14T06:23:51.607000Z TestFramework (INFO): Epoch 1: 25/100 native origins ready
+2026-09-14T06:23:55.891000Z TestFramework (INFO): Epoch 1: 50/100 native origins ready
+2026-09-14T06:24:00.607000Z TestFramework (INFO): Epoch 1: 75/100 native origins ready
+2026-09-14T06:24:05.758000Z TestFramework (INFO): Epoch 1: 100/100 native origins ready
+2026-09-14T06:26:01.450000Z TestFramework (INFO): Epoch 1: 300 offers admitted in 2 blocks; zero expired
+2026-09-14T06:26:01.451000Z TestFramework (INFO): Capacity epoch 2/3: 100 distinct native origins, layout=cumulative, padding outputs=0, witness-heavy=False
+2026-09-14T06:26:21.849000Z TestFramework (INFO): Epoch 2: 25/100 native origins ready
+2026-09-14T06:26:42.741000Z TestFramework (INFO): Epoch 2: 50/100 native origins ready
+2026-09-14T06:27:04.052000Z TestFramework (INFO): Epoch 2: 75/100 native origins ready
+2026-09-14T06:27:25.869000Z TestFramework (INFO): Epoch 2: 100/100 native origins ready
+2026-09-14T06:29:31.918000Z TestFramework (INFO): Epoch 2: 300 offers admitted in 3 blocks; zero expired
+2026-09-14T06:29:31.919000Z TestFramework (INFO): Capacity epoch 3/3: 100 distinct native origins, layout=cumulative, padding outputs=0, witness-heavy=False
+2026-09-14T06:29:58.548000Z TestFramework (INFO): Epoch 3: 25/100 native origins ready
+2026-09-14T06:30:25.565000Z TestFramework (INFO): Epoch 3: 50/100 native origins ready
+2026-09-14T06:30:53.366000Z TestFramework (INFO): Epoch 3: 75/100 native origins ready
+2026-09-14T06:31:21.457000Z TestFramework (INFO): Epoch 3: 100/100 native origins ready
+2026-09-14T06:34:12.994000Z TestFramework (INFO): Epoch 3: 300 offers admitted in 3 blocks; zero expired
+2026-09-14T06:34:16.887000Z TestFramework (INFO): Stopping nodes
+2026-09-14T06:34:17.069000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-production-gaps-capacity-100
+2026-09-14T06:34:17.069000Z TestFramework (INFO): Tests successful

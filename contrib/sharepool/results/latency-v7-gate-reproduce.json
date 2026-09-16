@@ -1,0 +1,24 @@
+{
+  "scope": "Python gate synthetic fixtures with RPC double; no native performance claim",
+  "history_proofs": 100,
+  "new_proofs": 20,
+  "unique_incoming_origins": 1,
+  "source_sha256": {
+    "hash_mining_gate.py": "3f95b12e3b3ca79a61d47b4370088a95f6937c7285809950840ba8350e27f19f",
+    "hash_gate_inventory.py": "a95827a8b52243811f05d4cb97a0cb603f2e783271d9be2d04e1af0ac2d36ff6",
+    "hash_gate_batch.py": "1762caf26308b54b61eacfd1e448dba4d226b3ac9e94203cdac6f4474654f45d",
+    "hash_snapshot.py": "dd027da54e773459dfd2126822e2f38947e63936d6e096790f83a57e83678b1d",
+    "hash_gate_cache.py": "49408d7b9144198591eeb36a803f6e129aacd121a14d4e5c7547d453f24fb6f5"
+  },
+  "rpc_calls": {
+    "getblockchaininfo": 20,
+    "getsharepoolhashstatus": 20,
+    "getbestblockhash": 80,
+    "getblockhash": 60,
+    "getblockheader": 40,
+    "submitsharepoolhashsnapshot": 60,
+    "validatesharepoolhashtemplate": 20,
+    "validatesharepoolhashshare": 20
+  },
+  "profile_total_seconds": 1.2321776409999996
+}

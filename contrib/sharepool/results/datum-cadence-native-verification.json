@@ -1,0 +1,87 @@
+{
+  "result": "passed",
+  "scope": "Three sequential isolated native regtest correctness scenarios; existing unchanged Debug daemon; no public network, hardware or capacity measurement",
+  "runs": [
+    {
+      "name": "datum-cadence",
+      "command": [
+        "python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_datum_cadence.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-datum-cadence-final-datum-cadence",
+        "--portseed=1520",
+        "--nocleanup"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 3.4028882499999997,
+      "log": "contrib/sharepool/results/datum-cadence-native-final-datum-cadence.txt",
+      "tmpdir": "/private/tmp/sharepool-datum-cadence-final-datum-cadence",
+      "report": "contrib/sharepool/results/datum-cadence-native-results.json"
+    },
+    {
+      "name": "state-reuse",
+      "command": [
+        "python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_state_reuse.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-datum-cadence-final-state-reuse",
+        "--portseed=1521",
+        "--nocleanup"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 2.6455300000000004,
+      "log": "contrib/sharepool/results/datum-cadence-native-final-state-reuse.txt",
+      "tmpdir": "/private/tmp/sharepool-datum-cadence-final-state-reuse",
+      "report": "contrib/sharepool/results/datum-cadence-native-state-reuse-results.json"
+    },
+    {
+      "name": "compact",
+      "command": [
+        "python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_compact.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-datum-cadence-final-compact",
+        "--portseed=1522",
+        "--nocleanup"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 17.130163166,
+      "log": "contrib/sharepool/results/datum-cadence-native-final-compact.txt",
+      "tmpdir": "/private/tmp/sharepool-datum-cadence-final-compact",
+      "report": "contrib/sharepool/results/datum-cadence-native-compact-results.json"
+    }
+  ],
+  "verified_source_sha256": {
+    "contrib/sharepool/hash_job_scheduler.py": "0b44d3e63c843240d2dd27c4029278b86c5632bf4695a178076fd04d6861b911",
+    "contrib/sharepool/hash_mining_gate.py": "fb317723022963485cdf4ac5c7497c3dc8c4bb44c17a570c974d10434e6b1596",
+    "test/functional/feature_sharepool_hash_datum_cadence.py": "03d07ebedea04fbd7909059786fd075584152ae046f8417e31a3b77dd5e2fcb0",
+    "test/functional/feature_sharepool_hash_state_reuse.py": "ed10fd0d4c0badf52da2c27bba57ef855b53121d65d1bbb6f86ae189f0f3bc1e",
+    "test/functional/feature_sharepool_hash_compact.py": "91f4167074194895af1bc68cb82dcbb961c53cb239d5a994f192ccaf79f3bb83"
+  },
+  "daemon_sha256": "2f06596d94347f8491c6506d8474e4ffbfc44243fd41f0bcb884957e108d5365",
+  "signer_sha256": "bbb7b90309010477f0e13866671c84cd05ddb4699c087d55897d6cf10cc169f3",
+  "prior_bringup_runs": "contrib/sharepool/results/datum-cadence-native-second-verification.json",
+  "prior_bringup_note": "Initial fixture omitted native snapshot announcement and correctly received missing-data; fixed only the publication callback. Intermediate success retained. Final rerun uses the scheduler with failed-withdrawal latch and retryable close.",
+  "artifact_sha256": {
+    "contrib/sharepool/results/datum-cadence-native-compact-results.json": "2d60d263a8b63bf41f13231345325ff1a3451acdef4b165f39369a2f78c5c12d",
+    "contrib/sharepool/results/datum-cadence-native-final-compact.txt": "c90aa0bde76ed04f0f2da4aa87ae55bcba18426a891fbb97c87d1d1eac1c51b0",
+    "contrib/sharepool/results/datum-cadence-native-final-datum-cadence.txt": "2190221070b2bc933fa9def0431845e17129b5654a2912aca2d973966f4ab234",
+    "contrib/sharepool/results/datum-cadence-native-final-state-reuse.txt": "c82c26aa49cd7dd24685d04c9e1ba42f380c44b655778ad1a95e4b7a7b8361a6",
+    "contrib/sharepool/results/datum-cadence-native-initial.txt": "ed1b9cd1483dc93283ddb185b2e27aab7d31d9be27a590c73142a1a5ff957772",
+    "contrib/sharepool/results/datum-cadence-native-regressions.json": "ec92a1afbd7107db2ac7c268261aee46d24906e823c320e972f8920675582fbb",
+    "contrib/sharepool/results/datum-cadence-native-results.json": "190c674b0400f3ecf334211c7c5f8f46f334b31dbc0817edf913ef57f89ba301",
+    "contrib/sharepool/results/datum-cadence-native-second-results.json": "1bba1ffb6eac872cfe39ea5406dcf69be89170e7e0374fb5c7976a76e3396d45",
+    "contrib/sharepool/results/datum-cadence-native-second-verification.json": "50d4f34610623c5df4e56ad282f570d32809ca60e217ab03d1d6f350f9e607a2",
+    "contrib/sharepool/results/datum-cadence-native-second.txt": "b996bb499790ae03cdd974c34e0c03132b2df27effb7334de90afefb691b21ed",
+    "contrib/sharepool/results/datum-cadence-native-state-reuse-results.json": "081655b60fffddef6d0df025479ca0cd2bfe4cfcfe10ed472b6ababce8fddb91"
+  },
+  "nodes_stopped": true,
+  "log_normalization": {
+    "log": "contrib/sharepool/results/datum-cadence-native-initial.txt",
+    "change": "Removed trailing whitespace from three blank error-log lines; substantive output unchanged",
+    "raw_sha256": "da1bee0e6c47003067fc15034e95980c3ee99d6bb4a4bb558e350f7cd389453e"
+  }
+}

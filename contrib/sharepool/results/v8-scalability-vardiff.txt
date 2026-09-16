@@ -1,0 +1,33 @@
+2026-09-14T16:06:53.951000Z TestFramework (INFO): PRNG seed is: 7524103497990705937
+2026-09-14T16:06:53.951000Z TestFramework (DEBUG): Setting up network thread
+2026-09-14T16:06:53.951000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v8-registration-vardiff
+2026-09-14T16:06:53.954000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:06:53.955000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:06:53.956000Z TestFramework.node2 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:06:54.482000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-14T16:06:54.485000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-14T16:06:54.488000Z TestFramework.node2 (DEBUG): RPC successfully started
+2026-09-14T16:06:54.525000Z TestFramework (INFO): Independent miners commit three different assigned targets at the same native difficulty
+2026-09-14T16:07:18.088000Z TestFramework (INFO): Assignment changes, another miner's authorization and insufficient work are rejected
+2026-09-14T16:07:54.267000Z TestFramework (INFO): A late old-target proof keeps its original credit alongside a new harder job
+2026-09-14T16:07:54.993000Z TestFramework (INFO): Persistent history, restart and competing branches preserve assigned work weights
+2026-09-14T16:07:54.993000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-14T16:07:55.166000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-14T16:07:55.167000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:07:55.429000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-14T16:07:58.243000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-14T16:07:58.422000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-14T16:07:58.427000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:07:58.636000Z TestFramework.node1 (DEBUG): [node 1] bitcoind exited with status 1 during initialization
+2026-09-14T16:07:58.637000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:07:59.371000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-14T16:07:59.671000Z TestFramework (DEBUG): Closing down network thread
+2026-09-14T16:07:59.724000Z TestFramework (INFO): Stopping nodes
+2026-09-14T16:07:59.724000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-14T16:07:59.725000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-14T16:07:59.725000Z TestFramework.node2 (DEBUG): Stopping node
+2026-09-14T16:07:59.785000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-14T16:07:59.899000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-14T16:07:59.899000Z TestFramework.node2 (DEBUG): Node stopped
+2026-09-14T16:07:59.899000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v8-registration-vardiff
+2026-09-14T16:07:59.899000Z TestFramework (INFO): Tests successful

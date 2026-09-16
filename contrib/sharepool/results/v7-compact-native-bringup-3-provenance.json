@@ -1,0 +1,28 @@
+{
+  "result": "failed",
+  "git_head": "88d4ab03333076b119dc317160bfa075707ad6b8",
+  "command": [
+    "python3",
+    "-B",
+    "test/functional/feature_sharepool_hash_compact.py",
+    "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+    "--tmpdir=/private/tmp/sharepool-v7-compact-bringup-3",
+    "--portseed=1232",
+    "--nocleanup"
+  ],
+  "source_sha256": {
+    "contrib/sharepool/hash_snapshot.py": "44173ab51d60fd5bc4378d327e14ba9cbf78f61086faa4ff2e0db92180ae3013",
+    "contrib/sharepool/hash_mining_gate.py": "96fe589dc0f6d5b9d257800f6c4a2308104f989a1df274ade098eaa8c8e71e18",
+    "contrib/sharepool/hash_gate_batch.py": "0e0b55d97a2820dccc1884fa1c2c45c7d6589cef235a2a138831b90c069572b3",
+    "contrib/sharepool/hash_gate_inventory.py": "a95827a8b52243811f05d4cb97a0cb603f2e783271d9be2d04e1af0ac2d36ff6",
+    "test/functional/feature_sharepool_hash_compact.py": "d081f63d483c72c65c21b4684d768f06c61dcd92c5cfea1549ac666597ec4736",
+    "test/functional/feature_sharepool_hash_tides.py": "098dc2b32792d4b2cef5252c45ceb16700dfe79a5c93550e103117323c3da8f8"
+  },
+  "binary_sha256": {
+    "bitcoind": "6b83af631e78f68305ca973fb4bef50b16fff1dfdc19302cfa7302394877e242",
+    "bitcoin-sharepool-signer": "bbb7b90309010477f0e13866671c84cd05ddb4699c087d55897d6cf10cc169f3"
+  },
+  "scope": "Isolated native regtest correctness; concurrent C++ and native regressions, no performance claim.",
+  "stage": "final negative option assertion wording (all native correctness, reorg, missing-data, index fallback and reindex steps passed)",
+  "source_hashes_unchanged_through_native_checks": true
+}

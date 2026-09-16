@@ -171,6 +171,13 @@ public:
         //! value (see -rdtsexpiry). Requires a blake2b activation height.
         std::optional<int64_t> rdts_expiry_time{};
         std::optional<std::vector<unsigned char>> blake2b_headline{};
+        //! Regtest-only native sharepool validation, at or after BLAKE2b activation.
+        std::optional<int> sharepool_height{};
+        bool sharepool_hash_only{false};
+        bool sharepool_admitted_ledger{false};
+        bool sharepool_tides{false};
+        bool sharepool_compact_tides{false};
+        bool sharepool_vardiff{false};
     };
 
     static std::unique_ptr<const CChainParams> RegTest(const RegTestOptions& options);

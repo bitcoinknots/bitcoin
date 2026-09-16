@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+from pathlib import Path
+import datetime, hashlib, json, os, subprocess, sys, time
+base=Path(__file__).resolve().parent
+stage=sys.argv[1]
+assert stage in ("baseline", "final")
+root=base/stage
+source=root/"source"
+manifest=json.loads((base/(stage+"-manifest.json")).read_text())
+run=root/"run-1"
+assert not run.exists(), "Preserve prior run; select a new run explicitly"
+run.mkdir()
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+command=[sys.executable,"-B",str(source/"test/functional/feature_sharepool_hash_live_capacity.py"),
+    "--configfile="+str(root/"native/test/config.ini"),"--profile-version=8", "--share-work-bits=2,4,6",
+    "--miners=20","--source-workers=4","--duration-seconds=60","--target-share-seconds=6",
+    "--snapshot-budget-bytes=1048576","--settlement-seconds=20","--work-update-seconds=40",
+    "--deduplicate-job-evidence","--max-runtime-seconds=900","--results="+str(run/"results.json"),
+    "--tmpdir="+str(run/"nodes"),"--portseed=925","--randomseed=20260915","--nocleanup","--loglevel=DEBUG"]
+binaries={p.name:sha(p) for p in (root/"native/bin").iterdir() if p.is_file()}
+report={"stage":stage,"command":command,"cwd":str(source),"started_utc":datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    "binary_sha256_before":binaries,"source_manifest_sha256":sha(base/(stage+"-manifest.json")),
+    "timing_lane":"Root explicitly released lane; all build/test agents paused; source editing may continue",
+    "limits":["One finite 20-miner/4-owner/200-proof capture; not saturation or production qualification", "Same configuration, fresh synthetic keys/jobs; scheduling can change job and settlement counts", "Nested operation durations overlap and are not additive CPU or elapsed costs"]}
+(run/"launch.json").write_text(json.dumps(report,indent=2)+"\n")
+env=dict(os.environ)
+for k in ("BITCOIND","BITCOINCLI","BITCOINUTIL","BITCOINWALLET","PYTHONPATH"):env.pop(k,None)
+env["PYTHONDONTWRITEBYTECODE"]="1"
+began=time.monotonic()
+with (run/"console.txt").open("w") as log:
+    child=subprocess.run(command,cwd=source,env=env,stdout=log,stderr=subprocess.STDOUT)
+report.update(exit_code=child.returncode,elapsed_seconds=time.monotonic()-began,finished_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    binary_sha256_after={p.name:sha(p) for p in (root/"native/bin").iterdir() if p.is_file()},
+    artifacts={p.name:{"bytes":p.stat().st_size,"sha256":sha(p)} for p in (run/"console.txt",run/"results.json") if p.exists()})
+assert report["binary_sha256_after"]==binaries
+(run/"launch.json").write_text(json.dumps(report,indent=2)+"\n")
+print(json.dumps({k:v for k,v in report.items() if k in ("stage","exit_code","elapsed_seconds","artifacts")},indent=2))
+sys.exit(child.returncode)

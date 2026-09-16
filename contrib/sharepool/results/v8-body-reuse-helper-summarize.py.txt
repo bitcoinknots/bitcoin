@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+from collections import Counter
+from pathlib import Path
+import hashlib,json,sys
+base=Path(__file__).resolve().parent
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+reports={}
+for stage in sys.argv[1:] or ["baseline","final"]:
+    run=base/stage/"run-1"; p=run/"results.json"; r=json.loads(p.read_text()); launch=json.loads((run/"launch.json").read_text())
+    assert r["result"]=="passed" and launch["exit_code"]==0
+    counts={};events_by_stage={}
+    for phase,limit in (("measured_phase",r["configuration"]["duration_seconds"]),("completed_run",float("inf"))):
+        phase_counts={}
+        for event_stage in ("offered","acknowledged","admitted","peer_verified","rejected","admission_refused"):
+            ids=[proof for e in r["events"] if e["stage"]==event_stage and e["seconds"]<=limit for proof in e["proof_ids"]]
+            assert len(ids)==len(set(ids)),(phase,event_stage,"duplicate proof event")
+            phase_counts[event_stage]=len(ids)
+            assert len(ids)==r[phase][event_stage],(phase,event_stage,"reported count differs")
+            if phase=="completed_run": events_by_stage[event_stage]=set(ids)
+        counts[phase]=phase_counts
+    assert events_by_stage["offered"]==events_by_stage["acknowledged"]==events_by_stage["admitted"]==events_by_stage["peer_verified"]
+    assert len(events_by_stage["offered"])==r["scheduled_requests"]==200
+    assert r["payout_oracle_verified"] and r["peer_verified"] and r["expired_acknowledged"]==0
+    assert launch["binary_sha256_before"]==launch["binary_sha256_after"]
+    assert r["native_binary_sha256"]==launch["binary_sha256_before"]["bitcoind"]
+    assert not r["resources"]["errors"]
+    log=(run/"console.txt").read_text()
+    assert "node0 (DEBUG): Node stopped" in log and "node1 (DEBUG): Node stopped" in log
+    summary={"stage":stage,"result":r["result"],"configuration":r["configuration"],"report_sha256":sha(p),"daemon_sha256":r["native_binary_sha256"],
+        "signer_sha256":r["signer_binary_sha256"],"independent_event_counts":counts,"event_identity_sets_equal":True,
+        "receipt_states":r["receipt_states"],"expired_acknowledged":r["expired_acknowledged"],"payout_oracle_verified":r["payout_oracle_verified"],
+        "jobs":len(r["jobs"]),"unique_templates":len({j["template_id"] for j in r["jobs"]}),"blocks":len(r["blocks"]),
+        "block_proof_counts":[b["admitted"] for b in r["blocks"]],"block_snapshot_bytes":[b["snapshot_bytes"] for b in r["blocks"]],
+        "queue_payload":r["completed_queue_payload"],"live_and_drain_seconds":r["live_and_drain_seconds"],"test_seconds_including_setup":r["seconds"],
+        "launcher_elapsed_seconds":launch["elapsed_seconds"],"collector_measurements":r["measurements"],"source_rpc_measurements":r["source_rpc_measurements"],
+        "resources":{k:v for k,v in r["resources"].items() if k!="samples"},"both_nodes_stopped":True}
+    (run/"summary.json").write_text(json.dumps(summary,indent=2)+"\n")
+    reports[stage]=summary
+if len(reports)==2:
+    before,after=reports["baseline"],reports["final"]
+    assert before["configuration"]==after["configuration"]
+    rows={}
+    for key in ("collector.register_and_ack","collector.rpc.validatesharepoolhashshare","collector.rpc.validatesharepoolhashtemplate","collector.settlement"):
+        a,b=before["collector_measurements"][key],after["collector_measurements"][key]
+        rows[key]={"before_calls":a["count"],"after_calls":b["count"],"before_seconds":a["total_seconds"],"after_seconds":b["total_seconds"],
+            "seconds_change_percent":100*(b["total_seconds"]/a["total_seconds"]-1)}
+    comparison={"scope":"Single finite before/after capture with same configuration, not saturation or production qualification","configuration_equal":True,
+        "baseline":before,"final":after,"selected_operation_comparison":rows,
+        "limitations":["Synthetic proof bytes and signing keys differ; common deterministic schedule and fixture code, not byte-identical replay", "Protocol-driven job refresh and block membership may vary with timing", "Nested RPC intervals are included in caller service time and must not be added", "Aggregate owner RPC intervals can overlap; CPU samples are separate", "No repeat distribution or confidence interval is claimed", "Tiny templates and loopback peers do not establish heavy-template/WAN performance"]}
+    (base/"comparison.json").write_text(json.dumps(comparison,indent=2)+"\n")
+    print(json.dumps({"configuration_equal":True,"operations":rows,"jobs":[before["jobs"],after["jobs"]],"blocks":[before["blocks"],after["blocks"]],"node0":[before["resources"]["processes"]["node0"],after["resources"]["processes"]["node0"]]},indent=2))
+else:
+    print(json.dumps({stage:{k:r[k] for k in ("result","independent_event_counts","jobs","blocks","both_nodes_stopped")} for stage,r in reports.items()},indent=2))

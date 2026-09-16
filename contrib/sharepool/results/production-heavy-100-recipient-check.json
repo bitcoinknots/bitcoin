@@ -1,0 +1,18 @@
+{
+  "result": "passed",
+  "source": "independent read of stopped native blk file using its xor.dat key",
+  "input_report_sha256": "3e5d9637283e0074dd0faa8d47be06161b967107e09fa8fd7b3e0b24bc6ad3a6",
+  "checks": [
+    {
+      "block": "3dc089e431ff91a960f357f3dc05e990c14a9c44060f87870eb63a25aa5e66b2",
+      "block_bytes_sha256": "dd11416567aaeccc7194336669f33020c57874749d221050e5ed445ccfbf77a3",
+      "payout_scripts": 100,
+      "satoshis_per_recipient": 50011000,
+      "native_weight": 3379600,
+      "coinbase_weight": 12840
+    }
+  ],
+  "no_initial_deferred": true,
+  "one_block": true,
+  "all_counts_and_final_backlogs_verified": true
+}

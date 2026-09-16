@@ -1,0 +1,225 @@
+{
+  "commands": {
+    "conditional_sweep": "python3 -B contrib/sharepool/tides_conditional_variance.py --replicas 64 --workers 4 --seed 20260919 --output contrib/sharepool/results/tides-v6-conditional-variance.json",
+    "labeled_sweep": "python3 -B contrib/sharepool/tides_service_contract.py --replicas 128 --workers 4 --seed 20260919 --output contrib/sharepool/results/tides-v6-service-contract.json",
+    "tests": "python3 -B -m unittest discover -s contrib/sharepool -p 'test_tides_*py' -v"
+  },
+  "decision": {
+    "conditional_variance_calculation_excludes_integer_rounding": true,
+    "current_native_capacity_contract_passes": false,
+    "engineering_criteria_are_proposed_not_user_approved": true,
+    "exact_post_rounding_conditional_variance_computed": false,
+    "measured_expected_pool_blocks": 24,
+    "minimum_miner_fraction_is_a_statistical_service_claim_not_a_permission_requirement": true,
+    "native_bits_hex": "17034219",
+    "native_target_activated": false,
+    "production_contract_passes": false,
+    "reason": "SHIFT14 supports the proposed conditional unrounded variance and raw integer-payout mean criteria for the tested >=0.1%-of-pool recipients, but current distinct-origin/full-body limits fail. No arbitrary-miner, all-target or dynamic-mainnet guarantee follows.",
+    "smallest_supported_tested_miner_fraction_of_pool": 0.001,
+    "statistical_candidate_shift": 14,
+    "tested_pool_fractions": [
+      0.1,
+      0.01,
+      0.001
+    ],
+    "warmup_expected_pool_blocks": 16,
+    "window_native_work": 8
+  },
+  "execution": {
+    "conditional": {
+      "cases": 6,
+      "independent_traces_per_case": 64,
+      "marked_event_evaluations": 308957452,
+      "system_cpu_seconds": 16.28,
+      "user_cpu_seconds": 1281.82,
+      "wall_seconds": 328.31
+    },
+    "labeled": {
+      "cases": 11,
+      "independent_runs_per_case": 128,
+      "marked_event_evaluations": 1132720900,
+      "system_cpu_seconds": 55.27,
+      "user_cpu_seconds": 4767.47,
+      "wall_seconds": 1247.94
+    },
+    "tests": {
+      "failed": 0,
+      "passed": 74,
+      "wall_seconds_reported_by_unittest": 1.412
+    }
+  },
+  "git_head_at_recording": "5d3194f1c110d4aebd218de8de7d64a01e7d3662",
+  "notes": [
+    "The main sweep is intentionally uncongested except two explicit global 134-proof controls; it is not a native admission capacity measurement.",
+    "The conditional sweep reuses a subset of the main seeds. Evaluations are additional CPU operations, not additional independent trials to combine with the main sweep.",
+    "Main simulation payouts/counters were preserved while the capacity-only section was regenerated after reviewed coinbase-only accounting, integer-ceiling and conservative density-bound corrections. Final source reproduces the corrected report.",
+    "Native quiet measurements ran between the two CPU sweeps. Model execution never ran on a GPU or physical miner.",
+    "Variance intervals are individual whole-trace/bootstrap intervals, not a simultaneous confidence guarantee across all cases. Integer rounding-loss bounds are distinct from an exact post-rounding variance calculation."
+  ],
+  "outputs": {
+    "tides-v6-conditional-variance-run.txt": {
+      "bytes": 341,
+      "sha256": "4bafe2ea5c83671720842fc53283648e5e72ce46ee8ef16d30e1b8f085c45694"
+    },
+    "tides-v6-conditional-variance.json": {
+      "bytes": 620880,
+      "sha256": "4c4fb84713b827264c5545ab69848bfe87e1004cb339fadade6142a3d97defdb"
+    },
+    "tides-v6-service-contract-run.txt": {
+      "bytes": 1006,
+      "sha256": "bfd496e682229933477a171ba43da50853e95bc18ae8ae82fe76e4bb42c9b4d9"
+    },
+    "tides-v6-service-contract-tests.txt": {
+      "bytes": 8341,
+      "sha256": "2e5fddd313065ab733a197fb910872e7c233fe905ee76743a759e6209d9b3f63"
+    },
+    "tides-v6-service-contract.json": {
+      "bytes": 2342629,
+      "sha256": "da7c82e2ee20f9467a0012cef2009994113ea34d04c0ba40cc192942ad61f338"
+    }
+  },
+  "recorded_at_utc": "2026-09-13T09:12:34.041597+00:00",
+  "runtime": {
+    "architecture": "arm64",
+    "implementation": "CPython",
+    "os": "Darwin",
+    "python": "3.9.6"
+  },
+  "schema": 1,
+  "source_sha256": {
+    "contrib/sharepool/test_tides_calibration.py": "cb3d082c4dfb8369475f8e349a1f5d741916721278155f6e92e294db3d019147",
+    "contrib/sharepool/test_tides_conditional_variance.py": "17185b4fd298093c37bfb8636e808ff9ceb54aa68b3bf271e63806863f56fbc8",
+    "contrib/sharepool/test_tides_service_contract.py": "34abea6a53412d2edcf71920d8d9a0a34c72267e64871aeb314a44967fac57bb",
+    "contrib/sharepool/tides_calibration.py": "43314b88018ecba91f71d51247e94252c01b4b68fece6a3965f17bb23ecfb30d",
+    "contrib/sharepool/tides_conditional_variance.py": "79a26973f08a52c0cd3d8240ea4c4adf085c34a26102f04a37bb08d233731a18",
+    "contrib/sharepool/tides_service_contract.py": "12227edb3a11700d605e42c454aeafb4c9853f4a82dd858fd72bd20f3909997d"
+  },
+  "statistical_checks": [
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": true,
+      "miner_fraction_of_pool": 0.01,
+      "pool_fraction": 0.1,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": true,
+      "shift": 12
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": false,
+      "miner_fraction_of_pool": 0.001,
+      "pool_fraction": 0.1,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": false,
+      "shift": 12
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": false,
+      "miner_fraction_of_pool": 0.0001,
+      "pool_fraction": 0.1,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": false,
+      "shift": 12
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": true,
+      "miner_fraction_of_pool": 0.01,
+      "pool_fraction": 0.1,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": true,
+      "shift": 14
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": true,
+      "miner_fraction_of_pool": 0.001,
+      "pool_fraction": 0.1,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": true,
+      "shift": 14
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": false,
+      "miner_fraction_of_pool": 0.0001,
+      "pool_fraction": 0.1,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": false,
+      "shift": 14
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": true,
+      "miner_fraction_of_pool": 0.01,
+      "pool_fraction": 0.01,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": true,
+      "shift": 12
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": false,
+      "miner_fraction_of_pool": 0.001,
+      "pool_fraction": 0.01,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": false,
+      "shift": 12
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": false,
+      "miner_fraction_of_pool": 0.0001,
+      "pool_fraction": 0.01,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": false,
+      "shift": 12
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": true,
+      "miner_fraction_of_pool": 0.01,
+      "pool_fraction": 0.01,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": true,
+      "shift": 14
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": true,
+      "miner_fraction_of_pool": 0.001,
+      "pool_fraction": 0.01,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": true,
+      "shift": 14
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": false,
+      "miner_fraction_of_pool": 0.0001,
+      "pool_fraction": 0.01,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": false,
+      "shift": 14
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": true,
+      "miner_fraction_of_pool": 0.01,
+      "pool_fraction": 0.001,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": true,
+      "shift": 12
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": false,
+      "miner_fraction_of_pool": 0.001,
+      "pool_fraction": 0.001,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": false,
+      "shift": 12
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": false,
+      "miner_fraction_of_pool": 0.0001,
+      "pool_fraction": 0.001,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": false,
+      "shift": 12
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": true,
+      "miner_fraction_of_pool": 0.01,
+      "pool_fraction": 0.001,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": true,
+      "shift": 14
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": true,
+      "miner_fraction_of_pool": 0.001,
+      "pool_fraction": 0.001,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": true,
+      "shift": 14
+    },
+    {
+      "conditional_pre_rounding_variance_95_percent_interval_within_1_10": false,
+      "miner_fraction_of_pool": 0.0001,
+      "pool_fraction": 0.001,
+      "raw_integer_payout_paired_mean_95_percent_interval_within_plus_or_minus_0_02": false,
+      "shift": 14
+    }
+  ]
+}

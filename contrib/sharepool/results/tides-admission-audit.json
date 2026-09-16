@@ -1,0 +1,134 @@
+{
+  "aggregate_before_floor": {
+    "counted_work": {
+      "denominator": 1,
+      "numerator": 2
+    },
+    "payouts": {
+      "alice": 2
+    },
+    "rounding_residue": 1,
+    "weights": {
+      "alice": {
+        "denominator": 2,
+        "numerator": 3
+      },
+      "bob": {
+        "denominator": 2,
+        "numerator": 1
+      }
+    }
+  },
+  "fixture": "independent-exact-admission-arithmetic",
+  "limits": [
+    "Synthetic hash ranks and assigned work; no PoW or native validation.",
+    "Proportional cohorts remove rank dependence only for the same complete admitted set.",
+    "A producer can still omit a receipt or shift eligible work to a later native admission height.",
+    "Examples do not estimate net mining profitability, long-run payout variance or global reception order."
+  ],
+  "proof_rank_selection": {
+    "honest_generated_work": 100,
+    "legacy_full": {
+      "counted_work": {
+        "denominator": 1,
+        "numerator": 16
+      },
+      "payouts": {
+        "honest": 4500,
+        "operator": 7500
+      },
+      "rounding_residue": 0,
+      "weights": {
+        "honest": {
+          "denominator": 1,
+          "numerator": 6
+        },
+        "operator": {
+          "denominator": 1,
+          "numerator": 10
+        }
+      }
+    },
+    "legacy_selected": {
+      "counted_work": {
+        "denominator": 1,
+        "numerator": 16
+      },
+      "payouts": {
+        "honest": 4500,
+        "operator": 7500
+      },
+      "rounding_residue": 0,
+      "weights": {
+        "honest": {
+          "denominator": 1,
+          "numerator": 6
+        },
+        "operator": {
+          "denominator": 1,
+          "numerator": 10
+        }
+      }
+    },
+    "operator_generated_work": 200,
+    "operator_retained_work": 20,
+    "proportional_selected": {
+      "counted_work": {
+        "denominator": 1,
+        "numerator": 16
+      },
+      "payouts": {
+        "honest": 10000,
+        "operator": 2000
+      },
+      "rounding_residue": 0,
+      "weights": {
+        "honest": {
+          "denominator": 3,
+          "numerator": 40
+        },
+        "operator": {
+          "denominator": 3,
+          "numerator": 8
+        }
+      }
+    },
+    "window_work": 16
+  },
+  "result": "passed",
+  "schema": 1,
+  "withholding_across_heights": {
+    "delayed": {
+      "counted_work": {
+        "denominator": 1,
+        "numerator": 8
+      },
+      "payouts": {
+        "operator": 100
+      },
+      "rounding_residue": 0,
+      "weights": {
+        "operator": {
+          "denominator": 1,
+          "numerator": 8
+        }
+      }
+    },
+    "immediate": {
+      "counted_work": {
+        "denominator": 1,
+        "numerator": 8
+      },
+      "payouts": {
+        "honest": 100
+      },
+      "rounding_residue": 0,
+      "weights": {
+        "honest": {
+          "denominator": 1,
+          "numerator": 8
+        }
+      }
+    }
+  }
+}

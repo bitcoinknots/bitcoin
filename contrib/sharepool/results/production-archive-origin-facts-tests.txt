@@ -1,0 +1,29 @@
+test_cold_bytes_are_rechecked_without_timestamp_or_cached_verdict (test_hash_gate_startup.HashGateStartupTests) ... ok
+test_database_scalar_binding_and_offsets_cannot_reuse_valid_segment (test_hash_gate_startup.HashGateStartupTests) ... ok
+test_hash_chain_alone_does_not_establish_exact_proof_origin (test_hash_gate_startup.HashGateStartupTests) ... ok
+test_mutation_during_export_does_not_publish_or_discard_resident_bytes (test_hash_gate_startup.HashGateStartupTests) ... ok
+test_origin_facts_are_bounded_and_eviction_reauthenticates_dependencies (test_hash_gate_startup.HashGateStartupTests) ... ok
+test_origin_facts_never_survive_a_full_pass_or_hide_changed_origin (test_hash_gate_startup.HashGateStartupTests) ... ok
+test_proof_can_precede_origin_but_entire_later_origin_is_checked (test_hash_gate_startup.HashGateStartupTests) ... ok
+test_protected_high_water_and_missing_segment_rows_are_preserved (test_hash_gate_startup.HashGateStartupTests) ... ok
+test_rollover_performs_one_full_verification_and_preserves_head (test_hash_gate_startup.HashGateStartupTests) ... ok
+test_segments_stream_once_and_proof_bodies_are_not_reread (test_hash_gate_startup.HashGateStartupTests) ... ok
+test_warm_origin_facts_still_compare_each_proof_signature_and_envelope (test_hash_gate_startup.HashGateStartupTests) ... ok
+test_archive_header_bounds_and_untrusted_checkpoint_are_refused (test_hash_gate_archive.HashGateArchiveTests) ... ok
+test_automatic_rollover_applies_quota_only_to_resident_evidence (test_hash_gate_archive.HashGateArchiveTests) ... ok
+test_cold_receipt_becomes_unpaid_again_after_native_reorganization (test_hash_gate_archive.HashGateArchiveTests) ... ok
+test_cold_rotation_preserves_frozen_job_receipts_and_restart (test_hash_gate_archive.HashGateArchiveTests) ... ok
+test_export_and_restore_never_overwrite_existing_destinations (test_hash_gate_archive.HashGateArchiveTests) ... ok
+test_failed_cold_segment_verification_preserves_resident_copy (test_hash_gate_archive.HashGateArchiveTests) ... ok
+test_full_archive_restores_exact_receipts_and_complete_origins (test_hash_gate_archive.HashGateArchiveTests) ... ok
+test_incomplete_or_changed_export_never_publishes_partial_restore (test_hash_gate_archive.HashGateArchiveTests) ... ok
+test_incremental_segments_rotate_without_removing_acknowledgments (test_hash_gate_archive.HashGateArchiveTests) ... ok
+test_lifetime_counters_are_not_the_resident_quota (test_hash_gate_archive.HashGateArchiveTests) ... ok
+test_missing_or_changed_cold_body_fails_closed (test_hash_gate_archive.HashGateArchiveTests) ... ok
+test_native_revalidation_failure_keeps_restore_unpublished (test_hash_gate_archive.HashGateArchiveTests) ... ok
+test_paid_and_orphaned_work_is_retained_for_native_branch_reconciliation (test_hash_gate_archive.HashGateArchiveTests) ... ok
+
+----------------------------------------------------------------------
+Ran 24 tests in 1.744s
+
+OK

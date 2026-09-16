@@ -1,0 +1,24 @@
+{
+  "format": 1,
+  "scope": "CPU-only loopback Stratum preflight, disposable native SPN1 regtest node; no hardware access",
+  "success": true,
+  "stats": {
+    "accepted": 2,
+    "rejected": 0,
+    "connections": 1,
+    "block_candidates": 2,
+    "subscriptions": 1,
+    "authorizations": 1,
+    "notifications": 2,
+    "submissions": 2,
+    "assigned_difficulty_shares": 0,
+    "native_blocks_accepted": 2,
+    "old_parent_shares": 0,
+    "durable_acknowledgments_ready": 2
+  },
+  "final_native_height": 2,
+  "stratum_true_responses": 2,
+  "jobs": 3,
+  "pending_proofs": 1,
+  "native_regtest_candidates_below_assigned_share_difficulty": 2
+}

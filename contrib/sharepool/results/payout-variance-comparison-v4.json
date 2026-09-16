@@ -1,0 +1,802 @@
+{
+  "claim": "Conditional comparisons only; current v4 payout-variance equivalence is not established.",
+  "conditional_multiple_payout_cases": [
+    {
+      "cutoffs_in_proof_positions": [
+        8192,
+        16384,
+        24576,
+        32768,
+        40960,
+        49152,
+        57344,
+        65536
+      ],
+      "effective_proofs_for_average_allocation": 65536.0,
+      "equal_work_proofs_per_window": 8192,
+      "expected_total_reward_units": 0.8,
+      "fixed_reward_count": 8,
+      "miner_fraction_of_domain": 0.1,
+      "model": "disjoint_same_size_windows",
+      "relative_standard_deviation_conditional_on_cutoffs": 0.011718750000000002,
+      "total_pairwise_shared_proofs": 0,
+      "total_reward_units_variance_conditional_on_cutoffs": 8.789062500000001e-05
+    },
+    {
+      "cutoffs_in_proof_positions": [
+        8192,
+        9216,
+        10240,
+        11264,
+        12288,
+        13312,
+        14336,
+        15360
+      ],
+      "effective_proofs_for_average_allocation": 12192.744186046511,
+      "equal_work_proofs_per_window": 8192,
+      "expected_total_reward_units": 0.8,
+      "fixed_reward_count": 8,
+      "miner_fraction_of_domain": 0.1,
+      "model": "overlapping_eight_work_unit_windows",
+      "relative_standard_deviation_conditional_on_cutoffs": 0.02716880418602257,
+      "total_pairwise_shared_proofs": 143360,
+      "total_reward_units_variance_conditional_on_cutoffs": 0.00047241210937500007
+    },
+    {
+      "cutoffs_in_proof_positions": [
+        1024,
+        2048,
+        3072,
+        4096,
+        5120,
+        6144,
+        7168,
+        8192
+      ],
+      "effective_proofs_for_average_allocation": 8192.0,
+      "equal_work_proofs_per_window": 1024,
+      "expected_total_reward_units": 0.8,
+      "fixed_reward_count": 8,
+      "miner_fraction_of_domain": 0.1,
+      "model": "disjoint_one_work_unit_windows",
+      "relative_standard_deviation_conditional_on_cutoffs": 0.03314563036811942,
+      "total_pairwise_shared_proofs": 0,
+      "total_reward_units_variance_conditional_on_cutoffs": 0.0007031250000000001
+    },
+    {
+      "cutoffs_in_proof_positions": [
+        8192,
+        16384,
+        24576,
+        32768,
+        40960,
+        49152,
+        57344,
+        65536
+      ],
+      "effective_proofs_for_average_allocation": 65536.0,
+      "equal_work_proofs_per_window": 8192,
+      "expected_total_reward_units": 0.08,
+      "fixed_reward_count": 8,
+      "miner_fraction_of_domain": 0.01,
+      "model": "disjoint_same_size_windows",
+      "relative_standard_deviation_conditional_on_cutoffs": 0.03886669676197734,
+      "total_pairwise_shared_proofs": 0,
+      "total_reward_units_variance_conditional_on_cutoffs": 9.66796875e-06
+    },
+    {
+      "cutoffs_in_proof_positions": [
+        8192,
+        9216,
+        10240,
+        11264,
+        12288,
+        13312,
+        14336,
+        15360
+      ],
+      "effective_proofs_for_average_allocation": 12192.744186046511,
+      "equal_work_proofs_per_window": 8192,
+      "expected_total_reward_units": 0.08,
+      "fixed_reward_count": 8,
+      "miner_fraction_of_domain": 0.01,
+      "model": "overlapping_eight_work_unit_windows",
+      "relative_standard_deviation_conditional_on_cutoffs": 0.09010872948767401,
+      "total_pairwise_shared_proofs": 143360,
+      "total_reward_units_variance_conditional_on_cutoffs": 5.196533203125e-05
+    },
+    {
+      "cutoffs_in_proof_positions": [
+        1024,
+        2048,
+        3072,
+        4096,
+        5120,
+        6144,
+        7168,
+        8192
+      ],
+      "effective_proofs_for_average_allocation": 8192.0,
+      "equal_work_proofs_per_window": 1024,
+      "expected_total_reward_units": 0.08,
+      "fixed_reward_count": 8,
+      "miner_fraction_of_domain": 0.01,
+      "model": "disjoint_one_work_unit_windows",
+      "relative_standard_deviation_conditional_on_cutoffs": 0.10993161937086163,
+      "total_pairwise_shared_proofs": 0,
+      "total_reward_units_variance_conditional_on_cutoffs": 7.734375e-05
+    },
+    {
+      "cutoffs_in_proof_positions": [
+        8192,
+        16384,
+        24576,
+        32768,
+        40960,
+        49152,
+        57344,
+        65536
+      ],
+      "effective_proofs_for_average_allocation": 65536.0,
+      "equal_work_proofs_per_window": 8192,
+      "expected_total_reward_units": 0.0008,
+      "fixed_reward_count": 8,
+      "miner_fraction_of_domain": 0.0001,
+      "model": "disjoint_same_size_windows",
+      "relative_standard_deviation_conditional_on_cutoffs": 0.39060546826169434,
+      "total_pairwise_shared_proofs": 0,
+      "total_reward_units_variance_conditional_on_cutoffs": 9.764648437500001e-08
+    },
+    {
+      "cutoffs_in_proof_positions": [
+        8192,
+        9216,
+        10240,
+        11264,
+        12288,
+        13312,
+        14336,
+        15360
+      ],
+      "effective_proofs_for_average_allocation": 12192.744186046511,
+      "equal_work_proofs_per_window": 8192,
+      "expected_total_reward_units": 0.0008,
+      "fixed_reward_count": 8,
+      "miner_fraction_of_domain": 0.0001,
+      "model": "overlapping_eight_work_unit_windows",
+      "relative_standard_deviation_conditional_on_cutoffs": 0.9055815237283522,
+      "total_pairwise_shared_proofs": 143360,
+      "total_reward_units_variance_conditional_on_cutoffs": 5.248498535156251e-07
+    },
+    {
+      "cutoffs_in_proof_positions": [
+        1024,
+        2048,
+        3072,
+        4096,
+        5120,
+        6144,
+        7168,
+        8192
+      ],
+      "effective_proofs_for_average_allocation": 8192.0,
+      "equal_work_proofs_per_window": 1024,
+      "expected_total_reward_units": 0.0008,
+      "fixed_reward_count": 8,
+      "miner_fraction_of_domain": 0.0001,
+      "model": "disjoint_one_work_unit_windows",
+      "relative_standard_deviation_conditional_on_cutoffs": 1.1047991015055634,
+      "total_pairwise_shared_proofs": 0,
+      "total_reward_units_variance_conditional_on_cutoffs": 7.811718750000001e-07
+    }
+  ],
+  "conditional_single_payout_cases": [
+    {
+      "equal_work_proofs": 64,
+      "expected_payout_fraction": 0.1,
+      "miner_fraction_of_domain": 0.1,
+      "payout_fraction_variance": 0.0014062500000000002,
+      "probability_miner_absent": 0.0011790184577738577,
+      "relative_allocation_standard_deviation": 0.37500000000000006
+    },
+    {
+      "equal_work_proofs": 1024,
+      "expected_payout_fraction": 0.1,
+      "miner_fraction_of_domain": 0.1,
+      "payout_fraction_variance": 8.789062500000001e-05,
+      "probability_miner_absent": 1.3942147270623566e-47,
+      "relative_allocation_standard_deviation": 0.09375000000000001
+    },
+    {
+      "equal_work_proofs": 8192,
+      "expected_payout_fraction": 0.1,
+      "miner_fraction_of_domain": 0.1,
+      "payout_fraction_variance": 1.0986328125000001e-05,
+      "probability_miner_absent": 0.0,
+      "relative_allocation_standard_deviation": 0.03314563036811942
+    },
+    {
+      "equal_work_proofs": 64,
+      "expected_payout_fraction": 0.01,
+      "miner_fraction_of_domain": 0.01,
+      "payout_fraction_variance": 0.0001546875,
+      "probability_miner_absent": 0.5255964875255623,
+      "relative_allocation_standard_deviation": 1.243734296383275
+    },
+    {
+      "equal_work_proofs": 1024,
+      "expected_payout_fraction": 0.01,
+      "miner_fraction_of_domain": 0.01,
+      "payout_fraction_variance": 9.66796875e-06,
+      "probability_miner_absent": 3.391870540193442e-05,
+      "relative_allocation_standard_deviation": 0.31093357409581873
+    },
+    {
+      "equal_work_proofs": 8192,
+      "expected_payout_fraction": 0.01,
+      "miner_fraction_of_domain": 0.01,
+      "payout_fraction_variance": 1.20849609375e-06,
+      "probability_miner_absent": 1.7519194858652253e-36,
+      "relative_allocation_standard_deviation": 0.10993161937086163
+    },
+    {
+      "equal_work_proofs": 64,
+      "expected_payout_fraction": 0.0001,
+      "miner_fraction_of_domain": 0.0001,
+      "payout_fraction_variance": 1.5623437500000002e-06,
+      "probability_miner_absent": 0.9936201183994614,
+      "relative_allocation_standard_deviation": 12.499374984374219
+    },
+    {
+      "equal_work_proofs": 1024,
+      "expected_payout_fraction": 0.0001,
+      "miner_fraction_of_domain": 0.0001,
+      "payout_fraction_variance": 9.764648437500001e-08,
+      "probability_miner_absent": 0.9026637901223713,
+      "relative_allocation_standard_deviation": 3.1248437460935548
+    },
+    {
+      "equal_work_proofs": 8192,
+      "expected_payout_fraction": 0.0001,
+      "miner_fraction_of_domain": 0.0001,
+      "payout_fraction_variance": 1.2205810546875001e-08,
+      "probability_miner_absent": 0.44076608545299306,
+      "relative_allocation_standard_deviation": 1.1047991015055634
+    }
+  ],
+  "current_age_eligibility_upper_bounds": [
+    {
+      "already_winning_proof": false,
+      "effective_domain_fraction_of_network": 1,
+      "maximum_origin_age_in_network_heights": 3,
+      "optimistic_matching_block_opportunities": 4,
+      "probability_at_least_one_matching_block": 1,
+      "probability_no_matching_block": 0
+    },
+    {
+      "already_winning_proof": true,
+      "effective_domain_fraction_of_network": 1,
+      "maximum_origin_age_in_network_heights": 3,
+      "optimistic_matching_block_opportunities": 3,
+      "probability_at_least_one_matching_block": 1,
+      "probability_no_matching_block": 0
+    },
+    {
+      "already_winning_proof": false,
+      "effective_domain_fraction_of_network": 0.1,
+      "maximum_origin_age_in_network_heights": 3,
+      "optimistic_matching_block_opportunities": 4,
+      "probability_at_least_one_matching_block": 0.34390000000000004,
+      "probability_no_matching_block": 0.6561
+    },
+    {
+      "already_winning_proof": true,
+      "effective_domain_fraction_of_network": 0.1,
+      "maximum_origin_age_in_network_heights": 3,
+      "optimistic_matching_block_opportunities": 3,
+      "probability_at_least_one_matching_block": 0.271,
+      "probability_no_matching_block": 0.7290000000000001
+    },
+    {
+      "already_winning_proof": false,
+      "effective_domain_fraction_of_network": 0.01,
+      "maximum_origin_age_in_network_heights": 3,
+      "optimistic_matching_block_opportunities": 4,
+      "probability_at_least_one_matching_block": 0.03940399,
+      "probability_no_matching_block": 0.96059601
+    },
+    {
+      "already_winning_proof": true,
+      "effective_domain_fraction_of_network": 0.01,
+      "maximum_origin_age_in_network_heights": 3,
+      "optimistic_matching_block_opportunities": 3,
+      "probability_at_least_one_matching_block": 0.029701,
+      "probability_no_matching_block": 0.970299
+    },
+    {
+      "already_winning_proof": false,
+      "effective_domain_fraction_of_network": 0.001,
+      "maximum_origin_age_in_network_heights": 3,
+      "optimistic_matching_block_opportunities": 4,
+      "probability_at_least_one_matching_block": 0.003994003999,
+      "probability_no_matching_block": 0.996005996001
+    },
+    {
+      "already_winning_proof": true,
+      "effective_domain_fraction_of_network": 0.001,
+      "maximum_origin_age_in_network_heights": 3,
+      "optimistic_matching_block_opportunities": 3,
+      "probability_at_least_one_matching_block": 0.0029970009999999996,
+      "probability_no_matching_block": 0.997002999
+    },
+    {
+      "already_winning_proof": false,
+      "effective_domain_fraction_of_network": 0.0001,
+      "maximum_origin_age_in_network_heights": 3,
+      "optimistic_matching_block_opportunities": 4,
+      "probability_at_least_one_matching_block": 0.0003999400039999,
+      "probability_no_matching_block": 0.9996000599960001
+    },
+    {
+      "already_winning_proof": true,
+      "effective_domain_fraction_of_network": 0.0001,
+      "maximum_origin_age_in_network_heights": 3,
+      "optimistic_matching_block_opportunities": 3,
+      "probability_at_least_one_matching_block": 0.000299970001,
+      "probability_no_matching_block": 0.999700029999
+    }
+  ],
+  "design_decisions_needed": [
+    "Select the reference contract: a direct-coinbase rolling-work pool or operator-funded PPS/FPPS credits.",
+    "For a rolling-work baseline, define an authenticated work-window ledger and permit repeated participation in distinct block rewards.",
+    "Separate duplicate proof submission and duplicate settlement protection from legitimate reuse across rolling payouts.",
+    "Replace the short native-height payment expiry with the chosen work-window eligibility, preserving acknowledged deferred work.",
+    "Specify deterministic job cutoff and ordered work-window updates, including difficulty changes, reorgs and late receipts.",
+    "Match miner-level effective sample counts and window weights under the same aggregate hashrate, target and payout horizon.",
+    "Validate payout variance and mean on coupled block/share traces; retain covariance and block-finding dependence."
+  ],
+  "empty_window_fixed_time_proxies_not_actual_batch_distribution": [
+    {
+      "domain_fraction_of_network": 0.01,
+      "expected_payout_fraction_if_miner_is_always_fallback_owner": 0.010000000000000002,
+      "expected_payout_fraction_if_miner_is_not_fallback_owner": 0.01,
+      "expected_total_domain_proofs": 40.96,
+      "fixed_duration_seconds": 2400,
+      "miner_fraction_of_domain": 0.01,
+      "probability_empty_domain_window": 1.626664621453243e-18,
+      "scope": "Independent fixed-time proxy only; excludes actual block stopping, previous settlement and self-proof rules."
+    },
+    {
+      "domain_fraction_of_network": 0.001,
+      "expected_payout_fraction_if_miner_is_always_fallback_owner": 0.026472707873106387,
+      "expected_payout_fraction_if_miner_is_not_fallback_owner": 0.009833609011382763,
+      "expected_total_domain_proofs": 4.096,
+      "fixed_duration_seconds": 2400,
+      "miner_fraction_of_domain": 0.01,
+      "probability_empty_domain_window": 0.016639098861723624,
+      "scope": "Independent fixed-time proxy only; excludes actual block stopping, previous settlement and self-proof rules."
+    },
+    {
+      "domain_fraction_of_network": 0.0001,
+      "expected_payout_fraction_if_miner_is_always_fallback_owner": 0.6672766057021188,
+      "expected_payout_fraction_if_miner_is_not_fallback_owner": 0.0033608423666452647,
+      "expected_total_domain_proofs": 0.4096,
+      "fixed_duration_seconds": 2400,
+      "miner_fraction_of_domain": 0.01,
+      "probability_empty_domain_window": 0.6639157633354735,
+      "scope": "Independent fixed-time proxy only; excludes actual block stopping, previous settlement and self-proof rules."
+    }
+  ],
+  "experimental_share_target_shift": 10,
+  "limits": [
+    "Equal share difficulty; unclamped 2**shift target ratio; independent uniform hash trials.",
+    "Owner labels are IID and independent of the specified window cutoffs; no miner-selective omissions.",
+    "Constant block reward and hashrates; no satoshi rounding, payout minimums, stales, latency or reorgs.",
+    "Actual native block successes are a subset of proof successes; no independent block/share simulation is asserted.",
+    "Fixed-window and overlap formulas condition on window membership, not actual block-discovery stopping times.",
+    "Fixed-split block luck and PPS credits are separate benchmarks, not terms added into a forecast.",
+    "Current v4 proof counts per settlement are variable; fixed N examples are not measurements of those batches.",
+    "Current v4 pays the owner when the selected proof set is empty; conditional nonempty allocation statistics omit that policy bias.",
+    "Durable carry-forward preserves evidence but does not extend the current consensus age or permit repeated payment."
+  ],
+  "notation": {
+    "N": "equal-work proofs in a specific payout window",
+    "a": "individual miner fraction of the settlement domain's steady hashrate",
+    "b": "fixed 600-second wall-time intervals, not an observed random block count",
+    "q": "fraction of network hashrate actually mining that settlement domain"
+  },
+  "profile_version": 4,
+  "rolling_eight_work_unit_window": {
+    "equal_work_proofs_at_shift10": 8192,
+    "expected_fill_seconds_by_domain_fraction": [
+      {
+        "q": 1,
+        "seconds": 4800.0
+      },
+      {
+        "q": 0.1,
+        "seconds": 48000.0
+      },
+      {
+        "q": 0.01,
+        "seconds": 480000.0
+      },
+      {
+        "q": 0.001,
+        "seconds": 4800000.0
+      },
+      {
+        "q": 0.0001,
+        "seconds": 48000000.0
+      }
+    ],
+    "minimum_proof_bytes_excluding_all_other_data": 4194304
+  },
+  "same_hashrate_block_luck_and_pps_benchmarks": [
+    {
+      "domain_fraction_of_network": 1,
+      "duration_seconds": 600,
+      "expected_domain_blocks": 1,
+      "expected_miner_proofs": 102.4,
+      "expected_reward_units_both_benchmarks": 0.1,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 0.09882117688026185,
+      "ideal_fixed_rate_pps_credit_variance": 9.765625e-05,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 1.0,
+      "ideal_fixed_split_block_luck_variance": 0.010000000000000002,
+      "miner_fraction_of_domain": 0.1
+    },
+    {
+      "domain_fraction_of_network": 1,
+      "duration_seconds": 86400,
+      "expected_domain_blocks": 144,
+      "expected_miner_proofs": 14745.6,
+      "expected_reward_units_both_benchmarks": 14.4,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 0.008235098073355155,
+      "ideal_fixed_rate_pps_credit_variance": 0.0140625,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 0.08333333333333333,
+      "ideal_fixed_split_block_luck_variance": 1.4400000000000004,
+      "miner_fraction_of_domain": 0.1
+    },
+    {
+      "domain_fraction_of_network": 1,
+      "duration_seconds": 600,
+      "expected_domain_blocks": 1,
+      "expected_miner_proofs": 10.24,
+      "expected_reward_units_both_benchmarks": 0.01,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 0.3125,
+      "ideal_fixed_rate_pps_credit_variance": 9.765625e-06,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 1.0,
+      "ideal_fixed_split_block_luck_variance": 0.0001,
+      "miner_fraction_of_domain": 0.01
+    },
+    {
+      "domain_fraction_of_network": 1,
+      "duration_seconds": 86400,
+      "expected_domain_blocks": 144,
+      "expected_miner_proofs": 1474.56,
+      "expected_reward_units_both_benchmarks": 1.44,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 0.026041666666666668,
+      "ideal_fixed_rate_pps_credit_variance": 0.00140625,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 0.08333333333333333,
+      "ideal_fixed_split_block_luck_variance": 0.014400000000000001,
+      "miner_fraction_of_domain": 0.01
+    },
+    {
+      "domain_fraction_of_network": 1,
+      "duration_seconds": 600,
+      "expected_domain_blocks": 1,
+      "expected_miner_proofs": 0.1024,
+      "expected_reward_units_both_benchmarks": 0.0001,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 3.125,
+      "ideal_fixed_rate_pps_credit_variance": 9.765625e-08,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 1.0,
+      "ideal_fixed_split_block_luck_variance": 1e-08,
+      "miner_fraction_of_domain": 0.0001
+    },
+    {
+      "domain_fraction_of_network": 1,
+      "duration_seconds": 86400,
+      "expected_domain_blocks": 144,
+      "expected_miner_proofs": 14.745600000000001,
+      "expected_reward_units_both_benchmarks": 0.014400000000000001,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 0.26041666666666663,
+      "ideal_fixed_rate_pps_credit_variance": 1.4062500000000001e-05,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 0.08333333333333333,
+      "ideal_fixed_split_block_luck_variance": 1.44e-06,
+      "miner_fraction_of_domain": 0.0001
+    },
+    {
+      "domain_fraction_of_network": 0.1,
+      "duration_seconds": 600,
+      "expected_domain_blocks": 0.1,
+      "expected_miner_proofs": 10.240000000000002,
+      "expected_reward_units_both_benchmarks": 0.010000000000000002,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 0.3125,
+      "ideal_fixed_rate_pps_credit_variance": 9.765625000000002e-06,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 3.162277660168379,
+      "ideal_fixed_split_block_luck_variance": 0.0010000000000000002,
+      "miner_fraction_of_domain": 0.1
+    },
+    {
+      "domain_fraction_of_network": 0.1,
+      "duration_seconds": 86400,
+      "expected_domain_blocks": 14.4,
+      "expected_miner_proofs": 1474.5600000000002,
+      "expected_reward_units_both_benchmarks": 1.4400000000000002,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 0.026041666666666664,
+      "ideal_fixed_rate_pps_credit_variance": 0.0014062500000000002,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 0.26352313834736496,
+      "ideal_fixed_split_block_luck_variance": 0.14400000000000004,
+      "miner_fraction_of_domain": 0.1
+    },
+    {
+      "domain_fraction_of_network": 0.1,
+      "duration_seconds": 600,
+      "expected_domain_blocks": 0.1,
+      "expected_miner_proofs": 1.024,
+      "expected_reward_units_both_benchmarks": 0.001,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 0.9882117688026186,
+      "ideal_fixed_rate_pps_credit_variance": 9.765625e-07,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 3.162277660168379,
+      "ideal_fixed_split_block_luck_variance": 1e-05,
+      "miner_fraction_of_domain": 0.01
+    },
+    {
+      "domain_fraction_of_network": 0.1,
+      "duration_seconds": 86400,
+      "expected_domain_blocks": 14.4,
+      "expected_miner_proofs": 147.45600000000002,
+      "expected_reward_units_both_benchmarks": 0.14400000000000002,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 0.08235098073355154,
+      "ideal_fixed_rate_pps_credit_variance": 0.00014062500000000002,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 0.26352313834736496,
+      "ideal_fixed_split_block_luck_variance": 0.00144,
+      "miner_fraction_of_domain": 0.01
+    },
+    {
+      "domain_fraction_of_network": 0.1,
+      "duration_seconds": 600,
+      "expected_domain_blocks": 0.1,
+      "expected_miner_proofs": 0.01024,
+      "expected_reward_units_both_benchmarks": 1e-05,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 9.882117688026185,
+      "ideal_fixed_rate_pps_credit_variance": 9.765625e-09,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 3.162277660168379,
+      "ideal_fixed_split_block_luck_variance": 1e-09,
+      "miner_fraction_of_domain": 0.0001
+    },
+    {
+      "domain_fraction_of_network": 0.1,
+      "duration_seconds": 86400,
+      "expected_domain_blocks": 14.4,
+      "expected_miner_proofs": 1.47456,
+      "expected_reward_units_both_benchmarks": 0.00144,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 0.8235098073355155,
+      "ideal_fixed_rate_pps_credit_variance": 1.40625e-06,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 0.26352313834736496,
+      "ideal_fixed_split_block_luck_variance": 1.4400000000000002e-07,
+      "miner_fraction_of_domain": 0.0001
+    },
+    {
+      "domain_fraction_of_network": 0.01,
+      "duration_seconds": 600,
+      "expected_domain_blocks": 0.01,
+      "expected_miner_proofs": 1.024,
+      "expected_reward_units_both_benchmarks": 0.001,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 0.9882117688026186,
+      "ideal_fixed_rate_pps_credit_variance": 9.765625e-07,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 10.0,
+      "ideal_fixed_split_block_luck_variance": 0.00010000000000000002,
+      "miner_fraction_of_domain": 0.1
+    },
+    {
+      "domain_fraction_of_network": 0.01,
+      "duration_seconds": 86400,
+      "expected_domain_blocks": 1.44,
+      "expected_miner_proofs": 147.456,
+      "expected_reward_units_both_benchmarks": 0.144,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 0.08235098073355156,
+      "ideal_fixed_rate_pps_credit_variance": 0.000140625,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 0.8333333333333334,
+      "ideal_fixed_split_block_luck_variance": 0.014400000000000003,
+      "miner_fraction_of_domain": 0.1
+    },
+    {
+      "domain_fraction_of_network": 0.01,
+      "duration_seconds": 600,
+      "expected_domain_blocks": 0.01,
+      "expected_miner_proofs": 0.1024,
+      "expected_reward_units_both_benchmarks": 0.0001,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 3.125,
+      "ideal_fixed_rate_pps_credit_variance": 9.765625e-08,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 10.0,
+      "ideal_fixed_split_block_luck_variance": 1.0000000000000002e-06,
+      "miner_fraction_of_domain": 0.01
+    },
+    {
+      "domain_fraction_of_network": 0.01,
+      "duration_seconds": 86400,
+      "expected_domain_blocks": 1.44,
+      "expected_miner_proofs": 14.7456,
+      "expected_reward_units_both_benchmarks": 0.0144,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 0.2604166666666667,
+      "ideal_fixed_rate_pps_credit_variance": 1.40625e-05,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 0.8333333333333334,
+      "ideal_fixed_split_block_luck_variance": 0.000144,
+      "miner_fraction_of_domain": 0.01
+    },
+    {
+      "domain_fraction_of_network": 0.01,
+      "duration_seconds": 600,
+      "expected_domain_blocks": 0.01,
+      "expected_miner_proofs": 0.0010240000000000002,
+      "expected_reward_units_both_benchmarks": 1.0000000000000002e-06,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 31.25,
+      "ideal_fixed_rate_pps_credit_variance": 9.765625000000002e-10,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 10.0,
+      "ideal_fixed_split_block_luck_variance": 1e-10,
+      "miner_fraction_of_domain": 0.0001
+    },
+    {
+      "domain_fraction_of_network": 0.01,
+      "duration_seconds": 86400,
+      "expected_domain_blocks": 1.44,
+      "expected_miner_proofs": 0.147456,
+      "expected_reward_units_both_benchmarks": 0.000144,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 2.6041666666666665,
+      "ideal_fixed_rate_pps_credit_variance": 1.40625e-07,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 0.8333333333333334,
+      "ideal_fixed_split_block_luck_variance": 1.44e-08,
+      "miner_fraction_of_domain": 0.0001
+    },
+    {
+      "domain_fraction_of_network": 0.001,
+      "duration_seconds": 600,
+      "expected_domain_blocks": 0.001,
+      "expected_miner_proofs": 0.1024,
+      "expected_reward_units_both_benchmarks": 0.0001,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 3.125,
+      "ideal_fixed_rate_pps_credit_variance": 9.765625e-08,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 31.622776601683796,
+      "ideal_fixed_split_block_luck_variance": 1.0000000000000003e-05,
+      "miner_fraction_of_domain": 0.1
+    },
+    {
+      "domain_fraction_of_network": 0.001,
+      "duration_seconds": 86400,
+      "expected_domain_blocks": 0.14400000000000002,
+      "expected_miner_proofs": 14.745600000000003,
+      "expected_reward_units_both_benchmarks": 0.014400000000000003,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 0.26041666666666663,
+      "ideal_fixed_rate_pps_credit_variance": 1.4062500000000003e-05,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 2.6352313834736494,
+      "ideal_fixed_split_block_luck_variance": 0.0014400000000000005,
+      "miner_fraction_of_domain": 0.1
+    },
+    {
+      "domain_fraction_of_network": 0.001,
+      "duration_seconds": 600,
+      "expected_domain_blocks": 0.001,
+      "expected_miner_proofs": 0.01024,
+      "expected_reward_units_both_benchmarks": 1e-05,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 9.882117688026185,
+      "ideal_fixed_rate_pps_credit_variance": 9.765625e-09,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 31.622776601683796,
+      "ideal_fixed_split_block_luck_variance": 1.0000000000000001e-07,
+      "miner_fraction_of_domain": 0.01
+    },
+    {
+      "domain_fraction_of_network": 0.001,
+      "duration_seconds": 86400,
+      "expected_domain_blocks": 0.14400000000000002,
+      "expected_miner_proofs": 1.47456,
+      "expected_reward_units_both_benchmarks": 0.00144,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 0.8235098073355155,
+      "ideal_fixed_rate_pps_credit_variance": 1.40625e-06,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 2.6352313834736494,
+      "ideal_fixed_split_block_luck_variance": 1.4400000000000003e-05,
+      "miner_fraction_of_domain": 0.01
+    },
+    {
+      "domain_fraction_of_network": 0.001,
+      "duration_seconds": 600,
+      "expected_domain_blocks": 0.001,
+      "expected_miner_proofs": 0.00010240000000000001,
+      "expected_reward_units_both_benchmarks": 1.0000000000000001e-07,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 98.82117688026185,
+      "ideal_fixed_rate_pps_credit_variance": 9.765625000000001e-11,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 31.622776601683796,
+      "ideal_fixed_split_block_luck_variance": 1.0000000000000001e-11,
+      "miner_fraction_of_domain": 0.0001
+    },
+    {
+      "domain_fraction_of_network": 0.001,
+      "duration_seconds": 86400,
+      "expected_domain_blocks": 0.14400000000000002,
+      "expected_miner_proofs": 0.014745600000000003,
+      "expected_reward_units_both_benchmarks": 1.4400000000000003e-05,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 8.235098073355154,
+      "ideal_fixed_rate_pps_credit_variance": 1.4062500000000003e-08,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 2.6352313834736494,
+      "ideal_fixed_split_block_luck_variance": 1.4400000000000002e-09,
+      "miner_fraction_of_domain": 0.0001
+    },
+    {
+      "domain_fraction_of_network": 0.0001,
+      "duration_seconds": 600,
+      "expected_domain_blocks": 0.0001,
+      "expected_miner_proofs": 0.01024,
+      "expected_reward_units_both_benchmarks": 1e-05,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 9.882117688026185,
+      "ideal_fixed_rate_pps_credit_variance": 9.765625e-09,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 100.0,
+      "ideal_fixed_split_block_luck_variance": 1.0000000000000002e-06,
+      "miner_fraction_of_domain": 0.1
+    },
+    {
+      "domain_fraction_of_network": 0.0001,
+      "duration_seconds": 86400,
+      "expected_domain_blocks": 0.014400000000000001,
+      "expected_miner_proofs": 1.4745600000000003,
+      "expected_reward_units_both_benchmarks": 0.0014400000000000003,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 0.8235098073355154,
+      "ideal_fixed_rate_pps_credit_variance": 1.4062500000000003e-06,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 8.333333333333332,
+      "ideal_fixed_split_block_luck_variance": 0.00014400000000000003,
+      "miner_fraction_of_domain": 0.1
+    },
+    {
+      "domain_fraction_of_network": 0.0001,
+      "duration_seconds": 600,
+      "expected_domain_blocks": 0.0001,
+      "expected_miner_proofs": 0.0010240000000000002,
+      "expected_reward_units_both_benchmarks": 1.0000000000000002e-06,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 31.25,
+      "ideal_fixed_rate_pps_credit_variance": 9.765625000000002e-10,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 100.0,
+      "ideal_fixed_split_block_luck_variance": 1e-08,
+      "miner_fraction_of_domain": 0.01
+    },
+    {
+      "domain_fraction_of_network": 0.0001,
+      "duration_seconds": 86400,
+      "expected_domain_blocks": 0.014400000000000001,
+      "expected_miner_proofs": 0.147456,
+      "expected_reward_units_both_benchmarks": 0.000144,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 2.6041666666666665,
+      "ideal_fixed_rate_pps_credit_variance": 1.40625e-07,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 8.333333333333332,
+      "ideal_fixed_split_block_luck_variance": 1.4400000000000002e-06,
+      "miner_fraction_of_domain": 0.01
+    },
+    {
+      "domain_fraction_of_network": 0.0001,
+      "duration_seconds": 600,
+      "expected_domain_blocks": 0.0001,
+      "expected_miner_proofs": 1.024e-05,
+      "expected_reward_units_both_benchmarks": 1e-08,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 312.5,
+      "ideal_fixed_rate_pps_credit_variance": 9.765625e-12,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 100.0,
+      "ideal_fixed_split_block_luck_variance": 1e-12,
+      "miner_fraction_of_domain": 0.0001
+    },
+    {
+      "domain_fraction_of_network": 0.0001,
+      "duration_seconds": 86400,
+      "expected_domain_blocks": 0.014400000000000001,
+      "expected_miner_proofs": 0.0014745600000000002,
+      "expected_reward_units_both_benchmarks": 1.4400000000000002e-06,
+      "ideal_fixed_rate_pps_credit_relative_standard_deviation": 26.041666666666664,
+      "ideal_fixed_rate_pps_credit_variance": 1.4062500000000002e-09,
+      "ideal_fixed_split_block_luck_relative_standard_deviation": 8.333333333333332,
+      "ideal_fixed_split_block_luck_variance": 1.4400000000000002e-10,
+      "miner_fraction_of_domain": 0.0001
+    }
+  ],
+  "sources": {
+    "direct_coinbase_rolling_work_window": "https://ocean.xyz/docs/tides",
+    "fpps_accounting": "https://docs.luxor.tech/platform/mining/revenue-payments"
+  }
+}

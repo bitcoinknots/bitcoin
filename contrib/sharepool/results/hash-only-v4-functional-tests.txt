@@ -1,0 +1,666 @@
+RUN worker
+COMMAND /usr/bin/python3 -B test/functional/feature_sharepool_hash_worker.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-worker-v4-609 --portseed=609 --nocleanup
+2026-09-12T20:35:02.404000Z TestFramework (INFO): PRNG seed is: 7059722835193107997
+2026-09-12T20:35:02.404000Z TestFramework (DEBUG): Setting up network thread
+2026-09-12T20:35:02.404000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-worker-v4-609
+2026-09-12T20:35:02.407000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:35:02.408000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:35:03.437000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-12T20:35:03.439000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-12T20:35:06.284000Z TestFramework.p2p (DEBUG): Connecting to Bitcoin Node: 127.0.0.1:13322
+2026-09-12T20:35:06.285000Z TestFramework.p2p (DEBUG): Connected: us=127.0.0.1:54898, them=127.0.0.1:13322
+2026-09-12T20:35:06.285000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_version(nVersion=70016 nServices=402653193 nTime=Sat Sep 12 14:35:06 2026 addrTo=CAddress(nServices=1 net=IPv4 addr=127.0.0.1 port=13322) addrFrom=CAddress(nServices=1 net=IPv4 addr=0.0.0.0 port=0) nNonce=0x1E18D20E8F96BDF8 strSubVer=/python-p2p-tester:0.0.3/ nStartingHeight=-1 relay=1)
+2026-09-12T20:35:06.285000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_version(nVersion=70016 nServices=268436493 nTime=Sat Sep 12 14:35:06 2026 addrTo=CAddress(nServices=0 net=IPv4 addr=0.0.0.0 port=0) addrFrom=CAddress(nServices=268436493 net=IPv4 addr=0.0.0.0 port=0) nNonce=0x2021BE22040F9897 strSubVer=/Satoshi:29.4.1(testnode1)/Knots:20260508/ nStartingHeight=201 relay=1)
+2026-09-12T20:35:06.285000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_wtxidrelay()
+2026-09-12T20:35:06.285000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_verack()
+2026-09-12T20:35:06.285000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_getaddr()
+2026-09-12T20:35:06.285000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_wtxidrelay()
+2026-09-12T20:35:06.285000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_sendaddrv2()
+2026-09-12T20:35:06.285000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_verack()
+2026-09-12T20:35:06.286000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_sendcmpct(announce=False, version=2)
+2026-09-12T20:35:06.286000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_ping(nonce=565890047da22c33)
+2026-09-12T20:35:06.286000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_pong(nonce=565890047da22c33)
+2026-09-12T20:35:06.286000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_getheaders(locator=CBlockLocator(vHave=[40588923941078816016041949323646483338981155329302872600791755451090800660893, 20625568141409784954290594515076318450750886423520707658199639623267812488649, 2991969682306575466136721711369633674335812861536881492336519789864271875860, 38549474531513208183608487560575960480156502040358875791690699123911811373940, 49812792226891408585333137612484120690674661175235048705742116246234598349868, 15752132607037527502653336495921268353721688292465949553389116... (msg truncated)
+2026-09-12T20:35:06.286000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: b'sphhello'(69 bytes)
+2026-09-12T20:35:06.286000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_feefilter(feerate=00000064)
+2026-09-12T20:35:06.344000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_ping(nonce=00000000)
+2026-09-12T20:35:06.344000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_ping(nonce=00000001)
+2026-09-12T20:35:06.345000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_pong(nonce=00000000)
+2026-09-12T20:35:06.345000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_pong(nonce=00000001)
+2026-09-12T20:35:06.406000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_block(block=CBlock(nVersion=536870912 hashPrevBlock=0fd4c998e9cfc86012fae563ed1fe1209f8e2aa06d89ea1f51b1a9584067a55d hashMerkleRoot=fdc0067f2c2b9b20a630590f7d905d9e883027d4468137722954480c2c0cf12c nTime=Sat Sep 12 14:35:39 2026 nBits=207fffff nNonce=00000000 vtx=[CTransaction(version=2 vin=[CTxIn(prevout=COutPoint(hash=0000000000000000000000000000000000000000000000000000000000000000 n=4294967295) scriptSig=02ca00 nSequence=4294967295)] vout=[CTxOut(nValue=0.39062500 scriptPubKey=001400000000... (msg truncated)
+2026-09-12T20:35:06.406000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_ping(nonce=00000000)
+2026-09-12T20:35:06.406000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_ping(nonce=00000002)
+2026-09-12T20:35:06.506000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_pong(nonce=00000000)
+2026-09-12T20:35:06.506000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_pong(nonce=00000002)
+2026-09-12T20:35:08.510000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_inv(inv=[CInv(type=Block hash=124972c330b07f793efb567a0e037d9d49e74f66ef34f522268614d9762bd267)])
+2026-09-12T20:35:08.510000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_getdata(inv=[CInv(type=Block hash=124972c330b07f793efb567a0e037d9d49e74f66ef34f522268614d9762bd267)])
+2026-09-12T20:35:08.510000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_block(block=CBlock(nVersion=536870912 hashPrevBlock=0fd4c998e9cfc86012fae563ed1fe1209f8e2aa06d89ea1f51b1a9584067a55d hashMerkleRoot=fdc0067f2c2b9b20a630590f7d905d9e883027d4468137722954480c2c0cf12c nTime=Sat Sep 12 14:35:39 2026 nBits=207fffff nNonce=00000000 vtx=[CTransaction(version=2 vin=[CTxIn(prevout=COutPoint(hash=0000000000000000000000000000000000000000000000000000000000000000 n=4294967295) scriptSig=02ca00 nSequence=4294967295)] vout=[CTxOut(nValue=0.39062500 scriptPubKey=001400000000... (msg truncated)
+2026-09-12T20:35:08.516000Z TestFramework (INFO): A pending data notification survives shutdown and is accepted after restart
+2026-09-12T20:35:08.530000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-12T20:35:08.621000Z TestFramework.p2p (DEBUG): Closed connection to: 127.0.0.1:13322
+2026-09-12T20:35:08.710000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-12T20:35:08.712000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:35:09.238000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-12T20:35:09.324000Z TestFramework (INFO): A local disconnect/reconnect revalidates the settled branch with retained evidence
+2026-09-12T20:35:10.026000Z TestFramework (INFO): A tip change during script execution discards the capture and retries the competing block
+2026-09-12T20:35:11.758000Z TestFramework.p2p (DEBUG): Connecting to Bitcoin Node: 127.0.0.1:13322
+2026-09-12T20:35:11.759000Z TestFramework.p2p (DEBUG): Connected: us=127.0.0.1:54923, them=127.0.0.1:13322
+2026-09-12T20:35:11.759000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_version(nVersion=70016 nServices=402653193 nTime=Sat Sep 12 14:35:11 2026 addrTo=CAddress(nServices=1 net=IPv4 addr=127.0.0.1 port=13322) addrFrom=CAddress(nServices=1 net=IPv4 addr=0.0.0.0 port=0) nNonce=0xA52D3E5B969941BC strSubVer=/python-p2p-tester:0.0.3/ nStartingHeight=-1 relay=1)
+2026-09-12T20:35:11.759000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_version(nVersion=70016 nServices=268436493 nTime=Sat Sep 12 14:35:11 2026 addrTo=CAddress(nServices=0 net=IPv4 addr=0.0.0.0 port=0) addrFrom=CAddress(nServices=268436493 net=IPv4 addr=0.0.0.0 port=0) nNonce=0x7711C9E2861948F7 strSubVer=/Satoshi:29.4.1(testnode1)/Knots:20260508/ nStartingHeight=203 relay=1)
+2026-09-12T20:35:11.759000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_wtxidrelay()
+2026-09-12T20:35:11.759000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_verack()
+2026-09-12T20:35:11.759000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_getaddr()
+2026-09-12T20:35:11.759000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_wtxidrelay()
+2026-09-12T20:35:11.759000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_sendaddrv2()
+2026-09-12T20:35:11.760000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_verack()
+2026-09-12T20:35:11.760000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_sendcmpct(announce=False, version=2)
+2026-09-12T20:35:11.760000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_ping(nonce=9bab694ce9871b4d)
+2026-09-12T20:35:11.760000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_pong(nonce=9bab694ce9871b4d)
+2026-09-12T20:35:11.760000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_getheaders(locator=CBlockLocator(vHave=[8271403171628348308244060979261639674554181725900618467588922547844045066855, 7160655680032852423981249740507594795762555312525697459133379968184642676061, 40588923941078816016041949323646483338981155329302872600791755451090800660893, 20625568141409784954290594515076318450750886423520707658199639623267812488649, 2991969682306575466136721711369633674335812861536881492336519789864271875860, 3854947453151320818360848756057596048015650204035887579169069912... (msg truncated)
+2026-09-12T20:35:11.760000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: b'sphhello'(69 bytes)
+2026-09-12T20:35:11.760000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_feefilter(feerate=00000064)
+2026-09-12T20:35:11.818000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_ping(nonce=00000000)
+2026-09-12T20:35:11.819000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_ping(nonce=00000001)
+2026-09-12T20:35:11.819000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_pong(nonce=00000000)
+2026-09-12T20:35:11.819000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_pong(nonce=00000001)
+2026-09-12T20:35:11.880000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_block(block=CBlock(nVersion=536870912 hashPrevBlock=6ca95e26f7d308eb3fc801cb2fe64b533546b73dc94eb93079808a1ef51b29a4 hashMerkleRoot=59787f4aa039445e504f48ac29e6a2dc77fc461c40c0b98986b02ed095c566c7 nTime=Sat Sep 12 14:35:41 2026 nBits=207fffff nNonce=00000000 vtx=[CTransaction(version=2 vin=[CTxIn(prevout=COutPoint(hash=0000000000000000000000000000000000000000000000000000000000000000 n=4294967295) scriptSig=02cc00 nSequence=4294967295)] vout=[CTxOut(nValue=0.39062500 scriptPubKey=001400000000... (msg truncated)
+2026-09-12T20:35:12.121000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_inv(inv=[CInv(type=Block hash=061308d02bc9f08f9dd93abe30b137a74c1405d94beb6a0d21648aba3f120e96)])
+2026-09-12T20:35:12.121000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_getdata(inv=[CInv(type=Block hash=061308d02bc9f08f9dd93abe30b137a74c1405d94beb6a0d21648aba3f120e96)])
+2026-09-12T20:35:12.121000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_block(block=CBlock(nVersion=536870912 hashPrevBlock=6ca95e26f7d308eb3fc801cb2fe64b533546b73dc94eb93079808a1ef51b29a4 hashMerkleRoot=fa549756bd917d1c0f385bc1b3ec3519a5a54b6bfa3d47474a23fb12a2c18115 nTime=Sat Sep 12 14:35:42 2026 nBits=207fffff nNonce=00000003 vtx=[CTransaction(version=2 vin=[CTxIn(prevout=COutPoint(hash=0000000000000000000000000000000000000000000000000000000000000000 n=4294967295) scriptSig=02cc00 nSequence=4294967295)] vout=[CTxOut(nValue=25.00000000 scriptPubKey=00147a7a7a7... (msg truncated)
+2026-09-12T20:35:14.903000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_inv(inv=[CInv(type=Block hash=324ee11dc8d5cff1b453abdc87f64d61ca698a752f5f58bfd89eb2aea6937bbc)])
+2026-09-12T20:35:14.903000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13322: msg_getdata(inv=[CInv(type=Block hash=324ee11dc8d5cff1b453abdc87f64d61ca698a752f5f58bfd89eb2aea6937bbc)])
+2026-09-12T20:35:14.904000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13322: msg_block(block=CBlock(nVersion=536870912 hashPrevBlock=3d6a23a075312c964acd3df5977d80e1630726bc559460505cfc8022d82f47df hashMerkleRoot=8e5920bec875ab7d52a940c3c1ec07393a3a382c1d984c86af88ff5e40786567 nTime=Sat Sep 12 14:35:43 2026 nBits=207fffff nNonce=00000001 vtx=[CTransaction(version=2 vin=[CTxIn(prevout=COutPoint(hash=0000000000000000000000000000000000000000000000000000000000000000 n=4294967295) scriptSig=02cd00 nSequence=4294967295)] vout=[CTxOut(nValue=25.00000000 scriptPubKey=00147a7a7a7... (msg truncated)
+2026-09-12T20:35:15.383000Z TestFramework (INFO): Worker measurement: {"active_rpc_samples": 126, "binary_sha256": "bfd41c0173bbeffdf24f5a719f5e48a448c37ea0f5bd4d9bc3974f3ca36079b4", "block_bytes": 2203, "context_change": {"competing_branch": "accepted_and_extended", "retry_count": 1}, "inputs_per_origin": 100, "maximum_active_rpc_seconds": 0.0024427090000003204, "origins": 64, "p2p_ping_seconds": 0.11185879099999951, "pending_restart": "accepted", "pipeline_seconds": 2.1098040420000004, "platform": "macOS-26.6.2-arm64-arm-64bit", "protocol_version": 4, "reorganization_verifydb": "valid", "sha256_ops_per_input": 199, "snapshot_bytes": 135741, "test_sha256": "7c864a7835fb74d5e3e355ab66e6a2c8721112cca3a4e51ebd07771bb84b3de2", "worker": {"active": false, "context_retries": 0, "failures": 0, "last_micros": 2004459, "locked_fallbacks": 0, "max_micros": 2004459, "outside_script_checks": 6400, "passes": 25, "pending": false, "requests": 67, "started": true, "stopping": false}}
+2026-09-12T20:35:15.383000Z TestFramework (DEBUG): Closing down network thread
+2026-09-12T20:35:15.443000Z TestFramework (INFO): Stopping nodes
+2026-09-12T20:35:15.443000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-12T20:35:15.444000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-12T20:35:15.624000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-12T20:35:15.624000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-12T20:35:15.624000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-worker-v4-609
+2026-09-12T20:35:15.624000Z TestFramework (INFO): Tests successful
+
+RUN http
+COMMAND /usr/bin/python3 -B test/functional/feature_sharepool_hash_http.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-http-v4-610 --portseed=610 --nocleanup
+2026-09-12T20:35:34.038000Z TestFramework (INFO): PRNG seed is: 4517952826566992878
+2026-09-12T20:35:34.039000Z TestFramework (DEBUG): Setting up network thread
+2026-09-12T20:35:34.039000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-http-v4-610
+2026-09-12T20:35:34.041000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:35:34.043000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:35:34.305000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-12T20:35:34.577000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-12T20:35:34.577000Z TestFramework (INFO): Default HTTP still rejects bodies above32MiB; the explicit profile still has a48MiB cap
+2026-09-12T20:35:34.668000Z TestFramework (INFO): Maximum template-plus-snapshot JSON reaches field validation and is rejected there
+2026-09-12T20:35:35.081000Z TestFramework (DEBUG): Closing down network thread
+2026-09-12T20:35:35.141000Z TestFramework (INFO): Stopping nodes
+2026-09-12T20:35:35.141000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-12T20:35:35.142000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-12T20:35:35.263000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-12T20:35:35.263000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-12T20:35:35.263000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-http-v4-610
+2026-09-12T20:35:35.263000Z TestFramework (INFO): Tests successful
+
+RUN lifecycle-v1
+COMMAND /usr/bin/python3 -B test/functional/feature_sharepool_hash_lifecycle.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-lifecycle-v4-611 --portseed=611 --nocleanup
+2026-09-12T20:36:21.793000Z TestFramework (INFO): PRNG seed is: 704982082846283282
+2026-09-12T20:36:21.794000Z TestFramework (DEBUG): Setting up network thread
+2026-09-12T20:36:21.794000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-lifecycle-v4-611
+2026-09-12T20:36:21.796000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:21.798000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:21.799000Z TestFramework.node2 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:22.309000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-12T20:36:22.310000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-12T20:36:22.311000Z TestFramework.node2 (DEBUG): RPC successfully started
+2026-09-12T20:36:22.636000Z TestFramework (INFO): A solved block waits for its full snapshot; pending data survives restart
+2026-09-12T20:36:22.906000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-12T20:36:23.026000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-12T20:36:23.028000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:23.289000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-12T20:36:23.290000Z TestFramework (INFO): Existing native peer connections deliver dependencies and automatically retry the block
+2026-09-12T20:36:33.467000Z TestFramework (INFO): Late work uses a new immutable snapshot and direct coinbase payout
+2026-09-12T20:36:33.730000Z TestFramework (INFO): An offline restart replays chainstate from the locally retained snapshot history
+2026-09-12T20:36:33.784000Z TestFramework.node2 (DEBUG): Stopping node
+2026-09-12T20:36:33.895000Z TestFramework.node2 (DEBUG): Node stopped
+2026-09-12T20:36:33.897000Z TestFramework.node2 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:34.158000Z TestFramework.node2 (DEBUG): RPC successfully started
+2026-09-12T20:36:34.160000Z TestFramework (INFO): Valid competing branches reorganize by native chainwork after snapshots arrive
+2026-09-12T20:36:36.421000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-12T20:36:36.481000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-12T20:36:36.483000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:36.744000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-12T20:36:36.748000Z TestFramework (INFO): Level-four native verification disconnects and reconnects the complete selected chain
+2026-09-12T20:36:36.790000Z TestFramework (INFO): Hash-only native snapshot lifecycle passed
+2026-09-12T20:36:36.790000Z TestFramework (DEBUG): Closing down network thread
+2026-09-12T20:36:36.850000Z TestFramework (INFO): Stopping nodes
+2026-09-12T20:36:36.850000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-12T20:36:36.851000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-12T20:36:36.851000Z TestFramework.node2 (DEBUG): Stopping node
+2026-09-12T20:36:37.023000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-12T20:36:37.084000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-12T20:36:37.084000Z TestFramework.node2 (DEBUG): Node stopped
+2026-09-12T20:36:37.084000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-lifecycle-v4-611
+2026-09-12T20:36:37.084000Z TestFramework (INFO): Tests successful
+
+RUN lifecycle-v2
+COMMAND /usr/bin/python3 -B test/functional/feature_sharepool_hash_lifecycle.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-lifecycle-v4-612 --portseed=612 --nocleanup --v2transport
+2026-09-12T20:36:24.083000Z TestFramework (INFO): PRNG seed is: 5069258705021297101
+2026-09-12T20:36:24.083000Z TestFramework (DEBUG): Setting up network thread
+2026-09-12T20:36:24.083000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-lifecycle-v4-612
+2026-09-12T20:36:24.086000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:24.087000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:24.089000Z TestFramework.node2 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:24.610000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-12T20:36:24.611000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-12T20:36:24.612000Z TestFramework.node2 (DEBUG): RPC successfully started
+2026-09-12T20:36:24.938000Z TestFramework (INFO): A solved block waits for its full snapshot; pending data survives restart
+2026-09-12T20:36:25.206000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-12T20:36:25.327000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-12T20:36:25.328000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:25.586000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-12T20:36:25.587000Z TestFramework (INFO): Existing native peer connections deliver dependencies and automatically retry the block
+2026-09-12T20:36:35.892000Z TestFramework (INFO): Late work uses a new immutable snapshot and direct coinbase payout
+2026-09-12T20:36:36.222000Z TestFramework (INFO): An offline restart replays chainstate from the locally retained snapshot history
+2026-09-12T20:36:36.293000Z TestFramework.node2 (DEBUG): Stopping node
+2026-09-12T20:36:36.354000Z TestFramework.node2 (DEBUG): Node stopped
+2026-09-12T20:36:36.356000Z TestFramework.node2 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:36.608000Z TestFramework.node2 (DEBUG): RPC successfully started
+2026-09-12T20:36:36.610000Z TestFramework (INFO): Valid competing branches reorganize by native chainwork after snapshots arrive
+2026-09-12T20:36:38.767000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-12T20:36:38.941000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-12T20:36:38.947000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:39.207000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-12T20:36:39.208000Z TestFramework (INFO): Level-four native verification disconnects and reconnects the complete selected chain
+2026-09-12T20:36:39.239000Z TestFramework (INFO): Hash-only native snapshot lifecycle passed
+2026-09-12T20:36:39.240000Z TestFramework (DEBUG): Closing down network thread
+2026-09-12T20:36:39.300000Z TestFramework (INFO): Stopping nodes
+2026-09-12T20:36:39.300000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-12T20:36:39.300000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-12T20:36:39.301000Z TestFramework.node2 (DEBUG): Stopping node
+2026-09-12T20:36:39.419000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-12T20:36:39.473000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-12T20:36:39.473000Z TestFramework.node2 (DEBUG): Node stopped
+2026-09-12T20:36:39.473000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-lifecycle-v4-612
+2026-09-12T20:36:39.473000Z TestFramework (INFO): Tests successful
+
+RUN relay
+COMMAND /usr/bin/python3 -B test/functional/feature_sharepool_hash_relay.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-integration-v4-613 --portseed=613 --nocleanup
+2026-09-12T20:37:17.143000Z TestFramework (INFO): PRNG seed is: 8755392309511027566
+2026-09-12T20:37:17.143000Z TestFramework (DEBUG): Setting up network thread
+2026-09-12T20:37:17.143000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-integration-v4-613
+2026-09-12T20:37:17.145000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:37:17.667000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-12T20:37:17.670000Z TestFramework (INFO): Empty inventory stays quiet; changes and new connections discover existing objects
+2026-09-12T20:37:17.670000Z TestFramework.p2p (DEBUG): Connecting to Bitcoin Node: 127.0.0.1:13369
+2026-09-12T20:37:17.670000Z TestFramework.p2p (DEBUG): Connected: us=127.0.0.1:55775, them=127.0.0.1:13369
+2026-09-12T20:37:17.670000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_version(nVersion=70016 nServices=402653193 nTime=Sat Sep 12 14:37:17 2026 addrTo=CAddress(nServices=1 net=IPv4 addr=127.0.0.1 port=13369) addrFrom=CAddress(nServices=1 net=IPv4 addr=0.0.0.0 port=0) nNonce=0x1FE8082C33EC02CC strSubVer=/python-p2p-tester:0.0.3/ nStartingHeight=-1 relay=1)
+2026-09-12T20:37:17.671000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_version(nVersion=70016 nServices=268436493 nTime=Sat Sep 12 14:37:17 2026 addrTo=CAddress(nServices=0 net=IPv4 addr=0.0.0.0 port=0) addrFrom=CAddress(nServices=268436493 net=IPv4 addr=0.0.0.0 port=0) nNonce=0xF4E1C9F1733C9728 strSubVer=/Satoshi:29.4.1(testnode0)/Knots:20260508/ nStartingHeight=0 relay=1)
+2026-09-12T20:37:17.671000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:17.671000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:17.671000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_getaddr()
+2026-09-12T20:37:17.671000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:17.671000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendaddrv2()
+2026-09-12T20:37:17.671000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:17.671000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendcmpct(announce=False, version=2)
+2026-09-12T20:37:17.672000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_ping(nonce=743cd8e2de391839)
+2026-09-12T20:37:17.672000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_pong(nonce=743cd8e2de391839)
+2026-09-12T20:37:17.672000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_getheaders(locator=CBlockLocator(vHave=[7041830694386478471858881810674310864173988660927928131397671070347943617030]), stop=0000000000000000000000000000000000000000000000000000000000000000)
+2026-09-12T20:37:17.672000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:17.672000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_feefilter(feerate=00979e7a)
+2026-09-12T20:37:17.729000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:17.729000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000001)
+2026-09-12T20:37:17.730000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:17.730000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000001)
+2026-09-12T20:37:17.783000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:17.783000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:17.783000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000002)
+2026-09-12T20:37:17.783000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:17.784000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000002)
+2026-09-12T20:37:18.865000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphinv'(33 bytes)
+2026-09-12T20:37:21.092000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:21.092000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000003)
+2026-09-12T20:37:21.092000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:21.092000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000003)
+2026-09-12T20:37:21.202000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphinv'(65 bytes)
+2026-09-12T20:37:21.217000Z TestFramework.p2p (DEBUG): Connecting to Bitcoin Node: 127.0.0.1:13369
+2026-09-12T20:37:21.217000Z TestFramework.p2p (DEBUG): Connected: us=127.0.0.1:55791, them=127.0.0.1:13369
+2026-09-12T20:37:21.217000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_version(nVersion=70016 nServices=402653193 nTime=Sat Sep 12 14:37:21 2026 addrTo=CAddress(nServices=1 net=IPv4 addr=127.0.0.1 port=13369) addrFrom=CAddress(nServices=1 net=IPv4 addr=0.0.0.0 port=0) nNonce=0x4A35E7BAD859BFFF strSubVer=/python-p2p-tester:0.0.3/ nStartingHeight=-1 relay=1)
+2026-09-12T20:37:21.217000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_version(nVersion=70016 nServices=268436493 nTime=Sat Sep 12 14:37:21 2026 addrTo=CAddress(nServices=0 net=IPv4 addr=0.0.0.0 port=0) addrFrom=CAddress(nServices=268436493 net=IPv4 addr=0.0.0.0 port=0) nNonce=0x672317309CC5E549 strSubVer=/Satoshi:29.4.1(testnode0)/Knots:20260508/ nStartingHeight=0 relay=1)
+2026-09-12T20:37:21.217000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:21.217000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:21.217000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_getaddr()
+2026-09-12T20:37:21.218000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:21.218000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendaddrv2()
+2026-09-12T20:37:21.218000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:21.218000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendcmpct(announce=False, version=2)
+2026-09-12T20:37:21.218000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_ping(nonce=fff3dcc20f936a00)
+2026-09-12T20:37:21.218000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_pong(nonce=fff3dcc20f936a00)
+2026-09-12T20:37:21.219000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:21.219000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_feefilter(feerate=00979e7a)
+2026-09-12T20:37:21.272000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:21.272000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000001)
+2026-09-12T20:37:21.272000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:21.273000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000001)
+2026-09-12T20:37:21.333000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:21.333000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:21.333000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000002)
+2026-09-12T20:37:21.334000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphinv'(65 bytes)
+2026-09-12T20:37:21.334000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:21.334000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000002)
+2026-09-12T20:37:21.387000Z TestFramework.p2p (DEBUG): Closed connection to: 127.0.0.1:13369
+2026-09-12T20:37:21.387000Z TestFramework.p2p (DEBUG): Closed connection to: 127.0.0.1:13369
+2026-09-12T20:37:21.440000Z TestFramework (INFO): Four active downloads cannot repeatedly overtake an already waiting fifth peer
+2026-09-12T20:37:21.441000Z TestFramework.p2p (DEBUG): Connecting to Bitcoin Node: 127.0.0.1:13369
+2026-09-12T20:37:21.441000Z TestFramework.p2p (DEBUG): Connected: us=127.0.0.1:55793, them=127.0.0.1:13369
+2026-09-12T20:37:21.441000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_version(nVersion=70016 nServices=402653193 nTime=Sat Sep 12 14:37:21 2026 addrTo=CAddress(nServices=1 net=IPv4 addr=127.0.0.1 port=13369) addrFrom=CAddress(nServices=1 net=IPv4 addr=0.0.0.0 port=0) nNonce=0x83BDC6067A9E1FB9 strSubVer=/python-p2p-tester:0.0.3/ nStartingHeight=-1 relay=1)
+2026-09-12T20:37:21.441000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_version(nVersion=70016 nServices=268436493 nTime=Sat Sep 12 14:37:21 2026 addrTo=CAddress(nServices=0 net=IPv4 addr=0.0.0.0 port=0) addrFrom=CAddress(nServices=268436493 net=IPv4 addr=0.0.0.0 port=0) nNonce=0x14AC0BA776D4BC9B strSubVer=/Satoshi:29.4.1(testnode0)/Knots:20260508/ nStartingHeight=0 relay=1)
+2026-09-12T20:37:21.442000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:21.442000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:21.442000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_getaddr()
+2026-09-12T20:37:21.442000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:21.442000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendaddrv2()
+2026-09-12T20:37:21.443000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:21.443000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendcmpct(announce=False, version=2)
+2026-09-12T20:37:21.443000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_ping(nonce=ad6aef91cdc959f0)
+2026-09-12T20:37:21.443000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_pong(nonce=ad6aef91cdc959f0)
+2026-09-12T20:37:21.443000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_getheaders(locator=CBlockLocator(vHave=[7041830694386478471858881810674310864173988660927928131397671070347943617030]), stop=0000000000000000000000000000000000000000000000000000000000000000)
+2026-09-12T20:37:21.443000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:21.443000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_feefilter(feerate=00979e7a)
+2026-09-12T20:37:21.495000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:21.495000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000001)
+2026-09-12T20:37:21.496000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:21.496000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000001)
+2026-09-12T20:37:21.557000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:21.557000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:21.557000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000002)
+2026-09-12T20:37:21.557000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphinv'(65 bytes)
+2026-09-12T20:37:21.557000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:21.557000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000002)
+2026-09-12T20:37:21.617000Z TestFramework.p2p (DEBUG): Connecting to Bitcoin Node: 127.0.0.1:13369
+2026-09-12T20:37:21.617000Z TestFramework.p2p (DEBUG): Connected: us=127.0.0.1:55794, them=127.0.0.1:13369
+2026-09-12T20:37:21.617000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_version(nVersion=70016 nServices=402653193 nTime=Sat Sep 12 14:37:21 2026 addrTo=CAddress(nServices=1 net=IPv4 addr=127.0.0.1 port=13369) addrFrom=CAddress(nServices=1 net=IPv4 addr=0.0.0.0 port=0) nNonce=0xD8C779AC20915DC1 strSubVer=/python-p2p-tester:0.0.3/ nStartingHeight=-1 relay=1)
+2026-09-12T20:37:21.618000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_version(nVersion=70016 nServices=268436493 nTime=Sat Sep 12 14:37:21 2026 addrTo=CAddress(nServices=0 net=IPv4 addr=0.0.0.0 port=0) addrFrom=CAddress(nServices=268436493 net=IPv4 addr=0.0.0.0 port=0) nNonce=0x7FC80224D1CF5FE2 strSubVer=/Satoshi:29.4.1(testnode0)/Knots:20260508/ nStartingHeight=0 relay=1)
+2026-09-12T20:37:21.618000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:21.618000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:21.618000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_getaddr()
+2026-09-12T20:37:21.618000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:21.618000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendaddrv2()
+2026-09-12T20:37:21.618000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:21.618000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendcmpct(announce=False, version=2)
+2026-09-12T20:37:21.618000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_ping(nonce=89b7be3ca2fc357a)
+2026-09-12T20:37:21.619000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_pong(nonce=89b7be3ca2fc357a)
+2026-09-12T20:37:21.619000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:21.619000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_feefilter(feerate=00979e7a)
+2026-09-12T20:37:21.669000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:21.669000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000001)
+2026-09-12T20:37:21.669000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:21.669000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000001)
+2026-09-12T20:37:21.724000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:21.724000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:21.724000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000002)
+2026-09-12T20:37:21.724000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphinv'(65 bytes)
+2026-09-12T20:37:21.725000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:21.725000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000002)
+2026-09-12T20:37:21.783000Z TestFramework.p2p (DEBUG): Connecting to Bitcoin Node: 127.0.0.1:13369
+2026-09-12T20:37:21.784000Z TestFramework.p2p (DEBUG): Connected: us=127.0.0.1:55797, them=127.0.0.1:13369
+2026-09-12T20:37:21.784000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_version(nVersion=70016 nServices=402653193 nTime=Sat Sep 12 14:37:21 2026 addrTo=CAddress(nServices=1 net=IPv4 addr=127.0.0.1 port=13369) addrFrom=CAddress(nServices=1 net=IPv4 addr=0.0.0.0 port=0) nNonce=0x858E1E972672751E strSubVer=/python-p2p-tester:0.0.3/ nStartingHeight=-1 relay=1)
+2026-09-12T20:37:21.784000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_version(nVersion=70016 nServices=268436493 nTime=Sat Sep 12 14:37:21 2026 addrTo=CAddress(nServices=0 net=IPv4 addr=0.0.0.0 port=0) addrFrom=CAddress(nServices=268436493 net=IPv4 addr=0.0.0.0 port=0) nNonce=0x75648B6E37AE04D1 strSubVer=/Satoshi:29.4.1(testnode0)/Knots:20260508/ nStartingHeight=0 relay=1)
+2026-09-12T20:37:21.784000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:21.784000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:21.784000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_getaddr()
+2026-09-12T20:37:21.784000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:21.784000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendaddrv2()
+2026-09-12T20:37:21.785000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:21.786000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendcmpct(announce=False, version=2)
+2026-09-12T20:37:21.786000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_ping(nonce=3426c3f4d5b380f5)
+2026-09-12T20:37:21.786000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_pong(nonce=3426c3f4d5b380f5)
+2026-09-12T20:37:21.786000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:21.786000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_feefilter(feerate=00979e7a)
+2026-09-12T20:37:21.835000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:21.836000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000001)
+2026-09-12T20:37:21.837000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:21.837000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000001)
+2026-09-12T20:37:21.900000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:21.900000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:21.900000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000002)
+2026-09-12T20:37:21.901000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphinv'(65 bytes)
+2026-09-12T20:37:21.901000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:21.902000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000002)
+2026-09-12T20:37:21.953000Z TestFramework.p2p (DEBUG): Connecting to Bitcoin Node: 127.0.0.1:13369
+2026-09-12T20:37:21.954000Z TestFramework.p2p (DEBUG): Connected: us=127.0.0.1:55799, them=127.0.0.1:13369
+2026-09-12T20:37:21.954000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_version(nVersion=70016 nServices=402653193 nTime=Sat Sep 12 14:37:21 2026 addrTo=CAddress(nServices=1 net=IPv4 addr=127.0.0.1 port=13369) addrFrom=CAddress(nServices=1 net=IPv4 addr=0.0.0.0 port=0) nNonce=0x8E0FA5C6F8F7D3C5 strSubVer=/python-p2p-tester:0.0.3/ nStartingHeight=-1 relay=1)
+2026-09-12T20:37:21.956000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_version(nVersion=70016 nServices=268436493 nTime=Sat Sep 12 14:37:21 2026 addrTo=CAddress(nServices=0 net=IPv4 addr=0.0.0.0 port=0) addrFrom=CAddress(nServices=268436493 net=IPv4 addr=0.0.0.0 port=0) nNonce=0x53DC864ED3D2E28D strSubVer=/Satoshi:29.4.1(testnode0)/Knots:20260508/ nStartingHeight=0 relay=1)
+2026-09-12T20:37:21.956000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:21.956000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:21.956000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_getaddr()
+2026-09-12T20:37:21.957000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:21.957000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendaddrv2()
+2026-09-12T20:37:21.959000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:21.960000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendcmpct(announce=False, version=2)
+2026-09-12T20:37:21.960000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_ping(nonce=74c100d719ab9a56)
+2026-09-12T20:37:21.960000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_pong(nonce=74c100d719ab9a56)
+2026-09-12T20:37:21.960000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:21.960000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_feefilter(feerate=00979e7a)
+2026-09-12T20:37:22.013000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:22.014000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000001)
+2026-09-12T20:37:22.015000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:22.017000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000001)
+2026-09-12T20:37:22.079000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:22.079000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:22.079000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000002)
+2026-09-12T20:37:22.080000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphinv'(65 bytes)
+2026-09-12T20:37:22.081000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:22.082000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000002)
+2026-09-12T20:37:22.139000Z TestFramework.p2p (DEBUG): Connecting to Bitcoin Node: 127.0.0.1:13369
+2026-09-12T20:37:22.140000Z TestFramework.p2p (DEBUG): Connected: us=127.0.0.1:55800, them=127.0.0.1:13369
+2026-09-12T20:37:22.140000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_version(nVersion=70016 nServices=402653193 nTime=Sat Sep 12 14:37:22 2026 addrTo=CAddress(nServices=1 net=IPv4 addr=127.0.0.1 port=13369) addrFrom=CAddress(nServices=1 net=IPv4 addr=0.0.0.0 port=0) nNonce=0x05161DDDEF03EAB8 strSubVer=/python-p2p-tester:0.0.3/ nStartingHeight=-1 relay=1)
+2026-09-12T20:37:22.140000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_version(nVersion=70016 nServices=268436493 nTime=Sat Sep 12 14:37:22 2026 addrTo=CAddress(nServices=0 net=IPv4 addr=0.0.0.0 port=0) addrFrom=CAddress(nServices=268436493 net=IPv4 addr=0.0.0.0 port=0) nNonce=0xDFF44E1B01804268 strSubVer=/Satoshi:29.4.1(testnode0)/Knots:20260508/ nStartingHeight=0 relay=1)
+2026-09-12T20:37:22.140000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:22.140000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:22.140000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_getaddr()
+2026-09-12T20:37:22.140000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:22.140000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendaddrv2()
+2026-09-12T20:37:22.141000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:22.141000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendcmpct(announce=False, version=2)
+2026-09-12T20:37:22.141000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_ping(nonce=4d578bdff4a200e4)
+2026-09-12T20:37:22.141000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_pong(nonce=4d578bdff4a200e4)
+2026-09-12T20:37:22.141000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:22.141000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_feefilter(feerate=00979e7a)
+2026-09-12T20:37:22.198000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:22.198000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000001)
+2026-09-12T20:37:22.199000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:22.199000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000001)
+2026-09-12T20:37:22.265000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:22.265000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:22.265000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000002)
+2026-09-12T20:37:22.265000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphinv'(65 bytes)
+2026-09-12T20:37:22.265000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:22.266000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000002)
+2026-09-12T20:37:22.325000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphinv'(33 bytes)
+2026-09-12T20:37:22.325000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:22.325000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000003)
+2026-09-12T20:37:22.325000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphget'(36 bytes)
+2026-09-12T20:37:22.325000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:22.326000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000003)
+2026-09-12T20:37:22.382000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphinv'(33 bytes)
+2026-09-12T20:37:22.382000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:22.382000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000003)
+2026-09-12T20:37:22.382000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphget'(36 bytes)
+2026-09-12T20:37:22.383000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:22.383000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000003)
+2026-09-12T20:37:22.442000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphinv'(33 bytes)
+2026-09-12T20:37:22.442000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:22.442000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000003)
+2026-09-12T20:37:22.443000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphget'(36 bytes)
+2026-09-12T20:37:22.443000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:22.443000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000003)
+2026-09-12T20:37:22.502000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphinv'(33 bytes)
+2026-09-12T20:37:22.502000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:22.502000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000003)
+2026-09-12T20:37:22.506000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphget'(36 bytes)
+2026-09-12T20:37:22.506000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:22.507000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000003)
+2026-09-12T20:37:22.562000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphinv'(33 bytes)
+2026-09-12T20:37:22.562000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:22.563000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000003)
+2026-09-12T20:37:22.563000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:22.563000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000003)
+2026-09-12T20:37:22.623000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphinv'(33 bytes)
+2026-09-12T20:37:22.623000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:22.623000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000004)
+2026-09-12T20:37:22.623000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:22.623000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000004)
+2026-09-12T20:37:22.679000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphdata'(41 bytes)
+2026-09-12T20:37:22.679000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphget'(36 bytes)
+2026-09-12T20:37:22.739000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:22.739000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000005)
+2026-09-12T20:37:22.739000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:22.740000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000005)
+2026-09-12T20:37:22.799000Z TestFramework.p2p (DEBUG): Closed connection to: 127.0.0.1:13369
+2026-09-12T20:37:22.850000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphget'(36 bytes)
+2026-09-12T20:37:22.908000Z TestFramework.p2p (DEBUG): Closed connection to: 127.0.0.1:13369
+2026-09-12T20:37:22.908000Z TestFramework.p2p (DEBUG): Closed connection to: 127.0.0.1:13369
+2026-09-12T20:37:22.908000Z TestFramework.p2p (DEBUG): Closed connection to: 127.0.0.1:13369
+2026-09-12T20:37:22.908000Z TestFramework.p2p (DEBUG): Closed connection to: 127.0.0.1:13369
+2026-09-12T20:37:22.971000Z TestFramework (INFO): Malformed inventory is refused before any download is scheduled
+2026-09-12T20:37:22.971000Z TestFramework.p2p (DEBUG): Connecting to Bitcoin Node: 127.0.0.1:13369
+2026-09-12T20:37:22.972000Z TestFramework.p2p (DEBUG): Connected: us=127.0.0.1:55808, them=127.0.0.1:13369
+2026-09-12T20:37:22.972000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_version(nVersion=70016 nServices=402653193 nTime=Sat Sep 12 14:37:22 2026 addrTo=CAddress(nServices=1 net=IPv4 addr=127.0.0.1 port=13369) addrFrom=CAddress(nServices=1 net=IPv4 addr=0.0.0.0 port=0) nNonce=0xA0CDE133AFDD14CF strSubVer=/python-p2p-tester:0.0.3/ nStartingHeight=-1 relay=1)
+2026-09-12T20:37:22.973000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_version(nVersion=70016 nServices=268436493 nTime=Sat Sep 12 14:37:22 2026 addrTo=CAddress(nServices=0 net=IPv4 addr=0.0.0.0 port=0) addrFrom=CAddress(nServices=268436493 net=IPv4 addr=0.0.0.0 port=0) nNonce=0x3734D744324A862A strSubVer=/Satoshi:29.4.1(testnode0)/Knots:20260508/ nStartingHeight=0 relay=1)
+2026-09-12T20:37:22.973000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:22.973000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:22.973000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_getaddr()
+2026-09-12T20:37:22.973000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:22.973000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendaddrv2()
+2026-09-12T20:37:22.973000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:22.973000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendcmpct(announce=False, version=2)
+2026-09-12T20:37:22.973000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_ping(nonce=e76276a89ce660d3)
+2026-09-12T20:37:22.973000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_pong(nonce=e76276a89ce660d3)
+2026-09-12T20:37:22.973000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_getheaders(locator=CBlockLocator(vHave=[7041830694386478471858881810674310864173988660927928131397671070347943617030]), stop=0000000000000000000000000000000000000000000000000000000000000000)
+2026-09-12T20:37:22.973000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:22.974000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_feefilter(feerate=00979e7a)
+2026-09-12T20:37:23.032000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:23.032000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000001)
+2026-09-12T20:37:23.032000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:23.032000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000001)
+2026-09-12T20:37:23.093000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:23.096000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:23.096000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000002)
+2026-09-12T20:37:23.096000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphinv'(65 bytes)
+2026-09-12T20:37:23.096000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:23.100000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000002)
+2026-09-12T20:37:23.146000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphinv'(3 bytes)
+2026-09-12T20:37:23.203000Z TestFramework.p2p (DEBUG): Closed connection to: 127.0.0.1:13369
+2026-09-12T20:37:23.257000Z TestFramework.p2p (DEBUG): Connecting to Bitcoin Node: 127.0.0.1:13369
+2026-09-12T20:37:23.258000Z TestFramework.p2p (DEBUG): Connected: us=127.0.0.1:55812, them=127.0.0.1:13369
+2026-09-12T20:37:23.258000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_version(nVersion=70016 nServices=402653193 nTime=Sat Sep 12 14:37:23 2026 addrTo=CAddress(nServices=1 net=IPv4 addr=127.0.0.1 port=13369) addrFrom=CAddress(nServices=1 net=IPv4 addr=0.0.0.0 port=0) nNonce=0xD7DC70373C1CE940 strSubVer=/python-p2p-tester:0.0.3/ nStartingHeight=-1 relay=1)
+2026-09-12T20:37:23.258000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_version(nVersion=70016 nServices=268436493 nTime=Sat Sep 12 14:37:23 2026 addrTo=CAddress(nServices=0 net=IPv4 addr=0.0.0.0 port=0) addrFrom=CAddress(nServices=268436493 net=IPv4 addr=0.0.0.0 port=0) nNonce=0x1506B5AEAA15D1EA strSubVer=/Satoshi:29.4.1(testnode0)/Knots:20260508/ nStartingHeight=0 relay=1)
+2026-09-12T20:37:23.258000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:23.258000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:23.261000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_getaddr()
+2026-09-12T20:37:23.261000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:23.261000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendaddrv2()
+2026-09-12T20:37:23.261000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:23.265000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendcmpct(announce=False, version=2)
+2026-09-12T20:37:23.265000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_ping(nonce=10ada8fc82566bd4)
+2026-09-12T20:37:23.265000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_pong(nonce=10ada8fc82566bd4)
+2026-09-12T20:37:23.265000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_getheaders(locator=CBlockLocator(vHave=[7041830694386478471858881810674310864173988660927928131397671070347943617030]), stop=0000000000000000000000000000000000000000000000000000000000000000)
+2026-09-12T20:37:23.265000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:23.265000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_feefilter(feerate=00979e7a)
+2026-09-12T20:37:23.316000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:23.316000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000001)
+2026-09-12T20:37:23.316000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:23.317000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000001)
+2026-09-12T20:37:23.371000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:23.371000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:23.371000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000002)
+2026-09-12T20:37:23.371000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphinv'(65 bytes)
+2026-09-12T20:37:23.371000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:23.371000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000002)
+2026-09-12T20:37:23.430000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphinv'(65 bytes)
+2026-09-12T20:37:23.490000Z TestFramework.p2p (DEBUG): Closed connection to: 127.0.0.1:13369
+2026-09-12T20:37:23.551000Z TestFramework.p2p (DEBUG): Connecting to Bitcoin Node: 127.0.0.1:13369
+2026-09-12T20:37:23.551000Z TestFramework.p2p (DEBUG): Connected: us=127.0.0.1:55815, them=127.0.0.1:13369
+2026-09-12T20:37:23.551000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_version(nVersion=70016 nServices=402653193 nTime=Sat Sep 12 14:37:23 2026 addrTo=CAddress(nServices=1 net=IPv4 addr=127.0.0.1 port=13369) addrFrom=CAddress(nServices=1 net=IPv4 addr=0.0.0.0 port=0) nNonce=0xD0697C9A6D897CF9 strSubVer=/python-p2p-tester:0.0.3/ nStartingHeight=-1 relay=1)
+2026-09-12T20:37:23.551000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_version(nVersion=70016 nServices=268436493 nTime=Sat Sep 12 14:37:23 2026 addrTo=CAddress(nServices=0 net=IPv4 addr=0.0.0.0 port=0) addrFrom=CAddress(nServices=268436493 net=IPv4 addr=0.0.0.0 port=0) nNonce=0xA3DC9D85E12D93A7 strSubVer=/Satoshi:29.4.1(testnode0)/Knots:20260508/ nStartingHeight=0 relay=1)
+2026-09-12T20:37:23.551000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:23.551000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:23.551000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_getaddr()
+2026-09-12T20:37:23.552000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_wtxidrelay()
+2026-09-12T20:37:23.552000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendaddrv2()
+2026-09-12T20:37:23.552000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_verack()
+2026-09-12T20:37:23.552000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_sendcmpct(announce=False, version=2)
+2026-09-12T20:37:23.552000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_ping(nonce=959a201cc1990233)
+2026-09-12T20:37:23.552000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_pong(nonce=959a201cc1990233)
+2026-09-12T20:37:23.552000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_getheaders(locator=CBlockLocator(vHave=[7041830694386478471858881810674310864173988660927928131397671070347943617030]), stop=0000000000000000000000000000000000000000000000000000000000000000)
+2026-09-12T20:37:23.552000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:23.552000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_feefilter(feerate=00979e7a)
+2026-09-12T20:37:23.611000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:23.611000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000001)
+2026-09-12T20:37:23.611000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:23.611000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000001)
+2026-09-12T20:37:23.670000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphhello'(69 bytes)
+2026-09-12T20:37:23.670000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000000)
+2026-09-12T20:37:23.670000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: msg_ping(nonce=00000002)
+2026-09-12T20:37:23.670000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: b'sphinv'(65 bytes)
+2026-09-12T20:37:23.671000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000000)
+2026-09-12T20:37:23.671000Z TestFramework.p2p (DEBUG): Received message from 127.0.0.1:13369: msg_pong(nonce=00000002)
+2026-09-12T20:37:23.722000Z TestFramework.p2p (DEBUG): Send message to 127.0.0.1:13369: b'sphinv'(65 bytes)
+2026-09-12T20:37:23.780000Z TestFramework.p2p (DEBUG): Closed connection to: 127.0.0.1:13369
+2026-09-12T20:37:23.840000Z TestFramework (DEBUG): Closing down network thread
+2026-09-12T20:37:23.900000Z TestFramework (INFO): Stopping nodes
+2026-09-12T20:37:23.900000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-12T20:37:24.013000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-12T20:37:24.013000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-integration-v4-613
+2026-09-12T20:37:24.013000Z TestFramework (INFO): Tests successful
+
+RUN attestation
+COMMAND /usr/bin/python3 -B test/functional/feature_sharepool_hash_attestation.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-integration-v4-614 --portseed=614 --nocleanup
+2026-09-12T20:37:15.544000Z TestFramework (INFO): PRNG seed is: 6623065229250766203
+2026-09-12T20:37:15.544000Z TestFramework (DEBUG): Setting up network thread
+2026-09-12T20:37:15.544000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-integration-v4-614
+2026-09-12T20:37:15.546000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:37:15.802000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-12T20:37:16.261000Z TestFramework (INFO): GBT identifies the exact v4 share target and explicitly requires job completion
+2026-09-12T20:37:16.272000Z TestFramework (INFO): Valid and invalid snapshot overlays leave native evidence storage unchanged
+2026-09-12T20:37:16.288000Z TestFramework (INFO): Changing a valid transaction body requires a new exact-job signature
+2026-09-12T20:37:16.307000Z TestFramework (INFO): Witness bytes are signed even when the ordinary transaction ID is unchanged
+2026-09-12T20:37:16.325000Z TestFramework (INFO): The signature authenticates policy/context and the complete evidence snapshot
+2026-09-12T20:37:16.378000Z TestFramework (INFO): Search nonces can change; a newly authorized valid transaction can be mined
+2026-09-12T20:37:16.398000Z TestFramework (INFO): A legitimate owner cannot authorize a nonexistent UTXO into a valid origin
+2026-09-12T20:37:16.431000Z TestFramework (INFO): Native origin validation rejects two transactions spending the same input
+2026-09-12T20:37:16.465000Z TestFramework (INFO): A signed origin with correct witness commitment still must execute its scripts
+2026-09-12T20:37:16.499000Z TestFramework (INFO): The accepted settlement validates its real spend and pays the verified origin owner
+2026-09-12T20:37:16.683000Z TestFramework (DEBUG): Closing down network thread
+2026-09-12T20:37:16.743000Z TestFramework (INFO): Stopping nodes
+2026-09-12T20:37:16.743000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-12T20:37:16.924000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-12T20:37:16.924000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-integration-v4-614
+2026-09-12T20:37:16.924000Z TestFramework (INFO): Tests successful
+
+RUN builder
+COMMAND /usr/bin/python3 -B test/functional/feature_sharepool_hash_builder.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-builder-v4-711 --portseed=711 --nocleanup
+2026-09-12T20:35:53.032000Z TestFramework (INFO): PRNG seed is: 3862383752243509012
+2026-09-12T20:35:53.032000Z TestFramework (DEBUG): Setting up network thread
+2026-09-12T20:35:53.032000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-builder-v4-711
+2026-09-12T20:35:53.034000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:35:53.036000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:35:53.564000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-12T20:35:53.566000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-12T20:35:54.794000Z TestFramework (INFO): Native construction creates distinct fully validated externally signed origins
+2026-09-12T20:35:55.049000Z TestFramework (INFO): The native mempool supplies a valid witness transaction and exact fee
+2026-09-12T20:35:55.174000Z TestFramework (INFO): A changed job or forged payout cannot reuse the exact owner authorization
+2026-09-12T20:35:55.293000Z TestFramework (INFO): Full snapshot relay permits the follower to verify and accept the winning block
+2026-09-12T20:35:56.645000Z TestFramework (DEBUG): Closing down network thread
+2026-09-12T20:35:56.705000Z TestFramework (INFO): Stopping nodes
+2026-09-12T20:35:56.705000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-12T20:35:56.706000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-12T20:35:56.877000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-12T20:35:56.877000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-12T20:35:56.877000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-builder-v4-711
+2026-09-12T20:35:56.878000Z TestFramework (INFO): Tests successful
+
+RUN rules
+COMMAND /usr/bin/python3 -B test/functional/feature_sharepool_hash_rules.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-rules-v4-712 --portseed=712 --nocleanup
+2026-09-12T20:35:56.321000Z TestFramework (INFO): PRNG seed is: 3746937374335761530
+2026-09-12T20:35:56.321000Z TestFramework (DEBUG): Setting up network thread
+2026-09-12T20:35:56.322000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-rules-v4-712
+2026-09-12T20:35:56.323000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:35:56.587000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-12T20:35:56.608000Z TestFramework (INFO): Complete proof attribution fixes the actual payout script
+2026-09-12T20:35:56.636000Z TestFramework (INFO): The snapshot and coinbase must allocate the exact native subsidy plus fees
+2026-09-12T20:35:56.665000Z TestFramework (INFO): Unavailable preimages are pending; available invalid encodings establish rejection
+2026-09-12T20:35:56.766000Z TestFramework (INFO): A complete consistent settlement is accepted after the refused examples
+2026-09-12T20:35:56.817000Z TestFramework (DEBUG): Closing down network thread
+2026-09-12T20:35:56.877000Z TestFramework (INFO): Stopping nodes
+2026-09-12T20:35:56.877000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-12T20:35:56.998000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-12T20:35:56.998000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-rules-v4-712
+2026-09-12T20:35:56.998000Z TestFramework (INFO): Tests successful
+
+RUN 100-miners
+COMMAND /usr/bin/python3 -B test/functional/feature_sharepool_hash_100_miners.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-100-v4-713 --portseed=713 --nocleanup --results=contrib/sharepool/results/hash-only-v4-100-miners.json
+2026-09-12T20:36:43.597000Z TestFramework (INFO): PRNG seed is: 4671403083036033083
+2026-09-12T20:36:43.597000Z TestFramework (DEBUG): Setting up network thread
+2026-09-12T20:36:43.598000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-100-v4-713
+2026-09-12T20:36:43.601000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:43.602000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:43.603000Z TestFramework.node2 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:43.604000Z TestFramework.node3 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:43.605000Z TestFramework.node4 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:36:44.140000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-12T20:36:44.144000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-12T20:36:44.147000Z TestFramework.node2 (DEBUG): RPC successfully started
+2026-09-12T20:36:44.150000Z TestFramework.node3 (DEBUG): RPC successfully started
+2026-09-12T20:36:44.153000Z TestFramework.node4 (DEBUG): RPC successfully started
+2026-09-12T20:36:44.731000Z TestFramework (INFO): Create100 fresh v4 native signer keys and distinct payout scripts
+2026-09-12T20:36:55.376000Z TestFramework (INFO): Mature native funding and create100 independent UTXO spends
+2026-09-12T20:37:35.122000Z TestFramework (INFO): Authorize and dispatch100 distinct full transaction templates before disclosure
+2026-09-12T20:37:49.295000Z TestFramework (INFO): 100 origin snapshot dependencies: missing snapshots per native node [10, 10, 10, 9, 10]
+2026-09-12T20:38:05.915000Z TestFramework (INFO): 100 full origins and100 proofs in P2P snapshots: missing snapshots per native node [17, 17, 15, 15, 17]
+2026-09-12T20:38:40.286000Z TestFramework (INFO): 100-proof baseline: full native admission and durable evidence at20/100 gates
+2026-09-12T20:39:07.608000Z TestFramework (INFO): 100-proof baseline: full native admission and durable evidence at40/100 gates
+2026-09-12T20:39:34.910000Z TestFramework (INFO): 100-proof baseline: full native admission and durable evidence at60/100 gates
+2026-09-12T20:40:02.162000Z TestFramework (INFO): 100-proof baseline: full native admission and durable evidence at80/100 gates
+2026-09-12T20:40:29.471000Z TestFramework (INFO): 100-proof baseline: full native admission and durable evidence at100/100 gates
+2026-09-12T20:40:39.066000Z TestFramework (INFO): Every informed miner authorizes one complete100-proof settlement
+2026-09-12T20:43:16.074000Z TestFramework (INFO): Late work refreshes future dispatch while the solved100-proof block stays immutable
+2026-09-12T20:43:16.220000Z TestFramework (INFO): late proof after winning header was frozen: missing snapshots per native node [0, 1, 1, 1, 1]
+2026-09-12T20:43:19.319000Z TestFramework (INFO): late-proof refresh: full native admission and durable evidence at20/100 gates
+2026-09-12T20:43:19.583000Z TestFramework (INFO): late-proof refresh: full native admission and durable evidence at40/100 gates
+2026-09-12T20:43:19.850000Z TestFramework (INFO): late-proof refresh: full native admission and durable evidence at60/100 gates
+2026-09-12T20:43:20.115000Z TestFramework (INFO): late-proof refresh: full native admission and durable evidence at80/100 gates
+2026-09-12T20:43:20.380000Z TestFramework (INFO): late-proof refresh: full native admission and durable evidence at100/100 gates
+2026-09-12T20:43:30.794000Z TestFramework (INFO): Carry late work and the winning proof into a second honestly authorized settlement
+2026-09-12T20:43:30.961000Z TestFramework (INFO): winning full origin and proof: missing snapshots per native node [1, 0, 1, 1, 1]
+2026-09-12T20:43:39.707000Z TestFramework (INFO): winner carry: full native admission and durable evidence at20/100 gates
+2026-09-12T20:43:46.033000Z TestFramework (INFO): winner carry: full native admission and durable evidence at40/100 gates
+2026-09-12T20:43:52.358000Z TestFramework (INFO): winner carry: full native admission and durable evidence at60/100 gates
+2026-09-12T20:43:58.681000Z TestFramework (INFO): winner carry: full native admission and durable evidence at80/100 gates
+2026-09-12T20:44:05.011000Z TestFramework (INFO): winner carry: full native admission and durable evidence at100/100 gates
+2026-09-12T20:45:18.973000Z TestFramework (INFO): 100-miner hash-only pipeline passed:100 exact payouts, then late proof and winner paid
+2026-09-12T20:45:19.778000Z TestFramework (DEBUG): Closing down network thread
+2026-09-12T20:45:19.838000Z TestFramework (INFO): Stopping nodes
+2026-09-12T20:45:19.838000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-12T20:45:19.839000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-12T20:45:19.839000Z TestFramework.node2 (DEBUG): Stopping node
+2026-09-12T20:45:19.840000Z TestFramework.node3 (DEBUG): Stopping node
+2026-09-12T20:45:19.840000Z TestFramework.node4 (DEBUG): Stopping node
+2026-09-12T20:45:20.081000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-12T20:45:20.081000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-12T20:45:20.081000Z TestFramework.node2 (DEBUG): Node stopped
+2026-09-12T20:45:20.081000Z TestFramework.node3 (DEBUG): Node stopped
+2026-09-12T20:45:20.081000Z TestFramework.node4 (DEBUG): Node stopped
+2026-09-12T20:45:20.081000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-100-v4-713
+2026-09-12T20:45:20.081000Z TestFramework (INFO): Tests successful
+
+RUN legacy-rule-cases
+COMMAND /usr/bin/python3 -B test/functional/feature_sharepool_rule_cases.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-legacy-v4-715 --portseed=715 --nocleanup
+2026-09-12T20:46:52.749000Z TestFramework (INFO): PRNG seed is: 6794341547124512830
+2026-09-12T20:46:52.749000Z TestFramework (DEBUG): Setting up network thread
+2026-09-12T20:46:52.749000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-legacy-v4-715
+2026-09-12T20:46:52.752000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:46:52.753000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-12T20:46:53.016000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-12T20:46:53.017000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-12T20:46:55.090000Z TestFramework (INFO): Rule case: distinct_templates_and_nonce_only_identity
+2026-09-12T20:46:55.215000Z TestFramework (INFO): Rule case: origin_missing_input
+2026-09-12T20:46:55.218000Z TestFramework (INFO): Rule case: origin_invalid_owner_signature
+2026-09-12T20:46:55.219000Z TestFramework (INFO): Rule case: share_invalid_owner_signature
+2026-09-12T20:46:55.220000Z TestFramework (INFO): Rule case: share_insufficient_pow
+2026-09-12T20:46:55.221000Z TestFramework (INFO): Rule case: duplicate_proof_idempotent_admission
+2026-09-12T20:46:55.363000Z TestFramework (INFO): Rule case: duplicate_proof_in_snapshot
+2026-09-12T20:46:55.605000Z TestFramework (INFO): Rule case: payout_script_tampering_recommitted
+2026-09-12T20:46:55.623000Z TestFramework (INFO): Rule case: payout_amount_tampering_recommitted
+2026-09-12T20:46:55.762000Z TestFramework (INFO): Rule case: known_omission_is_local_not_consensus
+2026-09-12T20:46:55.930000Z TestFramework (INFO): Rule case: frozen_commitment_and_late_share_refresh
+2026-09-12T20:46:57.274000Z TestFramework (INFO): Rule case: repeated_payment_rejected
+2026-09-12T20:46:57.532000Z TestFramework (INFO): Rule case: late_omitted_and_winning_work_settle_next_block
+2026-09-12T20:46:57.560000Z TestFramework (INFO): All 13 identifiable rule cases passed
+2026-09-12T20:46:57.563000Z TestFramework (DEBUG): Closing down network thread
+2026-09-12T20:46:57.614000Z TestFramework (INFO): Stopping nodes
+2026-09-12T20:46:57.614000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-12T20:46:57.614000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-12T20:46:57.735000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-12T20:46:57.795000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-12T20:46:57.795000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-legacy-v4-715
+2026-09-12T20:46:57.795000Z TestFramework (INFO): Tests successful

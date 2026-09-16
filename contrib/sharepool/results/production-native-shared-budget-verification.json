@@ -1,0 +1,204 @@
+{
+  "schema": 1,
+  "scope": "Shared optional decoded LRU retention only; no consensus, total-RSS or scheduling claim.",
+  "base_commit": "c94b5cbc90db3c6b76b9fed5adbc316b91d5f36e",
+  "source_sha256": {
+    "src/consensus/sharepool_hash.cpp": "eef5ff846677ed7f87596123cbf5b39b8c4046f57849fb08a6345b5225d070c0",
+    "src/validation.cpp": "5bfe182d37dd62239f55e94c7b43ae9f37bd9bfad88e4e76ca50043fdeb49a63",
+    "src/validation.h": "48c29d8c6bbe9967cd28482aae7031573b0a5b6c55df52b3917544c4fe2cd6b9",
+    "src/sharepool/hash_validation_cache.h": "0e38d0206e8d80ea2282b85fc1d400edac748848514ddd4346a9fbfc763e2848",
+    "src/test/sharepool_hash_tests.cpp": "e3ee3127ad926dd3468ad12cf4cd4404329ee2085c7593ac39684369bb19ea41",
+    "src/test/sharepool_retry_worker_tests.cpp": "f3054eb123221db0ea9733d8923ec48b6468d2acfd5702e1b193f72a246688ee"
+  },
+  "shared_maximum_bytes": 134217728,
+  "per_session_maximum_bytes": 67108864,
+  "per_session_maximum_entries": 1024,
+  "source_diff": {
+    "path": "contrib/sharepool/results/production-native-shared-budget-source.diff",
+    "sha256": "63c63e92eedcf577a5f5def183dbede140a7c024289ef8980179e7bff83299ff",
+    "apply_check": true,
+    "applied_file_hashes_match": true
+  },
+  "build": {
+    "type": "Debug",
+    "exit_code": 0,
+    "command": [
+      "/private/tmp/sharepool-build-tools-20260912/cmake/data/bin/cmake",
+      "--build",
+      "/private/tmp/sharepool-native-build",
+      "--parallel",
+      "2",
+      "--target",
+      "bitcoind",
+      "test_bitcoin",
+      "bitcoin-sharepool-signer",
+      "bitcoin-cli"
+    ]
+  },
+  "binary_sha256": {
+    "bitcoind": "a4de6a3a0a8381fce7b3d0feef572ae129a7e1062b326df51c33317bf7a0e641",
+    "test_bitcoin": "9ea8d34729f839b40a8dc86bee61addfc0cbfdcf3f265198ba3e98dacc661f89",
+    "bitcoin-sharepool-signer": "f84dc1d8dd2cd6f3557b334a8a2d87f7c4fc5d676b3b5eb08efe003756ed06ff",
+    "bitcoin-cli": "f91a8b6da17996f7166e4474418824b2db947c35ddd90cd7b059ec8f77b91b80"
+  },
+  "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)\nTarget: arm64-apple-darwin25.6.0\nThread model: posix\nInstalledDir: /Library/Developer/CommandLineTools/usr/bin\n",
+  "standalone": {
+    "retention-stress-tsan": {
+      "build_command": [
+        "/usr/bin/c++",
+        "-std=c++20",
+        "-O1",
+        "-g",
+        "-fno-omit-frame-pointer",
+        "-pthread",
+        "-fsanitize=thread",
+        "-I/private/tmp/sharepool-native-build/src",
+        "-I/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/src",
+        "/private/tmp/sharepool-native-shared-budget/retention_stress.cpp",
+        "-o",
+        "/private/tmp/sharepool-native-shared-budget/retention-stress-tsan"
+      ],
+      "build_exit_code": 0,
+      "build_seconds": 0.9180042079999999,
+      "run_command": [
+        "/private/tmp/sharepool-native-shared-budget/retention-stress-tsan"
+      ],
+      "run_exit_code": 0,
+      "run_seconds": 0.8987927920000001,
+      "binary_sha256": "ae3a94db05ef14f547f161a19b03c6a2768451a6e73ad6db672bc2861def8fcc"
+    },
+    "retention-stress-plain": {
+      "build_command": [
+        "/usr/bin/c++",
+        "-std=c++20",
+        "-O1",
+        "-g",
+        "-fno-omit-frame-pointer",
+        "-pthread",
+        "-I/private/tmp/sharepool-native-build/src",
+        "-I/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/src",
+        "/private/tmp/sharepool-native-shared-budget/retention_stress.cpp",
+        "-o",
+        "/private/tmp/sharepool-native-shared-budget/retention-stress-plain"
+      ],
+      "build_exit_code": 0,
+      "build_seconds": 0.7136351249999999,
+      "run_command": [
+        "/private/tmp/sharepool-native-shared-budget/retention-stress-plain"
+      ],
+      "run_exit_code": 0,
+      "run_seconds": 0.29201558299999997,
+      "binary_sha256": "560b07bf2dcd3439c49ed50126f37ff5acec2356445462fe07bd5860229b5761"
+    }
+  },
+  "result": "passed",
+  "completed_utc": "2026-09-14T08:04:37.434557+00:00",
+  "cpp": {
+    "cases": 61,
+    "new_cases": 4,
+    "exit_code": 0,
+    "testing_microseconds": 135019415,
+    "command": [
+      "/private/tmp/sharepool-native-build/bin/test_bitcoin",
+      "--run_test=sharepool_hash_tests,sharepool_retry_worker_tests,sharepool_tides_consensus_tests",
+      "--log_level=test_suite"
+    ],
+    "log": "contrib/sharepool/results/production-native-shared-budget-cpp.txt",
+    "raw_private_log_sha256": "b7cb75f6cc560aeb6e704386265b539914891634d42786a7920eb990b1f71bc8"
+  },
+  "focused_equivalence": {
+    "exit_code": 0,
+    "cases": 1,
+    "budgets_bytes": [
+      134217728,
+      "one origin record charge",
+      1,
+      0
+    ],
+    "routes": [
+      "CheckSnapshot",
+      "CheckMiningJob",
+      "CheckHistoricalTemplate",
+      "CheckShareProof"
+    ],
+    "scenarios": [
+      "valid",
+      "wrong coinbase payout",
+      "invalid snapshot owner signature",
+      "invalid proof signature",
+      "authenticated malformed evidence",
+      "missing ancestry"
+    ],
+    "compared_fields": [
+      "status",
+      "reason",
+      "missing",
+      "expected_reward"
+    ],
+    "command": [
+      "/private/tmp/sharepool-native-build/bin/test_bitcoin",
+      "--run_test=sharepool_hash_tests/v7_shared_optional_retention_preserves_exact_validation_results",
+      "--log_level=test_suite"
+    ],
+    "log": "contrib/sharepool/results/production-native-shared-budget-cpp-matrix.txt"
+  },
+  "standalone_scope": {
+    "threads": 8,
+    "iterations_per_thread": 10000,
+    "thread_sanitizer_exit_code": 0,
+    "actual_put_allocation_failure": true,
+    "allocator_hook_scope": "Standalone harness only; no node runtime hook.",
+    "source_path": "contrib/sharepool/results/production-native-shared-budget-stress.cpp",
+    "header_sha256": "0e38d0206e8d80ea2282b85fc1d400edac748848514ddd4346a9fbfc763e2848"
+  },
+  "limitations": [
+    "The cap is optional decoded-LRU charge per ChainstateManager, not a bound on caller-owned decoded data, decode scratch space, raw storage, history indexes, transaction caches, JSON queues or whole-process RSS.",
+    "No RPC admission fairness, all-worker saturation, slow-disk cs_main latency or starvation guarantee was measured.",
+    "The ThreadSanitizer run covers the standalone shared accounting/cache helper, not the complete daemon.",
+    "Full verifier result equivalence is tested through the decoded lookup seam; coordinated reorg/cancellation contention remains an integration gap.",
+    "No throughput speedup is claimed. Historical 30-miner, 100-miner and A/B/A captures predate this cap and use their separately recorded source/binary selections.",
+    "Build hashes identify captured binaries; deterministic reproduction of debug binary bytes is not claimed."
+  ],
+  "artifacts": {
+    "contrib/sharepool/results/production-native-shared-budget-build.txt": {
+      "sha256": "e4894d60213752b658ddd13b3d4d28e6f94b2a7074e5e83ae52c53f8eede59c7",
+      "bytes": 7975
+    },
+    "contrib/sharepool/results/production-native-shared-budget-cpp-matrix.txt": {
+      "sha256": "a7207dde97871e6703a3c4d3447dbf1e701f4e464ced084e221db2b65f8d674d",
+      "bytes": 18347
+    },
+    "contrib/sharepool/results/production-native-shared-budget-cpp.txt": {
+      "sha256": "9bec0b9092c38e3ed7d68a6545e3dde7b957c2e9d282fd572195dbeb2b53b91f",
+      "bytes": 28112
+    },
+    "contrib/sharepool/results/production-native-shared-budget-plain-build.txt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "contrib/sharepool/results/production-native-shared-budget-plain.txt": {
+      "sha256": "9b2750304f1bfcdd0afebaec69d21c4b8e37515d705b964a80e070d57809f05f",
+      "bytes": 167
+    },
+    "contrib/sharepool/results/production-native-shared-budget-source.diff": {
+      "sha256": "63c63e92eedcf577a5f5def183dbede140a7c024289ef8980179e7bff83299ff",
+      "bytes": 41142
+    },
+    "contrib/sharepool/results/production-native-shared-budget-stress.cpp": {
+      "sha256": "1a95e05ab9da0672c59616c5fa2bba840f3fc7b8c331cc2e5d18bafc043b396a",
+      "bytes": 3541
+    },
+    "contrib/sharepool/results/production-native-shared-budget-stress.json": {
+      "sha256": "7065c22810d02848cfe7e6f8710bde03ed86ddd8d6238af7470631ca8e74742e",
+      "bytes": 1612
+    },
+    "contrib/sharepool/results/production-native-shared-budget-tsan-build.txt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "contrib/sharepool/results/production-native-shared-budget-tsan.txt": {
+      "sha256": "9b2750304f1bfcdd0afebaec69d21c4b8e37515d705b964a80e070d57809f05f",
+      "bytes": 167
+    }
+  }
+}

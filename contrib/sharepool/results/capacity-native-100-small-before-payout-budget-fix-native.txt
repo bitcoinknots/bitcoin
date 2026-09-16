@@ -1,0 +1,31 @@
+2026-09-13T08:20:29.297000Z TestFramework (INFO): PRNG seed is: 6537112796937902534
+2026-09-13T08:20:29.297000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-capacity-baseline-1001
+2026-09-13T08:20:41.627000Z TestFramework (INFO): Capacity epoch 1/3: 100 distinct native origins, padding outputs=0
+2026-09-13T08:20:45.548000Z TestFramework (INFO): Epoch 1: 25/100 native origins ready
+2026-09-13T08:20:49.858000Z TestFramework (INFO): Epoch 1: 50/100 native origins ready
+2026-09-13T08:20:54.562000Z TestFramework (INFO): Epoch 1: 75/100 native origins ready
+2026-09-13T08:20:59.712000Z TestFramework (INFO): Epoch 1: 100/100 native origins ready
+2026-09-13T08:21:15.116000Z TestFramework (ERROR): Unexpected exception
+Traceback (most recent call last):
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_framework.py", line 136, in main
+    self.run_test()
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_capacity.py", line 221, in run_test
+    block, snapshot, authorization = self.job(collector, signers[0], "gate.settlement_job")
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_capacity.py", line 66, in job
+    block, snapshot = gate.make_native(sign_owner=signer.sign_owner)
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_mining_gate.py", line 1229, in make_native
+    block, snapshot, reward = decode(prepared)
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/contrib/sharepool/hash_mining_gate.py", line 1201, in decode
+    raise ValueError("native job response exceeds " + name + " byte bound")
+ValueError: native job response exceeds snapshot byte bound
+2026-09-13T08:21:15.179000Z TestFramework (INFO): Not stopping nodes as test failed. The dangling processes will be cleaned up later.
+2026-09-13T08:21:15.179000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-capacity-baseline-1001
+2026-09-13T08:21:15.179000Z TestFramework (ERROR): Test failed. Test logging available at /private/tmp/sharepool-capacity-baseline-1001/test_framework.log
+2026-09-13T08:21:15.179000Z TestFramework (ERROR):
+2026-09-13T08:21:15.179000Z TestFramework (ERROR): Hint: Call /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/combine_logs.py '/private/tmp/sharepool-capacity-baseline-1001' to consolidate all logs
+2026-09-13T08:21:15.179000Z TestFramework (ERROR):
+2026-09-13T08:21:15.179000Z TestFramework (ERROR): If this failure happened unexpectedly or intermittently, please file a bug and provide a link or upload of the combined log.
+2026-09-13T08:21:15.179000Z TestFramework (ERROR): https://github.com/bitcoinknots/bitcoin/issues
+2026-09-13T08:21:15.179000Z TestFramework (ERROR):
+[node 1] Cleaning up leftover process
+[node 0] Cleaning up leftover process

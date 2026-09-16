@@ -1,0 +1,49 @@
+2026-09-14T15:22:16.545000Z TestFramework (INFO): User supplied random seed 110060
+2026-09-14T15:22:16.545000Z TestFramework (INFO): PRNG seed is: 110060
+2026-09-14T15:22:16.545000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v8-scale-100
+2026-09-14T15:22:53.220000Z TestFramework (INFO): Live block 102 admitted 69 proofs; source continues independently
+2026-09-14T15:23:20.418000Z TestFramework (INFO): Live block 103 admitted 62 proofs; source continues independently
+2026-09-14T15:23:47.008000Z TestFramework (INFO): Live block 104 admitted 62 proofs; source continues independently
+2026-09-14T15:24:10.844000Z TestFramework (INFO): Live block 105 admitted 19 proofs; source continues independently
+2026-09-14T15:24:35.425000Z TestFramework (INFO): Live block 106 admitted 20 proofs; source continues independently
+2026-09-14T15:24:59.699000Z TestFramework (INFO): Live block 107 admitted 22 proofs; source continues independently
+2026-09-14T15:25:24.349000Z TestFramework (INFO): Live block 108 admitted 22 proofs; source continues independently
+2026-09-14T15:25:51.014000Z TestFramework (INFO): Live block 109 admitted 43 proofs; source continues independently
+2026-09-14T15:26:16.129000Z TestFramework (INFO): Live block 110 admitted 40 proofs; source continues independently
+2026-09-14T15:26:41.353000Z TestFramework (INFO): Live block 111 admitted 38 proofs; source continues independently
+2026-09-14T15:27:06.035000Z TestFramework (INFO): Live block 112 admitted 31 proofs; source continues independently
+2026-09-14T15:27:31.072000Z TestFramework (INFO): Live block 113 admitted 27 proofs; source continues independently
+2026-09-14T15:27:55.636000Z TestFramework (INFO): Live block 114 admitted 29 proofs; source continues independently
+2026-09-14T15:28:19.886000Z TestFramework (INFO): Live block 115 admitted 30 proofs; source continues independently
+2026-09-14T15:28:45.122000Z TestFramework (INFO): Live block 116 admitted 34 proofs; source continues independently
+2026-09-14T15:29:10.186000Z TestFramework (INFO): Live block 117 admitted 37 proofs; source continues independently
+2026-09-14T15:29:35.887000Z TestFramework (INFO): Live block 118 admitted 35 proofs; source continues independently
+2026-09-14T15:30:01.738000Z TestFramework (INFO): Live block 119 admitted 35 proofs; source continues independently
+2026-09-14T15:30:26.698000Z TestFramework (INFO): Live block 120 admitted 32 proofs; source continues independently
+2026-09-14T15:30:51.239000Z TestFramework (INFO): Live block 121 admitted 31 proofs; source continues independently
+2026-09-14T15:31:15.943000Z TestFramework (INFO): Live block 122 admitted 32 proofs; source continues independently
+2026-09-14T15:31:40.336000Z TestFramework (INFO): Live block 123 admitted 32 proofs; source continues independently
+2026-09-14T15:31:57.849000Z TestFramework (INFO): Live block 124 admitted 34 proofs; source continues independently
+2026-09-14T15:32:02.004000Z TestFramework (INFO): Live block 125 admitted 34 proofs; source continues independently
+2026-09-14T15:32:05.665000Z TestFramework (INFO): Live block 126 admitted 33 proofs; source continues independently
+2026-09-14T15:32:07.626000Z TestFramework (INFO): Live block 127 admitted 21 proofs; source continues independently
+2026-09-14T15:32:08.315000Z TestFramework (ERROR): Unexpected exception
+Traceback (most recent call last):
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_framework.py", line 136, in main
+    self.run_test()
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_live_capacity.py", line 433, in run_test
+    self.settle(collector,signers[0],history,admitted)
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_live_capacity.py", line 295, in settle
+    assert ids and not ids & admitted
+AssertionError
+2026-09-14T15:32:08.377000Z TestFramework (INFO): Not stopping nodes as test failed. The dangling processes will be cleaned up later.
+2026-09-14T15:32:08.377000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v8-scale-100
+2026-09-14T15:32:08.377000Z TestFramework (ERROR): Test failed. Test logging available at /private/tmp/sharepool-v8-scale-100/test_framework.log
+2026-09-14T15:32:08.377000Z TestFramework (ERROR):
+2026-09-14T15:32:08.377000Z TestFramework (ERROR): Hint: Call /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/combine_logs.py '/private/tmp/sharepool-v8-scale-100' to consolidate all logs
+2026-09-14T15:32:08.378000Z TestFramework (ERROR):
+2026-09-14T15:32:08.378000Z TestFramework (ERROR): If this failure happened unexpectedly or intermittently, please file a bug and provide a link or upload of the combined log.
+2026-09-14T15:32:08.378000Z TestFramework (ERROR): https://github.com/bitcoinknots/bitcoin/issues
+2026-09-14T15:32:08.378000Z TestFramework (ERROR):
+[node 1] Cleaning up leftover process
+[node 0] Cleaning up leftover process

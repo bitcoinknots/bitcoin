@@ -1,0 +1,8 @@
+2026-09-13T07:54:35.526000Z TestFramework (INFO): PRNG seed is: 8135987706828003554
+2026-09-13T07:54:35.527000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v6-r2-one-satoshi-964
+2026-09-13T07:54:36.188000Z TestFramework (INFO): Generate ordinary preactivation blocks to a 1-satoshi subsidy
+2026-09-13T07:56:40.191000Z TestFramework (INFO): Native builder and gate approve a witness-only coinbase with empty monetary payouts
+2026-09-13T07:56:40.893000Z TestFramework (INFO): Repeating the rolling window preserves the empty payout vector through restart/reindex
+2026-09-13T07:57:00.297000Z TestFramework (INFO): Stopping nodes
+2026-09-13T07:57:00.466000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v6-r2-one-satoshi-964
+2026-09-13T07:57:00.466000Z TestFramework (INFO): Tests successful

@@ -1,0 +1,92 @@
+[
+  {
+    "name": "v7-compact",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_compact.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-v7-state-native/v7-compact",
+      "--portseed=1340",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 16.438971083,
+    "log": "contrib/sharepool/results/state-v7-native-v7-compact.txt"
+  },
+  {
+    "name": "v4-builder",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_builder.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-v7-state-native/v4-builder",
+      "--portseed=1341",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.601396041000001,
+    "log": "contrib/sharepool/results/state-v7-native-v4-builder.txt"
+  },
+  {
+    "name": "v5-ledger",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_ledger.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-v7-state-native/v5-ledger",
+      "--portseed=1342",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 8.284669291,
+    "log": "contrib/sharepool/results/state-v7-native-v5-ledger.txt"
+  },
+  {
+    "name": "v6-tides",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_tides.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-v7-state-native/v6-tides",
+      "--portseed=1343",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 14.651185833999996,
+    "log": "contrib/sharepool/results/state-v7-native-v6-tides.txt"
+  },
+  {
+    "name": "v4-worker",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_worker.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-v7-state-native/v4-worker",
+      "--portseed=1344",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 11.883788957999997,
+    "log": "contrib/sharepool/results/state-v7-native-v4-worker.txt"
+  },
+  {
+    "name": "v6-archive",
+    "command": [
+      "/Library/Developer/CommandLineTools/usr/bin/python3",
+      "-B",
+      "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_archive.py",
+      "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+      "--tmpdir=/private/tmp/sharepool-v7-state-native/v6-archive",
+      "--portseed=1345",
+      "--nocleanup"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 31.40125225,
+    "log": "contrib/sharepool/results/state-v7-native-v6-archive.txt"
+  }
+]

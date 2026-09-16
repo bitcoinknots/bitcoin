@@ -1,0 +1,158 @@
+{
+  "format": "sharepool-production-gaps-verification-v1",
+  "created_utc": "2026-09-14T06:45:45.749770+00:00",
+  "base_commit": "31d3fa9f375144c65bacfa5c2c2f3d1f205a57ee",
+  "result": "passed",
+  "scope": "Hardening sources atop base_commit; no mainnet activation, wire format or consensus rule change. Finite isolated regtest and local archive fixtures only.",
+  "changed_source_sha256": {
+    "contrib/sharepool/benchmark_archive_startup.py": "1777df39e1dd52a200462ddc9e8c4d9b927d3e77c7d202df8a86a85e2b9b8c98",
+    "contrib/sharepool/hash_gate_batch.py": "54247ed9c7757a573460179837a0d89f1f4e575ddcfd4e9361a770c94f52971c",
+    "contrib/sharepool/hash_gate_startup.py": "6707b348d2fe846baf8add953b09c819aa0fe009ba6f8a918ca9b5a82c1ffe6e",
+    "contrib/sharepool/hash_job_scheduler.py": "e4c19eff41b4c7ca94c3bdb44669c1e1048e3b5d3454fe4d71bf5f748dbc95e0",
+    "contrib/sharepool/hash_mining_gate.py": "0e2b1375b0b582eeb1ce42912c09abe5f41d10ecb15ee494e8c58d9abcc51d3d",
+    "contrib/sharepool/hash_signature_cache.py": "41c7bb570ad3126b62443c0140e1a4116e9deafed6581e3ebf2ed60ec92f111e",
+    "contrib/sharepool/hash_snapshot.py": "2dc99c6ee4682d8a9b90af7dfa8b61e82e1d233ea1ba78e9a1229a8b9ea19181",
+    "contrib/sharepool/hash_stratum.py": "20d37af630a941065116290ec20df19453e66820955673fc895288eef2475317",
+    "contrib/sharepool/hash_stratum_runner.py": "cfbdf7230f5fb1435c22ad18373be6a923ef49d8a8df799ec743958b1b60be1a",
+    "contrib/sharepool/test_hash_batch_resource_loading.py": "809750d8be71f5453550ec1a90392d30f339d3838d273a2afd58230f5c9dd6d6",
+    "contrib/sharepool/test_hash_gate_batch.py": "8ee8e86ac8fb2b20b64baa137a5f9ede4a4ff23c70e75a47cffc095ad3d19222",
+    "contrib/sharepool/test_hash_gate_startup.py": "245811d7759e37ba67d2b3871881ec95afc3e699eb287a3c412a8ca634e2664c",
+    "contrib/sharepool/test_hash_gate_state_reuse.py": "4be5076cc39306041851c183279c31d1994cc8091217fb77d2931b462eead467",
+    "contrib/sharepool/test_hash_job_scheduler.py": "bfa79570a20e6985d34c70facf3178ec25375b102a038b8ef4113ff9e82251c3",
+    "contrib/sharepool/test_hash_signature_cache.py": "1aff7e5e62ef02007a9e0ba1b9738baa1656fbc7a7d01c3b1db7b310824bde62",
+    "contrib/sharepool/test_hash_stratum.py": "04b4c061f32c426684af2a8972184c64d5957326ff73ee9ebbf9ee19721a4b4b",
+    "doc/sharepool-production-hardening.md": "a55036c90f18b6661b71baeab2a43410f63c2b1dd6732cf0dc8fd0d81adef3bf",
+    "doc/sharepool-v7-stratum.md": "8917b0feb7a7b79565d5c0a5556e66a1ce48938bd28c9544a04ade81bf0e796e",
+    "src/net_processing.cpp": "b794a5c215ed275f35c535af9918ddd5bd8b893e10affc20e2d59a31d73082e2",
+    "src/rpc/mining.cpp": "23031a6ea86a09df340f3bbdd1d602f053b255ea267b5b651595a4f87049e822",
+    "src/sharepool/hash_store.cpp": "120385886f3bd5a01b567125824b409277ff4d22bfd3db71c0a5aa3f763d1566",
+    "src/sharepool/hash_store.h": "fba6e3167a63436889223d5e9a2fee0dba920369d9605fed51e656fbb3aab01f",
+    "src/test/sharepool_hash_store_tests.cpp": "43a8aa189b5a0d5bbf0a77581027dc2b2203aa87c1fcc78ecddc9a9011154df4",
+    "test/functional/feature_sharepool_hash_job_profile.py": "ed24ba6ddf517a974fae642a7b8937905e57528f77a528aa0d115fb8069a1dc5",
+    "test/functional/feature_sharepool_hash_stratum.py": "9aa99ea13409426a278064c42582211374d27a26ae3ab8f9ff8de404c93ed54f",
+    "test/functional/test_runner.py": "313434bb91e9af490bb880a2808eef2758b7588309c8e28444b172fdf36e5334"
+  },
+  "source_capture_checks": [
+    {
+      "artifact": "production-gaps-regressions.json",
+      "hash_field": "source_sha256_after",
+      "checked_sources": 144,
+      "matches_final_sources": true
+    },
+    {
+      "artifact": "production-gaps-cadence-forward-run.json",
+      "hash_field": "source_sha256_after",
+      "checked_sources": 20,
+      "matches_final_sources": true
+    },
+    {
+      "artifact": "production-gaps-capacity-100-run.json",
+      "hash_field": "source_sha256_after",
+      "checked_sources": 20,
+      "matches_final_sources": true
+    },
+    {
+      "artifact": "production-native-predecode-verification.json",
+      "hash_field": "selected_source_sha256",
+      "checked_sources": 9,
+      "matches_final_sources": true
+    },
+    {
+      "artifact": "v7-stratum-integration-run.json",
+      "hash_field": "python_runtime_sha256_at_capture_copy",
+      "checked_sources": 117,
+      "matches_final_sources": true
+    },
+    {
+      "artifact": "production-gaps-job-profile-after.json",
+      "hash_field": "source_sha256",
+      "checked_sources": 6,
+      "matches_final_sources": true
+    },
+    {
+      "artifact": "production-archive-startup-scaling-final.json",
+      "hash_field": "current_source_sha256",
+      "checked_sources": 4,
+      "matches_final_sources": true
+    }
+  ],
+  "binary_sha256": {
+    "bitcoind": "4cf54b5fadd3d4cee0354feb609508d0cf1107c7d0ccdf3935f862a15717678d",
+    "bitcoin-cli": "d1dd2115052b6dd9923bced9015a44e2fb7560051bb275dcd4ca3db5eb774fbb",
+    "bitcoin-sharepool-signer": "f4f592321ccce37ae9c416fb4e1a2263da4c95438959b58fa356ac937148e250",
+    "test_bitcoin": "21afffead912ccb31d4a87333593e56497d23beca5e879a76827efc20012089c"
+  },
+  "regressions": {
+    "python_hash_protocol_tests": 254,
+    "python_result": "passed",
+    "native_functional": [
+      "worker",
+      "compact",
+      "state_reuse",
+      "datum_cadence",
+      "archive"
+    ],
+    "cpp_cases": 86,
+    "cpp_and_relay_result": "passed",
+    "stratum_native_result": "passed",
+    "all_current_binary_hashes_match": true
+  },
+  "benchmarks": {
+    "profile": "production-gaps-job-profile-comparison.json",
+    "cadence": "production-gaps-cadence-comparison.json",
+    "capacity": "production-gaps-capacity-comparison.json",
+    "archive_final_sources": "production-archive-startup-scaling-final.json",
+    "all_results": "passed",
+    "capacity_proofs_admitted": 900,
+    "capacity_blocks": 8,
+    "capacity_expired": 0,
+    "capacity_final_backlog": 0
+  },
+  "baseline_archive_source_matches_git": true,
+  "historical_tracked_results_unchanged": true,
+  "python_ast_files_checked": 19,
+  "new_functional_tests_registered": true,
+  "artifact_sha256": {
+    "contrib/sharepool/results/production-archive-startup-scaling-final.json": "73bf9835006ab435023225bd97db9e604ce1c2d06bbf26a0ee601beef195fd3a",
+    "contrib/sharepool/results/production-archive-startup-scaling-final.txt": "966ea235ca908c2bf1da93c0816949f657cc42e2f4418395e794668f08ae108d",
+    "contrib/sharepool/results/production-archive-startup-scaling.json": "e08d28c7d5d4f37da7f8a10d2548ee61554c5ee221204935d01e6f90c5ab1a63",
+    "contrib/sharepool/results/production-gaps-cadence-comparison.json": "197607942d2e0235093ba4b6b0d0d1055ac659366ebd2ef135c30f8b3a8ad60e",
+    "contrib/sharepool/results/production-gaps-cadence-forward-native.txt": "6fb10947aa68f5f4ad028b6a2ca64a744ee5b52e56831232da4bc202e84ef35e",
+    "contrib/sharepool/results/production-gaps-cadence-forward-run.json": "568b45098b75bbc2b9adc5c5892a6734bbfed9d3130d9577a6c62b55b7cebfcc",
+    "contrib/sharepool/results/production-gaps-cadence-forward.json": "bb9f51babb9c9068d4091af6849aeb44a6d572a1cd4b06c959ee4cb9301458dc",
+    "contrib/sharepool/results/production-gaps-capacity-100-native.txt": "386c2e698fb15c779f608fcc07250039733d492f06273e6b2ade75863852d22b",
+    "contrib/sharepool/results/production-gaps-capacity-100-run.json": "0af7042601b3937a022a448f815357148125841e1acdd376a2ab58877c1bc4a0",
+    "contrib/sharepool/results/production-gaps-capacity-100.json": "309f1c44ca6ff67e507cdb969b9f57abd6425b3d9331ed82711c05dd77209935",
+    "contrib/sharepool/results/production-gaps-capacity-comparison.json": "586ee83ed21ba61e52ce1c1e528b10bd4db96e74f4f9cc28dceaeacc1ced1fa1",
+    "contrib/sharepool/results/production-gaps-job-profile-after-native.txt": "705f6933411ce8c6fbe4132f881fe562cb15ac139b4c989f625dab06f5f3a774",
+    "contrib/sharepool/results/production-gaps-job-profile-after.json": "ad8e1184103aa9615d99625c99bd027be2c4180d33d1122f9ddec3f76abfc53f",
+    "contrib/sharepool/results/production-gaps-job-profile-after.json.pstats": "cafb2b190ed80f408b886c148d6ef5eb0a4dc352f2b810788984059b95acdb32",
+    "contrib/sharepool/results/production-gaps-job-profile-after.json.txt": "5ce275030ca5d3fa468233768ac46c5cdac1a530ec54deb80bbba42b2c63b85e",
+    "contrib/sharepool/results/production-gaps-job-profile-before-driver.txt": "466aaa6d9b08eae894c36f5d8a12ac55139cc764881cd785bbaca1792ca68807",
+    "contrib/sharepool/results/production-gaps-job-profile-before.json": "3e54f7137f8fdd6e4239fe12c610bf45466bfbd7d7b82a222e13edb1df12b5f8",
+    "contrib/sharepool/results/production-gaps-job-profile-before.txt": "08da7d81fb53027bc7d24a6f7865e190284235e36c77daddfab121943fd6395d",
+    "contrib/sharepool/results/production-gaps-job-profile-comparison.json": "2c0cb819f3aa7d7eef7cb654aad4532c2eb7114d284574369c62306b28575eaa",
+    "contrib/sharepool/results/production-gaps-regression-archive.txt": "99ad1a89c9af23d722e858b35ba3f1bd23d0593d1fe3326867a4ccb0ddc4c491",
+    "contrib/sharepool/results/production-gaps-regression-compact.txt": "ed1a68f30854d64db566a5b796f33ffc1c62acc4cadb1c2f861965d1cf490183",
+    "contrib/sharepool/results/production-gaps-regression-datum_cadence.txt": "1df8df287cba2108e15c1573e893fb5458ca444a04690f74e0f8a526d584cf8d",
+    "contrib/sharepool/results/production-gaps-regression-python.txt": "a0af528dc4ce1ae15cce7402c988e60888b0a344b9745164db22f2a7ae412200",
+    "contrib/sharepool/results/production-gaps-regression-state_reuse.txt": "fbe99445d3622f173430b1dc1e17c11c611dad9e940caa9ed646b5b89e22a3b4",
+    "contrib/sharepool/results/production-gaps-regression-worker.txt": "b00613839e46de3dbfc9659d61d9e82a1c95d0b00d2734bf84d85ababcd264f3",
+    "contrib/sharepool/results/production-gaps-regressions.json": "3515aba5e610a0ff6713c791241fcaff03763b69145a7b4bfe0dc932422d6a5f",
+    "contrib/sharepool/results/production-native-predecode-cpp.txt": "010a3fa57ee156c8618cd83321d6422f01fb949483442d465283f8005fc52c5f",
+    "contrib/sharepool/results/production-native-predecode-relay.txt": "a2470995d9860ded3a7fbc59b7df30724335d2c4a2e5af60ae9d29f5016eee49",
+    "contrib/sharepool/results/production-native-predecode-verification.json": "018396a17fab29bf1ff86f1fc83b200474c0b5d51b3ee9e67b4b22a703b5241d",
+    "contrib/sharepool/results/v7-stratum-integration-native.txt": "eb389c97fc1544b43a5a97643ae209ae76cf56fad94d9427f6a9f938c21b1c52",
+    "contrib/sharepool/results/v7-stratum-integration-run.json": "fa9c72ef528a08a665aca35cfcfff9a15fda369de3a7d8fe1ace6bb4d3e95713",
+    "contrib/sharepool/results/v7-stratum-integration.json": "0a32cc449ad9708abd077a7b691302803a8273bb52e6d4efcbe040b4367429da"
+  },
+  "limitations": [
+    "Only one new cadence paired capture against historical results; host not isolated.",
+    "Profile baseline native binary hash was not captured; warmed signature memo and profiler overhead affect comparison.",
+    "Native Debug build; finite small-template regtest fixtures do not establish sustained production rate, ASIC compatibility or WAN behavior.",
+    "Later 100-origin preparation still takes about 137 seconds; native work and later ingress remain capacity limits.",
+    "Archive comparison uses an RPC test double and full verification still scales with lifetime history.",
+    "P2P message-loop lock and durable disk/index I/O under cs_main remain; withdrawal timings are observations, not deadlines.",
+    "No physical miner or mainnet configuration changed."
+  ]
+}

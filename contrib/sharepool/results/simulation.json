@@ -1,0 +1,255 @@
+{
+  "success": true,
+  "scope": "Deterministic model nodes; actual synthetic BLAKE2b proofs; not live settlement consensus",
+  "assumptions": {
+    "pool": "pool-A",
+    "window": "shares reference candidate's parent",
+    "cap_hashes_per_second": 1,
+    "window_seconds": 2,
+    "window_time_basis": "configured nominal duration; no share arrival clock",
+    "reward": 100003,
+    "xor_key": "zero/public",
+    "snapshot_inclusion": "coordinator-disclosed set",
+    "budget_grouping": "canonical payout script; all tags to one destination aggregate",
+    "payout_binding": "actual zero-value share coinbase output bound into share PoW; no signed registry in this earlier model",
+    "supporting_templates": "zero-payout evidence jobs; eligibility as settlement-bearing reward-mining jobs is not established",
+    "signatures_and_full_bitcoin_consensus": false,
+    "balances": "provisional expected payouts; no maturity/spendability simulation"
+  },
+  "cases": [
+    {
+      "name": "snapshot_order_independence",
+      "passed": true,
+      "behavior": "Same selected records produce the same root and settlement.",
+      "nodes": [
+        {
+          "node": "ordered",
+          "tip": "07709405a626e5e61eea7a62e393aac9ad238c5c626a5a1208e009a215e6b077",
+          "valid_blocks": 1,
+          "pending_blocks": 0,
+          "invalid_blocks": 0,
+          "provisional_payout_total": 100003,
+          "active_share_count": 10
+        },
+        {
+          "node": "reversed",
+          "tip": "07709405a626e5e61eea7a62e393aac9ad238c5c626a5a1208e009a215e6b077",
+          "valid_blocks": 1,
+          "pending_blocks": 0,
+          "invalid_blocks": 0,
+          "provisional_payout_total": 100003,
+          "active_share_count": 10
+        }
+      ]
+    },
+    {
+      "name": "missing_and_wrong_peer_data",
+      "passed": true,
+      "behavior": "Wait, discard a wrong reply, then validate both parent and child when correct data arrives.",
+      "before": {
+        "node": "missing-data",
+        "tip": "7441e9528e91dc3bb19c698773b07540e73db638b6021a432b979cf85d8b15a5",
+        "valid_blocks": 0,
+        "pending_blocks": 2,
+        "invalid_blocks": 0,
+        "provisional_payout_total": 0,
+        "active_share_count": 0
+      },
+      "after": {
+        "node": "missing-data",
+        "tip": "0ab00778f6e00e442162a2da09d431d5f1444461de4724ef5d07d0b853a08528",
+        "valid_blocks": 2,
+        "pending_blocks": 0,
+        "invalid_blocks": 0,
+        "provisional_payout_total": 200006,
+        "active_share_count": 22
+      }
+    },
+    {
+      "name": "older_issued_job",
+      "passed": true,
+      "behavior": "Settle the winning job's snapshot, not a newer local share inventory.",
+      "included_shares": 10,
+      "later_share_included": false
+    },
+    {
+      "name": "duplicate_committed_share",
+      "passed": true,
+      "behavior": "Correctly committed duplicate proof invalidates the block and excludes descendants.",
+      "reasons": [
+        "share-or-snapshot: duplicate share ID",
+        "invalid-ancestor"
+      ],
+      "node": {
+        "node": "invalid-evidence",
+        "tip": "7441e9528e91dc3bb19c698773b07540e73db638b6021a432b979cf85d8b15a5",
+        "valid_blocks": 0,
+        "pending_blocks": 0,
+        "invalid_blocks": 2,
+        "provisional_payout_total": 0,
+        "active_share_count": 0
+      }
+    },
+    {
+      "name": "payout_diversion",
+      "passed": true,
+      "behavior": "A valid PoW and snapshot do not excuse coinbase outputs that violate the committed payout calculation.",
+      "rejection": "payouts"
+    },
+    {
+      "name": "same_rules_fork_and_reorg",
+      "passed": true,
+      "behavior": "Equal-work tips may differ; more valid work converges nodes and replaces the old branch's provisional settlement.",
+      "before": [
+        {
+          "node": "fork-A",
+          "tip": "05d5f8501d614c5b23441009a92cf5dd220e3b9ac1042b511fa3d60faf7b74ca",
+          "valid_blocks": 2,
+          "pending_blocks": 0,
+          "invalid_blocks": 0,
+          "provisional_payout_total": 100003,
+          "active_share_count": 12
+        },
+        {
+          "node": "fork-B",
+          "tip": "0a8f0300d17b424195b6fed888c78f6d9d3099ca4e31602edc586f97afd9cad3",
+          "valid_blocks": 2,
+          "pending_blocks": 0,
+          "invalid_blocks": 0,
+          "provisional_payout_total": 100003,
+          "active_share_count": 12
+        }
+      ],
+      "after": [
+        {
+          "node": "fork-A",
+          "tip": "091bcb3eaa0d4e7f5cf235c7effaa908e4ff5de93e131d7bdb8f7ab6968ccb7a",
+          "valid_blocks": 3,
+          "pending_blocks": 0,
+          "invalid_blocks": 0,
+          "provisional_payout_total": 200006,
+          "active_share_count": 24
+        },
+        {
+          "node": "fork-B",
+          "tip": "091bcb3eaa0d4e7f5cf235c7effaa908e4ff5de93e131d7bdb8f7ab6968ccb7a",
+          "valid_blocks": 3,
+          "pending_blocks": 0,
+          "invalid_blocks": 0,
+          "provisional_payout_total": 200006,
+          "active_share_count": 24
+        }
+      ],
+      "duplicate_delivery_idempotent": true,
+      "unsigned_proposal_conflict_observed": true
+    },
+    {
+      "name": "restart_replay",
+      "passed": true,
+      "behavior": "Revalidate stored objects and reconstruct the active settlement without double counting."
+    },
+    {
+      "name": "different_consensus_rules",
+      "passed": true,
+      "behavior": "A group with 4 work units passes a budget of 4 but fails a budget of 2; more work cannot cure the invalid ancestor.",
+      "group_work": 4,
+      "strict_budget": 2,
+      "relaxed_budget": 4,
+      "nodes": [
+        {
+          "node": "budget-2",
+          "tip": "05d5f8501d614c5b23441009a92cf5dd220e3b9ac1042b511fa3d60faf7b74ca",
+          "valid_blocks": 1,
+          "pending_blocks": 0,
+          "invalid_blocks": 2,
+          "provisional_payout_total": 100003,
+          "active_share_count": 12
+        },
+        {
+          "node": "budget-4",
+          "tip": "0eb12b6bdbf3d8e0a2c748662af9fa924e0d16ab280ce95eafc5daf2daa8c346",
+          "valid_blocks": 3,
+          "pending_blocks": 0,
+          "invalid_blocks": 0,
+          "provisional_payout_total": 200006,
+          "active_share_count": 25
+        }
+      ]
+    },
+    {
+      "name": "different_rules_common_valid_branch_reconverges",
+      "passed": true,
+      "behavior": "A branch valid under both caps can reunite nodes when it gains the greatest cumulative work.",
+      "nodes": [
+        {
+          "node": "budget-2",
+          "tip": "0b1fa3246497c8ed9f95dec0fed0a1e129cd98e3327724817ab9b620408e6bfa",
+          "valid_blocks": 3,
+          "pending_blocks": 0,
+          "invalid_blocks": 2,
+          "provisional_payout_total": 300009,
+          "active_share_count": 36
+        },
+        {
+          "node": "budget-4",
+          "tip": "0b1fa3246497c8ed9f95dec0fed0a1e129cd98e3327724817ab9b620408e6bfa",
+          "valid_blocks": 5,
+          "pending_blocks": 0,
+          "invalid_blocks": 0,
+          "provisional_payout_total": 300009,
+          "active_share_count": 36
+        }
+      ]
+    },
+    {
+      "name": "same_payout_script_multiple_tags",
+      "passed": true,
+      "behavior": "Different tags sharing one PoW-bound payout script share its work budget and final payout; another script keeps its own allowance.",
+      "distinct_tags": 3,
+      "distinct_payout_scripts": 2,
+      "shared_destination_work": 4,
+      "other_destination_work": 2,
+      "strict_budget": 2,
+      "relaxed_budget": 4,
+      "strict_outcome": "invalid",
+      "relaxed_outcome": "valid"
+    },
+    {
+      "name": "omission_limitation",
+      "passed": true,
+      "behavior": "A committed sample fits the work budget despite known extra work exceeding it; this model does not prove total-pool disclosure.",
+      "finding": "Unresolved complete eligible-share history",
+      "committed_group_work": 2,
+      "observed_group_work": 22,
+      "per_group_budget": 2
+    },
+    {
+      "name": "no_minimum_group_count",
+      "passed": true,
+      "behavior": "Any nonempty group count may pass its absolute budgets; no pool-percentage threshold applies.",
+      "outcomes": [
+        {
+          "groups": 0,
+          "outcome": "invalid"
+        },
+        {
+          "groups": 1,
+          "outcome": "valid"
+        },
+        {
+          "groups": 2,
+          "outcome": "valid"
+        },
+        {
+          "groups": 9,
+          "outcome": "valid"
+        },
+        {
+          "groups": 10,
+          "outcome": "valid"
+        }
+      ],
+      "finding": "Empty snapshots still cannot derive work-based payouts"
+    }
+  ]
+}

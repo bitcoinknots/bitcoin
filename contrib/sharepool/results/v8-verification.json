@@ -1,0 +1,144 @@
+{
+  "result": "passed",
+  "profile": "hash-only-v8-vardiff-tides",
+  "generated_utc": "2026-09-14T14:53:40.189076+00:00",
+  "base_commit": "553816eea9ec52ea3fc4495cbc309409318eb01b",
+  "rules_hash": "173ff6fa511f227cc8d4751bb15373afdca5c8ec235dc69ca2680d7ade13ea31",
+  "default_target_share_seconds": 60,
+  "default_retarget_window_seconds": 240,
+  "global_share_difficulty": false,
+  "mainnet_enabled": false,
+  "physical_hardware_used": false,
+  "verification": {
+    "python_tests": 295,
+    "native_cpp_cases": 105,
+    "native_scenarios": [
+      {
+        "test": "feature_sharepool_hash_vardiff.py",
+        "miners": 100,
+        "checks": [
+          "assigned_target_bound_before_work",
+          "miner_relabel_rejected",
+          "insufficient_share_work_rejected",
+          "exact_weighted_payouts",
+          "retarget_only_future_jobs",
+          "old_authorization_keeps_assigned_target",
+          "late_proof_original_weight",
+          "actual_coinbase_payout_mutation_rejected",
+          "p2p_peer_validation",
+          "persistent_history_restart",
+          "competing_fork_reorg_weights",
+          "v7_v8_datadir_separation",
+          "offline_reindex_weight_recovery"
+        ]
+      },
+      {
+        "test": "feature_sharepool_hash_vardiff_stratum.py",
+        "checks": [
+          "independent_signed_assignments_and_real_notifications",
+          "wire_difficulty_matches_union_of_assigned_and_native_targets",
+          "one_active_client_per_identity",
+          "eight_native_validated_shares_without_refresh",
+          "duplicate_does_not_affect_estimator",
+          "retarget_only_on_due_refresh",
+          "other_identity_assignment_unchanged",
+          "late_old_target_share_keeps_original_work",
+          "all_gate_rpc_calls_on_owner_thread",
+          "native_only_winner_exact_bytes_accepted",
+          "native_only_winner_not_credited",
+          "exact_work_weighted_coinbase_payouts",
+          "native_verifychain",
+          "standalone_cli_startup_default_cadence_and_shutdown"
+        ]
+      },
+      {
+        "test": "feature_sharepool_hash_compact.py",
+        "profile": 7,
+        "result": "passed"
+      },
+      {
+        "test": "feature_sharepool_hash_stratum.py",
+        "profile": 7,
+        "result": "passed"
+      }
+    ],
+    "python_ast_files": 15,
+    "local_document_links": 14,
+    "legacy_wire_vectors": "v4-v7 unchanged",
+    "initial_test_correction": "The old unsupported-profile sentinel was changed from 8 to 9; the complete 105-case native suite then passed."
+  },
+  "first_settlement": {
+    "shares": 100,
+    "recipients": 100,
+    "snapshot_bytes": 78518,
+    "assigned_work": 2776,
+    "paid_satoshis": 4999999934
+  },
+  "binary_sha256": {
+    "bitcoind": "3817e0c9bc6f2a7f72679f6e041e5af0d7b75558b55557cb3999400450142573",
+    "bitcoin-sharepool-signer": "25c3ae071cf6f74677cdc8655fa7f6e7522df7fbbcb74499bd4adf989243b1f9",
+    "test_bitcoin": "c03a1b629c93083ce404f5503d7617af653feaab3340ca3a89cf7e1722c4baad",
+    "bitcoin-cli": "f91a8b6da17996f7166e4474418824b2db947c35ddd90cd7b059ec8f77b91b80"
+  },
+  "source_sha256": {
+    "contrib/sharepool/hash_gate_batch.py": "a80e0541b27207f8db037831646a557ff796796525daa9301139b92149e25284",
+    "contrib/sharepool/hash_job_scheduler.py": "ba0118070b128c24652f6980a7ae74838f848fbf3e3199a0b76f3336eeacd0cf",
+    "contrib/sharepool/hash_mining_gate.py": "25c54b1ef1bba673e26b300410a5df7979d7a54042623740a718a774848bb2fe",
+    "contrib/sharepool/hash_snapshot.py": "8cc9f1ae092cdd71b955e017181fd566c6015b7d6c6aae38104caa4c4598fa0c",
+    "contrib/sharepool/hash_state_cache.py": "fe452a5dfc3be9b22b77a39b4a4a44a5e430bbd9b4371b7ede65f122a95f32b8",
+    "contrib/sharepool/hash_stratum.py": "158b81198c23e3289aac78ef4cbe6d8199e6ce535896841936c8f168053dcfd1",
+    "contrib/sharepool/hash_stratum_runner.py": "162f7fb9c04e1044ab3db49469f20451cb5b5bd65b0f1097276a8397ee5dbf76",
+    "contrib/sharepool/hash_vardiff.py": "a21306310c66f99c8e1b168f3d1154a856559f4d1a412b2bf312f33f52e89d92",
+    "contrib/sharepool/test_hash_tides.py": "ef73a6d8f3ed0c7896bcf74dc4705b98369e8813e855b2dc58345f04d898db96",
+    "contrib/sharepool/test_hash_vardiff.py": "81d41d3342b28c93d90981050fdd8e627167f31f6c5049efad71a30e012c2830",
+    "contrib/sharepool/test_hash_vardiff_stratum.py": "a406d69e2f85b763159422c9240265ac68bb7a39897506b74cbb10bcd202c863",
+    "contrib/sharepool/test_hash_variable.py": "be4c8d372962936334b12f4044403b513cef5494317b99a5b93216aa2f02005e",
+    "doc/sharepool-production-capacity-gate.md": "ad75a4506cc79f40f2e7fc5698886a50de0c499e8bc80cb92fb8d9beb7f7c4f7",
+    "doc/sharepool-v8-vardiff.md": "bc847f4fc4a117fee0ce1d37343fe487b0c758a5ffd7c0e1593fa037434de9a3",
+    "src/chainparams.cpp": "cb936fc48f6c9bdf5053327a954d6026377e5a14b7f6659d45ab89f90d0877eb",
+    "src/chainparamsbase.cpp": "1647907e2f4dc0b19952ad4331a7dde92e1692136e3d2afb20e0a68c548188aa",
+    "src/consensus/params.h": "542f316acc87c28eac5ffd98dbfc5ba024b68f7e5157df0382fc7fe66aa4a753",
+    "src/consensus/sharepool.cpp": "8bbd34055159b84f30225d473359fed8dac9df47613c7a7c4929dcf8b2afeb96",
+    "src/consensus/sharepool.h": "f59f032d925258b8d8c81770d0ff88ed39d7f86f6fdbc4cadb0a90afe14d3642",
+    "src/consensus/sharepool_hash.cpp": "b1279b5c3a64bf5f106b189cf8d4950ae8447844ee7c1a167669d2fcc0af2059",
+    "src/consensus/sharepool_hash.h": "bd40363270eeee8d8bd38efa38a98f7ba638f25e8cab17aedd15f7ef051edfdf",
+    "src/kernel/chainparams.cpp": "2a0c64b5b49583bff1894ec1c2eb9032f79081457695412763e98d6e07e3ba4f",
+    "src/kernel/chainparams.h": "ebb28f41d16a259af84cc3079a3a600bad3016a9df0de0f100397ad9b1525633",
+    "src/rpc/mining.cpp": "a3cff368e195549449226fb8f9635cb3ecad326a07ff4439a393568a20573851",
+    "src/sharepool/signer.cpp": "987ec194380bff56994867a13b6b953d90401e5d5d583ca974af5584d4815b30",
+    "src/sharepool/signer.h": "f077c8837c1dff45a531b3a0363a09420a669a74a659e9e081b88b6d1bfba2fa",
+    "src/sharepool/tides_history.cpp": "2f2d82a8930f5baffbdf97fb3f94caa7ee3eade55872164e9fc93e2d4e163af2",
+    "src/sharepool/tides_history.h": "dca68dc2f726fd121f6553bb3bcaaa4f35b242db00ef14f9f06fbf4161d63e62",
+    "src/sharepool/tides_history_store.cpp": "d9dd11c01ed95b0cfbccc6c76276688936cefedda7e7c81236e0ae7a8d33192c",
+    "src/test/sharepool_hash_tests.cpp": "0ba6c65a15e2efb903f1b6d528721a80d634330e0ee474cabccabd8559448632",
+    "src/test/sharepool_params_tests.cpp": "5677aa6a7c94617f5ea1cf0cdc01af0fc0289eb067eb4b0b8810ab2c60c028d9",
+    "src/test/sharepool_signer_tests.cpp": "fc01cc070c575c475c09b38f2c46e5cfb8356bd172eff4edae03e466eec507b6",
+    "src/test/sharepool_tides_consensus_tests.cpp": "27af38ed63b3bba956d5944bc80c211ffbd4e1498cecd9f17c12cad071586099",
+    "src/test/sharepool_tides_history_store_tests.cpp": "045f505e084ebfdd8e14c03dde68ed5030834d5008b92751b810bcb9a04084ee",
+    "src/test/sharepool_tides_history_tests.cpp": "8e3351ee7b624677d36257fa260af9bd25445da13578ee08cf42e9f70d8d03ff",
+    "src/validation.cpp": "e9ed31fd91fcb0ade288f56af0d7649c1cb9b21dbc0c1ec639676aeb473a0fd8",
+    "test/functional/feature_sharepool_hash_vardiff.py": "b1891e8b964bb9f270118003b045a6009d98f8e43009d05649ff48cdce4ef9a7",
+    "test/functional/feature_sharepool_hash_vardiff_stratum.py": "fea57db8f95bd83c284ea74c57db9b3a30cf0516be50c875ead39e1affe94610",
+    "test/functional/test_runner.py": "78db3770671099a8c5c29d94c97f5316b6dda2a169e667aaf859e64e6f1e1c1c"
+  },
+  "artifact_sha256": {
+    "contrib/sharepool/results/v8-assigned-work-endpoint-model-tests.txt": "cf6a81b410d7f0a3ba8ca13720eba45147d642388ea1a4aa54751bf6be784681",
+    "contrib/sharepool/results/v8-assigned-work-endpoint-model-verification.json": "9c0e1f69e5e6db978b8a25e5e580ab5a3458291b5b39f5efe37c205dfae8c929",
+    "contrib/sharepool/results/v8-hash-python-tests.txt": "bfb9bab8fe2100172e7ebd122c8c0499a497e5b695efbf5336eba8a9139b3e7c",
+    "contrib/sharepool/results/v8-legacy-compact-native.txt": "5ac411a800ce4ad19f08ae2532afc2248815e728ae4fb6c29ca02dabfaf6be66",
+    "contrib/sharepool/results/v8-legacy-stratum-native.txt": "890144c87c093771a7c1d9253261ee05d12eb10a29909e2db873540a835c7a3f",
+    "contrib/sharepool/results/v8-native-100-miners.json": "0b6bc748f053627cc5d1e780a02b3aaa4b11f11b1d340db95b5494f247ae6d42",
+    "contrib/sharepool/results/v8-native-100-miners.txt": "ec38f8b75d82858e103a6a8608d3035533604bce6ea20532b48fb93f483ebe1c",
+    "contrib/sharepool/results/v8-native-unit-tests.txt": "3e2ac5c070ecaf029791a33af28567a294ea27fb32b395a4999e9d45a7048659",
+    "contrib/sharepool/results/v8-vardiff-controller-tests.txt": "643cfc3905cbefcb5ea412c916500c4358674cd3a05b11cda9951a7aff74a120",
+    "contrib/sharepool/results/v8-vardiff-stratum-native.txt": "9bec95a7f5151a4aaba96b423789d2a8d690d842c3fadbd3168dddb10b11ccdd",
+    "contrib/sharepool/results/v8-vardiff-stratum.json": "938742552349c2a1fb7a1443275265998c8dbcddc957780557e7f790c92d8496"
+  },
+  "limits": [
+    "One active ASIC connection per configured miner identity/listener in the test adapter.",
+    "Assigned-work validation does not attest physical hashrate, complete disclosure or independent template construction.",
+    "No physical hashrate cap is introduced.",
+    "Synthetic regtest correctness and injected-clock retarget tests are not sustained production capacity or payout-variance qualification.",
+    "Production resource fairness, full load, archive startup and WAN recovery remain open."
+  ]
+}

@@ -1,0 +1,5 @@
+2026-09-14T08:06:10.163000Z TestFramework (INFO): PRNG seed is: 6254904292567826051
+2026-09-14T08:06:10.163000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-capacity-followup-regression-stratum
+2026-09-14T08:06:16.662000Z TestFramework (INFO): Stopping nodes
+2026-09-14T08:06:16.780000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-capacity-followup-regression-stratum
+2026-09-14T08:06:16.780000Z TestFramework (INFO): Tests successful

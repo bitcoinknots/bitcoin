@@ -1,0 +1,38 @@
+{
+  "source_sha256": {
+    "test/functional/feature_sharepool_hash_capacity.py": "c9f48b374b5d7c0c5b31dbab25072927ea109f2ec2f153d013736226130971cd",
+    "contrib/sharepool/capacity_metrics.py": "71f68e44d56a555fdae635c3467eed67e97c3db4dacc0758a426b0cafd993934",
+    "contrib/sharepool/test_capacity_metrics.py": "5fa2c189a5dcccc2f40cdd743b470326a150e3a657122853b7df90fd8d374648",
+    "contrib/sharepool/test_capacity_fixture.py": "17bf1846ae7ea2b407cceead5a8461a6717be233bcc8ea134ab5ddeed2f1784a"
+  },
+  "tests": {
+    "command": "python3 -m unittest test_capacity_metrics.py test_capacity_fixture.py",
+    "working_directory": "contrib/sharepool",
+    "passed": 15,
+    "log": "resource-budget-capacity-python-tests.txt"
+  },
+  "native_preflight_build": "a7c5cbd34c882ccd942cd819963d2e480212061341aaeffd7eff458ef178f116",
+  "native_preflight_scope": "Two-miner shared/disjoint/witness layout calibration only, before optional unsigned shared tags and new resource RPC validation; requires new-build two-epoch preflight before full-size runs",
+  "native_mainnet_or_wan_capacity_claimed": false,
+  "final_native_preflight": {
+    "report": "resource-budget-shared-two-epoch-preflight.json",
+    "log": "resource-budget-shared-two-epoch-preflight-native.txt",
+    "result": "passed",
+    "native_binary_sha256": "120fd9ee24d7f53de8f6dee754a4ebdea3aa535a696ce59f05d99fedf19c9459",
+    "harness_sha256": "c9f48b374b5d7c0c5b31dbab25072927ea109f2ec2f153d013736226130971cd",
+    "miners": 2,
+    "epochs": 2,
+    "native_proofs_admitted": 12,
+    "settlement_blocks": 4,
+    "resource_rpc_checks": 4,
+    "unsigned_coinbase_tags_natively_finalized": true,
+    "large_capacity_claimed": false
+  },
+  "final_source_sha256": {
+    "test/functional/feature_sharepool_hash_capacity.py": "f612f466bb80d11e195d60b8b87224449ef6cee7b43829e0ba1a8cd75ac134d9",
+    "contrib/sharepool/capacity_metrics.py": "4c5d2534c45bdee99f12e653ec46e010f4ab6aba6108914015bc8e08498a25db",
+    "contrib/sharepool/test_capacity_metrics.py": "721075e9d9d8bb3ca6d8d8366efdb03456a497d52d70304ff94040a307311d69",
+    "contrib/sharepool/test_capacity_fixture.py": "17bf1846ae7ea2b407cceead5a8461a6717be233bcc8ea134ab5ddeed2f1784a"
+  },
+  "post_capture_harness_change": "Report checkpoint hardening only: preserve durable ACK counts and locally accepted block/admission rows before waiting for peers; distinguish local admissions from peer verification and never count an unsuccessful submitblock as admission. Native snapshots, signatures, selection policy and timeout bounds are unchanged. Before recording local admission, producing-node getbestblockhash must also equal the submitted block hash; a null submitblock response alone is insufficient."
+}

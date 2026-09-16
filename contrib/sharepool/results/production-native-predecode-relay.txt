@@ -1,0 +1,8 @@
+2026-09-14T06:11:26.699000Z TestFramework (INFO): PRNG seed is: 1553639552029008356
+2026-09-14T06:11:26.699000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-predecode-relay
+2026-09-14T06:11:26.967000Z TestFramework (INFO): Empty inventory stays quiet; changes and new connections discover existing objects
+2026-09-14T06:11:36.196000Z TestFramework (INFO): Four active downloads cannot repeatedly overtake an already waiting fifth peer
+2026-09-14T06:11:37.732000Z TestFramework (INFO): Malformed inventory is refused before any download is scheduled
+2026-09-14T06:11:38.671000Z TestFramework (INFO): Stopping nodes
+2026-09-14T06:11:38.786000Z TestFramework (INFO): Cleaning up /private/tmp/sharepool-predecode-relay on exit
+2026-09-14T06:11:38.787000Z TestFramework (INFO): Tests successful

@@ -1,0 +1,33 @@
+test_aggregate_same_payout_address_before_satoshi_floor (test_tides_accounting.TidesAccountingTest) ... ok
+test_difficulty_increase_recovers_older_history (test_tides_accounting.TidesAccountingTest) ... ok
+test_duplicate_and_noncontiguous_admissions_are_rejected (test_tides_accounting.TidesAccountingTest) ... ok
+test_empty_window_is_distinct_and_has_no_implicit_coordinator_payout (test_tides_accounting.TidesAccountingTest) ... ok
+test_fee_deductions_use_per_bucket_floors_and_do_not_take_rounding_residue (test_tides_accounting.TidesAccountingTest) ... ok
+test_fee_flags_remain_individual_and_are_aggregated_by_address_and_rate (test_tides_accounting.TidesAccountingTest) ... ok
+test_fee_recipient_can_also_be_a_miner_and_gets_one_aggregate_output (test_tides_accounting.TidesAccountingTest) ... ok
+test_invalid_work_fees_reward_and_mutable_history_fail (test_tides_accounting.TidesAccountingTest) ... ok
+test_issued_cutoff_cannot_be_padded_after_work_is_found (test_tides_accounting.TidesAccountingTest) ... ok
+test_large_work_and_monetary_multiplication_are_exact (test_tides_accounting.TidesAccountingTest) ... ok
+test_no_largest_remainder_bonus_or_fractional_balance (test_tides_accounting.TidesAccountingTest) ... ok
+test_oldest_boundary_is_clipped_without_altering_distinct_record (test_tides_accounting.TidesAccountingTest) ... ok
+test_only_supported_exact_script_shapes_are_accepted (test_tides_accounting.TidesAccountingTest) ... ok
+test_output_budget_fails_complete_proposal_without_silently_omitting_miners (test_tides_accounting.TidesAccountingTest) ... ok
+test_pools_are_isolated_and_cross_pool_append_is_atomic (test_tides_accounting.TidesAccountingTest) ... ok
+test_repeated_blocks_do_not_reset_or_consume_window (test_tides_accounting.TidesAccountingTest) ... ok
+test_shared_native_fixture_matches_independent_forward_oracle (test_tides_accounting.TidesAccountingTest) ... ok
+test_small_windows_equal_explicit_unit_expansion (test_tides_accounting.TidesAccountingTest) ... ok
+test_startup_uses_available_work_denominator (test_tides_accounting.TidesAccountingTest) ... ok
+test_subsidy_and_transaction_fees_are_both_shared (test_tides_accounting.TidesAccountingTest) ... ok
+test_zero_output_budget_only_allows_no_positive_entitlements (test_tides_accounting.TidesAccountingTest) ... ok
+test_all_native_script_shapes_and_zero_fee_reward_partition (test_tides_accounting_oracle.TidesAccountingOracleTests) ... ok
+test_shared_cpp_vectors_match_independent_oracle (test_tides_accounting_oracle.TidesAccountingOracleTests) ... ok
+test_small_exact_windows_match_forward_interval_oracle (test_tides_accounting_oracle.TidesAccountingOracleTests) ... ok
+test_archive_failure_after_receipt_never_acknowledges (test_tides_hardware_capture.TidesHardwareTests) ... ok
+test_native_refusal_after_archive_stops_without_ack (test_tides_hardware_capture.TidesHardwareTests) ... ok
+test_owner_thread_dispatch_and_bound_shutdown (test_tides_hardware_capture.TidesHardwareTests) ... ok
+test_signed_native_job_full_snapshot_and_late_work_replay (test_tides_hardware_capture.TidesHardwareTests) ... ok
+
+----------------------------------------------------------------------
+Ran 28 tests in 0.384s
+
+OK

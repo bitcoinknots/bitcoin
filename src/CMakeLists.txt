@@ -163,6 +163,8 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   common/system_ram.cpp
   common/url.cpp
   compressor.cpp
+  consensus/sharepool.cpp
+  consensus/sharepool_hash.cpp
   core_read.cpp
   core_write.cpp
   deploymentinfo.cpp
@@ -193,6 +195,9 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   script/sign.cpp
   script/signingprovider.cpp
   script/solver.cpp
+  sharepool/signer.cpp
+  sharepool/tides.cpp
+  sharepool/tides_history.cpp
 )
 target_link_libraries(bitcoin_common
   PRIVATE
@@ -315,6 +320,9 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   rpc/signmessage.cpp
   rpc/txoutproof.cpp
   script/sigcache.cpp
+  sharepool/relay.cpp
+  sharepool/hash_store.cpp
+  sharepool/tides_history_store.cpp
   signet.cpp
   stats/init.cpp
   stats/rpc_stats.cpp
@@ -441,6 +449,15 @@ if(BUILD_UTIL)
     bitcoin_util
   )
   install_binary_component(bitcoin-util HAS_MANPAGE)
+  if(UNIX)
+    add_executable(bitcoin-sharepool-signer bitcoin-sharepool-signer.cpp)
+    target_link_libraries(bitcoin-sharepool-signer
+      core_interface
+      bitcoin_common
+      bitcoin_util
+    )
+    install_binary_component(bitcoin-sharepool-signer)
+  endif()
 endif()
 
 

@@ -1,0 +1,68 @@
+{
+  "kind": "native v6-r2 paged snapshot archive recovery; disposable regtest",
+  "height": 9,
+  "tip": "5892f8d118d241a0604628ebedb4efa7837083c8d1b92ba960a0c344899a1c08",
+  "snapshots": 11,
+  "chunks": 6,
+  "payout_satoshis": [
+    2500000000,
+    2500000000
+  ],
+  "elapsed_seconds": 28.866,
+  "pending_recovery_worker_observed": {
+    "started": true,
+    "active": false,
+    "pending": false,
+    "stopping": false,
+    "requests": 13,
+    "passes": 3,
+    "failures": 0,
+    "last_micros": 10472,
+    "max_micros": 10472,
+    "outside_script_checks": 0,
+    "locked_fallbacks": 0,
+    "context_retries": 0
+  },
+  "p2p_inventory": {
+    "opaque_records": 1030,
+    "total_records": 1041,
+    "records_beyond_first_page": 17,
+    "records_fetched_from_later_archive_pages": 17,
+    "preloaded_inventory_records": 1024,
+    "source_recent_announcements_cleared_by_restart": true,
+    "kind": "Untrusted hash-addressed transport, not validated mining evidence"
+  },
+  "timing_scope": "Small disposable native recovery fixture; not sustained validation throughput",
+  "archive_startup": {
+    "normal_restart": {
+      "fast_path": true,
+      "resumed_rebuild": false,
+      "records_scanned": 0,
+      "bytes_scanned": 0,
+      "batches": 0
+    },
+    "explicit_rebuild": {
+      "fast_path": false,
+      "resumed_rebuild": false,
+      "records_scanned": 11,
+      "bytes_scanned": 8064,
+      "batches": 3
+    },
+    "preserved_snapshot_count": 11,
+    "preserved_charged_bytes": 9920
+  },
+  "checks": [
+    "zero-payload-scan restart",
+    "explicit resumable index rebuild",
+    "paged RPC inventory",
+    "exclusive 0600 export",
+    "hash/profile/truncation rejection",
+    "authenticated partial retention",
+    "pending-block import recovery",
+    "restart",
+    "reindex-chainstate",
+    "full reindex",
+    "finite quota option validation",
+    "P2P inventory beyond 1,024 records"
+  ]
+}

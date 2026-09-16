@@ -1,0 +1,930 @@
+{
+  "cases": [
+    {
+      "case": "distinct_templates_and_nonce_only_identity",
+      "checks": [
+        {
+          "interface": "RPC",
+          "layer": "share",
+          "method": "validatesharepoolshare",
+          "outcome": "accepted",
+          "result": {
+            "native_tip": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+            "origin_height": 2,
+            "owner": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+            "payout_script": "00141111111111111111111111111111111111111111",
+            "pool": "00000000000000000000000000000000000000000000000052554c4543415345",
+            "proof_id": "700c9088c02b159a875da89fa7e5cd129f6d2debdfc2174712aa9fcd0960a990",
+            "settlement_height": 2,
+            "share_bits": "207fffff",
+            "valid": true
+          }
+        },
+        {
+          "interface": "RPC",
+          "layer": "share",
+          "method": "validatesharepoolshare",
+          "outcome": "accepted",
+          "result": {
+            "native_tip": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+            "origin_height": 2,
+            "owner": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+            "payout_script": "00141111111111111111111111111111111111111111",
+            "pool": "00000000000000000000000000000000000000000000000052554c4543415345",
+            "proof_id": "3bfad20531971e777ebe23cc64052fdf750c27aebd06c27aa664231d67a684a1",
+            "settlement_height": 2,
+            "share_bits": "207fffff",
+            "valid": true
+          }
+        }
+      ],
+      "fixture_owner": {
+        "name": "Alice",
+        "payout_script": "00141111111111111111111111111111111111111111",
+        "public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe"
+      },
+      "native_tip_after": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "native_tip_before": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "nonce_only_same_normalized_template": true,
+      "proofs": [
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "700c9088c02b159a875da89fa7e5cd129f6d2debdfc2174712aa9fcd0960a990"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "3bfad20531971e777ebe23cc64052fdf750c27aebd06c27aa664231d67a684a1"
+        }
+      ],
+      "result": "passed",
+      "template_ids": [
+        "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+        "46af951bb226a6a0528debe4e6ee5d608aa4944abcf09a25cd45c615f87c4a0d",
+        "8761f2487de064aeff7027c338bb5f287bb464c3b403903e5fe01d1dc39cd030"
+      ]
+    },
+    {
+      "case": "origin_missing_input",
+      "checks": [
+        {
+          "error": {
+            "code": -26,
+            "message": "bad-txns-inputs-missingorspent, CheckTxInputs: inputs missing/spent in transaction a2e089425eebfd42f902ebad821a7af384ea1d50677f3ce7b68fb96ef0d78cca"
+          },
+          "interface": "RPC",
+          "layer": "origin",
+          "method": "validatesharepooltemplate",
+          "node": 0,
+          "outcome": "rejected"
+        },
+        {
+          "error": {
+            "code": -26,
+            "message": "bad-txns-inputs-missingorspent, CheckTxInputs: inputs missing/spent in transaction a2e089425eebfd42f902ebad821a7af384ea1d50677f3ce7b68fb96ef0d78cca"
+          },
+          "interface": "RPC",
+          "layer": "origin",
+          "method": "validatesharepooltemplate",
+          "node": 1,
+          "outcome": "rejected"
+        }
+      ],
+      "fixture_owner": {
+        "name": "Alice",
+        "payout_script": "00141111111111111111111111111111111111111111",
+        "public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe"
+      },
+      "missing_outpoint": {
+        "txid": "00000000000000000000000000000000000000000000000000000000deadbeef",
+        "vout": 0
+      },
+      "native_tip_after": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "native_tip_before": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "proofs": [],
+      "result": "passed",
+      "template_ids": [
+        "f337f03b32ce6a7f5932871cf8c93096590febca02dee0d0f80020419a99832e"
+      ],
+      "transaction_id": "a2e089425eebfd42f902ebad821a7af384ea1d50677f3ce7b68fb96ef0d78cca"
+    },
+    {
+      "case": "origin_invalid_owner_signature",
+      "checks": [
+        {
+          "error": {
+            "code": -26,
+            "message": "bad-sharepool-owner"
+          },
+          "interface": "RPC",
+          "layer": "origin",
+          "method": "validatesharepooltemplate",
+          "node": 0,
+          "outcome": "rejected"
+        }
+      ],
+      "fixture_owner": {
+        "name": "Alice",
+        "payout_script": "00141111111111111111111111111111111111111111",
+        "public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe"
+      },
+      "native_tip_after": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "native_tip_before": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "proofs": [],
+      "result": "passed",
+      "template_ids": [
+        "ec7b4f24947f8550c91a32702c9f03e3e12b601b67353a7299fbda68b0bb21de"
+      ]
+    },
+    {
+      "attribution_verified": false,
+      "case": "share_invalid_owner_signature",
+      "checks": [
+        {
+          "error": {
+            "code": -26,
+            "message": "bad-sharepool-proof"
+          },
+          "interface": "RPC",
+          "layer": "share",
+          "method": "validatesharepoolshare",
+          "node": 0,
+          "outcome": "rejected"
+        }
+      ],
+      "fixture_owner": {
+        "name": "Alice",
+        "payout_script": "00141111111111111111111111111111111111111111",
+        "public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe"
+      },
+      "native_tip_after": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "native_tip_before": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "proofs": [
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "700c9088c02b159a875da89fa7e5cd129f6d2debdfc2174712aa9fcd0960a990"
+        }
+      ],
+      "result": "passed",
+      "template_ids": [
+        "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033"
+      ]
+    },
+    {
+      "case": "share_insufficient_pow",
+      "checks": [
+        {
+          "error": {
+            "code": -26,
+            "message": "bad-sharepool-shares"
+          },
+          "interface": "RPC",
+          "layer": "share",
+          "method": "validatesharepoolshare",
+          "node": 0,
+          "outcome": "rejected"
+        }
+      ],
+      "fixture_owner": {
+        "name": "Alice",
+        "payout_script": "00141111111111111111111111111111111111111111",
+        "public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe"
+      },
+      "native_tip_after": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "native_tip_before": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "proofs": [
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "c1ae25d684a25bb22a80d681c5a27e630c541a30e37c1b0a2996c556721570c9"
+        }
+      ],
+      "result": "passed",
+      "template_ids": [
+        "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033"
+      ]
+    },
+    {
+      "case": "duplicate_proof_idempotent_admission",
+      "checks": [
+        {
+          "duplicate_result": false,
+          "first_result": true,
+          "interface": "local miner gate",
+          "layer": "gate",
+          "method": "receive",
+          "outcome": "idempotent",
+          "receipt_revision_after_duplicate": 1,
+          "receipt_revision_after_first": 1
+        }
+      ],
+      "fixture_owner": {
+        "name": "Alice",
+        "payout_script": "00141111111111111111111111111111111111111111",
+        "public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe"
+      },
+      "native_tip_after": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "native_tip_before": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "proofs": [
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "700c9088c02b159a875da89fa7e5cd129f6d2debdfc2174712aa9fcd0960a990"
+        }
+      ],
+      "result": "passed",
+      "template_ids": [
+        "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033"
+      ]
+    },
+    {
+      "case": "duplicate_proof_in_snapshot",
+      "checks": [
+        {
+          "block_id": "443b9791cc5d4a4780414dcc41069b2f2a526aaf381bfc43e10f3e1717eaee42",
+          "block_pow_valid": true,
+          "interface": "RPC",
+          "layer": "block",
+          "method": "submitblock",
+          "node": 0,
+          "outcome": "rejected",
+          "reason": "bad-sharepool-shares"
+        },
+        {
+          "block_id": "443b9791cc5d4a4780414dcc41069b2f2a526aaf381bfc43e10f3e1717eaee42",
+          "block_pow_valid": true,
+          "interface": "RPC",
+          "layer": "block",
+          "method": "submitblock",
+          "node": 1,
+          "outcome": "rejected",
+          "reason": "bad-sharepool-shares"
+        }
+      ],
+      "fixture_owner": {
+        "name": "Alice",
+        "payout_script": "00141111111111111111111111111111111111111111",
+        "public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe"
+      },
+      "native_tip_after": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "native_tip_before": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "proofs": [
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "700c9088c02b159a875da89fa7e5cd129f6d2debdfc2174712aa9fcd0960a990"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "700c9088c02b159a875da89fa7e5cd129f6d2debdfc2174712aa9fcd0960a990"
+        }
+      ],
+      "result": "passed",
+      "template_ids": [
+        "0938a507588b200f78340ac3883354d4fe4ef2c7e0b0bdce0d4bdecad1514224"
+      ]
+    },
+    {
+      "case": "payout_script_tampering_recommitted",
+      "checks": [
+        {
+          "error": {
+            "code": -26,
+            "message": "bad-sharepool-payout"
+          },
+          "interface": "RPC",
+          "layer": "origin",
+          "method": "validatesharepooltemplate",
+          "node": 0,
+          "outcome": "rejected"
+        },
+        {
+          "error_type": "ValueError",
+          "interface": "local miner gate",
+          "layer": "gate",
+          "method": "authorize",
+          "outcome": "refused",
+          "reason": "native node rejected completed settlement job: bad-sharepool-payout",
+          "underlying_rpc": "getblocktemplate(mode=proposal)"
+        },
+        {
+          "block_id": "098400438f40636e9a4b8ad79ddee7bf8e4c69a2cd666f3b32946a7c8077e7df",
+          "block_pow_valid": true,
+          "interface": "RPC",
+          "layer": "block",
+          "method": "submitblock",
+          "node": 0,
+          "outcome": "rejected",
+          "reason": "bad-sharepool-payout"
+        },
+        {
+          "block_id": "098400438f40636e9a4b8ad79ddee7bf8e4c69a2cd666f3b32946a7c8077e7df",
+          "block_pow_valid": true,
+          "interface": "RPC",
+          "layer": "block",
+          "method": "submitblock",
+          "node": 1,
+          "outcome": "rejected",
+          "reason": "bad-sharepool-payout"
+        }
+      ],
+      "expected_outputs": [
+        {
+          "payout_script": "00141111111111111111111111111111111111111111",
+          "satoshis": 3000000000
+        },
+        {
+          "payout_script": "00141212121212121212121212121212121212121212",
+          "satoshis": 1500000000
+        },
+        {
+          "payout_script": "00141313131313131313131313131313131313131313",
+          "satoshis": 500000000
+        }
+      ],
+      "fixture_owner": {
+        "name": "Alice",
+        "payout_script": "00141111111111111111111111111111111111111111",
+        "public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe"
+      },
+      "native_tip_after": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "native_tip_before": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "original_commitment": "63fd5dbd8f730711afddcb70d28a3b0f26828c662e28031fed688838dafa012a",
+      "proofs": [
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "700c9088c02b159a875da89fa7e5cd129f6d2debdfc2174712aa9fcd0960a990"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "3bfad20531971e777ebe23cc64052fdf750c27aebd06c27aa664231d67a684a1"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "21ac3e24b63e22d6d8c45723a79383e26ea8862656eb871b493f01d3e2f3bac8"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "210158157e9bec62d0363230f100fce26fb96a5f80ce8bc05569cb93e133e903"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "208c28caec29e2c140fe65079641419607c8f1c0eb9f5308f4c977bf64e337c6"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "25ecbf9d5d7371a8f0f549166cd17e172a591c20a44bbbee3307fc6297287adc"
+        },
+        {
+          "claimed_owner_public_key": "1371bcb86308c50a27d3b23b5bfa34f38cd6733e9938e88f5ee1fd2da6ab98a9",
+          "claimed_payout_script": "00141212121212121212121212121212121212121212",
+          "origin_template_id": "46af951bb226a6a0528debe4e6ee5d608aa4944abcf09a25cd45c615f87c4a0d",
+          "proof_id": "79020776d6fec2ff79ab966658f16ce3253fca615ce28069f73aa9ea958c540b"
+        },
+        {
+          "claimed_owner_public_key": "1371bcb86308c50a27d3b23b5bfa34f38cd6733e9938e88f5ee1fd2da6ab98a9",
+          "claimed_payout_script": "00141212121212121212121212121212121212121212",
+          "origin_template_id": "46af951bb226a6a0528debe4e6ee5d608aa4944abcf09a25cd45c615f87c4a0d",
+          "proof_id": "6161a089d5965801979e2880be9dade04ee09640b3b0ec423fb839b6a4da22f6"
+        },
+        {
+          "claimed_owner_public_key": "1371bcb86308c50a27d3b23b5bfa34f38cd6733e9938e88f5ee1fd2da6ab98a9",
+          "claimed_payout_script": "00141212121212121212121212121212121212121212",
+          "origin_template_id": "46af951bb226a6a0528debe4e6ee5d608aa4944abcf09a25cd45c615f87c4a0d",
+          "proof_id": "241efb49afe23d983752bca59696d7f9423647825b749eb4295b588b7affe006"
+        },
+        {
+          "claimed_owner_public_key": "df0df773d0f6c043af1fcc8ff18c91392336ed8e9f579cf152e5556b13efaf7c",
+          "claimed_payout_script": "00141313131313131313131313131313131313131313",
+          "origin_template_id": "8761f2487de064aeff7027c338bb5f287bb464c3b403903e5fe01d1dc39cd030",
+          "proof_id": "3bd6383335e07bd5c4b930228965da3c826393f9f00600cb223904ad91e605e1"
+        }
+      ],
+      "proposed_outputs": [
+        {
+          "payout_script": "00141212121212121212121212121212121212121212",
+          "satoshis": 1500000000
+        },
+        {
+          "payout_script": "00141313131313131313131313131313131313131313",
+          "satoshis": 500000000
+        },
+        {
+          "payout_script": "00144444444444444444444444444444444444444444",
+          "satoshis": 3000000000
+        }
+      ],
+      "recomputed_commitment": "ae10e92a44348bfd3c579e9f293a5594a6ebbac340094ebfabaf4d4fcc80490f",
+      "result": "passed",
+      "template_ids": [
+        "5712e5165b4c7212cd4c81b1f717dc2817eb1989e61a2899a27dc881ee44ff4e",
+        "fa8e461ca6eab269ba9bbc5a9386845ee865087ec33d32996379846115cc6602"
+      ]
+    },
+    {
+      "case": "payout_amount_tampering_recommitted",
+      "checks": [
+        {
+          "error": {
+            "code": -26,
+            "message": "bad-sharepool-payout"
+          },
+          "interface": "RPC",
+          "layer": "origin",
+          "method": "validatesharepooltemplate",
+          "node": 0,
+          "outcome": "rejected"
+        },
+        {
+          "error_type": "ValueError",
+          "interface": "local miner gate",
+          "layer": "gate",
+          "method": "authorize",
+          "outcome": "refused",
+          "reason": "native node rejected completed settlement job: bad-sharepool-payout",
+          "underlying_rpc": "getblocktemplate(mode=proposal)"
+        },
+        {
+          "block_id": "5100cee3c3cf416aee722d73b7534d22029945b4e391e82f0a83cfb56346f33a",
+          "block_pow_valid": true,
+          "interface": "RPC",
+          "layer": "block",
+          "method": "submitblock",
+          "node": 0,
+          "outcome": "rejected",
+          "reason": "bad-sharepool-payout"
+        },
+        {
+          "block_id": "5100cee3c3cf416aee722d73b7534d22029945b4e391e82f0a83cfb56346f33a",
+          "block_pow_valid": true,
+          "interface": "RPC",
+          "layer": "block",
+          "method": "submitblock",
+          "node": 1,
+          "outcome": "rejected",
+          "reason": "bad-sharepool-payout"
+        }
+      ],
+      "expected_outputs": [
+        {
+          "payout_script": "00141111111111111111111111111111111111111111",
+          "satoshis": 3000000000
+        },
+        {
+          "payout_script": "00141212121212121212121212121212121212121212",
+          "satoshis": 1500000000
+        },
+        {
+          "payout_script": "00141313131313131313131313131313131313131313",
+          "satoshis": 500000000
+        }
+      ],
+      "fixture_owner": {
+        "name": "Alice",
+        "payout_script": "00141111111111111111111111111111111111111111",
+        "public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe"
+      },
+      "native_tip_after": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "native_tip_before": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "original_commitment": "63fd5dbd8f730711afddcb70d28a3b0f26828c662e28031fed688838dafa012a",
+      "proofs": [
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "700c9088c02b159a875da89fa7e5cd129f6d2debdfc2174712aa9fcd0960a990"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "3bfad20531971e777ebe23cc64052fdf750c27aebd06c27aa664231d67a684a1"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "21ac3e24b63e22d6d8c45723a79383e26ea8862656eb871b493f01d3e2f3bac8"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "210158157e9bec62d0363230f100fce26fb96a5f80ce8bc05569cb93e133e903"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "208c28caec29e2c140fe65079641419607c8f1c0eb9f5308f4c977bf64e337c6"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "25ecbf9d5d7371a8f0f549166cd17e172a591c20a44bbbee3307fc6297287adc"
+        },
+        {
+          "claimed_owner_public_key": "1371bcb86308c50a27d3b23b5bfa34f38cd6733e9938e88f5ee1fd2da6ab98a9",
+          "claimed_payout_script": "00141212121212121212121212121212121212121212",
+          "origin_template_id": "46af951bb226a6a0528debe4e6ee5d608aa4944abcf09a25cd45c615f87c4a0d",
+          "proof_id": "79020776d6fec2ff79ab966658f16ce3253fca615ce28069f73aa9ea958c540b"
+        },
+        {
+          "claimed_owner_public_key": "1371bcb86308c50a27d3b23b5bfa34f38cd6733e9938e88f5ee1fd2da6ab98a9",
+          "claimed_payout_script": "00141212121212121212121212121212121212121212",
+          "origin_template_id": "46af951bb226a6a0528debe4e6ee5d608aa4944abcf09a25cd45c615f87c4a0d",
+          "proof_id": "6161a089d5965801979e2880be9dade04ee09640b3b0ec423fb839b6a4da22f6"
+        },
+        {
+          "claimed_owner_public_key": "1371bcb86308c50a27d3b23b5bfa34f38cd6733e9938e88f5ee1fd2da6ab98a9",
+          "claimed_payout_script": "00141212121212121212121212121212121212121212",
+          "origin_template_id": "46af951bb226a6a0528debe4e6ee5d608aa4944abcf09a25cd45c615f87c4a0d",
+          "proof_id": "241efb49afe23d983752bca59696d7f9423647825b749eb4295b588b7affe006"
+        },
+        {
+          "claimed_owner_public_key": "df0df773d0f6c043af1fcc8ff18c91392336ed8e9f579cf152e5556b13efaf7c",
+          "claimed_payout_script": "00141313131313131313131313131313131313131313",
+          "origin_template_id": "8761f2487de064aeff7027c338bb5f287bb464c3b403903e5fe01d1dc39cd030",
+          "proof_id": "3bd6383335e07bd5c4b930228965da3c826393f9f00600cb223904ad91e605e1"
+        }
+      ],
+      "proposed_outputs": [
+        {
+          "payout_script": "00141111111111111111111111111111111111111111",
+          "satoshis": 3500000000
+        },
+        {
+          "payout_script": "00141212121212121212121212121212121212121212",
+          "satoshis": 1000000000
+        },
+        {
+          "payout_script": "00141313131313131313131313131313131313131313",
+          "satoshis": 500000000
+        }
+      ],
+      "recomputed_commitment": "b11814a6cbfab12407687a9c37165743714355f1e686a2285dc3e7b718abdb83",
+      "result": "passed",
+      "template_ids": [
+        "5712e5165b4c7212cd4c81b1f717dc2817eb1989e61a2899a27dc881ee44ff4e",
+        "218a30853e10d639f92bcdee72309ff8eff9eb2a73550f793d3ce53e4a47c4ec"
+      ]
+    },
+    {
+      "case": "known_omission_is_local_not_consensus",
+      "checks": [
+        {
+          "interface": "RPC",
+          "layer": "block",
+          "method": "getblocktemplate(mode=proposal)",
+          "node": 0,
+          "outcome": "valid",
+          "result": null
+        },
+        {
+          "interface": "RPC",
+          "layer": "block",
+          "method": "getblocktemplate(mode=proposal)",
+          "node": 1,
+          "outcome": "valid",
+          "result": null
+        },
+        {
+          "error_type": "JobOmission",
+          "interface": "local miner gate",
+          "layer": "gate",
+          "method": "authorize",
+          "missing_proof_ids": [
+            "3bd6383335e07bd5c4b930228965da3c826393f9f00600cb223904ad91e605e1"
+          ],
+          "outcome": "refused",
+          "reason": "job omits known eligible unpaid work"
+        },
+        {
+          "accepting_enforcing_nodes": 2,
+          "block_id": "532adcd412f0879995fc9c42b234741c839229f85056c232843ea1a25a26f903",
+          "interface": "RPC",
+          "layer": "block",
+          "method": "submitblock",
+          "outcome": "accepted",
+          "result": null
+        }
+      ],
+      "fixture_owner": {
+        "name": "Carol",
+        "payout_script": "00141313131313131313131313131313131313131313",
+        "public_key": "df0df773d0f6c043af1fcc8ff18c91392336ed8e9f579cf152e5556b13efaf7c"
+      },
+      "native_tip_after": "532adcd412f0879995fc9c42b234741c839229f85056c232843ea1a25a26f903",
+      "native_tip_before": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "omitted_proof_ids": [
+        "3bd6383335e07bd5c4b930228965da3c826393f9f00600cb223904ad91e605e1"
+      ],
+      "omitted_proof_remains_unpaid": true,
+      "paid_outputs": [
+        {
+          "payout_script": "00141111111111111111111111111111111111111111",
+          "satoshis": 3333333333
+        },
+        {
+          "payout_script": "00141212121212121212121212121212121212121212",
+          "satoshis": 1666666667
+        }
+      ],
+      "proofs": [
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "700c9088c02b159a875da89fa7e5cd129f6d2debdfc2174712aa9fcd0960a990"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "3bfad20531971e777ebe23cc64052fdf750c27aebd06c27aa664231d67a684a1"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "21ac3e24b63e22d6d8c45723a79383e26ea8862656eb871b493f01d3e2f3bac8"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "210158157e9bec62d0363230f100fce26fb96a5f80ce8bc05569cb93e133e903"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "208c28caec29e2c140fe65079641419607c8f1c0eb9f5308f4c977bf64e337c6"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "25ecbf9d5d7371a8f0f549166cd17e172a591c20a44bbbee3307fc6297287adc"
+        },
+        {
+          "claimed_owner_public_key": "1371bcb86308c50a27d3b23b5bfa34f38cd6733e9938e88f5ee1fd2da6ab98a9",
+          "claimed_payout_script": "00141212121212121212121212121212121212121212",
+          "origin_template_id": "46af951bb226a6a0528debe4e6ee5d608aa4944abcf09a25cd45c615f87c4a0d",
+          "proof_id": "79020776d6fec2ff79ab966658f16ce3253fca615ce28069f73aa9ea958c540b"
+        },
+        {
+          "claimed_owner_public_key": "1371bcb86308c50a27d3b23b5bfa34f38cd6733e9938e88f5ee1fd2da6ab98a9",
+          "claimed_payout_script": "00141212121212121212121212121212121212121212",
+          "origin_template_id": "46af951bb226a6a0528debe4e6ee5d608aa4944abcf09a25cd45c615f87c4a0d",
+          "proof_id": "6161a089d5965801979e2880be9dade04ee09640b3b0ec423fb839b6a4da22f6"
+        },
+        {
+          "claimed_owner_public_key": "1371bcb86308c50a27d3b23b5bfa34f38cd6733e9938e88f5ee1fd2da6ab98a9",
+          "claimed_payout_script": "00141212121212121212121212121212121212121212",
+          "origin_template_id": "46af951bb226a6a0528debe4e6ee5d608aa4944abcf09a25cd45c615f87c4a0d",
+          "proof_id": "241efb49afe23d983752bca59696d7f9423647825b749eb4295b588b7affe006"
+        },
+        {
+          "claimed_owner_public_key": "df0df773d0f6c043af1fcc8ff18c91392336ed8e9f579cf152e5556b13efaf7c",
+          "claimed_payout_script": "00141313131313131313131313131313131313131313",
+          "origin_template_id": "8761f2487de064aeff7027c338bb5f287bb464c3b403903e5fe01d1dc39cd030",
+          "proof_id": "3bd6383335e07bd5c4b930228965da3c826393f9f00600cb223904ad91e605e1"
+        }
+      ],
+      "result": "passed",
+      "template_ids": [
+        "b42d76244c55b8a4e7a3241e58a9495178110861549541e13047d70c09a87481"
+      ]
+    },
+    {
+      "authorized_job_id": "6e4fac8f56f84a7ddc4b4de2eea7c7b0772fa18b0b573f8482323c1f8e21ec4d",
+      "case": "frozen_commitment_and_late_share_refresh",
+      "checks": [
+        {
+          "error_type": "ValueError",
+          "interface": "local mining authorization",
+          "layer": "gate",
+          "method": "block_for_header",
+          "outcome": "refused",
+          "reason": "work changes the authorized template or settlement"
+        },
+        {
+          "layer": "gate",
+          "method": "needs_refresh / ready_for_dispatch",
+          "new_ready": true,
+          "old_bytes_unchanged": true,
+          "old_needs_refresh": true,
+          "old_ready": false,
+          "outcome": "refresh required"
+        },
+        {
+          "candidate": "old solved immutable job",
+          "interface": "RPC",
+          "layer": "block",
+          "method": "getblocktemplate(mode=proposal)",
+          "outcome": "valid",
+          "result": null
+        }
+      ],
+      "fixture_owner": {
+        "name": "Alice",
+        "payout_script": "00141111111111111111111111111111111111111111",
+        "public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe"
+      },
+      "frozen_commitment": "cdc1834c273d630c8d64d873eac2d66f123feb31f01abe4a72e1a667b6e04a82",
+      "native_tip_after": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "native_tip_before": "5ffe1f9362386e69da42f3dd081f023627eef18a76437fd8f13971876eabd910",
+      "proofs": [
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "7e19a170faedd49de5fd17333a50e956750ab2a5f63095172ebd2e91471ae92e"
+        }
+      ],
+      "refreshed_commitment": "13d96d77de276690419a2d696e9e0548b2b601e5f6368a3a7780e52f63e790cb",
+      "refreshed_template_id": "fae4a6260e7bbc38de09f4043d509412b7bf4c7da322df7839924e29b20319f2",
+      "result": "passed",
+      "solved_candidate_id": "4c58488ae6df8f961167c3c36a63932ced15e67585e02baaedf4a210472941c6",
+      "template_ids": [
+        "b1a01d339de9e801a9bd2948747cd2113b31a3d60841e085e35f3182a2471b1e"
+      ]
+    },
+    {
+      "case": "repeated_payment_rejected",
+      "checks": [
+        {
+          "interface": "RPC",
+          "layer": "share",
+          "method": "validatesharepoolshare",
+          "note": "This RPC checks proof validity, not payment eligibility against paid state.",
+          "outcome": "proof still valid",
+          "result": {
+            "native_tip": "532adcd412f0879995fc9c42b234741c839229f85056c232843ea1a25a26f903",
+            "origin_height": 2,
+            "owner": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+            "payout_script": "00141111111111111111111111111111111111111111",
+            "pool": "00000000000000000000000000000000000000000000000052554c4543415345",
+            "proof_id": "700c9088c02b159a875da89fa7e5cd129f6d2debdfc2174712aa9fcd0960a990",
+            "settlement_height": 3,
+            "share_bits": "207fffff",
+            "valid": true
+          }
+        },
+        {
+          "block_id": "2868ce99884f247f629b66d92d4083425219e0f64064b5aae42dbacbbf683a97",
+          "block_pow_valid": true,
+          "interface": "RPC",
+          "layer": "block",
+          "method": "submitblock",
+          "node": 0,
+          "outcome": "rejected",
+          "reason": "bad-sharepool-shares"
+        },
+        {
+          "block_id": "2868ce99884f247f629b66d92d4083425219e0f64064b5aae42dbacbbf683a97",
+          "block_pow_valid": true,
+          "interface": "RPC",
+          "layer": "block",
+          "method": "submitblock",
+          "node": 1,
+          "outcome": "rejected",
+          "reason": "bad-sharepool-shares"
+        }
+      ],
+      "first_payment_block": "532adcd412f0879995fc9c42b234741c839229f85056c232843ea1a25a26f903",
+      "fixture_owner": {
+        "name": "Alice",
+        "payout_script": "00141111111111111111111111111111111111111111",
+        "public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe"
+      },
+      "native_tip_after": "532adcd412f0879995fc9c42b234741c839229f85056c232843ea1a25a26f903",
+      "native_tip_before": "532adcd412f0879995fc9c42b234741c839229f85056c232843ea1a25a26f903",
+      "proofs": [
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "700c9088c02b159a875da89fa7e5cd129f6d2debdfc2174712aa9fcd0960a990"
+        }
+      ],
+      "result": "passed",
+      "template_ids": [
+        "a164174d5e462c40df552f110ed7df0bffbe8082f255cf2d13c66de32bf66c4e"
+      ]
+    },
+    {
+      "case": "late_omitted_and_winning_work_settle_next_block",
+      "checks": [
+        {
+          "accepting_enforcing_nodes": 2,
+          "block_id": "78367b7da1d8dd28147d96a09be1c20e99fd409f49105950b3006f92d937684b",
+          "interface": "RPC",
+          "layer": "block",
+          "method": "submitblock",
+          "outcome": "accepted",
+          "result": null
+        }
+      ],
+      "fixture_owner": {
+        "name": "Carol",
+        "payout_script": "00141313131313131313131313131313131313131313",
+        "public_key": "df0df773d0f6c043af1fcc8ff18c91392336ed8e9f579cf152e5556b13efaf7c"
+      },
+      "native_tip_after": "78367b7da1d8dd28147d96a09be1c20e99fd409f49105950b3006f92d937684b",
+      "native_tip_before": "532adcd412f0879995fc9c42b234741c839229f85056c232843ea1a25a26f903",
+      "paid_outputs": [
+        {
+          "payout_script": "00141111111111111111111111111111111111111111",
+          "satoshis": 1666666667
+        },
+        {
+          "payout_script": "00141313131313131313131313131313131313131313",
+          "satoshis": 3333333333
+        }
+      ],
+      "paid_state_entries": 12,
+      "proofs": [
+        {
+          "claimed_owner_public_key": "df0df773d0f6c043af1fcc8ff18c91392336ed8e9f579cf152e5556b13efaf7c",
+          "claimed_payout_script": "00141313131313131313131313131313131313131313",
+          "origin_template_id": "8761f2487de064aeff7027c338bb5f287bb464c3b403903e5fe01d1dc39cd030",
+          "proof_id": "3bd6383335e07bd5c4b930228965da3c826393f9f00600cb223904ad91e605e1"
+        },
+        {
+          "claimed_owner_public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe",
+          "claimed_payout_script": "00141111111111111111111111111111111111111111",
+          "origin_template_id": "a9e13cb57ff1c811a8a97101d52937b8ad98a3884ae83cb7dd3b78413dc2e033",
+          "proof_id": "7e19a170faedd49de5fd17333a50e956750ab2a5f63095172ebd2e91471ae92e"
+        },
+        {
+          "claimed_owner_public_key": "df0df773d0f6c043af1fcc8ff18c91392336ed8e9f579cf152e5556b13efaf7c",
+          "claimed_payout_script": "00141313131313131313131313131313131313131313",
+          "origin_template_id": "b42d76244c55b8a4e7a3241e58a9495178110861549541e13047d70c09a87481",
+          "proof_id": "532adcd412f0879995fc9c42b234741c839229f85056c232843ea1a25a26f903"
+        }
+      ],
+      "result": "passed",
+      "template_ids": [
+        "ef54fdb07a2a794c9b38c7fea1d5848d244f5848fbad64488ffb8b0a19355ffa",
+        "b42d76244c55b8a4e7a3241e58a9495178110861549541e13047d70c09a87481"
+      ]
+    }
+  ],
+  "final_tip": "78367b7da1d8dd28147d96a09be1c20e99fd409f49105950b3006f92d937684b",
+  "finished_utc": "2026-09-12T18:25:11.184725+00:00",
+  "genesis": "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206",
+  "identity_scope": "Fresh native owner keys; fixture attribution does not identify the submitter of an invalid authorization.",
+  "native_binary_sha256": "a0858e2bd5db85387239052c4fa23c993deeb9f2eeb3bb0334308f5c66808df8",
+  "native_blocks": 3,
+  "native_signer_sha256": "e9d92517d91d15cbf269e43d217a953deb43e70ab6188893fd3ba5dac0095e7a",
+  "owners": [
+    {
+      "name": "Alice",
+      "payout_script": "00141111111111111111111111111111111111111111",
+      "public_key": "d5b78f05890fc2c5b3833b79797c3f6031469077f865e0f0b7c4dcaf6d7c3dbe"
+    },
+    {
+      "name": "Bob",
+      "payout_script": "00141212121212121212121212121212121212121212",
+      "public_key": "1371bcb86308c50a27d3b23b5bfa34f38cd6733e9938e88f5ee1fd2da6ab98a9"
+    },
+    {
+      "name": "Carol",
+      "payout_script": "00141313131313131313131313131313131313131313",
+      "public_key": "df0df773d0f6c043af1fcc8ff18c91392336ed8e9f579cf152e5556b13efaf7c"
+    }
+  ],
+  "physical_hardware_used": false,
+  "pool": "00000000000000000000000000000000000000000000000052554c4543415345",
+  "private_keys_exported": false,
+  "profile": "SPN1 opt-in regtest",
+  "public_network_used": false,
+  "result": "passed",
+  "schema": 1,
+  "started_utc": "2026-09-12T18:25:06.859908+00:00"
+}

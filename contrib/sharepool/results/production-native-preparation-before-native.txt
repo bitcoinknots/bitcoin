@@ -1,0 +1,24 @@
+2026-09-14T06:52:01.440000Z TestFramework (INFO): PRNG seed is: 5963415761062334152
+2026-09-14T06:52:01.441000Z TestFramework (DEBUG): Setting up network thread
+2026-09-14T06:52:01.441000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-native-sample-before
+2026-09-14T06:52:01.444000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T06:52:01.445000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T06:52:01.973000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-14T06:52:01.974000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-14T06:52:06.036000Z TestFramework (INFO): Capacity epoch 1/3: 30 distinct native origins, layout=cumulative, padding outputs=0, witness-heavy=False
+2026-09-14T06:52:10.065000Z TestFramework (INFO): Epoch 1: 25/30 native origins ready
+2026-09-14T06:52:29.593000Z TestFramework (INFO): Epoch 1: 90 offers admitted in 2 blocks; zero expired
+2026-09-14T06:52:29.593000Z TestFramework (INFO): Capacity epoch 2/3: 30 distinct native origins, layout=cumulative, padding outputs=0, witness-heavy=False
+2026-09-14T06:52:38.525000Z TestFramework (INFO): Epoch 2: 25/30 native origins ready
+2026-09-14T06:52:52.767000Z TestFramework (INFO): Epoch 2: 90 offers admitted in 2 blocks; zero expired
+2026-09-14T06:52:52.767000Z TestFramework (INFO): Capacity epoch 3/3: 30 distinct native origins, layout=cumulative, padding outputs=0, witness-heavy=False
+2026-09-14T06:53:05.396000Z TestFramework (INFO): Epoch 3: 25/30 native origins ready
+2026-09-14T06:53:30.355000Z TestFramework (INFO): Epoch 3: 90 offers admitted in 3 blocks; zero expired
+2026-09-14T06:53:31.444000Z TestFramework (DEBUG): Closing down network thread
+2026-09-14T06:53:31.501000Z TestFramework (INFO): Stopping nodes
+2026-09-14T06:53:31.501000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-14T06:53:31.502000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-14T06:53:31.665000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-14T06:53:31.666000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-14T06:53:31.666000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-native-sample-before
+2026-09-14T06:53:31.666000Z TestFramework (INFO): Tests successful

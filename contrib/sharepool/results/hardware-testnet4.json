@@ -1,0 +1,98 @@
+{
+  "format": 1,
+  "date_utc": "2026-09-11",
+  "scope": "Actual Goldshell hardware shares on this Knots release's public Testnet4 branch; separate from synthetic checkpoint settlement",
+  "miner": {
+    "model": "Goldshell-SCLITE",
+    "firmware": "2.2.0"
+  },
+  "native_node": {
+    "version": "/Satoshi:29.4.1/Knots:20260508/",
+    "chain": "testnet4",
+    "genesis": "00000000da84f2bafbbc53dee25a72ae507ff4914b867c565be350b0da8bf043",
+    "height": 150903,
+    "ibd": false,
+    "p2p_connections_at_preflight": 8
+  },
+  "test_seconds": 90,
+  "stats": {
+    "accepted": 13,
+    "rejected": 0,
+    "connections": 30,
+    "block_candidates": 0,
+    "subscriptions": 1,
+    "authorizations": 1,
+    "notifications": 6,
+    "submissions": 13
+  },
+  "snapshot_share_counts": [
+    0,
+    0,
+    5,
+    7,
+    13,
+    13,
+    13
+  ],
+  "constructed_jobs": 7,
+  "unique_settlement_commitments": 4,
+  "all_native_proposals_accepted": true,
+  "full_transactions_including_coinbase": [
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4
+  ],
+  "offline_replay": {
+    "verified": true,
+    "network": "testnet4",
+    "jobs": 7,
+    "shares": 13,
+    "unique_work_headers": 13,
+    "native_hash_matches": 13,
+    "base_target_solutions": 0,
+    "base_target_solutions_among_credited_shares": 0,
+    "candidate_archive_count": 0,
+    "candidate_only_count": 0,
+    "candidate_archive_verified": true,
+    "committed_in_last_job": 13,
+    "tail_after_last_job": 0,
+    "total_target_work": 228698418577408,
+    "payout_outputs_reconstructed": true,
+    "snapshot_causality_verified": true,
+    "native_consensus_validation": "separate live RPC evidence required"
+  },
+  "capture_sha256": "ed8de8d05824db811745da21bacca94f50709ff144f3fcca7736f63edd4fd457",
+  "raw_capture_storage": "Retained locally; miner credentials and pool configuration are not repository artifacts.",
+  "restoration": {
+    "restored": true,
+    "test_completed": true,
+    "failure_stage": "",
+    "restore_failures": [],
+    "lazarus_active_verified_utc": "2026-09-11T20:34:53.112823+00:00",
+    "fresh_upstream_accepted_share_local_time": "2026-09-11 14:34:51.168 -06:00",
+    "lazarus_upstream": "stratum.awokenlazarus.xyz:28915",
+    "original_pool_order_restored": true,
+    "original_operating_settings_restored": true,
+    "test_pool_removed": true,
+    "final_readback": {
+      "verified_utc": "2026-09-11T20:53:01.765445+00:00",
+      "original_pool_order_matches": true,
+      "original_settings_match": true,
+      "original_first_pool_active": true,
+      "test_pool_absent": true,
+      "latest_upstream_accepted_log_timestamp": "2026-09-11 14:53:01.396",
+      "log_timezone": "UTC-06:00"
+    }
+  },
+  "limits": [
+    "No testnet block met the base target; public winning-block settlement was not exercised.",
+    "The capture adapter does not feed the permissionless checkpoint ledger or enforce pool consensus.",
+    "Native proposal acceptance skips PoW; every recorded hardware share was separately verified against both ASIC and Knots header hashes.",
+    "Protocol and resource safeguards added after capture were covered by unit fault-injection tests; hardware was not rerouted for those storage-only edits.",
+    "Device-origin evidence is the observed LAN session plus recorded control state, not hardware attestation."
+  ]
+}

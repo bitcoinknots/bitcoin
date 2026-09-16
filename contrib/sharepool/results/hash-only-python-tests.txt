@@ -1,0 +1,30 @@
+test_every_snapshot_component_is_committed (test_hash_snapshot.HashSnapshotTests) ... ok
+test_flat_complete_snapshot_hash_and_rules (test_hash_snapshot.HashSnapshotTests) ... ok
+test_huge_compact_sizes_and_truncation_fail_before_loops (test_hash_snapshot.HashSnapshotTests) ... ok
+test_one_hundred_distinct_proofs_roundtrip_and_payout (test_hash_snapshot.HashSnapshotTests) ... ok
+test_owner_domain_and_reserved_fields (test_hash_snapshot.HashSnapshotTests) ... ok
+test_template_order_is_serialized_bytes_not_numeric (test_hash_snapshot.HashSnapshotTests) ... ok
+test_templates_are_full_normalized_bodies (test_hash_snapshot.HashSnapshotTests) ... ok
+test_wrong_signer_domain_and_policy_reject (test_hash_snapshot.HashSnapshotTests) ... ok
+test_corrupt_acknowledged_bytes_fail_restart (test_hash_mining_gate.HashGateTests) ... ok
+test_database_rollback_cannot_match_newer_protected_head (test_hash_mining_gate.HashGateTests) ... ok
+test_historical_origin_is_revalidated_before_new_ack (test_hash_mining_gate.HashGateTests) ... ok
+test_invalid_proof_and_wrong_response_never_acknowledge (test_hash_mining_gate.HashGateTests) ... ok
+test_missing_head_and_second_owner_fail_closed (test_hash_mining_gate.HashGateTests) ... ok
+test_native_tip_race_refuses_authorization (test_hash_mining_gate.HashGateTests) ... ok
+test_network_and_public_policy_are_bound (test_hash_mining_gate.HashGateTests) ... ok
+test_omission_survives_restart (test_hash_mining_gate.HashGateTests) ... ok
+test_one_hundred_acknowledgments_restart_and_frozen_authorization (test_hash_mining_gate.HashGateTests) ... ok
+test_oversized_checkpoint_metadata_is_refused_before_materialization (test_hash_mining_gate.HashGateTests) ... ok
+test_oversized_configuration_is_refused_before_materialization (test_hash_mining_gate.HashGateTests) ... ok
+test_oversized_journal_metadata_is_refused_before_body_materialization (test_hash_mining_gate.HashGateTests) ... ok
+test_payment_rollback_and_deep_expiry_do_not_delete_acknowledged_work (test_hash_mining_gate.HashGateTests) ... ok
+test_quota_failure_rolls_back_then_larger_quota_retries_once (test_hash_mining_gate.HashGateTests) ... ok
+test_seal_failure_returns_no_ack_and_restart_preserves_commit (test_hash_mining_gate.HashGateTests) ... ok
+test_successful_storage_never_authorizes_missing_dependency (test_hash_mining_gate.HashGateTests) ... ok
+test_unworked_template_coverage_is_required (test_hash_mining_gate.HashGateTests) ... ok
+
+----------------------------------------------------------------------
+Ran 25 tests in 2.525s
+
+OK

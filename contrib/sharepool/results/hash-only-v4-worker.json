@@ -1,0 +1,35 @@
+{
+  "origins": 64,
+  "inputs_per_origin": 100,
+  "sha256_ops_per_input": 199,
+  "snapshot_bytes": 135741,
+  "block_bytes": 2203,
+  "pipeline_seconds": 2.1098040420000004,
+  "p2p_ping_seconds": 0.11185879099999951,
+  "active_rpc_samples": 126,
+  "maximum_active_rpc_seconds": 0.0024427090000003204,
+  "worker": {
+    "started": true,
+    "active": false,
+    "pending": false,
+    "stopping": false,
+    "requests": 67,
+    "passes": 25,
+    "failures": 0,
+    "last_micros": 2004459,
+    "max_micros": 2004459,
+    "outside_script_checks": 6400,
+    "locked_fallbacks": 0,
+    "context_retries": 0
+  },
+  "pending_restart": "accepted",
+  "reorganization_verifydb": "valid",
+  "context_change": {
+    "retry_count": 1,
+    "competing_branch": "accepted_and_extended"
+  },
+  "protocol_version": 4,
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "binary_sha256": "bfd41c0173bbeffdf24f5a719f5e48a448c37ea0f5bd4d9bc3974f3ca36079b4",
+  "test_sha256": "7c864a7835fb74d5e3e355ab66e6a2c8721112cca3a4e51ebd07771bb84b3de2"
+}

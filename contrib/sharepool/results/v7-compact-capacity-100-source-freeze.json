@@ -1,0 +1,38 @@
+{
+  "stage": "capacity source freeze before local decoded-cache and Python derived-state-retention fixes",
+  "base_commit": "88d4ab03333076b119dc317160bfa075707ad6b8",
+  "source_sha256": {
+    "contrib/sharepool/hash_mining_gate.py": "96fe589dc0f6d5b9d257800f6c4a2308104f989a1df274ade098eaa8c8e71e18",
+    "contrib/sharepool/hash_snapshot.py": "44173ab51d60fd5bc4378d327e14ba9cbf78f61086faa4ff2e0db92180ae3013",
+    "contrib/sharepool/hash_gate_batch.py": "0e0b55d97a2820dccc1884fa1c2c45c7d6589cef235a2a138831b90c069572b3",
+    "contrib/sharepool/hash_gate_inventory.py": "a95827a8b52243811f05d4cb97a0cb603f2e783271d9be2d04e1af0ac2d36ff6",
+    "contrib/sharepool/capacity_metrics.py": "4c5d2534c45bdee99f12e653ec46e010f4ab6aba6108914015bc8e08498a25db",
+    "test/functional/feature_sharepool_hash_tides_100_miners.py": "5b6903c6806c970577ae661755139175317600a6faf92851004486e81b022529",
+    "test/functional/feature_sharepool_hash_capacity.py": "9b3563b73a651afb3aac7cd20d03f3a4f83f5d8e9c96bed0dd061c26e1b0516d",
+    "src/validation.cpp": "e1cb695cdf66ea74a7e8b663d51350401248b0f4c05694dd5768eea8387eeba5",
+    "src/consensus/sharepool_hash.cpp": "6905bde0a02f10dff7fd9116193155c4a09750b538bfe4c2a0cc2aedbc03922d",
+    "src/consensus/sharepool_hash.h": "a20e39af67f047368f722d8e6a6d799cd7ab5dfa99a31fde188b388bd63dfe27",
+    "src/sharepool/tides_history_store.cpp": "11b719b4375523a9dc629c55d17f9cb954f59a9e2ed876c4c3b4444d5c9ca02d",
+    "src/sharepool/tides_history_store.h": "55ae0fad470302baadfb99ad38b73e67f51087dea6ce89173ea3091c8aaccb16"
+  },
+  "binaries": {
+    "bitcoind": "6b83af631e78f68305ca973fb4bef50b16fff1dfdc19302cfa7302394877e242",
+    "bitcoin-sharepool-signer": "bbb7b90309010477f0e13866671c84cd05ddb4699c087d55897d6cf10cc169f3",
+    "test_bitcoin": "1927a389d63f7303f6a87c789d71e9e3b3f47e510e6acfa35eeba7e87576fb8e"
+  },
+  "note": "Keep binaries unchanged until this running capacity capture finishes. Python imports are resident from startup. Later source changes are recorded separately; this is not final-code capacity evidence.",
+  "terminal_control": {
+    "reason": "Configured 1800-second runtime budget was exceeded inside a step between cooperative deadline checks. Root sent SIGINT to the positively identified driver PID16658; framework preserved the failed report and cleaned up both node processes.",
+    "actual_recorded_seconds": 1852.234867916,
+    "signal": "SIGINT",
+    "result": "failed",
+    "error_type": "KeyboardInterrupt",
+    "failure_stage": "settlement_job_construction",
+    "offered": 900,
+    "acknowledged": 900,
+    "admitted": 600,
+    "peer_verified_admitted": 600,
+    "acknowledged_backlog": 300,
+    "note": "Not a consensus rejection, not a passed sustained-capacity run, and not evidence for the final cache-hardened source."
+  }
+}

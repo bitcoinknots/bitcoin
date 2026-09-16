@@ -1,0 +1,84 @@
+{
+  "recorded_utc": "2026-09-16T01:04:50.643331+00:00",
+  "base_commit": "1f7b010e425186800bc65472062e03007c5a1f87",
+  "source_sha256": {
+    "src/consensus/sharepool_hash.cpp": "f821ea56f685f08010e9a98e391ce83399d9c7dd1ef07d41381c3fb60e77b977",
+    "src/consensus/sharepool_hash.h": "9297958afc93fa774910c8c002c5334b412c04ca8621cdd3eab3fe2fae5de63a",
+    "src/sharepool/hash_store.cpp": "422978a38ba589db39ec44426458939b91d270a9882deecc99ea54dd16ee53e7",
+    "src/sharepool/hash_store.h": "0ddebdf9633cf6d85f8bbad9449b821470cf3b1ef44262362c15d479d0795408",
+    "src/sharepool/hash_validation_cache.h": "2fe3435ef181061f6d0ccf13cb682c4b3fc8e56099272f9c3656d69d2f55ffdd",
+    "src/validation.cpp": "c10cae0775b49c2711f765c3a1f5d27be5f4e6480df10b675eb5990a151ae908",
+    "src/test/sharepool_hash_tests.cpp": "68c457205b4339ee66a7a6fcd8a4a12484378bddfd6d1350911c2d132fc7ea5f",
+    "src/test/sharepool_hash_store_tests.cpp": "485fede9e82770c90b6ae2e285bc30e343bd6c91d6bb3213e8dc78c43f1edf80"
+  },
+  "binary_sha256": {
+    "/private/tmp/sharepool-native-build/bin/bitcoind": "f889cf8d0e4108a8e40aea7174109d3c6fec14e0713521493e5309cc301346db",
+    "/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer": "3f75f3829a1976b5c2b8f0f87caae6e5e044af0ee64577737006f9739684b5ff",
+    "/private/tmp/sharepool-native-build/bin/test_bitcoin": "dbe17e13b2417702f02c37981dd2c0bc3cd1b8c78fdd8e87407e9edb73951f68"
+  },
+  "primary_run": {
+    "command": "/private/tmp/sharepool-native-build/bin/test_bitcoin --run_test=sharepool_hash_tests,sharepool_hash_store_tests,sharepool_retry_worker_tests --log_level=test_suite --report_level=short",
+    "exit_code": 201,
+    "passed": 83,
+    "failed": 1,
+    "completion_chunk": "/private/tmp/sharepool-native-repeat-body-primary-completion.log",
+    "full_log_available": false,
+    "explanation": "Only final output chunk saved; earlier output remains in tool transcript. One new test assigned the same parent value as the fixture, so its expected cache miss was incorrect. Fixed test parent to a distinct value; production code unchanged."
+  },
+  "focused_rerun": {
+    "command": "/private/tmp/sharepool-native-build/bin/test_bitcoin --run_test=sharepool_hash_store_tests/captured_template_cache_binds_body_and_never_supplies_evidence --log_level=test_suite --report_level=short",
+    "exit_code": 0,
+    "passed": 1,
+    "assertions_passed": 15,
+    "log": "/private/tmp/sharepool-native-repeat-body-focused.log"
+  },
+  "remaining_run": {
+    "command": "/private/tmp/sharepool-native-build/bin/test_bitcoin --run_test=sharepool_params_tests,sharepool_signer_tests,sharepool_tides_tests,sharepool_tides_history_tests,sharepool_tides_history_store_tests,sharepool_tides_consensus_tests --log_level=test_suite --report_level=short",
+    "exit_code": 0,
+    "passed": 74,
+    "assertions_passed": 1759,
+    "log": "/private/tmp/sharepool-native-repeat-body-remaining.log"
+  },
+  "distinct_passing_cases_after_fixture_correction": 158,
+  "new_test_cases": 4,
+  "test_build": {
+    "exit_code": 0,
+    "log": "/private/tmp/sharepool-native-repeat-body-test-build.log",
+    "command": "/private/tmp/sharepool-build-tools-20260912/cmake/data/bin/cmake --build /private/tmp/sharepool-native-build --target test_bitcoin -j2 > /private/tmp/sharepool-native-repeat-body-test-build.log 2>&1"
+  },
+  "daemon_signer_build": {
+    "exit_code": 0,
+    "log": "/private/tmp/sharepool-native-repeat-body-daemon-build.log",
+    "command": "/private/tmp/sharepool-build-tools-20260912/cmake/data/bin/cmake --build /private/tmp/sharepool-native-build --target bitcoind bitcoin-sharepool-signer -j2 > /private/tmp/sharepool-native-repeat-body-daemon-build.log 2>&1"
+  },
+  "diff_check_exit_code": 0,
+  "remaining_work": "Native sources, builds, and focused correctness verification are complete. Root integration fixtures and performance comparison on the recorded binaries are pending; no commits or pushes performed.",
+  "integration_check_status": "pending_root_integration",
+  "verified_log_files": [
+    {
+      "path": "/private/tmp/sharepool-native-repeat-body-primary-completion.log",
+      "exists": true,
+      "bytes": 19145
+    },
+    {
+      "path": "/private/tmp/sharepool-native-repeat-body-focused.log",
+      "exists": true,
+      "bytes": 19693
+    },
+    {
+      "path": "/private/tmp/sharepool-native-repeat-body-remaining.log",
+      "exists": true,
+      "bytes": 38086
+    },
+    {
+      "path": "/private/tmp/sharepool-native-repeat-body-test-build.log",
+      "exists": true,
+      "bytes": 809
+    },
+    {
+      "path": "/private/tmp/sharepool-native-repeat-body-daemon-build.log",
+      "exists": true,
+      "bytes": 996
+    }
+  ]
+}

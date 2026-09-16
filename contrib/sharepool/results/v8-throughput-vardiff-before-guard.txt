@@ -1,0 +1,9 @@
+2026-09-14T19:45:51.836000Z TestFramework (INFO): PRNG seed is: 6412988334962876743
+2026-09-14T19:45:51.836000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-pressure-vardiff-100-native
+2026-09-14T19:45:52.392000Z TestFramework (INFO): Independent miners commit three different assigned targets at the same native difficulty
+2026-09-14T19:46:15.979000Z TestFramework (INFO): Assignment changes, another miner's authorization and insufficient work are rejected
+2026-09-14T19:46:52.120000Z TestFramework (INFO): A late old-target proof keeps its original credit alongside a new harder job
+2026-09-14T19:46:52.799000Z TestFramework (INFO): Persistent history, restart and competing branches preserve assigned work weights
+2026-09-14T19:46:57.638000Z TestFramework (INFO): Stopping nodes
+2026-09-14T19:46:57.810000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-pressure-vardiff-100-native
+2026-09-14T19:46:57.810000Z TestFramework (INFO): Tests successful

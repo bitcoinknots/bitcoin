@@ -1,0 +1,4 @@
+# Archived unified diffs require a leading space on empty context lines.
+# Preserve their exact captured bytes without exempting implementation files.
+production-native-preparation-source.diff whitespace=-blank-at-eol
+production-native-shared-budget-source.diff whitespace=-blank-at-eol

@@ -50,6 +50,13 @@ struct ChainstateManagerOpts {
     int worker_threads_num{0};
     size_t script_execution_cache_bytes{DEFAULT_SCRIPT_EXECUTION_CACHE_BYTES};
     size_t signature_cache_bytes{DEFAULT_SIGNATURE_CACHE_BYTES};
+    //! Positive local charged snapshot archive quota; not a consensus or RSS limit.
+    uint64_t sharepool_archive_bytes{1024ULL * 1024 * 1024};
+    //! Rebuild the disposable archive index; interrupted rebuilds resume automatically.
+    bool sharepool_archive_index_rebuild{false};
+    //! Local derived TIDES index quota; unrelated to consensus evidence limits.
+    uint64_t sharepool_tides_index_bytes{1024ULL * 1024 * 1024};
+    bool sharepool_tides_index_rebuild{false};
 };
 
 } // namespace kernel

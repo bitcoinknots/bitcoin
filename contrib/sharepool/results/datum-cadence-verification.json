@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "base_commit": "6e3f869a46f7f174330eb248ceec5dbb61150c62",
+  "scope": "Cooperative DATUM-style local job cadence and analytical payload sizing; opt-in regtest only",
+  "source_hashes": "datum-cadence-source-hashes.json",
+  "source_files": 141,
+  "binary_sha256": {
+    "bitcoind": "2f06596d94347f8491c6506d8474e4ffbfc44243fd41f0bcb884957e108d5365",
+    "bitcoin-sharepool-signer": "bbb7b90309010477f0e13866671c84cd05ddb4699c087d55897d6cf10cc169f3"
+  },
+  "consensus_changes": false,
+  "wire_changes": false,
+  "difficulty_changes": false,
+  "admission_budget_changes": false,
+  "python": {
+    "cases_passed": 342,
+    "skipped": 0,
+    "report": "datum-cadence-python-checks.json"
+  },
+  "native": {
+    "scenarios_passed": 3,
+    "report": "datum-cadence-native-verification.json",
+    "new_fixture": "feature_sharepool_hash_datum_cadence.py",
+    "clock": "injected, no real 40-second sleep"
+  },
+  "cpp": "Not rerun: native source and exact previously verified Debug daemon unchanged",
+  "traffic": {
+    "report": "datum-traffic-40s.json",
+    "encoder": "datum-traffic-encoder.json",
+    "kind": "Analytical projection from preserved measured encoding; no live traffic measurement"
+  },
+  "prior_artifact_integrity": {
+    "manifest": "state-v7-verification.json",
+    "manifest_sha256": "7025a32c5b7b7beaa2ff3152cbf4839c51f86d9e23416ea7cb07651e89c3de01",
+    "artifact_count": 24,
+    "all_unchanged": true
+  },
+  "limitations": [
+    "Local cooperative adapter; mining transport and prompt block-event delivery are supplied by the caller.",
+    "Normal interval starts after successful handoff; synchronous preparation may exceed it or delay block-event servicing.",
+    "Already issued jobs keep their original cutoff; late acknowledged work follows existing deterministic carry-forward and age rules.",
+    "Publication must make full snapshot evidence available; the flat commitment alone is insufficient.",
+    "Failed withdrawal prevents further construction/publication, but cannot physically stop an unresponsive transport.",
+    "No public-network activation, physical miner configuration, share-difficulty change, live v7 template delta gossip or pruning change.",
+    "No new 900-proof capacity run; existing 138-second preparation for 100 jobs remains a historical measurement.",
+    "Synthetic shared transaction geometry and ideal batching do not establish total traffic or CPU/RAM/storage minima."
+  ],
+  "artifact_sha256": {
+    "contrib/sharepool/results/datum-cadence-native-compact-results.json": "2d60d263a8b63bf41f13231345325ff1a3451acdef4b165f39369a2f78c5c12d",
+    "contrib/sharepool/results/datum-cadence-native-final-compact.txt": "c90aa0bde76ed04f0f2da4aa87ae55bcba18426a891fbb97c87d1d1eac1c51b0",
+    "contrib/sharepool/results/datum-cadence-native-final-datum-cadence.txt": "2190221070b2bc933fa9def0431845e17129b5654a2912aca2d973966f4ab234",
+    "contrib/sharepool/results/datum-cadence-native-final-state-reuse.txt": "c82c26aa49cd7dd24685d04c9e1ba42f380c44b655778ad1a95e4b7a7b8361a6",
+    "contrib/sharepool/results/datum-cadence-native-initial.txt": "ed1b9cd1483dc93283ddb185b2e27aab7d31d9be27a590c73142a1a5ff957772",
+    "contrib/sharepool/results/datum-cadence-native-regressions.json": "ec92a1afbd7107db2ac7c268261aee46d24906e823c320e972f8920675582fbb",
+    "contrib/sharepool/results/datum-cadence-native-results.json": "190c674b0400f3ecf334211c7c5f8f46f334b31dbc0817edf913ef57f89ba301",
+    "contrib/sharepool/results/datum-cadence-native-second-results.json": "1bba1ffb6eac872cfe39ea5406dcf69be89170e7e0374fb5c7976a76e3396d45",
+    "contrib/sharepool/results/datum-cadence-native-second-verification.json": "50d4f34610623c5df4e56ad282f570d32809ca60e217ab03d1d6f350f9e607a2",
+    "contrib/sharepool/results/datum-cadence-native-second.txt": "b996bb499790ae03cdd974c34e0c03132b2df27effb7334de90afefb691b21ed",
+    "contrib/sharepool/results/datum-cadence-native-state-reuse-results.json": "081655b60fffddef6d0df025479ca0cd2bfe4cfcfe10ed472b6ababce8fddb91",
+    "contrib/sharepool/results/datum-cadence-native-verification.json": "fe778e294c875d8ae8ab24bc397bae80305a7ac75a9d941256a867ef3e4bfdcd",
+    "contrib/sharepool/results/datum-cadence-python-capacity.txt": "43a6d74e0b5eed911910301faae3ec0911a365f8af568713663a995370ec3a1d",
+    "contrib/sharepool/results/datum-cadence-python-checks.json": "9d470cfc25cfc6f127c9390724f5a79f91a58a1afb9ecd86e34304154753a492",
+    "contrib/sharepool/results/datum-cadence-python-compact-model.txt": "4b3f0d58a4f1fee4e872aa203a4f07693028eef1d21e41e86d1e49ad089fa4db",
+    "contrib/sharepool/results/datum-cadence-python-hash.txt": "024f424fe62d319b2f7510fa20baef514d9976e823ce4d6bab27dd7271a65b3f",
+    "contrib/sharepool/results/datum-cadence-python-tides.txt": "e41db52ebcd26ba6a5c80368db87ee97f59a9980d2a7cdcf5e00b04cd5cb1006",
+    "contrib/sharepool/results/datum-cadence-python-traffic-model.txt": "e8e78005a9f9fda8791933487bd12a7019da9e1e5f5e5a16473c9403ff97d943",
+    "contrib/sharepool/results/datum-cadence-source-hashes.json": "4186da4133f06516c8f21f3132fcb342f9e38e54cff1467a0c6f19fda98e03f5",
+    "contrib/sharepool/results/datum-traffic-40s.json": "a3b9f27bff21e3a72cb6932190c3c4a8a684d37e1f59af2fa69e358570c089c8",
+    "contrib/sharepool/results/datum-traffic-encoder.json": "0e164539aca524b279cb0dde830393cd454b3042d8df740651d4041eba02bdc0"
+  }
+}

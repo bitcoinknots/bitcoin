@@ -1,0 +1,19 @@
+2026-09-16T01:09:56.522000Z TestFramework (INFO): User supplied random seed 20260915
+2026-09-16T01:09:56.522000Z TestFramework (INFO): PRNG seed is: 20260915
+2026-09-16T01:09:56.522000Z TestFramework (DEBUG): Setting up network thread
+2026-09-16T01:09:56.522000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-repeated-body-ab-20260915-o73ifr4p/final/run-1/nodes
+2026-09-16T01:09:56.525000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-16T01:09:56.526000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-16T01:09:57.566000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-16T01:09:57.569000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-16T01:10:21.059000Z TestFramework (INFO): Live block 102 admitted 67 proofs; source continues independently
+2026-09-16T01:10:41.803000Z TestFramework (INFO): Live block 103 admitted 69 proofs; source continues independently
+2026-09-16T01:11:01.481000Z TestFramework (INFO): Live block 104 admitted 64 proofs; source continues independently
+2026-09-16T01:11:02.035000Z TestFramework (DEBUG): Closing down network thread
+2026-09-16T01:11:02.095000Z TestFramework (INFO): Stopping nodes
+2026-09-16T01:11:02.095000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-16T01:11:02.096000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-16T01:11:02.277000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-16T01:11:02.277000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-16T01:11:02.277000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-repeated-body-ab-20260915-o73ifr4p/final/run-1/nodes
+2026-09-16T01:11:02.277000Z TestFramework (INFO): Tests successful

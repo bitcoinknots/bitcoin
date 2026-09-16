@@ -1,0 +1,142 @@
+{
+  "network": "isolated native regtest",
+  "profile": "hash-only-v8-vardiff-tides",
+  "transport": "two independent loopback Sia listeners; one active client per identity",
+  "hardware_used": false,
+  "injected_controller_clock": true,
+  "daemon_sha256": "f889cf8d0e4108a8e40aea7174109d3c6fec14e0713521493e5309cc301346db",
+  "source_sha256": {
+    "contrib/sharepool/hash_mining_gate.py": "bcf2f8a26a0159af7dfc54e372174da0c6bb78a83d32d61760df4f0c3a421ed0",
+    "contrib/sharepool/hash_job_scheduler.py": "8617b86fd3f80574e1bd947dc73e8b4552f56fe17d4dec89a108822a4de78eb6",
+    "contrib/sharepool/hash_stratum.py": "c58408b43ba7270f312be19f01a7f43b222f5f2d145581d776f5dc50c9ecf4d3",
+    "contrib/sharepool/hash_vardiff.py": "a2f855cc5f89748f622b1b59ea4d2435efaba38edbc7d561bb69079622086e3d",
+    "contrib/sharepool/hash_stratum_runner.py": "5e6c64429a51d5d5594666d9104c4f3d93656fb8fd9f8afb58dcaa3667c6483e",
+    "test/functional/feature_sharepool_hash_vardiff_stratum.py": "26dabe067a218a98c6897e7981d0a28c692f6ec21cf6279f9b73cf8fa61b210a"
+  },
+  "checks": [
+    "explicit_registration_first_proof_without_missing_recovery",
+    "wire_submissions_no_missing_origin_recovery",
+    "independent_signed_assignments_and_real_notifications",
+    "wire_difficulty_matches_union_of_assigned_and_native_targets",
+    "one_active_client_per_identity",
+    "eight_native_validated_shares_without_refresh",
+    "duplicate_does_not_affect_estimator",
+    "retarget_only_on_due_refresh",
+    "other_identity_assignment_unchanged",
+    "late_old_target_share_keeps_original_work",
+    "all_gate_rpc_calls_on_owner_thread",
+    "native_only_winner_exact_bytes_accepted",
+    "native_only_winner_not_credited",
+    "exact_work_weighted_coinbase_payouts",
+    "native_verifychain",
+    "standalone_cli_startup_default_cadence_and_shutdown"
+  ],
+  "explicit_registration": {
+    "initial_native_missing_origins": 2,
+    "first_receives": [
+      {
+        "owner": 0,
+        "proof_id": "aae0d479beb8688551821bc1663e888797208afcbec76e10cdb53d933a1cbc75",
+        "proof_rpcs": 1,
+        "template_recovery_rpcs": 0,
+        "snapshot_replay_rpcs": 0
+      },
+      {
+        "owner": 0,
+        "proof_id": "03bd135c9d73879b6a777ab6f3ec59382a27faa312376c3cfdb648c451b384b4",
+        "proof_rpcs": 1,
+        "template_recovery_rpcs": 0,
+        "snapshot_replay_rpcs": 0
+      },
+      {
+        "owner": 1,
+        "proof_id": "aae0d479beb8688551821bc1663e888797208afcbec76e10cdb53d933a1cbc75",
+        "proof_rpcs": 1,
+        "template_recovery_rpcs": 0,
+        "snapshot_replay_rpcs": 0
+      },
+      {
+        "owner": 1,
+        "proof_id": "03bd135c9d73879b6a777ab6f3ec59382a27faa312376c3cfdb648c451b384b4",
+        "proof_rpcs": 1,
+        "template_recovery_rpcs": 0,
+        "snapshot_replay_rpcs": 0
+      }
+    ]
+  },
+  "transport_proof_rpcs": 10,
+  "retarget": {
+    "share_work_bits": 1,
+    "target_share_seconds": 10,
+    "retarget_seconds": 40,
+    "window_elapsed_seconds": 0,
+    "window_accepted_shares": 1,
+    "window_accepted_work": 1,
+    "adjustments": 1,
+    "observations": 1,
+    "last_estimate": {
+      "elapsed_seconds": 40.0,
+      "accepted_shares": 8,
+      "accepted_work": 8,
+      "estimated_hashes_per_second": 0.2,
+      "previous_work_bits": 0,
+      "next_work_bits": 1
+    },
+    "admission_paused": false,
+    "physical_hashrate_attested": false
+  },
+  "native_only_block": "53f6a3505990498fcf2df6a05cdab7b960a8100d7ff834b6fa9cd8a0ed9c8102",
+  "notify_job_ids": [
+    "2fd9be37d7e953c4e999392ec9f788fc632077fc3e08c1232789ba77ca01a078",
+    "214cb36b76e5d4e9816049bbad280deead3d051865942cec36c2785b5fbb4752"
+  ],
+  "initial_wire_difficulties": [
+    2.328306436538696e-10,
+    4.65661342818897e-10
+  ],
+  "initial_assignments": [
+    0,
+    6
+  ],
+  "service_stats": [
+    {
+      "published": 2,
+      "acknowledged": 9,
+      "duplicate": 1,
+      "rejected": 0,
+      "capacity_refused": 0,
+      "submitted_candidates": 0,
+      "accepted_candidates": 0,
+      "candidate_rpc_failures": 0,
+      "candidate_rejections": 0,
+      "native_only_candidates": 0
+    },
+    {
+      "published": 2,
+      "acknowledged": 0,
+      "duplicate": 0,
+      "rejected": 0,
+      "capacity_refused": 0,
+      "submitted_candidates": 1,
+      "accepted_candidates": 1,
+      "candidate_rpc_failures": 0,
+      "candidate_rejections": 0,
+      "native_only_candidates": 1
+    }
+  ],
+  "payouts": {
+    "00140101010101010101010101010101010101010101": 76923076,
+    "00140202020202020202020202020202020202020202": 4923076923
+  },
+  "native_only_receipt_revision_unchanged": true,
+  "standalone_runner": {
+    "exit_code": 0,
+    "v8_job_published": true,
+    "listener_closed": true,
+    "chain_and_network_unchanged": true,
+    "target_share_seconds": 6,
+    "retarget_seconds": 24,
+    "assigned_work_bits": 6,
+    "bitcoin_cli_sha256": "f91a8b6da17996f7166e4474418824b2db947c35ddd90cd7b059ec8f77b91b80"
+  }
+}

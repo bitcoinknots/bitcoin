@@ -1,0 +1,31 @@
+2026-09-13T17:30:05.546000Z TestFramework (INFO): PRNG seed is: 6580641209524658396
+2026-09-13T17:30:05.546000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-resource-budget-heavy-replay
+2026-09-13T17:30:05.921000Z TestFramework (INFO): Copied stopped native state and300 sealed public receipts; source capture is untouched
+2026-09-13T17:30:06.178000Z TestFramework (ERROR): Unexpected exception
+Traceback (most recent call last):
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_framework.py", line 132, in main
+    self.setup()
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_framework.py", line 302, in setup
+    self.setup_network()
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_tides.py", line 45, in setup_network
+    self.setup_nodes()
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_framework.py", line 415, in setup_nodes
+    self.start_nodes()
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_framework.py", line 574, in start_nodes
+    node.wait_for_rpc_connection()
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_node.py", line 294, in wait_for_rpc_connection
+    raise FailedToStartError(self._node_msg(
+test_framework.test_node.FailedToStartError: [node 0] bitcoind exited with status 1 during initialization. Error: Failed to initialize ChainstateManager: TIDES datadir profile, activation schedule or blocks directory mismatch; use the original configuration or a fresh datadir.
+************************
+
+2026-09-13T17:30:06.243000Z TestFramework (INFO): Not stopping nodes as test failed. The dangling processes will be cleaned up later.
+2026-09-13T17:30:06.243000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-resource-budget-heavy-replay
+2026-09-13T17:30:06.243000Z TestFramework (ERROR): Test failed. Test logging available at /private/tmp/sharepool-resource-budget-heavy-replay/test_framework.log
+2026-09-13T17:30:06.243000Z TestFramework (ERROR): 
+2026-09-13T17:30:06.244000Z TestFramework (ERROR): Hint: Call /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/combine_logs.py '/private/tmp/sharepool-resource-budget-heavy-replay' to consolidate all logs
+2026-09-13T17:30:06.244000Z TestFramework (ERROR): 
+2026-09-13T17:30:06.244000Z TestFramework (ERROR): If this failure happened unexpectedly or intermittently, please file a bug and provide a link or upload of the combined log.
+2026-09-13T17:30:06.244000Z TestFramework (ERROR): https://github.com/bitcoinknots/bitcoin/issues
+2026-09-13T17:30:06.244000Z TestFramework (ERROR): 
+[node 1] Cleaning up leftover process
+[node 0] Cleaning up leftover process

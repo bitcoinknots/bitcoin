@@ -1,0 +1,14 @@
+Finished service-contract scenario 1/11: pool=0.1, shift=10, kind=uncongested_variance
+Finished service-contract scenario 2/11: pool=0.1, shift=12, kind=uncongested_variance
+Finished service-contract scenario 3/11: pool=0.1, shift=14, kind=uncongested_variance
+Finished service-contract scenario 4/11: pool=0.01, shift=10, kind=uncongested_variance
+Finished service-contract scenario 5/11: pool=0.01, shift=12, kind=uncongested_variance
+Finished service-contract scenario 6/11: pool=0.01, shift=14, kind=uncongested_variance
+Finished service-contract scenario 7/11: pool=0.001, shift=10, kind=uncongested_variance
+Finished service-contract scenario 8/11: pool=0.001, shift=12, kind=uncongested_variance
+Finished service-contract scenario 9/11: pool=0.001, shift=14, kind=uncongested_variance
+Finished service-contract scenario 10/11: pool=1, shift=12, kind=global_capacity_control
+Finished service-contract scenario 11/11: pool=1, shift=14, kind=global_capacity_control
+real 1247.94
+user 4767.47
+sys 55.27

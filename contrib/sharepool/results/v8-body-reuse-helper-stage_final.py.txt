@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+from pathlib import Path
+import configparser, datetime, hashlib, json, shutil, subprocess
+base=Path(__file__).resolve().parent
+repo=Path("/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool")
+root=base/"final"
+assert not root.exists(), "Preserve any prior final stage"
+source=root/"source"; source.mkdir(parents=True)
+paths=sorted(p for directory in (repo/"test/functional",repo/"contrib/sharepool",repo/"share/rpcauth") for p in directory.rglob("*.py") if "__pycache__" not in p.parts)
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+for original in paths:
+    saved=source/original.relative_to(repo); saved.parent.mkdir(parents=True,exist_ok=True); shutil.copy2(original,saved)
+native=root/"native";(native/"bin").mkdir(parents=True);(native/"test").mkdir()
+binaries={}
+for name in ("bitcoind","bitcoin-sharepool-signer","bitcoin-cli"):
+    original=Path("/private/tmp/sharepool-native-build/bin")/name;saved=native/"bin"/name;shutil.copy2(original,saved)
+    assert sha(original)==sha(saved)
+    binaries[name]={"original":str(original),"saved":str(saved),"sha256":sha(saved),"bytes":saved.stat().st_size}
+config=configparser.ConfigParser();config.read(base/"baseline/original-config.ini")
+config["environment"]["SRCDIR"]=str(source);config["environment"]["BUILDDIR"]=str(native);config["environment"]["RPCAUTH"]=str(source/"share/rpcauth/rpcauth.py")
+with (native/"test/config.ini").open("w") as f:config.write(f)
+patch=subprocess.check_output(["git","diff","--binary","HEAD"],cwd=repo);(root/"source.patch").write_bytes(patch)
+manifest={"created_utc":datetime.datetime.now(datetime.timezone.utc).isoformat(),"repository":str(repo),"head":subprocess.check_output(["git","rev-parse","HEAD"],cwd=repo,text=True).strip(),
+    "source_origin":"Frozen working tree after root releases code and successful build", "source":str(source),"python_files":len(paths),
+    "python_sha256":{str(p.relative_to(repo)):sha(source/p.relative_to(repo)) for p in paths},"binaries":binaries,"config":{"path":str(native/"test/config.ini"),"sha256":sha(native/"test/config.ini")},"patch_sha256":sha(root/"source.patch")}
+base_manifest=json.loads((base/"baseline-manifest.json").read_text())
+runner="test/functional/feature_sharepool_hash_live_capacity.py"
+assert manifest["python_sha256"][runner]==base_manifest["python_sha256"][runner],"Benchmark runner changed; review fairness before running"
+(base/"final-manifest.json").write_text(json.dumps(manifest,indent=2)+"\n")
+print(json.dumps({"source":str(source),"files":len(paths),"binaries":binaries},indent=2))

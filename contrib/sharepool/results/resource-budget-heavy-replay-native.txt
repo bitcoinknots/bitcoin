@@ -1,0 +1,12 @@
+2026-09-13T17:33:30.143000Z TestFramework (INFO): PRNG seed is: 9193442878555287398
+2026-09-13T17:33:30.143000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-resource-budget-heavy-replay-fresh
+2026-09-13T17:33:30.706000Z TestFramework (INFO): Copied and checked exact genesis-through102 native records and300 sealed public receipts
+2026-09-13T17:33:31.276000Z TestFramework (INFO): Fresh native nodes revalidate the captured101-block ancestry
+2026-09-13T17:35:06.993000Z TestFramework (INFO): Follower recovered the captured201-proof block; authenticating original300 receipt order
+2026-09-13T17:36:14.751000Z TestFramework (INFO): Native replay verified25/99 original receipts
+2026-09-13T17:37:21.840000Z TestFramework (INFO): Native replay verified50/99 original receipts
+2026-09-13T17:38:28.882000Z TestFramework (INFO): Native replay verified75/99 original receipts
+2026-09-13T17:39:33.654000Z TestFramework (INFO): Native replay verified99/99 original receipts
+2026-09-13T17:40:29.070000Z TestFramework (INFO): Stopping nodes
+2026-09-13T17:40:29.306000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-resource-budget-heavy-replay-fresh
+2026-09-13T17:40:29.306000Z TestFramework (INFO): Tests successful

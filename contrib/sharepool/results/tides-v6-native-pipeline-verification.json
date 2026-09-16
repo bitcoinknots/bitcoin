@@ -1,0 +1,151 @@
+{
+  "schema": 1,
+  "scope": "Experimental opt-in separate-pool v6 TIDES, isolated native regtest only",
+  "result": "passed",
+  "physical_miners_used": 0,
+  "gpu_used": false,
+  "network": "Two disposable native regtest nodes connected through existing Bitcoin P2P, transport v1",
+  "observed_binaries": {
+    "bitcoind_sha256": "08411d5c044f41264321761598e90f848585dff9c32bc3a10ea5656b4e2b0a17",
+    "bitcoin-sharepool-signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f"
+  },
+  "binary_provenance": {
+    "state_at_run": "Uncommitted v6 working tree; exact executed native binary is identified by its SHA256 above",
+    "tiny_tests_loaded_observed_binary": "Observed binary mtime 2026-09-13T06:40:54.235294Z precedes both node launches at 2026-09-13T06:41:47Z",
+    "subsequent_bitcoind_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+    "subsequent_native_change": "The only native change after these runs pins Blake2bHeadline in the v6 startup datadir-profile marker. It does not change payout accounting or snapshot rules.",
+    "coverage_statement": "These artifacts describe runs of 08411d5c..., not runs of the later 86ab0ebd... binary. The later startup guard has separate verification."
+  },
+  "reproduction": [
+    "Run command_argv from the repository root after building bitcoind and bitcoin-sharepool-signer with native functional tests enabled.",
+    "stdout_and_stderr_redirect is the exact original output redirection. The commands are recorded as argv, without shell quoting.",
+    "Change --configfile to the generated test/config.ini of your local build, and choose unused temporary directories and port seeds.",
+    "Fresh native signer keys and varying wall-clock times produce different commitments. Reproduce the passing assertions, not identical random hashes or timings.",
+    "The tests overlapped and share local machine resources. Reported wall time is regression-test duration, not a throughput benchmark."
+  ],
+  "sanitization": "Temporary test directory paths in successful logs are replaced with <TEST_TMPDIR>. The result JSON is copied unchanged. No signer secrets, RPC credentials, hardware configuration or failed-run logs are included.",
+  "limits": [
+    "The 100-miner case uses 100 separate logical gates and signer keys, with one validating native node and one P2P follower; it does not use 100 native nodes.",
+    "All 100 independent valid transactions and 100 distinct native templates are checked. The collector admits all 100 proofs; full 100-by-100 replication between miner gates is not simulated.",
+    "At this deliberately easy regtest target, share PoW uses the maximum 256-bit target and unit work. The exact eight-network-work window spans 16 full shares and part of a 17th, so admission of 100 proofs does not imply all 100 recipients earn from that block.",
+    "Admission order is canonical native block order followed by increasing numeric proof ID within each block. It is not wall-clock receipt order; the window visits that ordering backwards.",
+    "A cutoff inside one large admission batch selects the largest numeric proof IDs first. These tests neither measure nor rule out withholding, proof selection or grinding advantages around that boundary.",
+    "The cases do not establish equal payout variance to a regular pool, mainnet proof sampling calibration, WAN latency, sustained capacity, data-availability resilience or adversarial fairness.",
+    "The miner gate checks its locally acknowledged work. Only work admitted into canonical pool history becomes recurring reward-eligible; a provisional local receipt is not an unconditional future payment guarantee.",
+    "The same recipient script can participate in different pools without an ownership signature; per-job pool and recipient bindings remain immutable.",
+    "The tiny-reward cases verify current builder behavior: no payout fix was needed because the normal witness commitment preserves a nonempty coinbase when all monetary payouts floor to zero."
+  ],
+  "cases": [
+    {
+      "name": "100-miners",
+      "result": "passed",
+      "exit_code": 0,
+      "command_argv": [
+        "python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_tides_100_miners.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides100-v6-final",
+        "--portseed=809",
+        "--results=/private/tmp/sharepool-tides100-v6-final.json"
+      ],
+      "stdout_and_stderr_redirect": "/private/tmp/sharepool-tides100-v6-final.log",
+      "activation_height": 102,
+      "native_args_each_node": [
+        "-sharepoolheight=102",
+        "-sharepoolhashonly=1",
+        "-sharepooltides=1",
+        "-testactivationheight=blake2b@1",
+        "-disablewallet"
+      ],
+      "observed_native_binary_sha256": "08411d5c044f41264321761598e90f848585dff9c32bc3a10ea5656b4e2b0a17",
+      "test_source_sha256": "6f25c2303c4bf023137d1ed8bf0c75c058a9e00ea5642b165a45cf998abfbf30",
+      "framework_first_log_utc": "2026-09-13T06:43:03.934000+00:00",
+      "framework_last_log_utc": "2026-09-13T06:44:04.992000+00:00",
+      "framework_log_elapsed_seconds": 61.058,
+      "artifact_log": "tides-v6-100-miners-log.txt",
+      "original_log_sha256": "e173485cabac46630c97856b6b08fbfba69003e554a13945e728ac9a11032fc9",
+      "sanitized_log_sha256": "4681418ee8fac76eb99076e64bc054307b88fb2f0dea1fe1ae92e572d5755658",
+      "result_json": "tides-v6-100-miners.json",
+      "result_json_sha256": "7881eb1b87ddee8aa9a9dddada3f5ebefd6217e34cd316089f48c8a70cd06fe7",
+      "run_test_body_elapsed_seconds": 60.223
+    },
+    {
+      "name": "zero-floor",
+      "result": "passed",
+      "exit_code": 0,
+      "command_argv": [
+        "python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_tides_zero_reward.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-zero-floor-v6-second",
+        "--portseed=807"
+      ],
+      "stdout_and_stderr_redirect": "/private/tmp/sharepool-tides-zero-floor-v6-second.log",
+      "activation_height": 4800,
+      "native_args_each_node": [
+        "-sharepoolheight=4800",
+        "-sharepoolhashonly=1",
+        "-sharepooltides=1",
+        "-testactivationheight=blake2b@1",
+        "-disablewallet"
+      ],
+      "observed_native_binary_sha256": "08411d5c044f41264321761598e90f848585dff9c32bc3a10ea5656b4e2b0a17",
+      "test_source_sha256": "f48d3bdec58cdd54759fc29f0cbb54e590d62831d6a890c63e7af9dde104f599",
+      "framework_first_log_utc": "2026-09-13T06:41:47.037000+00:00",
+      "framework_last_log_utc": "2026-09-13T06:43:46.856000+00:00",
+      "framework_log_elapsed_seconds": 119.819,
+      "artifact_log": "tides-v6-zero-floor-log.txt",
+      "original_log_sha256": "f8e281933f8d4b2d7838aac15138e313ff59a8c6131ccf8455c8350a24dae097",
+      "sanitized_log_sha256": "ad617154793cc934704bec92eaea246b701d33b117c31343d5b6ed46220eab55",
+      "subsidy_satoshis": 1,
+      "positive_monetary_outputs": 0,
+      "coinbase_outputs": 1,
+      "sole_coinbase_output": "Normal zero-value BIP141 witness commitment",
+      "native_builder_and_gate_dispatch_verified": true,
+      "malformed_payout_rejected": true,
+      "repeated_reward_p2p_and_reindex_chainstate_verified": true,
+      "eligible_recipient_scripts": 2
+    },
+    {
+      "name": "zero-subsidy",
+      "result": "passed",
+      "exit_code": 0,
+      "command_argv": [
+        "python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_tides_zero_reward.py",
+        "--activation-height=4950",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-zero-subsidy-v6-second",
+        "--portseed=808"
+      ],
+      "stdout_and_stderr_redirect": "/private/tmp/sharepool-tides-zero-subsidy-v6-second.log",
+      "activation_height": 4950,
+      "native_args_each_node": [
+        "-sharepoolheight=4950",
+        "-sharepoolhashonly=1",
+        "-sharepooltides=1",
+        "-testactivationheight=blake2b@1",
+        "-disablewallet"
+      ],
+      "observed_native_binary_sha256": "08411d5c044f41264321761598e90f848585dff9c32bc3a10ea5656b4e2b0a17",
+      "test_source_sha256": "f48d3bdec58cdd54759fc29f0cbb54e590d62831d6a890c63e7af9dde104f599",
+      "framework_first_log_utc": "2026-09-13T06:41:47.669000+00:00",
+      "framework_last_log_utc": "2026-09-13T06:43:54.519000+00:00",
+      "framework_log_elapsed_seconds": 126.85,
+      "artifact_log": "tides-v6-zero-subsidy-log.txt",
+      "original_log_sha256": "57bc99860833201e5667a310568d98091cec572473d3c2a28488379a50d663de",
+      "sanitized_log_sha256": "494f1df086d396d87dd3daf41a99bae18d14ef50fdae371f4823cbffecc9c245",
+      "subsidy_satoshis": 0,
+      "positive_monetary_outputs": 0,
+      "coinbase_outputs": 1,
+      "sole_coinbase_output": "Normal zero-value BIP141 witness commitment",
+      "native_builder_and_gate_dispatch_verified": true,
+      "malformed_payout_rejected": true,
+      "repeated_reward_p2p_and_reindex_chainstate_verified": true,
+      "eligible_recipient_scripts": 2
+    }
+  ]
+}

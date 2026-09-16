@@ -110,6 +110,7 @@ add_executable(fuzz
   scriptnum_ops.cpp
   secp256k1_ec_seckey_import_export_der.cpp
   secp256k1_ecdsa_signature_parse_der_lax.cpp
+  sharepool.cpp
   signature_checker.cpp
   signet.cpp
   socks5.cpp

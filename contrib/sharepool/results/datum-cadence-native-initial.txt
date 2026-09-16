@@ -1,0 +1,25 @@
+2026-09-14T04:09:49.531000Z TestFramework (INFO): PRNG seed is: 5627805320106311808
+2026-09-14T04:09:49.531000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-datum-cadence-native-1
+2026-09-14T04:09:51.049000Z TestFramework (INFO): The first job freezes its exact snapshot and one-recipient coinbase
+2026-09-14T04:09:51.198000Z TestFramework (INFO): A real mempool transaction and late ACK do not rewrite or repeatedly rebuild active work
+2026-09-14T04:09:51.225000Z TestFramework (INFO): At the 40-second deadline the next native job includes the transaction and both ACKs
+2026-09-14T04:09:51.381000Z TestFramework (INFO): A solved older job remains valid with its original commitment and original payout
+2026-09-14T04:09:51.387000Z TestFramework (ERROR): Unexpected exception
+Traceback (most recent call last):
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/test_framework.py", line 136, in main
+    self.run_test()
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/feature_sharepool_hash_datum_cadence.py", line 170, in run_test
+    assert_equal(node.submitblock(original_block.serialize().hex()), None)
+  File "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/test_framework/util.py", line 77, in assert_equal
+    raise AssertionError("not(%s)" % " == ".join(str(arg) for arg in (thing1, thing2) + args))
+AssertionError: not(sharepool-hash-data-missing == None)
+2026-09-14T04:09:51.449000Z TestFramework (INFO): Not stopping nodes as test failed. The dangling processes will be cleaned up later.
+2026-09-14T04:09:51.449000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-datum-cadence-native-1
+2026-09-14T04:09:51.449000Z TestFramework (ERROR): Test failed. Test logging available at /private/tmp/sharepool-datum-cadence-native-1/test_framework.log
+2026-09-14T04:09:51.449000Z TestFramework (ERROR):
+2026-09-14T04:09:51.449000Z TestFramework (ERROR): Hint: Call /Users/jeronimolopez/Desktop/untitled folder/knots-sharepool/test/functional/combine_logs.py '/private/tmp/sharepool-datum-cadence-native-1' to consolidate all logs
+2026-09-14T04:09:51.449000Z TestFramework (ERROR):
+2026-09-14T04:09:51.449000Z TestFramework (ERROR): If this failure happened unexpectedly or intermittently, please file a bug and provide a link or upload of the combined log.
+2026-09-14T04:09:51.449000Z TestFramework (ERROR): https://github.com/bitcoinknots/bitcoin/issues
+2026-09-14T04:09:51.449000Z TestFramework (ERROR):
+[node 0] Cleaning up leftover process

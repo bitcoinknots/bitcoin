@@ -1,0 +1,9 @@
+Finished conditional case 1/6: pool=0.1, shift=12
+Finished conditional case 2/6: pool=0.1, shift=14
+Finished conditional case 3/6: pool=0.01, shift=12
+Finished conditional case 4/6: pool=0.01, shift=14
+Finished conditional case 5/6: pool=0.001, shift=12
+Finished conditional case 6/6: pool=0.001, shift=14
+real 328.31
+user 1281.82
+sys 16.28

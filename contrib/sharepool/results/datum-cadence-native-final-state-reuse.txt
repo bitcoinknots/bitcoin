@@ -1,0 +1,11 @@
+2026-09-14T04:16:02.714000Z TestFramework (INFO): PRNG seed is: 8499416602843658686
+2026-09-14T04:16:02.714000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-datum-cadence-final-state-reuse
+2026-09-14T04:16:03.503000Z TestFramework (INFO): Create an actual native parent with two admitted recipients
+2026-09-14T04:16:04.267000Z TestFramework (INFO): Warm state calculations retain fresh native proof checks and header reads
+2026-09-14T04:16:04.289000Z TestFramework (INFO): Reject an exact-header witness-body substitution before the proof endpoint
+2026-09-14T04:16:04.289000Z TestFramework (INFO): A same-tip node without the full job body triggers exactly one bounded recovery
+2026-09-14T04:16:04.323000Z TestFramework (INFO): Same-tip daemon restart cannot substitute cached Python state for a native verdict
+2026-09-14T04:16:04.808000Z TestFramework (INFO): Recovered work settles to the exact 3:2 native coinbase payouts
+2026-09-14T04:16:05.071000Z TestFramework (INFO): Stopping nodes
+2026-09-14T04:16:05.253000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-datum-cadence-final-state-reuse
+2026-09-14T04:16:05.253000Z TestFramework (INFO): Tests successful

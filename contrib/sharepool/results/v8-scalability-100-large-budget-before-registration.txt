@@ -1,0 +1,33 @@
+2026-09-14T15:34:30.691000Z TestFramework (INFO): User supplied random seed 110060
+2026-09-14T15:34:30.691000Z TestFramework (INFO): PRNG seed is: 110060
+2026-09-14T15:34:30.691000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v8-scale-100-1m
+2026-09-14T15:35:16.995000Z TestFramework (INFO): Live block 102 admitted 188 proofs; source continues independently
+2026-09-14T15:35:40.550000Z TestFramework (INFO): Live block 103 admitted 41 proofs; source continues independently
+2026-09-14T15:36:03.862000Z TestFramework (INFO): Live block 104 admitted 29 proofs; source continues independently
+2026-09-14T15:36:27.365000Z TestFramework (INFO): Live block 105 admitted 24 proofs; source continues independently
+2026-09-14T15:36:50.720000Z TestFramework (INFO): Live block 106 admitted 23 proofs; source continues independently
+2026-09-14T15:37:13.574000Z TestFramework (INFO): Live block 107 admitted 34 proofs; source continues independently
+2026-09-14T15:37:36.194000Z TestFramework (INFO): Live block 108 admitted 39 proofs; source continues independently
+2026-09-14T15:37:59.131000Z TestFramework (INFO): Live block 109 admitted 38 proofs; source continues independently
+2026-09-14T15:38:22.158000Z TestFramework (INFO): Live block 110 admitted 35 proofs; source continues independently
+2026-09-14T15:38:44.867000Z TestFramework (INFO): Live block 111 admitted 32 proofs; source continues independently
+2026-09-14T15:39:07.984000Z TestFramework (INFO): Live block 112 admitted 32 proofs; source continues independently
+2026-09-14T15:39:31.451000Z TestFramework (INFO): Live block 113 admitted 33 proofs; source continues independently
+2026-09-14T15:39:54.345000Z TestFramework (INFO): Live block 114 admitted 34 proofs; source continues independently
+2026-09-14T15:40:17.642000Z TestFramework (INFO): Live block 115 admitted 34 proofs; source continues independently
+2026-09-14T15:40:40.820000Z TestFramework (INFO): Live block 116 admitted 32 proofs; source continues independently
+2026-09-14T15:41:03.589000Z TestFramework (INFO): Live block 117 admitted 31 proofs; source continues independently
+2026-09-14T15:41:26.524000Z TestFramework (INFO): Live block 118 admitted 32 proofs; source continues independently
+2026-09-14T15:41:49.706000Z TestFramework (INFO): Live block 119 admitted 32 proofs; source continues independently
+2026-09-14T15:42:13.161000Z TestFramework (INFO): Live block 120 admitted 33 proofs; source continues independently
+2026-09-14T15:42:36.232000Z TestFramework (INFO): Live block 121 admitted 33 proofs; source continues independently
+2026-09-14T15:42:59.355000Z TestFramework (INFO): Live block 122 admitted 32 proofs; source continues independently
+2026-09-14T15:43:22.410000Z TestFramework (INFO): Live block 123 admitted 32 proofs; source continues independently
+2026-09-14T15:43:45.290000Z TestFramework (INFO): Live block 124 admitted 31 proofs; source continues independently
+2026-09-14T15:44:08.276000Z TestFramework (INFO): Live block 125 admitted 31 proofs; source continues independently
+2026-09-14T15:44:31.304000Z TestFramework (INFO): Live block 126 admitted 32 proofs; source continues independently
+2026-09-14T15:44:53.824000Z TestFramework (INFO): Live block 127 admitted 32 proofs; source continues independently
+2026-09-14T15:44:55.655000Z TestFramework (INFO): Live block 128 admitted 1 proofs; source continues independently
+2026-09-14T15:45:00.861000Z TestFramework (INFO): Stopping nodes
+2026-09-14T15:45:01.043000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v8-scale-100-1m
+2026-09-14T15:45:01.043000Z TestFramework (INFO): Tests successful

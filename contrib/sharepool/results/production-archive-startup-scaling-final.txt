@@ -1,0 +1,24 @@
+{
+  "result": "passed",
+  "cases": [
+    {
+      "receipts": 100,
+      "verification_wall_p50_reduction_fraction": 0.29433847218508646,
+      "verification_cpu_p50_reduction_fraction": 0.2943026825708379,
+      "rollover_wall_reduction_fraction": 0.4295713785473213
+    },
+    {
+      "receipts": 1000,
+      "verification_wall_p50_reduction_fraction": 0.3244312284742954,
+      "verification_cpu_p50_reduction_fraction": 0.3241377775909934,
+      "rollover_wall_reduction_fraction": 0.46205868695396835
+    },
+    {
+      "receipts": 5000,
+      "verification_wall_p50_reduction_fraction": 0.34777639036873154,
+      "verification_cpu_p50_reduction_fraction": 0.34775643884726615,
+      "rollover_wall_reduction_fraction": 0.43799948218210605
+    }
+  ],
+  "wall_seconds": 17.76414175
+}

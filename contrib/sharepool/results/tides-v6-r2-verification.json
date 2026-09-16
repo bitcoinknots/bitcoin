@@ -1,0 +1,114 @@
+{
+  "schema": 1,
+  "profile": "hash-only-v6-tides",
+  "rules_revision": 2,
+  "network": "fresh opt-in isolated regtest",
+  "source_base_commit": "590cfe6b043ea64bffebb03624e22a9f4b949e4c",
+  "source_files_sha256": {
+    "contrib/sharepool/hash_gate_inventory.py": "2bf60749366de6217391626315d7591b5fb3029bc95c1c164f019b6b1f27860b",
+    "contrib/sharepool/hash_mining_gate.py": "88f2f456aa17f2f7f971d70a56a7c993a60ef55415bf0b2999ecc12a4d97efa9",
+    "contrib/sharepool/hash_snapshot.py": "712f34059ac045dbfdef70b97f65408c1dd6f07942964268bd7753ac1e1d55d2",
+    "contrib/sharepool/test_hash_tides_cross_pool.py": "0d08f0f7e2209d099c453ddf461a33b6025a22f8f95812c4864c8c7a2a275b25",
+    "contrib/sharepool/test_tides_admission_audit.py": "38c3d94db47f39274f693121df585eaf962959fcd3ecdeb8177dce03c20374ef",
+    "contrib/sharepool/test_tides_calibration.py": "c922d92d46a084aa98afe6b647b30866a6cf1c1d805b219d6ee9b042455b8b01",
+    "contrib/sharepool/tides_admission_audit.py": "801e9b0e6394a86bbca4519662fcf3ec11ce532eb3d7979b606e2c8c64ff0196",
+    "contrib/sharepool/tides_calibration.py": "8c15d1142949c2253ce73b0bddff56b1ab04c58f3176a9f011960be89792c177",
+    "contrib/sharepool/verify_tides_hardware_capture.py": "1118a2fdfcfe9070e6c771f7cdac0ef3c0a2c6c9d348bfa7bb2e4d47bc747430",
+    "src/consensus/sharepool_hash.cpp": "3eff48a7911e8cdb8ced47add1918478aeb54c99c290929c4d928baa644ee2fc",
+    "src/init.cpp": "bed422bda9c27d71a739719a579188f78ec7174f4d546d2fb4a69e75dca5d39f",
+    "src/kernel/chainstatemanager_opts.h": "034e2865d90204f0b2addddce87604fc9cacd3801b6edc9052cb5eb5e7f6996e",
+    "src/net_processing.cpp": "f2030edcdb4c14472b4e794e0a320b13c3a5f07be91d4556201b681f27707845",
+    "src/node/chainstatemanager_args.cpp": "94da3c68e8044f8eaf7affc0664b5a2c5c6b88dfb14473b6ecca4c8eb3e3533f",
+    "src/rpc/client.cpp": "86e85b33caf946eb24474a8b8cbbf8410c666e018214cd687031d711d8bd7622",
+    "src/rpc/mining.cpp": "2981fcc166c178250478a9f0cb1453f10fb689afaee06ce47e8c5456a008a638",
+    "src/sharepool/hash_relay.h": "73fd5f235f1d4187fb06c20b930db7d0be051ed4acb178ac9aa09f3ef96cc6fe",
+    "src/sharepool/hash_store.cpp": "0f45b2c84efa0730376053043829b8b7a5aaac492a9d3e144ee18dd86908cfcc",
+    "src/sharepool/hash_store.h": "3b139a8f7c98c6520af4bd7b774d5469ab8221b4daa5e928f7ec4b63fb35b097",
+    "src/sharepool/tides.h": "6a9889c0748f440d5b0260dbe5db1167de2ffa7bc3dcaa12a372d225f678eb17",
+    "src/sharepool/tides_history.cpp": "9bda5862cbbeb92b76c16d59ca44cffb0a1e0fe9ac171d8e17eece352f0caa35",
+    "src/sharepool/tides_history.h": "fdadb61bac94eec841f84febbf6285d9971cd10b0b7ae616725f970b056734a7",
+    "src/test/sharepool_hash_relay_tests.cpp": "f6b6dc8f452d21b3626d3e60731de9e76227006e398bea0f9544fdf31091551e",
+    "src/test/sharepool_hash_store_tests.cpp": "0929a096d00372e410ae096fbcfb13724cc1baac8d7e516b2c9e05f65dcc5f31",
+    "src/test/sharepool_tides_consensus_tests.cpp": "a4bfae02eaff9c25d5340f96feaba5dd6fb05664e5e3555a34a0008adf61ad04",
+    "src/test/sharepool_tides_history_tests.cpp": "97e19e067749dfd46cbd259dea94268b52062255a6dca3eb656baaa16550d2f9",
+    "src/validation.cpp": "1a1bb776743804d48ca5b21ea33db2943dbdcac666ed199d215a1b7896a20554",
+    "test/functional/feature_sharepool_hash_archive.py": "3aa473f68201e7f4ec5ec1bb3f3f141e3f669617857017d60c276d6df96e197b",
+    "test/functional/feature_sharepool_hash_relay.py": "79fa93b74853f8e9aa49c88c1e423164f6a0a0f553878ebdf3ebbf097a0f7784",
+    "test/functional/feature_sharepool_hash_tides_100_miners.py": "cdfdf311c54cd0927f6cc2ac0b382edcdeff4b023c1b19f0989d84eaaa73963c",
+    "test/functional/feature_sharepool_hash_tides_cross_pool.py": "3b90f52b836f51e90824bc51de945caafa57d0079285f4e0cd0c19b673ff6627",
+    "test/functional/test_runner.py": "cec3fc31fb079f48d1210bbf794f31b7c64831524d2a3bd003c19061c52580a2"
+  },
+  "final_binaries_sha256": {
+    "bitcoind": "ebf5acc747e5bc7d51b928ada4d14232b5d43a8f7ba948b1799a688c1b391cb8",
+    "bitcoin-sharepool-signer": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+    "test_bitcoin": "841c838677d0279d849b95cd20a518e1f01fe16d5c0d65a6257b0512971c3836"
+  },
+  "host_platform": "macOS-26.6.2-arm64-arm-64bit",
+  "recorded_utc": "2026-09-13T08:04:04.455390+00:00",
+  "build_command": "/private/tmp/sharepool-build-tools-20260912/cmake/data/bin/cmake --build /private/tmp/sharepool-native-build -j4 --target bitcoind bitcoin-sharepool-signer test_bitcoin",
+  "cpp": {
+    "command": "/private/tmp/sharepool-native-build/bin/test_bitcoin --run_test='sharepool*' --report_level=detailed --log_level=message --color_output=no",
+    "result": "passed",
+    "cases": 139,
+    "assertions": 141234,
+    "unrelated_cases_not_selected": 695,
+    "log": "tides-v6-r2-cpp-tests.txt",
+    "log_sha256": "50339a2b94f11256ca98db0316eafa11533b392796c49f7972674ec27ca9260d",
+    "raw_log_sha256": "9b8e2094399bebf898bc516334a41296fbb215c46f84a41ee6dd14e9b4dc6ccb",
+    "log_normalization": "Only trailing blank lines removed for repository whitespace checks."
+  },
+  "python": [
+    {
+      "command": "SHAREPOOL_SIGNER_BINARY=/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer python3 -B -m unittest discover -s contrib/sharepool -p 'test_hash*.py' -v",
+      "cases": 127,
+      "skips": 0,
+      "result": "passed",
+      "log": "tides-v6-r2-python-hash-tests.txt",
+      "log_sha256": "6028b1c4aa6df281371fed5646c0e525067c4d563bf5747929c6c3630ed795fc"
+    },
+    {
+      "command": "python3 -B -m unittest discover -s contrib/sharepool -p 'test_tides*.py' -v",
+      "cases": 55,
+      "skips": 0,
+      "result": "passed",
+      "log": "tides-v6-r2-python-tides-tests.txt",
+      "log_sha256": "05e1036d42d6d3cd3f86e977fd1e3d2c91311b094bacf353b4870b5307c1894b"
+    },
+    {
+      "command": "SHAREPOOL_SIGNER_BINARY=/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer python3 -B -m unittest discover -s contrib/sharepool -p 'test_native_signer.py' -v",
+      "cases": 22,
+      "skips": 0,
+      "result": "passed",
+      "log": "tides-v6-r2-python-signer-tests.txt",
+      "log_sha256": "04c8fdcd7c7a6b2fa2a5db4a8c1765d9193293015280a25a88440c5bcfd60b70"
+    }
+  ],
+  "native_regressions": {
+    "result": "passed",
+    "cases": 19,
+    "manifest": "tides-v6-r2-functional-results.json",
+    "log": "tides-v6-r2-functional-tests.txt",
+    "log_sha256": "2d3a3fe2d21f6f3a7661bbfa7b30bec81c74fb1558ed6b09b6a474842a8b53a3",
+    "raw_log_sha256": "94b74fa863d54f7a524083ab5df9b4f7cb32b40baf92196e21a75ca13b2bdc9e",
+    "log_normalization": "Only trailing blank lines removed for repository whitespace checks."
+  },
+  "additional_native": {
+    "cases": 5,
+    "pipeline": "tides-v6-r2-native-pipeline-verification.json",
+    "archive": "tides-v6-r2-archive-verification.json",
+    "cross_pool": "tides-v6-r2-cross-pool.json"
+  },
+  "cpu_capture": "tides-v6-r2-cpu-capture.json",
+  "cpu_preflight": "tides-v6-r2-cpu-preflight.json",
+  "calibration": "tides-v6-calibration.json",
+  "admission_audit": "tides-admission-audit.json",
+  "superseded_regressions": "tides-v6-r2-regression-attempts.json",
+  "physical_miner_used": false,
+  "limits": [
+    "Native tests ran on macOS with disposable loopback nodes; no Windows build or WAN throughput claim.",
+    "The 100 miners are logical gates with distinct native-valid jobs; not 100 native nodes or physical devices.",
+    "The 1030 tiny opaque records test untrusted transport only.",
+    "Current share difficulty does not establish ordinary-pool variance for small participants.",
+    "Archive startup still scans retained evidence; no production initial-sync, sustained capacity or mainnet activation claim."
+  ]
+}

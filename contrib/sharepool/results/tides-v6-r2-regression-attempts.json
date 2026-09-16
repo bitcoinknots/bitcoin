@@ -1,0 +1,509 @@
+[
+  {
+    "reason": "Stopped after reproducing unsorted recent inventory; fixed before final run.",
+    "recorded_completed_cases": [
+      {
+        "name": "v4-100-miners",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_100_miners.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-1/v4-100-miners",
+          "--portseed=930",
+          "--nocleanup",
+          "--results=/private/tmp/sharepool-v6-r2-regressions-1/v4-100-miners-result.json"
+        ],
+        "binary_sha256": "e35c9aa19f2138d834534ed9ee3f3224a4dd2b28583a927d8d85dfa168635ba6",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "41f5e98a0c26bfa7478511e8bc2234d36d632444e700a089ddb8bc90ece9ae71",
+        "started": 1789285333.656469,
+        "exit_code": 1,
+        "elapsed_seconds": 14.19682502746582
+      },
+      {
+        "name": "http",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_http.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-1/http",
+          "--portseed=932",
+          "--nocleanup"
+        ],
+        "binary_sha256": "e35c9aa19f2138d834534ed9ee3f3224a4dd2b28583a927d8d85dfa168635ba6",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "b018c2c16326d39dbc799e3a4572dc9eeddc908d7b2c1e723f0f514e98ca63b2",
+        "started": 1789285347.853614,
+        "exit_code": 0,
+        "elapsed_seconds": 1.3393058776855469
+      },
+      {
+        "name": "worker",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_worker.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-1/worker",
+          "--portseed=931",
+          "--nocleanup"
+        ],
+        "binary_sha256": "e35c9aa19f2138d834534ed9ee3f3224a4dd2b28583a927d8d85dfa168635ba6",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "7c864a7835fb74d5e3e355ab66e6a2c8721112cca3a4e51ebd07771bb84b3de2",
+        "started": 1789285333.656527,
+        "exit_code": 0,
+        "elapsed_seconds": 20.84573197364807
+      },
+      {
+        "name": "lifecycle-v2",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_lifecycle.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-1/lifecycle-v2",
+          "--portseed=934",
+          "--nocleanup",
+          "--v2transport"
+        ],
+        "binary_sha256": "e35c9aa19f2138d834534ed9ee3f3224a4dd2b28583a927d8d85dfa168635ba6",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "465f17e1f139517880f911b3e52b6b50dbb22c986f0e8072c5e741644eb20672",
+        "started": 1789285354.502445,
+        "exit_code": 1,
+        "elapsed_seconds": 73.68356108665466
+      },
+      {
+        "name": "relay",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_relay.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-1/relay",
+          "--portseed=935",
+          "--nocleanup"
+        ],
+        "binary_sha256": "e35c9aa19f2138d834534ed9ee3f3224a4dd2b28583a927d8d85dfa168635ba6",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "63743be8456a43f4e645dc3e807eb1a6ef7f87cb85320edc2f3d7cb8f189a3da",
+        "started": 1789285428.186344,
+        "exit_code": 1,
+        "elapsed_seconds": 2.954604148864746
+      },
+      {
+        "name": "attestation",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_attestation.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-1/attestation",
+          "--portseed=936",
+          "--nocleanup"
+        ],
+        "binary_sha256": "e35c9aa19f2138d834534ed9ee3f3224a4dd2b28583a927d8d85dfa168635ba6",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "0ca5b1b0b6866f1f4f480351cc537f42acc2b6180529091e92f3b8d25c4d9d30",
+        "started": 1789285431.141272,
+        "exit_code": 0,
+        "elapsed_seconds": 1.479921817779541
+      },
+      {
+        "name": "builder",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_builder.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-1/builder",
+          "--portseed=937",
+          "--nocleanup"
+        ],
+        "binary_sha256": "e35c9aa19f2138d834534ed9ee3f3224a4dd2b28583a927d8d85dfa168635ba6",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "71b4189f1017609be1844ebb232fb269af5e5f8fbb49c04247a95f828ac2aedc",
+        "started": 1789285432.621435,
+        "exit_code": 0,
+        "elapsed_seconds": 3.551305055618286
+      },
+      {
+        "name": "rules",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_rules.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-1/rules",
+          "--portseed=938",
+          "--nocleanup"
+        ],
+        "binary_sha256": "e35c9aa19f2138d834534ed9ee3f3224a4dd2b28583a927d8d85dfa168635ba6",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "d39c7c0bc2a6b3e47e51015b2605220a412f5babf98a4ac4ea89056f1f63adf5",
+        "started": 1789285436.172939,
+        "exit_code": 0,
+        "elapsed_seconds": 0.776282787322998
+      },
+      {
+        "name": "legacy-rules",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_rule_cases.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-1/legacy-rules",
+          "--portseed=939",
+          "--nocleanup"
+        ],
+        "binary_sha256": "e35c9aa19f2138d834534ed9ee3f3224a4dd2b28583a927d8d85dfa168635ba6",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "b87436433d2834292885852d38fde87b4b7b792a33d753b54432bc22a4b269cd",
+        "started": 1789285436.949526,
+        "exit_code": 0,
+        "elapsed_seconds": 5.029733896255493
+      }
+    ],
+    "not_counted_as_final": true
+  },
+  {
+    "reason": "Stopped after reproducing combined inventory rate overflow. The old relay test also needed to account for the two bounded feeds; final tests verify quiescence after both.",
+    "recorded_completed_cases": [
+      {
+        "name": "worker",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_worker.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/worker",
+          "--portseed=931",
+          "--nocleanup"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "7c864a7835fb74d5e3e355ab66e6a2c8721112cca3a4e51ebd07771bb84b3de2",
+        "started": 1789285725.639797,
+        "exit_code": 0,
+        "elapsed_seconds": 20.64179801940918
+      },
+      {
+        "name": "v4-100-miners",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_100_miners.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/v4-100-miners",
+          "--portseed=930",
+          "--nocleanup",
+          "--results=/private/tmp/sharepool-v6-r2-regressions-final/v4-100-miners-result.json"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "41f5e98a0c26bfa7478511e8bc2234d36d632444e700a089ddb8bc90ece9ae71",
+        "started": 1789285725.63973,
+        "exit_code": 1,
+        "elapsed_seconds": 21.054452896118164
+      },
+      {
+        "name": "http",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_http.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/http",
+          "--portseed=932",
+          "--nocleanup"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "b018c2c16326d39dbc799e3a4572dc9eeddc908d7b2c1e723f0f514e98ca63b2",
+        "started": 1789285746.281795,
+        "exit_code": 0,
+        "elapsed_seconds": 1.570207118988037
+      },
+      {
+        "name": "lifecycle-v1",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_lifecycle.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/lifecycle-v1",
+          "--portseed=933",
+          "--nocleanup"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "465f17e1f139517880f911b3e52b6b50dbb22c986f0e8072c5e741644eb20672",
+        "started": 1789285746.698005,
+        "exit_code": 0,
+        "elapsed_seconds": 16.693348169326782
+      },
+      {
+        "name": "lifecycle-v2",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_lifecycle.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/lifecycle-v2",
+          "--portseed=934",
+          "--nocleanup",
+          "--v2transport"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "465f17e1f139517880f911b3e52b6b50dbb22c986f0e8072c5e741644eb20672",
+        "started": 1789285747.8521442,
+        "exit_code": 0,
+        "elapsed_seconds": 16.741650819778442
+      },
+      {
+        "name": "relay",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_relay.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/relay",
+          "--portseed=935",
+          "--nocleanup"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "63743be8456a43f4e645dc3e807eb1a6ef7f87cb85320edc2f3d7cb8f189a3da",
+        "started": 1789285763.3915362,
+        "exit_code": 1,
+        "elapsed_seconds": 3.2735307216644287
+      },
+      {
+        "name": "attestation",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_attestation.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/attestation",
+          "--portseed=936",
+          "--nocleanup"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "0ca5b1b0b6866f1f4f480351cc537f42acc2b6180529091e92f3b8d25c4d9d30",
+        "started": 1789285764.59395,
+        "exit_code": 0,
+        "elapsed_seconds": 2.3017959594726562
+      },
+      {
+        "name": "rules",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_rules.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/rules",
+          "--portseed=938",
+          "--nocleanup"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "d39c7c0bc2a6b3e47e51015b2605220a412f5babf98a4ac4ea89056f1f63adf5",
+        "started": 1789285766.895998,
+        "exit_code": 0,
+        "elapsed_seconds": 1.1416199207305908
+      },
+      {
+        "name": "builder",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_builder.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/builder",
+          "--portseed=937",
+          "--nocleanup"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "71b4189f1017609be1844ebb232fb269af5e5f8fbb49c04247a95f828ac2aedc",
+        "started": 1789285766.665218,
+        "exit_code": 0,
+        "elapsed_seconds": 4.146091938018799
+      },
+      {
+        "name": "legacy-rules",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_rule_cases.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/legacy-rules",
+          "--portseed=939",
+          "--nocleanup"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "b87436433d2834292885852d38fde87b4b7b792a33d753b54432bc22a4b269cd",
+        "started": 1789285768.037788,
+        "exit_code": 0,
+        "elapsed_seconds": 6.066952228546143
+      },
+      {
+        "name": "v5-ledger",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_ledger.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/v5-ledger",
+          "--portseed=940",
+          "--nocleanup"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "da43f90a01a25c2a0b750dac4e681d982959c1d3275603fd64831f990187e162",
+        "started": 1789285770.811462,
+        "exit_code": 0,
+        "elapsed_seconds": 9.07583212852478
+      },
+      {
+        "name": "gate-provenance",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_gate_provenance.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/gate-provenance",
+          "--portseed=942",
+          "--nocleanup"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "86bfd53fed9dc75dfe3d0e6407253690c2ffd7c50a59b72be847383176b8a5e0",
+        "started": 1789285779.887531,
+        "exit_code": 0,
+        "elapsed_seconds": 1.1471381187438965
+      },
+      {
+        "name": "pending-body",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_pending.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/pending-body",
+          "--portseed=941",
+          "--nocleanup"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "b32625528bfc6812a0153f077813459d3066c003bd9895bc4a35535f65900218",
+        "started": 1789285774.104903,
+        "exit_code": 0,
+        "elapsed_seconds": 10.915240049362183
+      },
+      {
+        "name": "gate-ledger-1",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_gate_ledger.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/gate-ledger-1",
+          "--portseed=943",
+          "--nocleanup",
+          "--activation-height=1"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "cc3cd50581a3c9d2b744d98134cab878722772611d38c88b57959c459e2ca81a",
+        "started": 1789285781.035072,
+        "exit_code": 1,
+        "elapsed_seconds": 8.968977928161621
+      },
+      {
+        "name": "gate-ledger-102",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_gate_ledger.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/gate-ledger-102",
+          "--portseed=944",
+          "--nocleanup",
+          "--activation-height=102"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "cc3cd50581a3c9d2b744d98134cab878722772611d38c88b57959c459e2ca81a",
+        "started": 1789285785.020407,
+        "exit_code": 1,
+        "elapsed_seconds": 10.029646158218384
+      },
+      {
+        "name": "tides-1",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_tides.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/tides-1",
+          "--portseed=946",
+          "--nocleanup",
+          "--activation-height=1"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "a5c177582d00ee5abcdf395e6494d41ba614e91facdf0efd1498897a05c02201",
+        "started": 1789285795.0502,
+        "exit_code": 0,
+        "elapsed_seconds": 14.519788026809692
+      },
+      {
+        "name": "tides-102",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_tides.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/tides-102",
+          "--portseed=947",
+          "--nocleanup",
+          "--activation-height=102"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "a5c177582d00ee5abcdf395e6494d41ba614e91facdf0efd1498897a05c02201",
+        "started": 1789285809.570156,
+        "exit_code": 0,
+        "elapsed_seconds": 17.21471381187439
+      },
+      {
+        "name": "tides-cpu",
+        "command": [
+          "/Library/Developer/CommandLineTools/usr/bin/python3",
+          "-B",
+          "test/functional/feature_sharepool_hash_tides.py",
+          "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+          "--tmpdir=/private/tmp/sharepool-v6-r2-regressions-final/tides-cpu",
+          "--portseed=948",
+          "--nocleanup",
+          "--cpu-capture"
+        ],
+        "binary_sha256": "5dbdb0c56edf8d69af8290506a19eea63c2f44913a0c1475d98f230a8f382cb4",
+        "signer_sha256": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+        "test_sha256": "a5c177582d00ee5abcdf395e6494d41ba614e91facdf0efd1498897a05c02201",
+        "started": 1789285826.785026,
+        "exit_code": 0,
+        "elapsed_seconds": 2.250570058822632
+      }
+    ],
+    "not_counted_as_final": true
+  }
+]

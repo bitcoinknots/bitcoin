@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "result": "failed",
+  "network": "isolated native regtest",
+  "started_utc": "2026-09-13T16:45:11.304535+00:00",
+  "rules_hash": "9050ab43fa5feddb7f0659abc4ca43f596d4465f93535f3b9ab37449397e6edd",
+  "native_binary_sha256": "a7c5cbd34c882ccd942cd819963d2e480212061341aaeffd7eff458ef178f116",
+  "signer_binary_sha256": "27b76bfbc15b9df4fe5ae7d68ff9bf48286e82d6aa8ff2e6829e633d56e49b81",
+  "harness_sha256": "6579dd4510401414fc2cbf19ccd538e0adaff82632197e68f989f86ef7be7263",
+  "source_sha256": {
+    "contrib/sharepool/hash_mining_gate.py": "91646df17fb30d55486b69cf485979cfd3e22d307a8a0ab3f8a74d6d553824dd",
+    "contrib/sharepool/hash_snapshot.py": "712f34059ac045dbfdef70b97f65408c1dd6f07942964268bd7753ac1e1d55d2",
+    "contrib/sharepool/hash_gate_batch.py": "a41c510602748c50a75b66a9dddfa9f028fd5a7cfb57ccc8cccf29cff7f424c4",
+    "contrib/sharepool/hash_gate_inventory.py": "2bf60749366de6217391626315d7591b5fb3029bc95c1c164f019b6b1f27860b",
+    "contrib/sharepool/capacity_metrics.py": "71f68e44d56a555fdae635c3467eed67e97c3db4dacc0758a426b0cafd993934",
+    "test/functional/feature_sharepool_hash_tides_100_miners.py": "cdfdf311c54cd0927f6cc2ac0b382edcdeff4b023c1b19f0989d84eaaa73963c"
+  },
+  "command": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "test/functional/feature_sharepool_hash_capacity.py",
+    "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+    "--miners=2",
+    "--epochs=1",
+    "--shares-per-origin=3",
+    "--max-runtime-seconds=240",
+    "--host-load=quiescent",
+    "--nocleanup",
+    "--tmpdir=/private/tmp/resource-budget-layout-preflight-witness",
+    "--portseed=1008",
+    "--results=contrib/sharepool/results/resource-budget-layout-preflight-witness.json",
+    "--template-layout=shared",
+    "--witness-heavy"
+  ],
+  "host": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "logical_cpus": 10
+  },
+  "operator_declared_host_load": "quiescent",
+  "configuration": {
+    "miners": 2,
+    "epochs": 1,
+    "shares_per_origin": 3,
+    "padding_outputs": 0,
+    "template_layout": "shared",
+    "witness_heavy": true,
+    "resource_diagnostics": false,
+    "snapshot_budget_bytes": 0,
+    "batch_fraction": 0.75,
+    "offer_interval_ms": 0,
+    "settle_every": 0,
+    "max_runtime_seconds": 240
+  },
+  "native_nodes": 2,
+  "physical_miners_used": 0,
+  "opaque_proof_fixtures": 0,
+  "transaction_fee_satoshis": 11000,
+  "transaction_policy": {
+    "acceptnonstdtxn_explicit": true,
+    "witness_items_per_input": 64,
+    "witness_item_bytes": 512,
+    "consensus_limits_changed": false,
+    "disjoint_selection": null
+  },
+  "epochs": [],
+  "rewards": [],
+  "limitations": [
+    "Sequential local RPC driver; observed service rate is not a concurrent saturation maximum",
+    "Offered bursts are finite precomputed native proofs; client queue and settlement backlog are measured separately",
+    "Two loopback native nodes, not 100 native nodes, WAN propagation, or a public testnet",
+    "Easy regtest proof target does not establish production sampling variance or mining hashrate",
+    "The driver deliberately schedules settlement blocks; qualifying headers may also satisfy native difficulty without immediate publication",
+    "Snapshot budget overload tests deterministic carry and expiry; it does not exhaust host RAM or disk",
+    "RSS is sampled, CPU is cumulative ps time, disk sizes are logical lengths rather than physical allocation",
+    "Local durable ACKs become recurring reward eligible only after native canonical admission"
+  ],
+  "error_type": "JSONRPCException",
+  "error": "mempool-script-verify-flag-failed (Push value size limit exceeded), input 0 of 92687e2497cc2739bb7a0899b05683dc2a2efac1a1d68a7f2bbf296c7b8ecad2 (wtxid 697740aa7c7f4e9c44a5ababbec7c36b627fb23b244f874d8dcc192dd643b74b), spending 9fde8ae29c39a2220e02260efc09625a6f0877f5ba8637963690700a853ebac8:0 (-26)",
+  "seconds": 0.6632875420000001,
+  "measurements": {}
+}

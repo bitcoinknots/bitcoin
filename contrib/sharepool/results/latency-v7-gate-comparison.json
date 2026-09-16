@@ -1,0 +1,94 @@
+[
+  {
+    "scope": "Python gate synthetic codec fixtures with RPC double; no native consensus/performance claim",
+    "history_proofs": 100,
+    "new_proofs": 20,
+    "unique_incoming_origins": 1,
+    "source_sha256": {
+      "contrib/sharepool/hash_mining_gate.py": "96fe589dc0f6d5b9d257800f6c4a2308104f989a1df274ade098eaa8c8e71e18",
+      "contrib/sharepool/hash_gate_inventory.py": "a95827a8b52243811f05d4cb97a0cb603f2e783271d9be2d04e1af0ac2d36ff6",
+      "contrib/sharepool/hash_gate_batch.py": "4a80fea33b1eaef277f8fd5552b3f28ce12d7e9100d5aa0fcd7310694205a7bf",
+      "contrib/sharepool/hash_snapshot.py": "44173ab51d60fd5bc4378d327e14ba9cbf78f61086faa4ff2e0db92180ae3013"
+    },
+    "rpc_calls": {
+      "getblockchaininfo": 20,
+      "getsharepoolhashstatus": 20,
+      "getbestblockhash": 80,
+      "getblockhash": 60,
+      "getblockheader": 40,
+      "submitsharepoolhashsnapshot": 60,
+      "validatesharepoolhashtemplate": 20,
+      "validatesharepoolhashshare": 20
+    },
+    "profile_total_seconds": 5.804155581999997,
+    "profile_counts": {
+      "hash_snapshot.py:materialize_compact_state": {
+        "calls": 60,
+        "cumulative_seconds": 3.9497903680000004
+      },
+      "hash_snapshot.py:serialize": {
+        "calls": 1020,
+        "cumulative_seconds": 3.7371131300000004
+      },
+      "hash_snapshot.py:deserialize": {
+        "calls": 220,
+        "cumulative_seconds": 0.675724202
+      },
+      "messages.py:calc_sha256": {
+        "calls": 198420,
+        "cumulative_seconds": 2.5349101870000004
+      },
+      "hash_mining_gate.py:receive": {
+        "calls": 20,
+        "cumulative_seconds": 5.811849334000001
+      }
+    },
+    "label": "before"
+  },
+  {
+    "scope": "Python gate synthetic codec fixtures with RPC double; no native consensus/performance claim",
+    "history_proofs": 100,
+    "new_proofs": 20,
+    "unique_incoming_origins": 1,
+    "source_sha256": {
+      "contrib/sharepool/hash_mining_gate.py": "3f95b12e3b3ca79a61d47b4370088a95f6937c7285809950840ba8350e27f19f",
+      "contrib/sharepool/hash_gate_inventory.py": "a95827a8b52243811f05d4cb97a0cb603f2e783271d9be2d04e1af0ac2d36ff6",
+      "contrib/sharepool/hash_gate_batch.py": "1762caf26308b54b61eacfd1e448dba4d226b3ac9e94203cdac6f4474654f45d",
+      "contrib/sharepool/hash_snapshot.py": "dd027da54e773459dfd2126822e2f38947e63936d6e096790f83a57e83678b1d"
+    },
+    "rpc_calls": {
+      "getblockchaininfo": 20,
+      "getsharepoolhashstatus": 20,
+      "getbestblockhash": 80,
+      "getblockhash": 60,
+      "getblockheader": 40,
+      "submitsharepoolhashsnapshot": 60,
+      "validatesharepoolhashtemplate": 20,
+      "validatesharepoolhashshare": 20
+    },
+    "profile_total_seconds": 1.1892596910000002,
+    "profile_counts": {
+      "hash_snapshot.py:materialize_compact_state": {
+        "calls": 60,
+        "cumulative_seconds": 0.955866493
+      },
+      "hash_snapshot.py:serialize": {
+        "calls": 400,
+        "cumulative_seconds": 0.211905627
+      },
+      "hash_snapshot.py:deserialize": {
+        "calls": 120,
+        "cumulative_seconds": 0.24752245800000003
+      },
+      "messages.py:calc_sha256": {
+        "calls": 6400,
+        "cumulative_seconds": 0.08517179300000001
+      },
+      "hash_mining_gate.py:receive": {
+        "calls": 20,
+        "cumulative_seconds": 1.196125332
+      }
+    },
+    "label": "after"
+  }
+]

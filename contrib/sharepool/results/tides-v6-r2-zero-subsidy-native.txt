@@ -1,0 +1,8 @@
+2026-09-13T07:54:36.372000Z TestFramework (INFO): PRNG seed is: 7314645076297612188
+2026-09-13T07:54:36.372000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v6-r2-zero-subsidy-965
+2026-09-13T07:54:37.044000Z TestFramework (INFO): Generate ordinary preactivation blocks to a 0-satoshi subsidy
+2026-09-13T07:56:45.341000Z TestFramework (INFO): Native builder and gate approve a witness-only coinbase with empty monetary payouts
+2026-09-13T07:56:46.026000Z TestFramework (INFO): Repeating the rolling window preserves the empty payout vector through restart/reindex
+2026-09-13T07:57:06.261000Z TestFramework (INFO): Stopping nodes
+2026-09-13T07:57:06.544000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v6-r2-zero-subsidy-965
+2026-09-13T07:57:06.544000Z TestFramework (INFO): Tests successful

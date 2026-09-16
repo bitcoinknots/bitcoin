@@ -1,0 +1,10 @@
+2026-09-13T07:54:59.589000Z TestFramework (INFO): PRNG seed is: 5644320725170727009
+2026-09-13T07:54:59.597000Z TestFramework (INFO): Initializing test directory <temporary-regtest-directory>
+2026-09-13T07:55:01.191000Z TestFramework (INFO): Pool B ingests A's unmined proposal through bounded native P2P inventory
+2026-09-13T07:55:01.243000Z TestFramework (INFO): Bounded inventory ingestion: {'native_tip': '0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206', 'cursor': {'archive': {'after': None, 'snapshot': None, 'share': 0}, 'recent': {'after': 2, 'epoch': 'b57bd2853c349519de59262dc2f5570cc00acfbe0ad3a6e65664679b0513666f', 'snapshot': None, 'share': 0, 'sequence': 0}, 'next_lane': 'recent'}, 'complete': True, 'inventory_revision': 2, 'pages': 6, 'snapshots': 4, 'proofs_examined': 2, 'accepted': ['d7d5f9401818d67ee7c5acc362b89f11208b07009b6a0cb7be5f69bbbd02578a'], 'already_retained': 1, 'ineligible': 0, 'deferred': [], 'bytes_charged': 5632, 'limit_reason': None, 'recent_gap': False, 'recent_epoch_changed': False, 'recent_pages': 3, 'archive_pages': 3, 'receipt_revision': 1}
+2026-09-13T07:55:01.249000Z TestFramework (INFO): Restore a foreign-pool ACK from its protected archive and revalidate its native origin
+2026-09-13T07:55:01.328000Z TestFramework (INFO): Pool B's native block admits A's proof without paying A from B's reward
+2026-09-13T07:55:02.611000Z TestFramework (INFO): After origin admission expiry and peer restart, A's later block pays its old recipient
+2026-09-13T07:55:03.901000Z TestFramework (INFO): Stopping nodes
+2026-09-13T07:55:04.074000Z TestFramework (WARNING): Not cleaning up dir <temporary-regtest-directory>
+2026-09-13T07:55:04.074000Z TestFramework (INFO): Tests successful

@@ -1,0 +1,23 @@
+2026-09-13T08:28:08.179000Z TestFramework (INFO): PRNG seed is: 4910448327511535125
+2026-09-13T08:28:08.180000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-capacity-baseline-1002
+2026-09-13T08:28:25.287000Z TestFramework (INFO): Capacity epoch 1/3: 100 distinct native origins, padding outputs=0
+2026-09-13T08:28:32.057000Z TestFramework (INFO): Epoch 1: 25/100 native origins ready
+2026-09-13T08:28:39.028000Z TestFramework (INFO): Epoch 1: 50/100 native origins ready
+2026-09-13T08:28:46.912000Z TestFramework (INFO): Epoch 1: 75/100 native origins ready
+2026-09-13T08:28:54.687000Z TestFramework (INFO): Epoch 1: 100/100 native origins ready
+2026-09-13T08:32:07.183000Z TestFramework (INFO): Epoch 1: 300 offers admitted in 2 blocks; zero expired
+2026-09-13T08:32:07.184000Z TestFramework (INFO): Capacity epoch 2/3: 100 distinct native origins, padding outputs=0
+2026-09-13T08:32:28.104000Z TestFramework (INFO): Epoch 2: 25/100 native origins ready
+2026-09-13T08:32:50.447000Z TestFramework (INFO): Epoch 2: 50/100 native origins ready
+2026-09-13T08:33:13.171000Z TestFramework (INFO): Epoch 2: 75/100 native origins ready
+2026-09-13T08:33:36.419000Z TestFramework (INFO): Epoch 2: 100/100 native origins ready
+2026-09-13T08:38:20.372000Z TestFramework (INFO): Epoch 2: 300 offers admitted in 3 blocks; zero expired
+2026-09-13T08:38:20.373000Z TestFramework (INFO): Capacity epoch 3/3: 100 distinct native origins, padding outputs=0
+2026-09-13T08:38:43.906000Z TestFramework (INFO): Epoch 3: 25/100 native origins ready
+2026-09-13T08:39:06.176000Z TestFramework (INFO): Epoch 3: 50/100 native origins ready
+2026-09-13T08:39:28.342000Z TestFramework (INFO): Epoch 3: 75/100 native origins ready
+2026-09-13T08:39:50.156000Z TestFramework (INFO): Epoch 3: 100/100 native origins ready
+2026-09-13T08:43:34.363000Z TestFramework (INFO): Epoch 3: 300 offers admitted in 3 blocks; zero expired
+2026-09-13T08:43:38.390000Z TestFramework (INFO): Stopping nodes
+2026-09-13T08:43:38.614000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-capacity-baseline-1002
+2026-09-13T08:43:38.614000Z TestFramework (INFO): Tests successful

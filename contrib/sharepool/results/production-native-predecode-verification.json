@@ -1,0 +1,93 @@
+{
+  "scope": "Bounded snapshot predecode outside cs_main; no wire, consensus, activation or resource-limit changes",
+  "created_utc": "2026-09-14T06:13:40.898293+00:00",
+  "base_commit": "31d3fa9f375144c65bacfa5c2c2f3d1f205a57ee",
+  "working_tree_changes": true,
+  "build": {
+    "path": "/private/tmp/sharepool-native-build",
+    "type": "Debug",
+    "targets": [
+      "bitcoind",
+      "test_bitcoin",
+      "bitcoin-sharepool-signer"
+    ],
+    "result": "passed",
+    "warnings": [
+      "Linker ignores duplicate consensus/secp256k1 library arguments"
+    ]
+  },
+  "binary_sha256": {
+    "bitcoind": "4cf54b5fadd3d4cee0354feb609508d0cf1107c7d0ccdf3935f862a15717678d",
+    "bitcoin-sharepool-signer": "f4f592321ccce37ae9c416fb4e1a2263da4c95438959b58fa356ac937148e250",
+    "test_bitcoin": "21afffead912ccb31d4a87333593e56497d23beca5e879a76827efc20012089c"
+  },
+  "selected_source_sha256": {
+    "src/sharepool/hash_store.h": "fba6e3167a63436889223d5e9a2fee0dba920369d9605fed51e656fbb3aab01f",
+    "src/sharepool/hash_store.cpp": "120385886f3bd5a01b567125824b409277ff4d22bfd3db71c0a5aa3f763d1566",
+    "src/net_processing.cpp": "b794a5c215ed275f35c535af9918ddd5bd8b893e10affc20e2d59a31d73082e2",
+    "src/rpc/mining.cpp": "23031a6ea86a09df340f3bbdd1d602f053b255ea267b5b651595a4f87049e822",
+    "src/test/sharepool_hash_store_tests.cpp": "43a8aa189b5a0d5bbf0a77581027dc2b2203aa87c1fcc78ecddc9a9011154df4",
+    "src/test/sharepool_hash_relay_tests.cpp": "b97812fa4e407eda76bbbd3397cf90093fdf47ab8a79088b9361ef4b78a09f08",
+    "src/test/sharepool_hash_tests.cpp": "1ae9b8c68cdd1100960910278dc4db01cc6978f1afeeb0be76c07cee29392899",
+    "src/test/sharepool_retry_worker_tests.cpp": "9c2565f3e6d802051771fcdf885bf97cca9b3c97574510e7ddd6e839986b6887",
+    "test/functional/feature_sharepool_hash_relay.py": "79fa93b74853f8e9aa49c88c1e423164f6a0a0f553878ebdf3ebbf097a0f7784"
+  },
+  "checks": [
+    {
+      "name": "focused_cpp",
+      "command": [
+        "/private/tmp/sharepool-native-build/bin/test_bitcoin",
+        "--run_test=sharepool_hash_store_tests,sharepool_hash_relay_tests,sharepool_hash_tests,sharepool_retry_worker_tests",
+        "--log_level=test_suite"
+      ],
+      "cases": 86,
+      "new_cases": 4,
+      "exit_code": 0,
+      "result": "passed"
+    },
+    {
+      "name": "native_relay",
+      "command": [
+        "python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_relay.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-predecode-relay",
+        "--portseed=1645"
+      ],
+      "exit_code": 0,
+      "result": "passed",
+      "network": "disposable isolated regtest loopback",
+      "test_nodes_stopped": true
+    }
+  ],
+  "new_guard_evidence": [
+    "Preparation finishes while another thread holds cs_main; no storage admission occurs during preparation",
+    "Prepared content owns exact bytes; caller mutation and reuse after consumption cannot change admitted contents",
+    "Wrong profile and capacity consumed after preparation are rejected against current store state",
+    "A prepared reoffer reauthenticates disk bytes despite a warm cache and repairs the exact corrupted record",
+    "Hash-bound malformed bytes remain available consensus evidence; wrong requested hashes are rejected"
+  ],
+  "remaining_limits": [
+    "P2P preparation still holds g_msgproc_mutex; this does not remove all message-loop pauses",
+    "Durable reads/writes, quota/index checks and template archival still run under cs_main",
+    "Legacy direct Put callers still prepare under their existing lock; the moved paths are P2P and snapshot-submit RPC",
+    "The existing four-download reservation bounds raw transfer memory; no additional background queue was introduced",
+    "No elapsed critical-section benchmark, slow-disk/WAN test or production throughput claim",
+    "The relay test covers disconnect download recovery, not a deterministic disconnect injected midway through decoding"
+  ],
+  "artifacts": {
+    "cpp": {
+      "path": "contrib/sharepool/results/production-native-predecode-cpp.txt",
+      "sha256": "010a3fa57ee156c8618cd83321d6422f01fb949483442d465283f8005fc52c5f",
+      "original_capture_sha256": "a3826069d285de45e9a6d508f1f61106f035f2e7954ce546c815fd19ca3a1dfb",
+      "transformation": "ANSI color control sequences removed"
+    },
+    "relay": {
+      "path": "contrib/sharepool/results/production-native-predecode-relay.txt",
+      "sha256": "a2470995d9860ded3a7fbc59b7df30724335d2c4a2e5af60ae9d29f5016eee49",
+      "original_capture_sha256": "a2470995d9860ded3a7fbc59b7df30724335d2c4a2e5af60ae9d29f5016eee49",
+      "transformation": "ANSI color control sequences removed"
+    }
+  }
+}

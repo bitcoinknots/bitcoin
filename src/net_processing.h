@@ -17,6 +17,7 @@ class AddrMan;
 class CChainParams;
 class CTxMemPool;
 class ChainstateManager;
+namespace sharepool { class RelayStore; }
 
 namespace node {
 class Warnings;
@@ -121,6 +122,10 @@ public:
 
     /** Get peer manager info. */
     virtual PeerManagerInfo GetInfo() const = 0;
+
+    /** Explicitly configured legacy SPN1 evidence. Hash-only block dependencies
+     * use ChainstateManager's all-pools snapshot store instead. */
+    virtual sharepool::RelayStore& SharePoolRelay() EXCLUSIVE_LOCKS_REQUIRED(cs_main) = 0;
 
     /** Relay transaction to all peers. */
     virtual void RelayTransaction(const uint256& txid, const uint256& wtxid) = 0;

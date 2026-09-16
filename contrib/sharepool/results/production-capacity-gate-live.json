@@ -1,0 +1,285 @@
+{
+  "consensus_parameters_changed": false,
+  "current_profile_version": 7,
+  "declared_reference_cadences": [
+    {
+      "candidate_monitored_rate_screen": {
+        "expected_admissions_per_nominal_native_interval": 1287309.4846320641,
+        "expected_proof_arrivals_per_day": 185372565.78701723,
+        "mean_load_exceeds_v7_count_ceiling": true,
+        "not_exceeding_observed_workload_rate": false,
+        "required_over_observed_rate": 3065.0225824572954,
+        "required_proofs_per_second": 2145.5158077201067,
+        "required_rate_with_headroom": 4291.0316154402135,
+        "sustainable_capacity_established": false,
+        "v7_maximum_compact_shares_per_block": 32768,
+        "v7_maximum_mean_admissions_per_day_at_600_second_blocks": 4718592
+      },
+      "candidate_network_proofs_per_second": 2145.5158077201067,
+      "candidate_v7_compact_proof_component_bytes_per_day_lower_bound": 6117294670.971568,
+      "declared_seconds_per_equal_miner_share": 10,
+      "expected_proofs_per_miner_in_observation": 8640.0,
+      "implied_network_proofs_per_second_at_one_global_target": 1440.0,
+      "minimum_analytical_shift_meeting_this_cadence": 20,
+      "proof_count_relative_standard_deviation": 0.01075828707279838,
+      "reference_cadence_is_not_a_production_requirement": true,
+      "requested_pool_proofs_per_second": 10.0
+    },
+    {
+      "candidate_monitored_rate_screen": {
+        "expected_admissions_per_nominal_native_interval": 321827.37115801603,
+        "expected_proof_arrivals_per_day": 46343141.44675431,
+        "mean_load_exceeds_v7_count_ceiling": true,
+        "not_exceeding_observed_workload_rate": false,
+        "required_over_observed_rate": 766.2556456143238,
+        "required_proofs_per_second": 536.3789519300267,
+        "required_rate_with_headroom": 1072.7579038600534,
+        "sustainable_capacity_established": false,
+        "v7_maximum_compact_shares_per_block": 32768,
+        "v7_maximum_mean_admissions_per_day_at_600_second_blocks": 4718592
+      },
+      "candidate_network_proofs_per_second": 536.3789519300267,
+      "candidate_v7_compact_proof_component_bytes_per_day_lower_bound": 1529323667.742892,
+      "declared_seconds_per_equal_miner_share": 30,
+      "expected_proofs_per_miner_in_observation": 2880.0,
+      "implied_network_proofs_per_second_at_one_global_target": 480.00000000000006,
+      "minimum_analytical_shift_meeting_this_cadence": 18,
+      "proof_count_relative_standard_deviation": 0.018633899812498248,
+      "reference_cadence_is_not_a_production_requirement": true,
+      "requested_pool_proofs_per_second": 3.3333333333333335
+    },
+    {
+      "candidate_monitored_rate_screen": {
+        "expected_admissions_per_nominal_native_interval": 160913.68557900802,
+        "expected_proof_arrivals_per_day": 23171570.723377153,
+        "mean_load_exceeds_v7_count_ceiling": true,
+        "not_exceeding_observed_workload_rate": false,
+        "required_over_observed_rate": 383.1278228071619,
+        "required_proofs_per_second": 268.18947596501334,
+        "required_rate_with_headroom": 536.3789519300267,
+        "sustainable_capacity_established": false,
+        "v7_maximum_compact_shares_per_block": 32768,
+        "v7_maximum_mean_admissions_per_day_at_600_second_blocks": 4718592
+      },
+      "candidate_network_proofs_per_second": 268.18947596501334,
+      "candidate_v7_compact_proof_component_bytes_per_day_lower_bound": 764661833.871446,
+      "declared_seconds_per_equal_miner_share": 60,
+      "expected_proofs_per_miner_in_observation": 1440.0,
+      "implied_network_proofs_per_second_at_one_global_target": 240.00000000000003,
+      "minimum_analytical_shift_meeting_this_cadence": 17,
+      "proof_count_relative_standard_deviation": 0.026352313834736494,
+      "reference_cadence_is_not_a_production_requirement": true,
+      "requested_pool_proofs_per_second": 1.6666666666666667
+    }
+  ],
+  "direct_payout_weight_screens": [
+    {
+      "contextual_weight_limit": 4000000,
+      "declared_non_payout_weight": 0,
+      "fits_declared_weight_budget": true,
+      "maximum_recipients_by_this_reservation_only": 32245,
+      "recipients": 100,
+      "reserved_header_and_coinbase_weight": 13952,
+      "script_bytes": 22,
+      "serialized_payout_output_bytes": 3100,
+      "sufficient_for_native_admission": false
+    },
+    {
+      "contextual_weight_limit": 800000,
+      "declared_non_payout_weight": 0,
+      "fits_declared_weight_budget": true,
+      "maximum_recipients_by_this_reservation_only": 6439,
+      "recipients": 100,
+      "reserved_header_and_coinbase_weight": 13952,
+      "script_bytes": 22,
+      "serialized_payout_output_bytes": 3100,
+      "sufficient_for_native_admission": false
+    }
+  ],
+  "evidence_artifact": {
+    "path": "contrib/sharepool/results/production-live-100.json",
+    "sha256": "ab66351cf134e55d86c54a44148ddc1294667d8d7a09f528c4488f315f968cc5"
+  },
+  "global_difficulty_scenarios": [
+    {
+      "active": true,
+      "assigned_expected_hash_work": "295147905179352825856",
+      "exact_shares_per_native_block": [
+        "392318858461667547739736838950479151006397215279002157056",
+        "312072983117630369221114618645075196904111619969122305"
+      ],
+      "expected_proofs_per_miner_in_observation": 12.571381685859999,
+      "log_probability_zero_proofs_per_miner": -12.571381685859999,
+      "mean_seconds_per_equal_miner_share": 6872.752904891969,
+      "monitored_rate_screen": {
+        "expected_admissions_per_nominal_native_interval": 1257.1381685860001,
+        "expected_proof_arrivals_per_day": 181027.896276384,
+        "mean_load_exceeds_v7_count_ceiling": false,
+        "not_exceeding_observed_workload_rate": false,
+        "required_over_observed_rate": 2.9931861156809525,
+        "required_proofs_per_second": 2.0952302809766667,
+        "required_rate_with_headroom": 4.1904605619533335,
+        "sustainable_capacity_established": false,
+        "v7_maximum_compact_shares_per_block": 32768,
+        "v7_maximum_mean_admissions_per_day_at_600_second_blocks": 4718592
+      },
+      "network_proofs_per_second": 2.0952302809766667,
+      "pool_proofs_per_second": 0.014550210284560185,
+      "probability_zero_proofs_per_miner": 3.4699107463128015e-06,
+      "proof_count_relative_standard_deviation": 0.28203856334555993,
+      "shift": 10
+    },
+    {
+      "active": false,
+      "assigned_expected_hash_work": "73786976294838206464",
+      "exact_shares_per_native_block": [
+        "1569275433846670190958947355801916604025588861116008628224",
+        "312072983117630369221114618645075196904111619969122305"
+      ],
+      "expected_proofs_per_miner_in_observation": 50.285526743439995,
+      "log_probability_zero_proofs_per_miner": -50.285526743439995,
+      "mean_seconds_per_equal_miner_share": 1718.1882262229922,
+      "monitored_rate_screen": {
+        "expected_admissions_per_nominal_native_interval": 5028.5526743440005,
+        "expected_proof_arrivals_per_day": 724111.585105536,
+        "mean_load_exceeds_v7_count_ceiling": false,
+        "not_exceeding_observed_workload_rate": false,
+        "required_over_observed_rate": 11.97274446272381,
+        "required_proofs_per_second": 8.380921123906667,
+        "required_rate_with_headroom": 16.761842247813334,
+        "sustainable_capacity_established": false,
+        "v7_maximum_compact_shares_per_block": 32768,
+        "v7_maximum_mean_admissions_per_day_at_600_second_blocks": 4718592
+      },
+      "network_proofs_per_second": 8.380921123906667,
+      "pool_proofs_per_second": 0.05820084113824074,
+      "probability_zero_proofs_per_miner": 1.4496835662276894e-22,
+      "proof_count_relative_standard_deviation": 0.14101928167277997,
+      "shift": 12
+    },
+    {
+      "active": false,
+      "assigned_expected_hash_work": "18446744073709551616",
+      "exact_shares_per_native_block": [
+        "6277101735386680763835789423207666416102355444464034512896",
+        "312072983117630369221114618645075196904111619969122305"
+      ],
+      "expected_proofs_per_miner_in_observation": 201.14210697375998,
+      "log_probability_zero_proofs_per_miner": -201.14210697375998,
+      "mean_seconds_per_equal_miner_share": 429.54705655574804,
+      "monitored_rate_screen": {
+        "expected_admissions_per_nominal_native_interval": 20114.210697376002,
+        "expected_proof_arrivals_per_day": 2896446.340422144,
+        "mean_load_exceeds_v7_count_ceiling": false,
+        "not_exceeding_observed_workload_rate": false,
+        "required_over_observed_rate": 47.89097785089524,
+        "required_proofs_per_second": 33.52368449562667,
+        "required_rate_with_headroom": 67.04736899125334,
+        "sustainable_capacity_established": false,
+        "v7_maximum_compact_shares_per_block": 32768,
+        "v7_maximum_mean_admissions_per_day_at_600_second_blocks": 4718592
+      },
+      "network_proofs_per_second": 33.52368449562667,
+      "pool_proofs_per_second": 0.23280336455296297,
+      "probability_zero_proofs_per_miner": 4.4166487613239383e-88,
+      "proof_count_relative_standard_deviation": 0.07050964083638998,
+      "shift": 14
+    }
+  ],
+  "limitations": [
+    "The finite capture's achieved rate is not a sustained rate, saturation maximum or impossibility bound; live phase rates exclude later drain.",
+    "Observed proof counts have a different target, transaction geometry, churn and block timing from this scenario.",
+    "Count sampling RSD excludes block luck, overlapping TIDES windows, cutoff, admission, expiry and payout rounding.",
+    "The explicit native target and reference cadences are analytical inputs, not live network measurements or a regular-pool standard.",
+    "A global share target implies traffic outside the example pool; monitored_network_fraction declares this scope.",
+    "The 33-byte compact proof component omits shared job descriptors, templates, transactions, snapshots, relaying and archive overhead.",
+    "V7 still admits at most 32768 proofs per block; shrinking wire records did not raise this verification-work ceiling. Mean load below it proves no burst headroom.",
+    "A direct-payout weight screen does not establish simultaneous native recipient coverage or snapshot/validation capacity."
+  ],
+  "minimum_seconds_per_equal_miner_share_at_observed_rate_screen": 20571.428571428572,
+  "native_evidence": {
+    "all_offers_acknowledged_without_rejection": true,
+    "completed_run_counts": {
+      "acknowledged": 240,
+      "acknowledged_backlog": 0,
+      "admitted": 240,
+      "observed_admitted_per_second": 1.5111244753482167,
+      "observed_peer_verified_per_second": 1.5111244753482167,
+      "offered": 240,
+      "peer_backlog": 0,
+      "peer_verified": 240,
+      "rejected": 0,
+      "seconds": 158.822124792,
+      "unacknowledged_queue": 0
+    },
+    "configuration": {
+      "duration_seconds": 120,
+      "max_runtime_seconds": 1200,
+      "miners": 100,
+      "offer_interval_ms": 500,
+      "padding_outputs": 0,
+      "settlement_seconds": 20,
+      "snapshot_budget_bytes": 65536,
+      "work_update_seconds": 40
+    },
+    "counts": {
+      "acknowledged": 205,
+      "acknowledged_backlog": 37,
+      "admitted": 168,
+      "observed_admitted_per_second": 1.4,
+      "observed_peer_verified_per_second": 1.4,
+      "offered": 211,
+      "peer_backlog": 0,
+      "peer_verified": 168,
+      "rejected": 0,
+      "seconds": 120,
+      "unacknowledged_queue": 6
+    },
+    "duration_seconds": 120,
+    "final_receipts_drained_without_loss": true,
+    "fixed_phase_all_scheduled_work_confirmed": false,
+    "kind": "finite_continuously_scheduled_native_phase_then_explicit_drain",
+    "limitations": [
+      "One source thread serially services logical miners; source scheduling backlog is reported.",
+      "Source offers continue during settlement on separate owner gates and an independent RPC connection.",
+      "Finite scheduled phase followed by explicit catch-up/drain; only timestamped phase completions count toward phase rates.",
+      "Two loopback Debug native nodes, easy proofs and controlled block opportunities; no WAN, ASIC or production variance claim.",
+      "Serialized queue has eight items of at most two MiB, plus one producer and one consumer item; Python object overhead is not bounded by this wire charge."
+    ],
+    "live_and_drain_seconds": 158.822124792,
+    "maximum_phase_verified_coinbase_weight": 5400,
+    "maximum_phase_verified_native_weight": 22470,
+    "maximum_phase_verified_payout_recipients_in_one_block": 40,
+    "maximum_verified_coinbase_weight": 5524,
+    "maximum_verified_native_weight": 22470,
+    "maximum_verified_payout_recipients_in_one_block": 41,
+    "miners": 100,
+    "native_blocks": 8,
+    "observed_native_admissions_per_elapsed_second": 1.4,
+    "observed_peer_verified_admissions_per_elapsed_second": 1.4,
+    "scheduled_requests": 240,
+    "source_unfulfilled_requests_at_cutoff": 29,
+    "sustained_capacity_qualified": false
+  },
+  "payout_variance_equivalence_established": false,
+  "recipient_count_exceeds_measured_phase_coverage": true,
+  "recipient_count_exceeds_native_fixture_coverage": true,
+  "remaining_gates": [
+    "continuous arrivals during construction and settlement with bounded queues",
+    "admission and peer verification before expiry, including recovery under continued arrivals",
+    "native exact payouts at the declared simultaneous recipient count and transaction weight",
+    "admission-aware paired payout variance against a specified pool contract",
+    "WAN, resource exhaustion, long-duration retention and independent consensus review"
+  ],
+  "result": "production_capacity_not_established",
+  "scenario_inputs": {
+    "equal_hashrate_miners_and_payout_recipients": 100,
+    "expected_pool_round_seconds": 86400.0,
+    "monitored_network_fraction": 1,
+    "native_bits_hex": "17034219",
+    "observation_seconds": 86400,
+    "pool_fraction": 0.006944444444444444,
+    "required_rate_headroom": 2
+  },
+  "schema": 1
+}

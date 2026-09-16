@@ -1,0 +1,20 @@
+--- src/validation.cpp (retention on)
++++ src/validation.cpp (temporary retention off)
+@@ -5666,7 +5666,7 @@
+     const auto time = std::max<int64_t>(tip->GetMedianTimePast() + 1, GetTime());
+     if (time < 0 || time > std::numeric_limits<uint32_t>::max()) return Result::Missing({}, "sharepool-hash-native-time-range");
+     const auto overlay_hash = overlay ? hashonly::ProfileSnapshotHash(*overlay, hashonly::ProfileVersion(chainman.GetConsensus())) : uint256{};
+-    sharepool::DecodedSnapshotCache snapshots{hashonly::MAX_DEPENDENCY_BYTES};
++    sharepool::DecodedSnapshotCache snapshots{hashonly::MAX_DEPENDENCY_BYTES, 0};
+     const auto checked = hashonly::CheckHistoricalTemplate(block, tip, static_cast<uint32_t>(time), chainman.GetConsensus(),
+         [&](const uint256& hash) -> std::shared_ptr<const hashonly::Snapshot> {
+             if (overlay && hash == overlay_hash) return overlay;
+@@ -5708,7 +5708,7 @@
+     }
+     const auto time = std::max<int64_t>(tip->GetMedianTimePast() + 1, GetTime());
+     if (time < 0 || time > std::numeric_limits<uint32_t>::max()) return Result::Missing({}, "sharepool-hash-native-time-range");
+-    sharepool::DecodedSnapshotCache snapshots{hashonly::MAX_DEPENDENCY_BYTES};
++    sharepool::DecodedSnapshotCache snapshots{hashonly::MAX_DEPENDENCY_BYTES, 0};
+     const auto checked = hashonly::CheckShareProof(share, *full_origin, tip, static_cast<uint32_t>(time), chainman.GetConsensus(),
+         [&](const uint256& hash) -> std::shared_ptr<const hashonly::Snapshot> {
+             return LookupHashPoolSnapshot(chainman, hash, snapshots);

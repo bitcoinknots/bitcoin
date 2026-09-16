@@ -1,0 +1,9 @@
+2026-09-14T04:16:05.363000Z TestFramework (INFO): PRNG seed is: 3680543623997131735
+2026-09-14T04:16:05.364000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-datum-cadence-final-compact
+2026-09-14T04:16:06.371000Z TestFramework (INFO): Four exact signed jobs, 128 independent proofs, two independent payout pools
+2026-09-14T04:16:10.919000Z TestFramework (INFO): Missing compact ancestry remains pending through restart and recovers over native P2P
+2026-09-14T04:16:13.983000Z TestFramework (INFO): Competing branches derive their own omitted state and history
+2026-09-14T04:16:16.440000Z TestFramework (INFO): Persistent local history survives restart and falls back when its local seal is unavailable
+2026-09-14T04:16:22.211000Z TestFramework (INFO): Stopping nodes
+2026-09-14T04:16:22.385000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-datum-cadence-final-compact
+2026-09-14T04:16:22.385000Z TestFramework (INFO): Tests successful

@@ -1,0 +1,30 @@
+{
+  "network": "isolated native regtest",
+  "profile": "hash-only-v8-vardiff-tides",
+  "miners": 100,
+  "hardware_used": false,
+  "daemon_sha256": "f889cf8d0e4108a8e40aea7174109d3c6fec14e0713521493e5309cc301346db",
+  "rules": "173ff6fa511f227cc8d4751bb15373afdca5c8ec235dc69ca2680d7ade13ea31",
+  "checks": [
+    "assigned_target_bound_before_work",
+    "miner_relabel_rejected",
+    "insufficient_share_work_rejected",
+    "exact_weighted_payouts",
+    "retarget_only_future_jobs",
+    "old_authorization_keeps_assigned_target",
+    "late_proof_original_weight",
+    "actual_coinbase_payout_mutation_rejected",
+    "p2p_peer_validation",
+    "persistent_history_restart",
+    "competing_fork_reorg_weights",
+    "v7_v8_datadir_separation",
+    "offline_reindex_weight_recovery"
+  ],
+  "first_settlement": {
+    "shares": 100,
+    "recipients": 100,
+    "snapshot_bytes": 78518,
+    "assigned_work": 2776,
+    "paid_satoshis": 4999999934
+  }
+}

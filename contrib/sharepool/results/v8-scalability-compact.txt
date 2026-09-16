@@ -1,0 +1,71 @@
+2026-09-14T16:08:47.916000Z TestFramework (INFO): PRNG seed is: 2243033659742986946
+2026-09-14T16:08:47.916000Z TestFramework (DEBUG): Setting up network thread
+2026-09-14T16:08:47.916000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v8-registration-compact
+2026-09-14T16:08:47.919000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:08:47.920000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:08:47.921000Z TestFramework.node2 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:08:48.455000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-14T16:08:48.458000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-14T16:08:48.462000Z TestFramework.node2 (DEBUG): RPC successfully started
+2026-09-14T16:08:48.934000Z TestFramework (INFO): Four exact signed jobs, 128 independent proofs, two independent payout pools
+2026-09-14T16:08:53.058000Z TestFramework (INFO): Missing compact ancestry remains pending through restart and recovers over native P2P
+2026-09-14T16:08:53.116000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-14T16:08:53.237000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-14T16:08:53.241000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:08:53.768000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-14T16:08:53.791000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-14T16:08:53.908000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-14T16:08:53.913000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:08:54.437000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-14T16:08:55.941000Z TestFramework (INFO): Competing branches derive their own omitted state and history
+2026-09-14T16:08:58.184000Z TestFramework (INFO): Persistent local history survives restart and falls back when its local seal is unavailable
+2026-09-14T16:08:58.268000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-14T16:08:58.387000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-14T16:08:58.390000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:08:58.917000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-14T16:08:59.083000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-14T16:08:59.199000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-14T16:08:59.201000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:08:59.463000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-14T16:08:59.620000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-14T16:08:59.735000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-14T16:08:59.737000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:08:59.999000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-14T16:08:59.999000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-14T16:09:00.120000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-14T16:09:00.121000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:09:00.603000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-14T16:09:00.743000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-14T16:09:00.859000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-14T16:09:00.861000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:09:01.679000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-14T16:09:01.820000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-14T16:09:01.996000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-14T16:09:02.014000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:09:02.219000Z TestFramework.node1 (DEBUG): [node 1] bitcoind exited with status 1 during initialization
+2026-09-14T16:09:02.230000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:09:02.432000Z TestFramework.node1 (DEBUG): [node 1] bitcoind exited with status 1 during initialization
+2026-09-14T16:09:02.443000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:09:02.489000Z TestFramework.node1 (DEBUG): [node 1] bitcoind exited with status 1 during initialization
+2026-09-14T16:09:02.491000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:09:02.572000Z TestFramework.node1 (DEBUG): [node 1] bitcoind exited with status 1 during initialization
+2026-09-14T16:09:02.574000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:09:02.621000Z TestFramework.node1 (DEBUG): [node 1] bitcoind exited with status 1 during initialization
+2026-09-14T16:09:02.622000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:09:02.884000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-14T16:09:02.884000Z TestFramework.node2 (DEBUG): Stopping node
+2026-09-14T16:09:02.999000Z TestFramework.node2 (DEBUG): Node stopped
+2026-09-14T16:09:03.002000Z TestFramework.node2 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:09:03.203000Z TestFramework.node2 (DEBUG): [node 2] bitcoind exited with status 1 during initialization
+2026-09-14T16:09:03.205000Z TestFramework.node2 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T16:09:03.467000Z TestFramework.node2 (DEBUG): RPC successfully started
+2026-09-14T16:09:03.471000Z TestFramework (DEBUG): Closing down network thread
+2026-09-14T16:09:03.531000Z TestFramework (INFO): Stopping nodes
+2026-09-14T16:09:03.531000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-14T16:09:03.532000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-14T16:09:03.533000Z TestFramework.node2 (DEBUG): Stopping node
+2026-09-14T16:09:03.710000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-14T16:09:03.710000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-14T16:09:03.710000Z TestFramework.node2 (DEBUG): Node stopped
+2026-09-14T16:09:03.710000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v8-registration-compact
+2026-09-14T16:09:03.710000Z TestFramework (INFO): Tests successful

@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "profile": "SPN1 opt-in regtest relay over existing Bitcoin P2P connections",
+  "native_binary_sha256": "b762725b0645594372f6da174452d9fd6e73056cd9a3793202bc0f3f511b4666",
+  "test": "test/functional/feature_sharepool_relay.py",
+  "python": "python3 -B",
+  "runs": [
+    {
+      "transport": "v1",
+      "arguments": "(default legacy transport)",
+      "result": "passed",
+      "started_utc": "2026-09-11T23:56:45.255000Z",
+      "finished_utc": "2026-09-11T23:57:30.516000Z"
+    },
+    {
+      "transport": "BIP324 v2",
+      "arguments": "--v2transport",
+      "result": "passed",
+      "started_utc": "2026-09-11T23:56:48.614000Z",
+      "finished_utc": "2026-09-11T23:57:33.935000Z"
+    }
+  ],
+  "checks": [
+    "Late local opt-in on an already established Bitcoin connection",
+    "Disabled profile, legacy peer, and mismatched version/genesis/rules/pool/activation",
+    "Bounded notfound replies and no admission from unsolicited bodies",
+    "22 malformed framing, count, ordering, offset, digest and byte-bound cases",
+    "Same-kind uint256 serialized-byte ordering accepts ID256 before ID1 and rejects the opposite order",
+    "Rapid negotiation consumes the control-message budget",
+    "Complete three-chunk invalid template is refused by native admission",
+    "At most eight active download slots across peers; disconnect frees a slot",
+    "Incomplete two-chunk body expires after 30 seconds and next queued object proceeds",
+    "Immediate retry of an expired object is suppressed",
+    "Valid native template and receipt sent under wrong IDs leave cache unchanged",
+    "The same valid template and receipt are admitted under their correct IDs",
+    "Native active chain tip unchanged and no peer ban entries"
+  ],
+  "native_focused_tests": {
+    "result": "passed",
+    "cases": 16,
+    "suites": [
+      "sharepool_tests",
+      "sharepool_signer_tests",
+      "sharepool_params_tests"
+    ]
+  },
+  "build": {
+    "targets": [
+      "bitcoind",
+      "test_bitcoin"
+    ],
+    "result": "passed",
+    "cpp_warnings": 0,
+    "linker_note": "Existing duplicate-static-library warning when linking test_bitcoin"
+  },
+  "internal_independent_review": {
+    "result": "No clear memory, lifetime, EOF or lock-order issue found",
+    "follow_up": "Added same-kind identifier-order regression; synchronous native validation latency limit documented"
+  },
+  "physical_hardware_used": false,
+  "public_network_used": false,
+  "extra_listener_added": false,
+  "limitations": [
+    "Disposable loopback regtest nodes only; no WAN or sustained-load measurement",
+    "No isolated forced send-queue backpressure-resume test",
+    "No coverage-guided fuzzing or external independent review of the new wire protocol",
+    "This test does not measure sustained validation CPU fairness",
+    "Successful test directories were cleaned by the functional framework; timestamps and results are from captured command output",
+    "Valid signed-body service integration is exercised separately by feature_sharepool_node.py",
+    "No production-readiness or mainnet activation claim"
+  ],
+  "sources": {
+    "src/net_processing.cpp": "1ffe29fa34e9909d495051a652d54bc816906eb6a47eb98da9dc8bbbe24ca45f",
+    "src/net_processing.h": "81311bfe5155c0365186ee666dcc87e65c1376a8f4ad29f6bafb47cafcfcb9c9",
+    "src/protocol.h": "e511ae88f9c6b751d466933bafb84f4ed072f35e0b82281cbfde7fbfa24b278b",
+    "src/sharepool/relay.cpp": "29d9c50defe6f6a385babe9f606ec94bbe92fe99eb4c6c586225bbc5bfcd44a4",
+    "src/sharepool/relay.h": "3afa3e18c1130b1d48363c98db9bd40f27f82e5660bb3de1d3c5786e2879399f",
+    "test/functional/feature_sharepool_relay.py": "0ea3819fe2f0d94085aca1a66a3c385079c2778a70e81fafb65befb22438eec1"
+  }
+}

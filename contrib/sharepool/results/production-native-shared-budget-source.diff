@@ -1,0 +1,748 @@
+diff --git a/src/consensus/sharepool_hash.cpp b/src/consensus/sharepool_hash.cpp
+index b974465..424eaa1 100644
+--- a/src/consensus/sharepool_hash.cpp
++++ b/src/consensus/sharepool_hash.cpp
+@@ -277,7 +277,36 @@ PreparedSnapshot PrepareSnapshot(const Snapshot& snapshot)
+     return PreparedSnapshot{snapshot};
+ }
+ 
+-size_t EncodedSize(const Snapshot& snapshot) { return PrepareSnapshot(snapshot).usage.encoded_bytes; }
++// These helpers share a single operation-local preparation. They retain no
++// snapshot pointers or validation verdicts across calls. The caller must pass
++// the exact unchanged snapshot from which the tables were prepared.
++uint256 PreparedProfileHash(const Snapshot& snapshot, uint32_t version, const PreparedSnapshot& prepared)
++{
++    static constexpr char old_domain[]{"SharePool/snapshot/v4"};
++    static constexpr char new_domain[]{"SharePool/snapshot/v5"};
++    static constexpr char tides_domain[]{"SharePool/snapshot/v6"};
++    static constexpr char compact_domain[]{"SharePool/snapshot/v7"};
++    HashWriter writer;
++    writer.write(AsBytes(version == COMPACT_TIDES_VERSION ? Span{compact_domain} :
++                        version == TIDES_VERSION ? Span{tides_domain} :
++                        snapshot.binding.version == LEDGER_VERSION ? Span{new_domain} : Span{old_domain}));
++    WriteSnapshot(writer, snapshot, prepared.table, prepared.jobs);
++    return writer.GetHash();
++}
++
++uint256 PreparedContentsHash(const Snapshot& snapshot, const PreparedSnapshot& prepared)
++{
++    HashWriter writer;
++    static constexpr char old_domain[]{"SharePool/contents/v4"};
++    static constexpr char new_domain[]{"SharePool/contents/v5"};
++    static constexpr char tides_domain[]{"SharePool/contents/v6"};
++    static constexpr char compact_domain[]{"SharePool/contents/v7"};
++    writer.write(AsBytes(snapshot.binding.version == COMPACT_TIDES_VERSION ? Span{compact_domain} :
++                        snapshot.binding.version == TIDES_VERSION ? Span{tides_domain} :
++                        snapshot.binding.version == LEDGER_VERSION ? Span{new_domain} : Span{old_domain}));
++    WriteSnapshot(writer, snapshot, prepared.table, prepared.jobs, true);
++    return writer.GetHash();
++}
+ 
+ /** Compare the canonical serialization in place, without allocating a second
+  * complete transaction or snapshot byte buffer. */
+@@ -417,11 +446,12 @@ CBlock ReadBlock(Span<const unsigned char> bytes, bool normalized)
+ 
+ CBlock ReadTemplate(Span<const unsigned char> bytes) { return ReadBlock(bytes, true); }
+ 
+-bool OwnerValid(const Snapshot& snapshot)
++bool OwnerValid(const Snapshot& snapshot, const PreparedSnapshot* prepared = nullptr)
+ {
+     const XOnlyPubKey owner{Span{snapshot.binding.owner}};
+     return !snapshot.job_commitment.IsNull() && owner.IsFullyValid() &&
+-        owner.VerifySchnorr(hashonly::OwnerHash(snapshot), snapshot.authorization);
++        owner.VerifySchnorr(prepared ? hashonly::OwnerHash(snapshot.binding, snapshot.job_commitment, PreparedContentsHash(snapshot, *prepared))
++                                    : hashonly::OwnerHash(snapshot), snapshot.authorization);
+ }
+ 
+ Result CheckBinding(const Envelope& binding, const Consensus::Params& consensus,
+@@ -548,8 +578,9 @@ class Checker {
+         if (!result) return Result::Missing({hash});
+         size_t size;
+         try {
+-            size = EncodedSize(*result);
+-            if (ProfileSnapshotHash(*result, ProfileVersion(m_consensus)) != hash) return Result::Missing({hash});
++            const auto prepared = PrepareSnapshot(*result);
++            size = prepared.usage.encoded_bytes;
++            if (PreparedProfileHash(*result, ProfileVersion(m_consensus), prepared) != hash) return Result::Missing({hash});
+         } catch (const std::ios_base::failure&) { return Bad("snapshot-encoding"); }
+         if (size > MAX_DEPENDENCY_BYTES - m_dependency_bytes) return Bad("dependency-bytes");
+         if (m_consensus.SharePoolCompactTides && result->shares.size() > MAX_DEPENDENCY_SHARES - m_dependency_shares) return Bad("dependency-shares");
+@@ -1137,16 +1168,7 @@ uint256 ProfileSnapshotHash(const Snapshot& snapshot, uint32_t version)
+         throw std::invalid_argument("unknown snapshot hash profile");
+     }
+     const auto prepared = PrepareSnapshot(snapshot);
+-    static constexpr char old_domain[]{"SharePool/snapshot/v4"};
+-    static constexpr char new_domain[]{"SharePool/snapshot/v5"};
+-    static constexpr char tides_domain[]{"SharePool/snapshot/v6"};
+-    static constexpr char compact_domain[]{"SharePool/snapshot/v7"};
+-    HashWriter writer;
+-    writer.write(AsBytes(version == COMPACT_TIDES_VERSION ? Span{compact_domain} :
+-                        version == TIDES_VERSION ? Span{tides_domain} :
+-                        snapshot.binding.version == LEDGER_VERSION ? Span{new_domain} : Span{old_domain}));
+-    WriteSnapshot(writer, snapshot, prepared.table, prepared.jobs);
+-    return writer.GetHash();
++    return PreparedProfileHash(snapshot, version, prepared);
+ }
+ 
+ uint32_t ProfileVersion(const Consensus::Params& consensus)
+@@ -1184,16 +1206,7 @@ uint256 SnapshotContentsHash(const Snapshot& snapshot)
+ {
+     // Stream rather than copying a potentially 16 MiB snapshot.
+     const auto prepared = PrepareSnapshot(snapshot);
+-    HashWriter writer;
+-    static constexpr char old_domain[]{"SharePool/contents/v4"};
+-    static constexpr char new_domain[]{"SharePool/contents/v5"};
+-    static constexpr char tides_domain[]{"SharePool/contents/v6"};
+-    static constexpr char compact_domain[]{"SharePool/contents/v7"};
+-    writer.write(AsBytes(snapshot.binding.version == COMPACT_TIDES_VERSION ? Span{compact_domain} :
+-                        snapshot.binding.version == TIDES_VERSION ? Span{tides_domain} :
+-                        snapshot.binding.version == LEDGER_VERSION ? Span{new_domain} : Span{old_domain}));
+-    WriteSnapshot(writer, snapshot, prepared.table, prepared.jobs, true);
+-    return writer.GetHash();
++    return PreparedContentsHash(snapshot, prepared);
+ }
+ 
+ uint256 OwnerHash(const Envelope& binding, const uint256& job, const uint256& contents)
+@@ -1493,9 +1506,12 @@ Result MaterializeTidesState(Snapshot& snapshot, const CBlockIndex* previous,
+             catch (const MalformedSnapshot&) { return Bad("snapshot-encoding"); }
+             catch (const std::exception&) { return Result::Missing({index->m_mm_rhs}); }
+             if (!raw) return Result::Missing({index->m_mm_rhs});
+-            if (ProfileSnapshotHash(*raw, COMPACT_TIDES_VERSION) != index->m_mm_rhs) return Result::Missing({index->m_mm_rhs});
+-            if (!CheckBinding(raw->binding, consensus, height, index->pprev->GetBlockHash()).IsValid() ||
+-                !OwnerValid(*raw) || raw->history_head.IsNull()) return Bad("compact-state-parent");
++            {
++                const auto prepared = PrepareSnapshot(*raw);
++                if (PreparedProfileHash(*raw, COMPACT_TIDES_VERSION, prepared) != index->m_mm_rhs) return Result::Missing({index->m_mm_rhs});
++                if (!CheckBinding(raw->binding, consensus, height, index->pprev->GetBlockHash()).IsValid() ||
++                    !OwnerValid(*raw, &prepared) || raw->history_head.IsNull()) return Bad("compact-state-parent");
++            }
+             Snapshot current{*raw};
+             // ApplyTidesState ignores these inputs; clear explicitly so no
+             // caller-supplied derived cache can accidentally become evidence.
+@@ -1551,15 +1567,20 @@ Result CalculateTidesPayouts(const Snapshot& snapshot, const CBlockIndex* previo
+         catch (const MalformedSnapshot&) { return tides::DeltaResult::Invalid("tides-history-encoding"); }
+         catch (const std::exception&) { return tides::DeltaResult::Missing({index.m_mm_rhs}); }
+         if (!old) return tides::DeltaResult::Missing({index.m_mm_rhs});
+-        if (ProfileSnapshotHash(*old, ProfileVersion(consensus)) != index.m_mm_rhs) return tides::DeltaResult::Missing({index.m_mm_rhs});
+-        if (!index.pprev || !CheckBinding(old->binding, consensus, index.nHeight, index.pprev->GetBlockHash()).IsValid() ||
+-            !OwnerValid(*old) || old->history_head.IsNull()) return tides::DeltaResult::Invalid("tides-history-binding");
++        size_t encoded_bytes;
++        {
++            const auto prepared = PrepareSnapshot(*old);
++            if (PreparedProfileHash(*old, ProfileVersion(consensus), prepared) != index.m_mm_rhs) return tides::DeltaResult::Missing({index.m_mm_rhs});
++            if (!index.pprev || !CheckBinding(old->binding, consensus, index.nHeight, index.pprev->GetBlockHash()).IsValid() ||
++                !OwnerValid(*old, &prepared) || old->history_head.IsNull()) return tides::DeltaResult::Invalid("tides-history-binding");
++            encoded_bytes = prepared.usage.encoded_bytes;
++        }
+         auto delta = std::make_shared<tides::HistoryDelta>();
+         delta->block_hash = index.GetBlockHash();
+         delta->parent_hash = index.pprev->GetBlockHash();
+         delta->snapshot_hash = index.m_mm_rhs;
+         delta->height = index.nHeight;
+-        delta->encoded_bytes = EncodedSize(*old);
++        delta->encoded_bytes = encoded_bytes;
+         // These summaries belong to the candidate's exact native ancestry.
+         // On an unconnected competing branch they remain CONDITIONAL on native
+         // validation of every ancestor during activation. Requiring connected
+diff --git a/src/sharepool/hash_validation_cache.h b/src/sharepool/hash_validation_cache.h
+index fff47f8..670d69c 100644
+--- a/src/sharepool/hash_validation_cache.h
++++ b/src/sharepool/hash_validation_cache.h
+@@ -11,13 +11,74 @@
+ #include <primitives/block.h>
+ 
+ #include <algorithm>
++#include <atomic>
++#include <cassert>
+ #include <limits>
+ #include <map>
+ #include <memory>
++#include <new>
++#include <optional>
+ #include <set>
+ #include <stdexcept>
++#include <utility>
+ 
+ namespace sharepool {
++/** Local optional retention policy, independent of consensus and RPC concurrency. */
++inline constexpr size_t DEFAULT_DECODED_SNAPSHOT_RETENTION_BYTES{128 * 1024 * 1024};
++
++/** Shared accounting for optional decoded LRU entries, not all live snapshots.
++ * Reservations never wait for capacity. Leases keep the counter alive beyond
++ * the service owner and release it without I/O, callbacks or chain locks. */
++class DecodedSnapshotRetentionBudget {
++    struct State {
++        const size_t maximum;
++        std::atomic<size_t> bytes{0};
++        explicit State(size_t limit) : maximum{limit} {}
++    };
++    const std::shared_ptr<State> m_state;
++public:
++    class Lease {
++        friend class DecodedSnapshotRetentionBudget;
++        std::shared_ptr<State> m_state;
++        size_t m_bytes{0};
++        Lease(std::shared_ptr<State> state, size_t bytes) noexcept : m_state{std::move(state)}, m_bytes{bytes} {}
++        void Release() noexcept
++        {
++            if (m_state) {
++                [[maybe_unused]] const auto prior = m_state->bytes.fetch_sub(m_bytes, std::memory_order_relaxed);
++                assert(prior >= m_bytes);
++                m_state.reset();
++            }
++        }
++    public:
++        Lease() = default;
++        Lease(const Lease&) = delete;
++        Lease& operator=(const Lease&) = delete;
++        Lease(Lease&& other) noexcept : m_state{std::move(other.m_state)}, m_bytes{other.m_bytes} {}
++        Lease& operator=(Lease&& other) noexcept
++        {
++            if (this != &other) {
++                Release();
++                m_state = std::move(other.m_state);
++                m_bytes = other.m_bytes;
++            }
++            return *this;
++        }
++        ~Lease() { Release(); }
++    };
++
++    explicit DecodedSnapshotRetentionBudget(size_t maximum) : m_state{std::make_shared<State>(maximum)} {}
++    std::optional<Lease> TryAcquire(size_t bytes)
++    {
++        size_t current = m_state->bytes.load(std::memory_order_relaxed);
++        do {
++            if (bytes > m_state->maximum - current) return std::nullopt;
++        } while (!m_state->bytes.compare_exchange_weak(current, current + bytes, std::memory_order_relaxed));
++        return Lease{m_state, bytes};
++    }
++    size_t Bytes() const { return m_state->bytes.load(std::memory_order_relaxed); }
++};
++
+ /** Local decoded-snapshot retention charge, not a consensus or wire limit.
+  * Count nested vectors/scripts/witnesses, full reconstructed shares and each
+  * distinct immutable transaction allocation once. Cross-entry sharing may be
+@@ -35,7 +96,7 @@ inline size_t DecodedSnapshotCacheCharge(const hashonly::Snapshot& snapshot, siz
+     add(memusage::MallocUsage(sizeof(hashonly::Snapshot)));
+     add(memusage::MallocUsage(sizeof(memusage::stl_shared_counter)));
+     add(memusage::MallocUsage(sizeof(uint256) + sizeof(std::shared_ptr<const hashonly::Snapshot>) +
+-                             sizeof(size_t) + sizeof(uint64_t) + 4 * sizeof(void*)));
++                             sizeof(size_t) + sizeof(uint64_t) + sizeof(DecodedSnapshotRetentionBudget::Lease) + 4 * sizeof(void*)));
+     add(memusage::DynamicUsage(snapshot.binding.payout_script));
+     add(memusage::DynamicUsage(snapshot.templates));
+     add(memusage::DynamicUsage(snapshot.shares));
+@@ -64,16 +125,24 @@ inline size_t DecodedSnapshotCacheCharge(const hashonly::Snapshot& snapshot, siz
+  * Hash/content authentication and dependency budgets belong to the verifier. */
+ class DecodedSnapshotCache {
+     struct Entry {
++        // Destroy the reservation after releasing this entry's snapshot owner.
++        DecodedSnapshotRetentionBudget::Lease lease;
+         std::shared_ptr<const hashonly::Snapshot> snapshot;
+         size_t charge;
+         uint64_t touched;
+     };
+     const size_t m_maximum;
++    const size_t m_maximum_entries;
++    const std::shared_ptr<DecodedSnapshotRetentionBudget> m_budget;
+     std::map<uint256, Entry> m_entries;
+     size_t m_bytes{0};
+     uint64_t m_clock{0};
+ public:
+-    explicit DecodedSnapshotCache(size_t maximum) : m_maximum{maximum} {}
++    explicit DecodedSnapshotCache(size_t maximum, size_t maximum_entries = 1024,
++                                  std::shared_ptr<DecodedSnapshotRetentionBudget> budget = {})
++        : m_maximum{maximum}, m_maximum_entries{maximum_entries}, m_budget{std::move(budget)} {}
++    DecodedSnapshotCache(const DecodedSnapshotCache&) = delete;
++    DecodedSnapshotCache& operator=(const DecodedSnapshotCache&) = delete;
+     std::shared_ptr<const hashonly::Snapshot> Get(const uint256& hash)
+     {
+         const auto found = m_entries.find(hash);
+@@ -81,26 +150,36 @@ public:
+         found->second.touched = ++m_clock;
+         return found->second.snapshot;
+     }
+-    bool Put(const uint256& hash, std::shared_ptr<const hashonly::Snapshot> snapshot, size_t encoded_bytes)
++    bool Put(const uint256& hash, std::shared_ptr<const hashonly::Snapshot> snapshot, size_t encoded_bytes) try
+     {
+-        if (!snapshot) return false;
++        if (!snapshot || m_maximum_entries == 0) return false;
+         const auto charge = DecodedSnapshotCacheCharge(*snapshot, encoded_bytes);
+         if (charge > m_maximum) return false;
+         if (const auto existing = m_entries.find(hash); existing != m_entries.end()) {
+             m_bytes -= existing->second.charge;
+             m_entries.erase(existing);
+         }
+-        while (charge > m_maximum - m_bytes) {
++        while (charge > m_maximum - m_bytes || m_entries.size() >= m_maximum_entries) {
+             const auto oldest = std::min_element(m_entries.begin(), m_entries.end(),
+                 [](const auto& a, const auto& b) { return a.second.touched < b.second.touched; });
+             m_bytes -= oldest->second.charge;
+             m_entries.erase(oldest);
+         }
+-        // Publish the charge only after allocation succeeds. A local
+-        // allocation failure may be caught as MissingData by the verifier.
+-        m_entries.emplace(hash, Entry{std::move(snapshot), charge, ++m_clock});
++        DecodedSnapshotRetentionBudget::Lease lease;
++        if (m_budget) {
++            auto reservation = m_budget->TryAcquire(charge);
++            if (!reservation) return false;
++            lease = std::move(*reservation);
++        }
++        // Publish the local charge only after allocation succeeds. The lease
++        // releases the shared charge if insertion throws. A caller may still
++        // own the snapshot after eviction, outside optional LRU accounting.
++        m_entries.emplace(hash, Entry{std::move(lease), std::move(snapshot), charge, ++m_clock});
+         m_bytes += charge;
+         return true;
++    } catch (const std::bad_alloc&) {
++        // Failure to retain optional evidence must not hide an available value.
++        return false;
+     }
+     size_t Bytes() const { return m_bytes; }
+     size_t Size() const { return m_entries.size(); }
+diff --git a/src/test/sharepool_hash_tests.cpp b/src/test/sharepool_hash_tests.cpp
+index c8897de..dca5ce4 100644
+--- a/src/test/sharepool_hash_tests.cpp
++++ b/src/test/sharepool_hash_tests.cpp
+@@ -13,6 +13,7 @@
+ #include <pubkey.h>
+ #include <script/script.h>
+ #include <sharepool/hash_store.h>
++#include <sharepool/hash_validation_cache.h>
+ #include <streams.h>
+ #include <test/util/setup_common.h>
+ #include <versionbits.h>
+@@ -1581,6 +1582,157 @@ BOOST_AUTO_TEST_CASE(v7_bounded_native_suffix_reconstructs_expiry_and_repeat_sta
+     BOOST_CHECK(ho::MaterializeTidesState(next, &indexes[9], consensus, Lookup()).status == ho::Status::Invalid);
+ }
+ 
++BOOST_AUTO_TEST_CASE(v7_preparation_and_full_validation_reauthenticate_ancestry_evidence)
++{
++    consensus.SharePoolTides = true;
++    consensus.SharePoolCompactTides = true;
++    auto initial = CompactEmpty();
++    const auto origin = CompactBlock(initial);
++    auto first = CompactEmpty();
++    first.templates = {Record(origin)};
++    first.shares = {Proof(origin, initial, 1)};
++    CompactState(first);
++    const auto settled = CompactBlock(first);
++    BOOST_REQUIRE(Check(settled).IsValid());
++    Anchor(settled);
++    auto child = CompactEmpty(2);
++    const auto child_block = CompactBlock(child);
++    const auto parent_hash = indexes[1].m_mm_rhs;
++    const auto parent = snapshots.at(parent_hash);
++    const auto materialize = [&] { return ho::MaterializeTidesState(child, &indexes[1], consensus, Lookup()); };
++    std::vector<CTxOut> payouts;
++    const auto account = [&] { return ho::CalculateTidesPayouts(child, &indexes[1], indexes[1].nBits,
++                                                              consensus, Lookup(), REWARD, payouts); };
++    BOOST_REQUIRE(materialize().IsValid());
++    BOOST_REQUIRE(account().IsValid());
++    const auto expected = payouts;
++    // A previously seen address cannot authenticate changed canonical bytes.
++    auto corrupt = *parent;
++    corrupt.authorization[0] ^= 1;
++    snapshots[parent_hash] = std::make_shared<const ho::Snapshot>(corrupt);
++    BOOST_CHECK(materialize().IsMissing());
++    BOOST_CHECK(Check(child_block).IsMissing());
++    // Correctly rehashing the corrupted signature still cannot authenticate it.
++    const auto bad_hash = ho::SnapshotHash(corrupt);
++    snapshots[bad_hash] = std::make_shared<const ho::Snapshot>(corrupt);
++    indexes[1].m_mm_rhs = bad_hash;
++    Reason(materialize(), "compact-state-parent");
++    BOOST_CHECK(account().status == ho::Status::Invalid);
++    // A warm payout cursor owns an already authenticated admission summary;
++    // full validation must nevertheless reopen its required recent ancestry.
++    // Restoring that evidence recovers both reconstruction and accounting.
++    indexes[1].m_mm_rhs = parent_hash;
++    snapshots[parent_hash] = parent;
++    BOOST_REQUIRE(materialize().IsValid());
++    BOOST_REQUIRE(account().IsValid());
++    BOOST_CHECK(payouts == expected);
++    snapshots.erase(parent_hash);
++    BOOST_CHECK(materialize().IsMissing());
++    BOOST_CHECK(Check(child_block).IsMissing());
++    snapshots[parent_hash] = parent;
++    BOOST_REQUIRE(materialize().IsValid());
++    BOOST_REQUIRE(account().IsValid());
++    BOOST_CHECK(payouts == expected);
++}
++
++BOOST_AUTO_TEST_CASE(v7_shared_optional_retention_preserves_exact_validation_results)
++{
++    consensus.SharePoolTides = true;
++    consensus.SharePoolCompactTides = true;
++    auto initial = CompactEmpty();
++    const auto origin = CompactBlock(initial);
++    auto first = CompactEmpty();
++    first.templates = {Record(origin)};
++    first.shares = {Proof(origin, initial, 1)};
++    CompactState(first);
++    const auto settled = CompactBlock(first);
++    BOOST_REQUIRE(Check(settled).IsValid());
++    Anchor(settled);
++    auto child = CompactEmpty(2);
++    const auto block = CompactBlock(child);
++    auto proof = Proof(origin, initial, first.shares.front().header.nNonce + 1);
++    auto bad_proof = proof;
++    bad_proof.authorization[0] ^= 1;
++    auto wrong_payout = block;
++    CMutableTransaction coinbase{*wrong_payout.vtx.front()};
++    --coinbase.vout.front().nValue;
++    wrong_payout.vtx.front() = MakeTransactionRef(std::move(coinbase));
++    wrong_payout.hashMerkleRoot = BlockMerkleRoot(wrong_payout);
++    Reseal(wrong_payout);
++    auto bad_owner = block;
++    auto unauthorized = *snapshots.at(block.m_mm_rhs);
++    unauthorized.authorization[0] ^= 1;
++    bad_owner.m_mm_rhs = ho::SnapshotHash(unauthorized);
++    snapshots[bad_owner.m_mm_rhs] = std::make_shared<const ho::Snapshot>(unauthorized);
++
++    const auto validate = [&](size_t maximum, const auto& evaluate,
++                              std::optional<uint256> missing = {}, bool malformed = false) {
++        auto budget = std::make_shared<DecodedSnapshotRetentionBudget>(maximum);
++        ho::Result result;
++        {
++            DecodedSnapshotCache cache{ho::MAX_DEPENDENCY_BYTES, 1024, budget};
++            const ho::Lookup lookup = [&](const uint256& hash) -> std::shared_ptr<const ho::Snapshot> {
++                if (malformed) throw ho::MalformedSnapshot("authenticated malformed bytes");
++                if (missing && hash == *missing) return {};
++                if (auto retained = cache.Get(hash)) return retained;
++                const auto found = snapshots.find(hash);
++                if (found == snapshots.end()) return {};
++                const auto raw = ho::EncodeSnapshot(*found->second);
++                auto decoded = std::make_shared<const ho::Snapshot>(ho::DecodeSnapshot(raw));
++                cache.Put(hash, decoded, raw.size());
++                // Same availability rule as the native store lookup: denied
++                // optional retention never hides this freshly decoded value.
++                return decoded;
++            };
++            result = evaluate(lookup);
++            BOOST_CHECK_LE(budget->Bytes(), maximum);
++            if (maximum <= 1) BOOST_CHECK_EQUAL(cache.Bytes(), 0);
++        }
++        BOOST_CHECK_EQUAL(budget->Bytes(), 0);
++        return result;
++    };
++    std::vector<ho::Result> expected;
++    const auto& origin_snapshot = *snapshots.at(origin.m_mm_rhs);
++    const size_t one_record = DecodedSnapshotCacheCharge(origin_snapshot, ho::EncodeSnapshot(origin_snapshot).size());
++    for (const size_t maximum : {DEFAULT_DECODED_SNAPSHOT_RETENTION_BYTES, one_record, size_t{1}, size_t{0}}) {
++        const auto check = [&](const CBlock& value, std::optional<uint256> missing = {}, bool malformed = false) {
++            return validate(maximum, [&](const ho::Lookup& lookup) {
++                return ho::CheckSnapshot(value, &indexes[1], consensus, lookup, Native(), REWARD);
++            }, missing, malformed);
++        };
++        std::vector<ho::Result> results;
++        results.push_back(check(block));
++        results.push_back(validate(maximum, [&](const ho::Lookup& lookup) {
++            return ho::CheckHistoricalTemplate(origin, &indexes[1], indexes[1].nTime + 1, consensus, lookup, Native());
++        }));
++        const auto check_proof = [&](const Share& value) {
++            return validate(maximum, [&](const ho::Lookup& lookup) {
++                return ho::CheckShareProof(value, origin, &indexes[1], indexes[1].nTime + 1, consensus, lookup, Native());
++            });
++        };
++        results.push_back(check_proof(proof));
++        results.push_back(validate(maximum, [&](const ho::Lookup& lookup) {
++            return ho::CheckMiningJob(block, &indexes[1], consensus, lookup, Native(), REWARD);
++        }));
++        results.push_back(check(wrong_payout));
++        results.push_back(check(bad_owner));
++        results.push_back(check_proof(bad_proof));
++        results.push_back(check(block, {}, true));
++        results.push_back(check(block, indexes[1].m_mm_rhs));
++        for (size_t i{0}; i < 4; ++i) BOOST_REQUIRE_MESSAGE(results[i].IsValid(), results[i].reason);
++        for (size_t i{4}; i < 8; ++i) BOOST_CHECK(results[i].status == ho::Status::Invalid);
++        BOOST_REQUIRE(results[8].IsMissing());
++        BOOST_CHECK(!results[8].missing.empty());
++        if (expected.empty()) expected = results;
++        else for (size_t i{0}; i < results.size(); ++i) {
++            BOOST_CHECK(results[i].status == expected[i].status);
++            BOOST_CHECK_EQUAL(results[i].reason, expected[i].reason);
++            BOOST_CHECK(results[i].missing == expected[i].missing);
++            BOOST_CHECK(results[i].expected_reward == expected[i].expected_reward);
++        }
++    }
++}
++
+ BOOST_AUTO_TEST_CASE(v7_compact_dictionary_and_proof_indexes_cross_compactsize_boundaries)
+ {
+     consensus.SharePoolTides = true;
+diff --git a/src/test/sharepool_retry_worker_tests.cpp b/src/test/sharepool_retry_worker_tests.cpp
+index 3ecd709..e66f901 100644
+--- a/src/test/sharepool_retry_worker_tests.cpp
++++ b/src/test/sharepool_retry_worker_tests.cpp
+@@ -11,6 +11,7 @@
+ 
+ #include <boost/test/unit_test.hpp>
+ 
++#include <array>
+ #include <atomic>
+ #include <chrono>
+ #include <future>
+@@ -255,6 +256,33 @@ BOOST_AUTO_TEST_CASE(compact_decoded_snapshot_lru_charges_expansion_and_preserve
+                       std::numeric_limits<size_t>::max());
+ }
+ 
++BOOST_AUTO_TEST_CASE(decoded_snapshot_entry_budget_is_independent_of_bytes_and_session)
++{
++    auto snapshot = std::make_shared<const sharepool::hashonly::Snapshot>();
++    const size_t charge = sharepool::DecodedSnapshotCacheCharge(*snapshot, 512);
++    const uint256 first{uint8_t{1}}, second{uint8_t{2}}, third{uint8_t{3}};
++    sharepool::DecodedSnapshotCache cache{10 * charge, 2};
++    BOOST_REQUIRE(cache.Put(first, snapshot, 512));
++    BOOST_REQUIRE(cache.Put(second, snapshot, 512));
++    BOOST_REQUIRE(cache.Get(first));
++    BOOST_REQUIRE(cache.Put(third, snapshot, 512));
++    BOOST_CHECK(!cache.Get(second));
++    BOOST_CHECK(cache.Get(first) == snapshot);
++    BOOST_CHECK(cache.Get(third) == snapshot);
++    BOOST_CHECK_EQUAL(cache.Size(), 2);
++    BOOST_CHECK_EQUAL(cache.Bytes(), 2 * charge);
++    // Replacing an entry neither evicts another value nor double-charges it.
++    BOOST_REQUIRE(cache.Put(first, snapshot, 512));
++    BOOST_CHECK(cache.Get(third) == snapshot);
++    BOOST_CHECK_EQUAL(cache.Bytes(), 2 * charge);
++    sharepool::DecodedSnapshotCache following{10 * charge, 2};
++    BOOST_CHECK(!following.Get(first));
++    sharepool::DecodedSnapshotCache disabled{10 * charge, 0};
++    BOOST_CHECK(!disabled.Put(first, snapshot, 512));
++    BOOST_CHECK_EQUAL(disabled.Size(), 0);
++    BOOST_CHECK_EQUAL(disabled.Bytes(), 0);
++}
++
+ BOOST_AUTO_TEST_CASE(decoded_snapshot_cache_counts_nested_witnesses_outputs_and_shared_transaction_objects)
+ {
+     namespace ho = sharepool::hashonly;
+@@ -293,4 +321,113 @@ BOOST_AUTO_TEST_CASE(decoded_snapshot_cache_counts_nested_witnesses_outputs_and_
+     BOOST_CHECK_GT(sharepool::DecodedSnapshotCacheCharge(snapshot, wire), first + metadata + added);
+ }
+ 
++BOOST_AUTO_TEST_CASE(decoded_snapshot_shared_budget_releases_on_eviction_replacement_and_destruction)
++{
++    using namespace sharepool;
++    const auto snapshot = std::make_shared<const hashonly::Snapshot>();
++    const size_t charge = DecodedSnapshotCacheCharge(*snapshot, 512);
++    const auto budget = std::make_shared<DecodedSnapshotRetentionBudget>(2 * charge);
++    const uint256 first{uint8_t{1}}, second{uint8_t{2}}, third{uint8_t{3}};
++    {
++        DecodedSnapshotCache one{10 * charge, 1, budget};
++        DecodedSnapshotCache two{10 * charge, 1, budget};
++        DecodedSnapshotCache three{10 * charge, 1, budget};
++        BOOST_REQUIRE(one.Put(first, snapshot, 512));
++        // Conservative duplicate charging applies even to the same object/hash.
++        BOOST_REQUIRE(two.Put(first, snapshot, 512));
++        BOOST_CHECK_EQUAL(budget->Bytes(), 2 * charge);
++        BOOST_CHECK(!three.Put(third, snapshot, 512));
++        BOOST_CHECK_EQUAL(three.Bytes(), 0);
++        BOOST_REQUIRE(one.Put(second, snapshot, 512)); // Eviction releases its lease.
++        BOOST_CHECK(!one.Get(first));
++        BOOST_CHECK_EQUAL(budget->Bytes(), 2 * charge);
++        BOOST_REQUIRE(two.Put(first, snapshot, 512)); // Replacement releases its lease.
++        BOOST_CHECK_EQUAL(budget->Bytes(), 2 * charge);
++        BOOST_CHECK(!three.Put(third, snapshot, 513));
++        BOOST_CHECK_EQUAL(budget->Bytes(), 2 * charge);
++        BOOST_CHECK(snapshot == one.Get(second)); // Denial did not hide caller-owned data.
++    }
++    BOOST_CHECK_EQUAL(budget->Bytes(), 0);
++    for (const size_t maximum : {size_t{0}, charge - 1}) {
++        const auto denied = std::make_shared<DecodedSnapshotRetentionBudget>(maximum);
++        DecodedSnapshotCache cache{10 * charge, 1024, denied};
++        BOOST_CHECK(!cache.Put(first, snapshot, 512));
++        BOOST_CHECK_EQUAL(cache.Size(), 0);
++        BOOST_CHECK_EQUAL(denied->Bytes(), 0);
++    }
++    DecodedSnapshotCache disabled{10 * charge, 0, budget};
++    BOOST_CHECK(!disabled.Put(first, snapshot, 512));
++    BOOST_CHECK(!disabled.Put(first, nullptr, 512));
++    BOOST_CHECK_EQUAL(budget->Bytes(), 0);
++}
++
++BOOST_AUTO_TEST_CASE(decoded_snapshot_shared_leases_are_overflow_safe_and_exception_safe)
++{
++    using Budget = sharepool::DecodedSnapshotRetentionBudget;
++    const auto maximum = std::numeric_limits<size_t>::max();
++    auto budget = std::make_shared<Budget>(maximum);
++    auto all = budget->TryAcquire(maximum);
++    BOOST_REQUIRE(all);
++    BOOST_CHECK(!budget->TryAcquire(1));
++    BOOST_CHECK_EQUAL(budget->Bytes(), maximum);
++    auto zero = budget->TryAcquire(0);
++    BOOST_REQUIRE(zero);
++    *zero = std::move(*all); // Move assignment releases its prior reservation.
++    all.reset(); // Moved-from destruction cannot double release.
++    BOOST_CHECK_EQUAL(budget->Bytes(), maximum);
++    zero.reset();
++    BOOST_CHECK_EQUAL(budget->Bytes(), 0);
++    const auto fail_after_reservation = [&] {
++        auto lease = budget->TryAcquire(100);
++        if (!lease) throw std::runtime_error("reservation unexpectedly failed");
++        std::vector<Budget::Lease> insertion;
++        insertion.push_back(std::move(*lease));
++        throw std::bad_alloc{};
++    };
++    BOOST_CHECK_THROW(fail_after_reservation(), std::bad_alloc);
++    BOOST_CHECK_EQUAL(budget->Bytes(), 0);
++    auto remaining = budget->TryAcquire(maximum);
++    BOOST_REQUIRE(remaining);
++    const std::weak_ptr<Budget> owner{budget};
++    budget.reset();
++    BOOST_CHECK(owner.expired());
++    // The reservation owns its accounting state independently of the service.
++    remaining.reset();
++}
++
++BOOST_AUTO_TEST_CASE(decoded_snapshot_shared_budget_concurrent_sessions_never_exceed_limit)
++{
++    using namespace sharepool;
++    const auto snapshot = std::make_shared<const hashonly::Snapshot>();
++    const size_t charge = DecodedSnapshotCacheCharge(*snapshot, 512);
++    constexpr size_t THREADS{8};
++    const size_t maximum = 3 * charge;
++    const auto budget = std::make_shared<DecodedSnapshotRetentionBudget>(maximum);
++    std::promise<void> release;
++    const auto released = release.get_future().share();
++    std::array<std::promise<void>, THREADS> entered;
++    std::vector<std::future<void>> workers;
++    std::atomic<size_t> admitted{0}, violations{0};
++    for (size_t thread{0}; thread < THREADS; ++thread) {
++        workers.push_back(std::async(std::launch::async, [&, thread] {
++            DecodedSnapshotCache cache{2 * charge, 1, budget};
++            if (cache.Put(uint256{uint8_t{1}}, snapshot, 512)) ++admitted;
++            entered[thread].set_value();
++            released.wait();
++            for (size_t i{0}; i < 1000; ++i) {
++                cache.Put(uint256{static_cast<uint8_t>(i % 3 + 1)}, snapshot, 512);
++                if (budget->Bytes() > maximum || cache.Bytes() > charge) ++violations;
++                if (i % 16 == 0) std::this_thread::yield();
++            }
++        }));
++    }
++    for (auto& ready : entered) ready.get_future().wait();
++    BOOST_CHECK_EQUAL(admitted.load(), 3);
++    BOOST_CHECK_EQUAL(budget->Bytes(), maximum);
++    release.set_value();
++    for (auto& worker : workers) worker.get();
++    BOOST_CHECK_EQUAL(violations.load(), 0);
++    BOOST_CHECK_EQUAL(budget->Bytes(), 0);
++}
++
+ BOOST_AUTO_TEST_SUITE_END()
+diff --git a/src/validation.cpp b/src/validation.cpp
+index 2117b08..4a0bb0f 100644
+--- a/src/validation.cpp
++++ b/src/validation.cpp
+@@ -5413,6 +5413,24 @@ bool TestSharePoolTemplateOnAncestor(BlockValidationState& state,
+ }
+ 
+ namespace {
++std::shared_ptr<const sharepool::hashonly::Snapshot> LookupHashPoolSnapshot(
++    ChainstateManager& chainman, const uint256& hash, sharepool::DecodedSnapshotCache& snapshots)
++{
++    AssertLockNotHeld(cs_main);
++    if (auto cached = snapshots.Get(hash)) return cached;
++    const auto raw = WITH_LOCK(cs_main, return chainman.m_sharepool_hash_store->GetShared(hash));
++    if (!raw) return {};
++    std::shared_ptr<const sharepool::hashonly::Snapshot> decoded;
++    try { decoded = std::make_shared<const sharepool::hashonly::Snapshot>(sharepool::hashonly::DecodeSnapshot(*raw)); }
++    catch (const std::ios_base::failure&) { throw sharepool::hashonly::MalformedSnapshot("hash-verified snapshot encoding is invalid"); }
++    // Only this validation invocation retains immutable decoded evidence. Each
++    // new invocation reads through the store again; no cached ancestry, payout
++    // or native verdict can substitute for a missing preimage. Oversized values
++    // remain available to the verifier even when the retention LRU cannot fit.
++    snapshots.Put(hash, decoded, raw->size());
++    return decoded;
++}
++
+ uint256 HashPoolNativeBody(const CBlock& block)
+ {
+     return sharepool::NativeBodyCacheKey(block);
+@@ -5569,22 +5587,10 @@ sharepool::hashonly::Result PrepareSharePoolHashOrigins(ChainstateManager& chain
+     // Decode/hash/signature work executes outside cs_main. Only owned byte
+     // references and small native cache lookups cross the mutex boundary.
+     std::map<uint256, Result> prepared;
+-    sharepool::DecodedSnapshotCache snapshots{hashonly::MAX_DEPENDENCY_BYTES};
++    sharepool::DecodedSnapshotCache snapshots{hashonly::MAX_DEPENDENCY_BYTES, 1024, chainman.m_sharepool_decoded_retention};
+     const hashonly::Lookup lookup = [&](const uint256& hash) -> std::shared_ptr<const hashonly::Snapshot> {
+         if (overlay && hash == overlay_hash) return overlay;
+-        if (auto cached = snapshots.Get(hash)) return cached;
+-        const auto raw = WITH_LOCK(cs_main, return chainman.m_sharepool_hash_store->GetShared(hash));
+-        if (!raw) return {};
+-        std::shared_ptr<const hashonly::Snapshot> decoded;
+-        try { decoded = std::make_shared<const hashonly::Snapshot>(hashonly::DecodeSnapshot(*raw)); }
+-        catch (const std::ios_base::failure&) { throw hashonly::MalformedSnapshot("hash-verified snapshot encoding is invalid"); }
+-        // Eviction is only a local optimization. Never hide an available
+-        // preimage and thereby turn a consensus dependency budget failure into
+-        // indefinitely missing data; the pure checker owns that rule.
+-        // Charge reconstructed shares and template references as well as raw
+-        // bytes. A v7 proof's small wire record is not its decoded memory cost.
+-        snapshots.Put(hash, decoded, raw->size());
+-        return decoded;
++        return LookupHashPoolSnapshot(chainman, hash, snapshots);
+     };
+     for (uint32_t pass = 0; pass <= hashonly::MAX_ORIGIN_CHECKS; ++pass) {
+         if (chainman.m_interrupt || (stop && *stop)) return Result::Missing({}, "sharepool-hash-validation-interrupted");
+@@ -5660,13 +5666,11 @@ sharepool::hashonly::Result ValidateSharePoolHashHistoricalTemplateUnlocked(Chai
+     const auto time = std::max<int64_t>(tip->GetMedianTimePast() + 1, GetTime());
+     if (time < 0 || time > std::numeric_limits<uint32_t>::max()) return Result::Missing({}, "sharepool-hash-native-time-range");
+     const auto overlay_hash = overlay ? hashonly::ProfileSnapshotHash(*overlay, hashonly::ProfileVersion(chainman.GetConsensus())) : uint256{};
++    sharepool::DecodedSnapshotCache snapshots{hashonly::MAX_DEPENDENCY_BYTES, 1024, chainman.m_sharepool_decoded_retention};
+     const auto checked = hashonly::CheckHistoricalTemplate(block, tip, static_cast<uint32_t>(time), chainman.GetConsensus(),
+         [&](const uint256& hash) -> std::shared_ptr<const hashonly::Snapshot> {
+             if (overlay && hash == overlay_hash) return overlay;
+-            const auto raw = WITH_LOCK(cs_main, return chainman.m_sharepool_hash_store->GetShared(hash));
+-            if (!raw) return {};
+-            try { return std::make_shared<const hashonly::Snapshot>(hashonly::DecodeSnapshot(*raw)); }
+-            catch (const std::ios_base::failure&) { throw hashonly::MalformedSnapshot("hash-verified snapshot encoding is invalid"); }
++            return LookupHashPoolSnapshot(chainman, hash, snapshots);
+         },
+         [&](const CBlock& origin, const CBlockIndex* parent) {
+             if (!parent) return Result::Missing({}, "sharepool-hash-native-ancestor-missing");
+@@ -5704,12 +5708,10 @@ sharepool::hashonly::Result ValidateSharePoolHashProofUnlocked(ChainstateManager
+     }
+     const auto time = std::max<int64_t>(tip->GetMedianTimePast() + 1, GetTime());
+     if (time < 0 || time > std::numeric_limits<uint32_t>::max()) return Result::Missing({}, "sharepool-hash-native-time-range");
++    sharepool::DecodedSnapshotCache snapshots{hashonly::MAX_DEPENDENCY_BYTES, 1024, chainman.m_sharepool_decoded_retention};
+     const auto checked = hashonly::CheckShareProof(share, *full_origin, tip, static_cast<uint32_t>(time), chainman.GetConsensus(),
+         [&](const uint256& hash) -> std::shared_ptr<const hashonly::Snapshot> {
+-            const auto raw = WITH_LOCK(cs_main, return chainman.m_sharepool_hash_store->GetShared(hash));
+-            if (!raw) return {};
+-            try { return std::make_shared<const hashonly::Snapshot>(hashonly::DecodeSnapshot(*raw)); }
+-            catch (const std::ios_base::failure&) { throw hashonly::MalformedSnapshot("hash-verified snapshot encoding is invalid"); }
++            return LookupHashPoolSnapshot(chainman, hash, snapshots);
+         },
+         [&](const CBlock& origin, const CBlockIndex* parent) {
+             if (!parent) return Result::Missing({}, "sharepool-hash-native-ancestor-missing");
+@@ -7742,6 +7744,7 @@ ChainstateManager::ChainstateManager(const util::SignalInterrupt& interrupt, Opt
+       m_interrupt{interrupt},
+       m_options{Flatten(std::move(options))},
+       m_blockman{interrupt, CheckSharePoolProfileDirectory(m_options, std::move(blockman_options))},
++      m_sharepool_decoded_retention{std::make_shared<sharepool::DecodedSnapshotRetentionBudget>(sharepool::DEFAULT_DECODED_SNAPSHOT_RETENTION_BYTES)},
+       m_validation_cache{m_options.script_execution_cache_bytes, m_options.signature_cache_bytes}
+ {
+     if (GetConsensus().SharePoolHashOnly) {
+diff --git a/src/validation.h b/src/validation.h
+index f461743..0f1c024 100644
+--- a/src/validation.h
++++ b/src/validation.h
+@@ -50,7 +50,7 @@
+ class Chainstate;
+ class CTxMemPool;
+ class ChainstateManager;
+-namespace sharepool { struct Share; class HashSnapshotStore; class RetryWorker; struct RetryWorkerStats; namespace hashonly { struct Result; struct Snapshot; } namespace tides { class PersistentHistoryIndex; } }
++namespace sharepool { struct Share; class HashSnapshotStore; class DecodedSnapshotRetentionBudget; class RetryWorker; struct RetryWorkerStats; namespace hashonly { struct Result; struct Snapshot; } namespace tides { class PersistentHistoryIndex; } }
+ struct ChainTxData;
+ class DisconnectedBlockTransactions;
+ struct PrecomputedTransactionData;
+@@ -1123,6 +1123,8 @@ public:
+     node::BlockManager m_blockman;
+ 
+     std::unique_ptr<sharepool::HashSnapshotStore> m_sharepool_hash_store;
++    // Aggregate optional decoded-LRU retention, shared by every validation route.
++    const std::shared_ptr<sharepool::DecodedSnapshotRetentionBudget> m_sharepool_decoded_retention;
+     std::shared_ptr<sharepool::tides::PersistentHistoryIndex> m_sharepool_tides_history;
+     std::string m_sharepool_tides_history_error;
+     // Exact-body deterministic script failures, bounded like the native reward cache.

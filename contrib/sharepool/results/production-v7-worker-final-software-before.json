@@ -1,0 +1,8 @@
+{
+  "src/validation.cpp": "5bfe182d37dd62239f55e94c7b43ae9f37bd9bfad88e4e76ca50043fdeb49a63",
+  "src/consensus/sharepool_hash.cpp": "eef5ff846677ed7f87596123cbf5b39b8c4046f57849fb08a6345b5225d070c0",
+  "src/sharepool/hash_validation_cache.h": "0e38d0206e8d80ea2282b85fc1d400edac748848514ddd4346a9fbfc763e2848",
+  "test/functional/feature_sharepool_hash_hardware_worker.py": "1321f34fd61e14369a4e2008a76ca415bbd1d969095c42b955466b09f72c4ac6",
+  "contrib/sharepool/v7_hardware_capture.py": "f904b2add53b500ffae992a2a370514aa61729d5043b6bc6879c76f03aeed462",
+  "/private/tmp/sharepool-native-build/bin/bitcoind": "a4de6a3a0a8381fce7b3d0feef572ae129a7e1062b326df51c33317bf7a0e641"
+}

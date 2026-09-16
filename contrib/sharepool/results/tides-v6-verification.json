@@ -1,0 +1,133 @@
+{
+  "schema": 1,
+  "profile": "hash-only-v6-tides",
+  "network": "opt-in fresh isolated regtest",
+  "source_base_commit": "3c58371ff22e3f62bd82589a57528c7fb1a8e5ab",
+  "source_files_sha256": {
+    "contrib/sharepool/hash_gate_batch.py": "a41c510602748c50a75b66a9dddfa9f028fd5a7cfb57ccc8cccf29cff7f424c4",
+    "contrib/sharepool/hash_mining_gate.py": "eff7410e71dcbab98cbc0581d9fa1bb445f4b59f2b1765259b75e3eda4049767",
+    "contrib/sharepool/hash_snapshot.py": "469f720e0806a89b5ab129c55289b609dffc02febc178d6dcc48d09b902dbf09",
+    "contrib/sharepool/test_hash_tides.py": "45b615e8d28ae7e7dd5576fb590b9f97998a917a1b9a6703903cad462c54c1b0",
+    "contrib/sharepool/test_tides_hardware_capture.py": "64c84482262239a0c3bb82d1d83169003c24de31b07ff7d4d5d21830aaeae79e",
+    "contrib/sharepool/tides_hardware_capture.py": "77630445a73fe7b7a2ffbfacca6792976581b5443170c4b543ec4ad014cfb40a",
+    "contrib/sharepool/verify_tides_hardware_capture.py": "686d8831975015406e3a170abbc995b3958375265ea3bfe92c346b3643ebd297",
+    "src/CMakeLists.txt": "4219468307a89e4fe6c06d3bba7326027624749530c7da9be7a909e5fd8713fa",
+    "src/chainparams.cpp": "8236a2d228ff0bed789807989fd8cd4243d568d576793ea32ca3f10c60431ffc",
+    "src/chainparamsbase.cpp": "0e37e239d53790e38348af9db7fcfb0eb9ca5915321fa65b12f54fad2f8ed642",
+    "src/consensus/params.h": "d9beeda5f3fab7611b275aa64774a8a774fbe3d73339d92409f1c5b5f5bc274b",
+    "src/consensus/sharepool_hash.cpp": "f9f9bcf1eae13b1f3d23fdb8b7d3ffa674ed05c83a031df8c2ec36aec0d6dfde",
+    "src/consensus/sharepool_hash.h": "9f663a16c78bbb5a9c86d61207fb474751681dbaa5cd7a4856283d480acfb6de",
+    "src/init.cpp": "8b1c2168ef7d5f2d42749e4d4362e9b3e423a59fac16c45efa190bddc5fc6e16",
+    "src/kernel/chainparams.cpp": "fc237676ff746e09abe65c5618c73a1d61053da2af0fccba4f511a609d9442fc",
+    "src/kernel/chainparams.h": "1d5d2d9654dc07cf5622fe484fed1baabae64b6a5effcc8ef7550431b87ca3f5",
+    "src/rpc/mining.cpp": "30a72de03cab90f42bfdb379db21d1d85460f8753fa704c671e04af61178ca0f",
+    "src/sharepool/hash_store.cpp": "8f563b4ea863a90515644c3048005463d43e4935ecc90552611eaae8b8a630dd",
+    "src/sharepool/hash_store.h": "2fdd42bc385e3345e409b4836f84eb9fa1ae00ef1cddbf1b24519326273ccbf9",
+    "src/sharepool/signer.cpp": "bb3a54a44ec1b5d32c6ca6c72b9cb27e5c410d7ee5a01c2cb5d9d930779b6c30",
+    "src/sharepool/tides_history.cpp": "4e61eb34bca8c34242e78f940940d2ef8b79f28251bad03a0932245688bbf97a",
+    "src/sharepool/tides_history.h": "a7533952d09a853dd11113026ce5ab5dd63a76f4a4ebc6b9733dc5e8304c06de",
+    "src/test/CMakeLists.txt": "deb4a49f19baabcb545ef387ac18b900ed6d26ed34bfc83871494cb04c6dd18b",
+    "src/test/sharepool_hash_store_tests.cpp": "a6c8f1c275e2b1381ebb7d93ba017368f67533303e93067b90d514494acd905d",
+    "src/test/sharepool_params_tests.cpp": "8d9852141a04ee507c68f55e48a449aec1451ed85584a09cc66723f5d0963d69",
+    "src/test/sharepool_signer_tests.cpp": "bf01bc66601b93065235c10cc712064b3f0f392fc5f9e32df41952aa4935c452",
+    "src/test/sharepool_tides_consensus_tests.cpp": "ce876b40356f472c43524268e7fba49402619381f01c17c420c5ae40b2bdafc2",
+    "src/test/sharepool_tides_history_tests.cpp": "2419933e71143b013092cf689178a5a8129650f666a765a656c1c23c45c7d877",
+    "src/validation.cpp": "97d34d805ef027c9ec312e0f584738f56ef3b875ad48dd3f5176fb9db33a7360",
+    "test/functional/feature_sharepool_hash_tides.py": "a5c177582d00ee5abcdf395e6494d41ba614e91facdf0efd1498897a05c02201",
+    "test/functional/feature_sharepool_hash_tides_100_miners.py": "6f25c2303c4bf023137d1ed8bf0c75c058a9e00ea5642b165a45cf998abfbf30",
+    "test/functional/feature_sharepool_hash_tides_zero_reward.py": "f48d3bdec58cdd54759fc29f0cbb54e590d62831d6a890c63e7af9dde104f599",
+    "test/functional/test_runner.py": "2610f8c4a3094291c93ec5ffc64d7fbaa7beddbd279e08eb2d749b8f11f437c1"
+  },
+  "final_binaries_sha256": {
+    "bitcoind": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+    "bitcoin-sharepool-signer": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+    "test_bitcoin": "c144a3b66020bc8296af3cee855061439ee618909fddac467b2e2aabd1685f6c"
+  },
+  "build_command": "/private/tmp/sharepool-build-tools-20260912/cmake/data/bin/cmake --build /private/tmp/sharepool-native-build -j 4 --target bitcoind bitcoin-sharepool-signer test_bitcoin",
+  "cpp": {
+    "command": "/private/tmp/sharepool-native-build/bin/test_bitcoin --run_test='sharepool*' --report_level=detailed --log_level=message --color_output=no",
+    "result": "passed",
+    "cases": 119,
+    "assertions": 10360,
+    "unrelated_cases_not_selected": 695,
+    "log": "tides-v6-native-tests.txt"
+  },
+  "python": [
+    {
+      "command": "SHAREPOOL_SIGNER_BINARY=/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer python3 -B -m unittest discover -s contrib/sharepool -p 'test_hash*.py' -v",
+      "result": "passed",
+      "cases": 107,
+      "skips": 0,
+      "log": "tides-v6-python-hash-tests.txt",
+      "log_sha256": "9c9ed34986e885cf8c313680314788319c9113be5dc239fb3ce08994a43bdafc"
+    },
+    {
+      "command": "SHAREPOOL_SIGNER_BINARY=/private/tmp/sharepool-native-build/bin/bitcoin-sharepool-signer python3 -B -m unittest discover -s contrib/sharepool -p 'test_native_signer.py' -v",
+      "result": "passed",
+      "cases": 22,
+      "skips": 0,
+      "log": "tides-v6-python-signer-tests.txt",
+      "log_sha256": "45704eac7cd906869b940f6a322929114f79af973bdb332abfe765a0db21395f"
+    },
+    {
+      "command": "python3 -B -m unittest discover -s contrib/sharepool -p 'test_tides*.py' -v",
+      "result": "passed",
+      "cases": 28,
+      "skips": 0,
+      "log": "tides-v6-python-tides-tests.txt",
+      "log_sha256": "4d144cfac7400ecb3ef32c5e2fdb51fe2b3a135cfb1a2df1a9ddc87ce55eb5d8"
+    },
+    {
+      "command": "python3 -B -m unittest discover -s contrib/sharepool -p 'test_production_protocol_model.py' -v",
+      "result": "passed",
+      "cases": 18,
+      "skips": 0,
+      "log": "tides-v6-python-model-tests.txt",
+      "log_sha256": "7d37d1a1b145b5ca63166b0c6eb32dd2908ea5610d8ccc9008b690b7d6aee8be"
+    }
+  ],
+  "native_pipeline_manifest": "tides-v6-native-pipeline-verification.json",
+  "hardware_manifest": "tides-v6-hardware.json",
+  "notes": [
+    "No mainnet or public-testnet activation.",
+    "The 100-miner and zero-reward tests retain their 08411 daemon hash; later 86ab adds only the Blake2b headline to the startup marker.",
+    "Public snapshots contain synthetic regtest payout destinations and signatures, never device backup credentials or private signer keys.",
+    "Per-run manifests distinguish physical capture, real native integration, CPU transport and unit doubles."
+  ],
+  "artifact_sha256": {
+    "tides-v6-100-miners-log.txt": "4681418ee8fac76eb99076e64bc054307b88fb2f0dea1fe1ae92e572d5755658",
+    "tides-v6-100-miners.json": "7881eb1b87ddee8aa9a9dddada3f5ebefd6217e34cd316089f48c8a70cd06fe7",
+    "tides-v6-adapter-tests.txt": "8a19f84bc774c73d427304365dcc57426075dc35cba75bfe0bb1b9fedbf28dd4",
+    "tides-v6-cpu-capture.json": "eb61649ce9afd839009813559e04faef936f9a35e5aaf8190357996a3812ccbf",
+    "tides-v6-cpu-preflight.json": "3c8e9558b85143a273e2434cc2529d53a04a793201925a39bd062642ade9e0d2",
+    "tides-v6-functional-regressions.json": "3ca40a204501737baff23c761270ceebbfba8bd5da8e02608a07c9dad4c07401",
+    "tides-v6-functional-regressions.txt": "831f05f388d18ead94ae6ffcb392990249cf25579debace2b237958128bbab1a",
+    "tides-v6-hardware-capture.json": "e1e47d5998380d492236c1ed07ccbee18cb2a8e06ad4386fe5f52dfbd584243c",
+    "tides-v6-hardware.json": "6d36cfd11cde79f28a6083b93705ceb2b9f92c9dd8d4e33c838f673fc5e35686",
+    "tides-v6-legacy-v4-100-miners.json": "f5c909d7b1be9edfa88c80cac57e96f64ce39d01c70e8607abdddc1c8d45cb69",
+    "tides-v6-native-pipeline-verification.json": "6bc3ad7c342ef7f6f38f8833fc0eecb18d7dfe4705db25a84436ec89067d9074",
+    "tides-v6-native-tests.txt": "301fb4620e5036995b1b7a5cbab781a7c4ae888c3ae358b16f8799f3334b554b",
+    "tides-v6-python-hash-tests.txt": "9c9ed34986e885cf8c313680314788319c9113be5dc239fb3ce08994a43bdafc",
+    "tides-v6-python-model-tests.txt": "7d37d1a1b145b5ca63166b0c6eb32dd2908ea5610d8ccc9008b690b7d6aee8be",
+    "tides-v6-python-signer-tests.txt": "45704eac7cd906869b940f6a322929114f79af973bdb332abfe765a0db21395f",
+    "tides-v6-python-tides-tests.txt": "4d144cfac7400ecb3ef32c5e2fdb51fe2b3a135cfb1a2df1a9ddc87ce55eb5d8",
+    "tides-v6-zero-floor-log.txt": "ad617154793cc934704bec92eaea246b701d33b117c31343d5b6ed46220eab55",
+    "tides-v6-zero-subsidy-log.txt": "494f1df086d396d87dd3daf41a99bae18d14ef50fdae371f4823cbffecc9c245"
+  },
+  "functional_regressions": {
+    "manifest": "tides-v6-functional-regressions.json",
+    "passed": 19,
+    "failed": 0,
+    "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7"
+  },
+  "additional_v6_native_cases": {
+    "manifest": "tides-v6-native-pipeline-verification.json",
+    "passed": 3,
+    "failed": 0,
+    "cases": [
+      "100 miner gates with distinct native templates",
+      "one satoshi split floored to zero",
+      "zero subsidy"
+    ]
+  }
+}

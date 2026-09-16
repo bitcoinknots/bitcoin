@@ -1,0 +1,183 @@
+{
+  "schema": 1,
+  "base_commit": "88d4ab03333076b119dc317160bfa075707ad6b8",
+  "scope": "Opt-in regtest v7 encoding, bounded resource accounting and local indexed history; no production qualification",
+  "build": {
+    "type": "Debug",
+    "wallet": false,
+    "commands": [
+      "cmake --build /private/tmp/sharepool-native-build --target bitcoind bitcoin-sharepool-signer test_bitcoin --parallel 2",
+      "cmake --build /private/tmp/sharepool-native-build --target bitcoind test_bitcoin --parallel 2"
+    ],
+    "binary_sha256": {
+      "bitcoind": "2f06596d94347f8491c6506d8474e4ffbfc44243fd41f0bcb884957e108d5365",
+      "bitcoin-sharepool-signer": "bbb7b90309010477f0e13866671c84cd05ddb4699c087d55897d6cf10cc169f3",
+      "test_bitcoin": "acf4c8e43f382711cf8153d351730c165b22fd9d99c7afc541c544cc2f333b0b"
+    }
+  },
+  "cpp": {
+    "command": [
+      "/private/tmp/sharepool-native-build/bin/test_bitcoin",
+      "--run_test=sharepool*",
+      "--report_level=detailed",
+      "--log_level=test_suite"
+    ],
+    "cases_passed": 177,
+    "other_cases_not_selected": 695,
+    "assertions_passed": 143437,
+    "log": "v7-final-cpp-tests.txt",
+    "note": "Largest graph test exercises proof-count boundaries with native callbacks; it is not a production native-throughput benchmark."
+  },
+  "python": {
+    "cases_passed": 252,
+    "skipped": 0,
+    "report": "v7-final-python-checks.json"
+  },
+  "native": {
+    "scenarios_passed": 6,
+    "report": "v7-final-native-checks.json",
+    "compact_report": "v7-final-native-results.json"
+  },
+  "final_capacity": {
+    "report": "v7-final-capacity-100.json",
+    "log": "v7-final-capacity-100-native.txt",
+    "epochs": 1,
+    "miners": 100,
+    "proofs": 300,
+    "result": "passed",
+    "scope": "Finite fresh 300-proof, two-loopback-node, concurrent-host-load run on final cache-hardened code; not sustained saturation."
+  },
+  "earlier_capacity": {
+    "report": "v7-compact-capacity-100.json",
+    "source_freeze": "v7-compact-capacity-100-source-freeze.json",
+    "result": "failed",
+    "scope": "Three-epoch requested capture started before final native/Python cache-retention fixes. Its resident Python imports and daemon executable inode were preserved; it is not final-source capacity evidence.",
+    "diagnostic": "v7-compact-capacity-100-latency-diagnostic.json"
+  },
+  "serialization_model": {
+    "report": "v7-compact-resource-model.json",
+    "measured_native_throughput": false,
+    "illustrative_shift": 14,
+    "active_shift": 10,
+    "historical_input_unchanged": true
+  },
+  "earlier_failures_preserved": [
+    {
+      "log": "v7-compact-cpp-tests-initial.txt",
+      "cause": "Two fixture cases failed: CompactSize index-count expectation and old unsupported-version sentinel using newly supported v7. Tests corrected; old valid wire expectations unchanged."
+    },
+    {
+      "log": "v7-compact-native-initial.txt",
+      "cause": "Sandbox denied loopback bind before protocol testing; scoped native retry used approved loopback access."
+    },
+    {
+      "log": "v7-compact-native-bringup-2.txt",
+      "cause": "After intentional archive deletion, tip recovery did not establish restoration of every old origin opening before offline reindex. Test now awaits those exact P2P openings."
+    },
+    {
+      "log": "v7-compact-native-bringup-3.txt",
+      "cause": "Negative option test expected different error wording; expectation corrected."
+    }
+  ],
+  "limits": [
+    "No public network activation or physical miner use.",
+    "V4/V5/V6 wire commitments and active SHIFT10 unchanged.",
+    "Current admission deltas in distinct job openings, proof processing, direct recipient outputs and full archival availability remain constraints.",
+    "Sparse history index acceleration does not eliminate cold prefix construction or selected snapshot reauthentication.",
+    "Raw logs preserve original terminal formatting; source-only diff check passes."
+  ],
+  "source_sha256": {
+    "contrib/sharepool/README.md": "121c0daa0b29ee9bce0a7b2e032ff5eb92d856983ddf6888e2ef3248ef4c563e",
+    "contrib/sharepool/compact_resource_model.py": "68c7754562b0107dac077857f9eb0254a4738a2a6180bc8dda566bbb430e1c72",
+    "contrib/sharepool/hash_gate_batch.py": "4a80fea33b1eaef277f8fd5552b3f28ce12d7e9100d5aa0fcd7310694205a7bf",
+    "contrib/sharepool/hash_gate_inventory.py": "a95827a8b52243811f05d4cb97a0cb603f2e783271d9be2d04e1af0ac2d36ff6",
+    "contrib/sharepool/hash_mining_gate.py": "96fe589dc0f6d5b9d257800f6c4a2308104f989a1df274ade098eaa8c8e71e18",
+    "contrib/sharepool/hash_snapshot.py": "44173ab51d60fd5bc4378d327e14ba9cbf78f61086faa4ff2e0db92180ae3013",
+    "contrib/sharepool/test_compact_resource_model.py": "022b6e0fc44b75939044d6657a7b84675c934df6964808ce86a36a4d8a7da835",
+    "contrib/sharepool/test_hash_compact.py": "2987dfc4346cea6b3d58bed960522b33b47ba948ed33869f4bffa6188f7472a7",
+    "contrib/sharepool/test_hash_tides.py": "cdf0b77335f54bd933ea752db124cc2f7fba94322dbafd817cc5f0cef856b3c0",
+    "doc/sharepool-production-gaps.md": "84d1ac1545ed545da5e40452b696674f62fbfc3a7816eee80eabb59974ef5104",
+    "doc/sharepool-tides-accounting.md": "45f45bb2e8a961add2ec44a2ce6ff016bf8abd6fcd4fbf0591410a051d0a4aa8",
+    "doc/sharepool-v7-compact.md": "a59a3fb29ea804c2e8535d86005cd233e6f8a0bc30810f78b5fc5372ea248e19",
+    "doc/sharepool-v7-verification.md": "0f66d5f9d1366678cca38cbc329d8d3a4971001a4092aa5d7d8943aea337bf9b",
+    "src/CMakeLists.txt": "6d67987bb198b4236cefa5063e05318d1b29a651de7736dd55643e3484169e07",
+    "src/chainparams.cpp": "ec72f50d3bcac015e2c39f885f1d53a98969a8c59d40444c23aee92ff4466945",
+    "src/chainparamsbase.cpp": "02cf057d3cef82ddc4063fd4463cf69e267f51a8f1c13bd123a33374f5e297b7",
+    "src/consensus/params.h": "8f43ff1f4c3334d9634d9a84a23d39de69fccf5aa4c28409012ceae8bbaddac9",
+    "src/consensus/sharepool_hash.cpp": "6905bde0a02f10dff7fd9116193155c4a09750b538bfe4c2a0cc2aedbc03922d",
+    "src/consensus/sharepool_hash.h": "a20e39af67f047368f722d8e6a6d799cd7ab5dfa99a31fde188b388bd63dfe27",
+    "src/init.cpp": "3348ade6d2d43e00c577ff10abf5d09a64f6b14d744b30986a51e049220f0180",
+    "src/kernel/chainparams.cpp": "c688edd8ae1dbf053904f0f24c12b341541346bd0f00575763730218f2b14241",
+    "src/kernel/chainparams.h": "b73d91d2585fa20422e3086f6f24112df5e873b7a4de4009fec595ddd17000de",
+    "src/kernel/chainstatemanager_opts.h": "3cdda45769ea08858b7a4c86b96042c235705ba5e50425c742e23b6020597036",
+    "src/node/chainstatemanager_args.cpp": "9c6588744ac21ca0abcf655ed79bbcbf16b262242d6113a6216054e08b7183f4",
+    "src/rpc/mining.cpp": "88f8a162eb3df1398a75fc43a60be1ceff0c9afdc3087dfddaf010da0e836b56",
+    "src/sharepool/hash_store.cpp": "5d2db74ff733d0c07d107f7b31df022b32adfd7226fb722d6773751eb2fa71c6",
+    "src/sharepool/hash_validation_cache.h": "f7dedc11169473d1858e7a5bdd9a7ef2148f46df651b3cb95a14e5de58186039",
+    "src/sharepool/signer.cpp": "8e6c4d9c85aefcaa6fe4f7e71872c0abe22327b173c8fdce9267ed2c29a32cec",
+    "src/sharepool/tides_history.cpp": "e14e0cbafc91bdb3d06ce2e8f1809d6053401fd89f10d6a0de4d0779a68aa930",
+    "src/sharepool/tides_history.h": "e4bcd6ed40cb0d11e64f3272a498102a7cc6ceef0f3b88299605df7e63133115",
+    "src/sharepool/tides_history_store.cpp": "11b719b4375523a9dc629c55d17f9cb954f59a9e2ed876c4c3b4444d5c9ca02d",
+    "src/sharepool/tides_history_store.h": "55ae0fad470302baadfb99ad38b73e67f51087dea6ce89173ea3091c8aaccb16",
+    "src/test/CMakeLists.txt": "3eda36c2ac5926d835460b202d97a72841ab1fc3bf0ac1ea856285b06339a2e9",
+    "src/test/sharepool_hash_tests.cpp": "1ae9b8c68cdd1100960910278dc4db01cc6978f1afeeb0be76c07cee29392899",
+    "src/test/sharepool_params_tests.cpp": "83cf2894fbe67812ebbfcba9d61f988beb6d27176c693c5b3a9a02a4db292860",
+    "src/test/sharepool_retry_worker_tests.cpp": "9c2565f3e6d802051771fcdf885bf97cca9b3c97574510e7ddd6e839986b6887",
+    "src/test/sharepool_tides_consensus_tests.cpp": "874e449629f5a9a0c4a560e8776cd8a510213969d1f06cd32fa3411a88627997",
+    "src/test/sharepool_tides_history_store_tests.cpp": "34c3e89a9285abd983ce2425ba4bf42970dcf5ef0a001ddfc60416ed16c44b40",
+    "src/validation.cpp": "fa88890e17d0e32d6d35230e294921a360af81db8bbe2b2a3403c6b3ea1a72bd",
+    "src/validation.h": "7691920450c11c9aa3b2f849915b2470f5018022251a68c8c40b614eea8df413",
+    "test/functional/feature_sharepool_hash_capacity.py": "9b3563b73a651afb3aac7cd20d03f3a4f83f5d8e9c96bed0dd061c26e1b0516d",
+    "test/functional/feature_sharepool_hash_compact.py": "91f4167074194895af1bc68cb82dcbb961c53cb239d5a994f192ccaf79f3bb83",
+    "test/functional/feature_sharepool_hash_tides.py": "098dc2b32792d4b2cef5252c45ceb16700dfe79a5c93550e103117323c3da8f8",
+    "test/functional/feature_sharepool_hash_tides_100_miners.py": "5b6903c6806c970577ae661755139175317600a6faf92851004486e81b022529",
+    "test/functional/test_runner.py": "3d3773bf9595f5289918974d8a3a7a9c0a995165388cf843f2576ff958394901"
+  },
+  "artifact_sha256": {
+    "contrib/sharepool/results/v7-compact-capacity-100-latency-diagnostic.json": "50752394743fdee95e4782869d7709a21cc78fbcb3614647bd134af6e7a61a37",
+    "contrib/sharepool/results/v7-compact-capacity-100-native.txt": "634f635ef82eb8a9908e90dd55f68e13388661d42674dc9865fe5c4d916656b6",
+    "contrib/sharepool/results/v7-compact-capacity-100-source-freeze.json": "379c7192e98321fc1f90514dc2b05b11c3b398022384bcacfedf98c7acf23e2f",
+    "contrib/sharepool/results/v7-compact-capacity-100.json": "f74e9ca52fca4b51e3cb3e618b5e714b886de7ae42e64cf2bee5df030cd31387",
+    "contrib/sharepool/results/v7-compact-cpp-tests-initial.txt": "9489d0d122a7f8522edf2434f0a029bcee1a4f0bb981815afea36c08a8e050e9",
+    "contrib/sharepool/results/v7-compact-cpp-tests.txt": "1533db814a391bec963de9135117ab729bad0c77de17ea65d8c6af1705a90f1a",
+    "contrib/sharepool/results/v7-compact-native-bringup-2-provenance.json": "1832a9146ba96ca37c798f52753bb90826702a1fcaf9bb0399b7c331e0f7e7f7",
+    "contrib/sharepool/results/v7-compact-native-bringup-2.txt": "4785f2e72cfe7bcc251de8ec45923f6eb1fc200307561c4aea77f55d6bba948f",
+    "contrib/sharepool/results/v7-compact-native-bringup-3-provenance.json": "e8095114c2a43882c33d634d75a530ea7ced8fa0527b2757fb203182d8977361",
+    "contrib/sharepool/results/v7-compact-native-bringup-3.txt": "afc12b98bd28fb70caca57bcfbfaefb16440253904249d9b743001a8ac28890d",
+    "contrib/sharepool/results/v7-compact-native-bringup-4-provenance.json": "6000155fd6ed0ff7661f7d35d42cef7be6dfeea732c7c2bc5878b9323f316294",
+    "contrib/sharepool/results/v7-compact-native-bringup-4.txt": "1f3dc9626ac2b486a836779644e01bf2fc59adcd5f1f87c9c83519e03e4e3a66",
+    "contrib/sharepool/results/v7-compact-native-checks.json": "ba7a0ab9e5546eb6a5a4a9a74b454fe7202ad46f153b6922bb3fd635a87a3f6e",
+    "contrib/sharepool/results/v7-compact-native-initial.txt": "3fc9ce0a645bc948e0c3471f344e0bf6edbe289780cbe17138d61bc0dcf783e0",
+    "contrib/sharepool/results/v7-compact-native-results.json": "e542504b83c227f45d70fd9079cf7ddda11a1514f7747c8a12d6c955b212f863",
+    "contrib/sharepool/results/v7-compact-python-capacity-tests.txt": "f8df9b9d17898d095716008086b15c0d4dfdaa285f7d59099ad0d5a6c12fd2af",
+    "contrib/sharepool/results/v7-compact-python-checks.json": "823fa2df68e38db0e54dd83393e4498bcb96f45a278f106adec6c2d6b32ac8e3",
+    "contrib/sharepool/results/v7-compact-python-hash-tests.txt": "c8232ca684e9b7182efbc8fa6ae34fcb52c9d36d7b561e5e3973a4cdde202e95",
+    "contrib/sharepool/results/v7-compact-python-tides-tests.txt": "a6eae66d6cd7dd2cbf3116893aabdfcaa524df498c071a81cae295dc9643aeef",
+    "contrib/sharepool/results/v7-compact-resource-model-tests.txt": "8ad5fe6f8477e2b488e6451259aefc01f8b0f83cabb8db60f1efbf5b413be1e5",
+    "contrib/sharepool/results/v7-compact-resource-model.json": "7983566487db09185e80a2944a84d3a90783539b43a59c87f8bbf830be8c2150",
+    "contrib/sharepool/results/v7-compact-v4-builder-native.txt": "b1776bbc5e610683aeb6677c60e1ee7df997dd50902da7f19362d8bca96f8039",
+    "contrib/sharepool/results/v7-compact-v4-worker-native.txt": "564455684287aed1b1715580d4c8cee8a5a18c9e27e3bf2f774aa57d6d85fb2b",
+    "contrib/sharepool/results/v7-compact-v5-ledger-native.txt": "67e40f303c7c94381f811a8b0f93015d4ddba834e3c134d56cd19759e87a52cb",
+    "contrib/sharepool/results/v7-compact-v6-archive-native.txt": "65bbcb2fcfe2dca678457b542501114adead64008d10961abb60718e5fd6d415",
+    "contrib/sharepool/results/v7-compact-v6-tides-native.txt": "77966ac8226e0c81397eadec5efac669def277fc4159b4901e73b9b6c3c67334",
+    "contrib/sharepool/results/v7-final-capacity-100-native.txt": "104fa593497d5e6d63b533ad36d6e1fee494d5fa8b909aa3a102d7cc94d3e529",
+    "contrib/sharepool/results/v7-final-capacity-100.json": "31b897ada13a3b06c6049e22c3e41d20cf2bd6480a11535182ec816c78af04b0",
+    "contrib/sharepool/results/v7-final-cpp-tests.txt": "191dddab58e51d73af129bb46979b381da02f62021325d583291135289f64010",
+    "contrib/sharepool/results/v7-final-native-checks.json": "e76d5eb551635a62c7bc1944a1c9b5b00cb929bd8865028954c6850ce6ac040d",
+    "contrib/sharepool/results/v7-final-native-results.json": "9cd9efe3b0396228e70f3707d823f5466a10dbbbb8e72ff0c0a59651876c1d86",
+    "contrib/sharepool/results/v7-final-python-capacity-tests.txt": "9e878f5364bd29aa8d3f1c9f4af64a6b74155d1392e6d18c3585acc56a0de619",
+    "contrib/sharepool/results/v7-final-python-checks.json": "664396a2bdc60cc682ed33e954481c8b97ac47295a41e0405f142f07d399db51",
+    "contrib/sharepool/results/v7-final-python-hash-tests.txt": "1d0cae90299b8a67c5874031deaa8a18b9d85f01e890ad8ab87324b2243a6530",
+    "contrib/sharepool/results/v7-final-python-model-tests.txt": "314d5a8b6012d24529405f7f644a50d3f72d98136f4c459b7155c2b4b85d6c33",
+    "contrib/sharepool/results/v7-final-python-tides-tests.txt": "cdbd3788a1cfa78bb92939dc4d1a83b58b75be7e8220553836e738053fbc1e42",
+    "contrib/sharepool/results/v7-final-v4-builder-native.txt": "b3c1b2467ab31926fd23bd40be769b6fe87d064ebc5c981368766eb78fc6a73b",
+    "contrib/sharepool/results/v7-final-v4-worker-native.txt": "2e3889c0a457721d6ca1fdd156b8354c2d83c62c913b6aaa94186e0108b8b715",
+    "contrib/sharepool/results/v7-final-v5-ledger-native.txt": "42a8895c51113b2ebaba39f85ae409828cf29af9edfe81c8d62e292038d03c05",
+    "contrib/sharepool/results/v7-final-v6-archive-native.txt": "01c084218db3b4a325b2eb1ea1af5ad62950c0ba270fef81c6cbe5fcf34deac5",
+    "contrib/sharepool/results/v7-final-v6-tides-native.txt": "775826e9e5c6a459df9f4e7204d942463db320a52ec17cc6a82370c89c5f46d4",
+    "contrib/sharepool/results/v7-final-v7-compact-native.txt": "fd13271058330b53d32072e75e0b6f89784387ea2ce33bf8e491cf5f451ba942",
+    "contrib/sharepool/results/v7-python-hash-memory-final-tests.txt": "059c0a108d49abd0b5674e3bb5a280c88a959cec18cfa86f6ac64c78f3da269f",
+    "contrib/sharepool/results/v7-python-hash-memory-tests.txt": "1b6671f1356440439736137d76f0ff644638dae18063135f0b20d2a9e520de66",
+    "contrib/sharepool/results/v7-python-hash-tests.txt": "41db842312c8e2666edef6bfd95dcf4108e729f6b9dfb3dcdd7ce8bd9a1413b4"
+  }
+}

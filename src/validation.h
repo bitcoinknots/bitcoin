@@ -50,6 +50,7 @@
 class Chainstate;
 class CTxMemPool;
 class ChainstateManager;
+namespace sharepool { struct Share; class HashSnapshotStore; class DecodedSnapshotRetentionBudget; class RetryWorker; struct RetryWorkerStats; namespace hashonly { struct Result; struct Snapshot; } namespace tides { class PersistentHistoryIndex; } }
 struct ChainTxData;
 class DisconnectedBlockTransactions;
 struct PrecomputedTransactionData;
@@ -417,6 +418,49 @@ bool TestBlockValidity(BlockValidationState& state,
                        CBlockIndex* pindexPrev,
                        bool fCheckPOW = true,
                        bool fCheckMerkleRoot = true) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+
+/** Validate a complete SPN1 template on a recent active-chain ancestor.
+ * Regtest only, at most sharepool::MAX_SHARE_AGE disconnections into a temporary
+ * coins view. Does not change the active chain, flush coins, or publish a block.
+ * Like a mining proposal, candidate PoW is not required; transaction validity,
+ * merkle commitments, signatures, payouts and actual fees are checked.
+ */
+sharepool::hashonly::Result ValidateSharePoolHashOrigin(ChainstateManager& chainman,
+    const CBlock& block, const CBlockIndex* parent) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+/** Capture native coins and script closures under cs_main, execute scripts without
+ * it, then cache only after checking that the captured chain context survived.
+ * Local resource limits, interruption, or context changes return MissingData.
+ */
+sharepool::hashonly::Result ValidateSharePoolHashOriginUnlocked(ChainstateManager& chainman,
+    const CBlock& block, const uint256& parent_hash, const std::atomic<bool>* stop = nullptr) LOCKS_EXCLUDED(cs_main);
+/** Authenticate and prevalidate all available origins before entering ordinary
+ * locked acceptance. An overlay is read-only, never admitted to evidence storage.
+ * allow_unsigned is solely for preparing a job before its top owner signs it.
+ * for_mining reserves the current body and one depth edge for future proof
+ * settlement; historical origins and block acceptance leave it false.
+ */
+sharepool::hashonly::Result PrepareSharePoolHashOrigins(ChainstateManager& chainman,
+    const CBlock& block, std::shared_ptr<const sharepool::hashonly::Snapshot> overlay = nullptr,
+    const std::atomic<bool>* stop = nullptr, bool allow_unsigned = false,
+    bool for_mining = false) LOCKS_EXCLUDED(cs_main);
+/** Restore historical v5 template evidence against the current active parent's
+ * confirmed origin certificates, rather than reopening superseded proof graphs. */
+sharepool::hashonly::Result ValidateSharePoolHashHistoricalTemplateUnlocked(ChainstateManager& chainman,
+    const CBlock& block, std::shared_ptr<const sharepool::hashonly::Snapshot> overlay = nullptr,
+    const std::atomic<bool>* stop = nullptr) LOCKS_EXCLUDED(cs_main);
+/** Verify standalone proof and its complete native origin graph outside cs_main.
+ * The active tip must remain unchanged through the validation pass. */
+sharepool::hashonly::Result ValidateSharePoolHashProofUnlocked(ChainstateManager& chainman,
+    const sharepool::Share& share, const std::atomic<bool>* stop = nullptr) LOCKS_EXCLUDED(cs_main);
+/** Verify body witness commitments before content-addressed template admission. */
+bool CheckWitnessMalleation(const CBlock& block, bool expect_witness_commitment, BlockValidationState& state);
+bool CheckConfiguredSharePool(const CBlock& block, BlockValidationState& state,
+    ChainstateManager& chainman, const CBlockIndex* previous, std::optional<CAmount> reward) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+bool TestSharePoolTemplateOnAncestor(BlockValidationState& state,
+                                    const CChainParams& chainparams,
+                                    Chainstate& chainstate,
+                                    const CBlock& block,
+                                    CBlockIndex* pindexPrev) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
 /** Check with the proof of work on each blockheader matches the value in nBits */
 bool HasValidProofOfWork(const std::vector<CBlockHeader>& headers, const Consensus::Params& consensusParams);
@@ -1078,6 +1122,37 @@ public:
     //! chainstate to avoid duplicating block metadata.
     node::BlockManager m_blockman;
 
+    std::unique_ptr<sharepool::HashSnapshotStore> m_sharepool_hash_store;
+    // Aggregate optional decoded-LRU retention, shared by every validation route.
+    const std::shared_ptr<sharepool::DecodedSnapshotRetentionBudget> m_sharepool_decoded_retention;
+    std::shared_ptr<sharepool::tides::PersistentHistoryIndex> m_sharepool_tides_history;
+    std::string m_sharepool_tides_history_error;
+    // Exact-body deterministic script failures, bounded like the native reward cache.
+    std::map<uint256, std::string> m_sharepool_hash_script_failures GUARDED_BY(cs_main);
+    struct VerifiedHashSnapshot {
+        uint256 rules;
+        const CBlockIndex* parent;
+        CAmount reward;
+        uint64_t touched;
+    };
+    // Success only, exact body (including witness/rhs) and native ancestry bound.
+    std::map<uint256, VerifiedHashSnapshot> m_sharepool_hash_verified GUARDED_BY(cs_main);
+    uint64_t m_sharepool_hash_verified_clock GUARDED_BY(cs_main){0};
+    std::atomic<uint64_t> m_sharepool_hash_outside_script_checks{0};
+    std::atomic<uint64_t> m_sharepool_hash_locked_fallbacks{0};
+    std::atomic<uint64_t> m_sharepool_hash_context_retries{0};
+    /** Notifications coalesce independently of cs_main and network processing. */
+    void RequestSharePoolHashBlocks();
+    void StartSharePoolHashWorker() LOCKS_EXCLUDED(cs_main);
+    void StopSharePoolHashWorker() LOCKS_EXCLUDED(cs_main);
+    sharepool::RetryWorkerStats SharePoolHashWorkerStats() const;
+
+private:
+    std::unique_ptr<sharepool::RetryWorker> m_sharepool_hash_worker;
+    void RetrySharePoolHashBlocks(const std::atomic<bool>& stop) LOCKS_EXCLUDED(cs_main);
+
+public:
+
     ValidationCache m_validation_cache;
 
     /**
@@ -1293,7 +1368,7 @@ public:
      * @param[out]  new_block A boolean which is set to indicate if the block was first received via this call
      * @returns     If the block was processed, independently of block validity
      */
-    bool ProcessNewBlock(const std::shared_ptr<const CBlock>& block, bool force_processing, bool min_pow_checked, bool* new_block) LOCKS_EXCLUDED(cs_main);
+    bool ProcessNewBlock(const std::shared_ptr<const CBlock>& block, bool force_processing, bool min_pow_checked, bool* new_block, bool defer_hash_origin_scripts = false) LOCKS_EXCLUDED(cs_main);
 
     /**
      * Process incoming block headers.

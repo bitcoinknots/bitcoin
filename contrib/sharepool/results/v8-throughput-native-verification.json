@@ -1,0 +1,189 @@
+{
+  "created_utc": "2026-09-14T20:10:16.161506+00:00",
+  "repository": "/Users/jeronimolopez/Desktop/untitled folder/knots-sharepool",
+  "stage": "Final contextual coinbase payout capacity RPC/helper and integrated local admission handling",
+  "binary_sha256": {
+    "bitcoind": "e2e1bf00b31ec06ae173b799337d4a6a75a567ef2e0fd508e26a05d6646ac364",
+    "bitcoin-sharepool-signer": "6c0cfaed537b99c687e002b4248c4717419415e6b845d1a5c7ee633855ab60a0",
+    "test_bitcoin": "1a84d016dac09e1866c5156a756acf7b4d179a690e831df624a974a2e30829f3"
+  },
+  "native_source_sha256": {
+    "src/consensus/sharepool_hash.cpp": "0cfcc68537ff28c003f805501e669299ddfa9487a270ac9236c670d4ce349b4e",
+    "src/consensus/sharepool_hash.h": "7119704ad53fc2cde61ac8b2cdd055bee920a9d429f552560dc9d5cbe75da5b5",
+    "src/rpc/mining.cpp": "e54b211f6548b1d94171bd670e85ddb87b27848afea8f5faebbff681a03655d3",
+    "src/sharepool/mining_budget.h": "77e9c28e50e9fb0b2cd24117cfdf97d0069a21f12b457a7106c47a38856eb249",
+    "src/test/sharepool_hash_tests.cpp": "c5115402b78773a8d1d967bdc895080fee58e813198bf4078e5b67f3755c0488",
+    "src/test/sharepool_retry_worker_tests.cpp": "679420d1520e426e8f0aeff453fa2862fa06fe64383571457ffb22382eb2766f"
+  },
+  "functional_source_sha256": {
+    "src/sharepool/mining_budget.h": "77e9c28e50e9fb0b2cd24117cfdf97d0069a21f12b457a7106c47a38856eb249",
+    "src/rpc/mining.cpp": "e54b211f6548b1d94171bd670e85ddb87b27848afea8f5faebbff681a03655d3",
+    "src/test/sharepool_retry_worker_tests.cpp": "679420d1520e426e8f0aeff453fa2862fa06fe64383571457ffb22382eb2766f",
+    "test/functional/feature_sharepool_hash_mining_budget.py": "b655d9a715e5cf97c6c5459602fbfd850aeeb0ec6236becff9004ad62821fa29",
+    "contrib/sharepool/hash_mining_gate.py": "9fb23b15acdf5436a5949d5417240c6ebf3159984bab883a597a700809c2be8b",
+    "contrib/sharepool/hash_gate_admission.py": "36d4e9130667ac8c6c35f0644c3f8b1754fed0e8263836d132af270454e0d4e2",
+    "contrib/sharepool/hash_admission_accounting.py": "fc0742fc5058dce6fedb973622a50bf5fd0802416c75ace1c9704259cbbabdeb",
+    "contrib/sharepool/hash_stratum.py": "c58408b43ba7270f312be19f01a7f43b222f5f2d145581d776f5dc50c9ecf4d3",
+    "contrib/sharepool/hash_vardiff.py": "a2f855cc5f89748f622b1b59ea4d2435efaba38edbc7d561bb69079622086e3d",
+    "test/functional/feature_sharepool_hash_stratum_pressure.py": "ac30576c8477677fa7a04a4771e492431a4ca79c7c1bb8fb8d34f1d6ad2f1c2e",
+    "contrib/sharepool/hash_job_scheduler.py": "8617b86fd3f80574e1bd947dc73e8b4552f56fe17d4dec89a108822a4de78eb6",
+    "contrib/sharepool/hash_stratum_runner.py": "5e6c64429a51d5d5594666d9104c4f3d93656fb8fd9f8afb58dcaa3667c6483e",
+    "test/functional/feature_sharepool_hash_vardiff_stratum.py": "26dabe067a218a98c6897e7981d0a28c692f6ec21cf6279f9b73cf8fa61b210a"
+  },
+  "all_captured_sources_match_current": true,
+  "build": {
+    "passed": true,
+    "command": "/private/tmp/sharepool-build-tools-20260912/cmake/data/bin/cmake --build /private/tmp/sharepool-native-build --target bitcoind bitcoin-sharepool-signer test_bitcoin -j2 > /private/tmp/sharepool-coinbase-guard-build.txt 2>&1",
+    "log": {
+      "path": "/private/tmp/sharepool-coinbase-guard-build.txt",
+      "bytes": 1880,
+      "sha256": "56f4a1806f512feea8ccb4bfd003ea4542e20b52e9151d6f4eda47c6142dc6a4"
+    }
+  },
+  "cpp": {
+    "passed": true,
+    "test_cases": 121,
+    "time_seconds": {
+      "real": 122.01,
+      "user": 119.05,
+      "sys": 0.6
+    },
+    "command": "/usr/bin/time -p /private/tmp/sharepool-native-build/bin/test_bitcoin --run_test=sharepool_params_tests,sharepool_signer_tests,sharepool_hash_tests,sharepool_tides_history_tests,sharepool_tides_history_store_tests,sharepool_tides_consensus_tests,sharepool_retry_worker_tests --log_level=test_suite --report_level=detailed > /private/tmp/sharepool-coinbase-guard-cpp120.txt 2>&1",
+    "raw_log": {
+      "path": "/private/tmp/sharepool-coinbase-guard-cpp120.txt",
+      "bytes": 72226,
+      "sha256": "5c57bc06439adee0111f09de1655f008851840797d64b1d3686418b10ad82d2e"
+    },
+    "clean_log": {
+      "path": "/private/tmp/sharepool-coinbase-guard-cpp121-clean.txt",
+      "bytes": 64506,
+      "sha256": "09e7ac6e406300b91b0a965bae2280c8935fe271c475602aae997df157b297e5"
+    },
+    "case_results": {
+      "path": "/private/tmp/sharepool-coinbase-guard-cpp121-results.json",
+      "bytes": 14266,
+      "sha256": "b743ef164d4f49024c1c418d54a76b90e84d422f344bce1f37c56b7c948b54b9"
+    }
+  },
+  "functional": [
+    {
+      "name": "feature_sharepool_hash_mining_budget",
+      "passed": true,
+      "log_elapsed_seconds": 1.647,
+      "command": "python3 -B test/functional/feature_sharepool_hash_mining_budget.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-coinbase-guard-budget-native --nocleanup > /private/tmp/sharepool-coinbase-guard-budget-native.txt 2>&1",
+      "log": {
+        "path": "/private/tmp/sharepool-coinbase-guard-budget-native.txt",
+        "bytes": 675,
+        "sha256": "1ba7855d6e987f9293231ab443706777bed32400c2a74acd2ab97d69c713ac89"
+      },
+      "report": {
+        "path": "/private/tmp/sharepool-coinbase-guard-budget-native/mining-budget-results.json",
+        "bytes": 1875,
+        "sha256": "d59cc64697d1a9300ab6819b00821748360c961bb9cdb99ad563167e3a428037"
+      },
+      "checks": [
+        "ordinary_context_max_output_bytes",
+        "rdts_context_max_output_bytes",
+        "payout_budget_tip_and_target_binding",
+        "native_job_construction_in_both_contexts"
+      ]
+    },
+    {
+      "name": "feature_sharepool_hash_stratum_pressure",
+      "passed": true,
+      "log_elapsed_seconds": 1.325,
+      "command": "python3 -B test/functional/feature_sharepool_hash_stratum_pressure.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-coinbase-guard-pressure-native --nocleanup > /private/tmp/sharepool-coinbase-guard-pressure-native.txt 2>&1",
+      "log": {
+        "path": "/private/tmp/sharepool-coinbase-guard-pressure-native.txt",
+        "bytes": 888,
+        "sha256": "e0c21590c5bb3c112ebe8d0805ab0cc57bfca0d0e70a6c5aa46d62f9f5311ede"
+      },
+      "report": {
+        "path": "/private/tmp/sharepool-coinbase-guard-pressure-native/stratum-pressure-results.json",
+        "bytes": 2141,
+        "sha256": "601f12e28a16336e7415af4a107dda0b7061901a234f65075e7834155d73c420"
+      },
+      "checks": [
+        "actual_gate_budget_refuses_native_valid_share",
+        "refused_proofs_not_journaled",
+        "warm_proofs_no_template_or_snapshot_replay",
+        "exact_duplicate_not_recredited",
+        "missing_only_recovery_into_empty_native_peer",
+        "recovered_refusal_not_journaled",
+        "native_winner_submitted_with_exact_old_bytes",
+        "native_block_accepted",
+        "pressure_pauses_estimator_without_credit",
+        "native_verifychain"
+      ]
+    },
+    {
+      "name": "feature_sharepool_hash_vardiff_stratum",
+      "passed": true,
+      "log_elapsed_seconds": 3.771,
+      "command": "python3 -B test/functional/feature_sharepool_hash_vardiff_stratum.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-coinbase-guard-wire-native --nocleanup > /private/tmp/sharepool-coinbase-guard-wire-native.txt 2>&1",
+      "log": {
+        "path": "/private/tmp/sharepool-coinbase-guard-wire-native.txt",
+        "bytes": 607,
+        "sha256": "66eb1cfa7ff816a2d8192fdc9f64da628ae0e1a4f41f2f9a865a76f10bf0210c"
+      },
+      "report": {
+        "path": "/private/tmp/sharepool-coinbase-guard-wire-native/vardiff-stratum-results.json",
+        "bytes": 4925,
+        "sha256": "134d9d1135c6e58e4c6556f9eb349fd3e984d944a14e7557b6a1e557a0046288"
+      },
+      "checks": [
+        "explicit_registration_first_proof_without_missing_recovery",
+        "wire_submissions_no_missing_origin_recovery",
+        "independent_signed_assignments_and_real_notifications",
+        "wire_difficulty_matches_union_of_assigned_and_native_targets",
+        "one_active_client_per_identity",
+        "eight_native_validated_shares_without_refresh",
+        "duplicate_does_not_affect_estimator",
+        "retarget_only_on_due_refresh",
+        "other_identity_assignment_unchanged",
+        "late_old_target_share_keeps_original_work",
+        "all_gate_rpc_calls_on_owner_thread",
+        "native_only_winner_exact_bytes_accepted",
+        "native_only_winner_not_credited",
+        "exact_work_weighted_coinbase_payouts",
+        "native_verifychain",
+        "standalone_cli_startup_default_cadence_and_shutdown"
+      ]
+    },
+    {
+      "name": "feature_sharepool_hash_gate_provenance",
+      "passed": true,
+      "log_elapsed_seconds": 0.944,
+      "command": "python3 -B test/functional/feature_sharepool_hash_gate_provenance.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-coinbase-guard-provenance-native --nocleanup > /private/tmp/sharepool-coinbase-guard-provenance-native.txt 2>&1",
+      "log": {
+        "path": "/private/tmp/sharepool-coinbase-guard-provenance-native.txt",
+        "bytes": 885,
+        "sha256": "c5d474f18ab47c6bb7635f8242a7d579aa9c76b8d593ac4302e2ffb8e7aa0299"
+      }
+    }
+  ],
+  "reconstruction": {
+    "native_guard_only_patch": {
+      "path": "/private/tmp/sharepool-coinbase-guard-native-only.patch",
+      "bytes": 5347,
+      "sha256": "c08a2df2bd878525f873957a9a5df1e62685f4ab972adf8b8576bab7a1f3432c"
+    },
+    "pre_guard_sources": {
+      "path": "/private/tmp/sharepool-pre-coinbase-guard/manifest.json",
+      "bytes": 313,
+      "sha256": "e606c33b145e9a5f0a587936514e89debfd560814f904c9c921fd4efe71c19c4"
+    },
+    "preserved_pre_guard_daemon": "/private/tmp/sharepool-pre-coinbase-guard/bin/bitcoind",
+    "pre_guard_daemon_sha256": "9e108546089e821dca93344f10a2fe5020f07d7df61e2deb4139f18218422893"
+  },
+  "notes": [
+    "The helper and RPC expose the existing conservative native block-builder payout reservation. Native acceptance/rejection boundaries, consensus rules and profile wire encodings did not change.",
+    "The exact current maxima are 999612 output bytes ordinarily and 199612 with RDTS active; both exclude the payout output-count prefix already reserved by the builder. Unit tests check zero, maximum, maximum+1 and SIZE_MAX in both contexts.",
+    "The new native RPC fixture checks both contexts and constructs signed native jobs; it does not construct tens of thousands of physical payout outputs at the byte boundary. Exact reservation boundaries are checked in the native unit test.",
+    "The native pressure fixture uses real Sia proofs through owner-side submission. The separate v8 wire fixture checks real loopback notifications/submissions and the standalone CLI lifecycle.",
+    "The selected native suite contains 121 cases (108 in the six settlement suites plus 13 in retry-worker, including a BOOST_FIXTURE_TEST_CASE); the initially planned/log filename count 120 omitted that existing fixture case.",
+    "All four functional fixtures passed on the final e2e1bf00 binary and all listed source hashes still match. Nodes stopped; no hardware or external pool used.",
+    "The earlier 100-miner weighted/fork/reindex correctness and sustained capacity captures used preserved pre-guard daemon 9e108546; their results are not silently attributed to the final guard binary. See /private/tmp/sharepool-pressure-native-verification.json for that earlier correctness stage.",
+    "Root ran Python correctness tests concurrently with the final small native fixtures; these are correctness checks, not isolated performance benchmarks."
+  ]
+}

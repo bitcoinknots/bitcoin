@@ -1,0 +1,395 @@
+{
+  "format": 1,
+  "scope": "Final isolated regtest regression: 16 preserved legacy cases and 3 v6 variants; no mainnet claim.",
+  "passed": 19,
+  "failed": 0,
+  "concurrency": 2,
+  "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+  "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+  "runner_command": [
+    "python3",
+    "-B",
+    "/private/tmp/run_sharepool_final_regressions.py",
+    "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+    "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+    "/private/tmp/sharepool-tides-final-regressions-1"
+  ],
+  "runner_sha256": "9045f40f8876e406431d282584548ed68b8fd3790eaaac9f6b8d5a8509487d3b",
+  "artifacts": {
+    "tides-v6-functional-regressions.txt": "831f05f388d18ead94ae6ffcb392990249cf25579debace2b237958128bbab1a",
+    "tides-v6-legacy-v4-100-miners.json": "f5c909d7b1be9edfa88c80cac57e96f64ce39d01c70e8607abdddc1c8d45cb69",
+    "tides-v6-cpu-capture.json": "eb61649ce9afd839009813559e04faef936f9a35e5aaf8190357996a3812ccbf",
+    "tides-v6-cpu-preflight.json": "3c8e9558b85143a273e2434cc2529d53a04a793201925a39bd062642ade9e0d2",
+    "tides-v6-adapter-tests.txt": "8a19f84bc774c73d427304365dcc57426075dc35cba75bfe0bb1b9fedbf28dd4"
+  },
+  "cases": [
+    {
+      "name": "attestation",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_attestation.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/attestation",
+        "--portseed=906",
+        "--nocleanup"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "0ca5b1b0b6866f1f4f480351cc537f42acc2b6180529091e92f3b8d25c4d9d30",
+      "exit_code": 0,
+      "elapsed_seconds": 1.5385961532592773,
+      "started_utc": "2026-09-13T06:47:11.796262+00:00",
+      "log_sha256": "4461a9b9133c762c3bc28b438b84f5b5af2ed952937c58bdc7082b0f90d7cbb1"
+    },
+    {
+      "name": "builder",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_builder.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/builder",
+        "--portseed=907",
+        "--nocleanup"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "71b4189f1017609be1844ebb232fb269af5e5f8fbb49c04247a95f828ac2aedc",
+      "exit_code": 0,
+      "elapsed_seconds": 3.643150806427002,
+      "started_utc": "2026-09-13T06:47:13.334999+00:00",
+      "log_sha256": "f1357b34849a0bd02f9172377da14c16b957d3f4dacf1cca8f19fbb3f82112ed"
+    },
+    {
+      "name": "gate-ledger-1",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_gate_ledger.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/gate-ledger-1",
+        "--portseed=913",
+        "--nocleanup",
+        "--activation-height=1"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "cc3cd50581a3c9d2b744d98134cab878722772611d38c88b57959c459e2ca81a",
+      "exit_code": 0,
+      "elapsed_seconds": 11.330446004867554,
+      "started_utc": "2026-09-13T06:47:42.878004+00:00",
+      "log_sha256": "c5704f1862936f4f8a2a0462c4ab6c6be34148935c755bcff019289454b99c6d"
+    },
+    {
+      "name": "gate-ledger-102",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_gate_ledger.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/gate-ledger-102",
+        "--portseed=914",
+        "--nocleanup",
+        "--activation-height=102"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "cc3cd50581a3c9d2b744d98134cab878722772611d38c88b57959c459e2ca81a",
+      "exit_code": 0,
+      "elapsed_seconds": 12.36081314086914,
+      "started_utc": "2026-09-13T06:47:54.208584+00:00",
+      "log_sha256": "104523927751f221874b688fbcb44cb62131c1bf7938f38882ffb185f1db7db0"
+    },
+    {
+      "name": "gate-provenance",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_gate_provenance.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/gate-provenance",
+        "--portseed=912",
+        "--nocleanup"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "86bfd53fed9dc75dfe3d0e6407253690c2ffd7c50a59b72be847383176b8a5e0",
+      "exit_code": 0,
+      "elapsed_seconds": 1.0042362213134766,
+      "started_utc": "2026-09-13T06:47:41.873629+00:00",
+      "log_sha256": "7fb964e1e75736874b3c4108b9db168a22d1faafdd91a94c4371c6e4329de168"
+    },
+    {
+      "name": "http",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_http.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/http",
+        "--portseed=902",
+        "--nocleanup"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "b018c2c16326d39dbc799e3a4572dc9eeddc908d7b2c1e723f0f514e98ca63b2",
+      "exit_code": 0,
+      "elapsed_seconds": 1.3985302448272705,
+      "started_utc": "2026-09-13T06:46:31.856653+00:00",
+      "log_sha256": "90521be72a3882efe2c12bc11db3300cdd5f5ef5c372af6edc6983d9591a054f"
+    },
+    {
+      "name": "legacy-rules",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_rule_cases.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/legacy-rules",
+        "--portseed=909",
+        "--nocleanup"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "b87436433d2834292885852d38fde87b4b7b792a33d753b54432bc22a4b269cd",
+      "exit_code": 0,
+      "elapsed_seconds": 5.060671806335449,
+      "started_utc": "2026-09-13T06:47:17.743807+00:00",
+      "log_sha256": "e9e0f56b3157f7b858dce761871e7192120f0e7d2009fbb77445e0aa4586655a"
+    },
+    {
+      "name": "lifecycle-v1",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_lifecycle.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/lifecycle-v1",
+        "--portseed=903",
+        "--nocleanup"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "465f17e1f139517880f911b3e52b6b50dbb22c986f0e8072c5e741644eb20672",
+      "exit_code": 0,
+      "elapsed_seconds": 15.678011894226074,
+      "started_utc": "2026-09-13T06:46:33.255382+00:00",
+      "log_sha256": "a135ba2fbbcb5a7e9e25dad9a72fe30f610db6c27c9149f9f92dcb07dbc124ac"
+    },
+    {
+      "name": "lifecycle-v2",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_lifecycle.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/lifecycle-v2",
+        "--portseed=904",
+        "--nocleanup",
+        "--v2transport"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "465f17e1f139517880f911b3e52b6b50dbb22c986f0e8072c5e741644eb20672",
+      "exit_code": 0,
+      "elapsed_seconds": 16.12280511856079,
+      "started_utc": "2026-09-13T06:46:48.933580+00:00",
+      "log_sha256": "a44fc1864e6a7b5c36230579ca133e39af69d969bc0db2903dfd5e177c14cb59"
+    },
+    {
+      "name": "pending-body",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_pending.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/pending-body",
+        "--portseed=911",
+        "--nocleanup"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "b32625528bfc6812a0153f077813459d3066c003bd9895bc4a35535f65900218",
+      "exit_code": 0,
+      "elapsed_seconds": 10.8643057346344,
+      "started_utc": "2026-09-13T06:47:31.009143+00:00",
+      "log_sha256": "4bef5194ac1b996f2373f6a986c9fdf5a59f1b1fb6c5eb53541b041719b59b55"
+    },
+    {
+      "name": "relay",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_relay.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/relay",
+        "--portseed=905",
+        "--nocleanup"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "63743be8456a43f4e645dc3e807eb1a6ef7f87cb85320edc2f3d7cb8f189a3da",
+      "exit_code": 0,
+      "elapsed_seconds": 6.739543914794922,
+      "started_utc": "2026-09-13T06:47:05.056578+00:00",
+      "log_sha256": "843a466bcbd16b264b92e1b0e460d261b0709958ca6578e84d60e6217f363eed"
+    },
+    {
+      "name": "rules",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_rules.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/rules",
+        "--portseed=908",
+        "--nocleanup"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "d39c7c0bc2a6b3e47e51015b2605220a412f5babf98a4ac4ea89056f1f63adf5",
+      "exit_code": 0,
+      "elapsed_seconds": 0.765362024307251,
+      "started_utc": "2026-09-13T06:47:16.978297+00:00",
+      "log_sha256": "fad9ad7a52be160d35cf6d75ae1539d92368d50feb86d590c141eb672f1fae5f"
+    },
+    {
+      "name": "tides-1",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_tides.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/tides-1",
+        "--portseed=916",
+        "--nocleanup",
+        "--activation-height=1"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "a5c177582d00ee5abcdf395e6494d41ba614e91facdf0efd1498897a05c02201",
+      "exit_code": 0,
+      "elapsed_seconds": 12.078750133514404,
+      "started_utc": "2026-09-13T06:48:54.538820+00:00",
+      "log_sha256": "2d11f44ed4dbcb66ea03830b822be3cde207cdeaab8ae0ac770463c693d88a9c"
+    },
+    {
+      "name": "tides-102",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_tides.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/tides-102",
+        "--portseed=917",
+        "--nocleanup",
+        "--activation-height=102"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "a5c177582d00ee5abcdf395e6494d41ba614e91facdf0efd1498897a05c02201",
+      "exit_code": 0,
+      "elapsed_seconds": 14.08080792427063,
+      "started_utc": "2026-09-13T06:49:06.617716+00:00",
+      "log_sha256": "926344eac668efb762d7e749250cd43bae3f03f54e0e9f84d6624930cbc0b70e"
+    },
+    {
+      "name": "tides-cpu",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_tides.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/tides-cpu",
+        "--portseed=918",
+        "--nocleanup",
+        "--cpu-capture"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "a5c177582d00ee5abcdf395e6494d41ba614e91facdf0efd1498897a05c02201",
+      "exit_code": 0,
+      "elapsed_seconds": 2.2046079635620117,
+      "started_utc": "2026-09-13T06:49:20.698716+00:00",
+      "log_sha256": "0cdd1bcd110f1e1614f742dca5f9bde71451795dd9e87494e6fdcc129ac1d509"
+    },
+    {
+      "name": "v4-100-miners",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_100_miners.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/v4-100-miners",
+        "--portseed=900",
+        "--nocleanup",
+        "--results=/private/tmp/sharepool-tides-final-regressions-1/v4-100-miners-result.json"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "41f5e98a0c26bfa7478511e8bc2234d36d632444e700a089ddb8bc90ece9ae71",
+      "exit_code": 0,
+      "elapsed_seconds": 528.1856319904327,
+      "started_utc": "2026-09-13T06:46:18.148028+00:00",
+      "log_sha256": "3ca4529c46c20831b98d6ce42d4337b154053a66f1fa3e9d360cbd9003124d61"
+    },
+    {
+      "name": "v5-100-miners",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_ledger_100_miners.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/v5-100-miners",
+        "--portseed=915",
+        "--nocleanup"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "fe2eaf73cebef7fe3d0a380865676ba8316a417d08d594a2810cad19156385ea",
+      "exit_code": 0,
+      "elapsed_seconds": 47.96913981437683,
+      "started_utc": "2026-09-13T06:48:06.569541+00:00",
+      "log_sha256": "adc610d86a8285ebdd71c71da89f83b38db361c0f2c01c76b1aebbd8d9e4e6e5"
+    },
+    {
+      "name": "v5-ledger",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_ledger.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/v5-ledger",
+        "--portseed=910",
+        "--nocleanup"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "da43f90a01a25c2a0b750dac4e681d982959c1d3275603fd64831f990187e162",
+      "exit_code": 0,
+      "elapsed_seconds": 8.204360961914062,
+      "started_utc": "2026-09-13T06:47:22.804634+00:00",
+      "log_sha256": "b3d3ca69cb98a7224b2f20b0e6833cfa4ecf57487214c6634ca8fa81253a09b9"
+    },
+    {
+      "name": "worker",
+      "command": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "-B",
+        "test/functional/feature_sharepool_hash_worker.py",
+        "--configfile=/private/tmp/sharepool-native-build/test/config.ini",
+        "--tmpdir=/private/tmp/sharepool-tides-final-regressions-1/worker",
+        "--portseed=901",
+        "--nocleanup"
+      ],
+      "binary_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+      "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+      "test_sha256": "7c864a7835fb74d5e3e355ab66e6a2c8721112cca3a4e51ebd07771bb84b3de2",
+      "exit_code": 0,
+      "elapsed_seconds": 13.708401918411255,
+      "started_utc": "2026-09-13T06:46:18.148079+00:00",
+      "log_sha256": "22bea39109799cb762bf9350b52b8d241f8f3b6128eaf2472e4b7394bebc0b88"
+    }
+  ]
+}

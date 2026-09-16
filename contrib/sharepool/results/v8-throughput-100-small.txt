@@ -1,0 +1,42 @@
+2026-09-14T19:48:06.728000Z TestFramework (INFO): PRNG seed is: 4027555684347213310
+2026-09-14T19:48:06.728000Z TestFramework (DEBUG): Setting up network thread
+2026-09-14T19:48:06.729000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-v8-throughput-100-small
+2026-09-14T19:48:06.731000Z TestFramework.node0 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T19:48:06.732000Z TestFramework.node1 (DEBUG): bitcoind started, waiting for RPC to come up
+2026-09-14T19:48:07.262000Z TestFramework.node0 (DEBUG): RPC successfully started
+2026-09-14T19:48:07.266000Z TestFramework.node1 (DEBUG): RPC successfully started
+2026-09-14T19:48:41.660000Z TestFramework (INFO): Live block 102 admitted 69 proofs; source continues independently
+2026-09-14T19:49:03.665000Z TestFramework (INFO): Live block 103 admitted 29 proofs; source continues independently
+2026-09-14T19:49:25.438000Z TestFramework (INFO): Live block 104 admitted 24 proofs; source continues independently
+2026-09-14T19:49:47.263000Z TestFramework (INFO): Live block 105 admitted 36 proofs; source continues independently
+2026-09-14T19:50:10.795000Z TestFramework (INFO): Live block 106 admitted 33 proofs; source continues independently
+2026-09-14T19:50:32.950000Z TestFramework (INFO): Live block 107 admitted 31 proofs; source continues independently
+2026-09-14T19:50:56.053000Z TestFramework (INFO): Live block 108 admitted 33 proofs; source continues independently
+2026-09-14T19:51:18.567000Z TestFramework (INFO): Live block 109 admitted 32 proofs; source continues independently
+2026-09-14T19:51:41.164000Z TestFramework (INFO): Live block 110 admitted 32 proofs; source continues independently
+2026-09-14T19:52:03.672000Z TestFramework (INFO): Live block 111 admitted 32 proofs; source continues independently
+2026-09-14T19:52:26.610000Z TestFramework (INFO): Live block 112 admitted 32 proofs; source continues independently
+2026-09-14T19:52:49.149000Z TestFramework (INFO): Live block 113 admitted 32 proofs; source continues independently
+2026-09-14T19:53:12.130000Z TestFramework (INFO): Live block 114 admitted 32 proofs; source continues independently
+2026-09-14T19:53:35.453000Z TestFramework (INFO): Live block 115 admitted 32 proofs; source continues independently
+2026-09-14T19:53:58.426000Z TestFramework (INFO): Live block 116 admitted 32 proofs; source continues independently
+2026-09-14T19:54:21.824000Z TestFramework (INFO): Live block 117 admitted 32 proofs; source continues independently
+2026-09-14T19:54:44.305000Z TestFramework (INFO): Live block 118 admitted 32 proofs; source continues independently
+2026-09-14T19:55:07.567000Z TestFramework (INFO): Live block 119 admitted 32 proofs; source continues independently
+2026-09-14T19:55:30.820000Z TestFramework (INFO): Live block 120 admitted 31 proofs; source continues independently
+2026-09-14T19:55:52.874000Z TestFramework (INFO): Live block 121 admitted 31 proofs; source continues independently
+2026-09-14T19:56:15.257000Z TestFramework (INFO): Live block 122 admitted 33 proofs; source continues independently
+2026-09-14T19:56:38.516000Z TestFramework (INFO): Live block 123 admitted 32 proofs; source continues independently
+2026-09-14T19:57:00.661000Z TestFramework (INFO): Live block 124 admitted 32 proofs; source continues independently
+2026-09-14T19:57:22.501000Z TestFramework (INFO): Live block 125 admitted 32 proofs; source continues independently
+2026-09-14T19:57:45.796000Z TestFramework (INFO): Live block 126 admitted 33 proofs; source continues independently
+2026-09-14T19:58:07.604000Z TestFramework (INFO): Live block 127 admitted 32 proofs; source continues independently
+2026-09-14T19:58:10.250000Z TestFramework (INFO): Live block 128 admitted 10 proofs; source continues independently
+2026-09-14T19:58:14.976000Z TestFramework (DEBUG): Closing down network thread
+2026-09-14T19:58:15.036000Z TestFramework (INFO): Stopping nodes
+2026-09-14T19:58:15.036000Z TestFramework.node0 (DEBUG): Stopping node
+2026-09-14T19:58:15.037000Z TestFramework.node1 (DEBUG): Stopping node
+2026-09-14T19:58:15.204000Z TestFramework.node0 (DEBUG): Node stopped
+2026-09-14T19:58:15.204000Z TestFramework.node1 (DEBUG): Node stopped
+2026-09-14T19:58:15.204000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-v8-throughput-100-small
+2026-09-14T19:58:15.204000Z TestFramework (INFO): Tests successful

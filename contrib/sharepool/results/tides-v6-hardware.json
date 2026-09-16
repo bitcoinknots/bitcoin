@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "profile": "hash-only-v6-tides",
+  "network": "isolated regtest",
+  "result": "passed",
+  "started_utc": "2026-09-13T06:46:19.279539+00:00",
+  "finished_utc": "2026-09-13T06:47:55.610934+00:00",
+  "capture_seconds": 90.003784625,
+  "physical_device": "local Goldshell SCLITE, Sia/BLAKE2b transport",
+  "daemon_sha256": "86ab0ebd0105bf89d50673aa71f1e537002234cd0bd1264684c1f832a7aeccf7",
+  "signer_sha256": "33f50982ee4c31d78a294955e6e06e66fdb41a027ff41317d2e24be46e51086f",
+  "stats": {
+    "accepted": 21,
+    "rejected": 0,
+    "connections": 30,
+    "block_candidates": 21,
+    "subscriptions": 1,
+    "authorizations": 1,
+    "notifications": 22,
+    "submissions": 21,
+    "assigned_difficulty_shares": 21,
+    "native_blocks_accepted": 19,
+    "old_parent_shares": 2,
+    "durable_acknowledgments_ready": 21
+  },
+  "jobs": 22,
+  "unanchored_at_cutoff": 2,
+  "replay": {
+    "profile": "v6-tides",
+    "jobs": 22,
+    "proofs": 21,
+    "blocks": 19,
+    "native_replay": true,
+    "physical_provenance_verified": false,
+    "last_native_tip": "000000000002c91f6dc29d549502214c6e5169550dc41bc9a8d56b99dfe5fdd1"
+  },
+  "node_shutdown": {
+    "stopped": true,
+    "forced_terminate": false,
+    "forced_kill": false,
+    "returncode": 0
+  },
+  "replay_node_shutdown": {
+    "stopped": true,
+    "forced_terminate": false,
+    "forced_kill": false,
+    "returncode": 0
+  },
+  "restoration": {
+    "checked_utc": "2026-09-13T06:49:10.207461+00:00",
+    "checks": {
+      "original_pool_order_and_credentials_match": true,
+      "original_settings_match": true,
+      "original_first_pool_active": true,
+      "temporary_pool_absent": true,
+      "gateway_upstream_is_lazarus": true,
+      "fresh_upstream_accepted_shares": true
+    },
+    "all_checks_passed": true,
+    "accepted_upstream_after_restoration": 13,
+    "latest_accepted_utc": "2026-09-13T06:49:06.298000+00:00",
+    "capture_sha256": "a6c5fa2605664b3653b2000db4b870490c38b40c37273e5fe0910583d03810ca",
+    "scope": "Configuration restoration plus fresh gateway upstream acceptance; miner-specific socket correlation is separate."
+  },
+  "public_capture_sha256": "e1e47d5998380d492236c1ed07ccbee18cb2a8e06ad4386fe5f52dfbd584243c",
+  "private_wrapper_sha256": "908178582aafadc1b172c39d0644ec58c81adecda1b250b7a37be0902b3492a5",
+  "limits": [
+    "One physical device, one native validating node; separate fresh node replay afterward.",
+    "A submitted nonce alone does not prove physical provenance; device routing and capture provide operational evidence.",
+    "Transport difficulty4096 throttles submissions; native credited work follows the v6 share target.",
+    "Two last/late proofs remain durable but unanchored at cutoff; no eventual payout is asserted.",
+    "Fresh upstream acceptance is gateway evidence, not per-socket ASIC attribution.",
+    "No public-network or mainnet activation, WAN throughput, variance calibration, or production stress result."
+  ]
+}

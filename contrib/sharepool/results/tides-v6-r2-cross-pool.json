@@ -1,0 +1,97 @@
+{
+  "binary_sha256": {
+    "bitcoin-sharepool-signer": "03f8320042b43aa79ff3bf49b44dab6f50a39059cbf7f9b41f77d2d4bc9580cd",
+    "bitcoind": "ebf5acc747e5bc7d51b928ada4d14232b5d43a8f7ba948b1799a688c1b391cb8"
+  },
+  "command": "python3 -B test/functional/feature_sharepool_hash_tides_cross_pool.py --configfile=/private/tmp/sharepool-native-build/test/config.ini --tmpdir=/private/tmp/sharepool-v6-cross-pool-918 --portseed=918 --nocleanup",
+  "exit_code": 0,
+  "external_signers": 3,
+  "final_source_hashes_verified": true,
+  "ingestion": {
+    "accepted": [
+      "d7d5f9401818d67ee7c5acc362b89f11208b07009b6a0cb7be5f69bbbd02578a"
+    ],
+    "already_retained": 1,
+    "archive_pages": 3,
+    "bytes_charged": 5632,
+    "complete": true,
+    "cursor": {
+      "archive": {
+        "after": null,
+        "share": 0,
+        "snapshot": null
+      },
+      "next_lane": "recent",
+      "recent": {
+        "after": 2,
+        "epoch": "b57bd2853c349519de59262dc2f5570cc00acfbe0ad3a6e65664679b0513666f",
+        "sequence": 0,
+        "share": 0,
+        "snapshot": null
+      }
+    },
+    "deferred": [],
+    "ineligible": 0,
+    "inventory_revision": 2,
+    "limit_reason": null,
+    "native_tip": "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206",
+    "pages": 6,
+    "proofs_examined": 2,
+    "receipt_revision": 1,
+    "recent_epoch_changed": false,
+    "recent_gap": false,
+    "recent_pages": 3,
+    "snapshots": 4
+  },
+  "limits": [
+    "Isolated easy regtest; not a WAN or production-throughput measurement.",
+    "One bounded cross-pool proof, not a statistical payout-variance measurement.",
+    "Prior failed attempts exposed test synchronization assumptions; final run waits for P2P origins and native tips."
+  ],
+  "log_file": "contrib/sharepool/results/tides-v6-r2-cross-pool-native.txt",
+  "log_sha256": "603c267726b4ae6b0fe906479eb738bf1a1fae92e8e34f4659d5cb8a6b9d0020",
+  "native_block_count": 6,
+  "native_nodes": 2,
+  "pools": 2,
+  "portseed": 918,
+  "prior_attempts": [
+    {
+      "portseed": 914,
+      "reason": "first import returned no ACK; test had waited for carrier availability but not for the original opening",
+      "result": "failed"
+    },
+    {
+      "portseed": 916,
+      "reason": "test checked follower authorization invalidation before waiting for follower tip",
+      "result": "failed"
+    }
+  ],
+  "profile": "hash-only-v6-tides",
+  "raw_log_sha256": "c17e76a663d1a70005dd087b239026c9d38d0b7fdd51eb5b789d97c4c3c7488b",
+  "result": "passed",
+  "rules_revision": 2,
+  "schema": 1,
+  "source_sha256": {
+    "contrib/sharepool/hash_gate_inventory.py": "2bf60749366de6217391626315d7591b5fb3029bc95c1c164f019b6b1f27860b",
+    "contrib/sharepool/hash_mining_gate.py": "88f2f456aa17f2f7f971d70a56a7c993a60ef55415bf0b2999ecc12a4d97efa9",
+    "contrib/sharepool/test_hash_tides_cross_pool.py": "0d08f0f7e2209d099c453ddf461a33b6025a22f8f95812c4864c8c7a2a275b25",
+    "src/net_processing.cpp": "f2030edcdb4c14472b4e794e0a320b13c3a5f07be91d4556201b681f27707845",
+    "src/sharepool/hash_relay.h": "73fd5f235f1d4187fb06c20b930db7d0be051ed4acb178ac9aa09f3ef96cc6fe",
+    "src/sharepool/hash_store.cpp": "0f45b2c84efa0730376053043829b8b7a5aaac492a9d3e144ee18dd86908cfcc",
+    "src/sharepool/hash_store.h": "3b139a8f7c98c6520af4bd7b774d5469ab8221b4daa5e928f7ec4b63fb35b097",
+    "test/functional/feature_sharepool_hash_tides_cross_pool.py": "3b90f52b836f51e90824bc51de945caafa57d0079285f4e0cd0c19b673ff6627"
+  },
+  "source_state": "uncommitted working tree; source hashes recorded",
+  "test": "feature_sharepool_hash_tides_cross_pool.py",
+  "verified": [
+    "unmined proposal and full origin received over native P2P",
+    "foreign-pool proof natively validated before durable gate ACK",
+    "fair recent/archive inventory paths",
+    "protected gate archive recovery and native revalidation",
+    "pool B admits A proof without paying A from B reward",
+    "origin admission age expires after confirmed admission",
+    "native follower restart retains history",
+    "later pool A job with new recipient pays original A recipient",
+    "both native nodes verify full chain"
+  ]
+}

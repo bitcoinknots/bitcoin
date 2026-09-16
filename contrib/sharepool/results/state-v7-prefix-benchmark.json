@@ -1,0 +1,101 @@
+{
+  "scope": "Synthetic signed state replay, capture and resource callbacks; excludes native validation, networking, archive I/O, PoW verification and fixture creation",
+  "clock_sources": {
+    "cpu": "time.process_time",
+    "wall": "time.perf_counter"
+  },
+  "python": "3.9.6",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "repeats": 3,
+  "workload": {
+    "distinct_jobs": 100,
+    "target_height": 4,
+    "native_history_snapshots": 3,
+    "shares_per_history_snapshot": 100,
+    "total_history_shares": 300,
+    "new_shares_per_target": 0,
+    "fixtures_sha256": "1a91220e5abefb61c204f7297726f801146c8bea4db095e1405db43075f40589"
+  },
+  "same_runtime_only_cache_argument_differs": true,
+  "fresh_cache_per_sweep": true,
+  "all_derived_heads_states_certificates_equal": true,
+  "all_ancestry_and_observer_evidence_equal": true,
+  "source_sha256": {
+    "hash_snapshot.py": "075ac241ba3f90517df8521967509df3b9af4d29351bc2ff51bb60c121417492",
+    "hash_state_cache.py": "827a2a4afdea24c14781c39a91904785943dc880d35c00ba706a9cbaabf646f1",
+    "benchmark_hash_state.py": "9c0e096a75b5e7b8fbfe70c1fc1bbc994568b7477afc4707aed02332529d3764"
+  },
+  "modes": {
+    "disabled": {
+      "samples": [
+        {
+          "repeat": 1,
+          "cpu_seconds": 4.095286,
+          "wall_seconds": 4.095608834
+        },
+        {
+          "repeat": 2,
+          "cpu_seconds": 4.155446999999999,
+          "wall_seconds": 4.155940041999999
+        },
+        {
+          "repeat": 3,
+          "cpu_seconds": 4.147309,
+          "wall_seconds": 4.147562666999999
+        }
+      ],
+      "instrumentation": {
+        "separate_from_timing": true,
+        "apply_tides_state_calls": 400,
+        "verify_schnorr_calls": 400,
+        "ancestry_callbacks": 300,
+        "snapshot_observers": 400,
+        "observed_bytes": 1358800,
+        "callback_sha256": "4f035f3b92119f89e02350a8e6bdcbd73a4c965280168c5409d41cecc06c72e5",
+        "cache": null
+      },
+      "median_cpu_seconds": 4.147309,
+      "median_wall_seconds": 4.147562666999999
+    },
+    "enabled": {
+      "samples": [
+        {
+          "repeat": 1,
+          "cpu_seconds": 1.5528339999999998,
+          "wall_seconds": 1.5528896660000004
+        },
+        {
+          "repeat": 2,
+          "cpu_seconds": 1.5596459999999999,
+          "wall_seconds": 1.5597612080000003
+        },
+        {
+          "repeat": 3,
+          "cpu_seconds": 1.552693999999999,
+          "wall_seconds": 1.5527817090000013
+        }
+      ],
+      "instrumentation": {
+        "separate_from_timing": true,
+        "apply_tides_state_calls": 103,
+        "verify_schnorr_calls": 103,
+        "ancestry_callbacks": 300,
+        "snapshot_observers": 400,
+        "observed_bytes": 1358800,
+        "callback_sha256": "4f035f3b92119f89e02350a8e6bdcbd73a4c965280168c5409d41cecc06c72e5",
+        "cache": {
+          "entries": 4,
+          "bytes": 435407,
+          "shares": 1300,
+          "hits": 99,
+          "misses": 103,
+          "oversized": 0
+        }
+      },
+      "median_cpu_seconds": 1.5528339999999998,
+      "median_wall_seconds": 1.5528896660000004
+    }
+  },
+  "cpu_speedup_ratio": 2.670799969603963,
+  "wall_speedup_ratio": 2.67086758177963
+}

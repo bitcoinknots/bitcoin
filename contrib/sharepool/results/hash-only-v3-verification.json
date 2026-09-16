@@ -1,0 +1,98 @@
+{
+  "profile": "hash-only-v3-regtest",
+  "result": "passed",
+  "native_tests": {
+    "cases": 45,
+    "exit_code": 0,
+    "suites": [
+      "sharepool_hash_tests",
+      "sharepool_hash_relay_tests",
+      "sharepool_tests",
+      "sharepool_signer_tests",
+      "sharepool_params_tests"
+    ],
+    "log": "hash-only-v3-native-tests.txt"
+  },
+  "python_tests": {
+    "cases": 39,
+    "gate": 26,
+    "codec": 13,
+    "exit_code": 0,
+    "seconds": 3.233,
+    "command": "python3 -B -m unittest discover -s contrib/sharepool -p 'test_hash_*.py' -v"
+  },
+  "functional_tests": [
+    {
+      "script": "feature_sharepool_hash_rules.py",
+      "exit_code": 0
+    },
+    {
+      "script": "feature_sharepool_rule_cases.py",
+      "cases": 13,
+      "exit_code": 0
+    },
+    {
+      "script": "feature_sharepool_hash_relay.py",
+      "exit_code": 0
+    },
+    {
+      "script": "feature_sharepool_hash_attestation.py",
+      "exit_code": 0
+    },
+    {
+      "script": "feature_sharepool_hash_lifecycle.py",
+      "transport": "v1",
+      "exit_code": 0,
+      "report": "hash-only-v3-lifecycle-v1.json"
+    },
+    {
+      "script": "feature_sharepool_hash_lifecycle.py",
+      "transport": "v2",
+      "exit_code": 0,
+      "report": "hash-only-v3-lifecycle-v2.json"
+    }
+  ],
+  "binaries": {
+    "bitcoind": "031f95aea777895e18aa239dba0439bba876b947d63f9f9941b4dee5a4686eac",
+    "bitcoin-sharepool-signer": "e1b4cb28f95d2726ed9ff72d0b7b3fd48ddd3f199ba363705c5646d189c185b5",
+    "test_bitcoin": "f7e4faeed878ebeca867cc5f5494c4985ce3c64858856999bcee4709faeee7de"
+  },
+  "final_source_sha256": {
+    "contrib/sharepool/hash_mining_gate.py": "532824df6d8d25ef6ee5a2a232daaf46d291d6ce448883180ec39ece9b318e33",
+    "contrib/sharepool/hash_snapshot.py": "dd7f4fd1edede2851825df896bc5d8747deda17379c8a75b7d5d73bc8fbbe7c8",
+    "contrib/sharepool/native_signer.py": "bc4e251ee288e76ce0a7cb242fb6144b5ccf4f6623a4bb10cd60a085febe0aaa",
+    "contrib/sharepool/test_hash_mining_gate.py": "a8b5b7069a029d01bad387f65e72c2be484aa82d52766b299b0d7387ca4be3d5",
+    "contrib/sharepool/test_hash_snapshot.py": "6bb47f3448d8ca1b0fb127230a1e11a430ea192e2663e69c2dbc85a888498254",
+    "src/bitcoin-sharepool-signer.cpp": "a9dcfdd33568f55475f2094522bea4bd8048d66c2725eff6d846cbf6e78c6de5",
+    "src/consensus/sharepool_hash.cpp": "a1b82052864c0c69cc67eb9eb14130a178287a68f044ec876aba9a66b61cfb32",
+    "src/consensus/sharepool_hash.h": "816acbe151a5d762f70bf0832589876434bd87ee439b539e6ddfd3abfb11d892",
+    "src/net_processing.cpp": "ab616bcafb5c4d43033625e1fe42e889798f634d0a93f79cb391b7b76da76a31",
+    "src/rpc/mining.cpp": "865a3322bb8ce4fe2b986978398f26862a1cf2b24e6e0bba6db898d691a324bc",
+    "src/sharepool/hash_relay.h": "81f37798d575639445443c9b85fa3801b83843deb3e5fed61bd27af0a8c0469d",
+    "src/sharepool/signer.cpp": "ed5a2fc8a4595f454beae21e77d0a6631a03cb0289f5ca9591925f225d05c488",
+    "src/sharepool/signer.h": "407cee7e53ef09c4ab6acd066258ecc2bcb6b364dc10534909c58a417d1bef89",
+    "src/test/sharepool_hash_relay_tests.cpp": "669ac39f7c7112f94d786503ba97eeab7feead78527dce91a9b770a6166d23ba",
+    "src/test/sharepool_hash_tests.cpp": "541a2c607098131d82d952944a651ce47f9a9949bb1f7b7a5fafb66e4802cabc",
+    "src/test/sharepool_signer_tests.cpp": "bd9895e41f151c66ab950f9c5c30ebd4cf11ca53cc54cffe2cb296d9351551e2",
+    "src/validation.cpp": "ffc3b16fac8ca33c03674ab1a78dce2db97541ae369eeb183ee21a40f68f95f2",
+    "test/functional/feature_sharepool_hash_100_miners.py": "00e520b2b250db0e6390e16f81b86e5b1384725d81e7ac19a74bc4057342b690",
+    "test/functional/feature_sharepool_hash_attestation.py": "d8f5c2dd076c59f5ce0815f82d4eceb3042b96781ddc5e35712102703f357976",
+    "test/functional/feature_sharepool_hash_lifecycle.py": "768710ce1a128ba71be240475dc20f3302c826c73d28f2f86e3aa94c35d06b45",
+    "test/functional/feature_sharepool_hash_relay.py": "63743be8456a43f4e645dc3e807eb1a6ef7f87cb85320edc2f3d7cb8f189a3da",
+    "test/functional/feature_sharepool_hash_rules.py": "8c7498f739d8fe41e39fb15905f0d7a7e538a25fe921f3d0b505e1d53276ecb2",
+    "test/functional/test_runner.py": "e7bf574b5d71d47affaeb1f877f9af3925e9fd1e816362a40e6b567b2b45f8fe"
+  },
+  "scope_notes": [
+    "Regtest only; no hardware miner, GPU, public network or production difficulty benchmark.",
+    "The 100-miner process imported Python modules before the final small-target/scalar/exact-copied-signature guards. The final39 Python tests cover those guards; native consensus already checks the exact signatures. Native executable hashes identify the actual binaries.",
+    "Full sized100-template capacity, worst-case latency, native job construction and independent archive recovery remain unverified or incomplete."
+  ],
+  "hundred_miners": {
+    "exit_code": 0,
+    "report": "hash-only-v3-100-miners.json",
+    "seconds": 605.76,
+    "native_owner_keys_removed": true,
+    "nodes_stopped": true
+  },
+  "native_binary_matches_hundred_miners": true
+}

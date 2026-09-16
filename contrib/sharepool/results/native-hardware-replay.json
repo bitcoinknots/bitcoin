@@ -1,0 +1,32 @@
+{
+  "format": "sharepool-native-hardware-verification-v1",
+  "network": "regtest",
+  "jobs_verified": 29,
+  "asic_proofs_replayed": 28,
+  "native_expected_work": 56,
+  "assigned_difficulty_proofs": 28,
+  "accepted_blocks_verified": 28,
+  "historically_settled_proofs": 27,
+  "pending_proofs": [
+    "00000000000515133ea6fe4d34cbc31d8e25e518ab054614b7c6def2c6fe4b81"
+  ],
+  "last_native_tip": "00000000000515133ea6fe4d34cbc31d8e25e518ab054614b7c6def2c6fe4b81",
+  "independent_native_replay": true,
+  "physical_origin": "Requires separate device/session evidence; hashes alone do not identify hardware.",
+  "capture_sha256": "878abe6661b63680656c539585ba39f4cafeec832136a2d98bf02486e516d927",
+  "verified_utc": "2026-09-11T21:47:59.155861+00:00",
+  "hardware_capture_reported_success": true,
+  "restoration_reported_verified": true,
+  "native_replay_profile": {
+    "sharepool_activation_height": 1,
+    "blake2b_activation_height": 1,
+    "initial_native_height": 0,
+    "p2p_enabled": false
+  },
+  "limitations": [
+    "Regtest fixture profile only; mainnet is disabled.",
+    "Reported restoration is configuration evidence; live Lazarus recovery is verified separately.",
+    "ASIC hash replay alone cannot identify which physical device produced a nonce."
+  ],
+  "independent_replay_node_stopped": true
+}

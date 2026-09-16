@@ -569,7 +569,12 @@ bool InitHTTPServer(const util::SignalInterrupt& interrupt)
 
     evhttp_set_timeout(http, gArgs.GetIntArg("-rpcservertimeout", DEFAULT_HTTP_SERVER_TIMEOUT));
     evhttp_set_max_headers_size(http, MAX_HEADERS_SIZE);
-    evhttp_set_max_body_size(http, MAX_SIZE);
+    // The explicit experimental profile transports a 16 MiB snapshot and a 4 MB
+    // template as hexadecimal JSON, which exceeds the ordinary 32 MiB body cap.
+    // Keep the public-network/default limit and every P2P limit unchanged.
+    const uint64_t max_body_size = gArgs.GetChainType() == ChainType::REGTEST &&
+        gArgs.GetBoolArg("-sharepoolhashonly", false) ? 48ULL * 1024 * 1024 : MAX_SIZE;
+    evhttp_set_max_body_size(http, max_body_size);
     evhttp_set_gencb(http, http_request_cb, (void*)&interrupt);
 
     if (!HTTPBindAddresses(http)) {

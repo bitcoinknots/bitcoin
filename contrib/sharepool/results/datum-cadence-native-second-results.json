@@ -1,0 +1,69 @@
+{
+  "network": "isolated native regtest",
+  "profile": "hash-only-v7-compact-tides",
+  "scope": "Injected refresh clock; actual native transactions, signatures, proofs, payouts and reorgs",
+  "work_update_seconds": 40,
+  "activation_height": 102,
+  "daemon_sha256": "2f06596d94347f8491c6506d8474e4ffbfc44243fd41f0bcb884957e108d5365",
+  "signer_sha256": "bbb7b90309010477f0e13866671c84cd05ddb4699c087d55897d6cf10cc169f3",
+  "source_sha256": {
+    "contrib/sharepool/hash_job_scheduler.py": "3893a55d5c55b677d09f6fa24d88acddbc76d0f833612ca5e008695ca3144d53",
+    "contrib/sharepool/hash_mining_gate.py": "fb317723022963485cdf4ac5c7497c3dc8c4bb44c17a570c974d10434e6b1596",
+    "test/functional/feature_sharepool_hash_datum_cadence.py": "03d07ebedea04fbd7909059786fd075584152ae046f8417e31a3b77dd5e2fcb0"
+  },
+  "coalesced_updates": {
+    "mempool_transaction": "0ad665e0cdd401871c45c32be8f8fd77fea874088e85d98f748d2b730459b38c",
+    "late_receipt_retained": true,
+    "poll_times": [
+      5.0,
+      10.0,
+      20.0,
+      39.999
+    ],
+    "publications_before_deadline": 1,
+    "strict_redispatch_refused": true,
+    "already_issued_work_continues": true,
+    "original_bytes_unchanged": true
+  },
+  "normal_refresh": {
+    "clock": 40.0,
+    "next_refresh_at": 80.0,
+    "transaction_included": true,
+    "acknowledged_proofs_included": 2,
+    "payouts": {
+      "00140101010101010101010101010101010101010101": 2500005000,
+      "00140202020202020202020202020202020202020202": 2500005000
+    }
+  },
+  "older_job_solution": {
+    "accepted_block": "376097c01c0a5b2896d7abe4ce6c8ee385303e23a807302b0d15e6fc4c1fd003",
+    "snapshot_hash": "ca6a48d0843ce46857b155cb47dd89c4197c602d45ca5a7b452ed1eeeb80677b",
+    "original_payout_preserved": true,
+    "late_receipt_deferred": true
+  },
+  "new_block_refresh": {
+    "clock": 41.0,
+    "previous_deadline": 80.0,
+    "parent": "376097c01c0a5b2896d7abe4ce6c8ee385303e23a807302b0d15e6fc4c1fd003",
+    "late_proof_included": true,
+    "settled_child": "4929df90832375280abbde60eb4d1d13aeeff5a71513b8a11895698505d290d4"
+  },
+  "reorg_refresh": {
+    "rollback_clock": 43.0,
+    "rollback_parent": "376097c01c0a5b2896d7abe4ce6c8ee385303e23a807302b0d15e6fc4c1fd003",
+    "restoration_clock": 44.0,
+    "restoration_parent": "4929df90832375280abbde60eb4d1d13aeeff5a71513b8a11895698505d290d4",
+    "deferred_work_and_payout_recomputed": true
+  },
+  "result": "passed",
+  "final_height": 103,
+  "failure_fences": {
+    "invalid_signer_refused": true,
+    "native_tip_race_refused": true,
+    "withdrawal_before_retry": true
+  },
+  "acknowledged_and_confirmed_receipts": 2,
+  "publications": 8,
+  "withdrawals": 6,
+  "final_native_parent": "4929df90832375280abbde60eb4d1d13aeeff5a71513b8a11895698505d290d4"
+}

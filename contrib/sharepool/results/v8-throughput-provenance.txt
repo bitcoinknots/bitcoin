@@ -1,0 +1,8 @@
+2026-09-14T20:08:49.564000Z TestFramework (INFO): PRNG seed is: 3253182595697713830
+2026-09-14T20:08:49.564000Z TestFramework (INFO): Initializing test directory /private/tmp/sharepool-coinbase-guard-provenance-native
+2026-09-14T20:08:50.158000Z TestFramework (INFO): Native overlay validation admits a three-opening graph in one local receipt
+2026-09-14T20:08:50.201000Z TestFramework (INFO): An archive alone rehydrates a disconnected native node and revalidates the acknowledged work
+2026-09-14T20:08:50.254000Z TestFramework (INFO): The recovered evidence admits the actual solved settlement and native coinbase payment
+2026-09-14T20:08:50.333000Z TestFramework (INFO): Stopping nodes
+2026-09-14T20:08:50.508000Z TestFramework (WARNING): Not cleaning up dir /private/tmp/sharepool-coinbase-guard-provenance-native
+2026-09-14T20:08:50.508000Z TestFramework (INFO): Tests successful

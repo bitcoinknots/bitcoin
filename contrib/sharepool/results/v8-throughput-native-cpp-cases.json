@@ -1,0 +1,495 @@
+{
+  "passed": true,
+  "test_cases": 121,
+  "time_seconds": {
+    "real": 122.01,
+    "user": 119.05,
+    "sys": 0.6
+  },
+  "cases": [
+    {
+      "name": "public_network_factory_rejects_test_override",
+      "microseconds": 5241
+    },
+    {
+      "name": "command_line_parser_rejects_ambiguous_or_invalid_schedule",
+      "microseconds": 2916
+    },
+    {
+      "name": "hash_only_requires_explicit_regtest_native_schedule",
+      "microseconds": 2751
+    },
+    {
+      "name": "public_network_factory_rejects_hash_only_option",
+      "microseconds": 2475
+    },
+    {
+      "name": "confirmed_ledger_is_explicit_and_regtest_only",
+      "microseconds": 2865
+    },
+    {
+      "name": "tides_is_explicit_and_separate_from_confirmed_ledger",
+      "microseconds": 2666
+    },
+    {
+      "name": "public_network_factory_rejects_tides_option_even_disabled",
+      "microseconds": 2419
+    },
+    {
+      "name": "kernel_tides_profile_enforces_schedule_and_profile_exclusion",
+      "microseconds": 2337
+    },
+    {
+      "name": "tides_command_line_flag_is_registered_and_public_defaults_stay_disabled",
+      "microseconds": 2963
+    },
+    {
+      "name": "compact_tides_is_explicit_and_public_activation_is_rejected",
+      "microseconds": 3238
+    },
+    {
+      "name": "v8_assigned_work_is_explicit_and_requires_a_fresh_regtest_profile",
+      "microseconds": 3041
+    },
+    {
+      "name": "native_random_key_owner_signature",
+      "microseconds": 2897
+    },
+    {
+      "name": "native_policy_rejects_wrong_network_or_binding",
+      "microseconds": 2871
+    },
+    {
+      "name": "native_owner_authorization_is_not_template_attestation",
+      "microseconds": 2500
+    },
+    {
+      "name": "native_signer_canonical_bounded_decoding",
+      "microseconds": 2671
+    },
+    {
+      "name": "native_v4_job_signature_attests_exact_job_and_contents",
+      "microseconds": 2825
+    },
+    {
+      "name": "native_v4_job_signer_enforces_policy_and_nonzero_digests",
+      "microseconds": 2995
+    },
+    {
+      "name": "native_v4_job_signer_decoding_is_canonical_and_bounded",
+      "microseconds": 2389
+    },
+    {
+      "name": "native_v5_job_signer_requires_matching_profile_and_binds_domain",
+      "microseconds": 2503
+    },
+    {
+      "name": "native_v6_job_signer_binds_profile_and_exact_history_contents",
+      "microseconds": 2651
+    },
+    {
+      "name": "v8_job_signer_attests_assigned_work_and_rejects_legacy_field_reuse",
+      "microseconds": 2918
+    },
+    {
+      "name": "independent_hash_and_wire_vectors",
+      "microseconds": 3039
+    },
+    {
+      "name": "one_hundred_proofs_and_nonce_normalization",
+      "microseconds": 46938
+    },
+    {
+      "name": "prepared_codec_matches_original_wire_and_profile_hashes",
+      "microseconds": 75676
+    },
+    {
+      "name": "resource_measurement_never_reuses_mutated_object_metadata",
+      "microseconds": 17554
+    },
+    {
+      "name": "shared_references_keep_the_original_global_reference_budget",
+      "microseconds": 1550183
+    },
+    {
+      "name": "shared_payload_keeps_exact_individual_and_expanded_byte_limits",
+      "microseconds": 299793
+    },
+    {
+      "name": "deduplicated_large_templates_preserve_complete_transaction_bytes",
+      "microseconds": 12838754
+    },
+    {
+      "name": "unsigned_preparation_never_exempts_nested_owner_authorizations",
+      "microseconds": 3555
+    },
+    {
+      "name": "missing_data_is_distinct_from_invalidity",
+      "microseconds": 3300
+    },
+    {
+      "name": "known_empty_preimage_is_invalid_without_requesting_data",
+      "microseconds": 2707
+    },
+    {
+      "name": "local_callback_failures_are_unavailable_not_invalid_encoding",
+      "microseconds": 3172
+    },
+    {
+      "name": "current_owner_reserved_roots_and_reward",
+      "microseconds": 2902
+    },
+    {
+      "name": "share_target_authorization_binding_and_full_origin",
+      "microseconds": 2999
+    },
+    {
+      "name": "unused_full_templates_also_require_native_validation",
+      "microseconds": 2787
+    },
+    {
+      "name": "origin_memo_includes_exact_witness_body",
+      "microseconds": 3755
+    },
+    {
+      "name": "recommitting_does_not_authorize_wrong_payouts",
+      "microseconds": 5507
+    },
+    {
+      "name": "parent_state_repeat_payment_and_late_proof",
+      "microseconds": 4370
+    },
+    {
+      "name": "canonical_order_and_duplicate_proofs",
+      "microseconds": 5472
+    },
+    {
+      "name": "bounded_canonical_parser",
+      "microseconds": 173900
+    },
+    {
+      "name": "overflow_safe_payout_arithmetic_without_32_share_quota",
+      "microseconds": 98023
+    },
+    {
+      "name": "dependency_depth_is_a_distinct_bounded_failure",
+      "microseconds": 2634
+    },
+    {
+      "name": "worked_refresh_admission_reserves_future_settlement_depth",
+      "microseconds": 84481
+    },
+    {
+      "name": "dependency_depth_cannot_be_bypassed_by_a_shorter_memoized_path",
+      "microseconds": 21172
+    },
+    {
+      "name": "dense_dependency_dag_checks_each_exact_origin_once",
+      "microseconds": 107762
+    },
+    {
+      "name": "memoized_missing_origins_still_count_declared_dependency_edges",
+      "microseconds": 14905
+    },
+    {
+      "name": "unique_dependency_bytes_are_bounded_across_recursion",
+      "microseconds": 2194707
+    },
+    {
+      "name": "deterministic_share_target_and_weighted_payouts",
+      "microseconds": 3109
+    },
+    {
+      "name": "owner_attests_job_and_snapshot_but_allows_search",
+      "microseconds": 2652
+    },
+    {
+      "name": "v5_cross_pool_admissions_parent_cutoff_and_exact_credit_state",
+      "microseconds": 8803
+    },
+    {
+      "name": "v5_confirmed_work_outlives_fresh_proof_and_certificate_age",
+      "microseconds": 4195
+    },
+    {
+      "name": "v5_certificates_bind_witness_body_owner_and_actual_parent",
+      "microseconds": 4353
+    },
+    {
+      "name": "v5_byte_bounded_oldest_prefix_preserves_all_confirmed_credits",
+      "microseconds": 154813
+    },
+    {
+      "name": "v5_parent_certificate_renews_worked_graph_depth_budget",
+      "microseconds": 53291
+    },
+    {
+      "name": "v7_compact_jobs_reconstruct_exact_shares_and_ignore_derived_caches",
+      "microseconds": 131517
+    },
+    {
+      "name": "v7_compact_dictionary_rejects_conflicts_unused_entries_and_search_rebinding",
+      "microseconds": 18663
+    },
+    {
+      "name": "v7_bounded_native_suffix_reconstructs_expiry_and_repeat_state_after_nine_heights",
+      "microseconds": 31998
+    },
+    {
+      "name": "v7_preparation_and_full_validation_reauthenticate_ancestry_evidence",
+      "microseconds": 5096
+    },
+    {
+      "name": "compact_owner_digest_reuse_keeps_exact_openings_and_fresh_invocations",
+      "microseconds": 23502
+    },
+    {
+      "name": "v7_shared_optional_retention_preserves_exact_validation_results",
+      "microseconds": 14329
+    },
+    {
+      "name": "v7_compact_dictionary_and_proof_indexes_cross_compactsize_boundaries",
+      "microseconds": 122771
+    },
+    {
+      "name": "v7_compact_graph_keeps_full_share_validation_work_bound",
+      "microseconds": 100240518
+    },
+    {
+      "name": "v8_assignment_wire_rules_and_exact_target_vectors",
+      "microseconds": 7091
+    },
+    {
+      "name": "tides_payout_plan_reuses_exact_weights_for_reservation_and_rewards",
+      "microseconds": 2895
+    },
+    {
+      "name": "tides_payout_plan_failed_history_or_context_cannot_reuse_old_weights",
+      "microseconds": 2733
+    },
+    {
+      "name": "v8_assigned_target_is_attested_and_native_candidates_remain_valid",
+      "microseconds": 3360
+    },
+    {
+      "name": "v8_mixed_work_payouts_and_persistent_history_are_exact_and_profile_scoped",
+      "microseconds": 75172
+    },
+    {
+      "name": "signals_during_a_pass_are_coalesced_but_not_lost",
+      "microseconds": 1538
+    },
+    {
+      "name": "shutdown_stops_active_work_and_discards_a_queued_notification",
+      "microseconds": 1647
+    },
+    {
+      "name": "shutdown_before_start_never_launches_work",
+      "microseconds": 32
+    },
+    {
+      "name": "local_worker_failure_keeps_the_worker_available_for_a_later_signal",
+      "microseconds": 107
+    },
+    {
+      "name": "native_reward_cache_retains_a_warmed_graph_under_eviction_pressure",
+      "microseconds": 255061
+    },
+    {
+      "name": "native_cache_identity_binds_witness_order_coinbase_and_header",
+      "microseconds": 248
+    },
+    {
+      "name": "payout_reservation_rejects_contextual_weight_excess_before_assembly",
+      "microseconds": 45
+    },
+    {
+      "name": "compact_decoded_snapshot_lru_charges_expansion_and_preserves_available_values",
+      "microseconds": 196
+    },
+    {
+      "name": "decoded_snapshot_entry_budget_is_independent_of_bytes_and_session",
+      "microseconds": 43
+    },
+    {
+      "name": "decoded_snapshot_cache_counts_nested_witnesses_outputs_and_shared_transaction_objects",
+      "microseconds": 1070
+    },
+    {
+      "name": "decoded_snapshot_shared_budget_releases_on_eviction_replacement_and_destruction",
+      "microseconds": 68
+    },
+    {
+      "name": "decoded_snapshot_shared_leases_are_overflow_safe_and_exception_safe",
+      "microseconds": 46
+    },
+    {
+      "name": "decoded_snapshot_shared_budget_concurrent_sessions_never_exceed_limit",
+      "microseconds": 1481
+    },
+    {
+      "name": "chronological_exact_work_suffix_retains_full_boundary_share",
+      "microseconds": 2533
+    },
+    {
+      "name": "boundary_native_height_retains_every_pool_member_without_reading_older_history",
+      "microseconds": 2617
+    },
+    {
+      "name": "boundary_cohort_never_returns_only_the_affordable_members",
+      "microseconds": 2314
+    },
+    {
+      "name": "startup_and_absent_pool_require_complete_scan_to_activation",
+      "microseconds": 2258
+    },
+    {
+      "name": "competing_branches_and_repeated_rewards_do_not_mutate_history",
+      "microseconds": 2541
+    },
+    {
+      "name": "higher_difficulty_retrieves_history_below_previous_window",
+      "microseconds": 2279
+    },
+    {
+      "name": "missing_data_keeps_progress_but_never_returns_partial_entitlements",
+      "microseconds": 2280
+    },
+    {
+      "name": "empty_block_scans_resume_across_local_budget_and_cache_eviction",
+      "microseconds": 2466
+    },
+    {
+      "name": "delta_and_query_budgets_are_local_failures_not_empty_or_invalid_history",
+      "microseconds": 2287
+    },
+    {
+      "name": "raising_query_budget_resumes_without_losing_acknowledged_work_or_progress",
+      "microseconds": 2554
+    },
+    {
+      "name": "local_cache_options_reject_unlimited_invalid_and_overflowing_values",
+      "microseconds": 2357
+    },
+    {
+      "name": "process_configuration_is_validated_and_observable_without_consensus_mutation",
+      "microseconds": 2215
+    },
+    {
+      "name": "wrong_local_anchor_and_callback_failures_are_not_consensus_invalidity",
+      "microseconds": 2301
+    },
+    {
+      "name": "authenticated_admission_shape_and_numeric_order_are_checked",
+      "microseconds": 2258
+    },
+    {
+      "name": "payout_address_may_appear_in_separate_pool_histories",
+      "microseconds": 2265
+    },
+    {
+      "name": "cached_delta_owns_bytes_and_cursor_survives_new_index_objects",
+      "microseconds": 2277
+    },
+    {
+      "name": "v8_zero_endpoint_is_exact_and_cannot_enter_legacy_cached_queries",
+      "microseconds": 2276
+    },
+    {
+      "name": "sparse_pool_restart_reads_only_selected_native_admissions",
+      "microseconds": 465833
+    },
+    {
+      "name": "rebuild_progress_is_atomic_and_resumes_after_restart",
+      "microseconds": 118668
+    },
+    {
+      "name": "branch_roots_preserve_pool_identity_and_complete_height_boundary",
+      "microseconds": 42976
+    },
+    {
+      "name": "all_pool_keys_and_updates_use_bounded_persistent_paths",
+      "microseconds": 108804
+    },
+    {
+      "name": "missing_and_changed_source_snapshots_never_use_stored_amounts",
+      "microseconds": 48572
+    },
+    {
+      "name": "missing_source_during_rebuild_cannot_mark_prefix_complete",
+      "microseconds": 38664
+    },
+    {
+      "name": "conditional_branch_is_not_promoted_to_durable_coverage",
+      "microseconds": 32417
+    },
+    {
+      "name": "profile_genesis_rules_and_activation_are_explicit",
+      "microseconds": 77996
+    },
+    {
+      "name": "disk_and_query_limits_preserve_complete_batches_and_resume",
+      "microseconds": 77740
+    },
+    {
+      "name": "missing_key_or_key_replacement_requires_rebuild",
+      "microseconds": 94139
+    },
+    {
+      "name": "damaged_or_forged_empty_coverage_never_bootstraps_an_empty_pool",
+      "microseconds": 84689
+    },
+    {
+      "name": "fetch_callback_can_reenter_index_without_lock_inversion",
+      "microseconds": 40667
+    },
+    {
+      "name": "concurrent_rebuild_and_query_commit_a_batch_only_once",
+      "microseconds": 39745
+    },
+    {
+      "name": "missing_map_nodes_remain_unavailable_and_authoritative_scan_can_recover",
+      "microseconds": 86525
+    },
+    {
+      "name": "invalid_local_options_do_not_destroy_an_existing_index",
+      "microseconds": 59135
+    },
+    {
+      "name": "v8_zero_proof_endpoint_survives_persistent_restart_but_not_legacy_scope",
+      "microseconds": 110710
+    },
+    {
+      "name": "exact_assigned_work_and_probability_across_native_targets",
+      "microseconds": 11243
+    },
+    {
+      "name": "legacy_hash_domains_and_new_profile_remain_distinct",
+      "microseconds": 7563
+    },
+    {
+      "name": "rational_native_window_clips_boundary_without_integer_rounding",
+      "microseconds": 8496
+    },
+    {
+      "name": "boundary_cohort_pays_every_recipient_independently_of_proof_order",
+      "microseconds": 11793
+    },
+    {
+      "name": "fractional_cohort_uses_more_than_512_bits_without_losing_newer_work",
+      "microseconds": 664750
+    },
+    {
+      "name": "actual_parent_plus_current_delta_pays_and_rewards_do_not_reset_history",
+      "microseconds": 6233
+    },
+    {
+      "name": "same_recipient_can_join_multiple_pools_without_moving_old_work",
+      "microseconds": 4714
+    },
+    {
+      "name": "native_payout_queries_apply_configured_capacity_and_recover_after_increase",
+      "microseconds": 7522
+    }
+  ]
+}
