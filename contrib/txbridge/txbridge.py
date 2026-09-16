@@ -199,7 +199,8 @@ class Rpc:
 
 
 class Stats:
-    def __init__(self):
+    def __init__(self, mode: str):
+        self.mode = mode
         self.started = time.time()
         self.peers = 0
         self.blake2b_peers = 0
@@ -216,7 +217,7 @@ class Stats:
         self.submitted = 0
         self.accepted = 0
         self.known = 0
-        self.rejected = collections.Counter()
+        self.rejected: collections.Counter[str] = collections.Counter()
         self.rpc_errors = 0
         self.node_queue_drops = 0
         self.undelivered = 0
@@ -226,14 +227,18 @@ class Stats:
 
     def line(self) -> str:
         up = int(time.time() - self.started)
-        rej = ", ".join(f"{k}={v}" for k, v in self.rejected.most_common(5))
-        return (f"up {up}s in {self.bytes_in / 1e6:.1f} MB peers {self.peers} (BLAKE2b peers skipped {self.blake2b_peers}, connect failures {self.connect_failures}, "
-                f"dropped {self.dropped_peers}, banned {self.banned}, strikes {self.strikes}) "
-                f"announced {self.announced} requested {self.requested} received {self.received} "
-                f"malformed {self.malformed} oversized {self.oversized} rate-dropped {self.rate_dropped} undelivered {self.undelivered} notfound {self.notfound} | "
-                f"node {self.node_link} submitted {self.submitted} accepted {self.accepted} already-known {self.known} "
-                f"rpc-errors {self.rpc_errors} queue-drops {self.node_queue_drops} rejected {sum(self.rejected.values())}"
-                + (f" [{rej}]" if rej else ""))
+        s = (f"up {up}s in {self.bytes_in / 1e6:.1f} MB peers {self.peers} (BLAKE2b peers skipped {self.blake2b_peers}, connect failures {self.connect_failures}, "
+             f"dropped {self.dropped_peers}, banned {self.banned}, strikes {self.strikes}) "
+             f"announced {self.announced} requested {self.requested} received {self.received} "
+             f"malformed {self.malformed} oversized {self.oversized} rate-dropped {self.rate_dropped} undelivered {self.undelivered} notfound {self.notfound}")
+        if self.mode == "submit":
+            # The node tells a sending peer nothing about what it kept, so there is no accepted count here.
+            s += f" | node {self.node_link} submitted {self.submitted} queue-drops {self.node_queue_drops}"
+        elif self.mode == "test":
+            rej = ", ".join(f"{k}={v}" for k, v in self.rejected.most_common(5))
+            s += (f" | accepted {self.accepted} already-known {self.known} rejected {sum(self.rejected.values())} rpc-errors {self.rpc_errors}"
+                  + (f" [{rej}]" if rej else ""))
+        return s
 
 
 class Conn:
@@ -323,7 +328,7 @@ class Bridge:
     def __init__(self, args):
         self.args = args
         self.magic, self.default_port = NETWORKS[args.network]
-        self.stats = Stats()
+        self.stats = Stats(args.mode)
         self.seen: collections.OrderedDict[bytes, float] = collections.OrderedDict()        # wtxid (hash of the bytes) -> time
         self.delivered: collections.OrderedDict[str, list] = collections.OrderedDict()      # txid -> [time, distinct wtxids delivered]
         self.pending: dict[str, float] = {}           # announced hash -> time requested (any peer)

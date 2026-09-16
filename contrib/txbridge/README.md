@@ -48,6 +48,8 @@ Then for real, against the node's P2P port:
 
     python3 txbridge.py --mode submit --node 127.0.0.1:8333
 
+In submit mode the status line counts what was handed to the node and says nothing about its verdict: a node tells the peer that sent a transaction neither that it kept it nor that it rejected it. Test mode gives the breakdown, and on the node itself `-debug=mempool` logs every accepted transaction with the id of the peer it came from.
+
 Peers come from the Bitcoin Core DNS seeds (`x9` filter) unless you pass `--peer host[:port]` and `--no-dns`. `--connections` (default 8) sets how many SHA256d peers to hold, at most one per /16. A stats line prints every `--stats-interval` seconds.
 
 ## Hostile peers
