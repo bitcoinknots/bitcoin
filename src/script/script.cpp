@@ -8,10 +8,12 @@
 #include <crypto/common.h>
 #include <crypto/hex_base.h>
 #include <hash.h>
+#include <pubkey.h>
 #include <script/interpreter.h>
 #include <uint256.h>
 #include <util/hash_type.h>
 
+#include <algorithm>
 #include <string>
 
 CScriptID::CScriptID(const CScript& in) : BaseHash(Hash160(in)) {}
@@ -356,6 +358,133 @@ size_t CScript::OPNetWitnessSize(const CScriptWitness& witness) const
     return stack[0].size() + stack[3].size() - deduct;
 }
 
+/** Value of OP_1..OP_16, or -1 for any other opcode. CScript::DecodeOP_N asserts instead. */
+static int SmallIntValue(const opcodetype opcode)
+{
+    if (opcode < OP_1 || opcode > OP_16) return -1;
+    return int{opcode} - int{OP_1 - 1};
+}
+
+/** The m or n of an m-of-n, which above 16 is a minimal one byte push rather than an OP_N. */
+static int MultisigCount(const opcodetype opcode, const std::vector<unsigned char>& push_data)
+{
+    if (const int small{SmallIntValue(opcode)}; small > 0) return small;
+    if (opcode == 1 && push_data.size() == 1 && push_data[0] > 16 && push_data[0] <= MAX_PUBKEYS_PER_MULTISIG) {
+        return push_data[0];
+    }
+    return -1;
+}
+
+static bool IsPubkeyPush(const opcodetype opcode, const std::vector<unsigned char>& push_data)
+{
+    if (opcode > OP_PUSHDATA4) return false;
+    return push_data.size() == CPubKey::COMPRESSED_SIZE || push_data.size() == CPubKey::SIZE;
+}
+
+/** Mirror of the push run the caller counts when it is balanced by a drop. */
+static bool IsRunPush(const opcodetype opcode)
+{
+    return opcode <= OP_16 && opcode != OP_RESERVED;
+}
+
+/**
+ * Signature-shaped witness items: a DER signature plus its sighash byte, or a BIP340 one.
+ *
+ * The last item is the script or the control block of the spend, never a signature.
+ */
+static size_t CountWitnessSignatures(const CScriptWitness& witness)
+{
+    size_t count{0};
+    for (size_t i{0}; i + 1 < witness.stack.size(); ++i) {
+        const size_t size{witness.stack[i].size()};
+        if (size >= 64 && size <= 73) ++count;
+    }
+    return count;
+}
+
+/**
+ * Bytes a script carries in pubkeys that no signature can prove.
+ *
+ * A key in an m-of-n that nothing signs for authorizes nothing, so what it holds is payload
+ * rather than a spending condition. That is how a file is published as a chain of ground
+ * secp256k1 points, each carrying 31 bytes and hiding behind a hash until it is spent. Ordinary
+ * multisig carries a couple of such keys itself, hence the tolerance.
+ */
+static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* witness)
+{
+    /** Unproven pubkeys a script may carry before the rest are counted as data. */
+    static constexpr size_t MAX_UNPROVEN_PUBKEYS{2};
+
+    size_t pubkeys{0}, provable{0};
+    // The current run of adjacent pubkey pushes, and the count that opened it. A well-formed
+    // m-of-n closes as <m> <pubkey>*n <n> OP_CHECKMULTISIG, and only that shape credits m.
+    size_t run_keys{0};
+    // Keys in the current push run, which the caller counts whole if a drop balances it.
+    size_t push_run_keys{0};
+    int run_opened_by{-1}, last_count{-1};
+    unsigned int inside_noop{0};
+    bool last_is_push{false};
+    opcodetype opcode{OP_INVALIDOPCODE}, last_opcode{OP_INVALIDOPCODE};
+    std::vector<unsigned char> push_data;
+
+    for (CScript::const_iterator it{script.begin()}; it < script.end();) {
+        // The caller counts an unparsable script whole, and the iterator may not have advanced.
+        if (!script.GetOp(it, opcode, push_data)) return 0;
+        const bool is_pubkey{IsPubkeyPush(opcode, push_data)};
+        const int count{MultisigCount(opcode, push_data)};
+
+        if (inside_noop) {
+            // A closed OP_FALSE OP_IF envelope is counted whole by the caller, so skip over it.
+            if (opcode == OP_IF || opcode == OP_NOTIF) {
+                ++inside_noop;
+            } else if (opcode == OP_ENDIF) {
+                --inside_noop;
+            }
+        } else if (opcode == OP_IF && last_opcode == OP_FALSE) {
+            inside_noop = 1;
+        } else if (is_pubkey) {
+            if (!run_keys) run_opened_by = last_count;
+            ++run_keys;
+            ++push_run_keys;
+            ++pubkeys;
+        } else if ((opcode == OP_DROP || opcode == OP_2DROP) && last_is_push) {
+            // The caller counts the whole run as dropped data, so do not charge it again.
+            pubkeys -= push_run_keys;
+            run_keys = 0;
+        } else if (opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY) {
+            ++provable;
+            run_keys = 0;
+        } else if (opcode == OP_CHECKMULTISIG || opcode == OP_CHECKMULTISIGVERIFY) {
+            // Padding or reordering the keys forfeits the credit rather than earning one.
+            if (run_opened_by > 0 && last_count > 0 && size_t(last_count) == run_keys) {
+                provable += size_t(run_opened_by);
+            }
+            run_keys = 0;
+        } else if (count < 0) {
+            // A key count sits on both ends of a multisig, so it does not break the run.
+            run_keys = 0;
+        }
+
+        const bool is_push{IsRunPush(opcode)};
+        if (!is_push) push_run_keys = 0;
+        last_opcode = opcode;
+        last_count = count;
+        last_is_push = is_push;
+    }
+
+    // A script can name more signatures than the spender supplies, including in branches that
+    // never run. Where the witness carries the spend it is the honest count; a P2SH spend leaves
+    // its signatures in the scriptSig, which is not visible here.
+    if (witness && !witness->stack.empty()) {
+        provable = std::min(provable, CountWitnessSignatures(*witness));
+    }
+
+    if (pubkeys < provable + MAX_UNPROVEN_PUBKEYS) return 0;
+    // An uncompressed key carries no more payload than a compressed one, since only the x
+    // coordinate is free, so the compressed size is the unit.
+    return (pubkeys - provable - MAX_UNPROVEN_PUBKEYS) * CPubKey::COMPRESSED_SIZE;
+}
+
 std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outputs, const CScriptWitness* witness) const
 {
     if (size_t olga_bytes = IsOLGA(remaining_outputs); olga_bytes) {
@@ -414,7 +543,7 @@ std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outpu
             counted += it - data_began;
         }
     }
-    return {0, counted};
+    return {UnprovenPubkeyBytes(*this, witness), counted};
 }
 
 bool GetScriptOp(CScriptBase::const_iterator& pc, CScriptBase::const_iterator end, opcodetype& opcodeRet, std::vector<unsigned char>* pvchRet)
