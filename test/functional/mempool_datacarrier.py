@@ -3,6 +3,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test datacarrier functionality"""
+from test_framework.key import ECKey
 from test_framework.messages import (
     COutPoint,
     CTransaction,
@@ -16,10 +17,14 @@ from test_framework.script import (
     OP_1,
     OP_2DROP,
     OP_7,
+    OP_CHECKMULTISIG,
     OP_DROP,
     OP_RETURN,
+    SIGHASH_ALL,
+    SegwitV0SignatureHash,
     taproot_construct,
 )
+from test_framework.script_util import script_to_p2wsh_script
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.test_node import TestNode
 from test_framework.util import assert_raises_rpc_error
@@ -92,6 +97,46 @@ class DataCarrierTest(BitcoinTestFramework):
             assert_raises_rpc_error(-26, "txn-datacarrier-exceeded",
                                     self.wallet.sendrawtransaction, from_node=node, tx_hex=tx_hex)
 
+    def test_unproven_pubkeys_transaction(self, node: TestNode, m: int, n: int, success: bool,
+                                          num_inputs: int = 1) -> None:
+        """Spend num_inputs m-of-n P2WSH multisig outputs, offering every signature each asks for.
+
+        The n - m keys left over are ones no signature can prove, and past a small tolerance
+        their bytes are payload rather than a spending condition. The tolerance is per script,
+        so several wide multisig inputs in one transaction do add up.
+        """
+        keys = []
+        for _ in range(n):
+            key = ECKey()
+            key.generate(compressed=True)
+            keys.append(key)
+        # Above 16 a key count is a minimal push rather than an OP_N, which CScript handles.
+        script = CScript([m] + [k.get_pubkey().get_bytes() for k in keys] + [n, OP_CHECKMULTISIG])
+        script_pubkey = script_to_p2wsh_script(script)
+
+        funding_value = 100_000
+        funding = [self.wallet.send_to(from_node=self.nodes[0], scriptPubKey=script_pubkey,
+                                       amount=funding_value) for _ in range(num_inputs)]
+        self.generate(self.wallet, 1, sync_fun=self.sync_blocks)
+
+        spend_tx = CTransaction()
+        spend_tx.version = 2
+        spend_tx.vin = [CTxIn(COutPoint(int(f['txid'], 16), f['sent_vout'])) for f in funding]
+        spend_tx.vout = [CTxOut(funding_value * num_inputs - 10000, script_pubkey)]
+        spend_tx.wit.vtxinwit = [CTxInWitness() for _ in funding]
+        for i in range(num_inputs):
+            sighash = SegwitV0SignatureHash(script, spend_tx, i, SIGHASH_ALL, funding_value)
+            sigs = [k.sign_ecdsa(sighash) + bytes([SIGHASH_ALL]) for k in keys[:m]]
+            # The leading empty item is the CHECKMULTISIG dummy.
+            spend_tx.wit.vtxinwit[i].scriptWitness.stack = [b''] + sigs + [bytes(script)]
+        tx_hex = spend_tx.serialize().hex()
+
+        if success:
+            self.wallet.sendrawtransaction(from_node=node, tx_hex=tx_hex)
+            assert spend_tx.rehash() in node.getrawmempool(True)
+        else:
+            assert_raises_rpc_error(-26, "txn-datacarrier-exceeded",
+                                    self.wallet.sendrawtransaction, from_node=node, tx_hex=tx_hex)
 
     def test_bare_envelope(self, node: TestNode, data_len: int, success: bool, interleave_pushnum: bool = False) -> None:
         # A bare inscription envelope: <marker> <data>... balanced by OP_2DROP,
@@ -196,6 +241,26 @@ class DataCarrierTest(BitcoinTestFramework):
 
         self.log.info("Testing a bare envelope with a pushnum interleaved in the push run.")
         self.test_bare_envelope(node=self.nodes[0], data_len=MAX_OP_RETURN_RELAY, success=False, interleave_pushnum=True)
+
+        self.log.info("Testing ordinary multisig, whose spare keys stay within -datacarriersize.")
+        self.test_unproven_pubkeys_transaction(node=self.nodes[0], m=2, n=3, success=True)
+        self.test_unproven_pubkeys_transaction(node=self.nodes[0], m=3, n=5, success=True)
+        self.test_unproven_pubkeys_transaction(node=self.nodes[0], m=11, n=15, success=True)
+        self.test_unproven_pubkeys_transaction(node=self.nodes[0], m=14, n=17, success=True)
+
+        self.log.info("Testing a multisig padded out with keys no signature can prove.")
+        self.test_unproven_pubkeys_transaction(node=self.nodes[0], m=1, n=5, success=True)
+        self.test_unproven_pubkeys_transaction(node=self.nodes[0], m=1, n=15, success=False)
+
+        self.log.info("Testing that -datacarriersize governs the spare keys, and that multisig "
+                      "with nothing to spare is unaffected by it.")
+        self.test_unproven_pubkeys_transaction(node=self.nodes[3], m=2, n=3, success=True)
+        self.test_unproven_pubkeys_transaction(node=self.nodes[3], m=1, n=5, success=False)
+
+        self.log.info("Testing that the tolerance is per script, so the spare keys of several "
+                      "wide multisig inputs add up over a transaction.")
+        self.test_unproven_pubkeys_transaction(node=self.nodes[0], m=2, n=5, success=True, num_inputs=2)
+        self.test_unproven_pubkeys_transaction(node=self.nodes[0], m=2, n=5, success=False, num_inputs=3)
 
 
 if __name__ == '__main__':
