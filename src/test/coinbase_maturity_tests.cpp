@@ -33,12 +33,18 @@ BOOST_AUTO_TEST_CASE(long_maturity_derived_from_schedule)
         const auto& consensus{params->GetConsensus()};
         BOOST_CHECK_EQUAL(consensus.CoinbaseMaturityLong, consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight);
         BOOST_CHECK_GT(consensus.CoinbaseMaturityLong, COINBASE_MATURITY);
+        BOOST_REQUIRE_EQUAL(consensus.chainstate_revalidation_deployments.size(), 1);
+        const auto& deployment{consensus.chainstate_revalidation_deployments.front()};
+        BOOST_CHECK_EQUAL(deployment.name, "long_coinbase_maturity");
+        BOOST_CHECK_EQUAL(deployment.start_height, consensus.CoinbaseMaturityLongEnforceHeight);
+        BOOST_CHECK_EQUAL(deployment.stop_height, consensus.CoinbaseMaturityLongReleaseHeight - 1);
     }
 
     const auto regtest_default{CChainParams::RegTest({})};
     const auto& default_consensus{regtest_default->GetConsensus()};
     BOOST_CHECK_EQUAL(default_consensus.CoinbaseMaturityLong, COINBASE_MATURITY);
     BOOST_CHECK(!default_consensus.CoinbaseMaturityLongActiveAt(0));
+    BOOST_CHECK(default_consensus.chainstate_revalidation_deployments.empty());
 
     CChainParams::RegTestOptions options;
     options.coinbase_maturity_long_start_height = 10;
@@ -51,6 +57,11 @@ BOOST_AUTO_TEST_CASE(long_maturity_derived_from_schedule)
     BOOST_CHECK(consensus.CoinbaseMaturityLongActiveAt(20));
     BOOST_CHECK(consensus.CoinbaseMaturityLongActiveAt(149));
     BOOST_CHECK(!consensus.CoinbaseMaturityLongActiveAt(150));
+    BOOST_REQUIRE_EQUAL(consensus.chainstate_revalidation_deployments.size(), 1);
+    const auto& deployment{consensus.chainstate_revalidation_deployments.front()};
+    BOOST_CHECK_EQUAL(deployment.name, "long_coinbase_maturity");
+    BOOST_CHECK_EQUAL(deployment.start_height, 20);
+    BOOST_CHECK_EQUAL(deployment.stop_height, 149);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
