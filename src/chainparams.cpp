@@ -113,7 +113,7 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         if (!ParseInt32(values[0], &start_height) || start_height < 0 || start_height >= std::numeric_limits<int>::max()) {
             throw std::runtime_error(strprintf("Invalid start height (%s) for -testcoinbasematuritylong=<start_height>:<enforce_height>:<release_height>.", values[0]));
         }
-        if (!ParseInt32(values[1], &enforce_height) || enforce_height < 0 || enforce_height >= std::numeric_limits<int>::max()) {
+        if (!ParseInt32(values[1], &enforce_height) || enforce_height < 2 || enforce_height >= std::numeric_limits<int>::max()) {
             throw std::runtime_error(strprintf("Invalid enforce height (%s) for -testcoinbasematuritylong=<start_height>:<enforce_height>:<release_height>.", values[1]));
         }
         if (!ParseInt32(values[2], &release_height) || release_height <= start_height || release_height <= enforce_height || release_height >= std::numeric_limits<int>::max()) {

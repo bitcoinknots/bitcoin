@@ -80,6 +80,7 @@
 #include <span>
 #include <string>
 #include <tuple>
+#include <unordered_set>
 #include <utility>
 
 using kernel::CCoinsStats;
@@ -3283,6 +3284,9 @@ bool Chainstate::FlushStateToDisk(
                 if (!m_blockman.WriteBlockIndexDB()) {
                     return FatalError(m_chainman.GetNotifications(), state, _("Failed to write to block index database."));
                 }
+                if (m_chainstate_revalidation_complete && !UpdateChainstateRevalidationMarkers(state)) {
+                    return FatalError(m_chainman.GetNotifications(), state, _("Failed to write chainstate revalidation markers"));
+                }
             }
             // Finally remove any pruned files
             if (fFlushForPrune) {
@@ -5648,6 +5652,233 @@ bool ChainstateManager::ContinuesSha256dPastFork(const CBlockIndex& index) const
     return fork_block != nullptr && !fork_block->m_header_v2;
 }
 
+bool Chainstate::UpdateChainstateRevalidationMarkers(BlockValidationState& state)
+{
+    AssertLockHeld(cs_main);
+    if (m_chain.Tip() == nullptr) return true;
+
+    const CBlockIndex& tip{*m_chain.Tip()};
+    int first_validated_height{0};
+    if (!m_chainman.IsSnapshotValidated()) {
+        const CBlockIndex* base{SnapshotBase()};
+        if (base) {
+            if (tip.nHeight == base->nHeight) return true;
+            Assume(tip.nHeight > base->nHeight);
+            first_validated_height = base->nHeight + 1;
+        }
+    }
+    for (const auto& deployment : m_chainman.GetConsensus().chainstate_revalidation_deployments) {
+        if (tip.nHeight < deployment.start_height) continue;
+        if (deployment.stop_height < first_validated_height) continue;
+
+        const int start_height{std::max(deployment.start_height, first_validated_height)};
+        const int checked_height{std::min(tip.nHeight, deployment.stop_height)};
+        const CBlockIndex* checked_block{m_chain[checked_height]};
+        const node::ChainstateRevalidationMarker marker{
+            .start_height = start_height,
+            .stop_height = checked_height,
+            .block_hash = checked_block->GetBlockHash(),
+        };
+
+        auto current_marker{m_blockman.m_chainstate_revalidation_markers.find(deployment.name)};
+        if (current_marker == m_blockman.m_chainstate_revalidation_markers.end() || current_marker->second != marker) {
+            if (!m_blockman.m_block_tree_db->WriteChainstateRevalidationMarker(deployment.name, marker)) {
+                return FatalError(m_chainman.GetNotifications(), state, _("Failed to write chainstate revalidation marker."));
+            }
+            if (current_marker == m_blockman.m_chainstate_revalidation_markers.end()) {
+                m_blockman.m_chainstate_revalidation_markers.emplace(deployment.name, marker);
+            } else {
+                current_marker->second = marker;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool Chainstate::RewindForChainstateRevalidation(bilingual_str& error)
+{
+    AssertLockNotHeld(m_chainstate_mutex);
+    AssertLockNotHeld(::cs_main);
+
+    const auto& deployments{m_chainman.GetConsensus().chainstate_revalidation_deployments};
+    if (deployments.empty()) {
+        LOCK(cs_main);
+        m_chainstate_revalidation_complete = true;
+        return true;
+    }
+
+    BlockValidationState state;
+    CBlockIndex* rewind_target{nullptr};
+    {
+        LOCK(m_chainstate_mutex);
+        LOCK(cs_main);
+        LOCK(MempoolMutex());
+        m_blockman.m_chainstate_revalidation_markers.clear();
+
+        std::vector<std::pair<int, int>> valid_in_main_chain;
+        valid_in_main_chain.reserve(deployments.size());
+        for (const auto& deployment : deployments) {
+            node::ChainstateRevalidationMarker marker;
+            if (m_blockman.m_block_tree_db->ReadChainstateRevalidationMarker(deployment.name, marker)) {
+                m_blockman.m_chainstate_revalidation_markers.try_emplace(deployment.name, marker);
+                if (m_chain[marker.stop_height] && m_chain[marker.stop_height]->GetBlockHash() == marker.block_hash) {
+                    valid_in_main_chain.emplace_back(marker.start_height, marker.stop_height);
+                    continue;
+                }
+                // TODO: Could theoretically find the last common block
+            }
+            valid_in_main_chain.emplace_back(-1, -1);
+        }
+
+        std::unordered_set<CBlockIndex*> demoting;
+        {
+            const CBlockIndex* snapshot_base{m_chainman.IsSnapshotValidated() ? nullptr : SnapshotBase()};
+            std::map<CBlockIndex*, std::vector<CBlockIndex*>> seen_children;
+            for (auto& [_, block_index] : m_blockman.m_block_index) {
+                if (!block_index.IsValid(BLOCK_VALID_CHAIN)) continue;
+
+                // Apparently the genesis block doesn't have nStatus set properly, so just ignore blocks before height 2 (earliest allowed for regtest)
+                if (block_index.nHeight < 2) continue;
+                if (snapshot_base && block_index.nHeight <= snapshot_base->nHeight && m_chain.Contains(&block_index)) {
+                    continue;
+                }
+
+                bool demote_me{false};
+                // An assumeutxo snapshot base is a chainstate boundary: its
+                // descendants were connected against the snapshot UTXO set even
+                // though the base block itself may not be BLOCK_VALID_CHAIN.
+                if ((block_index.pprev->IsValid(BLOCK_VALID_CHAIN) && !demoting.contains(block_index.pprev)) || block_index.pprev == snapshot_base) {
+                    for (size_t deployment_n{deployments.size()}; deployment_n; ) {
+                        --deployment_n;
+                        const auto& deployment{deployments.at(deployment_n)};
+                        if (block_index.nHeight < deployment.start_height) continue;
+                        if (block_index.nHeight > deployment.stop_height) continue;
+
+                        if (m_chain.Contains(&block_index)) {
+                            const auto& valid_range{valid_in_main_chain.at(deployment_n)};
+                            if (block_index.nHeight >= valid_range.first && block_index.nHeight <= valid_range.second) {
+                                continue;
+                            }
+
+                            if ((!rewind_target) || rewind_target->nHeight >= block_index.nHeight) {
+                                rewind_target = block_index.pprev;
+                            }
+                        } else {
+                            // TODO: Could check ancestry if valid_in_main_chain is -1..-1, but CBlockIndex::GetAncestor is probably not worth it for every non-main-chain header?
+                        }
+
+                        demote_me = true;
+                        break;
+                    }
+                } else {
+                    // Parent already demoted
+                    demote_me = true;
+                }
+
+                if (demote_me) {
+                    // NOTE: rewind_target assigned above in the one scenario that needs it
+
+                    std::vector<CBlockIndex*> to_demote{&block_index};
+                    while (!to_demote.empty()) {
+                        CBlockIndex* const to_demote_now = to_demote.back();
+                        to_demote.pop_back();
+
+                        demoting.insert(to_demote_now);
+
+                        auto children{seen_children.extract(to_demote_now)};
+                        if (children) {
+                            auto& child_vec = children.mapped();
+                            to_demote.insert(to_demote.end(), child_vec.begin(), child_vec.end());
+                        }
+                    }
+                } else {
+                    seen_children[block_index.pprev].emplace_back(&block_index);
+                }
+            }
+        }
+        if (demoting.empty()) {
+            m_chainstate_revalidation_complete = true;
+            return true;
+        }
+
+        if (rewind_target) {
+            CBlockIndex * const old_tip{m_chain.Tip()};
+
+            for (const CBlockIndex* block{old_tip}; block != rewind_target; block = block->pprev) {
+                if (!(block->nStatus & BLOCK_HAVE_DATA) || !(block->nStatus & BLOCK_HAVE_UNDO)) {
+                    LogError("Chainstate revalidation needs to rewind through block %s at height %d, but required block or undo data has been pruned\n",
+                             block->GetBlockHash().ToString(), block->nHeight);
+                    error = _("The active chain must be revalidated for current consensus rules, but required block data has been pruned. Please restart with -reindex.");
+                    return false;
+                }
+            }
+
+            const int rewind_blocks{old_tip->nHeight - rewind_target->nHeight};
+            LogPrintf("Chainstate revalidation: rewinding %d block(s) from %s (height %d) to %s (height %d)\n",
+                      rewind_blocks, old_tip->GetBlockHash().ToString(), old_tip->nHeight,
+                      rewind_target->GetBlockHash().ToString(), rewind_target->nHeight);
+            m_chainman.GetNotifications().progress(_("Rewinding chainstate for revalidation…"), 0, false);
+
+            DisconnectedBlockTransactions disconnectpool{MAX_DISCONNECTED_TX_POOL_BYTES};
+            while (m_chain.Tip() != rewind_target) {
+                if (!DisconnectTip(state, &disconnectpool)) {
+                    if (m_mempool) MaybeUpdateMempoolForReorg(disconnectpool, /*fAddToMempool=*/false);
+                    LogError("Chainstate revalidation: failed to disconnect tip: %s\n", state.ToString());
+                    error = _("Failed to rewind chainstate for revalidation.");
+                    return false;
+                }
+            }
+
+            if (m_mempool) MaybeUpdateMempoolForReorg(disconnectpool, /*fAddToMempool=*/true);
+
+            // After rewinding, older blocks might be a potential tip, so add everything back in between for now
+            for (auto& [_, block_index] : m_blockman.m_block_index) {
+                if (!block_index.IsValid(BLOCK_VALID_TRANSACTIONS)) continue;
+                if (!block_index.HaveNumChainTxs()) continue;
+                if (CBlockIndexWorkComparator()(&block_index, rewind_target)) continue;
+
+                // If it had enough work previously, it's already been considered
+                if (!CBlockIndexWorkComparator()(&block_index, old_tip)) continue;
+
+                setBlockIndexCandidates.insert(&block_index);
+            }
+        }
+
+        if (rewind_target && !FlushStateToDisk(state, FlushStateMode::ALWAYS)) {
+            LogError("Chainstate revalidation: failed to flush rewound chainstate: %s\n", state.ToString());
+            error = _("Failed to rewind chainstate for revalidation.");
+            return false;
+        }
+
+        for (CBlockIndex* to_demote_now : demoting) {
+            to_demote_now->nStatus = (to_demote_now->nStatus & ~BLOCK_VALID_MASK) | BLOCK_VALID_TRANSACTIONS;
+            m_blockman.m_dirty_blockindex.insert(to_demote_now);
+        }
+        LogPrintf("Chainstate revalidation: demoted %d block index entries whose cached validation fell outside deployment validation ranges\n",
+                  demoting.size());
+    }
+
+    if (!ActivateBestChain(state) || !state.IsValid()) {
+        LogError("Chainstate revalidation: failed to reconnect best chain: %s\n", state.ToString());
+        error = _("Failed to reconnect chainstate after revalidation rewind.");
+        return false;
+    }
+
+    {
+        LOCK(cs_main);
+        m_chainstate_revalidation_complete = true;
+    }
+
+    if (!FlushStateToDisk(state, FlushStateMode::ALWAYS)) {
+        LogError("Chainstate revalidation: failed to flush revalidated chainstate: %s\n", state.ToString());
+        error = _("Failed to flush chainstate revalidation state.");
+        return false;
+    }
+    m_chainman.GetNotifications().progress(bilingual_str{}, 100, false);
+    return true;
+}
+
 bool Chainstate::CorrectRdtsInvalidBlocks(bilingual_str& error)
 {
     AssertLockNotHeld(m_chainstate_mutex);
@@ -6637,6 +6868,10 @@ util::Result<CBlockIndex*> ChainstateManager::ActivateSnapshot(
     Assert(!m_snapshot_chainstate->m_mempool);
     m_snapshot_chainstate->m_mempool = m_active_chainstate->m_mempool;
     m_active_chainstate->m_mempool = nullptr;
+
+    m_active_chainstate->m_chainstate_revalidation_complete = false;
+    m_snapshot_chainstate->m_chainstate_revalidation_complete = true;
+
     m_active_chainstate = m_snapshot_chainstate.get();
     m_blockman.m_snapshot_height = this->GetSnapshotBaseHeight();
 
@@ -7015,6 +7250,7 @@ SnapshotCompletionResult ChainstateManager::MaybeCompleteSnapshotValidation()
         snapshot_blockhash.ToString());
 
     m_ibd_chainstate->m_disabled = true;
+    m_snapshot_chainstate->ForceFlushStateToDisk();
     this->MaybeRebalanceCaches();
 
     return SnapshotCompletionResult::SUCCESS;

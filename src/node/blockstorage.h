@@ -44,6 +44,7 @@ struct Params;
 }
 namespace node {
 struct PruneLockInfo;
+struct ChainstateRevalidationMarker;
 };
 namespace util {
 class SignalInterrupt;
@@ -64,6 +65,8 @@ public:
     bool DeletePruneLock(const std::string& name);
     bool WriteFlag(const std::string& name, bool fValue);
     bool ReadFlag(const std::string& name, bool& fValue);
+    bool WriteChainstateRevalidationMarker(const std::string& name, const node::ChainstateRevalidationMarker& marker);
+    bool ReadChainstateRevalidationMarker(const std::string& name, node::ChainstateRevalidationMarker& marker);
     bool LoadBlockIndexGuts(const Consensus::Params& consensusParams, std::function<CBlockIndex*(const uint256&)> insertBlockIndex, const util::SignalInterrupt& interrupt)
         EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
     bool LoadPruneLocks(std::unordered_map<std::string, node::PruneLockInfo>& prune_locks, const util::SignalInterrupt& interrupt);
@@ -113,6 +116,21 @@ struct PruneLockInfo {
         READWRITE(VARINT(obj.height_first));
         READWRITE(VARINT(obj.height_last));
     }
+};
+
+struct ChainstateRevalidationMarker {
+    int start_height{0};
+    int stop_height{0};
+    uint256 block_hash{};
+
+    SERIALIZE_METHODS(ChainstateRevalidationMarker, obj)
+    {
+        READWRITE(VARINT_MODE(obj.start_height, VarIntMode::NONNEGATIVE_SIGNED));
+        READWRITE(VARINT_MODE(obj.stop_height, VarIntMode::NONNEGATIVE_SIGNED));
+        READWRITE(obj.block_hash);
+    }
+
+    friend bool operator==(const ChainstateRevalidationMarker&, const ChainstateRevalidationMarker&) = default;
 };
 
 enum BlockfileType {
@@ -296,6 +314,9 @@ public:
     std::atomic_bool m_blockfiles_indexed{true};
 
     BlockMap m_block_index GUARDED_BY(cs_main);
+
+    //! Cached chainstate revalidation markers read from/written to the block tree DB.
+    std::map<std::string, ChainstateRevalidationMarker> m_chainstate_revalidation_markers GUARDED_BY(::cs_main);
 
     /**
      * The height of the base block of an assumeutxo snapshot, if one is in use.
