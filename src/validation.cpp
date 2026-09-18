@@ -5741,7 +5741,15 @@ bool Chainstate::RewindForChainstateRevalidation(bilingual_str& error)
                     valid_in_main_chain.emplace_back(marker.start_height, marker.stop_height);
                     continue;
                 }
-                // TODO: Could theoretically find the last common block
+
+                const CBlockIndex* marker_block{m_blockman.LookupBlockIndex(marker.block_hash)};
+                if (marker_block && marker_block->nHeight == marker.stop_height) {
+                    const CBlockIndex* fork{m_chain.FindFork(marker_block)};
+                    if (fork && fork->nHeight >= marker.start_height) {
+                        valid_in_main_chain.emplace_back(marker.start_height, fork->nHeight);
+                        continue;
+                    }
+                }
             }
             valid_in_main_chain.emplace_back(-1, -1);
         }
