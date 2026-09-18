@@ -5674,13 +5674,28 @@ bool Chainstate::UpdateChainstateRevalidationMarkers(BlockValidationState& state
         const int start_height{std::max(deployment.start_height, first_validated_height)};
         const int checked_height{std::min(tip.nHeight, deployment.stop_height)};
         const CBlockIndex* checked_block{m_chain[checked_height]};
-        const node::ChainstateRevalidationMarker marker{
+        node::ChainstateRevalidationMarker marker{
             .start_height = start_height,
             .stop_height = checked_height,
             .block_hash = checked_block->GetBlockHash(),
         };
 
         auto current_marker{m_blockman.m_chainstate_revalidation_markers.find(deployment.name)};
+        if (current_marker != m_blockman.m_chainstate_revalidation_markers.end()) {
+            if (current_marker->second.stop_height > checked_height) {
+                const auto& current_stop_block_index{m_chain[current_marker->second.stop_height]};
+                if (current_stop_block_index && current_marker->second.block_hash == current_stop_block_index->GetBlockHash()) {
+                    // A newer version enforced the rule longer. Don't undo that
+                    marker.stop_height = current_marker->second.stop_height;
+                    marker.block_hash = current_marker->second.block_hash;
+                    if (current_marker->second.start_height < marker.start_height) {
+                        // ...and earlier too, for some reason
+                        marker.start_height = current_marker->second.start_height;
+                    }
+                }
+            }
+        }
+
         if (current_marker == m_blockman.m_chainstate_revalidation_markers.end() || current_marker->second != marker) {
             if (!m_blockman.m_block_tree_db->WriteChainstateRevalidationMarker(deployment.name, marker)) {
                 return FatalError(m_chainman.GetNotifications(), state, _("Failed to write chainstate revalidation marker."));
