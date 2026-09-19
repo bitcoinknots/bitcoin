@@ -7,7 +7,7 @@ Source: https://github.com/bitcoin/bitcoin
 Files: *
 Copyright: 2009-2025, Bitcoin Core Developers
 License: Expat
-Comment: The Bitcoin Core Developers encompasses all contributors to the
+Comment: The Bitcoin Knots developers encompasses all contributors to the
          project, listed in the release notes or the git log.
 
 Files: debian/*
