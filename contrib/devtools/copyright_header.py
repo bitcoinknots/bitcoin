@@ -574,7 +574,7 @@ def insert_cmd(argv):
 
 USAGE = """
 copyright_header.py - utilities for managing copyright headers of 'The Bitcoin
-Core developers' in repository source files.
+Knots developers' in repository source files.
 
 Usage:
     $ ./copyright_header <subcommand>
