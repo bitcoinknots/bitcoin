@@ -1,8 +1,8 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: Bitcoin
 Upstream-Contact: Satoshi Nakamoto <satoshin@gmx.com>
- irc://#bitcoin-core-dev@libera.chat
-Source: https://github.com/bitcoin/bitcoin
+ [Discord](https://discord.gg/HaJHmkMHh)
+Source: https://github.com/bitcoinknots/bitcoin
 
 Files: *
 Copyright: 2009-2025, Bitcoin Knots Developers
