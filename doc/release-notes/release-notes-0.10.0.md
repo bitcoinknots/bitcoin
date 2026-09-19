@@ -222,7 +222,7 @@ addresses need to added to the wallet before the payment, though.
 Consensus library
 -----------------
 
-Starting from 0.10.0, the Bitcoin Core distribution includes a consensus library.
+Starting from 0.10.0, The Bitcoin Knots distribution includes a consensus library.
 
 The purpose of this library is to make the verification functionality that is
 critical to Bitcoin's consensus available to other applications, e.g. to language

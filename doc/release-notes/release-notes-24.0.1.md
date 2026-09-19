@@ -211,13 +211,13 @@ Wallet
 
 - The `wsh()` output descriptor was extended with Miniscript support. You can import Miniscript
   descriptors for P2WSH in a watchonly wallet to track coins, but you can't spend from them using
-  the Bitcoin Core wallet yet.
+  The Bitcoin Knots wallet yet.
   You can find more about Miniscript on the [reference website](https://bitcoin.sipa.be/miniscript/). (#24148)
 
 - The `tr()` output descriptor now supports multisig scripts through the `multi_a()` and
   `sortedmulti_a()` functions. (#24043)
 
-- To help prevent fingerprinting transactions created by the Bitcoin Core wallet, change output
+- To help prevent fingerprinting transactions created by The Bitcoin Knots wallet, change output
   amounts are now randomized. (#24494)
 
 - The `listtransactions`, `gettransaction`, and `listsinceblock`

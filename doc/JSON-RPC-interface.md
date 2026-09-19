@@ -148,11 +148,11 @@ RPC interface will be abused.
   login credentials each time it restarts and puts them into a file
   readable only by the user that started Bitcoin Core, allowing any of
   that user's RPC clients with read access to the file to login
-  automatically.  The file is `.cookie` in the Bitcoin Core
+  automatically.  The file is `.cookie` in The Bitcoin Knots
   configuration directory, and using these credentials is the preferred
   RPC authentication method.  If you need to generate static login
   credentials for your programs, you can use the script in the
-  `share/rpcauth` directory in the Bitcoin Core source tree.  As a final
+  `share/rpcauth` directory in The Bitcoin Knots source tree.  As a final
   fallback, you can directly use manually-chosen `rpcuser` and
   `rpcpassword` configuration parameters---but you must ensure that you
   choose a strong and unique passphrase (and still don't use insecure

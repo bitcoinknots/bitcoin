@@ -107,7 +107,7 @@ MSan [requires](https://clang.llvm.org/docs/MemorySanitizer.html#handling-extern
 that all linked code be instrumented. The exact steps to achieve this may vary
 but involve compiling `clang` from source, using the built `clang` to compile
 an instrumentalized libc++, then using it to build [Bitcoin Core dependencies
-from source](../depends/README.md) and finally the Bitcoin Core fuzz binary
+from source](../depends/README.md) and finally The Bitcoin Knots fuzz binary
 itself. One can use the MSan CI job as an example for how to perform these
 steps.
 
@@ -141,7 +141,7 @@ Patience is useful; even with improved throughput, libFuzzer may need days and
 
 If you find coverage increasing inputs when fuzzing you are highly encouraged to submit them for inclusion in the [`bitcoin-core/qa-assets`](https://github.com/bitcoin-core/qa-assets) repo.
 
-Every single pull request submitted against the Bitcoin Core repo is automatically tested against all inputs in the [`bitcoin-core/qa-assets`](https://github.com/bitcoin-core/qa-assets) repo. Contributing new coverage increasing inputs is an easy way to help make Bitcoin Core more robust.
+Every single pull request submitted against The Bitcoin Knots repo is automatically tested against all inputs in the [`bitcoin-core/qa-assets`](https://github.com/bitcoin-core/qa-assets) repo. Contributing new coverage increasing inputs is an easy way to help make Bitcoin Core more robust.
 
 ## macOS hints for libFuzzer
 

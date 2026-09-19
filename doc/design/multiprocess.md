@@ -1,6 +1,6 @@
 # Multiprocess Bitcoin Design Document
 
-Guide to the design and architecture of the Bitcoin Core multiprocess feature
+Guide to the design and architecture of The Bitcoin Knots multiprocess feature
 
 _This document describes the design of the multiprocess feature. For usage information, see the top-level [multiprocess.md](../multiprocess.md) file._
 
@@ -27,7 +27,7 @@ _This document describes the design of the multiprocess feature. For usage infor
 
 ## Introduction
 
-The Bitcoin Core software has historically employed a monolithic architecture. The existing design has integrated functionality like P2P network operations, wallet management, and a GUI into a single executable. While effective, it has limitations in flexibility, security, and scalability. This project introduces changes that transition Bitcoin Core to a more modular architecture. It aims to enhance security, improve usability, and facilitate maintenance and development of the software in the long run.
+The Bitcoin Knots software has historically employed a monolithic architecture. The existing design has integrated functionality like P2P network operations, wallet management, and a GUI into a single executable. While effective, it has limitations in flexibility, security, and scalability. This project introduces changes that transition Bitcoin Core to a more modular architecture. It aims to enhance security, improve usability, and facilitate maintenance and development of the software in the long run.
 
 ## Current Architecture
 
@@ -150,7 +150,7 @@ The currently defined IPC interfaces are unstable, and can change freely with no
 
 ## Security Considerations
 
-The integration of [Cap’n Proto](https://capnproto.org/) and [libmultiprocess](https://github.com/bitcoin-core/libmultiprocess) into the Bitcoin Core architecture increases its potential attack surface. Cap’n Proto, being a complex and substantial new dependency, introduces potential sources of vulnerability, particularly through the creation of new UNIX sockets. The inclusion of libmultiprocess, while a smaller external dependency, also contributes to this risk. However, plans are underway to incorporate libmultiprocess as a git subtree, aligning it more closely with the project's well-reviewed internal libraries. While adopting these multiprocess features does introduce some risk, it's worth noting that they can be disabled, allowing builds without these new dependencies. This flexibility ensures that users can balance functionality with security considerations as needed.
+The integration of [Cap’n Proto](https://capnproto.org/) and [libmultiprocess](https://github.com/bitcoin-core/libmultiprocess) into The Bitcoin Knots architecture increases its potential attack surface. Cap’n Proto, being a complex and substantial new dependency, introduces potential sources of vulnerability, particularly through the creation of new UNIX sockets. The inclusion of libmultiprocess, while a smaller external dependency, also contributes to this risk. However, plans are underway to incorporate libmultiprocess as a git subtree, aligning it more closely with the project's well-reviewed internal libraries. While adopting these multiprocess features does introduce some risk, it's worth noting that they can be disabled, allowing builds without these new dependencies. This flexibility ensures that users can balance functionality with security considerations as needed.
 
 ## Example Use Cases and Flows
 
@@ -222,7 +222,7 @@ This modularization represents an advancement in Bitcoin Core's architecture, of
 
 ### Glossary of Terms
 
-- **abstract class**: A class in C++ that consists of virtual functions. In the Bitcoin Core project, they define interfaces for inter-component communication.
+- **abstract class**: A class in C++ that consists of virtual functions. In The Bitcoin Knots project, they define interfaces for inter-component communication.
 
 - **asynchronous I/O**: A form of input/output processing that allows a program to continue other operations while a transmission is in progress.
 

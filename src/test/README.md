@@ -16,7 +16,7 @@ The examples in this document assume the build directory is named
 ### Compiling/running unit tests
 
 Unit tests will be automatically compiled if dependencies were met
-during the generation of the Bitcoin Core build system
+during the generation of The Bitcoin Knots build system
 and tests weren't explicitly disabled.
 
 The unit tests can be run with `ctest --test-dir build`, which includes unit

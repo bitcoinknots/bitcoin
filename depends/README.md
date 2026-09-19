@@ -131,7 +131,7 @@ The following can be set when running make: `make FOO=bar`
 - `NO_HARDEN=1`: Don't use hardening options when building packages
 
 If some packages are not built, for example `make NO_WALLET=1`, the appropriate CMake cache
-variables will be set when generating the Bitcoin Core buildsystem. In this case, `-DENABLE_WALLET=OFF`.
+variables will be set when generating The Bitcoin Knots buildsystem. In this case, `-DENABLE_WALLET=OFF`.
 
 ### Additional targets
 

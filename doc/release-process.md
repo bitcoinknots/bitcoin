@@ -115,7 +115,7 @@ Generate list of authors:
 
 ### Setup and perform Guix builds
 
-Checkout the Bitcoin Core version you'd like to build:
+Checkout The Bitcoin Knots version you'd like to build:
 
 ```sh
 pushd ./bitcoin

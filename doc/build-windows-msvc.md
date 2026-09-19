@@ -23,7 +23,7 @@ Download and install [Git for Windows](https://git-scm.com/download/win). Once i
 
 ### 3. Clone Bitcoin Repository
 
-Clone the Bitcoin Core repository to a directory. All build scripts and commands will run from this directory.
+Clone The Bitcoin Knots repository to a directory. All build scripts and commands will run from this directory.
 ```
 git clone https://github.com/bitcoin/bitcoin.git
 ```
@@ -31,11 +31,11 @@ git clone https://github.com/bitcoin/bitcoin.git
 
 ## Triplets and Presets
 
-The Bitcoin Core project supports the following vcpkg triplets:
+The Bitcoin Knots project supports the following vcpkg triplets:
 - `x64-windows` (both CRT and library linkage is dynamic)
 - `x64-windows-static` (both CRT and library linkage is static)
 
-To facilitate build process, the Bitcoin Core project provides presets, which are used in this guide.
+To facilitate build process, The Bitcoin Knots project provides presets, which are used in this guide.
 
 Available presets can be listed as follows:
 ```

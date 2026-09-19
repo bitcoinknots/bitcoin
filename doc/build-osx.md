@@ -54,7 +54,7 @@ brew install cmake boost pkgconf libevent
 ### 4. Clone Bitcoin repository
 
 `git` should already be installed by default on your system.
-Now that all the required dependencies are installed, let's clone the Bitcoin Core repository to a directory.
+Now that all the required dependencies are installed, let's clone The Bitcoin Knots repository to a directory.
 All build scripts and commands will run from this directory.
 
 ``` bash
@@ -153,7 +153,7 @@ brew install python
 
 #### Deploy Dependencies
 
-You can [deploy](#3-deploy-optional) a `.zip` containing the Bitcoin Core application.
+You can [deploy](#3-deploy-optional) a `.zip` containing The Bitcoin Knots application.
 It is required that you have `python` installed.
 
 ## Building Bitcoin Core

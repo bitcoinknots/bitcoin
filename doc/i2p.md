@@ -81,7 +81,7 @@ one of the networks has issues.
 The first time Bitcoin Core connects to the I2P router, it automatically
 generates a persistent I2P address and its corresponding private key by default,
 unless `-i2pacceptincoming=0` is set.  The private key is saved in a file named
-`i2p_private_key` in the Bitcoin Core data directory.  The persistent I2P
+`i2p_private_key` in The Bitcoin Knots data directory.  The persistent I2P
 address is used for making outbound connections and accepting inbound
 connections.
 

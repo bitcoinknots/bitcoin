@@ -3,7 +3,7 @@
 ## Scope
 
 libsecp256k1 is a library for elliptic curve cryptography on the curve secp256k1, not a general-purpose cryptography library.
-The library primarily serves the needs of the Bitcoin Core project but provides additional functionality for the benefit of the wider Bitcoin ecosystem.
+The library primarily serves the needs of The Bitcoin Knots project but provides additional functionality for the benefit of the wider Bitcoin ecosystem.
 
 ## Adding new functionality or modules
 

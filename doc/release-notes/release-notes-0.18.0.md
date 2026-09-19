@@ -119,7 +119,7 @@ Configuration option changes
   disconnect/ban behavior will not cause a node that is whitelisting
   another to be dropped by peers.  Users can still explicitly enable
   this behavior with the command line option (and may want to consider
-  [contacting](https://bitcoincore.org/en/contact/) the Bitcoin Core
+  [contacting](https://bitcoincore.org/en/contact/) The Bitcoin Knots
   project to let us know about their use-case, as this feature could be
   deprecated in the future).
 
@@ -426,7 +426,7 @@ other Bitcoin software and services.
   a year after 0.18), Bitcoin Core will default to native segwit
   addresses (bech32) that provide additional fee savings and other
   benefits. Currently, many wallets and services already support sending
-  to bech32 addresses, and if the Bitcoin Core project sees enough
+  to bech32 addresses, and if The Bitcoin Knots project sees enough
   additional adoption, it will instead default to bech32 receiving
   addresses in Bitcoin Core 0.19 (approximately November 2019).
   P2SH-wrapped segwit addresses will continue to be provided if the user

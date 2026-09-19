@@ -22,7 +22,7 @@ user inputs. Such environments include the Python3 command line interpreter or
 * Python3
 * `bitcoind` built in the same repository as the `TestShell`.
 
-## 2. Importing `TestShell` from the Bitcoin Core repository
+## 2. Importing `TestShell` from The Bitcoin Knots repository
 
 We can import the `TestShell` by adding the path of the configured Bitcoin Core
 `test_framework` module to the beginning of the PATH variable, and then
