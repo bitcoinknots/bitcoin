@@ -115,7 +115,7 @@ const std::string NET_MESSAGE_TYPE_OTHER = "*other*";
 
 static const uint64_t RANDOMIZER_ID_NETGROUP = 0x6c0edd8036ef4036ULL; // SHA256("netgroup")[0:8]
 static const uint64_t RANDOMIZER_ID_LOCALHOSTNONCE = 0xd93e69e2bbfa5735ULL; // SHA256("localhostnonce")[0:8]
-static const uint64_t RANDOMIZER_ID_ADDRCACHE = 0x1cf2e4ddd306dda9ULL; // SHA256("addrcache")[0:8]
+static const uint64_t RANDOMIZER_ID_NETWORKKEY = 0x0e8a2b136c592a7dULL; // SHA256("networkkey")[0:8]
 //
 // Global state variables
 //
@@ -463,8 +463,10 @@ CNode* CConnman::ConnectNode(CAddress addrConnect, const char *pszDest, bool fCo
     std::unique_ptr<i2p::sam::Session> i2p_transient_session;
 
     for (auto& target_addr: connect_to) {
-        if (RequiresV2ForOutbound(target_addr, pszDest ? pszDest : "") && !use_v2transport) {
-            LogDebug(BCLog::NET, "skipping v1 connection to %s (-v2onlyclearnet)\n", target_addr.ToStringAddrPort());
+        const std::string_view dest_name{pszDest ? pszDest : ""};
+        if (RequiresV2Dest(target_addr, dest_name) && !use_v2transport) {
+            LogDebug(BCLog::NET, "skipping v1 connection to %s (-v2onlyclearnet)\n",
+                     target_addr.IsValid() ? target_addr.ToStringAddrPort() : std::string{dest_name});
             continue;
         }
         if (target_addr.IsValid()) {
@@ -535,6 +537,13 @@ CNode* CConnman::ConnectNode(CAddress addrConnect, const char *pszDest, bool fCo
         if (!addr_bind.IsValid()) {
             addr_bind = GetBindAddress(*sock);
         }
+        uint64_t network_id = GetDeterministicRandomizer(RANDOMIZER_ID_NETWORKKEY)
+                            .Write(target_addr.GetNetClass())
+                            .Write(addr_bind.GetAddrBytes())
+                            // For outbound connections, the port of the bound address is randomly
+                            // assigned by the OS and would therefore not be useful for seeding.
+                            .Write(0)
+                            .Finalize();
         CNode* pnode = new CNode(id,
                                 std::move(sock),
                                 target_addr,
@@ -544,6 +553,7 @@ CNode* CConnman::ConnectNode(CAddress addrConnect, const char *pszDest, bool fCo
                                 pszDest ? pszDest : "",
                                 conn_type,
                                 /*inbound_onion=*/false,
+                                network_id,
                                 CNodeOptions{
                                     .permission_flags = permission_flags,
                                     .i2p_sam_session = std::move(i2p_transient_session),
@@ -1839,6 +1849,11 @@ void CConnman::CreateNodeFromAcceptedSocket(std::unique_ptr<Sock>&& sock,
     ServiceFlags local_services = GetLocalServices();
     const bool use_v2transport(local_services & NODE_P2P_V2);
 
+    uint64_t network_id = GetDeterministicRandomizer(RANDOMIZER_ID_NETWORKKEY)
+                        .Write(inbound_onion ? NET_ONION : addr.GetNetClass())
+                        .Write(addr_bind.GetAddrBytes())
+                        .Write(addr_bind.GetPort()) // inbound connections use bind port
+                        .Finalize();
     CNode* pnode = new CNode(id,
                              std::move(sock),
                              CAddress{addr, NODE_NONE},
@@ -1848,6 +1863,7 @@ void CConnman::CreateNodeFromAcceptedSocket(std::unique_ptr<Sock>&& sock,
                              /*addrNameIn=*/"",
                              ConnectionType::INBOUND,
                              inbound_onion,
+                             network_id,
                              CNodeOptions{
                                  .permission_flags = permission_flags,
                                  .prefer_evict = discouraged,
@@ -1945,14 +1961,18 @@ void CConnman::DisconnectNodes()
                 // Add to reconnection list if appropriate. We don't reconnect right here, because
                 // the creation of a connection is a blocking operation (up to several seconds),
                 // and we don't want to hold up the socket handler thread for that long.
-                if (network_active && !RequiresV2ForOutbound(pnode->addr, pnode->m_dest) && pnode->m_transport->ShouldReconnectV1()) {
-                    reconnections_to_add.push_back({
-                        .addr_connect = pnode->addr,
-                        .grant = std::move(pnode->grantOutbound),
-                        .destination = pnode->m_dest,
-                        .conn_type = pnode->m_conn_type,
-                        .use_v2transport = false});
-                    LogDebug(BCLog::NET, "retrying with v1 transport protocol for peer=%d\n", pnode->GetId());
+                if (network_active && pnode->m_transport->ShouldReconnectV1()) {
+                    if (RequiresV2Dest(pnode->addr, pnode->m_dest)) {
+                        LogDebug(BCLog::NET, "not retrying with v1 transport protocol for peer=%d (-v2onlyclearnet)\n", pnode->GetId());
+                    } else {
+                        reconnections_to_add.push_back({
+                            .addr_connect = pnode->addr,
+                            .grant = std::move(pnode->grantOutbound),
+                            .destination = pnode->m_dest,
+                            .conn_type = pnode->m_conn_type,
+                            .use_v2transport = false});
+                        LogDebug(BCLog::NET, "retrying with v1 transport protocol for peer=%d\n", pnode->GetId());
+                    }
                 }
 
                 // release outbound grant (if any)
@@ -2509,11 +2529,17 @@ bool CConnman::MultipleManualOrFullOutboundConns(Network net) const
     return m_network_conn_counts[net] > 1;
 }
 
-bool CConnman::RequiresV2ForOutbound(const CNetAddr& addr, std::string_view dest_name) const
+bool CConnman::RequiresV2Peer(Network net) const
 {
-    if (!m_v2only_clearnet) return false;
-    if (IsClearnet(addr.GetNetClass())) return true;
-    return !addr.IsValid() && !dest_name.empty();
+    return m_v2only_clearnet && IsClearnet(net);
+}
+
+bool CConnman::RequiresV2Dest(const CNetAddr& addr, std::string_view dest_name) const
+{
+    // A name proxy resolves the destination for us, so we can't tell locally which
+    // network it belongs to. Assume clearnet, the worst case.
+    if (!addr.IsValid() && !dest_name.empty()) return m_v2only_clearnet;
+    return RequiresV2Peer(addr.GetNetClass());
 }
 
 bool CConnman::MaybePickPreferredNetwork(std::optional<Network>& network)
@@ -3535,15 +3561,9 @@ std::vector<CAddress> CConnman::GetAddresses(size_t max_addresses, size_t max_pc
 std::vector<CAddress> CConnman::GetAddresses(CNode& requestor, size_t max_addresses, size_t max_pct)
 {
     auto local_socket_bytes = requestor.addrBind.GetAddrBytes();
-    uint64_t cache_id = GetDeterministicRandomizer(RANDOMIZER_ID_ADDRCACHE)
-        .Write(requestor.ConnectedThroughNetwork())
-        .Write(local_socket_bytes)
-        // For outbound connections, the port of the bound address is randomly
-        // assigned by the OS and would therefore not be useful for seeding.
-        .Write(requestor.IsInboundConn() ? requestor.addrBind.GetPort() : 0)
-        .Finalize();
+    uint64_t network_id = requestor.m_network_key;
     const auto current_time = GetTime<std::chrono::microseconds>();
-    auto r = m_addr_response_caches.emplace(cache_id, CachedAddrResponse{});
+    auto r = m_addr_response_caches.emplace(network_id, CachedAddrResponse{});
     CachedAddrResponse& cache_entry = r.first->second;
     if (cache_entry.m_cache_entry_expiration < current_time) { // If emplace() added new one it has expiration 0.
         cache_entry.m_addrs_response_cache = GetAddresses(max_addresses, max_pct, /*network=*/std::nullopt);
@@ -3820,6 +3840,7 @@ CNode::CNode(NodeId idIn,
              const std::string& addrNameIn,
              ConnectionType conn_type_in,
              bool inbound_onion,
+             uint64_t network_key,
              CNodeOptions&& node_opts)
     : m_transport{MakeTransport(idIn, node_opts.use_v2transport, conn_type_in == ConnectionType::INBOUND)},
       m_permission_flags{node_opts.permission_flags},
@@ -3833,6 +3854,7 @@ CNode::CNode(NodeId idIn,
       m_prefer_evict{node_opts.prefer_evict},
       m_forced_inbound{node_opts.forced_inbound},
       nKeyedNetGroup{nKeyedNetGroupIn},
+      m_network_key{network_key},
       m_conn_type{conn_type_in},
       id{idIn},
       nLocalHostNonce{nLocalHostNonceIn},

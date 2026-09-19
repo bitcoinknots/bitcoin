@@ -138,7 +138,7 @@ class P2PEncrypted(BitcoinTestFramework):
         conf.keep_alive = True
         proxy = Socks5Server(conf)
         proxy.start()
-        args = ['-listen=0', '-nobind', f'-proxy={conf.addr[0]}:{conf.addr[1]}', '-proxyrandomize=0', '-v2onlyclearnet=1', '-v2transport=1']
+        args = ['-listen', f'-proxy={conf.addr[0]}:{conf.addr[1]}', '-proxyrandomize=0', '-v2onlyclearnet=1', '-v2transport=1']
         self.restart_node(0, extra_args=args)
         self.log.info("Test -v2onlyclearnet=1 behaviour")
         self.log.info("Check that outbound v2 connection to an ipv4 peer is successful")
