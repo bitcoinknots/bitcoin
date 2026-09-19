@@ -262,7 +262,7 @@ output directory.
 EOF
 }
 
-# Deterministically build Bitcoin Core
+# Deterministically build Bitcoin Knots
 # shellcheck disable=SC2153
 for host in $HOSTS; do
 

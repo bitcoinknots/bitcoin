@@ -2,7 +2,7 @@
 # Copyright (c) 2020-2021 The Bitcoin Knots developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Script for verifying Bitcoin Core release binaries.
+"""Script for verifying Bitcoin Knots release binaries.
 
 This script attempts to download the sum file SHA256SUMS and corresponding
 signature file SHA256SUMS.asc from bitcoincore.org and bitcoin.org and

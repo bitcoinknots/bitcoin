@@ -1,4 +1,4 @@
-BIPs that are implemented by Bitcoin Core:
+BIPs that are implemented by Bitcoin Knots:
 
 * [`BIP 9`](https://github.com/bitcoin/bips/blob/master/bip-0009.mediawiki): The changes allowing multiple soft-forks to be deployed in parallel have been implemented since **v0.12.1**  ([PR #7575](https://github.com/bitcoin/bitcoin/pull/7575))
 * [`BIP 11`](https://github.com/bitcoin/bips/blob/master/bip-0011.mediawiki): Multisig outputs are standard since **v0.6.0** ([PR #669](https://github.com/bitcoin/bitcoin/pull/669)).
@@ -25,7 +25,7 @@ BIPs that are implemented by Bitcoin Core:
 * [`BIP 67`](https://github.com/bitcoin/bips/blob/master/bip-0067.mediawiki): Sorting multisig keys according to BIP 67 was merged in **v0.15.1** ([PR #8751](https://github.com/bitcoin/bitcoin/pull/8751)).
 * [`BIP 68`](https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki): Sequence locks have been implemented as of **v0.12.1**  ([PR #7184](https://github.com/bitcoin/bitcoin/pull/7184)), and have been *buried* since **v0.19.0** ([PR #16060](https://github.com/bitcoin/bitcoin/pull/16060)).
 * [`BIP 70`](https://github.com/bitcoin/bips/blob/master/bip-0070.mediawiki) [`71`](https://github.com/bitcoin/bips/blob/master/bip-0071.mediawiki) [`72`](https://github.com/bitcoin/bips/blob/master/bip-0072.mediawiki):
-  Payment Protocol support has been available in Bitcoin Core GUI since **v0.9.0** ([PR #5216](https://github.com/bitcoin/bitcoin/pull/5216)).
+  Payment Protocol support has been available in Bitcoin Knots GUI since **v0.9.0** ([PR #5216](https://github.com/bitcoin/bitcoin/pull/5216)).
   Support can be optionally disabled at build time since **v0.18.0** ([PR 14451](https://github.com/bitcoin/bitcoin/pull/14451)),
   and it is disabled by default at build time since **v0.19.0** ([PR #15584](https://github.com/bitcoin/bitcoin/pull/15584)).
   It has been removed as of **v0.20.0** ([PR 17165](https://github.com/bitcoin/bitcoin/pull/17165)).

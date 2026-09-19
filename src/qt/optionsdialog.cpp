@@ -1090,7 +1090,7 @@ void OptionsDialog::on_resetButton_clicked()
         QStringList items;
         QString strPrefix = tr("Use policy defaults for %1");
         items << strPrefix.arg(tr(CLIENT_NAME));
-        items << strPrefix.arg(tr("Bitcoin Core")+" ");
+        items << strPrefix.arg(tr("Bitcoin Knots")+" ");
 
         QInputDialog dialog(this);
         dialog.setWindowTitle(tr("Confirm options reset"));

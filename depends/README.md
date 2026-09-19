@@ -12,11 +12,11 @@ For example:
 
     make HOST=x86_64-w64-mingw32 -j4
 
-**When configuring Bitcoin Core, CMake by default will ignore the depends output.** In
+**When configuring Bitcoin Knots, CMake by default will ignore the depends output.** In
 order for it to pick up libraries, tools, and settings from the depends build,
 you must specify the toolchain file.
 In the above example, a file named `depends/x86_64-w64-mingw32/toolchain.cmake` will be
-created. To use it during configuring Bitcoin Core:
+created. To use it during configuring Bitcoin Knots:
 
     cmake -B build --toolchain depends/x86_64-w64-mingw32/toolchain.cmake
 

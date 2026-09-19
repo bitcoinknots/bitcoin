@@ -151,7 +151,7 @@ class UpgradeWalletTest(BitcoinTestFramework):
 
         def copy_v16():
             node_master.get_wallet_rpc(self.default_wallet_name).unloadwallet()
-            # Copy the 0.16.3 wallet to the last Bitcoin Core version and open it:
+            # Copy the 0.16.3 wallet to the last Bitcoin Knots version and open it:
             shutil.rmtree(node_master_wallet_dir)
             os.mkdir(node_master_wallet_dir)
             shutil.copy(
@@ -162,7 +162,7 @@ class UpgradeWalletTest(BitcoinTestFramework):
 
         def copy_non_hd():
             node_master.get_wallet_rpc(self.default_wallet_name).unloadwallet()
-            # Copy the 0.15.2 non hd wallet to the last Bitcoin Core version and open it:
+            # Copy the 0.15.2 non hd wallet to the last Bitcoin Knots version and open it:
             shutil.rmtree(node_master_wallet_dir)
             os.mkdir(node_master_wallet_dir)
             shutil.copy(
@@ -173,7 +173,7 @@ class UpgradeWalletTest(BitcoinTestFramework):
 
         def copy_split_hd():
             node_master.get_wallet_rpc(self.default_wallet_name).unloadwallet()
-            # Copy the 0.15.2 split hd wallet to the last Bitcoin Core version and open it:
+            # Copy the 0.15.2 split hd wallet to the last Bitcoin Knots version and open it:
             shutil.rmtree(node_master_wallet_dir)
             os.mkdir(node_master_wallet_dir)
             shutil.copy(

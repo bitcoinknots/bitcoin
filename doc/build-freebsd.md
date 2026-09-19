@@ -64,7 +64,7 @@ sh/bash: export BDB_PREFIX=[path displayed above]
 #### GUI Dependencies
 ###### Qt5
 
-Bitcoin Core includes a GUI built with the cross-platform Qt Framework. To compile the GUI, we need to install
+Bitcoin Knots includes a GUI built with the cross-platform Qt Framework. To compile the GUI, we need to install
 the necessary parts of Qt, the libqrencode and pass `-DBUILD_GUI=ON`. Skip if you don't intend to use the GUI.
 
 ```bash
@@ -86,7 +86,7 @@ Otherwise, if you don't need QR encoding support, use the `-DWITH_QRENCODE=OFF` 
 #### Notifications
 ###### ZeroMQ
 
-Bitcoin Core can provide notifications via ZeroMQ. If the package is installed, support will be compiled in.
+Bitcoin Knots can provide notifications via ZeroMQ. If the package is installed, support will be compiled in.
 ```bash
 pkg install libzmq4
 ```
@@ -100,11 +100,11 @@ pkg install python3 databases/py-sqlite3 net/py-pyzmq
 ```
 ---
 
-## Building Bitcoin Core
+## Building Bitcoin Knots
 
 ### 1. Configuration
 
-There are many ways to configure Bitcoin Core, here are a few common examples:
+There are many ways to configure Bitcoin Knots, here are a few common examples:
 
 ##### Descriptor Wallet and GUI:
 This disables legacy wallet support and enables the GUI, assuming `sqlite` and `qt` are installed.

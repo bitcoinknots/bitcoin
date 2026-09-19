@@ -64,7 +64,7 @@ class P2PBlocksOnly(BitcoinTestFramework):
         with self.nodes[0].assert_debug_log(["received getdata"]):
             # Note that normally, first_peer would never send us transactions since we're a blocksonly node.
             # By activating blocksonly, we explicitly tell our peers that they should not send us transactions,
-            # and Bitcoin Core respects that choice and will not send transactions.
+            # and Bitcoin Knots respects that choice and will not send transactions.
             # But if, for some reason, first_peer decides to relay transactions to us anyway, we should relay them to
             # second_peer since we gave relay permission to first_peer.
             # See https://github.com/bitcoin/bitcoin/issues/19943 for details.

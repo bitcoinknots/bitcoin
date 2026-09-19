@@ -1,4 +1,4 @@
-# Bitcoin Core file system
+# Bitcoin Knots file system
 
 **Contents**
 
@@ -113,7 +113,7 @@ You can change this with the `-guisettingsdir=<path>` option. It will use the cr
 
 ## Legacy subdirectories and files
 
-These subdirectories and files are no longer used by Bitcoin Core:
+These subdirectories and files are no longer used by Bitcoin Knots:
 
 Path           | Description | Repository notes
 ---------------|-------------|-----------------

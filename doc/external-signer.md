@@ -1,14 +1,14 @@
-# Support for signing transactions outside of Bitcoin Core
+# Support for signing transactions outside of Bitcoin Knots
 
-Bitcoin Core can be launched with `-signer=<cmd>` where `<cmd>` is an external tool which can sign transactions and perform other functions. For example, it can be used to communicate with a hardware wallet.
+Bitcoin Knots can be launched with `-signer=<cmd>` where `<cmd>` is an external tool which can sign transactions and perform other functions. For example, it can be used to communicate with a hardware wallet.
 
 ## Example usage
 
-The following example is based on the [HWI](https://github.com/bitcoin-core/HWI) tool. Version 2.0 or newer is required. Although this tool is hosted under The Bitcoin Knots GitHub organization and maintained by Bitcoin Knots Developers, it should be used with caution. It is considered experimental and has far less review than Bitcoin Core itself. Be particularly careful when running tools such as these on a computer with private keys on it.
+The following example is based on the [HWI](https://github.com/bitcoin-core/HWI) tool. Version 2.0 or newer is required. Although this tool is hosted under The Bitcoin Knots GitHub organization and maintained by Bitcoin Knots Developers, it should be used with caution. It is considered experimental and has far less review than Bitcoin Knots itself. Be particularly careful when running tools such as these on a computer with private keys on it.
 
-When using a hardware wallet, consult the manufacturer website for (alternative) software they recommend. As long as their software conforms to the standard below, it should be able to work with Bitcoin Core.
+When using a hardware wallet, consult the manufacturer website for (alternative) software they recommend. As long as their software conforms to the standard below, it should be able to work with Bitcoin Knots.
 
-Start Bitcoin Core:
+Start Bitcoin Knots:
 
 ```sh
 $ bitcoind -signer=../HWI/hwi.py
@@ -68,7 +68,7 @@ it automatically broadcasts the transaction.
 
 ## Signer API
 
-In order to be compatible with Bitcoin Core any signer command should conform to the specification below. This specification is subject to change. Ideally a BIP should propose a standard so that other wallets can also make use of it.
+In order to be compatible with Bitcoin Knots any signer command should conform to the specification below. This specification is subject to change. Ideally a BIP should propose a standard so that other wallets can also make use of it.
 
 Prerequisite knowledge:
 * [Output Descriptors](descriptors.md)
@@ -159,7 +159,7 @@ If <descriptor> contains an xpub, the command MUST fail if it does not match the
 
 The command MAY complain if `--testnet` is set, but the BIP32 coin type is not `1h` (and vice versa).
 
-## How Bitcoin Core uses the Signer API
+## How Bitcoin Knots uses the Signer API
 
 The `enumeratesigners` RPC simply calls `<cmd> enumerate`.
 

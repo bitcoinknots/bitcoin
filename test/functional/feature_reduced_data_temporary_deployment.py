@@ -306,7 +306,7 @@ class TemporaryDeploymentTest(BitcoinTestFramework):
         self.assert_rdts_deploymentinfo(node_bip110, active=True)
 
         # Disconnect nodes BEFORE creating invalid block to prevent P2P relay
-        # (Bitcoin Core relays blocks via compact blocks before full validation completes)
+        # (Bitcoin Knots relays blocks via compact blocks before full validation completes)
         self.log.info("Disconnecting nodes for chain split test...")
         self.disconnect_nodes(0, 1)
 

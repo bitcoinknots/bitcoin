@@ -511,7 +511,7 @@ class CBlockLocator:
 
     def serialize(self):
         r = b""
-        r += (0).to_bytes(4, "little", signed=True)  # Bitcoin Core ignores the version field. Set it to 0.
+        r += (0).to_bytes(4, "little", signed=True)  # Bitcoin Knots ignores the version field. Set it to 0.
         r += ser_uint256_vector(self.vHave)
         return r
 

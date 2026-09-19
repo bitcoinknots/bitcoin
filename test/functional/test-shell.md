@@ -24,7 +24,7 @@ user inputs. Such environments include the Python3 command line interpreter or
 
 ## 2. Importing `TestShell` from The Bitcoin Knots repository
 
-We can import the `TestShell` by adding the path of the configured Bitcoin Core
+We can import the `TestShell` by adding the path of the configured Bitcoin Knots
 `test_framework` module to the beginning of the PATH variable, and then
 importing the `TestShell` class from the `test_shell` sub-package. Since
 the build system creates a copy of the `test_framework` module into a new `build/`

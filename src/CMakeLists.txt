@@ -340,7 +340,7 @@ target_link_libraries(bitcoin_node
 )
 
 
-# Bitcoin Core bitcoind.
+# Bitcoin Knots bitcoind.
 if(BUILD_DAEMON)
   add_executable(bitcoind
     bitcoind.cpp
@@ -396,7 +396,7 @@ target_link_libraries(bitcoin_cli
 )
 
 
-# Bitcoin Core RPC client
+# Bitcoin Knots RPC client
 if(BUILD_CLI)
   add_executable(bitcoin-cli bitcoin-cli.cpp)
   add_windows_resources(bitcoin-cli bitcoin-cli-res.rc)

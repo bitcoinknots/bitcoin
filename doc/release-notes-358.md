@@ -64,7 +64,7 @@ deployment.
 Test networks: the versionbits RDTS deployment that shipped in Knots 29.3 and
 29.4 did lock in and activate on testnet3 (heights 4963392 to 5015807, May to
 July 2026). That historical window is not carried over; this release validates
-testnet3 as Bitcoin Core does, without it, and no longer treats the bit-4
+testnet3 as Bitcoin Knots does, without it, and no longer treats the bit-4
 signalling of that era as an unknown deployment. A testnet3 node that rejected
 a block during that window under an earlier Knots release, and is therefore
 still on a shorter branch, needs a `-reindex` to rejoin the chain. Testnet4 and
