@@ -1,17 +1,18 @@
-Bitcoin Core version 29.4 is now available from:
+Bitcoin Knots version 29.4.2.knots20260508 is now available from:
 
-  <https://bitcoincore.org/bin/bitcoin-core-29.4/>
+  <https://bitcoinknots.org/files/29.x/29.4.2.knots20260508/>
 
-This release includes various bug fixes and performance
-improvements, as well as updated translations.
+This release includes further mitigation of the ongoing attack on the network.
+[Please read below](#FIXME) for important informed consent on this and upcoming planned
+changes.
 
 Please report bugs using the issue tracker at GitHub:
 
-  <https://github.com/bitcoin/bitcoin/issues>
+  <https://github.com/bitcoinknots/bitcoin/issues>
 
 To receive security and update notifications, please subscribe to:
 
-  <https://bitcoincore.org/en/list/announcements/join/>
+  <https://bitcoinknots.org/list/announcements/join/>
 
 How to Upgrade
 ==============
@@ -21,87 +22,100 @@ shut down (which might take a few minutes in some cases), then run the
 installer (on Windows) or just copy over `/Applications/Bitcoin-Qt` (on macOS)
 or `bitcoind`/`bitcoin-qt` (on Linux).
 
-Upgrading directly from a version of Bitcoin Core that has reached its EOL is
-possible, but it might take some time if the data directory needs to be migrated. Old
-wallet versions of Bitcoin Core are generally supported.
+Upgrading directly from very old versions of Bitcoin Core or Knots is possible,
+but it might take some time if the data directory needs to be migrated. Old
+wallet versions of Bitcoin Knots are generally supported.
+
+If your node was old, pruned, and followed invalid blocks, your node may need
+to re-sync the blockchain from scratch. You will be asked at startup if this
+is necessary.
 
 Compatibility
 ==============
 
-Bitcoin Core is supported and tested on operating systems using the
-Linux Kernel 3.17+, macOS 13+, and Windows 10+. Bitcoin
-Core should also work on most other Unix-like systems but is not as
-frequently tested on them. It is not recommended to use Bitcoin Core on
+Bitcoin Knots is supported on operating systems using the Linux kernel, macOS
+13+, and Windows 10+. It is not recommended to use Bitcoin Knots on
 unsupported systems.
+
+Known Bugs
+==========
+
+In various locations, including the GUI's transaction details dialog and the
+`"vsize"` result in many RPC results, transaction virtual sizes may not account
+for an unusually high number of sigops (ie, as determined by the
+`-bytespersigop` policy) or datacarrier penalties (ie, `-datacarriercost`).
+This could result in reporting a lower virtual size than is actually used for
+mempool or mining purposes.
+
+Due to disruption of the shared Bitcoin Transifex repository, this release
+still does not include updated translations, and Bitcoin Knots may be unable
+to do so until/unless that is resolved.
+
+Attack Mitigation
+=================
+
+Due to attacks from apathetic BLAKE2b incumbents looking to exploit Bitcoin for
+profit, the community has decided to extend the current (since 2009) 16-hour
+(100 blocks) maturity lock time on newly mined bitcoins up to 350 days, and
+possibly make it contingent on actually mining (the attackers are blind hashing
+instead of mining).
+
+Because this has the potential for negative side-effects and not been discussed
+more broadly (only within the active #strategy chat), this release of Bitcoin
+Knots deploys only a 45-day maturity time, but nothing more. If consensus is
+reached to extend it further, or withhold payment to attackers, a future update
+will be needed. However, miners and hashers are now on notice that these
+options are being considered and they may need to wait much longer or (if not
+mining with their own node) never be paid at all. Users should upgrade to this
+new version as soon as possible, and plan for updates around the end of October
+and 2027 August.
+
+If you are "mining" without running DATUM Gateway yourself, you are NOT
+actually mining, and are in fact attacking the network. You should expect to
+_never_ get paid any rewards for that going forward. If you wish to mine
+properly, set up your own DATUM Gateway and use it for mining. There is
+volunteer tech support available on the Knots Discord ⁠#support channel. Or for
+basic instructions, see:
+
+  <https://bitcoinknots.org/learn/mining>
+
+Please join and participate in the #⁠⁠strategic Discord channel if you hold any opinion or wish to discuss suggestions/plans on this matter.
+
+  <https://bitcoinknots.org/social/discord>
 
 Notable changes
 ===============
 
-This release fixes an issue where the chainstate database would repeatedly
-rewrite large portions of itself, causing excessive disk reads and writes
-during normal operation.
+- SHA256d difficulty and BLAKE2b difficulty are entirely different units and
+  cannot be compared or converted. To address this, the "difficulty" field has
+  been removed where applicable (SHA256d block information retains it), and
+  the `getdifficulty` RPC method has been removed (use `getblockchaininfo`
+  instead). knots#420
 
 ### Validation
 
-- #35209 validation: correct lifetime of precomputed tx data
-- #35465 coins: compact chainstate regularly
-
-### Leveldb
-
-- #61(bitcoin-core/leveldb): Disable seek compaction
+- knots#419 T.Softfork: Long coinbase maturity (part 1 of 3)
 
 ### Net
 
-- #34093 netif: fix compilation warning in QueryDefaultGatewayImpl()
+- #30951 net: Support -listen with -v2onlyclearnet properly
 
-### Wallet
+### RPC
 
-- #35228 wallet: use outpoint when estimating input size
-
-### Build
-
-- #34228 depends: Unset SOURCE_DATE_EPOCH in gen_id script
-- #34848 cmake: Migrate away from deprecated SQLite3 target
-
-### Test
-
-- #34918 fuzz: [refactor] Remove unused g_setup pointers
-
-### Doc
-
-- #34510 doc: fix broken bpftrace installation link
-- #34561 wallet: rpc: manpage: fix example missing `fee_rate` argument
-- #34671 doc: Update Guix install for Debian/Ubuntu
-- #35283 doc: mention -DWITH_ZMQ=ON in BSD build guides
-
-### CI
-
-- #35202 ci: restore sockets in i686, no IPC job
-- #35378 ci: switch runners from cirrus to warpbuild
-- #35408 ci: 35378 followups
+- knots#420 Bugfix: RPC: Replace SHA256d "difficulty" with "difficulty_blake2b"
 
 ### Misc
 
-- #35175 multi_index: fix compilation failure with boost >= 1.91
+- knots#365 test: Skip the completion-file comparison in pull request CI
 
 Credits
 =======
 
 Thanks to everyone who directly contributed to this release:
 
-- andrewtoth
-- Cory Fields
-- Daniel Pfeifer
-- darosior
-- fanquake
-- Hennadii Stepanov
-- jayvaliya
-- junbyjun1238
-- Lőrinc
-- MarcoFalke
-- SomberNight
-- ToRyVand
-- willcl-ark
+- Chris Guida
+- Luke Dashjr
+- stratospher
 
-As well as to everyone that helped with translations on
-[Transifex](https://explore.transifex.com/bitcoin/bitcoin/).
+As well as to the rest of the community for your patience and support as we
+mitigate the biggest attack on Bitcoin in history.
