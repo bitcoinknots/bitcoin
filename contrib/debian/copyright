@@ -1,18 +1,18 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: Bitcoin
-Upstream-Contact: Satoshi Nakamoto <satoshin@gmx.com>
- [Discord](https://discord.gg/HaJHmkMHh)
+Upstream-Name: Bitcoin Knots
+Upstream-Contact: Luke Dashjr <luke+knots+debian@dashjr.org>
 Source: https://github.com/bitcoinknots/bitcoin
 
 Files: *
-Copyright: 2009-2025, Bitcoin Knots Developers
+Copyright: 2009-2026, Bitcoin Core & Knots Developers
 License: Expat
-Comment: The Bitcoin Knots developers encompasses all contributors to the
+Comment: The Bitcoin Core & Knots Developers encompasses all contributors to the
          project, listed in the release notes or the git log.
 
 Files: debian/*
 Copyright: 2010-2011, Jonas Smedegaard <dr@jones.dk>
            2011, Matt Corallo <matt@bluematt.me>
+           2017, Luke Dashjr <luke+knots+debian@dashjr.org>
 License: GPL-2+
 
 Files: src/qt/res/icons/add.png
@@ -82,6 +82,10 @@ License: public-domain
 Files: src/qt/res/fonts/RobotoMono-Bold.ttf
 License: Apache-2.0
 Comment: Site: https://fonts.google.com/specimen/Roboto+Mono
+
+Files: src/qt/res/fonts/OCR-Bitcoin.ttf.in
+Copyright: Orange Manufacturing Group & Kurtis Stirling
+License: Expat
 
 
 License: Expat

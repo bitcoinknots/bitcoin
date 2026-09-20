@@ -1,9 +1,9 @@
 package=qt
-$(package)_version=5.15.18
+$(package)_version=5.15.19
 $(package)_download_path=https://download.qt.io/archive/qt/5.15/$($(package)_version)/submodules
 $(package)_suffix=everywhere-opensource-src-$($(package)_version).tar.xz
 $(package)_file_name=qtbase-$($(package)_suffix)
-$(package)_sha256_hash=7b632550ea1048fc10c741e46e2e3b093e5ca94dfa6209e9e0848800e247023b
+$(package)_sha256_hash=51e91c73abacab81e64efd01bf95794e79c0e605ad80947a024769f0dd620a32
 $(package)_linux_dependencies=freetype fontconfig libxcb libxkbcommon libxcb_util libxcb_util_render libxcb_util_keysyms libxcb_util_image libxcb_util_wm
 $(package)_qt_libs=corelib network widgets gui plugins testlib
 $(package)_linguist_tools = lrelease lupdate lconvert
@@ -12,7 +12,6 @@ $(package)_patches += qttools_src.pro
 $(package)_patches += mac-qmake.conf
 $(package)_patches += no-xlib.patch
 $(package)_patches += dont_hardcode_pwd.patch
-$(package)_patches += qdir_temppath.patch
 $(package)_patches += qtbase-moc-ignore-gcc-macro.patch
 $(package)_patches += no_warnings_for_symbols.patch
 $(package)_patches += rcc_hardcode_timestamp.patch
@@ -25,10 +24,10 @@ $(package)_patches += windows_lto.patch
 $(package)_patches += darwin_no_libm.patch
 
 $(package)_qttranslations_file_name=qttranslations-$($(package)_suffix)
-$(package)_qttranslations_sha256_hash=e5625757913caf66a9d702ba102ae92cb165d8dde17759b6de9fdea84a1f857f
+$(package)_qttranslations_sha256_hash=967e0d259af13f47e853f183cffc9671cc054380188fee28402f6425132a2c7b
 
 $(package)_qttools_file_name=qttools-$($(package)_suffix)
-$(package)_qttools_sha256_hash=931e0969d9f9d8f233e5e9bf9db0cea9ce9914d49982f1795fe6191010113568
+$(package)_qttools_sha256_hash=2694af886130d63b8a42bcd138f4035fd8108273ebd16781f87300da352f1aa6
 
 $(package)_extra_sources  = $($(package)_qttranslations_file_name)
 $(package)_extra_sources += $($(package)_qttools_file_name)
@@ -224,7 +223,6 @@ define $(package)_preprocess_cmds
   cp $($(package)_patch_dir)/qttools_src.pro qttools/src/src.pro && \
   patch -p1 -i $($(package)_patch_dir)/dont_hardcode_pwd.patch && \
   patch -p1 -i $($(package)_patch_dir)/no-xlib.patch && \
-  patch -p1 -i $($(package)_patch_dir)/qdir_temppath.patch && \
   patch -p1 -i $($(package)_patch_dir)/qtbase-moc-ignore-gcc-macro.patch && \
   patch -p1 -i $($(package)_patch_dir)/memory_resource.patch && \
   patch -p1 -i $($(package)_patch_dir)/no_warnings_for_symbols.patch && \

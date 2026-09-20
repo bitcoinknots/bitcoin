@@ -74,6 +74,8 @@ static const int MAX_BLOCK_RELAY_ONLY_CONNECTIONS = 2;
 static const int MAX_FEELER_CONNECTIONS = 1;
 /** -listen default */
 static const bool DEFAULT_LISTEN = true;
+/** -v2onlyclearnet default */
+static constexpr bool DEFAULT_V2_ONLY_CLEARNET{false};
 /** The maximum number of peer connections to maintain. */
 static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
 /** The default for -maxuploadtarget. 0 = Unlimited */
@@ -96,9 +98,6 @@ static const size_t DEFAULT_MAXSENDBUFFER    = 1 * 1000;
 static constexpr bool DEFAULT_V2_TRANSPORT{true};
 
 typedef int64_t NodeId;
-
-/** Get the score of a local address. */
-int GetnScore(const CService& addr);
 
 struct AddedNodeParams {
     std::string m_added_node;
@@ -866,13 +865,13 @@ public:
     std::atomic_bool m_has_all_wanted_services{false};
 
     /** Whether this connection counts towards an automatic outbound target. */
-    bool CountsTowardOutboundTarget() const { return !m_is_non_bip110_outbound; }
+    bool CountsTowardOutboundTarget() const { return !m_is_stale_outbound; }
 
-    /** Whether this outbound peer did not advertise NODE_REDUCED_DATA (BIP-110).
+    /** Whether this outbound peer did not advertise NODE_BLAKE2B.
      *  Such a peer is tolerated as an additional connection, like an addnode
      *  peer: it holds no automatic outbound semaphore slot and counts towards no
-     *  outbound target, so we keep looking for a BIP110 peer to fill it. */
-    std::atomic_bool m_is_non_bip110_outbound{false};
+     *  outbound target, so we keep looking for a preferred peer to fill it. */
+    std::atomic_bool m_is_stale_outbound{false};
 
     /** Whether we should relay transactions to this peer. This only changes
      * from false to true. It will never change back to false. */
@@ -1127,7 +1126,7 @@ public:
         bool whitelist_forcerelay = DEFAULT_WHITELISTFORCERELAY;
         bool whitelist_relay = DEFAULT_WHITELISTRELAY;
         bool m_capture_messages = false;
-        bool disable_v1conn_clearnet = false;
+        bool m_v2only_clearnet = DEFAULT_V2_ONLY_CLEARNET;
     };
 
     void Init(const Options& connOptions) EXCLUSIVE_LOCKS_REQUIRED(!m_added_nodes_mutex, !m_total_bytes_sent_mutex)
@@ -1168,7 +1167,7 @@ public:
         whitelist_forcerelay = connOptions.whitelist_forcerelay;
         whitelist_relay = connOptions.whitelist_relay;
         m_capture_messages = connOptions.m_capture_messages;
-        disable_v1conn_clearnet = connOptions.disable_v1conn_clearnet;
+        m_v2only_clearnet = connOptions.m_v2only_clearnet;
     }
 
     // test only
@@ -1249,8 +1248,8 @@ public:
 
     void StartExtraBlockRelayPeers();
 
-    // Count the number of BIP110 full-relay peers we have (excludes non-BIP110 peers).
-    int GetBIP110FullOutboundConnCount() const;
+    // Count the number of preferred full-relay peers we have (excludes demoted stale peers).
+    int GetFullOutboundConnCount() const;
     // Return the number of outbound peers we have in excess of our target (eg,
     // if we previously called SetTryNewOutboundPeer(true), and have since set
     // to false, we may have extra peers that we wish to disconnect). This may
@@ -1261,12 +1260,12 @@ public:
     // Count the number of block-relay-only peers we have over our limit.
     int GetExtraBlockRelayCount() const;
 
-    /** Demote an outbound peer that did not advertise NODE_REDUCED_DATA to an
+    /** Demote an outbound peer that did not advertise NODE_BLAKE2B to an
      *  additional connection: give up its automatic outbound semaphore slot (so
-     *  we keep looking for a BIP110 peer) and stop counting it as our outbound
+     *  we keep looking for a preferred peer) and stop counting it as our outbound
      *  coverage of its network. A demoted peer draws on the inbound budget, so it
      *  is kept only while fewer than max_stale are already tolerated, its outbound
-     *  target is not already filled (by BIP110 or stale peers alike), and the
+     *  target is not already filled (by preferred or stale peers alike), and the
      *  inbound budget has room; otherwise this sets fDisconnect and returns false
      *  without demoting. Does its own logging. Must not be called on an already-
      *  demoted peer (Assert): the version handler guarantees this by rejecting
@@ -1343,9 +1342,6 @@ public:
     bool ShouldRunInactivityChecks(const CNode& node, std::chrono::microseconds now) const;
 
     bool MultipleManualOrFullOutboundConns(Network net) const EXCLUSIVE_LOCKS_REQUIRED(m_nodes_mutex);
-
-    /* Returns true if outbound v1 connections need to be disabled on IPV4/IPV6 network. */
-    bool DisableV1OnClearnet(Network net) const;
 
 private:
     struct ListenSocket {
@@ -1483,6 +1479,24 @@ private:
      * @return           bool        Whether a preferred network was found.
      */
     bool MaybePickPreferredNetwork(std::optional<Network>& network);
+
+    /**
+     * Whether an outbound connection to this destination must be v2 only.
+     *
+     * Returns true when -v2onlyclearnet is set AND either:
+     *   - the resolved address is clearnet (IPv4/IPv6) OR
+     *   - the address is unresolved and a destination string was supplied.
+     *     if bitcoind delegates DNS to a name proxy (ex: Tor), we can't tell
+     *     locally whether the name resolves to clearnet or not, so we assume
+     *     the worst case and require v2 to avoid sending plaintext.
+     *
+     * Connections to non-routable (local/loopback) addresses can be v1 since
+     * their traffic never leaves the LAN.
+     *
+     * @param addr      target address (maybe unresolved)
+     * @param dest_name destination string (or empty if connecting by resolved address)
+     */
+    bool RequiresV2ForOutbound(const CNetAddr& addr, std::string_view dest_name) const;
 
     // Whether the node should be passed out in ForEach* callbacks
     static bool NodeFullyConnected(const CNode* pnode);
@@ -1682,11 +1696,11 @@ private:
     bool m_capture_messages{false};
 
     /**
-     * option for disabling outbound v1 connections on IPV4 and IPV6.
-     * outbound connections on IPV4/IPV6 need to be v2 connections.
-     * outbound connections on Tor/I2P/CJDNS can be v1 or v2 connections.
+     * option for restricting outbound clearnet connections (IPv4/IPv6) to v2 only.
+     * outbound connections to IPv4/IPv6 need to be v2 connections.
+     * outbound connections to Tor/I2P/CJDNS can be v1 or v2 connections.
      */
-    bool disable_v1conn_clearnet;
+    bool m_v2only_clearnet{DEFAULT_V2_ONLY_CLEARNET};
 
     /**
      * Mutex protecting m_i2p_sam_sessions.

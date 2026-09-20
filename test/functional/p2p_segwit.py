@@ -30,6 +30,7 @@ from test_framework.messages import (
     MSG_WTX,
     NODE_NETWORK,
     NODE_WITNESS,
+    WITNESS_SCALE_FACTOR,
     msg_no_witness_block,
     msg_getdata,
     msg_headers,
@@ -1893,6 +1894,7 @@ class SegWitTest(BitcoinTestFramework):
         # sig ops
         outputs = (MAX_SIGOP_COST // sigops_per_script) + 2
         extra_sigops_available = MAX_SIGOP_COST % sigops_per_script
+        p2sh_outputs = MAX_SIGOP_COST // (sigops_per_script * WITNESS_SCALE_FACTOR) + 1
 
         # We chose the number of checkmultisigs/checksigs to make this work:
         assert extra_sigops_available < 100  # steer clear of MAX_OPS_PER_SCRIPT
@@ -1916,6 +1918,7 @@ class SegWitTest(BitcoinTestFramework):
             tx.vout.append(CTxOut(split_value, script_pubkey))
         tx.vout[-2].scriptPubKey = script_pubkey_toomany
         tx.vout[-1].scriptPubKey = script_pubkey_justright
+        tx.vout += [CTxOut(0, script_to_p2sh_script(witness_script)) for _ in range(p2sh_outputs)]
         tx.rehash()
 
         block_1 = self.build_next_block()
@@ -1946,7 +1949,7 @@ class SegWitTest(BitcoinTestFramework):
         tx2.vout.append(CTxOut(0, script_pubkey_checksigs))
         tx2.vin.pop()
         tx2.wit.vtxinwit.pop()
-        tx2.vout[0].nValue -= tx.vout[-2].nValue
+        tx2.vout[0].nValue -= tx.vout[outputs - 2].nValue
         tx2.rehash()
         block_3 = self.build_next_block()
         self.update_witness_block_with_transactions(block_3, [tx2])
@@ -1975,98 +1978,25 @@ class SegWitTest(BitcoinTestFramework):
         self.update_witness_block_with_transactions(block_5, [tx2])
         test_witness_block(self.nodes[0], self.test_node, block_5, accepted=True)
 
-        # In P2SH, sigops are counted as *legacy sigops* (no witness discount),
-        # meaning each sigop costs 4x more than in witness.
-        p2sh_sigops_per_script = sigops_per_script * 4
-
-        # Compute how many outputs we can create before exceeding MAX_SIGOP_COST
-        # (same idea as P2WSH, but adjusted for 4x cost)
-        p2sh_outputs = (MAX_SIGOP_COST // p2sh_sigops_per_script) + 2
-
-        # Remaining sigops we can still use after filling full scripts,
-        # adjusted back (divide by 4) because we construct scripts in raw sigops
-        p2sh_extra_sigops_available = (MAX_SIGOP_COST % p2sh_sigops_per_script) // 4
-
-        # Ensure we don't accidentally exceed MAX_OPS_PER_SCRIPT
-        assert p2sh_extra_sigops_available < 100
-
-        # Base redeem script (same as witness_script, but now used in P2SH)
-        redeem_script = witness_script
-
-        # Script that will push us over the sigop limit when used
-        redeem_script_toomany = CScript([OP_TRUE, OP_IF, OP_TRUE, OP_ELSE] + [OP_CHECKSIG] * (p2sh_extra_sigops_available + 1) + [OP_ENDIF])
-
-        # Script that will bring us exactly to the sigop limit
-        redeem_script_justright = CScript([OP_TRUE, OP_IF, OP_TRUE, OP_ELSE] + [OP_CHECKSIG] * p2sh_extra_sigops_available + [OP_ENDIF])
-
-        # Create a transaction that splits one UTXO into many P2SH outputs
-        tx3 = CTransaction()
-        tx3.vin.append(CTxIn(COutPoint(tx2.sha256, 0), b""))
-
-        # Split value evenly across outputs
-        split_value = tx2.vout[0].nValue // p2sh_outputs
-
-        # Create outputs using the base redeem script
-        for _ in range(p2sh_outputs):
-            tx3.vout.append(CTxOut(split_value, script_to_p2sh_script(redeem_script)))
-
-        # Replace last two outputs:
-        # - second-to-last: will exceed sigop limit when spent
-        # - last: will exactly match sigop limit when spent
-        tx3.vout[-2].scriptPubKey = script_to_p2sh_script(redeem_script_toomany)
-        tx3.vout[-1].scriptPubKey = script_to_p2sh_script(redeem_script_justright)
-
-        # Mine block containing tx3 should be valid
+        p2sh_tx = CTransaction()
+        p2sh_tx.vin = [CTxIn(COutPoint(tx.sha256, outputs + i), CScript([witness_script])) for i in range(p2sh_outputs)]
+        p2sh_tx.vout.append(CTxOut(0, CScript([OP_TRUE])))
+        p2sh_tx.rehash()
         block_6 = self.build_next_block()
-        self.update_witness_block_with_transactions(block_6, [tx3])
-        test_witness_block(self.nodes[0], self.test_node, block_6, accepted=True)
+        self.update_witness_block_with_transactions(block_6, [p2sh_tx])
+        test_witness_block(self.nodes[0], self.test_node, block_6, accepted=False, reason='bad-blk-sigops')
 
-        # Now try to spend too many P2SH outputs should exceed sigop limit
-        tx4 = CTransaction()
-        total_value = 0
-
-        for i in range(p2sh_outputs - 1):
-            # Use normal scripts for most inputs,
-            # but last one uses the "too many sigops" script
-            script = redeem_script if i < p2sh_outputs - 2 else redeem_script_toomany
-
-            # In P2SH, redeem script is provided in scriptSig
-            tx4.vin.append(CTxIn(COutPoint(tx3.sha256, i), CScript([script])))
-            total_value += tx3.vout[i].nValue
-
-        tx4.vout.append(CTxOut(total_value, CScript([OP_TRUE])))
-
-        # This block should be rejected due to too many sigops
+        p2sh_tx.vin.append(CTxIn(COutPoint(tx.sha256, outputs - 2), b""))
+        p2sh_tx.wit.vtxinwit = [CTxInWitness() for _ in p2sh_tx.vin]
+        p2sh_tx.wit.vtxinwit[-1].scriptWitness.stack = [witness_script_toomany]
+        p2sh_tx.rehash()
         block_7 = self.build_next_block()
-        self.update_witness_block_with_transactions(block_7, [tx4])
-        test_witness_block(self.nodes[0], self.test_node, block_7,
-                        accepted=False, reason='bad-blk-sigops')
-
-        # Now construct a valid transaction that stays within sigop limits
-        tx5 = CTransaction()
-        total_value = 0
-
-        # Spend all but the last two outputs with normal redeem script
-        for i in range(p2sh_outputs - 2):
-            tx5.vin.append(CTxIn(COutPoint(tx3.sha256, i),
-                                CScript([redeem_script])))
-            total_value += tx3.vout[i].nValue
-
-        # Use the "just right" script for final input (exact limit)
-        tx5.vin.append(CTxIn(COutPoint(tx3.sha256, p2sh_outputs - 1),
-                            CScript([redeem_script_justright])))
-        total_value += tx3.vout[-1].nValue
-
-        tx5.vout.append(CTxOut(total_value, CScript([OP_TRUE])))
-
-        # This block should be accepted (sigops exactly at limit)
-        block_8 = self.build_next_block()
-        self.update_witness_block_with_transactions(block_8, [tx5])
-        test_witness_block(self.nodes[0], self.test_node, block_8, accepted=True)
+        self.update_witness_block_with_transactions(block_7, [p2sh_tx])
+        test_witness_block(self.nodes[0], self.test_node, block_7, accepted=False, reason='bad-blk-sigops')
 
         # Cleanup and prep for next test
         self.utxo.pop(0)
-        self.utxo.append(UTXO(tx5.sha256, 0, tx5.vout[0].nValue))
+        self.utxo.append(UTXO(tx2.sha256, 0, tx2.vout[0].nValue))
 
     @subtest
     def test_superfluous_witness(self):

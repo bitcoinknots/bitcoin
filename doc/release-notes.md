@@ -1,17 +1,17 @@
-Bitcoin Knots version 29.3 is now available from:
+Bitcoin Knots version 29.4.1.knots20260508 is now available from:
 
-  <https://bitcoincore.org/bin/bitcoin-core-29.3/>
+  <https://bitcoinknots.org/files/29.x/29.4.1.knots20260508/>
 
-This release includes various bug fixes and performance
-improvements, as well as updated translations.
+This release includes mitigation of the ongoing attack on the network, as well
+as a few improvements to spam filters.
 
 Please report bugs using the issue tracker at GitHub:
 
-  <https://github.com/bitcoin/bitcoin/issues>
+  <https://github.com/bitcoinknots/bitcoin/issues>
 
 To receive security and update notifications, please subscribe to:
 
-  <https://bitcoincore.org/en/list/announcements/join/>
+  <https://bitcoinknots.org/list/announcements/join/>
 
 How to Upgrade
 ==============
@@ -21,85 +21,141 @@ shut down (which might take a few minutes in some cases), then run the
 installer (on Windows) or just copy over `/Applications/Bitcoin-Qt` (on macOS)
 or `bitcoind`/`bitcoin-qt` (on Linux).
 
-Upgrading directly from a version of Bitcoin Knots that has reached its EOL is
-possible, but it might take some time if the data directory needs to be migrated. Old
+Upgrading directly from very old versions of Bitcoin Core or Knots is possible,
+but it might take some time if the data directory needs to be migrated. Old
 wallet versions of Bitcoin Knots are generally supported.
+
+If your node was old, pruned, and followed invalid blocks, your node may need
+to re-sync the blockchain from scratch. You will be asked at startup if this
+is necessary.
 
 Compatibility
 ==============
 
-Bitcoin Knots is supported and tested on operating systems using the
-Linux Kernel 3.17+, macOS 13+, and Windows 10+. Bitcoin
-Core should also work on most other Unix-like systems but is not as
-frequently tested on them. It is not recommended to use Bitcoin Knots on
+Bitcoin Knots is supported on operating systems using the Linux kernel, macOS
+13+, and Windows 10+. It is not recommended to use Bitcoin Knots on
 unsupported systems.
+
+Known Bugs
+==========
+
+In various locations, including the GUI's transaction details dialog and the
+`"vsize"` result in many RPC results, transaction virtual sizes may not account
+for an unusually high number of sigops (ie, as determined by the
+`-bytespersigop` policy) or datacarrier penalties (ie, `-datacarriercost`).
+This could result in reporting a lower virtual size than is actually used for
+mempool or mining purposes.
+
+Due to disruption of the shared Bitcoin Transifex repository, this release
+still does not include updated translations, and Bitcoin Knots may be unable
+to do so until/unless that is resolved.
+
+Attack Mitigation
+=================
+
+On August 8th, most former miners abandoned Bitcoin en masse and together with
+other bad actors have been falsely promoting a new altcoin as "Bitcoin". This
+is the biggest attack on the Bitcoin network to date, and brought the network
+to a crawl.
+
+Mitigating this attack unfortunately requires a backward-incompatible protocol
+change, included in this release. It has been 13 years since the last such
+change, and several other security issues had been deferred; where practical,
+those have also been fixed at the same time.
+
+These changes are included:
+- Fix poison blocks (CVE-2013-2292)
+- Fix unintentional fees (CVE-2020-14199)
+- Fix block tx count mutation (CVE-2017-12842)
+- Fix for block withholding attacks
+- Minor changes to BIP110 (Reduced Data Temporary Softfork) activation/expiry
+- Temporary 800 kWU block weight limit (approximately 300kB in size)
+- BLAKE2b proof-of-work algorithm (mitigates ongoing attack)
+- Efficiency improvements for mining hardware
+- Future-proofing for merge mined sidechains
+- Future-proofing for 40-bit block times
+
+Note that other software, such as third-party wallets, may require upgrades to
+remain compatible.
+
+If you intend to sell, gift, or spend fake “bitcoins” on the new altcoin
+launched by former miners, you should ensure your wallet supports the new
+SIGHASH_UNIFIED signature format and re-send your bitcoins to yourself using
+it first (the usual cautions on waiting for the transaction to confirm are
+applicable).
+
+For more information, please visit:
+
+  <https://bitcoinknots.org/learn/2026-blake2b>
 
 Notable changes
 ===============
 
-### P2P
+- The `rejecttokens` spam filter has been enabled by default, and now also
+  detects Counterparty transactions.
 
-- #33050 net, validation: don't punish peers for consensus-invalid txs
-- #33723 chainparams: remove dnsseed.bitcoin.dashjr-list-of-p2p-nodes.us
+- The `getblockheader` and `getblock` RPC methods now additionally include new
+  block headers: "txcount" (present only when known, replaces the deprecated
+  "nTx" key), "header_version", "nonce2", "nonce3", "extranonce",
+  "time_offset", "header_flags", "xor_key", "xor_key_mask_clear_bits", and
+  "mm_rhs".
 
 ### Validation
 
-- #32473 Introduce per-txin sighash midstate cache for legacy/p2sh/segwitv0 scripts
-- #33105 validation: detect witness stripping without re-running Script checks
+- knots#357 Consensus: Unified opt-in sighash for all transaction types
+- knots#358 Consensus: Activate RDTS at the PoW-change hardfork (flag day)
+- knots#359 Hardfork: New BLAKE2b proof-of-work algorithm
+- knots#360 validation: check the block index after InvalidateBlock repairs it
+- knots#385 HARDFORK: BLAKE2b Parameters (Mainnet & Testnet4)
 
-### Wallet
+### Net
 
-- #33268 wallet: Identify transactions spending 0-value outputs, and add tests for anchor outputs in a wallet
-- #34156 wallet: fix unnamed legacy wallet migration failure
-- #34226 wallet: test: Relative wallet failed migration cleanup
-- #34123 wallet: migration, avoid creating spendable wallet from a watch-only legacy wallet
-- #34215 wallettool: fix unnamed createfromdump failure walletsdir deletion
-- #34370 wallet: Additional cleanups for migration, and fixes for createfromdump with BDB
+- knots#368 p2p: Prefer NODE_BLAKE2B peers instead of NODE_REDUCED_DATA
+- knots#375 net: add Léo Haf testnet4 seed
+- knots#386 net: base DNS-seed cadence on NODE_BLAKE2B peer count
 
-### Mining
+### Policy
 
-- #33475 bugfix: miner: fix `addPackageTxs` unsigned integer overflow
+- knots#349 policy: reject Counterparty messages under -rejecttokens
+- knots#354 defaults: Enable rejecttokens by default
 
-### Build
+### GUI
 
-- #34227 guix: Fix `osslsigncode` tests
+- knots#377 qt: Fix MSVC C4305 in MempoolStats::drawChart
 
-### Documentation
+### RPC
 
-- #33623 doc: document capnproto and libmultiprocess deps in 29.x
-
-### Test
-
-- #33612 test: change log rate limit version gate
+- knots#363 rpc: expose v2 header fields in blockheaderToJSON
 
 ### Misc
 
-- #32513 ci: remove 3rd party js from windows dll gha job
-- #33508 ci: fix buildx gha cache authentication on forks
-- #33581 ci: Properly include $FILE_ENV in DEPENDS_HASH
-- #34344 ci: update GitHub Actions versions
+- knots#362 Remove the RDTS consent requirement
 
 Credits
 =======
 
 Thanks to everyone who directly contributed to this release:
 
-- Anthony Towns
-- Antoine Poinsot
-- Ava Chow
-- David Gumberg
-- Eugene Siegel
-- fanquake
-- furszy
-- Hennadii Stepanov
-- ismaelsadeeq
-- luke-jr
-- m3dwards
-- Padraic Slattery
-- Pieter Wuille
-- SatsAndSports
-- sedited
-- willcl-ark
+- AcesHigh70
+- Bill Cox
+- Chris Guida
+- Christian Heimes
+- CodesInChaos
+- Frank Denis
+- Hodlinator
+- Jason A. Donenfeld
+- Jason Sopko
+- JP Aumasson
+- Kai Köhne
+- Kyle Santiago
+- Léo Haf
+- Lőrinc
+- Luke Dashjr
+- Mangix
+- mjvk
+- Pádraig Brady
+- Philip D'Ath
+- Samuel Neves
 
-As well as to everyone that helped with translations on
-[Transifex](https://explore.transifex.com/bitcoin/bitcoin/).
+As well as to the rest of the community for your patience and support as we
+mitigate the biggest attack on Bitcoin in history.

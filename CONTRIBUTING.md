@@ -2,6 +2,7 @@ Contributing to Bitcoin Knots
 ============================
 
 The Bitcoin Knots project operates an open contributor model where anyone is
+The Bitcoin Knots project operates an open contributor model where anyone is
 welcome to contribute towards development in the form of peer review, testing
 and patches. This document explains the practical process and guidelines for
 contributing.

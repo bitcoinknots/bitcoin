@@ -728,7 +728,10 @@ std::string TorController::LaunchTor()
     }
 
     try {
-        m_process = new subprocess::Popen(m_execute + " -f " + fs::PathToString(tor_config_filepath), subprocess::input{subprocess::PIPE}, subprocess::close_fds{true});
+        std::vector<std::string> tor_argv = subprocess::util::split(m_execute);
+        tor_argv.emplace_back("-f");
+        tor_argv.emplace_back(fs::PathToString(tor_config_filepath));
+        m_process = new subprocess::Popen(tor_argv, subprocess::input{subprocess::PIPE}, subprocess::close_fds{true});
     } catch (...) {
         LogDebug(BCLog::TOR, "tor: Failed to execute Tor process\n");
         throw;

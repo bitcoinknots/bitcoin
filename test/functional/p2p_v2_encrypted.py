@@ -138,19 +138,21 @@ class P2PEncrypted(BitcoinTestFramework):
         conf.keep_alive = True
         proxy = Socks5Server(conf)
         proxy.start()
-        args = ['-listen', f'-proxy={conf.addr[0]}:{conf.addr[1]}', '-proxyrandomize=0', '-v2onlyclearnet=1', '-v2transport=1']
+        args = ['-listen=0', '-nobind', f'-proxy={conf.addr[0]}:{conf.addr[1]}', '-proxyrandomize=0', '-v2onlyclearnet=1', '-v2transport=1']
         self.restart_node(0, extra_args=args)
         self.log.info("Test -v2onlyclearnet=1 behaviour")
         self.log.info("Check that outbound v2 connection to an ipv4 peer is successful")
-        node0.addnode("15.61.23.23:1234", "onetry", True)
+        node0.addnode("15.61.23.23:1234", "onetry", v2transport=True)
         assert_equal(node0.getpeerinfo()[-1]["addr"], "15.61.23.23:1234")
         self.log.info("Check that outbound v1 connection to an ipv4 peer is unsuccessful")
-        node0.addnode("8.8.8.8:1234", "onetry", False)
+        with node0.assert_debug_log(expected_msgs=["skipping v1 connection to 8.8.8.8:1234"]):
+            node0.addnode("8.8.8.8:1234", "onetry", v2transport=False)
         assert all(peer["addr"] != "8.8.8.8:1234" for peer in node0.getpeerinfo())
         self.log.info("Check that outbound v1 connection to an onion peer is successful")
         addr = "pg6mmjiyjmcrsslvykfwnntlaru7p5svn6y2ymmju6nubxndf4pscryd.onion:8333"
         node0.addnode(addr, "onetry", False)
         assert_equal(node0.getpeerinfo()[-1]["addr"], addr)
+        proxy.stop()
 
 
 if __name__ == '__main__':

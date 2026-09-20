@@ -175,7 +175,7 @@ void LogEntry::clear()
             break;
         default: assert(false);
     }
-    delete m_data;
+    ::operator delete(m_data);
 }
 
 LogEntry::~LogEntry()
@@ -280,12 +280,22 @@ void NetWatchValidationInterface::ValidationInterfaceUnregistering()
 
 void NetWatchValidationInterface::BlockConnected(ChainstateRole role, const std::shared_ptr<const CBlock>& block, const CBlockIndex* pindex)
 {
-    model.LogBlock(pindex, block);
+    // Callbacks run on the scheduler thread; Qt models may only be mutated on
+    // the GUI thread. Marshal there (capturing the model, not this interface,
+    // which may be deleted before the event is delivered).
+    NetWatchLogModel* const model_ptr = &model;
+    QMetaObject::invokeMethod(model_ptr, [model_ptr, block, pindex] {
+        model_ptr->LogBlock(pindex, block);
+    }, Qt::QueuedConnection);
 }
 
 void NetWatchValidationInterface::TransactionAddedToMempool(const NewMempoolTransactionInfo& txinfo, uint64_t mempool_sequence)
 {
-    model.LogTransaction(txinfo.info.m_tx);
+    NetWatchLogModel* const model_ptr = &model;
+    const CTransactionRef tx = txinfo.info.m_tx;
+    QMetaObject::invokeMethod(model_ptr, [model_ptr, tx] {
+        model_ptr->LogTransaction(tx);
+    }, Qt::QueuedConnection);
 }
 
 NetWatchLogModel::NetWatchLogModel(QWidget *parent) :
@@ -680,8 +690,12 @@ void NetWatchLogModel::LogTransaction(const CTransactionRef& tx)
 void NetWatchLogModel::setClientModel(ClientModel *model)
 {
     if (m_client_model) {
-        delete m_validation_interface;
-        m_validation_interface = nullptr;
+        if (m_validation_interface) {
+            Assert(m_client_model->node().context()->validation_signals);
+            m_client_model->node().context()->validation_signals->UnregisterValidationInterface(m_validation_interface);
+            delete m_validation_interface;
+            m_validation_interface = nullptr;
+        }
 
         disconnect(m_client_model->getOptionsModel(), &OptionsModel::displayUnitChanged, this, &NetWatchLogModel::updateDisplayUnit);
         disconnect(m_client_model->getOptionsModel(), &OptionsModel::fontForMoneyChanged, this, &NetWatchLogModel::updateDisplayUnit);

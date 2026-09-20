@@ -5,7 +5,7 @@ Setup
 ---------------------
 Bitcoin Knots is the original Bitcoin client and it builds the backbone of the network. It downloads and, by default, stores the entire history of Bitcoin transactions, which requires several hundred gigabytes or more of disk space. Depending on the speed of your computer and network connection, the synchronization process can take anywhere from a few hours to several days or more.
 
-To download Bitcoin Knots, visit [bitcoincore.org](https://bitcoincore.org/en/download/).
+To download Bitcoin Knots, visit [bitcoinknots.org](https://bitcoinknots.org/).
 
 Running
 ---------------------

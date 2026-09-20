@@ -93,6 +93,13 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         options.rdts_expiry_time = expiry;
     }
 
+    if (const auto arg{args.GetArg("-blake2b_headline")}; arg) {
+        if (!options.activation_heights.contains(Consensus::BuriedDeployment::DEPLOYMENT_BLAKE2B)) {
+            throw std::runtime_error("-blake2b_headline requires -testactivationheight=blake2b@<height>");
+        }
+        options.blake2b_headline.emplace(arg->begin(), arg->end());
+    }
+
     for (const std::string& strDeployment : args.GetArgs("-vbparams")) {
         std::vector<std::string> vDeploymentParams = SplitString(strDeployment, ':');
         if (vDeploymentParams.size() < 3 || 7 < vDeploymentParams.size()) {

@@ -36,6 +36,7 @@ from test_framework.messages import (
 )
 from test_framework.p2p import P2PDataStore
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_equal
 
 
 class P2PBlockTimes(BitcoinTestFramework):
@@ -81,6 +82,21 @@ class P2PBlockTimes(BitcoinTestFramework):
         self.log.info("Verify that block announcement time isn't updated")
         peerinfo = node.getpeerinfo()[0]
         assert peerinfo['last_block_announcement'] == cur_time
+
+        # Receiving a second block at height 2 will not be accepted as the tip,
+        # because its chainwork is not greater the the earlier height 2 block.
+        self.log.info("Create a second block at height 2 (will be stale)")
+        block2 = create_block(tip, create_coinbase(2), ntime=block.nTime + 1)
+        block2.solve()
+        headers_message2 = msg_headers()
+        headers_message2.headers = [CBlockHeader(block2)]
+        self.log.info("Test framework peer sends node the new (stale) block")
+        node.p2ps[0].send_and_ping(headers_message2)
+
+        self.log.info("Verify that block announcement time isn't updated")
+        peerinfo = node.getpeerinfo()[0]
+        assert_equal(peerinfo['last_block_announcement'], cur_time)
+
 
 if __name__ == '__main__':
     P2PBlockTimes(__file__).main()

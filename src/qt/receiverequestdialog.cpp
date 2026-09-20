@@ -67,9 +67,12 @@ void ReceiveRequestDialog::updateInfoWidget()
             if (i == 1) {
                 html += "<b>" + text + "</b><br>";
             } else if (i % 2 == 0) {
-                assert(text.endsWith(":"));
-                text.chop(1);
-                html += "<b>" + text + "</b>: ";
+                // Bold only the field name, leaving its trailing separator
+                // unbolded. Don't assume an ASCII colon: translations may end
+                // with a non-ASCII colon, or none at all.
+                int name_len = text.size();
+                while (name_len > 0 && !text.at(name_len - 1).isLetterOrNumber()) --name_len;
+                html += "<b>" + text.left(name_len) + "</b>" + text.mid(name_len) + " ";
             } else {
                 html += text + "<br>";
             }

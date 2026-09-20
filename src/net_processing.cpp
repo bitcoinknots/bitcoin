@@ -2852,7 +2852,7 @@ void PeerManagerImpl::UpdatePeerStateForReceivedHeaders(CNode& pfrom, Peer& peer
     // thus always subject to eviction under the bad/lagging chain logic.
     // See ChainSyncTimeoutState.
     // Stale peers are excluded, so they cannot take all the protect slots and
-    // leave the BIP110 peers we want to keep unprotected.
+    // leave the preferred peers we want to keep unprotected.
     if (!pfrom.fDisconnect && pfrom.IsFullOutboundConn() && pfrom.CountsTowardOutboundTarget() && nodestate->pindexBestKnownBlock != nullptr) {
         if (m_outbound_peers_with_protect_from_disconnect < MAX_OUTBOUND_PEERS_TO_PROTECT_FROM_DISCONNECT && nodestate->pindexBestKnownBlock->nChainWork >= m_chainman.ActiveChain().Tip()->nChainWork && !nodestate->m_chain_sync.m_protect) {
             LogDebug(BCLog::NET, "Protecting outbound peer=%d from eviction\n", pfrom.GetId());
@@ -3537,13 +3537,13 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         }
 
         pfrom.m_has_all_wanted_services = HasAllDesirableServiceFlags(nServices);
-        // BIP-110: tolerate up to -maxstaleoutbound outbound peers not enforcing
-        // the ReducedData rules, demoting each to an additional connection. Only
+        // Tolerate up to -maxstaleoutbound outbound peers not enforcing the
+        // BLAKE2b hardfork rules, demoting each to an additional connection. Only
         // the persistent outbound target types are gated; ADDR_FETCH (eg
         // -seednode) and FEELER are transient and count towards no target, so
         // spending the budget on them would only break bootstrapping.
-        if ((pfrom.IsFullOutboundConn() || pfrom.IsBlockOnlyConn()) && !(nServices & NODE_REDUCED_DATA)) {
-            // Keep it as an additional connection, see CNode::m_is_non_bip110_outbound.
+        if ((pfrom.IsFullOutboundConn() || pfrom.IsBlockOnlyConn()) && !(nServices & NODE_BLAKE2B)) {
+            // Keep it as an additional connection, see CNode::m_is_stale_outbound.
             if (!m_connman.DemoteToStaleOutbound(pfrom, m_opts.maxstaleoutbound)) {
                 return;
             }

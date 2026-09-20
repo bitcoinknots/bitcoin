@@ -802,28 +802,33 @@ BOOST_AUTO_TEST_CASE(LocalAddress_BasicLifecycle)
 BOOST_AUTO_TEST_CASE(LocalAddress_nScore_Overflow)
 {
     g_reachable_nets.Add(NET_IPV4);
-    CService addr{UtilBuildAddress(0x002, 0x001, 0x001, 0x001), 1000}; // 2.1.1.1:1000
+    const CService addr{UtilBuildAddress(0x002, 0x001, 0x001, 0x001), 1000}; // 2.1.1.1:1000
 
-    // SeenLocal increments when nScore is below max
+    const auto get_score = [](const CService& service) -> int {
+        LOCK(g_maplocalhost_mutex);
+        const auto it = mapLocalHost.find(service);
+        return it != mapLocalHost.end() ? it->second.nScore : 0;
+    };
+
     const int initial_score = 1000;
     BOOST_REQUIRE(AddLocal(addr, initial_score));
     BOOST_REQUIRE(IsLocal(addr));
-    BOOST_CHECK_EQUAL(GetnScore(addr), initial_score);
+    BOOST_CHECK_EQUAL(get_score(addr), initial_score);
 
-    // SeenLocal increments the score
+    // SeenLocal should increment nScore by 1.
     BOOST_CHECK(SeenLocal(addr));
-    BOOST_CHECK_EQUAL(GetnScore(addr), initial_score + 1);
+    BOOST_CHECK_EQUAL(get_score(addr), initial_score + 1);
 
-    // SeenLocal saturates at max
-    RemoveLocal(addr);
+    // AddLocal() saturates nScore when updating an existing entry at INT_MAX.
     BOOST_REQUIRE(AddLocal(addr, std::numeric_limits<int>::max()));
-    BOOST_CHECK_EQUAL(GetnScore(addr), std::numeric_limits<int>::max());
+    BOOST_CHECK_EQUAL(get_score(addr), std::numeric_limits<int>::max());
 
-    // a couple increments should saturate
-    for (int i = 0; i < 2; ++i) {
-        BOOST_CHECK(SeenLocal(addr));
-        BOOST_CHECK_EQUAL(GetnScore(addr), std::numeric_limits<int>::max());
-    }
+    BOOST_CHECK(AddLocal(addr, std::numeric_limits<int>::max()));
+    BOOST_CHECK_EQUAL(get_score(addr), std::numeric_limits<int>::max());
+
+    // SeenLocal() also saturates at INT_MAX.
+    BOOST_CHECK(SeenLocal(addr));
+    BOOST_CHECK_EQUAL(get_score(addr), std::numeric_limits<int>::max());
 
     RemoveLocal(addr);
     BOOST_CHECK(!IsLocal(addr));
@@ -865,7 +870,7 @@ BOOST_AUTO_TEST_CASE(initial_advertise_from_version_message)
                /*inbound_onion=*/false,
                /*network_key=*/2};
 
-    const uint64_t services{NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA};
+    const uint64_t services{NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA | NODE_BLAKE2B};
     const int64_t time{0};
 
     // Force ChainstateManager::IsInitialBlockDownload() to return false.
@@ -873,7 +878,7 @@ BOOST_AUTO_TEST_CASE(initial_advertise_from_version_message)
     auto& chainman = static_cast<TestChainstateManager&>(*m_node.chainman);
     chainman.JumpOutOfIbd();
 
-    m_node.peerman->InitializeNode(peer, ServiceFlags(NODE_NETWORK | NODE_REDUCED_DATA));
+    m_node.peerman->InitializeNode(peer, ServiceFlags(NODE_NETWORK | NODE_REDUCED_DATA | NODE_BLAKE2B));
 
     std::atomic<bool> interrupt_dummy{false};
     std::chrono::microseconds time_received_dummy{0};

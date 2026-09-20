@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: Bitcoin Knots Security Policy
-    url: https://github.com/bitcoinknots/bitcoin/blob/29.x-knots/SECURITY.md
+    url: https://bitcoinknots.org/contact/
     about: View security policy
-  - name: Bitcoin Knots Developers
+  - name: Bitcoin Knots Website
     url: https://bitcoinknots.org
-    about: Bitcoin Knots homepage
+    about: User-oriented information

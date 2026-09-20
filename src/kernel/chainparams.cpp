@@ -117,6 +117,13 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = 1628640000; // August 11th, 2021
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 709632; // Approximately November 12th, 2021
 
+        consensus.Blake2bHeight = 961640;
+        {
+            constexpr std::string_view headline = "8-30 NYPost Deride And Conquer";
+            consensus.Blake2bHeadline.assign(headline.begin(), headline.end());
+        }
+        consensus.Blake2bTargetShift = 22;
+
         // RDTS: its rules apply to every block from Blake2bHeight (the
         // flag-day activation, set at release cut) until the parent block's
         // median-time-past reaches RdtsExpiryTime. (RDTS previously activated
@@ -124,8 +131,8 @@ public:
         // reaching ACTIVE, and that deployment has been removed.)
         consensus.RdtsExpiryTime = 1819756800; // September 1st, 2027 00:00 UTC
 
-        consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000dee8e2a309ad8a9820433c68"};
-        consensus.defaultAssumeValid = uint256{"00000000000000000000611fd22f2df7c8fbd0688745c3a6c3bb5109cc2a12cb"}; // 912683
+        consensus.nMinimumChainWork = uint256{"00000000000000000000000000000000000000013e00277374c9f9eeadc70200"};
+        consensus.defaultAssumeValid = uint256{"0000000000000078ed1e20cac1acf78df6d1060c78059fb6331e17141c881fc8"}; // 964264
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -153,8 +160,8 @@ public:
         // release ASAP to avoid it where possible.
         vSeeds.emplace_back("seed.bitcoin.sipa.be."); // Pieter Wuille, only supports x1, x5, x9, and xd
         vSeeds.emplace_back("dnsseed.bluematt.me."); // Matt Corallo, only supports x9
-        vSeeds.emplace_back("dnsseed.bitcoin.dashjr-list-of-p2p-nodes.us."); // Luke Dashjr, support BIP110 seeding (x8000009)
-        vSeeds.emplace_back("seed.bitcoin.haf.ovh."); // Léo Haf, support BIP110 seeding (x8000009)
+        vSeeds.emplace_back("dnsseed.bitcoin.dashjr-list-of-p2p-nodes.us."); // Luke Dashjr, support hardfork seeding (x10000009)
+        vSeeds.emplace_back("seed.bitcoin.haf.ovh."); // Léo Haf, support hardfork seeding (x10000009)
         vSeeds.emplace_back("seed.bitcoin.jonasschnelli.ch."); // Jonas Schnelli, only supports x1, x5, x9, and xd
         vSeeds.emplace_back("seed.bitcoin.sprovoost.nl."); // Sjors Provoost
         vSeeds.emplace_back("dnsseed.emzy.de."); // Stephan Oeste
@@ -215,6 +222,9 @@ public:
                 {855000, uint256{"0000000000000000000233ea80aa10d38aa4486cd7033fffc2c4df556d0b9138"}},
                 {885248, uint256{"000000000000000000006e926737e6a349f7581525ad36e743dfe5f4bc3abbb7"}},
                 {908765, uint256{"00000000000000000001b64acb5fe4b40b84092159b6406a6244f46a37fa6c6b"}},
+                {961632, uint256{"0000000000000000000169eb6f811ddbd0daf343af7b62180cdb13e7c78dbc16"}},  // first BIP110 block
+                {961639, uint256{"00000000000000000001bbc439e13f749dca850d32c7a2834165338713027e65"}},  // last SHA256d block
+                {961640, uint256{"0000000000000050c1e5f69672f459293be14f46e5a494e7a8c8541396f18eeb"}},  // first BLAKE2b block
             }
         };
 
@@ -391,6 +401,9 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
 
+        consensus.Blake2bHeight = 150308;
+        consensus.RdtsExpiryTime = 1791903600; // October 13th, 2026 15:00:00 UTC
+
         consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000001d6dce8651b6094e4c1"};
         consensus.defaultAssumeValid = uint256{"0000000000003ed4f08dbdf6f7d6b271a6bcffce25675cb40aa9fa43179a89f3"}; // 72600
 
@@ -421,6 +434,7 @@ public:
         // nodes with support for servicebits filtering should be at the top
         vSeeds.emplace_back("seed.testnet4.bitcoin.sprovoost.nl."); // Sjors Provoost
         vSeeds.emplace_back("seed.testnet4.wiz.biz."); // Jason Maurice
+        vSeeds.emplace_back("seed.testnet-bitcoin.haf.ovh."); // Léo Haf, support x10000009
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,196);
@@ -637,6 +651,10 @@ public:
                 consensus.CSVHeight = int{height};
                 break;
             }
+        }
+
+        if (opts.blake2b_headline) {
+            consensus.Blake2bHeadline = *opts.blake2b_headline;
         }
 
         // Optionally schedule the RDTS deployment (see -rdtsexpiry). RDTS

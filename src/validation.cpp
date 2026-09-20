@@ -113,6 +113,13 @@ const std::vector<std::string> CHECKLEVEL_DOC {
     "each level includes the checks of the previous levels",
 };
 
+// Return whether the completed full flush should compact chainstate
+static bool ShouldCompactChainstate(bool in_ibd)
+{
+    static constexpr uint32_t flush_ratio{320}; // Roughly every 2 weeks with hourly flushes
+    return !in_ibd && FastRandomContext().randrange(flush_ratio) == 0;
+}
+
 SpkReuseModes SpkReuseMode;
 
 TRACEPOINT_SEMAPHORE(validation, block_connected);
@@ -3309,9 +3316,20 @@ bool Chainstate::FlushStateToDisk(
             m_next_write = FastRandomContext().rand_uniform_delay(NodeClock::now() + DATABASE_WRITE_INTERVAL_MIN, range);
         }
     }
-    if (full_flush_completed && m_chainman.m_options.signals) {
-        // Update best block in wallet (so we can detect restored wallets).
-        m_chainman.m_options.signals->ChainStateFlushed(this->GetRole(), m_chain.GetLocator());
+
+    if (full_flush_completed) {
+        if (m_chainman.m_options.signals) {
+            // Update best block in wallet (so we can detect restored wallets).
+            m_chainman.m_options.signals->ChainStateFlushed(this->GetRole(), m_chain.GetLocator());
+        }
+
+        if (!m_chainman.m_interrupt && ShouldCompactChainstate(m_chainman.IsInitialBlockDownload())) {
+            try {
+                CoinsDB().CompactFull();
+            } catch (const std::exception& e) {
+                LogWarning("Failed to start chainstate compaction (%s)", e.what());
+            }
+        }
     }
     } catch (const std::runtime_error& e) {
         return FatalError(m_chainman.GetNotifications(), state, strprintf(_("System error while flushing: %s"), e.what()));
@@ -3739,8 +3757,11 @@ CBlockIndex* Chainstate::FindMostWorkChain()
                         // If we're missing data, then add back to m_blocks_unlinked,
                         // so that if the block arrives in the future we can try adding
                         // to setBlockIndexCandidates again.
-                        m_blockman.m_blocks_unlinked.insert(
-                            std::make_pair(pindexFailed->pprev, pindexFailed));
+                        // Avoid duplicate entries in m_blocks_unlinked. If the same entry is
+                        // processed twice in ReceivedBlockTransactions(), it may be re-added to
+                        // setBlockIndexCandidates with a modified nSequenceId, breaking ordering
+                        // guarantees and leading to undefined behavior.
+                        m_blockman.AddUnlinkedBlock(pindexFailed);
                     }
                     setBlockIndexCandidates.erase(pindexFailed);
                     pindexFailed = pindexFailed->pprev;
@@ -4197,8 +4218,6 @@ bool Chainstate::InvalidateBlock(BlockValidationState& state, CBlockIndex* pinde
         to_mark_failed = invalid_walk_tip;
     }
 
-    m_chainman.CheckBlockIndex();
-
     {
         LOCK(cs_main);
         if (m_chain.Contains(to_mark_failed)) {
@@ -4227,6 +4246,13 @@ bool Chainstate::InvalidateBlock(BlockValidationState& state, CBlockIndex* pinde
 
         InvalidChainFound(to_mark_failed);
     }
+
+    // Check the block index only after the block above has restored it. The
+    // disconnect loop releases cs_main between iterations, so a block that
+    // arrives in that window is absent from the candidate set precalculated
+    // before the loop, and the block above is what puts it back. Checking any
+    // earlier asserts on the very inconsistency it exists to repair.
+    m_chainman.CheckBlockIndex();
 
     // Only notify about a new block tip if the active chain was modified.
     if (pindex_was_in_chain) {
@@ -4375,7 +4401,7 @@ void ChainstateManager::ReceivedBlockTransactions(const CBlock& block, CBlockInd
         }
     } else {
         if (pindexNew->pprev && pindexNew->pprev->IsValid(BLOCK_VALID_TREE)) {
-            m_blockman.m_blocks_unlinked.insert(std::make_pair(pindexNew->pprev, pindexNew));
+            m_blockman.AddUnlinkedBlock(pindexNew);
         }
     }
 }
@@ -4493,8 +4519,6 @@ static bool CheckWitnessMalleation(const CBlock& block, bool expect_witness_comm
     return true;
 }
 
-std::vector<unsigned char> blake2b_headline;
-
 bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW, bool fCheckMerkleRoot)
 {
     // These are checks that are independent of context.
@@ -4536,7 +4560,7 @@ bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensu
 
     if (block.m_height == consensusParams.DeploymentHeight(Consensus::DEPLOYMENT_BLAKE2B)) {
         const auto& coinbase = block.vtx[0]->vin[0].scriptSig;
-        if (std::search(coinbase.begin(), coinbase.end(), blake2b_headline.begin(), blake2b_headline.end()) == coinbase.end()) {
+        if (std::search(coinbase.begin(), coinbase.end(), consensusParams.Blake2bHeadline.begin(), consensusParams.Blake2bHeadline.end()) == coinbase.end()) {
             return state.Invalid(
                 /*result=*/BlockValidationResult::BLOCK_MUTATED,
                 /*reject_reason=*/"bad-headline",
@@ -6222,13 +6246,12 @@ void ChainstateManager::CheckBlockIndex()
         // Check whether this block is in m_blocks_unlinked.
         std::pair<std::multimap<CBlockIndex*,CBlockIndex*>::iterator,std::multimap<CBlockIndex*,CBlockIndex*>::iterator> rangeUnlinked = m_blockman.m_blocks_unlinked.equal_range(pindex->pprev);
         bool foundInUnlinked = false;
-        while (rangeUnlinked.first != rangeUnlinked.second) {
-            assert(rangeUnlinked.first->first == pindex->pprev);
-            if (rangeUnlinked.first->second == pindex) {
+        for (auto it = rangeUnlinked.first; it != rangeUnlinked.second; ++it) {
+            assert(it->first == pindex->pprev);
+            if (it->second == pindex) {
+                assert(!foundInUnlinked); // No duplicates in m_blocks_unlinked
                 foundInUnlinked = true;
-                break;
             }
-            rangeUnlinked.first++;
         }
         if (pindex->pprev && (pindex->nStatus & BLOCK_HAVE_DATA) && pindexFirstNeverProcessed != nullptr && pindexFirstInvalid == nullptr) {
             // If this block has block data available, some parent was never received, and has no invalid parents, it must be in m_blocks_unlinked.

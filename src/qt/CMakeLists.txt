@@ -65,7 +65,7 @@ file(GLOB ts_files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} locale/*.ts)
 set_source_files_properties(${ts_files} PROPERTIES OUTPUT_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/locale)
 cmake_language(CALL "qt${WITH_QT_VERSION}_add_translation" qm_files ${ts_files})
 
-set(FONT_PATH "res/fonts/RobotoTonalMono-Bold.ttf")
+set(FONT_PATH "res/fonts/OCR-Bitcoin.ttf")
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/res/fonts")
 add_custom_command(
   OUTPUT ${FONT_PATH}
@@ -74,7 +74,116 @@ add_custom_command(
   VERBATIM
 )
 
+set(ICON_PATH "res/rendered_icons")
+set(ICO_SPECS
+  256 64 48 32 24 20 16
+)
+set(ICNS_SPECS
+  1024
+)
+set(EXTRA_ICON_SPECS
+  290 256
+)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(bitcoin_svg "res/src/bitcoin-mac.svg")
+else()
+  set(bitcoin_svg "res/src/bitcoin.svg")
+endif()
+
+set(ICON_SPECS ${ICO_SPECS} ${ICNS_SPECS} ${EXTRA_ICON_SPECS})
+list(REMOVE_DUPLICATES ICON_SPECS)
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${ICON_PATH}")
+foreach(size IN LISTS ICON_SPECS)
+  set(png "${ICON_PATH}/bitcoin${size}.png")
+  add_custom_command(
+    OUTPUT ${png}
+    COMMAND "${RSVG_CONVERT}" -f png -d ${size} -p ${size} --output "${png}" "${CMAKE_CURRENT_SOURCE_DIR}/${bitcoin_svg}"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${bitcoin_svg}"
+    COMMENT "Generating ${png} from ${bitcoin_svg}"
+    VERBATIM
+  )
+
+  # NOTE: ImageMagick will never convert transparent PNGs to 8-bit ICOs, but GIF is fine
+  set(gif "${ICON_PATH}/bitcoin${size}d8.gif")
+  add_custom_command(
+    OUTPUT ${gif}
+    COMMAND "${IMAGEMAGICK_CONVERT}" "${png}" -colors 256 -channel A -threshold 50% "${gif}"
+    DEPENDS "${png}"
+    COMMENT "Generating ${gif} from ${png}"
+    VERBATIM
+  )
+endforeach()
+
+set(bitcoin_icns "${ICON_PATH}/bitcoin.icns")
+set(ICNS_SRC_FILES ${ICNS_SPECS})
+list(TRANSFORM ICNS_SRC_FILES PREPEND "${ICON_PATH}/bitcoin")
+list(TRANSFORM ICNS_SRC_FILES APPEND ".png")
+add_custom_command(
+  OUTPUT "${bitcoin_icns}"
+  COMMAND "${PNG2ICNS}" "${bitcoin_icns}" ${ICNS_SRC_FILES}
+  DEPENDS ${ICNS_SRC_FILES}
+  COMMENT "Generating ${bitcoin_icns} from individual images"
+  VERBATIM
+)
+add_custom_target(generate_icns DEPENDS "${bitcoin_icns}")
+
+set(bitcoin_ico "${ICON_PATH}/bitcoin.ico")
+set(ICO_SRC_FILES ${ICO_SPECS})
+list(TRANSFORM ICO_SRC_FILES PREPEND "${ICON_PATH}/bitcoin")
+list(TRANSFORM ICO_SRC_FILES APPEND ".png")
+list(PREPEND ICO_SRC_FILES "${ICON_PATH}/bitcoin32d8.gif")
+add_custom_command(
+  OUTPUT "${bitcoin_ico}"
+  COMMAND "${IMAGEMAGICK_CONVERT}" ${ICO_SRC_FILES} "${bitcoin_ico}"
+  DEPENDS ${ICO_SRC_FILES}
+  COMMENT "Generating ${bitcoin_ico} from individual images"
+  VERBATIM
+)
+set(testnet_ico "${ICON_PATH}/bitcoin_testnet.ico")
+add_custom_command(
+  OUTPUT "${testnet_ico}"
+  COMMAND "${IMAGEMAGICK_CONVERT}" ${bitcoin_ico} -modulate 100,100,138.9 -colorspace HSL -channel G -evaluate subtract "11.76%" +channel -colorspace sRGB "${testnet_ico}"
+  DEPENDS ${bitcoin_ico}
+  COMMENT "Generating ${testnet_ico} from ${bitcoin_ico}"
+  VERBATIM
+)
+add_custom_target(generate_ico DEPENDS "${bitcoin_ico}" "${testnet_ico}")
+
+set(logo_svg "res/src/bitcoinknots-logo.svg")
+set(png "${ICON_PATH}/bitcoinknots-logo.png")
+set(size 960)
+add_custom_command(
+  OUTPUT ${png}
+  COMMAND "${RSVG_CONVERT}" -f png -d ${size} -p ${size} --output "${png}" "${CMAKE_CURRENT_SOURCE_DIR}/${logo_svg}"
+  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${logo_svg}"
+  COMMENT "Generating ${png} from ${logo_svg}"
+  VERBATIM
+)
+
+set(nsis_wizard_input "${ICON_PATH}/bitcoin290.png")
+set(nsis_wizard_bmp "${ICON_PATH}/nsis-wizard.bmp")
+add_custom_command(
+  OUTPUT "${nsis_wizard_bmp}"
+  COMMAND "${IMAGEMAGICK_CONVERT}" ${nsis_wizard_input} -crop 164x290+68+0 -border 0x12 -strip BMP3:${nsis_wizard_bmp}
+  DEPENDS ${nsis_wizard_input}
+  COMMENT "Generating ${nsis_wizard_bmp} from ${nsis_wizard_input}"
+  VERBATIM
+)
+set(nsis_header_input "res/src/nsis-header.svg")
+set(nsis_header_bmp "${ICON_PATH}/nsis-header.bmp")
+set(ABS_FONT_DIR ${CMAKE_CURRENT_BINARY_DIR}/res/fonts)
+add_custom_command(
+  OUTPUT "${nsis_header_bmp}"
+  COMMAND echo <fontconfig><dir>${ABS_FONT_DIR}</dir></fontconfig> > res/fonts/fonts.conf && FONTCONFIG_PATH=${ABS_FONT_DIR} ${RSVG_CONVERT} -f png -d 57 -p 57 ${CMAKE_CURRENT_SOURCE_DIR}/${nsis_header_input} | ${IMAGEMAGICK_CONVERT} - -background white -alpha remove BMP3:${nsis_header_bmp}
+  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${nsis_header_input}" "${FONT_PATH}"
+  COMMENT "Generating ${nsis_header_bmp} from ${nsis_header_input}"
+  VERBATIM
+)
+add_custom_target(generate_nsis_images DEPENDS "${nsis_wizard_bmp}" "${nsis_header_bmp}")
+
 configure_file(bitcoin_locale.qrc bitcoin_locale.qrc USE_SOURCE_PERMISSIONS COPYONLY)
+configure_file(bitcoin_rendered.qrc bitcoin_rendered.qrc USE_SOURCE_PERMISSIONS COPYONLY)
 configure_file(font.qrc font.qrc USE_SOURCE_PERMISSIONS COPYONLY)
 
 # The bitcoinqt sources have to include headers in
@@ -150,6 +259,7 @@ add_library(bitcoinqt STATIC EXCLUDE_FROM_ALL
   $<$<PLATFORM_ID:Windows>:winshutdownmonitor.h>
   bitcoin.qrc
   ${CMAKE_CURRENT_BINARY_DIR}/bitcoin_locale.qrc
+  ${CMAKE_CURRENT_BINARY_DIR}/bitcoin_rendered.qrc
   ${CMAKE_CURRENT_BINARY_DIR}/font.qrc
 )
 target_compile_definitions(bitcoinqt
@@ -295,7 +405,14 @@ add_executable(bitcoin-qt
   ../init/bitcoin-qt.cpp
 )
 
-add_windows_resources(bitcoin-qt res/bitcoin-qt-res.rc)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  add_dependencies(bitcoin-qt generate_ico)
+endif()
+
+if(WIN32)
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/res/bitcoin-qt-res.rc ${CMAKE_CURRENT_BINARY_DIR}/res/bitcoin-qt-res.rc USE_SOURCE_PERMISSIONS @ONLY)
+  add_windows_resources(bitcoin-qt ${CMAKE_CURRENT_BINARY_DIR}/res/bitcoin-qt-res.rc)
+endif()
 
 target_link_libraries(bitcoin-qt
   core_interface

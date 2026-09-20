@@ -28,11 +28,13 @@ get_directory_property(precious_variables CACHE_VARIABLES)
 #=============================
 set(CLIENT_NAME "Bitcoin Knots")
 set(CLIENT_VERSION_MAJOR 29)
-set(CLIENT_VERSION_MINOR 3)
-set(CLIENT_VERSION_BUILD 0)
+set(CLIENT_VERSION_MINOR 4)
+set(CLIENT_VERSION_BUILD 1)
 set(CLIENT_VERSION_RC 0)
 set(CLIENT_VERSION_IS_RELEASE "true")
-set(COPYRIGHT_YEAR "2025")
+set(COPYRIGHT_YEAR "2026")
+
+set(CLIENT_VERSION_SUFFIX ".knots20260508")
 
 # During the enabling of the CXX and CXXOBJ languages, we modify
 # CMake's compiler/linker invocation strings by appending the content
@@ -57,7 +59,7 @@ project(BitcoinKnots
   LANGUAGES NONE
 )
 
-set(CLIENT_VERSION_STRING ${PROJECT_VERSION})
+set(CLIENT_VERSION_STRING ${PROJECT_VERSION}${CLIENT_VERSION_SUFFIX})
 if(CLIENT_VERSION_RC GREATER 0)
   string(APPEND CLIENT_VERSION_STRING "rc${CLIENT_VERSION_RC}")
 endif()
@@ -163,8 +165,12 @@ if(WITH_SQLITE)
   if(VCPKG_TARGET_TRIPLET)
     # Use of the `unofficial::` namespace is a vcpkg package manager convention.
     find_package(unofficial-sqlite3 CONFIG REQUIRED)
+    add_library(SQLite3::SQLite3 ALIAS unofficial::sqlite3::sqlite3)
   else()
     find_package(SQLite3 3.7.17 REQUIRED)
+    if(NOT TARGET SQLite3::SQLite3) # CMake < 4.3
+      add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
+    endif()
   endif()
   set(USE_SQLITE ON)
 endif()
@@ -275,7 +281,7 @@ string(APPEND CMAKE_CXX_LINK_EXECUTABLE " ${APPEND_LDFLAGS}")
 set(configure_warnings)
 
 include(CheckLinkerSupportsPIE)
-check_linker_supports_pie(configure_warnings)
+check_linker_supports_pie(configure_warnings CXX)
 
 # The core_interface library aims to encapsulate common build flags.
 # It is a usage requirement for all targets except for secp256k1, which
@@ -682,6 +688,17 @@ else()
   list(APPEND configure_warnings
     "Minimum required Python not found. Utils and rpcauth tests are disabled."
   )
+endif()
+
+if(BUILD_GUI)
+  find_program(RSVG_CONVERT rsvg-convert REQUIRED)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    find_program(IMAGEMAGICK_CONVERT NAMES magick convert)
+    find_program(PNG2ICNS png2icns REQUIRED)
+  else()
+    find_program(IMAGEMAGICK_CONVERT NAMES magick convert REQUIRED)
+    find_program(PNG2ICNS png2icns)
+  endif()
 endif()
 
 target_compile_definitions(core_interface INTERFACE ${DEPENDS_COMPILE_DEFINITIONS})
