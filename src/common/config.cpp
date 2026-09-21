@@ -12,6 +12,7 @@
 #include <univalue.h>
 #include <util/chaintype.h>
 #include <util/fs.h>
+#include <util/fs_helpers.h>
 #include <util/string.h>
 
 #include <algorithm>
@@ -146,6 +147,23 @@ bool ArgsManager::ReadConfigFiles(std::string& error, bool ignore_invalid_keys)
         if (IsArgSet("-conf") && !stream.good()) {
             error = strprintf("specified config file \"%s\" could not be opened.", fs::PathToString(conf_path));
             return false;
+        }
+        // Warn only in the specific case where a config file exists at the default
+        // data directory but was not the one read, which can happen when a custom
+        // datadir moves the base path away from the default location where the
+        // user's bitcoin.conf actually lives. Warning merely because no config file
+        // could be read at all would fire for the many users who never create one,
+        // so require that a config file actually exists at the default location too.
+        if (!IsArgSet("-conf") && !stream.good()) {
+            const fs::path default_conf{GetDefaultDataDir() / BITCOIN_CONF_FILENAME};
+            if (conf_path != default_conf && fs::exists(default_conf)) {
+                LogWarning("Config file %s doesn't exist or cannot be read, but a config file "
+                           "exists at the default data directory (%s). It is being ignored "
+                           "because a different data directory is in use. Move or copy it to "
+                           "the current data directory, or use the -conf option to specify "
+                           "its location.",
+                           fs::PathToString(conf_path), fs::PathToString(default_conf));
+            }
         }
     }
     // ok to not have a config file
