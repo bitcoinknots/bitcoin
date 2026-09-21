@@ -67,6 +67,12 @@ const int INITIAL_TRAFFIC_GRAPH_MINS = 30;
 const QSize FONT_RANGE(4, 40);
 const char fontSizeSettingsKey[] = "consoleFontSize";
 
+#ifdef ENABLE_WALLET
+//! Index of the wallet selector entry that follows the wallet displayed in the main window.
+//! Entry 0 is "(none)", from the form; wallets are appended after this one.
+const int WALLET_SELECTOR_DISPLAYED = 1;
+#endif // ENABLE_WALLET
+
 const struct {
     const char *url;
     const char *source;
@@ -626,6 +632,11 @@ RPCConsole::RPCConsole(interfaces::Node& node, const PlatformStyle *_platformSty
     connect(ui->fontSmallerButton, &QAbstractButton::clicked, this, &RPCConsole::fontSmaller);
     connect(ui->btnClearTrafficGraph, &QPushButton::clicked, ui->trafficGraph, &TrafficGraphWidget::clear);
 
+#ifdef ENABLE_WALLET
+    ui->WalletSelector->insertItem(WALLET_SELECTOR_DISPLAYED, QString());
+    setDisplayedWallet(nullptr);
+#endif // ENABLE_WALLET
+
     // disable the wallet selector by default
     ui->WalletSelector->setVisible(false);
     ui->WalletSelectorLabel->setVisible(false);
@@ -981,11 +992,11 @@ void RPCConsole::addWallet(WalletModel * const walletModel)
 {
     // use name for text and wallet model for internal data object (to allow to move to a wallet id later)
     ui->WalletSelector->addItem(walletModel->getDisplayName(), QVariant::fromValue(walletModel));
-    if (ui->WalletSelector->count() == 2) {
-        // First wallet added, set to default to match wallet RPC behavior
-        ui->WalletSelector->setCurrentIndex(1);
+    if (ui->WalletSelector->count() == 3) {
+        // First wallet added, follow the wallet displayed in the main window
+        ui->WalletSelector->setCurrentIndex(WALLET_SELECTOR_DISPLAYED);
     }
-    if (ui->WalletSelector->count() > 2) {
+    if (ui->WalletSelector->count() > 3) {
         ui->WalletSelector->setVisible(true);
         ui->WalletSelectorLabel->setVisible(true);
     }
@@ -994,16 +1005,28 @@ void RPCConsole::addWallet(WalletModel * const walletModel)
 void RPCConsole::removeWallet(WalletModel * const walletModel)
 {
     ui->WalletSelector->removeItem(ui->WalletSelector->findData(QVariant::fromValue(walletModel)));
-    if (ui->WalletSelector->count() == 2) {
+    if (ui->WalletSelector->count() == 3) {
         ui->WalletSelector->setVisible(false);
         ui->WalletSelectorLabel->setVisible(false);
     }
+    // The main window switches to another wallet before removing this one, so
+    // this only hits when the last wallet is unloaded
+    if (m_displayed_wallet_model == walletModel) setDisplayedWallet(nullptr);
 }
 
-void RPCConsole::setCurrentWallet(WalletModel* const wallet_model)
+void RPCConsole::setDisplayedWallet(WalletModel* const wallet_model)
 {
-    QVariant data = QVariant::fromValue(wallet_model);
-    ui->WalletSelector->setCurrentIndex(ui->WalletSelector->findData(data));
+    m_displayed_wallet_model = wallet_model;
+    ui->WalletSelector->setItemText(WALLET_SELECTOR_DISPLAYED,
+                                    wallet_model ? tr("Use displayed wallet (%1)").arg(wallet_model->getDisplayName())
+                                                 : tr("Use displayed wallet"));
+}
+
+WalletModel* RPCConsole::currentWalletModel() const
+{
+    const int index = ui->WalletSelector->currentIndex();
+    if (index == WALLET_SELECTOR_DISPLAYED) return m_displayed_wallet_model;
+    return ui->WalletSelector->itemData(index).value<WalletModel*>();
 }
 #endif
 
@@ -1259,7 +1282,7 @@ void RPCConsole::on_lineEdit_returnPressed()
 
     WalletModel* wallet_model{nullptr};
 #ifdef ENABLE_WALLET
-    wallet_model = ui->WalletSelector->currentData().value<WalletModel*>();
+    wallet_model = currentWalletModel();
 
     if (m_last_wallet_model != wallet_model) {
         if (wallet_model) {
