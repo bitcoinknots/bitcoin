@@ -19,6 +19,7 @@ class ChainstateManager;
 class PeerManager;
 class BanMan;
 namespace node {
+class DatumTracker;
 struct NodeContext;
 } // namespace node
 namespace interfaces {
@@ -30,6 +31,8 @@ CTxMemPool& EnsureMemPool(const node::NodeContext& node);
 CTxMemPool& EnsureAnyMemPool(const std::any& context);
 BanMan& EnsureBanman(const node::NodeContext& node);
 BanMan& EnsureAnyBanman(const std::any& context);
+node::DatumTracker& EnsureDatumTracker(const node::NodeContext& node);
+node::DatumTracker& EnsureAnyDatumTracker(const std::any& context);
 ArgsManager& EnsureArgsman(const node::NodeContext& node);
 ArgsManager& EnsureAnyArgsman(const std::any& context);
 ChainstateManager& EnsureChainman(const node::NodeContext& node);

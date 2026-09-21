@@ -7,6 +7,7 @@
 
 #include <chain.h>
 #include <chainparams.h>
+#include <datum.h>
 #include <chainparamsbase.h>
 #include <clientversion.h>
 #include <common/system.h>
@@ -34,6 +35,7 @@
 #include <script/descriptor.h>
 #include <script/script.h>
 #include <script/signingprovider.h>
+#include <templatediversity.h>
 #include <txmempool.h>
 #include <univalue.h>
 #include <util/check.h>
@@ -52,9 +54,11 @@ using interfaces::BlockRef;
 using interfaces::BlockTemplate;
 using interfaces::Mining;
 using node::BlockAssembler;
+using node::DatumTracker;
 using node::GetMinimumTime;
 using node::NodeContext;
 using node::RegenerateCommitments;
+using node::StripDatumPort;
 using node::UpdateTime;
 using util::ToString;
 
@@ -723,6 +727,22 @@ static RPCHelpMan getblocktemplate()
     NodeContext& node = EnsureAnyNodeContext(request.context);
     ChainstateManager& chainman = EnsureChainman(node);
     Mining& miner = EnsureMining(node);
+
+    // Proof of Datum: refuse to hand out a template to a connection this node
+    // has flagged, heuristically or by hand. This withholds a voluntary
+    // service only; it has no bearing on whether any block is valid. See
+    // src/datum.h.
+    const std::string datum_addr{StripDatumPort(request.peerAddr)};
+    if (!datum_addr.empty()) {
+        DatumTracker& datum{EnsureAnyDatumTracker(request.context)};
+        if (const auto ban{datum.IsBanned(datum_addr)}) {
+            throw JSONRPCError(RPC_MISC_ERROR,
+                strprintf("This connection is on this node's Proof of Datum list and will not be served a "
+                         "block template: %s", ban->reason));
+        }
+        datum.RecordTemplateRequest(datum_addr);
+    }
+
     LOCK(cs_main);
     uint256 tip{CHECK_NONFATAL(miner.getTip()).value().hash};
 
@@ -1185,11 +1205,27 @@ static RPCHelpMan submitblock()
         }
     }
 
+    if (auto* template_diversity{EnsureAnyNodeContext(request.context).template_diversity.get()}) {
+        template_diversity->MarkLocalSubmission(block.GetHash());
+    }
+
     bool new_block;
     auto sc = std::make_shared<submitblock_StateCatcher>(block.GetHash());
     CHECK_NONFATAL(chainman.m_options.signals)->RegisterSharedValidationInterface(sc);
     bool accepted = chainman.ProcessNewBlock(blockptr, /*force_processing=*/true, /*min_pow_checked=*/true, /*new_block=*/&new_block);
     CHECK_NONFATAL(chainman.m_options.signals)->UnregisterSharedValidationInterface(sc);
+
+    // Proof of Datum: record this submission for scoring, regardless of the
+    // outcome above. A submitted block is never refused over a Datum flag --
+    // only template service is withheld -- because refusing to relay an
+    // already-valid block helps no one and only risks delaying its
+    // propagation. See src/datum.h.
+    const std::string datum_addr{StripDatumPort(request.peerAddr)};
+    if (!datum_addr.empty() && !block.vtx.empty() && !block.vtx[0]->vin.empty() && !block.vtx[0]->vout.empty()) {
+        EnsureAnyDatumTracker(request.context).RecordSubmission(datum_addr, block.vtx[0]->vout[0].scriptPubKey,
+                                                                node::BlockStructureKey(block));
+    }
+
     if (!new_block && accepted) {
         return "duplicate";
     }
@@ -1240,6 +1276,383 @@ static RPCHelpMan submitheader()
     };
 }
 
+static UniValue DatumVerdictToJSON(const std::string& addr, const node::DatumVerdict& verdict)
+{
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("address", addr);
+    obj.pushKV("gbt_calls", verdict.stats.gbt_calls);
+    obj.pushKV("blocks_submitted", verdict.stats.blocks_submitted);
+    obj.pushKV("coinbase_reuse_pct", verdict.coinbase_reuse_pct);
+    obj.pushKV("gbt_starved", verdict.gbt_starved);
+    obj.pushKV("coinbase_stale", verdict.coinbase_stale);
+    obj.pushKV("structure_reuse_pct", verdict.structure_reuse_pct);
+    if (!verdict.dominant_structure.empty()) obj.pushKV("dominant_structure", verdict.dominant_structure);
+    if (verdict.structure_chain_share_pct) obj.pushKV("structure_chain_share_pct", *verdict.structure_chain_share_pct);
+    obj.pushKV("structure_allowed", verdict.structure_allowed);
+    obj.pushKV("pool_structure_match", verdict.pool_structure_match);
+    obj.pushKV("heuristic_match", verdict.heuristic_match);
+    obj.pushKV("flagged", verdict.flagged);
+    obj.pushKV("manually_flagged", verdict.manually_flagged);
+    if (verdict.stats.first_seen) obj.pushKV("first_seen", verdict.stats.first_seen);
+    if (verdict.stats.last_gbt_call_time) obj.pushKV("last_gbt_call_time", verdict.stats.last_gbt_call_time);
+    return obj;
+}
+
+static RPCHelpMan gettemplatediversity()
+{
+    return RPCHelpMan{"gettemplatediversity",
+        "Estimate how many independent block-template builders produced recent blocks.\n"
+        "Blocks are grouped by structure: coinbase output layout, witness commitment placement, scriptSig push layout, "
+        "locktime/sequence conventions and version-bit use. Coinbase text tags are reported but never used for grouping, "
+        "since anyone can write any tag. A structure count is a lower bound on distinct template-building software and "
+        "configurations, not a count of entities: unrelated miners running identical software share a structure, and "
+        "one operator can run several.\n"
+        "For blocks this node saw connect while synced, it also counts mempool transactions that had waited at least 60 "
+        "seconds and paid more than the block's median included feerate, yet were left out. A structure whose blocks "
+        "skip heavily in some cases but not in most is marked selection_divergent: a hint that more than one template "
+        "builder shares it.\n"
+        "Local and advisory only: this has no effect on validation, relay, or mining.\n",
+        {
+            {"nblocks", RPCArg::Type::NUM, RPCArg::Default{144}, "Number of most recent blocks to analyze (capped at 2016 and at the chain length)"},
+            {"verbose", RPCArg::Type::BOOL, RPCArg::Default{false}, "Include per-block detail"},
+        },
+        RPCResult{
+            RPCResult::Type::OBJ, "", "",
+            {
+                {RPCResult::Type::NUM, "blocks", "Blocks analyzed"},
+                {RPCResult::Type::NUM, "first_height", /*optional=*/true, "Lowest height analyzed"},
+                {RPCResult::Type::NUM, "last_height", /*optional=*/true, "Highest height analyzed"},
+                {RPCResult::Type::NUM, "unavailable_blocks", "Blocks skipped because their data is pruned or unreadable"},
+                {RPCResult::Type::NUM, "distinct_structures", "Number of distinct template structures"},
+                {RPCResult::Type::NUM, "effective_template_makers", "Inverse Simpson index over structure shares (1 means one structure built every block)"},
+                {RPCResult::Type::NUM, "largest_structure_share", "Percentage of analyzed blocks built by the most common structure"},
+                {RPCResult::Type::NUM, "divergent_structures", "Structures marked selection_divergent"},
+                {RPCResult::Type::NUM, "template_makers_lower_bound", "distinct_structures plus divergent_structures"},
+                {RPCResult::Type::NUM, "claimed_identities", "Distinct non-empty coinbase tags"},
+                {RPCResult::Type::NUM, "live_samples", "Analyzed blocks with mempool-comparison data"},
+                {RPCResult::Type::ARR, "structures", "Structures, most blocks first",
+                {
+                    {RPCResult::Type::OBJ, "", "",
+                    {
+                        {RPCResult::Type::STR, "structure", "Structure key"},
+                        {RPCResult::Type::NUM, "blocks", "Blocks with this structure"},
+                        {RPCResult::Type::NUM, "share", "Percentage of analyzed blocks"},
+                        {RPCResult::Type::ARR, "tags", "Coinbase tags seen with this structure, most blocks first",
+                        {
+                            {RPCResult::Type::OBJ, "", "",
+                            {
+                                {RPCResult::Type::STR, "tag", "Tag text (empty if none)"},
+                                {RPCResult::Type::NUM, "blocks", "Blocks with this tag"},
+                            }},
+                        }},
+                        {RPCResult::Type::NUM, "empty_blocks", "Blocks containing only a coinbase"},
+                        {RPCResult::Type::NUM, "datacarrier_blocks", "Blocks with a transaction carrying more than 83 datacarrier bytes (needs undo data)"},
+                        {RPCResult::Type::NUM, "live_samples", "Blocks with mempool-comparison data"},
+                        {RPCResult::Type::NUM, "median_skipped_txs", /*optional=*/true, "Median skipped transactions across live samples"},
+                        {RPCResult::Type::BOOL, "selection_divergent", "At least 4 live samples, with heavy skipping in at least a quarter but under three quarters of them"},
+                    }},
+                }},
+                {RPCResult::Type::ARR, "blocks_detail", /*optional=*/true, "Per-block detail, newest first (verbose only)",
+                {
+                    {RPCResult::Type::OBJ, "", "",
+                    {
+                        {RPCResult::Type::NUM, "height", "Block height"},
+                        {RPCResult::Type::STR_HEX, "hash", "Block hash"},
+                        {RPCResult::Type::STR, "structure", "Structure key"},
+                        {RPCResult::Type::STR, "tag", "Coinbase tag text (empty if none)"},
+                        {RPCResult::Type::NUM, "txs", "Transactions, including the coinbase"},
+                        {RPCResult::Type::NUM, "datacarrier_bytes", /*optional=*/true, "Total datacarrier bytes (needs undo data)"},
+                        {RPCResult::Type::NUM, "feerate_ordered_pct", /*optional=*/true, "Percentage of adjacent transaction pairs in non-increasing feerate order"},
+                        {RPCResult::Type::NUM, "median_feerate", /*optional=*/true, "Median feerate in sat/vB"},
+                        {RPCResult::Type::NUM, "eligible_txs", /*optional=*/true, "Mempool transactions old enough to have been included (live only)"},
+                        {RPCResult::Type::NUM, "skipped_txs", /*optional=*/true, "Eligible transactions paying above the block's median feerate that were left out (live only)"},
+                        {RPCResult::Type::NUM, "skipped_fees_sat", /*optional=*/true, "Fees of skipped transactions in satoshis (live only)"},
+                    }},
+                }},
+            }},
+        RPCExamples{
+            HelpExampleCli("gettemplatediversity", "")
+            + HelpExampleCli("gettemplatediversity", "2016 true")
+            + HelpExampleRpc("gettemplatediversity", "144, false")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    int nblocks{request.params[0].isNull() ? 144 : request.params[0].getInt<int>()};
+    if (nblocks < 1) throw JSONRPCError(RPC_INVALID_PARAMETER, "nblocks must be at least 1");
+    nblocks = std::min(nblocks, 2016);
+    const bool verbose{!request.params[1].isNull() && request.params[1].get_bool()};
+
+    NodeContext& node = EnsureAnyNodeContext(request.context);
+    ChainstateManager& chainman = EnsureChainman(node);
+    const node::FingerprintWindow window{node::CollectRecentFingerprints(chainman, node.template_diversity.get(), nblocks)};
+
+    const auto round2{[](double x) { return std::round(x * 100) / 100; }};
+
+    struct Structure {
+        int blocks{0};
+        std::map<std::string, int> tags;
+        int empty{0};
+        int datacarrier{0};
+        std::vector<int64_t> skipped;
+    };
+    std::map<std::string, Structure> structures;
+    std::map<std::string, int> claimed;
+    int live_samples{0};
+    for (const auto& [fp, live] : window.blocks) {
+        Structure& s{structures[fp.structure_key]};
+        ++s.blocks;
+        ++s.tags[fp.coinbase_tag];
+        if (!fp.coinbase_tag.empty()) ++claimed[fp.coinbase_tag];
+        if (fp.tx_count == 1) ++s.empty;
+        if (fp.datacarrier_txs > 0) ++s.datacarrier;
+        if (live) {
+            ++live_samples;
+            s.skipped.push_back(live->skipped_txs);
+        }
+    }
+
+    std::vector<std::pair<std::string, const Structure*>> sorted;
+    for (const auto& [key, s] : structures) sorted.emplace_back(key, &s);
+    std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+        return a.second->blocks != b.second->blocks ? a.second->blocks > b.second->blocks : a.first < b.first;
+    });
+
+    const double total{double(window.blocks.size())};
+    double simpson{0};
+    int largest{0};
+    int divergent{0};
+    UniValue structures_json(UniValue::VARR);
+    for (const auto& [key, s] : sorted) {
+        const double share{s->blocks / total};
+        simpson += share * share;
+        largest = std::max(largest, s->blocks);
+
+        UniValue obj(UniValue::VOBJ);
+        obj.pushKV("structure", key);
+        obj.pushKV("blocks", s->blocks);
+        obj.pushKV("share", round2(share * 100));
+
+        std::vector<std::pair<std::string, int>> tags(s->tags.begin(), s->tags.end());
+        std::sort(tags.begin(), tags.end(), [](const auto& a, const auto& b) {
+            return a.second != b.second ? a.second > b.second : a.first < b.first;
+        });
+        UniValue tags_json(UniValue::VARR);
+        for (const auto& [tag, count] : tags) {
+            UniValue t(UniValue::VOBJ);
+            t.pushKV("tag", tag);
+            t.pushKV("blocks", count);
+            tags_json.push_back(std::move(t));
+        }
+        obj.pushKV("tags", std::move(tags_json));
+        obj.pushKV("empty_blocks", s->empty);
+        obj.pushKV("datacarrier_blocks", s->datacarrier);
+        obj.pushKV("live_samples", uint64_t(s->skipped.size()));
+
+        bool selection_divergent{false};
+        if (!s->skipped.empty()) {
+            std::vector<int64_t> skipped{s->skipped};
+            const auto mid{skipped.begin() + skipped.size() / 2};
+            std::nth_element(skipped.begin(), mid, skipped.end());
+            obj.pushKV("median_skipped_txs", *mid);
+            if (skipped.size() >= 4) {
+                const size_t heavy = std::count_if(skipped.begin(), skipped.end(),
+                                                   [](int64_t n) { return n >= node::TEMPLATE_DIVERSITY_HEAVY_SKIP; });
+                selection_divergent = heavy * 4 >= skipped.size() && heavy * 4 < skipped.size() * 3;
+            }
+        }
+        if (selection_divergent) ++divergent;
+        obj.pushKV("selection_divergent", selection_divergent);
+        structures_json.push_back(std::move(obj));
+    }
+
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("blocks", uint64_t(window.blocks.size()));
+    if (!window.blocks.empty()) {
+        result.pushKV("first_height", window.blocks.back().first.height);
+        result.pushKV("last_height", window.blocks.front().first.height);
+    }
+    result.pushKV("unavailable_blocks", window.unavailable);
+    result.pushKV("distinct_structures", uint64_t(structures.size()));
+    result.pushKV("effective_template_makers", simpson > 0 ? round2(1 / simpson) : 0.0);
+    result.pushKV("largest_structure_share", total > 0 ? round2(largest * 100 / total) : 0.0);
+    result.pushKV("divergent_structures", divergent);
+    result.pushKV("template_makers_lower_bound", uint64_t(structures.size()) + divergent);
+    result.pushKV("claimed_identities", uint64_t(claimed.size()));
+    result.pushKV("live_samples", live_samples);
+    result.pushKV("structures", std::move(structures_json));
+
+    if (verbose) {
+        UniValue detail(UniValue::VARR);
+        for (const auto& [fp, live] : window.blocks) {
+            UniValue b(UniValue::VOBJ);
+            b.pushKV("height", fp.height);
+            b.pushKV("hash", fp.hash.GetHex());
+            b.pushKV("structure", fp.structure_key);
+            b.pushKV("tag", fp.coinbase_tag);
+            b.pushKV("txs", uint64_t(fp.tx_count));
+            if (fp.have_undo) {
+                b.pushKV("datacarrier_bytes", fp.datacarrier_bytes);
+                if (fp.feerate_ordered_pct >= 0) b.pushKV("feerate_ordered_pct", fp.feerate_ordered_pct);
+                if (fp.median_feerate >= 0) b.pushKV("median_feerate", fp.median_feerate / 1000.0);
+            }
+            if (live) {
+                b.pushKV("eligible_txs", live->eligible_txs);
+                b.pushKV("skipped_txs", live->skipped_txs);
+                b.pushKV("skipped_fees_sat", live->skipped_fees);
+            }
+            detail.push_back(std::move(b));
+        }
+        result.pushKV("blocks_detail", std::move(detail));
+    }
+    return result;
+},
+    };
+}
+
+static RPCHelpMan getdatuminfo()
+{
+    return RPCHelpMan{"getdatuminfo",
+        "\nProof of Datum: this node's read on how a connection has been using its mining RPCs.\n"
+        "This is a local, advisory heuristic, not a claim of certainty: it distinguishes a client that\n"
+        "builds its own block templates from one that only ever submits an already-built block, by how\n"
+        "often it calls getblocktemplate relative to what it submits, and how often its submitted blocks\n"
+        "reuse the same coinbase payout script, over a fairly large sample (see DATUM_MIN_SUBMISSIONS).\n"
+        "It also fingerprints each submitted block's template structure (see gettemplatediversity): if a\n"
+        "connection's blocks keep using a structure that built a large share of recent network blocks,\n"
+        "\"pool_structure_match\" is set. A structure verified to belong to self-templating software, such\n"
+        "as a common DATUM gateway release, can be exempted with -datumallowstructure.\n"
+        "\"heuristic_match\" reports whether the pattern matched; it is informational only and never by\n"
+        "itself withholds anything. \"flagged\" reports whether this node is actually refusing this\n"
+        "address a template right now, which only happens by an explicit adddatumban call, or (only\n"
+        "with -datumautoban enabled) once heuristic_match has held. See doc/proof-of-datum.md.\n"
+        "With no address given, returns every address this node has recorded activity for.\n",
+        {
+            {"address", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "Look up a single address (as shown by getpeerinfo, without a port)"},
+        },
+        RPCResult{
+            RPCResult::Type::ARR, "", "",
+            {
+                {RPCResult::Type::OBJ, "", "",
+                {
+                    {RPCResult::Type::STR, "address", "the address"},
+                    {RPCResult::Type::NUM, "gbt_calls", "getblocktemplate calls recorded from this address"},
+                    {RPCResult::Type::NUM, "blocks_submitted", "blocks accepted by submitblock from this address"},
+                    {RPCResult::Type::NUM, "coinbase_reuse_pct", "share (0-100) of recent submitted blocks sharing this address's single most common coinbase payout script"},
+                    {RPCResult::Type::BOOL, "gbt_starved", "true if blocks are being submitted with too few getblocktemplate calls behind them"},
+                    {RPCResult::Type::BOOL, "coinbase_stale", "true if one payout script dominates this address's recent submitted blocks"},
+                    {RPCResult::Type::NUM, "structure_reuse_pct", "share (0-100) of recent submitted blocks sharing this address's single most common template structure"},
+                    {RPCResult::Type::STR, "dominant_structure", /*optional=*/true, "that most common template structure"},
+                    {RPCResult::Type::NUM, "structure_chain_share_pct", /*optional=*/true, "share (0-100) of recent network blocks, excluding blocks submitted to this node, built with that structure; omitted until enough blocks have connected"},
+                    {RPCResult::Type::BOOL, "structure_allowed", "true if that structure is exempted with -datumallowstructure"},
+                    {RPCResult::Type::BOOL, "pool_structure_match", "true if this address keeps submitting blocks with a structure that built a large share of recent network blocks"},
+                    {RPCResult::Type::BOOL, "heuristic_match", "true if this address's pattern matches the built-in heuristic; informational, never enforced by itself"},
+                    {RPCResult::Type::BOOL, "flagged", "true if this node is actually refusing this address a block template right now"},
+                    {RPCResult::Type::BOOL, "manually_flagged", "true if the active flag came from a human decision (adddatumban) rather than -datumautoban"},
+                    {RPCResult::Type::NUM_TIME, "first_seen", /*optional=*/true, "when this address was first recorded"},
+                    {RPCResult::Type::NUM_TIME, "last_gbt_call_time", /*optional=*/true, "the most recent getblocktemplate call from this address"},
+                }},
+            }
+        },
+        RPCExamples{
+            HelpExampleCli("getdatuminfo", "")
+            + HelpExampleCli("getdatuminfo", "\"203.0.113.5\"")
+            + HelpExampleRpc("getdatuminfo", "")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    DatumTracker& datum{EnsureAnyDatumTracker(request.context)};
+    UniValue result(UniValue::VARR);
+    if (!request.params[0].isNull()) {
+        const std::string addr{request.params[0].get_str()};
+        result.push_back(DatumVerdictToJSON(addr, datum.GetVerdict(addr)));
+        return result;
+    }
+    for (const std::string& addr : datum.GetTrackedAddresses()) {
+        result.push_back(DatumVerdictToJSON(addr, datum.GetVerdict(addr)));
+    }
+    return result;
+},
+    };
+}
+
+static RPCHelpMan adddatumban()
+{
+    return RPCHelpMan{"adddatumban",
+        "\nManually flag an address as a Proof of Datum offender: this node will stop serving it block\n"
+        "templates. Use this for a connection you have reason to believe is a bare pool relay that the\n"
+        "heuristic in getdatuminfo did not catch on its own -- a public disclosure, someone telling you\n"
+        "directly, whatever the evidence is doesn't have to fit the heuristic's shape. Persisted across\n"
+        "restarts. Never affects whether a block from this address is accepted or relayed.\n",
+        {
+            {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The address to flag (as shown by getpeerinfo, without a port)"},
+            {"reason", RPCArg::Type::STR, RPCArg::Optional::NO, "Why: recorded for your own future reference and shown by listdatumbans"},
+        },
+        RPCResult{RPCResult::Type::NONE, "", ""},
+        RPCExamples{
+            HelpExampleCli("adddatumban", "\"203.0.113.5\" \"known SV1-only bridge, reported by operator\"")
+            + HelpExampleRpc("adddatumban", "\"203.0.113.5\", \"known SV1-only bridge, reported by operator\"")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    EnsureAnyDatumTracker(request.context).AddManualBan(request.params[0].get_str(), request.params[1].get_str());
+    return UniValue::VNULL;
+},
+    };
+}
+
+static RPCHelpMan removedatumban()
+{
+    return RPCHelpMan{"removedatumban",
+        "\nRemove a Proof of Datum flag from an address, whether it was set manually or by the heuristic.\n",
+        {
+            {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The address to unflag"},
+        },
+        RPCResult{RPCResult::Type::BOOL, "", "Whether a flag was removed"},
+        RPCExamples{
+            HelpExampleCli("removedatumban", "\"203.0.113.5\"")
+            + HelpExampleRpc("removedatumban", "\"203.0.113.5\"")
+        },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    return EnsureAnyDatumTracker(request.context).RemoveBan(request.params[0].get_str());
+},
+    };
+}
+
+static RPCHelpMan listdatumbans()
+{
+    return RPCHelpMan{"listdatumbans",
+        "\nList every address this node currently refuses a block template, manual and heuristic alike.\n",
+        {},
+        RPCResult{
+            RPCResult::Type::ARR, "", "",
+            {
+                {RPCResult::Type::OBJ, "", "",
+                {
+                    {RPCResult::Type::STR, "address", "the flagged address"},
+                    {RPCResult::Type::STR, "reason", "why it was flagged"},
+                    {RPCResult::Type::STR, "source", "\"manual\" (adddatumban) or \"heuristic\" (crossed the automatic thresholds)"},
+                    {RPCResult::Type::NUM_TIME, "time", "when the flag was set"},
+                }},
+            }
+        },
+        RPCExamples{HelpExampleCli("listdatumbans", "") + HelpExampleRpc("listdatumbans", "")},
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    UniValue result(UniValue::VARR);
+    for (const auto& [addr, entry] : EnsureAnyDatumTracker(request.context).ListBans()) {
+        UniValue obj(UniValue::VOBJ);
+        obj.pushKV("address", addr);
+        obj.pushKV("reason", entry.reason);
+        obj.pushKV("source", entry.source);
+        obj.pushKV("time", entry.time);
+        result.push_back(std::move(obj));
+    }
+    return result;
+},
+    };
+}
+
 void RegisterMiningRPCCommands(CRPCTable& t)
 {
     static const CRPCCommand commands[]{
@@ -1250,6 +1663,11 @@ void RegisterMiningRPCCommands(CRPCTable& t)
         {"mining", &getblocktemplate},
         {"mining", &submitblock},
         {"mining", &submitheader},
+        {"mining", &getdatuminfo},
+        {"mining", &adddatumban},
+        {"mining", &removedatumban},
+        {"mining", &listdatumbans},
+        {"mining", &gettemplatediversity},
 
         {"hidden", &generatetoaddress},
         {"hidden", &generatetodescriptor},

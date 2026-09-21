@@ -6,6 +6,7 @@
 
 #include <addrman.h>
 #include <banman.h>
+#include <datum.h>
 #include <interfaces/chain.h>
 #include <interfaces/mining.h>
 #include <kernel/context.h>
@@ -17,6 +18,7 @@
 #include <node/warnings.h>
 #include <policy/fees.h>
 #include <scheduler.h>
+#include <templatediversity.h>
 #include <txmempool.h>
 #include <validation.h>
 #include <validationinterface.h>

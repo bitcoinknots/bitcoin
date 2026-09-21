@@ -6,6 +6,7 @@
 
 #include <chain.h>
 #include <common/args.h>
+#include <datum.h>
 #include <net_processing.h>
 #include <node/context.h>
 #include <node/miner.h>
@@ -56,6 +57,19 @@ BanMan& EnsureBanman(const NodeContext& node)
 BanMan& EnsureAnyBanman(const std::any& context)
 {
     return EnsureBanman(EnsureAnyNodeContext(context));
+}
+
+node::DatumTracker& EnsureDatumTracker(const node::NodeContext& node)
+{
+    if (!node.datum_tracker) {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Error: Proof of Datum tracker not initialized");
+    }
+    return *node.datum_tracker;
+}
+
+node::DatumTracker& EnsureAnyDatumTracker(const std::any& context)
+{
+    return EnsureDatumTracker(EnsureAnyNodeContext(context));
 }
 
 ArgsManager& EnsureArgsman(const NodeContext& node)

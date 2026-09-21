@@ -11,6 +11,7 @@
 
 #include <addrman.h>
 #include <banman.h>
+#include <datum.h>
 #include <blockfilter.h>
 #include <chain.h>
 #include <chainparams.h>
@@ -76,6 +77,7 @@
 #include <script/sigcache.h>
 #include <stats/stats.h>
 #include <sync.h>
+#include <templatediversity.h>
 #include <torcontrol.h>
 #include <txdb.h>
 #include <txmempool.h>
@@ -132,6 +134,8 @@ using common::ResolveErrMsg;
 
 using node::ApplyArgsManOptions;
 using node::BlockManager;
+using node::DatumTracker;
+using node::TemplateDiversityTracker;
 using node::CalculateCacheSizes;
 using node::ChainstateLoadResult;
 using node::ChainstateLoadStatus;
@@ -374,6 +378,12 @@ void Shutdown(NodeContext& node)
     // CValidationInterface callbacks, flush them...
     if (node.validation_signals) node.validation_signals->FlushBackgroundCallbacks();
 
+    node.datum_tracker.reset();
+    if (node.template_diversity) {
+        if (node.validation_signals) node.validation_signals->UnregisterValidationInterface(node.template_diversity.get());
+        node.template_diversity.reset();
+    }
+
     // Stop and delete all indexes only after flushing background callbacks.
     for (auto* index : node.indexes) index->Stop();
     if (g_txindex) g_txindex.reset();
@@ -563,6 +573,8 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-addnode=<ip>", strprintf("Add a node to connect to and attempt to keep the connection open (see the addnode RPC help for more info). This option can be specified multiple times to add multiple nodes; connections are limited to %u at a time and are counted separately from the -maxconnections limit.", MAX_ADDNODE_CONNECTIONS), ArgsManager::ALLOW_ANY | ArgsManager::NETWORK_ONLY, OptionsCategory::CONNECTION);
     argsman.AddArg("-asmap=<file>", strprintf("Specify asn mapping used for bucketing of the peers (default: %s). Relative paths will be prefixed by the net-specific datadir location.", DEFAULT_ASMAP_FILENAME), ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
     argsman.AddArg("-bantime=<n>", strprintf("Default duration (in seconds) of manually configured bans (default: %u)", DEFAULT_MISBEHAVING_BANTIME), ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
+    argsman.AddArg("-datumallowstructure=<structure>", "Never treat a connection's submitted blocks as a Proof of Datum pool-structure match when they use this template structure, as shown by getdatuminfo or gettemplatediversity. Use for a structure verified to belong to self-templating software, such as a common DATUM gateway release. Can be specified multiple times", ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
+    argsman.AddArg("-datumautoban", "Automatically add a persistent Proof of Datum ban when a connection's use of getblocktemplate/submitblock matches the built-in heuristic (see getdatuminfo). Off by default: the heuristic is always visible either way, this only controls whether it acts on its own rather than leaving that decision to adddatumban (default: 0)", ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
     argsman.AddArg("-bind=<addr>[:<port>][=onion]", strprintf("Bind to given address and always listen on it (default: 0.0.0.0). Use [host]:port notation for IPv6. Append =onion to tag any incoming connections to that address and port as incoming Tor connections (default: 127.0.0.1:%u=onion, testnet3: 127.0.0.1:%u=onion, testnet4: 127.0.0.1:%u=onion, signet: 127.0.0.1:%u=onion, regtest: 127.0.0.1:%u=onion)", defaultChainParams->GetDefaultPort() + 1, testnetChainParams->GetDefaultPort() + 1, testnet4ChainParams->GetDefaultPort() + 1, signetChainParams->GetDefaultPort() + 1, regtestChainParams->GetDefaultPort() + 1), ArgsManager::ALLOW_ANY | ArgsManager::NETWORK_ONLY, OptionsCategory::CONNECTION);
     argsman.AddArg("-cjdnsreachable", "If set, then this host is configured for CJDNS (connecting to fc00::/8 addresses would lead us to the CJDNS network, see doc/cjdns.md) (default: 0)", ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
     argsman.AddArg("-connect=<ip>", "Connect only to the specified node; -noconnect disables automatic connections (the rules for this peer are the same as for -addnode). This option can be specified multiple times to connect to multiple nodes.", ArgsManager::ALLOW_ANY | ArgsManager::NETWORK_ONLY, OptionsCategory::CONNECTION);
@@ -2107,6 +2119,18 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
                                      *node.mempool, *node.warnings,
                                      peerman_opts);
     validation_signals.RegisterValidationInterface(node.peerman.get());
+
+    assert(!node.template_diversity);
+    node.template_diversity = std::make_unique<TemplateDiversityTracker>(chainman, *node.mempool);
+    validation_signals.RegisterValidationInterface(node.template_diversity.get());
+
+    // RPC is still in warmup here, so nothing can reach the Datum tracker before it exists.
+    assert(!node.datum_tracker);
+    const std::vector<std::string> datum_allowed_structures{args.GetArgs("-datumallowstructure")};
+    node.datum_tracker = std::make_unique<DatumTracker>(args.GetDataDirNet() / "datumbans.json",
+                                                        args.GetBoolArg("-datumautoban", false),
+                                                        node.template_diversity.get(),
+                                                        std::set<std::string>(datum_allowed_structures.begin(), datum_allowed_structures.end()));
 
     // ********************************************************* Step 8: start indexers
 
