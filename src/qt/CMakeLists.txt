@@ -418,6 +418,7 @@ target_link_libraries(bitcoin-qt
   core_interface
   bitcoinqt
   bitcoin_node
+  $<TARGET_NAME_IF_EXISTS:Jemalloc::Jemalloc>
 )
 
 import_plugins(bitcoin-qt)
@@ -436,6 +437,7 @@ if(WITH_MULTIPROCESS)
     bitcoinqt
     bitcoin_node
     bitcoin_ipc
+    $<TARGET_NAME_IF_EXISTS:Jemalloc::Jemalloc>
   )
   import_plugins(bitcoin-gui)
   install_binary_component(bitcoin-gui)

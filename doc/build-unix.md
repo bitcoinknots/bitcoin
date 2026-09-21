@@ -72,6 +72,10 @@ ZMQ-enabled binaries are compiled with `-DWITH_ZMQ=ON` and require the following
 
     sudo apt-get install libzmq3-dev
 
+jemalloc-enabled binaries are compiled with `-DWITH_JEMALLOC=ON` and require the following dependency:
+
+    sudo apt-get install libjemalloc-dev
+
 User-Space, Statically Defined Tracing (USDT) dependencies:
 
     sudo apt install systemtap-sdt-dev
