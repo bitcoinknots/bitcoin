@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2021-2022 The Bitcoin Core developers
+# Copyright (c) 2021-2022 The Bitcoin Knots developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,7 +7,7 @@ import sys
 import ctypes
 from bcc import BPF, USDT
 
-"""Example logging Bitcoin Core utxo set cache flushes utilizing
+"""Example logging Bitcoin Knots utxo set cache flushes utilizing
     the utxocache:flush tracepoint."""
 
 # USAGE:  ./contrib/tracing/log_utxocache_flush.py path/to/bitcoind

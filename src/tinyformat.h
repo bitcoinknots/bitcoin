@@ -142,11 +142,11 @@ namespace tfm = tinyformat;
 //------------------------------------------------------------------------------
 // Implementation details.
 #include <algorithm>
-#include <attributes.h> // Added for Bitcoin Core
+#include <attributes.h> // Added for Bitcoin Knots
 #include <iostream>
 #include <sstream>
-#include <stdexcept> // Added for Bitcoin Core
-#include <util/string.h> // Added for Bitcoin Core
+#include <stdexcept> // Added for Bitcoin Knots
+#include <util/string.h> // Added for Bitcoin Knots
 
 #ifndef TINYFORMAT_ASSERT
 #   include <cassert>
@@ -180,13 +180,13 @@ namespace tfm = tinyformat;
 
 namespace tinyformat {
 
-// Added for Bitcoin Core. Similar to std::runtime_format from C++26.
+// Added for Bitcoin Knots. Similar to std::runtime_format from C++26.
 struct RuntimeFormat {
     const std::string& fmt; // Not a string view, because tinyformat requires a c_str
     explicit RuntimeFormat(LIFETIMEBOUND const std::string& str) : fmt{str} {}
 };
 
-// Added for Bitcoin Core. Wrapper for checking format strings at compile time.
+// Added for Bitcoin Knots. Wrapper for checking format strings at compile time.
 // Unlike ConstevalFormatString this supports RunTimeFormat-wrapped std::string
 // for runtime string formatting without compile time checks.
 template <unsigned num_params>
@@ -198,7 +198,7 @@ struct FormatStringCheck {
     const char* fmt;
 };
 
-// Added for Bitcoin Core
+// Added for Bitcoin Knots
 class format_error: public std::runtime_error
 {
 public:
@@ -1167,7 +1167,7 @@ TINYFORMAT_FOREACH_ARGNUM(TINYFORMAT_MAKE_FORMAT_FUNCS)
 
 } // namespace tinyformat
 
-// Added for Bitcoin Core:
+// Added for Bitcoin Knots:
 /** Format arguments and return the string or write to given std::ostream (see tinyformat::format doc for details) */
 #define strprintf tfm::format
 

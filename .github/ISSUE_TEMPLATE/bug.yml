@@ -6,6 +6,7 @@ body:
     attributes:
       value: |
         ## This issue tracker is only for technical issues related to Bitcoin Knots.
+        ## This issue tracker is only for technical issues related to Bitcoin Knots.
 
         * General bitcoin questions and/or support requests should use Bitcoin StackExchange at https://bitcoin.stackexchange.com.
         * For reporting security issues, please read instructions at https://bitcoinknots.org/contact/
@@ -51,13 +52,14 @@ body:
       description: |
         Please copy and paste any relevant log output or attach a debug log file.
 
-        You can find the debug.log in your [data dir.](https://github.com/bitcoin/bitcoin/blob/master/doc/files.md#data-directory-location)
+        You can find the debug.log in your [data dir.](https://github.com/bitcoinknots/bitcoin/blob/29.x-knots/doc/files.md#data-directory-location)
 
         Please be aware that the debug log might contain personally identifying information.
     validations:
       required: false
   - type: dropdown
     attributes:
+      label: How did you obtain Bitcoin Knots
       label: How did you obtain Bitcoin Knots
       multiple: false
       options:
@@ -70,6 +72,8 @@ body:
   - type: input
     id: knots-version
     attributes:
+      label: What version of Bitcoin Knots are you using?
+      description: Run `bitcoind --version` or in Bitcoin-QT use `Help > About Bitcoin Knots`
       label: What version of Bitcoin Knots are you using?
       description: Run `bitcoind --version` or in Bitcoin-QT use `Help > About Bitcoin Knots`
       placeholder: e.g. v24.0.1 or master@e1bf547

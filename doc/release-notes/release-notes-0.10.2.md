@@ -1,4 +1,4 @@
-Bitcoin Core version 0.10.2 is now available from:
+Bitcoin Knots version 0.10.2 is now available from:
 
   <https://bitcoin.org/bin/bitcoin-core-0.10.2/>
 
@@ -25,7 +25,7 @@ Downgrade warning
 
 Because release 0.10.0 and later makes use of headers-first synchronization and
 parallel block download (see further), the block files and databases are not
-backwards-compatible with pre-0.10 versions of Bitcoin Core or other software:
+backwards-compatible with pre-0.10 versions of Bitcoin Knots or other software:
 
 * Blocks will be stored on disk out of order (in the order they are
 received, really), which makes it incompatible with some tools or

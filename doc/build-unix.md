@@ -1,6 +1,6 @@
 UNIX BUILD NOTES
 ====================
-Some notes on how to build Bitcoin Core in Unix.
+Some notes on how to build Bitcoin Knots in Unix.
 
 (For BSD specific instructions, see `build-*bsd.md` in this directory.)
 
@@ -24,7 +24,7 @@ distributions](#linux-distribution-specific-instructions), or the
 ## Memory Requirements
 
 C++ compilers are memory-hungry. It is recommended to have at least 1.5 GB of
-memory available when compiling Bitcoin Core. On systems with less, gcc can be
+memory available when compiling Bitcoin Knots. On systems with less, gcc can be
 tuned to conserve memory with additional `CMAKE_CXX_FLAGS`:
 
 
@@ -62,7 +62,7 @@ Berkeley DB is only required for the legacy wallet. Ubuntu and Debian have their
 but these will install Berkeley DB 5.3 or later. This will break binary wallet compatibility with the distributed
 executables, which are based on BerkeleyDB 4.8. Otherwise, you can build Berkeley DB [yourself](#berkeley-db).
 
-To build Bitcoin Core without wallet, see [*Disable-wallet mode*](#disable-wallet-mode)
+To build Bitcoin Knots without wallet, see [*Disable-wallet mode*](#disable-wallet-mode)
 
 Optional port mapping library (see: `-DWITH_MINIUPNPC=ON`):
 
@@ -117,7 +117,7 @@ Berkeley DB is only required for the legacy wallet. Fedora releases have only `l
 Berkeley DB 5.3 or later. This will break binary wallet compatibility with the distributed executables, which
 are based on Berkeley DB 4.8. Otherwise, you can build Berkeley DB [yourself](#berkeley-db).
 
-To build Bitcoin Core without wallet, see [*Disable-wallet mode*](#disable-wallet-mode)
+To build Bitcoin Knots without wallet, see [*Disable-wallet mode*](#disable-wallet-mode)
 
 Optional port mapping library (see: `-DWITH_MINIUPNPC=ON`):
 
@@ -178,7 +178,7 @@ cmake -B build -DBerkeleyDB_INCLUDE_DIR:PATH="${BDB_PREFIX}/include" -DWITH_BDB=
 
 Disable-wallet mode
 --------------------
-When the intention is to only run a P2P node, without a wallet, Bitcoin Core can
+When the intention is to only run a P2P node, without a wallet, Bitcoin Knots can
 be compiled in disable-wallet mode with:
 
     cmake -B build -DENABLE_WALLET=OFF

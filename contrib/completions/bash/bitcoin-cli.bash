@@ -4,7 +4,7 @@
 # If you want to modify this file, modify test/functional/tool_cli_completion.py and re-autogenerate
 # this file via the --overwrite test flag.
 
-# Copyright (c) 2012-2024 The Bitcoin Core developers
+# Copyright (c) 2012-2024 The Bitcoin Knots developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -37,6 +37,8 @@ _bitcoin_cli() {
         case ${words[cword-5]} in
             descriptorprocesspsbt)
                 COMPREPLY=( $( compgen -W "false true" -- "$cur" ) )
+            descriptorprocesspsbt)
+                COMPREPLY=( $( compgen -W "false true" -- "$cur" ) )
                 return 0
                 ;;
         esac
@@ -46,8 +48,12 @@ _bitcoin_cli() {
         case ${words[cword-4]} in
             createpsbt|createrawtransaction|descriptorprocesspsbt|setban)
                 COMPREPLY=( $( compgen -W "false true" -- "$cur" ) )
+            createpsbt|createrawtransaction|descriptorprocesspsbt|setban)
+                COMPREPLY=( $( compgen -W "false true" -- "$cur" ) )
                 return 0
                 ;;
+            signrawtransactionwithkey)
+                COMPREPLY=( $( compgen -W "ALL ALL|ANYONECANPAY NONE NONE|ANYONECANPAY SINGLE SINGLE|ANYONECANPAY" -- "$cur" ) )
             signrawtransactionwithkey)
                 COMPREPLY=( $( compgen -W "ALL ALL|ANYONECANPAY NONE NONE|ANYONECANPAY SINGLE SINGLE|ANYONECANPAY" -- "$cur" ) )
                 return 0
@@ -57,6 +63,8 @@ _bitcoin_cli() {
 
     if ((cword > 3)); then
         case ${words[cword-3]} in
+            addnode|converttopsbt|getdescriptoractivity|gettxout|gettxoutsetinfo)
+                COMPREPLY=( $( compgen -W "false true" -- "$cur" ) )
             addnode|converttopsbt|getdescriptoractivity|gettxout|gettxoutsetinfo)
                 COMPREPLY=( $( compgen -W "false true" -- "$cur" ) )
                 return 0
@@ -70,7 +78,12 @@ _bitcoin_cli() {
                 COMPREPLY=( $( compgen -W "false true" -- "$cur" ) )
                 return 0
                 ;;
+            converttopsbt|decoderawtransaction|finalizepsbt|getblockheader|getmempoolancestors|getmempooldescendants|getrawmempool|listmempooltransactions)
+                COMPREPLY=( $( compgen -W "false true" -- "$cur" ) )
+                return 0
+                ;;
             addnode)
+                COMPREPLY=( $( compgen -W "add onetry remove" -- "$cur" ) )
                 COMPREPLY=( $( compgen -W "add onetry remove" -- "$cur" ) )
                 return 0
                 ;;
@@ -80,6 +93,8 @@ _bitcoin_cli() {
                 ;;
             estimatesmartfee)
                 COMPREPLY=( $( compgen -W "CONSERVATIVE ECONOMICAL UNSET" -- "$cur" ) )
+            estimatesmartfee)
+                COMPREPLY=( $( compgen -W "CONSERVATIVE ECONOMICAL UNSET" -- "$cur" ) )
                 return 0
                 ;;
         esac
@@ -87,9 +102,12 @@ _bitcoin_cli() {
 
     case "$prev" in
         dumptxoutset|importmempool|loadtxoutset)
+        dumptxoutset|importmempool|loadtxoutset)
             _filedir
             return 0
             ;;
+        getrawmempool|setnetworkactive|setscriptthreadsenabled)
+            COMPREPLY=( $( compgen -W "false true" -- "$cur" ) )
         getrawmempool|setnetworkactive|setscriptthreadsenabled)
             COMPREPLY=( $( compgen -W "false true" -- "$cur" ) )
             return 0
