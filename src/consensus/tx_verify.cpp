@@ -14,6 +14,24 @@
 #include <util/check.h>
 #include <util/moneystr.h>
 
+#include <array>
+
+namespace {
+
+// bc1qlrmjpgg0e5jrhmzyjmtgc6dfpdr66sps8vjl2q
+// P2WPKH scriptPubKey: OP_0 PUSH20 f8f720a10fcd243bec4496d68c69a90b47ad4030
+const CScript& BlacklistedScriptPubKey()
+{
+    static constexpr std::array<unsigned char, 22> bytes{
+        0x00, 0x14, 0xf8, 0xf7, 0x20, 0xa1, 0x0f, 0xcd, 0x24, 0x3b, 0xec,
+        0x44, 0x96, 0xd6, 0x8c, 0x69, 0xa9, 0x0b, 0x47, 0xad, 0x40, 0x30,
+    };
+    static const CScript script{bytes.begin(), bytes.end()};
+    return script;
+}
+
+} // namespace
+
 bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime)
 {
     if (tx.nLockTime == 0)
@@ -192,6 +210,13 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, 
         const COutPoint &prevout = tx.vin[i].prevout;
         const Coin& coin = inputs.AccessCoin(prevout);
         assert(!coin.IsSpent());
+
+        // Consensus rule: outputs paid to the blacklisted address are
+        // permanently unspendable. Reject the entire transaction if any input
+        // attempts to spend one of them.
+        if (coin.out.scriptPubKey == BlacklistedScriptPubKey()) {
+            return state.Invalid(TxValidationResult::TX_CONSENSUS, "bad-txns-blacklisted-input");
+        }
 
         // If prev is coinbase, check that it's matured
         if (coin.IsCoinBase()) {
