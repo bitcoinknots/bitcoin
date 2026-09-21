@@ -19,6 +19,7 @@ from test_framework.script import (
     OP_RETURN,
     taproot_construct,
 )
+from test_framework.script_util import program_to_witness_script
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.test_node import TestNode
 from test_framework.util import assert_raises_rpc_error
@@ -29,12 +30,13 @@ from random import randbytes
 
 class DataCarrierTest(BitcoinTestFramework):
     def set_test_params(self):
-        self.num_nodes = 4
+        self.num_nodes = 5
         self.extra_args = [
             ["-acceptnonstddatacarrier=1", "-datacarrierfullcount"],
             ["-datacarrier=0"],
             ["-datacarrier=1", f"-datacarriersize={MAX_OP_RETURN_RELAY - 1}"],
             ["-datacarrier=1", "-datacarriersize=2", "-acceptnonstddatacarrier=1", "-datacarrierfullcount"],
+            ["-corepolicy=0"],  # Knots defaults: non-OP_RETURN data carriers are rejected outright
         ]
 
     def test_null_data_transaction(self, node: TestNode, data, success: bool) -> None:
@@ -92,6 +94,20 @@ class DataCarrierTest(BitcoinTestFramework):
                                     self.wallet.sendrawtransaction, from_node=node, tx_hex=tx_hex)
 
 
+    def test_data_output_transaction(self, node: TestNode, outputs, reject_reason) -> None:
+        """Send a self-transfer with extra (value, scriptPubKey) outputs; reject_reason None means it must be accepted."""
+        tx = self.wallet.create_self_transfer(fee_rate=0, confirmed_only=True)["tx"]
+        for value, script in outputs:
+            tx.vout.append(CTxOut(nValue=value, scriptPubKey=script))
+        tx.vout[0].nValue -= sum(value for value, _ in outputs) + tx.get_vsize()  # 1 sat/vbyte
+        tx_hex = tx.serialize().hex()
+
+        if reject_reason is None:
+            self.wallet.sendrawtransaction(from_node=node, tx_hex=tx_hex)
+            assert tx.rehash() in node.getrawmempool(True), f'{tx_hex} not in mempool'
+        else:
+            assert_raises_rpc_error(-26, reject_reason, self.wallet.sendrawtransaction, from_node=node, tx_hex=tx_hex)
+
     def run_test(self):
         self.wallet = MiniWallet(self.nodes[0])
 
@@ -140,6 +156,39 @@ class DataCarrierTest(BitcoinTestFramework):
 
         self.log.info("Testing an OPNet transaction (just pushing 'op') with -datacarriersize=2.")
         self.test_opnet_transaction(node=self.nodes[3], success=False)
+
+        def p2wsh(program):
+            return program_to_witness_script(0, program)
+
+        # The cases below spend confirmed coins only, so a transaction one node
+        # accepted is never the parent of one sent to another node
+        self.generate(self.nodes[0], 1, sync_fun=self.sync_blocks)
+        self.wallet.rescan_utxos()
+
+        self.log.info("Testing three P2WSH outputs at the dust threshold (an OLGA-style payload, whatever its magic).")
+        dust_run = [(330, p2wsh(randbytes(32))) for _ in range(3)]
+        self.test_data_output_transaction(node=self.nodes[4], outputs=dust_run, reject_reason="txn-datacarrier-nonstandard")
+        # Counted as 3 * 41 bytes where non-standard carriers are accepted
+        self.test_data_output_transaction(node=self.nodes[0], outputs=dust_run, reject_reason="txn-datacarrier-exceeded")
+
+        self.log.info("Testing that three outputs at the dust threshold to one script are still standard.")
+        same_script = p2wsh(randbytes(32))
+        self.test_data_output_transaction(node=self.nodes[4], outputs=[(330, same_script)] * 3, reject_reason=None)
+
+        self.log.info("Testing that a pair of anchor-sized P2WSH outputs is still standard.")
+        anchors = [(330, p2wsh(randbytes(32))) for _ in range(2)] + [(10000, p2wsh(randbytes(32)))]
+        self.test_data_output_transaction(node=self.nodes[4], outputs=anchors, reject_reason=None)
+
+        self.log.info("Testing a taproot output whose key is not on the curve.")
+        off_curve = bytes.fromhex("4420f4cd273fe68ccc6df6aaf1bd40d6f879884882386754e2c2e55cfad0b0bb")
+        self.test_data_output_transaction(node=self.nodes[4], outputs=[(10000, program_to_witness_script(1, off_curve))], reject_reason="txn-datacarrier-nonstandard")
+
+        self.log.info("Testing P2WSH outputs whose hash is padded data.")
+        padded = [(10000, p2wsh(randbytes(24) + bytes(8))) for _ in range(2)]
+        self.test_data_output_transaction(node=self.nodes[4], outputs=padded[:1], reject_reason="txn-datacarrier-nonstandard")
+        # Two of them are 82 bytes, inside the default -datacarriersize where non-standard carriers are accepted
+        self.test_data_output_transaction(node=self.nodes[0], outputs=padded, reject_reason=None)
+        self.test_data_output_transaction(node=self.nodes[3], outputs=padded, reject_reason="txn-datacarrier-exceeded")
 
 
 if __name__ == '__main__':

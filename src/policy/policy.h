@@ -241,8 +241,25 @@ static inline int64_t GetVirtualTransactionInputSize(const CTxIn& tx)
 
 std::pair<CScript, unsigned int> GetScriptForTransactionInput(CScript prevScript, const CTxIn&);
 
-std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsViewCache& view);
+/** A byte value seen this many times in one hash or key marks the output as data */
+static constexpr unsigned int DATA_OUTPUT_BYTE_MULTIPLICITY{8};
+/** A run of identical bytes this long in one hash or key marks the output as data */
+static constexpr unsigned int DATA_OUTPUT_BYTE_RUN{6};
+/** Distinct same-type 32-byte outputs at the dust threshold are data from this many up */
+static constexpr unsigned int DATA_OUTPUT_DUST_RUN{3};
+/** Taproot outputs per transaction whose key is checked to be on the curve */
+static constexpr unsigned int DATA_OUTPUT_CURVE_CHECKS{64};
 
-int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte);
+/**
+ * Find outputs whose hash or key field carries data rather than a hash or key.
+ * Returns, per output, the bytes it spends on that data (program, script
+ * length and amount, as counted for OLGA), or 0 for a real output or one the
+ * OLGA detector already counts.
+ */
+std::vector<size_t> DataOutputBytes(const CTransaction& tx);
+
+std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsViewCache& view, const std::vector<size_t>& data_outputs);
+
+int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte, const std::vector<size_t>& data_outputs);
 
 #endif // BITCOIN_POLICY_POLICY_H
