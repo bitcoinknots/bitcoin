@@ -111,8 +111,15 @@ void UniValue::push_back(UniValue val)
 void UniValue::push_backV(const std::vector<UniValue>& vec)
 {
     checkType(VARR);
-
-    values.insert(values.end(), vec.begin(), vec.end());
+    // Always snapshot the input vector to avoid iterator invalidation.
+    // Previously only direct self-append (&vec == &values) was guarded, but this
+    // also handles nested aliases like arr.push_backV(arr[0].getValues()) where vec
+    // references a nested container's values. Reallocation during insert would
+    // invalidate such references, causing undefined behavior.
+    std::vector<UniValue> snapshot = vec;
+    for (const auto& v : snapshot) {
+        push_back(v);
+    }
 }
 
 void UniValue::pushKVEnd(std::string key, UniValue val)
@@ -140,7 +147,7 @@ void UniValue::pushKVs(UniValue obj)
     obj.checkType(VOBJ);
 
     for (size_t i = 0; i < obj.keys.size(); i++)
-        pushKVEnd(std::move(obj.keys.at(i)), std::move(obj.values.at(i)));
+        pushKVEnd(std::move(obj.keys[i]), std::move(obj.values[i]));
 }
 
 void UniValue::getObjMap(std::map<std::string,UniValue>& kv) const

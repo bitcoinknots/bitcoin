@@ -2,16 +2,49 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://opensource.org/license/mit/.
 
-add_library(univalue STATIC EXCLUDE_FROM_ALL
-  lib/univalue.cpp
-  lib/univalue_get.cpp
-  lib/univalue_read.cpp
-  lib/univalue_write.cpp
-)
+# Define the CMake option (default OFF for backwards compatibility)
+option(WITH_YYJSON "Use yyjson as primary UniValue storage" OFF)
+
+# Conditional library sources based on the CMake option
+if(WITH_YYJSON)
+    # New yyjson-primary implementation
+    enable_language(C)
+    add_library(univalue STATIC EXCLUDE_FROM_ALL
+        lib/univalue_common.cpp
+        lib/univalue_yyjson.cpp
+        lib/univalue_yyjson_get.cpp
+        lib/univalue_yyjson_read.cpp
+        lib/univalue_yyjson_write.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/yyjson/yyjson.c
+    )
+    target_compile_definitions(univalue PUBLIC WITH_YYJSON)
+else()
+    # Original implementation (used when WITH_YYJSON=OFF or omitted)
+    add_library(univalue STATIC EXCLUDE_FROM_ALL
+        lib/univalue_common.cpp
+        lib/univalue.cpp
+        lib/univalue_get.cpp
+        lib/univalue_read.cpp
+        lib/univalue_write.cpp
+    )
+endif()
+
+# Include directories for univalue
+# Always include base source and include directories
 target_include_directories(univalue
-  PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
+
+# Only include yyjson headers when WITH_YYJSON is enabled
+if(WITH_YYJSON)
+    target_include_directories(univalue
+        PUBLIC
+          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/yyjson>
+    )
+    target_compile_features(univalue PRIVATE c_std_17)
+endif()
 target_link_libraries(univalue PRIVATE core_interface)
 
 if(BUILD_TESTS)
