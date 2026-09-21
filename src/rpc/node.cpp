@@ -209,6 +209,7 @@ static RPCHelpMan getgeneralinfo()
                         {RPCResult::Type::STR, "datadir", "Data directory path"},
                         {RPCResult::Type::STR, "blocksdir", "Blocks directory path"},
                         {RPCResult::Type::NUM, "startuptime", "Startup time"},
+                        {RPCResult::Type::NUM_TIME, "expiry", "Expiry timestamp (0 = disabled)"}
                     }
                 },
                 RPCExamples{
@@ -218,6 +219,7 @@ static RPCHelpMan getgeneralinfo()
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
 {
         const ArgsManager& args{EnsureAnyArgsman(request.context)};
+        int64_t expiry = g_software_expiry <= 0 ? 0 : g_software_expiry;
 
         UniValue obj(UniValue::VOBJ);
         obj.pushKV("clientversion", FormatFullVersion());
@@ -225,6 +227,8 @@ static RPCHelpMan getgeneralinfo()
         obj.pushKV("datadir", fs::PathToString(args.GetDataDirNet()));
         obj.pushKV("blocksdir", fs::PathToString(args.GetBlocksDirPath()));
         obj.pushKV("startuptime", TicksSinceEpoch<std::chrono::seconds>(NodeClock::now() - GetUptime()));
+        obj.pushKV("expiry", expiry);
+
         return obj;
 },
     };
