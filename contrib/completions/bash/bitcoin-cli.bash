@@ -90,7 +90,7 @@ _bitcoin_cli() {
             _filedir
             return 0
             ;;
-        getrawmempool|setnetworkactive|setscriptthreadsenabled)
+        dumpsettings|getrawmempool|setnetworkactive|setscriptthreadsenabled)
             COMPREPLY=( $( compgen -W "false true" -- "$cur" ) )
             return 0
             ;;
