@@ -80,11 +80,14 @@ b. Then send 99 more headers that don't connect.
    Expect: getheaders message each time.
 """
 from test_framework.blocktools import create_block, create_coinbase
-from test_framework.messages import CInv
+from test_framework.messages import (
+    CInv,
+    NODE_NETWORK,
+)
 from test_framework.p2p import (
     CBlockHeader,
-    NODE_WITNESS,
     P2PInterface,
+    P2P_SERVICES,
     p2p_lock,
     MSG_BLOCK,
     msg_block,
@@ -226,7 +229,7 @@ class SendHeadersTest(BitcoinTestFramework):
         inv_node = self.nodes[0].add_p2p_connection(BaseNode())
         # Make sure NODE_NETWORK is not set for test_node, so no block download
         # will occur outside of direct fetching
-        test_node = self.nodes[0].add_p2p_connection(BaseNode(), services=NODE_WITNESS)
+        test_node = self.nodes[0].add_p2p_connection(BaseNode(), services=P2P_SERVICES & ~NODE_NETWORK)
 
         self.test_null_locators(test_node, inv_node)
         self.test_nonnull_locators(test_node, inv_node)

@@ -100,6 +100,15 @@ SHA256_SUMS = {
     "5708fc639cdfc27347cccfd50db9b73b53647b36fb5f3a4a93537cbe8828c27f": {"tag": "v25.0", "tarball": "bitcoin-25.0-x86_64-apple-darwin.tar.gz"},
     "33930d432593e49d58a9bff4c30078823e9af5d98594d2935862788ce8a20aec": {"tag": "v25.0", "tarball": "bitcoin-25.0-x86_64-linux-gnu.tar.gz"},
 
+    "154c9b9e6e17136edc8f20fda5d252fb339e727e4a85ef49e7d8facb9085f2d3": {"tag": "v27.2", "tarball": "bitcoin-27.2-aarch64-linux-gnu.tar.gz"},
+    "fb00da13525b52a4aad091c6521f94a79879e5ca0956c2302289301f71e6303c": {"tag": "v27.2", "tarball": "bitcoin-27.2-arm-linux-gnueabihf.tar.gz"},
+    "8f2247f4786f3559d37189b58452c91623efc5fa6886c975fa9386f9ff3f1001": {"tag": "v27.2", "tarball": "bitcoin-27.2-arm64-apple-darwin.tar.gz"},
+    "566ed37e33ce529c75d9d0c72ff3894d0d5a311bd5f21be2de7495937348e454": {"tag": "v27.2", "tarball": "bitcoin-27.2-powerpc64-linux-gnu.tar.gz"},
+    "efb66cc2648b3968f7186c990640589bd6fd72d93879b0cc1ff2adef9cd377b9": {"tag": "v27.2", "tarball": "bitcoin-27.2-powerpc64le-linux-gnu.tar.gz"},
+    "0c272ec7b7bb6bdee410fb177ceaab0df0373de5aed2228ab9fb4e6128ccc793": {"tag": "v27.2", "tarball": "bitcoin-27.2-riscv64-linux-gnu.tar.gz"},
+    "6ebc56ca1397615d5a6df2b5cf6727b768e3dcac320c2d5c2f321dcaabc7efa2": {"tag": "v27.2", "tarball": "bitcoin-27.2-x86_64-apple-darwin.tar.gz"},
+    "acc223af46c178064c132b235392476f66d486453ddbd6bca6f1f8411547da78": {"tag": "v27.2", "tarball": "bitcoin-27.2-x86_64-linux-gnu.tar.gz"},
+
     "7fa582d99a25c354d23e371a5848bd9e6a79702870f9cbbf1292b86e647d0f4e": {"tag": "v28.0", "tarball": "bitcoin-28.0-aarch64-linux-gnu.tar.gz"},
     "e004b7910bedd6dd18b6c52b4eef398d55971da666487a82cd48708d2879727e": {"tag": "v28.0", "tarball": "bitcoin-28.0-arm-linux-gnueabihf.tar.gz"},
     "c8108f30dfcc7ddffab33f5647d745414ef9d3298bfe67d243fe9b9cb4df4c12": {"tag": "v28.0", "tarball": "bitcoin-28.0-arm64-apple-darwin.tar.gz"},
@@ -107,6 +116,23 @@ SHA256_SUMS = {
     "6ee1a520b638132a16725020146abea045db418ce91c02493f02f541cd53062a": {"tag": "v28.0", "tarball": "bitcoin-28.0-riscv64-linux-gnu.tar.gz"},
     "77e931bbaaf47771a10c376230bf53223f5380864bad3568efc7f4d02e40a0f7": {"tag": "v28.0", "tarball": "bitcoin-28.0-x86_64-apple-darwin.tar.gz"},
     "7fe294b02b25b51acb8e8e0a0eb5af6bbafa7cd0c5b0e5fcbb61263104a82fbc": {"tag": "v28.0", "tarball": "bitcoin-28.0-x86_64-linux-gnu.tar.gz"},
+
+    "bc5353b3cda4a32c4ab7e46feed7fdb6ad68f23430743fee2e1fe0718df78db9": {"tag": "v29.4", "tarball": "bitcoin-29.4-aarch64-linux-gnu.tar.gz"},
+    "367e5a126889ead53b645eb60c8417d0ea119f6459f4967e04d58c4bf7314815": {"tag": "v29.4", "tarball": "bitcoin-29.4-arm-linux-gnueabihf.tar.gz"},
+    "ab9d71a1fe9b32a284b3456fd62e209c7d5d08ddfa2534d048c3f6e610cdb37a": {"tag": "v29.4", "tarball": "bitcoin-29.4-arm64-apple-darwin.tar.gz"},
+    "b50698d4a0fe16d559faed16e9bbab8f908f9679fcb7e9940b295a13ed23c56b": {"tag": "v29.4", "tarball": "bitcoin-29.4-powerpc64-linux-gnu.tar.gz"},
+    "8e2953b3fb8cf38fd4c9b3a90b824720a81b87693b20b26b2474952929a9287d": {"tag": "v29.4", "tarball": "bitcoin-29.4-riscv64-linux-gnu.tar.gz"},
+    "b2e13a7f4f430c52ca96a4fca8f041b0a23ea8ea97267357751cdd9de7606cf2": {"tag": "v29.4", "tarball": "bitcoin-29.4-x86_64-apple-darwin.tar.gz"},
+    "e15bff6f6d21a315c4af25d2e8ae933a22bd51e924e0e90ab0474e1e11516331": {"tag": "v29.4", "tarball": "bitcoin-29.4-x86_64-linux-gnu.tar.gz"},
+
+    "3558b084f433d835a9b00e8ba4a2ed916c592264d68635425771877b369a08bb": {"tag": "v29.3.knots20260507", "tarball": "bitcoin-29.3.knots20260507-aarch64-linux-gnu.tar.gz"},
+    "851d5fb89bb565c55e988b5803a1e3a3ace73a63e9f170ab8b5e75a95aca57c4": {"tag": "v29.3.knots20260507", "tarball": "bitcoin-29.3.knots20260507-arm-linux-gnueabihf.tar.gz"},
+    "45e873cf6f5f975da746165e869daffc9edb39c9f3c97f305c7e8c06e00d0f18": {"tag": "v29.3.knots20260507", "tarball": "bitcoin-29.3.knots20260507-arm64-apple-darwin.tar.gz"},
+    "fb2c34bee55e6f03d810ae18940235d5ee018baeb288528478ba14beab691336": {"tag": "v29.3.knots20260507", "tarball": "bitcoin-29.3.knots20260507-powerpc64-linux-gnu.tar.gz"},
+    "c5fed9544278fb3b327a96a3463d8d653c44228b308441dfb95d09e144949b7b": {"tag": "v29.3.knots20260507", "tarball": "bitcoin-29.3.knots20260507-powerpc64le-linux-gnu.tar.gz"},
+    "2b52534d1e1229ea2079cccd2cbdd53f094bcabb33158690e495507f78ad98d6": {"tag": "v29.3.knots20260507", "tarball": "bitcoin-29.3.knots20260507-riscv64-linux-gnu.tar.gz"},
+    "e99da0ad89d84e00ab24e7aa03f92ce33140445962b1ddd4eb44817cf8eaa419": {"tag": "v29.3.knots20260507", "tarball": "bitcoin-29.3.knots20260507-x86_64-apple-darwin.tar.gz"},
+    "383c6ac982972005c3db30af9ac5410f30ef0c139365e50a2db28625160e61d6": {"tag": "v29.3.knots20260507", "tarball": "bitcoin-29.3.knots20260507-x86_64-linux-gnu.tar.gz"},
 }
 
 
@@ -137,8 +163,12 @@ def download_binary(tag, args) -> int:
         platform = "osx64"
     tarball = 'bitcoin-{tag}-{platform}.tar.gz'.format(
         tag=tag[1:], platform=platform)
-    tarballUrl = 'https://bitcoincore.org/{bin_path}/{tarball}'.format(
-        bin_path=bin_path, tarball=tarball)
+    if ".knots" in tag:
+        major_version = tag[1:].split(".", 1)[0]
+        tarballUrl = f'https://bitcoinknots.org/files/{major_version}.x/{tag[1:]}/{tarball}'
+    else:
+        tarballUrl = 'https://bitcoincore.org/{bin_path}/{tarball}'.format(
+            bin_path=bin_path, tarball=tarball)
 
     print('Fetching: {tarballUrl}'.format(tarballUrl=tarballUrl))
 
@@ -206,7 +236,7 @@ def download_binary(tag, args) -> int:
 
 
 def build_release(tag, args) -> int:
-    githubUrl = "https://github.com/bitcoin/bitcoin"
+    githubUrl = "https://github.com/bitcoinknots/bitcoin" if ".knots" in tag else "https://github.com/bitcoin/bitcoin"
     if args.remove_dir:
         if Path(tag).is_dir():
             shutil.rmtree(tag)

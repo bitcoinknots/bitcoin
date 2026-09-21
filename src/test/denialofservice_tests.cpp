@@ -108,6 +108,64 @@ BOOST_AUTO_TEST_CASE(outbound_slow_chain_eviction)
     peerman.FinalizeNode(dummyNode1);
 }
 
+BOOST_AUTO_TEST_CASE(headers_sync_requires_blake2b)
+{
+    LOCK(NetEventsInterface::g_msgproc_mutex);
+
+    ConnmanTestMsg& connman = static_cast<ConnmanTestMsg&>(*m_node.connman);
+    PeerManager& peerman = *m_node.peerman;
+    NodeId id{0};
+
+    const auto has_getheaders = [](CNode& node) {
+        LOCK(node.cs_vSend);
+        const auto& [to_send, _more, msg_type] = node.m_transport->GetBytesToSend(!node.vSendMsg.empty());
+        return (!to_send.empty() && msg_type == NetMsgType::GETHEADERS) ||
+               std::any_of(node.vSendMsg.begin(), node.vSendMsg.end(), [](const CSerializedNetMsg& msg) {
+                   return msg.m_type == NetMsgType::GETHEADERS;
+               });
+    };
+
+    CNode legacy_peer{id++,
+                      /*sock=*/nullptr,
+                      CAddress{ip(0xa0b0c001), NODE_NONE},
+                      /*nKeyedNetGroupIn=*/0,
+                      /*nLocalHostNonceIn=*/0,
+                      CAddress(),
+                      /*addrNameIn=*/"",
+                      ConnectionType::MANUAL,
+                      /*inbound_onion=*/false,
+                      /*network_key=*/0};
+    connman.Handshake(
+        /*node=*/legacy_peer,
+        /*successfully_connected=*/true,
+        /*remote_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS),
+        /*local_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_BLAKE2B),
+        /*version=*/PROTOCOL_VERSION,
+        /*relay_txs=*/true);
+    BOOST_CHECK(!has_getheaders(legacy_peer));
+    peerman.FinalizeNode(legacy_peer);
+
+    CNode blake2b_peer{id++,
+                      /*sock=*/nullptr,
+                      CAddress{ip(0xa0b0c002), NODE_NONE},
+                      /*nKeyedNetGroupIn=*/0,
+                      /*nLocalHostNonceIn=*/0,
+                      CAddress(),
+                      /*addrNameIn=*/"",
+                      ConnectionType::MANUAL,
+                      /*inbound_onion=*/false,
+                      /*network_key=*/0};
+    connman.Handshake(
+        /*node=*/blake2b_peer,
+        /*successfully_connected=*/true,
+        /*remote_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_BLAKE2B),
+        /*local_services=*/ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_BLAKE2B),
+        /*version=*/PROTOCOL_VERSION,
+        /*relay_txs=*/true);
+    BOOST_CHECK(has_getheaders(blake2b_peer));
+    peerman.FinalizeNode(blake2b_peer);
+}
+
 struct OutboundTest : TestingSetup {
 void AddRandomOutboundPeer(NodeId& id, std::vector<CNode*>& vNodes, PeerManager& peerLogic, ConnmanTestMsg& connman, ConnectionType connType, bool onion_peer = false)
 {
