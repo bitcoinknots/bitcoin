@@ -16,9 +16,12 @@ from test_framework.script import (
     OP_1,
     OP_2DROP,
     OP_DROP,
+    OP_ENDIF,
+    OP_NOTIF,
     OP_RETURN,
     taproot_construct,
 )
+from test_framework.script_util import script_to_p2wsh_script
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.test_node import TestNode
 from test_framework.util import assert_raises_rpc_error
@@ -29,12 +32,13 @@ from random import randbytes
 
 class DataCarrierTest(BitcoinTestFramework):
     def set_test_params(self):
-        self.num_nodes = 4
+        self.num_nodes = 5
         self.extra_args = [
             ["-acceptnonstddatacarrier=1", "-datacarrierfullcount"],
             ["-datacarrier=0"],
             ["-datacarrier=1", f"-datacarriersize={MAX_OP_RETURN_RELAY - 1}"],
             ["-datacarrier=1", "-datacarriersize=2", "-acceptnonstddatacarrier=1", "-datacarrierfullcount"],
+            ["-corepolicy=0"],  # the Knots default; the framework passes -corepolicy to every other node
         ]
 
     def test_null_data_transaction(self, node: TestNode, data, success: bool) -> None:
@@ -92,6 +96,39 @@ class DataCarrierTest(BitcoinTestFramework):
                                     self.wallet.sendrawtransaction, from_node=node, tx_hex=tx_hex)
 
 
+    def test_dead_branch_witness(self, node: TestNode, success: bool) -> None:
+        # A P2WSH script that pushes data inside a branch the guard makes dead:
+        # OP_1 makes OP_NOTIF skip its branch, so the push cannot affect the
+        # spend. This is the JXL-n-hide witness shape; the OP_FALSE OP_IF
+        # inscription envelope is the same idea with the constant reversed.
+        witness_script = CScript([OP_1, OP_NOTIF, b'\xab' * 10, OP_ENDIF, OP_1])
+
+        utxo = self.wallet.get_utxo()
+        funding_value = int(utxo['value'] * 100_000_000) - 1000
+        funding_tx = CTransaction()
+        funding_tx.version = 2
+        funding_tx.vin = [CTxIn(COutPoint(int(utxo['txid'], 16), utxo['vout']))]
+        funding_tx.vout = [CTxOut(funding_value, script_to_p2wsh_script(witness_script))]
+        self.wallet.sign_tx(funding_tx)
+        funding_tx.rehash()
+        self.nodes[0].sendrawtransaction(funding_tx.serialize().hex())
+        self.generate(self.nodes[0], 1, sync_fun=self.sync_blocks)
+
+        spend_tx = CTransaction()
+        spend_tx.version = 2
+        spend_tx.vin = [CTxIn(COutPoint(int(funding_tx.hash, 16), 0))]
+        spend_tx.vout = [CTxOut(funding_value - 1000, script_to_p2wsh_script(witness_script))]
+        spend_tx.wit.vtxinwit = [CTxInWitness()]
+        spend_tx.wit.vtxinwit[0].scriptWitness.stack = [bytes(witness_script)]
+        tx_hex = spend_tx.serialize().hex()
+
+        if success:
+            self.wallet.sendrawtransaction(from_node=node, tx_hex=tx_hex)
+            assert spend_tx.rehash() in node.getrawmempool(True)
+        else:
+            assert_raises_rpc_error(-26, "txn-datacarrier-nonstandard",
+                                    self.wallet.sendrawtransaction, from_node=node, tx_hex=tx_hex)
+
     def run_test(self):
         self.wallet = MiniWallet(self.nodes[0])
 
@@ -140,6 +177,10 @@ class DataCarrierTest(BitcoinTestFramework):
 
         self.log.info("Testing an OPNet transaction (just pushing 'op') with -datacarriersize=2.")
         self.test_opnet_transaction(node=self.nodes[3], success=False)
+
+        self.log.info("Testing data in a dead witness branch: rejected under the Knots default, accepted where non-standard carriers are allowed.")
+        self.test_dead_branch_witness(node=self.nodes[4], success=False)
+        self.test_dead_branch_witness(node=self.nodes[0], success=True)
 
 
 if __name__ == '__main__':

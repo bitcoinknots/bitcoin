@@ -1658,6 +1658,32 @@ BOOST_AUTO_TEST_CASE(script_DataCarrierBytes)
     BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(olga_header, 1));
     // OGLA with extra outputs still is OLGA
     BOOST_CHECK_EQUAL("0+82", DatacarrierBytesStr(olga_header, 3));
+
+    // A dead branch guarded by a true constant before OP_NOTIF is data, the
+    // mirror of the OP_FALSE OP_IF envelope above (JXL-n-hide witness shape).
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_1 << OP_NOTIF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_16 << OP_NOTIF << OP_7 << OP_ENDIF));
+    // Empty dead branch counts its span, same as OP_FALSE OP_IF OP_ENDIF.
+    BOOST_CHECK_EQUAL("0+3", DatacarrierBytesStr(CScript() << OP_TRUE << OP_NOTIF << OP_ENDIF));
+    // A live branch is not data: false before OP_NOTIF, or true before OP_IF.
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << OP_0 << OP_NOTIF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << OP_1 << OP_IF << OP_7 << OP_ENDIF));
+    // A conditional guarded by a value computed at runtime, not by a preceding
+    // constant push, is not a dead branch and is not counted. This is the shape
+    // spendable scripts use (Lightning, miniscript), so they are unaffected.
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << OP_1 << OP_1 << OP_EQUAL << OP_IF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << OP_1 << OP_1 << OP_EQUAL << OP_NOTIF << OP_7 << OP_ENDIF));
+    // The guard can be a data push, judged by its value: a zero push is false
+    // (dead OP_IF), a one push is true (dead OP_NOTIF); the reverse is live.
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << "00"_hex << OP_IF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << "01"_hex << OP_NOTIF << OP_7 << OP_ENDIF));
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << "01"_hex << OP_IF << OP_7 << OP_ENDIF));
+    // The witness script shape from JXL-n-hide tx 23e8f946...: OP_1 OP_NOTIF,
+    // six 255-byte pushes, OP_ENDIF OP_1. The whole dead branch is counted.
+    CScript jxl_witness = CScript() << OP_1 << OP_NOTIF;
+    for (int i = 0; i < 6; ++i) jxl_witness << std::vector<unsigned char>(255, 0xab);
+    jxl_witness << OP_ENDIF << OP_1;
+    BOOST_CHECK_EQUAL("0+1545", DatacarrierBytesStr(jxl_witness));
 }
 
 BOOST_AUTO_TEST_CASE(script_GetScriptForTransactionInput)
