@@ -2,15 +2,15 @@
 
 #### Preparation
 
-As of Bitcoin Core v22.0, releases are signed by a number of public keys on the basis
-of the [guix.sigs repository](https://github.com/bitcoin-core/guix.sigs/). When
+Bitcoin Knots releases from 23.x onwards are signed by a number of public keys on the
+basis of the [guix.sigs repository](https://github.com/bitcoinknots/guix.sigs/). When
 verifying binary downloads, you (the end user) decide which of these public keys you
 trust and then use that trust model to evaluate the signature on a file that contains
 hashes of the release binaries. The downloaded binaries are then hashed and compared to
 the signed checksum file.
 
 First, you have to figure out which public keys to recognize. Browse the [list of frequent
-builder-keys](https://github.com/bitcoin-core/guix.sigs/tree/main/builder-keys) and
+builder-keys](https://github.com/bitcoinknots/guix.sigs/tree/knots/builder-keys) and
 decide which of these keys you would like to trust. For each key you want to trust, you
 must obtain that key for your local GPG installation.
 
@@ -23,7 +23,9 @@ You can obtain these keys by
 #### Usage
 
 This script attempts to download the checksum file (`SHA256SUMS`) and corresponding
-signature file `SHA256SUMS.asc` from https://bitcoincore.org and https://bitcoin.org.
+signature file `SHA256SUMS.asc` from https://bitcoinknots.org and https://github.com.
+Only final releases are published on GitHub, so for a release candidate the check falls
+back to bitcoinknots.org alone.
 
 It first checks if the checksum file is valid based upon a plurality of signatures, and
 then downloads the release files specified in the checksum file, and checks if the
@@ -42,37 +44,44 @@ See the `Config` object for various options.
 
 Validate releases with default settings:
 ```sh
-./contrib/verify-binaries/verify.py pub 22.0
-./contrib/verify-binaries/verify.py pub 22.0-rc3
+./contrib/verify-binaries/verify.py pub 29.4.1.knots20260508
+./contrib/verify-binaries/verify.py pub 29.4.1.knots20260508rc1
 ```
+
+Note that the release candidate suffix is appended directly to the version, without a
+separator, matching the release tag.
 
 Get JSON output and don't prompt for user input (no auto key import):
 
 ```sh
-./contrib/verify-binaries/verify.py --json pub 22.0-x86
-./contrib/verify-binaries/verify.py --json pub 23.0-rc5-linux-gnu
+./contrib/verify-binaries/verify.py --json pub 29.4.1.knots20260508-x86_64
+./contrib/verify-binaries/verify.py --json pub 29.4.1.knots20260508rc1-linux-gnu
 ```
 
 Rely only on local GPG state and manually specified keys, while requiring a
-threshold of at least 10 trusted signatures:
+threshold of at least 5 good signatures:
 ```sh
 ./contrib/verify-binaries/verify.py \
-    --trusted-keys 74E2DEF5D77260B98BC19438099BAD163C70FBFA,9D3CC86A72F8494342EA5FD10A41BDC3F4FAFF1C \
-    --min-good-sigs 10 pub 22.0-linux
+    --trusted-keys <fingerprint>,<fingerprint> \
+    --min-good-sigs 5 pub 29.4.1.knots20260508-linux
 ```
 
 If you only want to download the binaries for a certain architecture and/or platform, add the corresponding suffix, e.g.:
 
 ```sh
-./contrib/verify-binaries/verify.py pub 25.2-x86_64-linux
-./contrib/verify-binaries/verify.py pub 24.1-rc1-darwin
-./contrib/verify-binaries/verify.py pub 27.0-win64-setup.exe
+./contrib/verify-binaries/verify.py pub 29.4.1.knots20260508-x86_64-linux
+./contrib/verify-binaries/verify.py pub 29.4.1.knots20260508rc1-darwin
+./contrib/verify-binaries/verify.py pub 29.4.1.knots20260508-win64-setup-pgpverifiable.exe
 ```
+
+Note that intermediate build artifacts (`*-debug`, `*-unsigned`, `*-codesigning` and
+`*-codesignatures`) are skipped, since they are not release binaries and the debug
+archives are very large.
 
 If you do not want to keep the downloaded binaries, specify the cleanup option.
 
 ```sh
-./contrib/verify-binaries/verify.py pub --cleanup 22.0
+./contrib/verify-binaries/verify.py pub --cleanup 29.4.1.knots20260508
 ```
 
 Use the bin subcommand to verify all files listed in a local checksum file
@@ -85,6 +94,6 @@ Verify only a subset of the files listed in a local checksum file
 
 ```sh
 ./contrib/verify-binaries/verify.py bin ~/Downloads/SHA256SUMS \
-    ~/Downloads/bitcoin-24.0.1-x86_64-linux-gnu.tar.gz \
-    ~/Downloads/bitcoin-24.0.1-arm-linux-gnueabihf.tar.gz
+    ~/Downloads/bitcoin-29.4.1.knots20260508-x86_64-linux-gnu.tar.gz \
+    ~/Downloads/bitcoin-29.4.1.knots20260508-arm-linux-gnueabihf.tar.gz
 ```
