@@ -265,4 +265,35 @@ BOOST_AUTO_TEST_CASE(powchange_permitted_difficulty_transition)
     BOOST_CHECK(!PermittedDifficultyTransition(params, boundary_height, tip_nbits, beyond_window.GetCompact()));
 }
 
+
+/* BIP94's timewarp guard is inherited as testnet4/regtest-only. On a chain
+   whose security budget is a fraction of Siacoin's fleet, a majority is a much
+   smaller thing to acquire than it is today, so the rule is worth having from
+   the hardfork onward. Gating on height rather than flipping enforce_BIP94
+   keeps every pre-fork block valid. */
+BOOST_AUTO_TEST_CASE(timewarp_rule_starts_at_blake2b_height)
+{
+    Consensus::Params mainnet = CreateChainParams(*m_node.args, ChainType::MAIN)->GetConsensus();
+    BOOST_CHECK(!mainnet.enforce_BIP94);
+
+    // Mainnet's fork is at 961640: off below it, on at and above it.
+    BOOST_CHECK_EQUAL(mainnet.Blake2bHeight, 961640);
+    BOOST_CHECK(!mainnet.EnforceTimewarpRule(0));
+    BOOST_CHECK(!mainnet.EnforceTimewarpRule(mainnet.Blake2bHeight - 1));
+    BOOST_CHECK(mainnet.EnforceTimewarpRule(mainnet.Blake2bHeight));
+    BOOST_CHECK(mainnet.EnforceTimewarpRule(mainnet.Blake2bHeight + 2016));
+
+    // With no fork scheduled the rule is inert at every height.
+    mainnet.Blake2bHeight = std::numeric_limits<int>::max();
+    BOOST_CHECK(!mainnet.EnforceTimewarpRule(0));
+    BOOST_CHECK(!mainnet.EnforceTimewarpRule(961640));
+    BOOST_CHECK(!mainnet.EnforceTimewarpRule(900000000));
+
+    // Chains that already enforce it are unchanged, fork scheduled or not.
+    const Consensus::Params testnet4 = CreateChainParams(*m_node.args, ChainType::TESTNET4)->GetConsensus();
+    BOOST_CHECK(testnet4.enforce_BIP94);
+    BOOST_CHECK(testnet4.EnforceTimewarpRule(0));
+    BOOST_CHECK(testnet4.EnforceTimewarpRule(961640));
+}
+
 BOOST_AUTO_TEST_SUITE_END()
