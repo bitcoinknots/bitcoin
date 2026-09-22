@@ -418,6 +418,10 @@ private:
      */
     int m_last_block_processed_height GUARDED_BY(cs_wallet) = -1;
 
+    /** Median-time-past of the last block processed, for GetTxBlocksToMaturity
+     * while the long coinbase maturity rule is scheduled. 0 when unknown. */
+    int64_t m_last_block_processed_mtp GUARDED_BY(cs_wallet) = 0;
+
     /**
      * The following is used to track whether a confirmed transaction is in
      * a block that background validation hasn't checked yet, or above the
@@ -546,7 +550,8 @@ public:
     /**
      * @return number of blocks to maturity for this transaction:
      *  0 : is not a coinbase transaction, or is a mature coinbase transaction
-     * >0 : is a coinbase transaction which matures in this many blocks
+     * >0 : is a coinbase transaction which matures in this many blocks (an
+     *      estimate while the long coinbase maturity policy time is what holds it)
      */
     int GetTxBlocksToMaturity(const CWalletTx& wtx) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     bool IsTxImmatureCoinBase(const CWalletTx& wtx) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);

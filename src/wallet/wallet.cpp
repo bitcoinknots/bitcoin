@@ -32,6 +32,7 @@
 #include <node/types.h>
 #include <outputtype.h>
 #include <policy/feerate.h>
+#include <policy/policy.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
 #include <psbt.h>
@@ -684,6 +685,10 @@ void CWallet::SetLastBlockProcessedInMem(int block_height, uint256 block_hash)
 
     m_last_block_processed = block_hash;
     m_last_block_processed_height = block_height;
+    m_last_block_processed_mtp = 0;
+    if (block_height >= 0 && HaveChain() && chain().coinbaseMaturityLongScheduled()) {
+        chain().findBlock(block_hash, FoundBlock().mtpTime(m_last_block_processed_mtp));
+    }
 }
 
 void CWallet::SetLastBlockProcessed(int block_height, uint256 block_hash)
@@ -3646,7 +3651,30 @@ int CWallet::GetTxBlocksToMaturity(const CWalletTx& wtx) const
     }
     int chain_depth = GetTxDepthInMainChain(wtx);
     assert(chain_depth >= 0); // coinbase tx should not be conflicted
-    return std::max(0, (COINBASE_MATURITY + 1) - chain_depth);
+    const int blocks_to_maturity{std::max(0, (COINBASE_MATURITY + 1) - chain_depth)};
+
+    // While the long coinbase maturity rule is scheduled, policy also holds
+    // every coinbase for COINBASE_MATURITY_POLICY_TIME of median time past
+    // (see MemPoolAccept::PreChecks), so count the blocks that will take
+    const auto* conf{wtx.state<TxStateConfirmed>()};
+    if (!conf || !HaveChain() || !chain().coinbaseMaturityLongScheduled()) {
+        return blocks_to_maturity;
+    }
+    if (!wtx.m_confirmed_block_mtp || wtx.m_confirmed_block_mtp->first != conf->confirmed_block_hash) {
+        int64_t mtp;
+        if (!chain().findBlock(conf->confirmed_block_hash, FoundBlock().mtpTime(mtp))) {
+            return blocks_to_maturity;
+        }
+        wtx.m_confirmed_block_mtp = std::make_pair(conf->confirmed_block_hash, mtp);
+    }
+    const int64_t mature_time{wtx.m_confirmed_block_mtp->second + COINBASE_MATURITY_POLICY_TIME};
+    if (m_last_block_processed_mtp >= mature_time) {
+        return blocks_to_maturity;
+    }
+    // An estimate, refreshed as each block is processed
+    const int64_t spacing{Params().GetConsensus().nPowTargetSpacing};
+    const int64_t blocks_to_mature_time{(mature_time - m_last_block_processed_mtp - 1) / spacing + 1};
+    return std::max<int64_t>(blocks_to_maturity, std::min<int64_t>(blocks_to_mature_time, std::numeric_limits<int>::max()));
 }
 
 bool CWallet::IsTxImmatureCoinBase(const CWalletTx& wtx) const

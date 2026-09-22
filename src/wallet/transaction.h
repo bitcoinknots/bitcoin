@@ -18,6 +18,7 @@
 #include <bitset>
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -236,6 +237,11 @@ public:
     mutable bool m_is_cache_empty{true};
     mutable bool fChangeCached;
     mutable CAmount nChangeCached;
+    /**
+     * Median-time-past of the block this transaction is confirmed in, with
+     * that block's hash; cached by CWallet::GetTxBlocksToMaturity.
+     */
+    mutable std::optional<std::pair<uint256, int64_t>> m_confirmed_block_mtp;
 
     CWalletTx(CTransactionRef tx, const TxState& state) : tx(std::move(tx)), m_state(state)
     {
