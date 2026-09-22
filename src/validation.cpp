@@ -449,6 +449,10 @@ void Chainstate::MaybeUpdateMempoolForReorg(
                 if (mempool_spend_height - coin.nHeight < COINBASE_MATURITY) {
                     return true;
                 }
+                if (consensusParams.CoinbaseMaturityLongScheduled() &&
+                    Assert(m_chain[static_cast<int>(coin.nHeight)])->GetMedianTimePast() + COINBASE_MATURITY_POLICY_TIME > tip.GetMedianTimePast()) {
+                    return true;
+                }
             }
         }
         // Transaction is still valid and cached LockPoints are updated.
@@ -1031,6 +1035,22 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     if (!Consensus::CheckTxInputs(tx, state, m_view, block_height_next, ws.m_base_fees, CheckTxInputsRules::OutputSizeLimit,
                                   consensusParams.CoinbaseMaturityLongHeldFrom(block_height_next, tip.GetMedianTimePast()))) {
         return false; // state filled in by CheckTxInputs
+    }
+
+    // While the long coinbase maturity rule is scheduled, policy holds every
+    // coinbase for COINBASE_MATURITY_POLICY_TIME of median time past: covered
+    // coinbases then stay unspendable for at least that long whatever the
+    // block rate, and each of them is released on its own once its time is up
+    if (consensusParams.CoinbaseMaturityLongScheduled()) {
+        for (const CTxIn& txin : tx.vin) {
+            const Coin& coin{m_view.AccessCoin(txin.prevout)};
+            if (!coin.IsCoinBase()) continue;
+            const CBlockIndex& minting_block{*Assert(m_active_chainstate.m_chain[static_cast<int>(coin.nHeight)])};
+            if (minting_block.GetMedianTimePast() + COINBASE_MATURITY_POLICY_TIME > tip.GetMedianTimePast()) {
+                return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, "bad-txns-premature-spend-of-coinbase",
+                                     strprintf("tried to spend coinbase of block %d less than %d seconds of median time past old", coin.nHeight, COINBASE_MATURITY_POLICY_TIME));
+            }
+        }
     }
 
     if (m_pool.m_opts.minrelaymaturity) {

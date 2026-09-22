@@ -45,6 +45,9 @@ static constexpr unsigned int MINIMUM_BLOCK_RESERVED_WEIGHT{2000};
 static constexpr unsigned int DEFAULT_BLOCK_MIN_TX_FEE{1000};
 /** The maximum weight for transactions we're willing to relay/mine */
 static constexpr int32_t MAX_STANDARD_TX_WEIGHT{400000};
+/** Median time past a coinbase must have aged for before a spend of it is relayed/mined, while
+ *  the long coinbase maturity rule is scheduled (Consensus::Params::CoinbaseMaturityLongScheduled) */
+static constexpr int64_t COINBASE_MATURITY_POLICY_TIME{365 * 24 * 60 * 60};
 /** The minimum non-witness size for transactions we're willing to relay/mine: one larger than 64  */
 static constexpr unsigned int MIN_STANDARD_TX_NONWITNESS_SIZE{65};
 /** Maximum number of signature check operations in an IsStandard() P2SH script */

@@ -19,6 +19,7 @@ from test_framework.wallet import MiniWallet
 
 LONG_START_HEIGHT = 2
 LONG_ENFORCE_HEIGHT = LONG_START_HEIGHT + COINBASE_MATURITY + 2
+COINBASE_MATURITY_POLICY_TIME = 365 * 24 * 60 * 60
 DEPLOYMENT = "long_coinbase_maturity"
 REJECT_REASON = "bad-txns-premature-spend-of-coinbase"
 
@@ -83,10 +84,10 @@ class LongCoinbaseMaturityTest(BitcoinTestFramework):
         self.generate(wallet, COINBASE_MATURITY)
         self.assert_deployment(active=False)
 
-        self.log.info("Before enforcement, generation spends are relayed at ordinary maturity")
+        self.log.info("Policy holds every generation spend for a year of median time past")
         coinbase_txid = node.getblock(node.getblockhash(1))["tx"][0]
         coinbase_spend = wallet.create_self_transfer(utxo_to_spend=wallet.get_utxo(txid=coinbase_txid))
-        node.sendrawtransaction(coinbase_spend["hex"])
+        assert_raises_rpc_error(-26, REJECT_REASON, node.sendrawtransaction, coinbase_spend["hex"])
 
         self.log.info("Consensus accepts pre-window rewards at ordinary maturity")
         block = self.create_next_block([coinbase_spend["tx"]])
@@ -127,10 +128,23 @@ class LongCoinbaseMaturityTest(BitcoinTestFramework):
         self.assert_deployment(active=False)
         coinbase_txid = node.getblock(node.getblockhash(LONG_START_HEIGHT))["tx"][0]
         release_spend = wallet.create_self_transfer(utxo_to_spend=wallet.get_utxo(txid=coinbase_txid))
-        node.sendrawtransaction(release_spend["hex"])
-        node.sendrawtransaction(coinbase_spend["hex"])
+
+        self.log.info("Policy still holds released rewards until their year is up")
+        assert_raises_rpc_error(-26, REJECT_REASON, node.sendrawtransaction, release_spend["hex"])
+        assert_raises_rpc_error(-26, REJECT_REASON, node.sendrawtransaction, coinbase_spend["hex"])
         block = self.create_next_block([release_spend["tx"], coinbase_spend["tx"]])
         assert_equal(node.submitblock(block.serialize().hex()), None)
+
+        self.log.info("Policy relays generation spends once they are a year of median time past old")
+        coinbase_txid = node.getblock(node.getblockhash(5))["tx"][0]
+        year_spend = wallet.create_self_transfer(utxo_to_spend=wallet.get_utxo(txid=coinbase_txid))
+        node.setmocktime(self.start_time + COINBASE_MATURITY_POLICY_TIME + 10000)
+        self.generate(wallet, 5)
+        assert_raises_rpc_error(-26, REJECT_REASON, node.sendrawtransaction, year_spend["hex"])
+        self.generate(wallet, 1)
+        node.sendrawtransaction(year_spend["hex"])
+        assert_equal(node.getrawmempool(), [year_spend["txid"]])
+        self.generate(wallet, 1)
         assert_equal(node.getrawmempool(), [])
 
 
