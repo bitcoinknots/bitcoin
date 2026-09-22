@@ -16,9 +16,9 @@ from test_framework.wallet import MiniWallet
 
 LONG_START_HEIGHT = 2
 LONG_ENFORCE_HEIGHT = LONG_START_HEIGHT + COINBASE_MATURITY + 2
-LONG_RELEASE_HEIGHT = LONG_ENFORCE_HEIGHT + 2
+LONG_RELEASE_TIME = 4102444800  # 2100-01-01, never reached
 LONG_ARGS = [
-    f"-testcoinbasematuritylong={LONG_START_HEIGHT}:{LONG_ENFORCE_HEIGHT}:{LONG_RELEASE_HEIGHT}",
+    f"-testcoinbasematuritylong={LONG_START_HEIGHT}:{LONG_ENFORCE_HEIGHT}:{LONG_RELEASE_TIME}",
     "-checkmempool=1",
 ]
 

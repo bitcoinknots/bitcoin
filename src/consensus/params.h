@@ -6,7 +6,6 @@
 #ifndef BITCOIN_CONSENSUS_PARAMS_H
 #define BITCOIN_CONSENSUS_PARAMS_H
 
-#include <consensus/consensus.h>
 #include <uint256.h>
 
 #include <chrono>
@@ -153,13 +152,39 @@ struct Params {
      * behaviour is unchanged on chains that do not set it.
      */
     int64_t RdtsExpiryTime{std::numeric_limits<int64_t>::min()};
-    int CoinbaseMaturityLong{COINBASE_MATURITY};
+    /**
+     * Long coinbase maturity temporary softfork.
+     *
+     * From CoinbaseMaturityLongEnforceHeight, coinbases of height
+     * CoinbaseMaturityLongStartHeight or later cannot be spent at any depth
+     * until the rule is released. A block is past release when its parent's
+     * median-time-past has reached CoinbaseMaturityLongReleaseTime (the same
+     * boundary as RdtsExpiryTime), so the boundary is monotone along any
+     * chain and the rules for the next block are knowable in advance. Every
+     * other coinbase needs COINBASE_MATURITY as always.
+     *
+     * The defaults leave the rule unscheduled.
+     */
     int CoinbaseMaturityLongStartHeight{std::numeric_limits<int>::max()};
     int CoinbaseMaturityLongEnforceHeight{std::numeric_limits<int>::max()};
-    int CoinbaseMaturityLongReleaseHeight{std::numeric_limits<int>::max()};
-    bool CoinbaseMaturityLongActiveAt(int height) const
+    int64_t CoinbaseMaturityLongReleaseTime{std::numeric_limits<int64_t>::min()};
+    bool CoinbaseMaturityLongScheduled() const
     {
-        return height >= CoinbaseMaturityLongEnforceHeight && height < CoinbaseMaturityLongReleaseHeight;
+        return CoinbaseMaturityLongStartHeight != std::numeric_limits<int>::max();
+    }
+    /** Whether the rule applies to a block at the given height whose parent has the given median-time-past. */
+    bool CoinbaseMaturityLongActiveAt(int height, int64_t mtp_prev) const
+    {
+        return height >= CoinbaseMaturityLongEnforceHeight && mtp_prev < CoinbaseMaturityLongReleaseTime;
+    }
+    /**
+     * First coinbase height that cannot be spent in a block at the given
+     * height whose parent has the given median-time-past, or
+     * std::numeric_limits<int>::max() when the rule does not apply to it.
+     */
+    int CoinbaseMaturityLongHeldFrom(int height, int64_t mtp_prev) const
+    {
+        return CoinbaseMaturityLongActiveAt(height, mtp_prev) ? CoinbaseMaturityLongStartHeight : std::numeric_limits<int>::max();
     }
     std::vector<ChainstateRevalidationDeployment> chainstate_revalidation_deployments;
     /** Don't warn about unknown BIP 9 activations below this height.

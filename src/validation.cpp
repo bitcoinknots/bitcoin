@@ -435,12 +435,18 @@ void Chainstate::MaybeUpdateMempoolForReorg(
         // If the transaction spends any coinbase outputs, it must be mature.
         if (it->GetSpendsCoinbase()) {
             const auto& consensusParams{m_chainman.GetParams().GetConsensus()};
+            const CBlockIndex& tip{*m_chain.Tip()};
+            const auto mempool_spend_height{tip.nHeight + 1};
+            const int long_maturity_start_height{consensusParams.CoinbaseMaturityLongHeldFrom(mempool_spend_height, tip.GetMedianTimePast())};
             for (const CTxIn& txin : tx.vin) {
                 if (m_mempool->exists(GenTxid::Txid(txin.prevout.hash))) continue;
                 const Coin& coin{CoinsTip().AccessCoin(txin.prevout)};
                 assert(!coin.IsSpent());
-                const auto mempool_spend_height{m_chain.Tip()->nHeight + 1};
-                if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < consensusParams.CoinbaseMaturityLong) {
+                if (!coin.IsCoinBase()) continue;
+                if (coin.nHeight >= static_cast<uint32_t>(long_maturity_start_height)) {
+                    return true;
+                }
+                if (mempool_spend_height - coin.nHeight < COINBASE_MATURITY) {
                     return true;
                 }
             }
@@ -1018,9 +1024,12 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     const auto block_height_current = m_active_chainstate.m_chain.Height();
     const auto block_height_next = block_height_current + 1;
     const auto& consensusParams{args.m_chainparams.GetConsensus()};
+    const CBlockIndex& tip{*Assert(m_active_chainstate.m_chain.Tip())};
+    // Spends the long coinbase maturity rule would reject in the next block
+    // are not accepted either, so that the mempool never holds a transaction
+    // that cannot be mined
     if (!Consensus::CheckTxInputs(tx, state, m_view, block_height_next, ws.m_base_fees, CheckTxInputsRules::OutputSizeLimit,
-                                  consensusParams.CoinbaseMaturityLong,
-                                  /*long_maturity_start_height=*/ 0)) {
+                                  consensusParams.CoinbaseMaturityLongHeldFrom(block_height_next, tip.GetMedianTimePast()))) {
         return false; // state filled in by CheckTxInputs
     }
 
@@ -3009,8 +3018,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         }
     }
 
-    const bool long_maturity_consensus_active{consensusParams.CoinbaseMaturityLongActiveAt(pindex->nHeight)};
-    const int long_maturity_start_height{long_maturity_consensus_active ? consensusParams.CoinbaseMaturityLongStartHeight : std::numeric_limits<int>::max()};
+    const int long_maturity_start_height{consensusParams.CoinbaseMaturityLongHeldFrom(pindex->nHeight, Assert(pindex->pprev)->GetMedianTimePast())};
 
     std::vector<int> prevheights;
     CAmount nFees = 0;
@@ -3029,9 +3037,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         {
             CAmount txfee = 0;
             TxValidationState tx_state;
-            if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, chk_input_rules,
-                                          consensusParams.CoinbaseMaturityLong,
-                                          long_maturity_start_height)) {
+            if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, chk_input_rules, long_maturity_start_height)) {
                 // Any transaction validation failure in ConnectBlock is a block consensus failure
                 state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
                               tx_state.GetRejectReason(),

@@ -1915,8 +1915,7 @@ const std::vector<RPCResult> RPCHelpForDeployment{
     {RPCResult::Type::STR, "type", "one of \"buried\", \"bip9\", \"flagday\""},
     {RPCResult::Type::NUM, "height", /*optional=*/true, "height of the first block which enforces the rules (only for \"buried\" and \"flagday\" types, or \"bip9\" type with \"active\" status)"},
     {RPCResult::Type::NUM, "height_end", /*optional=*/true, "height of the last block which enforces the rules (only for temporary deployments)"},
-    {RPCResult::Type::NUM, "coinbase_start_height", /*optional=*/true, "height of the first generated coin covered by the long coinbase maturity rule (only for \"long_coinbase_maturity\")"},
-    {RPCResult::Type::NUM, "maturity", /*optional=*/true, "required coinbase maturity depth for covered generated coins (only for \"long_coinbase_maturity\")"},
+    {RPCResult::Type::NUM, "coinbase_start_height", /*optional=*/true, "height of the first generated coin covered by the long coinbase maturity rule: while the rules are enforced, no depth makes covered generated coins spendable (only for \"long_coinbase_maturity\")"},
     {RPCResult::Type::BOOL, "active", "true if the consensus rules are enforced for the next block (policy may enforce related rules independently of this flag)"},
     {RPCResult::Type::NUM_TIME, "expiry_time", /*optional=*/true, "median time past at and after which the rules are no longer enforced (only for \"flagday\" type; a block is past expiry when its parent's median time past has reached this value)"},
     {RPCResult::Type::OBJ, "bip9", /*optional=*/true, "status of bip9 softforks (only for \"bip9\" type)",
@@ -1964,18 +1963,19 @@ void RdtsFlagDayDescPushBack(const CBlockIndex* blockindex, UniValue& softforks,
     softforks.pushKV("reduced_data", std::move(rv));
 }
 
+// Long coinbase maturity: a flag-day deployment released, like RDTS, when the
+// parent block's median-time-past reaches its expiry time.
 void LongCoinbaseMaturityDescPushBack(const CBlockIndex* blockindex, UniValue& softforks, const ChainstateManager& chainman)
 {
     const Consensus::Params& params{chainman.GetConsensus()};
-    if (params.CoinbaseMaturityLongReleaseHeight == std::numeric_limits<int>::max()) return;
+    if (!params.CoinbaseMaturityLongScheduled()) return;
 
     UniValue rv(UniValue::VOBJ);
     rv.pushKV("type", "flagday");
     rv.pushKV("height", params.CoinbaseMaturityLongEnforceHeight);
-    rv.pushKV("height_end", params.CoinbaseMaturityLongReleaseHeight - 1);
     rv.pushKV("coinbase_start_height", params.CoinbaseMaturityLongStartHeight);
-    rv.pushKV("maturity", params.CoinbaseMaturityLong);
-    rv.pushKV("active", params.CoinbaseMaturityLongActiveAt(blockindex->nHeight + 1));
+    rv.pushKV("expiry_time", params.CoinbaseMaturityLongReleaseTime);
+    rv.pushKV("active", params.CoinbaseMaturityLongActiveAt(blockindex->nHeight + 1, blockindex->GetMedianTimePast()));
     softforks.pushKV("long_coinbase_maturity", std::move(rv));
 }
 

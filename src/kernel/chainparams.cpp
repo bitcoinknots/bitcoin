@@ -79,10 +79,12 @@ static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits
 
 static void AddLongCoinbaseMaturityRevalidationDeployment(Consensus::Params& consensus)
 {
+    // The rule is released by time, so the last height it applies to depends
+    // on the chain: every block from the enforce height on may need checking
     consensus.chainstate_revalidation_deployments.push_back({
         .name = "long_coinbase_maturity",
         .start_height = consensus.CoinbaseMaturityLongEnforceHeight,
-        .stop_height = consensus.CoinbaseMaturityLongReleaseHeight - 1,
+        .stop_height = std::numeric_limits<int>::max(),
     });
 }
 
@@ -140,10 +142,10 @@ public:
         // reaching ACTIVE, and that deployment has been removed.)
         consensus.RdtsExpiryTime = 1819756800; // September 1st, 2027 00:00 UTC
 
+        // Long coinbase maturity: held until RDTS expires
         consensus.CoinbaseMaturityLongStartHeight = 973440;
         consensus.CoinbaseMaturityLongEnforceHeight = 973440;
-        consensus.CoinbaseMaturityLongReleaseHeight = 979920;
-        consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
+        consensus.CoinbaseMaturityLongReleaseTime = consensus.RdtsExpiryTime;
         AddLongCoinbaseMaturityRevalidationDeployment(consensus);
 
         consensus.nMinimumChainWork = uint256{"00000000000000000000000000000000000000013e00277374c9f9eeadc70200"};
@@ -419,10 +421,10 @@ public:
         consensus.Blake2bHeight = 150308;
         consensus.RdtsExpiryTime = 1791903600; // October 13th, 2026 15:00:00 UTC
 
+        // Long coinbase maturity: held until RDTS expires
         consensus.CoinbaseMaturityLongStartHeight = 151406;
         consensus.CoinbaseMaturityLongEnforceHeight = 151550;
-        consensus.CoinbaseMaturityLongReleaseHeight = 158111;
-        consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
+        consensus.CoinbaseMaturityLongReleaseTime = consensus.RdtsExpiryTime;
         AddLongCoinbaseMaturityRevalidationDeployment(consensus);
 
         consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000001d6dce8651b6094e4c1"};
@@ -689,8 +691,7 @@ public:
         if (opts.coinbase_maturity_long_start_height) {
             consensus.CoinbaseMaturityLongStartHeight = *opts.coinbase_maturity_long_start_height;
             consensus.CoinbaseMaturityLongEnforceHeight = *opts.coinbase_maturity_long_enforce_height;
-            consensus.CoinbaseMaturityLongReleaseHeight = *opts.coinbase_maturity_long_release_height;
-            consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
+            consensus.CoinbaseMaturityLongReleaseTime = *opts.coinbase_maturity_long_release_time;
             AddLongCoinbaseMaturityRevalidationDeployment(consensus);
         }
 
