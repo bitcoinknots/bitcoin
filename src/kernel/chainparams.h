@@ -171,9 +171,11 @@ public:
         //! value (see -rdtsexpiry). Requires a blake2b activation height.
         std::optional<int64_t> rdts_expiry_time{};
         std::optional<std::vector<unsigned char>> blake2b_headline{};
+        //! Long coinbase maturity schedule (see -testcoinbasematuritylong):
+        //! all three are set together.
         std::optional<int> coinbase_maturity_long_start_height{};
         std::optional<int> coinbase_maturity_long_enforce_height{};
-        std::optional<int> coinbase_maturity_long_release_height{};
+        std::optional<int64_t> coinbase_maturity_long_release_time{};
     };
 
     static std::unique_ptr<const CChainParams> RegTest(const RegTestOptions& options);

@@ -329,8 +329,12 @@ QString TransactionDesc::toHTML(interfaces::Node& node, interfaces::Wallet& wall
 
     if (wtx.is_coinbase)
     {
-        const int numBlocksToMaturity{node.coinbaseMaturity() + 1};
-        strHTML += "<br>" + tr("Generated coins must mature %1 blocks before they can be spent. When you generated this block, it was broadcast to the network to be added to the block chain. If it fails to get into the chain, its state will change to \"not accepted\" and it won't be spendable. This may occasionally happen if another node generates a block within a few seconds of yours.").arg(QString::number(numBlocksToMaturity)) + "<br>";
+        const int numBlocksToMaturity{COINBASE_MATURITY + 1};
+        strHTML += "<br>" + tr("Generated coins must mature %1 blocks before they can be spent. When you generated this block, it was broadcast to the network to be added to the block chain. If it fails to get into the chain, its state will change to \"not accepted\" and it won't be spendable. This may occasionally happen if another node generates a block within a few seconds of yours.").arg(QString::number(numBlocksToMaturity));
+        if (node.coinbaseMaturityLongScheduled()) {
+            strHTML += " " + tr("On this network, generated coins must also be at least one year old before they can be spent.");
+        }
+        strHTML += "<br>";
     }
 
     //
