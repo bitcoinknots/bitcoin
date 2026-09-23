@@ -2361,10 +2361,7 @@ void Chainstate::CheckForkWarningConditions()
 {
     AssertLockHeld(cs_main);
 
-    // Before we get past initial download, we cannot reliably alert about forks
-    // (we assume we don't get stuck on a fork before finishing our initial sync)
-    // Also not applicable to the background chainstate
-    if (m_chainman.IsInitialBlockDownload() || this->GetRole() == ChainstateRole::BACKGROUND) {
+    if (this->GetRole() == ChainstateRole::BACKGROUND) {
         return;
     }
 
@@ -4909,7 +4906,8 @@ bool ChainstateManager::AcceptBlockHeader(const CBlockHeader& block, BlockValida
                 *ppindex = pindex;
             if (pindex->nStatus & BLOCK_FAILED_MASK) {
                 LogDebug(BCLog::VALIDATION, "%s: block %s is marked invalid\n", __func__, hash.ToString());
-                return state.Invalid(BlockValidationResult::BLOCK_CACHED_INVALID, "duplicate-invalid");
+                return state.Invalid(BlockValidationResult::BLOCK_CACHED_INVALID, "duplicate-invalid",
+                                     strprintf("block %s was previously marked invalid", hash.ToString()));
             }
             return true;
         }
@@ -5342,6 +5340,8 @@ bool Chainstate::LoadChainTip()
         // Ignoring return value for now.
         (void)m_chainman.GetNotifications().blockTip(GetSynchronizationState(/*init=*/true, m_chainman.m_blockman.m_blockfiles_indexed), *pindex);
     }
+
+    CheckForkWarningConditions();
 
     return true;
 }
