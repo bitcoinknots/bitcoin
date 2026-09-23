@@ -7,6 +7,7 @@
 
 namespace kernel {
 enum class Warning {
+    STUCK_ON_INVALID_BLOCK,
     UNKNOWN_NEW_RULES_ACTIVATED,
     LARGE_WORK_INVALID_CHAIN,
 };

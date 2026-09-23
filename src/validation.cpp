@@ -2061,6 +2061,56 @@ void Chainstate::CheckForkWarningConditions()
     }
 }
 
+void Chainstate::CheckStuckOnInvalidBlock()
+{
+    AssertLockHeld(cs_main);
+
+    if (this->GetRole() == ChainstateRole::BACKGROUND) return;
+    CBlockIndex* tip{m_chain.Tip()};
+    if (tip == nullptr) return;
+
+    // Walk from the most-work invalid header down to the lowest block marked
+    // invalid on that branch. Only a block that builds directly on the tip
+    // holds the chain back; any other invalid branch is simply not followed.
+    const CBlockIndex* culprit{m_chainman.m_best_invalid};
+    while (culprit && culprit->pprev && (culprit->pprev->nStatus & BLOCK_FAILED_MASK)) {
+        culprit = culprit->pprev;
+    }
+    if (culprit == nullptr || culprit->pprev != tip) return;
+
+    const uint256 hash{culprit->GetBlockHash()};
+    if (hash == m_stuck_on_invalid_block) return;
+    m_stuck_on_invalid_block = hash;
+
+    const int height{culprit->nHeight};
+    bilingual_str warning;
+    CBlock block;
+    if (!(culprit->nStatus & BLOCK_HAVE_DATA) || !m_blockman.ReadBlock(block, *culprit)) {
+        LogWarning("Block %s at height %d is marked invalid, so this node cannot advance past height %d, and its data is not available to check it again\n",
+                   hash.ToString(), height, tip->nHeight);
+        warning = strprintf(_("Warning: block %s at height %d is marked invalid; this node cannot advance past height %d."),
+                            hash.ToString(), height, tip->nHeight);
+    } else {
+        // The mark is only the cached outcome of an earlier run. Run every
+        // check again on a throwaway view under the rules this version
+        // enforces, and report what they say.
+        BlockValidationState state;
+        if (TestBlockValidity(state, m_chainman.GetParams(), *this, block, tip, /*fCheckPOW=*/true, /*fCheckMerkleRoot=*/true)) {
+            LogWarning("Block %s at height %d is marked invalid but passes validation under the current rules, so this node cannot advance past height %d. If the block should be accepted, run: bitcoin-cli reconsiderblock %s\n",
+                       hash.ToString(), height, tip->nHeight, hash.ToString());
+            warning = strprintf(_("Warning: block %s at height %d is marked invalid but passes validation; this node cannot advance past height %d. If the block should be accepted, run reconsiderblock %s."),
+                                hash.ToString(), height, tip->nHeight, hash.ToString());
+        } else {
+            LogWarning("Block %s at height %d is marked invalid and fails validation again (%s), so this node cannot advance past height %d. If the block is known to be valid, the chain state may be damaged; -reindex-chainstate rebuilds it\n",
+                       hash.ToString(), height, state.ToString(), tip->nHeight);
+            warning = strprintf(_("Warning: block %s at height %d is marked invalid and fails validation again (%s); this node cannot advance past height %d."),
+                                hash.ToString(), height, state.ToString(), tip->nHeight);
+        }
+    }
+    m_chainman.GetNotifications().warningSet(kernel::Warning::STUCK_ON_INVALID_BLOCK, warning);
+    m_stuck_on_invalid_block_warned = true;
+}
+
 // Called both upon regular invalid block discovery *and* InvalidateBlock
 void Chainstate::InvalidChainFound(CBlockIndex* pindexNew)
 {
@@ -3010,6 +3060,13 @@ void Chainstate::UpdateTip(const CBlockIndex* pindexNew)
 {
     AssertLockHeld(::cs_main);
     const auto& coins_tip = this->CoinsTip();
+
+    if (m_stuck_on_invalid_block_warned) {
+        // The tip moved, so whatever held it back was reconsidered or left behind.
+        m_chainman.GetNotifications().warningUnset(kernel::Warning::STUCK_ON_INVALID_BLOCK);
+        m_stuck_on_invalid_block_warned = false;
+        m_stuck_on_invalid_block.SetNull();
+    }
 
     // The remainder of the function isn't relevant if we are not acting on
     // the active chainstate, so return if need be.

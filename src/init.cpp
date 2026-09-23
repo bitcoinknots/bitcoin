@@ -1325,6 +1325,10 @@ static ChainstateLoadResult InitAndLoadChainstate(
         std::tie(status, error) = catch_exceptions([&] { return VerifyLoadedChainstate(chainman, options); });
         if (status == node::ChainstateLoadStatus::SUCCESS) {
             LogInfo("Block index and chainstate loaded");
+            // A block marked invalid that builds on the tip would hold this
+            // node here for good; say so now rather than after a headers sync
+            // that goes nowhere.
+            WITH_LOCK(::cs_main, chainman.ActiveChainstate().CheckStuckOnInvalidBlock());
         }
     }
     return {status, error};
