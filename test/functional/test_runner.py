@@ -302,6 +302,7 @@ BASE_SCRIPTS = [
     'wallet_backwards_compatibility.py --descriptors',
     'wallet_txn_clone.py --mineblock',
     'feature_notifications.py',
+    'feature_stuck_on_invalid_block.py',
     'rpc_getblockfilter.py',
     'rpc_getblockfrompeer.py',
     'rpc_invalidateblock.py',

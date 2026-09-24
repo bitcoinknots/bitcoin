@@ -2990,6 +2990,13 @@ void PeerManagerImpl::ProcessHeadersMessage(CNode& pfrom, Peer& peer,
     if (!m_chainman.ProcessNewBlockHeaders(headers, /*min_pow_checked=*/true, state, &pindexLast)) {
         if (state.IsInvalid()) {
             MaybePunishNodeForBlock(pfrom.GetId(), state, via_compact_block, "invalid header received");
+            if (state.GetResult() == BlockValidationResult::BLOCK_CACHED_INVALID) {
+                // Peers keep serving a chain through a block this node rejected
+                // earlier. If that block sits right on the tip, nothing will
+                // ever get past it: check it again and say what to do.
+                LOCK(cs_main);
+                m_chainman.ActiveChainstate().CheckStuckOnInvalidBlock();
+            }
             return;
         }
     }

@@ -761,6 +761,14 @@ public:
     /** Remove invalidity status from a block and its descendants. */
     void ResetBlockFailureFlags(CBlockIndex* pindex) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
+    /**
+     * If a block marked invalid builds directly on the tip, this chain cannot
+     * advance until it is reconsidered. Validate that block again under the
+     * current rules and set a warning saying either how to accept it or why it
+     * is still rejected. Reports each block once; cleared when the tip moves.
+     */
+    void CheckStuckOnInvalidBlock() EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+
     /** Replay blocks that aren't fully applied to the database. */
     bool ReplayBlocks();
 
@@ -853,6 +861,11 @@ private:
 
     void CheckForkWarningConditions() EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     void InvalidChainFound(CBlockIndex* pindexNew) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+
+    /** The block last reported by CheckStuckOnInvalidBlock, so it is reported once. */
+    uint256 m_stuck_on_invalid_block GUARDED_BY(::cs_main);
+    /** Whether a STUCK_ON_INVALID_BLOCK warning is currently set. */
+    bool m_stuck_on_invalid_block_warned GUARDED_BY(::cs_main){false};
 
     /**
      * Make mempool consistent after a reorg, by re-adding or recursively erasing
