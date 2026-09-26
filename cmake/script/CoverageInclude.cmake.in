@@ -24,7 +24,15 @@ separate_arguments(LCOV_OPTS)
 set(LCOV_COMMAND ${LCOV_EXECUTABLE} --gcov-tool ${CMAKE_CURRENT_LIST_DIR}/cov_tool_wrapper.sh ${LCOV_OPTS})
 
 find_program(GENHTML_EXECUTABLE genhtml REQUIRED)
-set(GENHTML_COMMAND ${GENHTML_EXECUTABLE} --show-details ${LCOV_OPTS})
+
+# HTML_OPTS is optionally passed via -D flag.
+# Default: inherit LCOV_OPTS. If HTML_OPTS is provided (even if empty), use it instead.
+set(GENHTML_OPTS ${LCOV_OPTS})
+if(DEFINED HTML_OPTS)
+  separate_arguments(HTML_OPTS)
+  set(GENHTML_OPTS ${HTML_OPTS})
+endif()
+set(GENHTML_COMMAND ${GENHTML_EXECUTABLE} --show-details ${GENHTML_OPTS})
 
 find_program(GREP_EXECUTABLE grep REQUIRED)
 find_program(AWK_EXECUTABLE awk REQUIRED)
