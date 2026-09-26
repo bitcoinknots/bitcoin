@@ -17,6 +17,7 @@
 #include <random.h>
 #include <util/thread.h>
 #include <util/threadinterrupt.h>
+#include <mapport_hooks.h>
 
 #ifdef USE_UPNP
 #include <cstddef>  // workaround missing include in miniupnpc 2.3.3
@@ -34,6 +35,7 @@ static_assert(MINIUPNPC_API_VERSION >= 17, "miniUPnPc API version >= 17 assumed"
 #include <functional>
 #include <string>
 #include <thread>
+
 
 static CThreadInterrupt g_mapport_interrupt;
 static std::thread g_mapport_thread;
@@ -79,7 +81,7 @@ static bool ProcessPCP()
         ret = false; // Set to true if any mapping succeeds.
 
         // IPv4
-        std::optional<CNetAddr> gateway4 = QueryDefaultGateway(NET_IPV4);
+        std::optional<CNetAddr> gateway4 = mapport_hooks::QueryDefaultGatewayFn(NET_IPV4);
         if (!gateway4) {
             LogPrintLevel(BCLog::NET, BCLog::Level::Debug, "portmap: Could not determine IPv4 default gateway\n");
         } else {
@@ -88,26 +90,26 @@ static bool ProcessPCP()
             // Open a port mapping on whatever local address we have toward the gateway.
             struct in_addr inaddr_any;
             inaddr_any.s_addr = htonl(INADDR_ANY);
-            auto res = PCPRequestPortMap(pcp_nonce, *gateway4, CNetAddr(inaddr_any), private_port, requested_lifetime, g_mapport_interrupt);
+            auto res = mapport_hooks::PCPRequestPortMapFn(pcp_nonce, *gateway4, CNetAddr(inaddr_any), private_port, requested_lifetime, g_mapport_interrupt);
             MappingError* pcp_err = std::get_if<MappingError>(&res);
             if (pcp_err && *pcp_err == MappingError::UNSUPP_VERSION) {
                 LogPrintLevel(BCLog::NET, BCLog::Level::Debug, "portmap: Got unsupported PCP version response, falling back to NAT-PMP\n");
-                res = NATPMPRequestPortMap(*gateway4, private_port, requested_lifetime, g_mapport_interrupt);
+                res = mapport_hooks::NATPMPRequestPortMapFn(*gateway4, private_port, requested_lifetime, g_mapport_interrupt);
             }
             handle_mapping(res);
         }
 
         // IPv6
-        std::optional<CNetAddr> gateway6 = QueryDefaultGateway(NET_IPV6);
+        std::optional<CNetAddr> gateway6 = mapport_hooks::QueryDefaultGatewayFn(NET_IPV6);
         if (!gateway6) {
             LogPrintLevel(BCLog::NET, BCLog::Level::Debug, "portmap: Could not determine IPv6 default gateway\n");
         } else {
             LogPrintLevel(BCLog::NET, BCLog::Level::Debug, "portmap: gateway [IPv6]: %s\n", gateway6->ToStringAddr());
 
             // Try to open pinholes for all routable local IPv6 addresses.
-            for (const auto &addr: GetLocalAddresses()) {
+            for (const auto &addr: mapport_hooks::GetLocalAddressesFn()) {
                 if (!addr.IsRoutable() || !addr.IsIPv6()) continue;
-                auto res = PCPRequestPortMap(pcp_nonce, *gateway6, addr, private_port, requested_lifetime, g_mapport_interrupt);
+                auto res = mapport_hooks::PCPRequestPortMapFn(pcp_nonce, *gateway6, addr, private_port, requested_lifetime, g_mapport_interrupt);
                 handle_mapping(res);
             }
         }
