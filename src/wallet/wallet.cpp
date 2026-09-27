@@ -684,6 +684,10 @@ void CWallet::SetLastBlockProcessedInMem(int block_height, uint256 block_hash)
 
     m_last_block_processed = block_hash;
     m_last_block_processed_height = block_height;
+    m_last_block_processed_mtp = 0;
+    if (block_height >= 0 && HaveChain() && chain().coinbaseMaturityLongScheduled()) {
+        chain().findBlock(block_hash, FoundBlock().mtpTime(m_last_block_processed_mtp));
+    }
 }
 
 void CWallet::SetLastBlockProcessed(int block_height, uint256 block_hash)
@@ -3646,8 +3650,31 @@ int CWallet::GetTxBlocksToMaturity(const CWalletTx& wtx) const
     }
     int chain_depth = GetTxDepthInMainChain(wtx);
     assert(chain_depth >= 0); // coinbase tx should not be conflicted
-    const int maturity{HaveChain() ? chain().coinbaseMaturity() : COINBASE_MATURITY};
-    return std::max(0, (maturity + 1) - chain_depth);
+    const int blocks_to_maturity{std::max(0, (COINBASE_MATURITY + 1) - chain_depth)};
+
+    // A covered coinbase also waits out its long-maturity period. Height
+    // periods release at a block height. The last period releases when the
+    // tip's median time past reaches the RDTS expiry, which is estimated
+    // from target spacing and refreshed as each block is processed.
+    const auto* conf{wtx.state<TxStateConfirmed>()};
+    if (!conf || !HaveChain() || !chain().coinbaseMaturityLongScheduled()) {
+        return blocks_to_maturity;
+    }
+    const auto& consensus{Params().GetConsensus()};
+    int release_height{std::numeric_limits<int>::max()};
+    if (!consensus.CoinbaseMaturityLongCovered(conf->confirmed_block_height, release_height)) {
+        return blocks_to_maturity;
+    }
+    if (release_height != std::numeric_limits<int>::max()) {
+        const int blocks_until_release{std::max(0, release_height - m_last_block_processed_height - 1)};
+        return std::max(blocks_to_maturity, blocks_until_release);
+    }
+    if (m_last_block_processed_mtp >= consensus.CoinbaseMaturityLongReleaseTime) {
+        return blocks_to_maturity;
+    }
+    const int64_t spacing{consensus.nPowTargetSpacing};
+    const int64_t blocks_to_release{(consensus.CoinbaseMaturityLongReleaseTime - m_last_block_processed_mtp - 1) / spacing + 1};
+    return std::max<int64_t>(blocks_to_maturity, std::min<int64_t>(blocks_to_release, std::numeric_limits<int>::max()));
 }
 
 bool CWallet::IsTxImmatureCoinBase(const CWalletTx& wtx) const

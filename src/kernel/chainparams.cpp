@@ -77,12 +77,20 @@ static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits
     return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nNonce, nBits, nVersion, genesisReward);
 }
 
-static void AddLongCoinbaseMaturityRevalidationDeployment(Consensus::Params& consensus)
+static void AddLongCoinbaseMaturityRevalidationDeployment(Consensus::Params& consensus, int anchor_height, int64_t anchor_mtp)
 {
+    // A node with no marker rewinds to the enforce height. With no stop, that
+    // rewind starts from whatever the tip is and the cost grows without bound.
+    // Median time past rises by at least one second every six blocks after
+    // the anchor, so the rule cannot apply past this height. On a chain that
+    // releases sooner, RewindForChainstateRevalidation stops at the last
+    // block the rule actually applies to.
+    const int stop_height{Consensus::LastHeightWithParentMtpBelow(anchor_height, anchor_mtp, consensus.CoinbaseMaturityLongReleaseTime)};
+    if (stop_height < consensus.CoinbaseMaturityLongEnforceHeight) return;
     consensus.chainstate_revalidation_deployments.push_back({
         .name = "long_coinbase_maturity",
         .start_height = consensus.CoinbaseMaturityLongEnforceHeight,
-        .stop_height = consensus.CoinbaseMaturityLongReleaseHeight - 1,
+        .stop_height = stop_height,
     });
 }
 
@@ -140,11 +148,29 @@ public:
         // reaching ACTIVE, and that deployment has been removed.)
         consensus.RdtsExpiryTime = 1819756800; // September 1st, 2027 00:00 UTC
 
+        // Long coinbase maturity extends RDTS. RDTS rules are unchanged.
+        // Four periods, from the deployed 45-day rule through RDTS expiry.
+        // At the 10-minute target, 45 days is 6,480 blocks and ends at the
+        // height Knots 29.4.2 already releases (979920). The next two periods
+        // are 105 days each: the same length, easy to remember, and not the
+        // ordinary 100-block maturity. The last period is however many blocks
+        // remain until RDTS expiry, about 102–109 days.
+        constexpr int blocks_per_day{144};
+        const int period1_end{973440 + 45 * blocks_per_day};  // 979920
+        const int period2_end{period1_end + 105 * blocks_per_day}; // 995040
+        const int period3_end{period2_end + 105 * blocks_per_day}; // 1010160
         consensus.CoinbaseMaturityLongStartHeight = 973440;
         consensus.CoinbaseMaturityLongEnforceHeight = 973440;
-        consensus.CoinbaseMaturityLongReleaseHeight = 979920;
-        consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
-        AddLongCoinbaseMaturityRevalidationDeployment(consensus);
+        consensus.CoinbaseMaturityLongReleaseTime = consensus.RdtsExpiryTime;
+        consensus.coinbase_maturity_long_periods = {
+            {973440, period1_end},
+            {period1_end, period2_end},
+            {period2_end, period3_end},
+            {period3_end, std::numeric_limits<int>::max()},
+        };
+        // Checkpoint block 908765. Every chain this node will accept includes
+        // it, and its median time past is 1754416682.
+        AddLongCoinbaseMaturityRevalidationDeployment(consensus, /*anchor_height=*/908765, /*anchor_mtp=*/1754416682);
 
         consensus.nMinimumChainWork = uint256{"00000000000000000000000000000000000000013e00277374c9f9eeadc70200"};
         consensus.defaultAssumeValid = uint256{"0000000000000078ed1e20cac1acf78df6d1060c78059fb6331e17141c881fc8"}; // 964264
@@ -419,11 +445,27 @@ public:
         consensus.Blake2bHeight = 150308;
         consensus.RdtsExpiryTime = 1791903600; // October 13th, 2026 15:00:00 UTC
 
+        // Same four-period shape as mainnet, on this chain's deployed window.
+        // The first release stays at height 158111, which is where the previous
+        // rule let covered coinbases be spent. The next two periods are 5 and
+        // 10 days of target spacing (both end in 0 or 5). The last period is
+        // the blocks that remain until this chain's RDTS expiry.
+        constexpr int blocks_per_day{144};
+        const int period1_end{158111};
+        const int period2_end{period1_end + 5 * blocks_per_day};  // 158831
+        const int period3_end{period2_end + 10 * blocks_per_day}; // 160271
         consensus.CoinbaseMaturityLongStartHeight = 151406;
         consensus.CoinbaseMaturityLongEnforceHeight = 151550;
-        consensus.CoinbaseMaturityLongReleaseHeight = 158111;
-        consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
-        AddLongCoinbaseMaturityRevalidationDeployment(consensus);
+        consensus.CoinbaseMaturityLongReleaseTime = consensus.RdtsExpiryTime;
+        consensus.coinbase_maturity_long_periods = {
+            {151406, period1_end},
+            {period1_end, period2_end},
+            {period2_end, period3_end},
+            {period3_end, std::numeric_limits<int>::max()},
+        };
+        // Genesis median time past is the genesis timestamp. The block is
+        // created just below; keep this anchor equal to that nTime.
+        AddLongCoinbaseMaturityRevalidationDeployment(consensus, /*anchor_height=*/0, /*anchor_mtp=*/1714777860);
 
         consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000001d6dce8651b6094e4c1"};
         consensus.defaultAssumeValid = uint256{"0000000000003ed4f08dbdf6f7d6b271a6bcffce25675cb40aa9fa43179a89f3"}; // 72600
@@ -689,9 +731,16 @@ public:
         if (opts.coinbase_maturity_long_start_height) {
             consensus.CoinbaseMaturityLongStartHeight = *opts.coinbase_maturity_long_start_height;
             consensus.CoinbaseMaturityLongEnforceHeight = *opts.coinbase_maturity_long_enforce_height;
-            consensus.CoinbaseMaturityLongReleaseHeight = *opts.coinbase_maturity_long_release_height;
-            consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
-            AddLongCoinbaseMaturityRevalidationDeployment(consensus);
+            consensus.CoinbaseMaturityLongReleaseTime = *opts.coinbase_maturity_long_release_time;
+            // Regtest keeps one period, released by median time past, so tests
+            // can set the whole window with -testcoinbasematuritylong.
+            consensus.coinbase_maturity_long_periods = {{
+                *opts.coinbase_maturity_long_start_height,
+                std::numeric_limits<int>::max(),
+            }};
+            // Regtest genesis timestamp. The block is created just below;
+            // keep this anchor equal to that nTime.
+            AddLongCoinbaseMaturityRevalidationDeployment(consensus, /*anchor_height=*/0, /*anchor_mtp=*/1296688602);
         }
 
         for (const auto& [deployment_pos, version_bits_params] : opts.version_bits_parameters) {

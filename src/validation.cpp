@@ -435,12 +435,18 @@ void Chainstate::MaybeUpdateMempoolForReorg(
         // If the transaction spends any coinbase outputs, it must be mature.
         if (it->GetSpendsCoinbase()) {
             const auto& consensusParams{m_chainman.GetParams().GetConsensus()};
+            const CBlockIndex& tip{*m_chain.Tip()};
+            const auto mempool_spend_height{tip.nHeight + 1};
+            const int long_maturity_start_height{consensusParams.CoinbaseMaturityLongHeldFrom(mempool_spend_height, tip.GetMedianTimePast())};
             for (const CTxIn& txin : tx.vin) {
                 if (m_mempool->exists(GenTxid::Txid(txin.prevout.hash))) continue;
                 const Coin& coin{CoinsTip().AccessCoin(txin.prevout)};
                 assert(!coin.IsSpent());
-                const auto mempool_spend_height{m_chain.Tip()->nHeight + 1};
-                if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < consensusParams.CoinbaseMaturityLong) {
+                if (!coin.IsCoinBase()) continue;
+                if (coin.nHeight >= static_cast<uint32_t>(long_maturity_start_height)) {
+                    return true;
+                }
+                if (mempool_spend_height - coin.nHeight < COINBASE_MATURITY) {
                     return true;
                 }
             }
@@ -1018,9 +1024,12 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     const auto block_height_current = m_active_chainstate.m_chain.Height();
     const auto block_height_next = block_height_current + 1;
     const auto& consensusParams{args.m_chainparams.GetConsensus()};
+    const CBlockIndex& tip{*Assert(m_active_chainstate.m_chain.Tip())};
+    // Spends the long coinbase maturity rule would reject in the next block
+    // are not accepted either, so that the mempool never holds a transaction
+    // that cannot be mined
     if (!Consensus::CheckTxInputs(tx, state, m_view, block_height_next, ws.m_base_fees, CheckTxInputsRules::OutputSizeLimit,
-                                  consensusParams.CoinbaseMaturityLong,
-                                  /*long_maturity_start_height=*/ 0)) {
+                                  consensusParams.CoinbaseMaturityLongHeldFrom(block_height_next, tip.GetMedianTimePast()))) {
         return false; // state filled in by CheckTxInputs
     }
 
@@ -3009,8 +3018,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         }
     }
 
-    const bool long_maturity_consensus_active{consensusParams.CoinbaseMaturityLongActiveAt(pindex->nHeight)};
-    const int long_maturity_start_height{long_maturity_consensus_active ? consensusParams.CoinbaseMaturityLongStartHeight : std::numeric_limits<int>::max()};
+    const int long_maturity_start_height{consensusParams.CoinbaseMaturityLongHeldFrom(pindex->nHeight, Assert(pindex->pprev)->GetMedianTimePast())};
 
     std::vector<int> prevheights;
     CAmount nFees = 0;
@@ -3029,9 +3037,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         {
             CAmount txfee = 0;
             TxValidationState tx_state;
-            if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, chk_input_rules,
-                                          consensusParams.CoinbaseMaturityLong,
-                                          long_maturity_start_height)) {
+            if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, chk_input_rules, long_maturity_start_height)) {
                 // Any transaction validation failure in ConnectBlock is a block consensus failure
                 state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
                               tx_state.GetRejectReason(),
@@ -5711,6 +5717,18 @@ bool Chainstate::UpdateChainstateRevalidationMarkers(BlockValidationState& state
     return true;
 }
 
+/** Highest main-chain block at or below `tip` that the long coinbase maturity rule still applies to, or one below the enforce height when it applies to none. */
+static int LastMainChainBlockUnderLongMaturity(const CBlockIndex* tip, const Consensus::Params& consensus)
+{
+    if (!tip || !consensus.CoinbaseMaturityLongScheduled()) return std::numeric_limits<int>::max();
+    for (const CBlockIndex* block{tip}; block && block->pprev && block->nHeight >= consensus.CoinbaseMaturityLongEnforceHeight; block = block->pprev) {
+        if (consensus.CoinbaseMaturityLongActiveAt(block->nHeight, block->pprev->GetMedianTimePast())) {
+            return block->nHeight;
+        }
+    }
+    return consensus.CoinbaseMaturityLongEnforceHeight - 1;
+}
+
 bool Chainstate::RewindForChainstateRevalidation(bilingual_str& error)
 {
     AssertLockNotHeld(m_chainstate_mutex);
@@ -5757,6 +5775,7 @@ bool Chainstate::RewindForChainstateRevalidation(bilingual_str& error)
         std::unordered_set<CBlockIndex*> demoting;
         {
             const CBlockIndex* snapshot_base{m_chainman.IsSnapshotValidated() ? nullptr : SnapshotBase()};
+            const Consensus::Params& consensus{m_chainman.GetConsensus()};
             std::map<CBlockIndex*, std::vector<CBlockIndex*>> seen_children;
             for (auto& [_, block_index] : m_blockman.m_block_index) {
                 if (!block_index.IsValid(BLOCK_VALID_CHAIN)) continue;
@@ -5777,6 +5796,13 @@ bool Chainstate::RewindForChainstateRevalidation(bilingual_str& error)
                         const auto& deployment{deployments.at(deployment_n)};
                         if (block_index.nHeight < deployment.start_height) continue;
                         if (block_index.nHeight > deployment.stop_height) continue;
+                        // Released blocks do not need another check. Leaving
+                        // them in the range would rewind a late upgrade from
+                        // its tip back to the enforce height.
+                        if (deployment.name == "long_coinbase_maturity" &&
+                            !consensus.CoinbaseMaturityLongActiveAt(block_index.nHeight, block_index.pprev->GetMedianTimePast())) {
+                            continue;
+                        }
 
                         if (m_chain.Contains(&block_index)) {
                             const auto& valid_range{valid_in_main_chain.at(deployment_n)};
@@ -5827,6 +5853,22 @@ bool Chainstate::RewindForChainstateRevalidation(bilingual_str& error)
 
         if (rewind_target) {
             CBlockIndex * const old_tip{m_chain.Tip()};
+            const Consensus::Params& consensus{m_chainman.GetConsensus()};
+            const int last_active{LastMainChainBlockUnderLongMaturity(old_tip, consensus)};
+            // The blocks the rule covered, plus at most that many again after
+            // it released. A later tip is not rewound from: with no marker the
+            // target is the enforce height, and that cost would grow with
+            // every new block.
+            if (old_tip && consensus.CoinbaseMaturityLongScheduled() && last_active >= consensus.CoinbaseMaturityLongEnforceHeight) {
+                const int64_t window{int64_t{last_active} - consensus.CoinbaseMaturityLongEnforceHeight + 1};
+                const int64_t distance{int64_t{old_tip->nHeight} - rewind_target->nHeight};
+                if (distance > window * 2) {
+                    LogError("Chainstate revalidation: long coinbase maturity would rewind %d block(s) from height %d to height %d; the rule last applies at height %d\n",
+                             static_cast<int>(distance), old_tip->nHeight, rewind_target->nHeight, last_active);
+                    error = _("The active chain must be revalidated for the long coinbase maturity rule, but it has grown too far past the release to rewind");
+                    return false;
+                }
+            }
 
             for (const CBlockIndex* block{old_tip}; block != rewind_target; block = block->pprev) {
                 if ((block->nStatus & BLOCK_CAN_REWIND) != BLOCK_CAN_REWIND) {

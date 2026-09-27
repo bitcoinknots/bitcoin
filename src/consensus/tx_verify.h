@@ -53,13 +53,11 @@ bool CheckOutputSizes(const CTransaction& tx, TxValidationState& state);
  * Check whether all inputs of this transaction are valid (no double spends and amounts)
  * This does not modify the UTXO set. This does not check scripts and sigs.
  * @param[out] txfee Set to the transaction fee if successful.
- * @param[in] coinbase_maturity_long Maturity required by the long-maturity rule.
- * @param[in] long_maturity_start_height First coinbase height requiring coinbase_maturity_long,
- *                                      or std::numeric_limits<int>::max() to disable.
+ * @param[in] long_maturity_start_height Coinbases of this height or later cannot be spent at any depth
+ *                                       (long coinbase maturity rule), or std::numeric_limits<int>::max() to disable.
  * Preconditions: tx.IsCoinBase() is false.
  */
 [[nodiscard]] bool CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, CheckTxInputsRules rules,
-                                 int coinbase_maturity_long,
                                  int long_maturity_start_height);
 } // namespace Consensus
 

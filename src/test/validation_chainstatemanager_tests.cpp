@@ -669,7 +669,7 @@ BOOST_FIXTURE_TEST_CASE(chainstatemanager_snapshot_init, SnapshotTestSetup)
 
 struct SnapshotRevalidationTestSetup : SnapshotTestSetup {
     SnapshotRevalidationTestSetup()
-        : SnapshotTestSetup{{"-testcoinbasematuritylong=1:2:103"}}
+        : SnapshotTestSetup{{"-testcoinbasematuritylong=1:2:4102444800"}}
     {
     }
 };
@@ -684,23 +684,28 @@ BOOST_FIXTURE_TEST_CASE(chainstatemanager_snapshot_revalidation_waits_for_backgr
         return chainman.m_blockman.m_block_tree_db->ReadChainstateRevalidationMarker("long_coinbase_maturity", marker);
     };
 
-    // The deployment ends before the snapshot base, so the active snapshot
-    // chainstate must not claim to have revalidated it. The background
-    // chainstate is responsible for validating pre-snapshot history.
-    BOOST_CHECK(!WITH_LOCK(::cs_main, return has_marker()));
+    // The deployment runs on past the snapshot base, so the active snapshot
+    // chainstate marks only what it validated itself: the blocks above the
+    // base. The background chainstate is responsible for validating
+    // pre-snapshot history, and the marker must not claim it yet.
+    BOOST_REQUIRE(WITH_LOCK(::cs_main, return has_marker()));
+    BOOST_CHECK_EQUAL(marker.start_height, 111);
+    BOOST_CHECK_EQUAL(marker.stop_height, 210);
 
     bilingual_str error;
     BOOST_CHECK(chainman.ActiveChainstate().RewindForChainstateRevalidation(error));
     BOOST_CHECK(error.empty());
     BOOST_CHECK_EQUAL(WITH_LOCK(::cs_main, return chainman.ActiveHeight()), 210);
-    BOOST_CHECK(!WITH_LOCK(::cs_main, return has_marker()));
+    BOOST_REQUIRE(WITH_LOCK(::cs_main, return has_marker()));
+    BOOST_CHECK_EQUAL(marker.start_height, 111);
+    BOOST_CHECK_EQUAL(marker.stop_height, 210);
 
     SnapshotCompletionResult res;
     res = WITH_LOCK(::cs_main, return chainman.MaybeCompleteSnapshotValidation());
     BOOST_CHECK_EQUAL(res, SnapshotCompletionResult::SUCCESS);
     BOOST_REQUIRE(WITH_LOCK(::cs_main, return has_marker()));
     BOOST_CHECK_EQUAL(marker.start_height, 2);
-    BOOST_CHECK_EQUAL(marker.stop_height, 102);
+    BOOST_CHECK_EQUAL(marker.stop_height, 210);
     const uint256 marker_block_hash = WITH_LOCK(::cs_main, return chainman.ActiveChain()[marker.stop_height]->GetBlockHash());
     BOOST_CHECK_EQUAL(marker.block_hash, marker_block_hash);
 }

@@ -6,7 +6,6 @@
 #ifndef BITCOIN_CONSENSUS_PARAMS_H
 #define BITCOIN_CONSENSUS_PARAMS_H
 
-#include <consensus/consensus.h>
 #include <uint256.h>
 
 #include <chrono>
@@ -153,13 +152,104 @@ struct Params {
      * behaviour is unchanged on chains that do not set it.
      */
     int64_t RdtsExpiryTime{std::numeric_limits<int64_t>::min()};
-    int CoinbaseMaturityLong{COINBASE_MATURITY};
+    /**
+     * One period of the long coinbase maturity schedule.
+     *
+     * Coinbases of height start_height or later, and below the next period,
+     * stay unspendable until release_height. release_height of
+     * std::numeric_limits<int>::max() means the period ends when the parent
+     * block's median-time-past reaches CoinbaseMaturityLongReleaseTime.
+     */
+    struct CoinbaseMaturityPeriod {
+        int start_height{std::numeric_limits<int>::max()};
+        int release_height{std::numeric_limits<int>::max()};
+    };
+    /**
+     * Long coinbase maturity temporary softfork. It extends RDTS: every RDTS
+     * rule stays in force on its own schedule, and this rule adds coinbase
+     * maturity periods that end at RDTS expiry. Mainnet has four.
+     *
+     * From CoinbaseMaturityLongEnforceHeight, a covered coinbase cannot be
+     * spent at any depth until its period releases. Height releases are
+     * monotone, and the last period releases when the parent block's
+     * median-time-past reaches CoinbaseMaturityLongReleaseTime (the same
+     * boundary as RdtsExpiryTime), so the rules for the next block are
+     * knowable in advance. Reaching that time does not release a period
+     * before the first period's release height: that height is the last
+     * block the previous rule still held. Every coinbase the schedule does
+     * not cover needs COINBASE_MATURITY as always.
+     *
+     * The defaults leave the rule unscheduled.
+     */
     int CoinbaseMaturityLongStartHeight{std::numeric_limits<int>::max()};
     int CoinbaseMaturityLongEnforceHeight{std::numeric_limits<int>::max()};
-    int CoinbaseMaturityLongReleaseHeight{std::numeric_limits<int>::max()};
-    bool CoinbaseMaturityLongActiveAt(int height) const
+    int64_t CoinbaseMaturityLongReleaseTime{std::numeric_limits<int64_t>::min()};
+    std::vector<CoinbaseMaturityPeriod> coinbase_maturity_long_periods;
+    bool CoinbaseMaturityLongScheduled() const
     {
-        return height >= CoinbaseMaturityLongEnforceHeight && height < CoinbaseMaturityLongReleaseHeight;
+        return !coinbase_maturity_long_periods.empty();
+    }
+    /** Earliest spending-block height at which a height-released period ends. */
+    int CoinbaseMaturityLongFirstReleaseHeight() const
+    {
+        int first{std::numeric_limits<int>::max()};
+        for (const CoinbaseMaturityPeriod& period : coinbase_maturity_long_periods) {
+            if (period.release_height < first) first = period.release_height;
+        }
+        return first;
+    }
+    bool CoinbaseMaturityPeriodReleased(const CoinbaseMaturityPeriod& period, int spend_height, int64_t mtp_prev) const
+    {
+        if (period.release_height != std::numeric_limits<int>::max() && spend_height >= period.release_height) {
+            return true;
+        }
+        if (mtp_prev < CoinbaseMaturityLongReleaseTime) return false;
+        // No release height: this period ends at the RDTS expiry time.
+        if (period.release_height == std::numeric_limits<int>::max()) return true;
+        // RDTS expiry also ends an earlier period once the first release
+        // height has passed. Releasing before that height would accept a
+        // spend the previous rule still rejects.
+        const int first_release{CoinbaseMaturityLongFirstReleaseHeight()};
+        return first_release != std::numeric_limits<int>::max() && spend_height >= first_release;
+    }
+    /** Whether any period still holds coinbases in a block at this height whose parent has this median-time-past. */
+    bool CoinbaseMaturityLongActiveAt(int height, int64_t mtp_prev) const
+    {
+        return CoinbaseMaturityLongHeldFrom(height, mtp_prev) != std::numeric_limits<int>::max();
+    }
+    /**
+     * First coinbase height that cannot be spent in a block at the given
+     * height whose parent has the given median-time-past, or
+     * std::numeric_limits<int>::max() when the rule does not apply to it.
+     */
+    int CoinbaseMaturityLongHeldFrom(int height, int64_t mtp_prev) const
+    {
+        if (coinbase_maturity_long_periods.empty() || height < CoinbaseMaturityLongEnforceHeight) {
+            return std::numeric_limits<int>::max();
+        }
+        int held{std::numeric_limits<int>::max()};
+        for (const CoinbaseMaturityPeriod& period : coinbase_maturity_long_periods) {
+            if (!CoinbaseMaturityPeriodReleased(period, height, mtp_prev) && period.start_height < held) {
+                held = period.start_height;
+            }
+        }
+        return held;
+    }
+    /**
+     * Release height of the period covering coin_height, or false when the
+     * schedule does not cover it. release_height_out is
+     * std::numeric_limits<int>::max() when that period ends at
+     * CoinbaseMaturityLongReleaseTime.
+     */
+    bool CoinbaseMaturityLongCovered(int coin_height, int& release_height_out) const
+    {
+        const CoinbaseMaturityPeriod* match{nullptr};
+        for (const CoinbaseMaturityPeriod& period : coinbase_maturity_long_periods) {
+            if (coin_height >= period.start_height) match = &period;
+        }
+        if (!match) return false;
+        release_height_out = match->release_height;
+        return true;
     }
     std::vector<ChainstateRevalidationDeployment> chainstate_revalidation_deployments;
     /** Don't warn about unknown BIP 9 activations below this height.
@@ -235,6 +325,26 @@ struct Params {
         return IsBlake2bHeight(height) && mtp_prev < RdtsExpiryTime;
     }
 };
+
+/**
+ * Last height at which a block can still have a parent median time past
+ * below `until_mtp`, given a block at `anchor_height` whose median time
+ * past is `anchor_mtp`.
+ *
+ * A block timestamp must be greater than the previous median time past, so
+ * that median rises by at least one second every six blocks. The block at
+ * the returned height can still see a parent median of `until_mtp - 1`.
+ */
+inline int LastHeightWithParentMtpBelow(int anchor_height, int64_t anchor_mtp, int64_t until_mtp)
+{
+    if (until_mtp <= anchor_mtp) return anchor_height;
+    const int64_t seconds{until_mtp - anchor_mtp};
+    constexpr int64_t blocks_per_second{6};
+    if (seconds > (static_cast<int64_t>(std::numeric_limits<int>::max()) - anchor_height) / blocks_per_second) {
+        return std::numeric_limits<int>::max();
+    }
+    return anchor_height + static_cast<int>(seconds * blocks_per_second);
+}
 
 } // namespace Consensus
 
