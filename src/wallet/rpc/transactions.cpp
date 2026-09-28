@@ -516,6 +516,8 @@ RPCHelpMan listtransactions()
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative count");
     if (nFrom < 0)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative from");
+    // Both are non-negative ints, so the sum can't overflow in 64 bits
+    const uint64_t limit{uint64_t(nCount) + uint64_t(nFrom)};
 
     std::vector<UniValue> ret;
     {
@@ -528,20 +530,18 @@ RPCHelpMan listtransactions()
         {
             CWalletTx *const pwtx = (*it).second;
             ListTransactions(*pwallet, *pwtx, 0, true, ret, filter, filter_label);
-            if ((int)ret.size() >= (nCount+nFrom)) break;
+            if (ret.size() >= limit) break;
         }
     }
 
     // ret is newest to oldest
 
-    if (nFrom > (int)ret.size())
-        nFrom = ret.size();
-    if ((nFrom + nCount) > (int)ret.size())
-        nCount = ret.size() - nFrom;
+    const size_t from{std::min<size_t>(nFrom, ret.size())};
+    const size_t num{std::min<size_t>(nCount, ret.size() - from)};
 
     auto txs_rev_it{std::make_move_iterator(ret.rend())};
     UniValue result{UniValue::VARR};
-    result.push_backV(txs_rev_it - nFrom - nCount, txs_rev_it - nFrom); // Return oldest to newest
+    result.push_backV(txs_rev_it - from - num, txs_rev_it - from); // Return oldest to newest
     return result;
 },
     };
