@@ -1784,6 +1784,19 @@ BOOST_AUTO_TEST_CASE(script_DataCarrierBytes)
     BOOST_CHECK_EQUAL("0+13", DatacarrierBytesStr(CScript() << zeros(11) << OP_DROP, 0, false));
     BOOST_CHECK_EQUAL("0+6", DatacarrierBytesStr(CScript() << OP_0 << OP_IF << OP_7 << OP_ELSE << OP_8 << OP_ENDIF, 0, false));
     BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << OP_1 << OP_IF << OP_ELSE << zeros(10) << OP_ENDIF, 0, false));
+
+    // Following constants costs one step per opcode plus each OP_ROLL's depth, at most
+    // four per byte: one deep roll before the guard is followed, a string of them is not
+    const CScript dead_tail = CScript() << OP_1 << OP_NOTIF << OP_7 << OP_ENDIF;
+    const auto deep_rolls = [&](int rolls) {
+        CScript s;
+        for (int i{0}; i < 999; ++i) s << OP_1;
+        for (int i{0}; i < rolls; ++i) s << CScriptNum{998} << OP_ROLL;
+        s.insert(s.end(), dead_tail.begin(), dead_tail.end());
+        return s;
+    };
+    BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(deep_rolls(1)));
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(deep_rolls(10)));
 }
 
 BOOST_AUTO_TEST_CASE(script_DataCarrierBytes_unproven_pubkeys)

@@ -396,10 +396,17 @@ DeadParts FindDeadParts(const CScript& script)
     KnownStack stack, alt;
     opcodetype opcode;
     std::vector<unsigned char> push;
+    // Each opcode costs one step, and OP_ROLL also costs its depth, the one move
+    // that is not constant time. Stop, marking nothing more, after a few steps per
+    // byte: no spendable script rolls deep over and over, and one built to do so
+    // gets the plain scan instead of costing the node more than its size.
+    size_t steps_left{4 * size_t{script.size()}};
 
     for (CScript::const_iterator it{script.begin()}; it < script.end();) {
         const size_t offset{size_t(it - script.begin())};
         if (!script.GetOp(it, opcode, push)) break;
+        if (steps_left == 0) break;
+        --steps_left;
 
         if (opcode == OP_IF || opcode == OP_NOTIF) {
             if (not_running) {
@@ -562,6 +569,8 @@ DeadParts FindDeadParts(const CScript& script)
             }
             const KnownValue v{stack.At(n)};
             if (opcode == OP_ROLL) {
+                if (size_t(n) > steps_left) return dead;
+                steps_left -= n;
                 std::vector<KnownValue> above;
                 for (int64_t i{0}; i < n; ++i) above.push_back(stack.Pop());
                 stack.Pop();
