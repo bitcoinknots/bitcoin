@@ -200,7 +200,7 @@ def ip_stats(ips: list[dict]) -> str:
 def parse_args():
     argparser = argparse.ArgumentParser(description='Generate a list of bitcoin node seed ip addresses.')
     argparser.add_argument("-a","--asmap", help='the location of the asmap asn database file (required)', required=True)
-    argparser.add_argument("-s","--seeds", help='the location of the DNS seeds file (required)', required=True)
+    argparser.add_argument("-s","--seeds", nargs='+', help='the location of one or more DNS seeds files (required). Given more than one, each is parsed as its own file, so a source missing a trailing newline cannot silently merge into the next.', required=True)
     argparser.add_argument("-m", "--minblocks", help="The minimum number of blocks each node must have", default=MIN_BLOCKS, type=int)
     argparser.add_argument("-u", "--uptime-window", help="Judge uptime over the last 7 or 30 days (default: 30). Use 7 while the network is younger than 30 days, when no node can meet a 30-day threshold", default=30, type=int, choices=[7, 30])
     return argparser.parse_args()
@@ -214,8 +214,14 @@ def main():
     print('Done.', file=sys.stderr)
 
     print('Loading and parsing DNS seeds…', end='', file=sys.stderr, flush=True)
-    with open(args.seeds, 'r', encoding='utf8') as f:
-        lines = f.readlines()
+    # Read each file separately and concatenate the parsed line lists, not the raw
+    # bytes. A shell-level `cat a b > combined` silently merges a's last line into
+    # b's first line if a has no trailing newline, corrupting both; readlines() per
+    # file has no such failure mode regardless of a file's trailing newline.
+    lines = []
+    for seeds_path in args.seeds:
+        with open(seeds_path, 'r', encoding='utf8') as f:
+            lines += f.readlines()
     ips = [parseline(line) for line in lines]
     random.shuffle(ips)
     print('Done.', file=sys.stderr)
