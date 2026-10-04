@@ -1064,6 +1064,14 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
 
     ws.m_vsize = ws.m_tx_handle->GetTxSize();
 
+    // Check actual fees and manual fee deltas before applying the automatic
+    // dust penalty. StageAddition already applied mapDeltas to the entry.
+    if (m_pool.m_opts.require_standard && !ignore_rejects.count("dust")) {
+        if (!PreCheckEphemeralTx(*ptx, m_pool.m_opts.dust_relay_feerate, ws.m_base_fees, ws.m_modified_fees, state)) {
+            return false; // state filled in by PreCheckEphemeralTx
+        }
+    }
+
     // Reduce effective fee by dust threshold for each sub-dust output
     if (m_pool.m_opts.subdustfeepenalty) {
         CAmount dust_penalty{0};
@@ -1078,13 +1086,6 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
                 e.UpdateModifiedFee(-dust_penalty);
             });
             ws.m_modified_fees = SaturatingAdd(ws.m_modified_fees, -dust_penalty);
-        }
-    }
-
-    // Enforces 0-fee for dust transactions, no incentive to be mined alone
-    if (m_pool.m_opts.require_standard && !ignore_rejects.count("dust")) {
-        if (!PreCheckEphemeralTx(*ptx, m_pool.m_opts.dust_relay_feerate, ws.m_base_fees, ws.m_modified_fees, state)) {
-            return false; // state filled in by PreCheckEphemeralTx
         }
     }
 
