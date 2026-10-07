@@ -94,6 +94,35 @@ class DumptxoutsetTest(BitcoinTestFramework):
                 assert_equal(content[0].rstrip(),
                     "b9edce02689692b1cdc3440d03011486a27c46b966248b922cc6e4315e900708{s}0{s}5000000000{s}1{s}78{s}76a9142b4569203694fc997e13f2c0a1383b9e16c77a0d88ac".format(s=sep))
 
+    def test_dumptxoutset_with_fork(self):
+        node = self.nodes[0]
+        tip = node.getbestblockhash()
+        target_height = node.getblockcount() - 10
+        target_hash = node.getblockhash(target_height)
+
+        # Create a fork of two blocks at the target height
+        invalid_block = node.getblockhash(target_height + 1)
+        node.invalidateblock(invalid_block)
+        # Reset mocktime to not regenerate the same blockhash
+        node.setmocktime(0)
+        self.generate(node, 2)
+
+        # Move back on to actual main chain
+        node.reconsiderblock(invalid_block)
+        self.wait_until(lambda: node.getbestblockhash() == tip)
+
+        # Use dumptxoutset at the forked height
+        out = node.dumptxoutset("txoutset_fork.dat", "rollback", {"rollback": target_height})
+
+        # Verify the snapshot was created at the target height and not the fork tip
+        assert_equal(out['base_height'], target_height)
+        assert_equal(out['base_hash'], target_hash)
+
+        # Cover the same case as above with an in-memory database
+        out_mem = node.dumptxoutset("txoutset_fork_mem.dat", "rollback", {"rollback": target_height, "in_memory": True})
+        assert_equal(out_mem['base_height'], target_height)
+        assert_equal(out_mem['base_hash'], target_hash)
+
     def run_test(self):
         """Test a trivial usage of the dumptxoutset RPC command."""
         node = self.nodes[0]
@@ -121,6 +150,9 @@ class DumptxoutsetTest(BitcoinTestFramework):
         # Other failing tests
         assert_raises_rpc_error(
             -8, 'unable to find item \'sample\'',  node.dumptxoutset, path='xxx', type='latest', format=['sample'])
+
+        self.log.info("Testing dumptxoutset with chain fork at target height")
+        self.test_dumptxoutset_with_fork()
 
 if __name__ == '__main__':
     DumptxoutsetTest(__file__).main()
