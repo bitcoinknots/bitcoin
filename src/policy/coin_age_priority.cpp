@@ -186,8 +186,8 @@ void BlockAssembler::addPriorityTxs(const CTxMemPool& mempool, int &nPackagesSel
 {
     AssertLockHeld(mempool.cs);
 
-    // How much of the block should be dedicated to high-priority transactions,
-    // included regardless of the fees they pay
+    // How much of the block should be dedicated to high-priority transactions
+    // meeting the mining fee floor.
     uint64_t nBlockPrioritySize = gArgs.GetIntArg("-blockprioritysize", DEFAULT_BLOCK_PRIORITY_SIZE);
     if (m_options.nBlockMaxSize < nBlockPrioritySize) {
         nBlockPrioritySize = m_options.nBlockMaxSize;
@@ -209,6 +209,12 @@ void BlockAssembler::addPriorityTxs(const CTxMemPool& mempool, int &nPackagesSel
 
     vecPriority.reserve(mempool.mapTx.size());
     for (auto mi = mempool.mapTx.begin(); mi != mempool.mapTx.end(); ++mi) {
+        // Use the same modified fees and policy vsize as package selection.
+        // Below-floor parents remain eligible through fee-paying descendants
+        // in addPackageTxs, rather than being selected individually here.
+        if (mi->GetModifiedFee() < m_options.blockMinFeeRate.GetFee(mi->GetTxSize())) {
+            continue;
+        }
         double dPriority = mi->GetPriority(nHeight);
         CAmount dummy;
         mempool.ApplyDeltas(mi->GetTx().GetHash(), dPriority, dummy);
