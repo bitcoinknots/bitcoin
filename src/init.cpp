@@ -725,6 +725,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-bytespersigopstrict", strprintf("Minimum bytes per sigop in transactions we relay and mine (default: %u)", DEFAULT_BYTES_PER_SIGOP_STRICT), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-datacarrier", strprintf("Relay and mine data carrier transactions (default: %u)", DEFAULT_ACCEPT_DATACARRIER), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-datacarriercost", strprintf("Treat extra data in transactions as at least N vbytes per actual byte (default: %s)", DEFAULT_WEIGHT_PER_DATA_BYTE / 4.0), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
+    argsman.AddArg("-oneofnkeypenalty", strprintf("Reduce modified fees by the minrelaytxfee charge for the witness discount on all but one public key in exact 1-of-N multisig scripts. Also affects legitimate matching wallet spends; wallet fee estimates include a conservative allowance (default: %u)", DEFAULT_ONE_OF_N_KEY_PENALTY), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-datacarrierfullcount", strprintf("Apply datacarriersize limit to all known datacarrier methods (default: %u)", DEFAULT_DATACARRIER_FULLCOUNT), ArgsManager::ALLOW_ANY | (DEFAULT_DATACARRIER_FULLCOUNT ? uint32_t{ArgsManager::DEBUG_ONLY} : 0), OptionsCategory::NODE_RELAY);
     argsman.AddArg("-datacarriersize",
                    strprintf("Maximum size of data in data carrier transactions we relay and mine, in bytes (maximum %s, default: %u)",
@@ -877,6 +878,7 @@ void InitParameterInteraction(ArgsManager& args)
         args.SoftSetArg("-rejecttokens", "0");
         args.SoftSetArg("-subdustfeepenalty", "0");
         args.SoftSetArg("-datacarriercost", "0.25");
+        args.SoftSetBoolArg("-oneofnkeypenalty", false);
         args.SoftSetArg("-datacarrierfullcount", "0");
         args.SoftSetArg("-maxtxlegacysigops", strprintf("%s", std::numeric_limits<unsigned int>::max()));
         args.SoftSetArg("-maxscriptsize", strprintf("%s", std::numeric_limits<unsigned int>::max()));
@@ -1222,6 +1224,7 @@ bool AppInitParameterInteraction(const ArgsManager& args)
     g_script_size_policy_limit = args.GetIntArg("-maxscriptsize", g_script_size_policy_limit);
 
     nBytesPerSigOp = args.GetIntArg("-bytespersigop", nBytesPerSigOp);
+    g_one_of_n_key_penalty = args.GetBoolArg("-oneofnkeypenalty", DEFAULT_ONE_OF_N_KEY_PENALTY);
     nBytesPerSigOpStrict = args.GetIntArg("-bytespersigopstrict", nBytesPerSigOpStrict);
 
     if (!g_wallet_init_interface.ParameterInteraction()) return false;

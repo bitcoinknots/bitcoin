@@ -33,6 +33,7 @@
 #include <vector>
 
 unsigned int g_script_size_policy_limit{DEFAULT_SCRIPT_SIZE_POLICY_LIMIT};
+bool g_one_of_n_key_penalty{DEFAULT_ONE_OF_N_KEY_PENALTY};
 
 CAmount GetDustThreshold(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
 {
@@ -652,6 +653,37 @@ std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsV
     }
 
     return ret;
+}
+
+int64_t GetOneOfNExtraWeight(const CScript& script)
+{
+    // Match whole scripts, not fragments of recovery paths or other conditions.
+    // These keys may all belong to a wallet; this does not classify them as data.
+    std::vector<std::vector<unsigned char>> solutions;
+    if (Solver(script, solutions) == TxoutType::MULTISIG && solutions.front()[0] == 1) {
+        size_t key_bytes{0}, largest_key{0};
+        for (size_t i{1}; i + 1 < solutions.size(); ++i) {
+            key_bytes += solutions[i].size();
+            largest_key = std::max(largest_key, solutions[i].size());
+        }
+        return int64_t(key_bytes - largest_key) * (WITNESS_SCALE_FACTOR - 1);
+    }
+    if (const auto multi_a = MatchMultiA(script); multi_a && multi_a->first == 1) {
+        return int64_t(multi_a->second.size() - 1) * 32 * (WITNESS_SCALE_FACTOR - 1);
+    }
+    return 0;
+}
+
+int64_t GetOneOfNTxExtraWeight(const CTransaction& tx, const CCoinsViewCache& view)
+{
+    int64_t extra_weight{0};
+    for (const CTxIn& txin : tx.vin) {
+        if (txin.scriptWitness.IsNull()) continue;
+        const auto& prev_script = view.AccessCoin(txin.prevout).out.scriptPubKey;
+        const auto [script, weight_per_byte] = GetScriptForTransactionInput(prev_script, txin);
+        if (weight_per_byte == 1) extra_weight += GetOneOfNExtraWeight(script);
+    }
+    return extra_weight;
 }
 
 int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte)

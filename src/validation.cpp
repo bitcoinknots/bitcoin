@@ -1139,6 +1139,19 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
         }
     }
 
+    // Apply after the ephemeral zero-fee check: this automatic penalty must not
+    // turn a zero-fee parent into a nonzero-fee transaction for that check.
+    // Keep size accounting unchanged, in particular TRUC and ancestor limits.
+    if (g_one_of_n_key_penalty) {
+        const auto penalty = m_pool.m_opts.min_relay_feerate.GetFee(GetVirtualTransactionSize(GetOneOfNTxExtraWeight(tx, m_view), 0, 0));
+        if (penalty > 0) {
+            m_subpackage.m_changeset->m_to_add.modify(ws.m_tx_handle, [&](CTxMemPoolEntry& e) {
+                e.UpdateModifiedFee(-penalty);
+            });
+            ws.m_modified_fees = SaturatingAdd(ws.m_modified_fees, -penalty);
+        }
+    }
+
     // To avoid rejecting low-sigop bare-multisig transactions, the sigops
     // are counted a second time more accurately.
     if ((nSigOpsCost > MAX_STANDARD_TX_SIGOPS_COST) || (nBytesPerSigOpStrict && GetAccurateTransactionSigOpCost(tx, m_view, STANDARD_SCRIPT_VERIFY_FLAGS) > ws.m_vsize * WITNESS_SCALE_FACTOR / nBytesPerSigOpStrict)) {

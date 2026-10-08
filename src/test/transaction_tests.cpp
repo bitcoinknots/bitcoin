@@ -1423,4 +1423,41 @@ BOOST_AUTO_TEST_CASE(spends_witness_prog)
     }
 }
 
+BOOST_AUTO_TEST_CASE(oneofn_policy_weight)
+{
+    const auto pubkey = GenerateRandomKey().GetPubKey();
+    const auto key = ToByteVector(pubkey);
+    const auto xonly = ToByteVector(XOnlyPubKey{pubkey});
+    for (const int n : {1, 2, 3, 4, 15, 20}) {
+        for (const int threshold : {1, n}) {
+            CScript multi;
+            multi << threshold;
+            for (int i{0}; i < n; ++i) multi << key;
+            multi << n << OP_CHECKMULTISIG;
+            const int64_t expected = threshold == 1 ? (n - 1) * 33 * 3 : 0;
+            BOOST_CHECK_EQUAL(GetOneOfNExtraWeight(multi), expected);
+
+            // Do not infer thresholds inside more complex scripts.
+            CScript prefixed = CScript{} << OP_0 << OP_CHECKSEQUENCEVERIFY << OP_DROP;
+            prefixed.insert(prefixed.end(), multi.begin(), multi.end());
+            BOOST_CHECK_EQUAL(GetOneOfNExtraWeight(prefixed), 0);
+            BOOST_CHECK_EQUAL(GetOneOfNExtraWeight(CScript{multi} << OP_NOP), 0);
+        }
+    }
+    for (const int n : {1, 2, 3, 4, 15, 999}) {
+        for (const int threshold : {1, n}) {
+            CScript multi_a;
+            for (int i{0}; i < n; ++i) multi_a << xonly << (i == 0 ? OP_CHECKSIG : OP_CHECKSIGADD);
+            multi_a << threshold << OP_NUMEQUAL;
+            BOOST_CHECK_EQUAL(GetOneOfNExtraWeight(multi_a), threshold == 1 ? (n - 1) * 32 * 3 : 0);
+            BOOST_CHECK_EQUAL(GetOneOfNExtraWeight(CScript{multi_a} << OP_NOP), 0);
+            multi_a.pop_back();
+            BOOST_CHECK_EQUAL(GetOneOfNExtraWeight(multi_a), 0);
+        }
+    }
+    BOOST_CHECK_EQUAL(GetOneOfNExtraWeight(CScript{}), 0);
+    BOOST_CHECK_EQUAL(GetOneOfNExtraWeight(CScript{} << xonly << OP_CHECKSIG), 0);
+    BOOST_CHECK_EQUAL(GetOneOfNExtraWeight(CScript{} << OP_PUSHDATA1), 0);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

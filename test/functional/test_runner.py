@@ -103,6 +103,7 @@ BASE_SCRIPTS = [
     'feature_rdts_ignore_rejects.py',
     'feature_block.py',
     'mempool_ephemeral_dust.py',
+    'mempool_oneofn_cost.py',
     'wallet_conflicts.py --legacy-wallet',
     'wallet_conflicts.py --descriptors',
     'p2p_opportunistic_1p1c.py',

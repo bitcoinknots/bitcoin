@@ -8,10 +8,12 @@
 #include <common/system.h>
 #include <consensus/amount.h>
 #include <consensus/validation.h>
+#include <hash.h>
 #include <interfaces/chain.h>
 #include <node/types.h>
 #include <numeric>
 #include <policy/policy.h>
+#include <policy/settings.h>
 #include <primitives/transaction.h>
 #include <script/script.h>
 #include <script/signingprovider.h>
@@ -87,13 +89,44 @@ static std::optional<int64_t> MaxInputWeight(const Descriptor& desc, const std::
     return {};
 }
 
+// Reserve the undiscounted key weight at the wallet's chosen feerate. This
+// covers the penalty at minrelaytxfee and is conservative at higher feerates.
+// Keep it separate from consensus weight and transaction weight limits.
+static int64_t MaximumOneOfNExtraWeight(const CScript& script_pubkey, const SigningProvider& provider)
+{
+    if (!g_one_of_n_key_penalty) return 0;
+    CScript script{script_pubkey};
+    std::vector<std::vector<unsigned char>> solutions;
+    auto type = Solver(script, solutions);
+    if (type == TxoutType::SCRIPTHASH) {
+        if (!provider.GetCScript(CScriptID{uint160{solutions[0]}}, script)) return 0;
+        type = Solver(script, solutions);
+    }
+    if (type == TxoutType::WITNESS_V0_SCRIPTHASH) {
+        if (!provider.GetCScript(CScriptID{RIPEMD160(solutions[0])}, script)) return 0;
+        return GetVirtualTransactionSize(GetOneOfNExtraWeight(script), 0, 0) * WITNESS_SCALE_FACTOR;
+    }
+    if (type == TxoutType::WITNESS_V1_TAPROOT) {
+        TaprootSpendData spenddata;
+        if (!provider.GetTaprootSpendData(XOnlyPubKey{solutions[0]}, spenddata)) return 0;
+        int64_t extra_weight{0};
+        for (const auto& [leaf, controls] : spenddata.scripts) {
+            if (leaf.second == TAPROOT_LEAF_TAPSCRIPT) {
+                extra_weight = std::max(extra_weight, GetOneOfNExtraWeight(CScript(leaf.first.begin(), leaf.first.end())));
+            }
+        }
+        return extra_weight;
+    }
+    return 0;
+}
+
 int CalculateMaximumSignedInputSize(const CTxOut& txout, const COutPoint outpoint, const SigningProvider* provider, bool can_grind_r, const CCoinControl* coin_control)
 {
     if (!provider) return -1;
 
     if (const auto desc = InferDescriptor(txout.scriptPubKey, *provider)) {
         if (const auto weight = MaxInputWeight(*desc, CTxIn{outpoint}, coin_control, true, can_grind_r)) {
-            return static_cast<int>(GetVirtualTransactionSize(*weight, 0, 0));
+            return static_cast<int>(GetVirtualTransactionSize(*weight + MaximumOneOfNExtraWeight(txout.scriptPubKey, *provider), 0, 0));
         }
     }
 
@@ -106,9 +139,7 @@ int CalculateMaximumSignedInputSize(const CTxOut& txout, const CWallet* wallet, 
     return CalculateMaximumSignedInputSize(txout, COutPoint(), provider.get(), wallet->CanGrindR(), coin_control);
 }
 
-/** Infer a descriptor for the given output script. */
-static std::unique_ptr<Descriptor> GetDescriptor(const CWallet* wallet, const CCoinControl* coin_control,
-                                                 const CScript script_pubkey)
+static MultiSigningProvider GetSigningProvider(const CWallet* wallet, const CCoinControl* coin_control, const CScript& script_pubkey)
 {
     MultiSigningProvider providers;
     for (const auto spkman: wallet->GetScriptPubKeyMans(script_pubkey)) {
@@ -117,7 +148,14 @@ static std::unique_ptr<Descriptor> GetDescriptor(const CWallet* wallet, const CC
     if (coin_control) {
         providers.AddProvider(std::make_unique<FlatSigningProvider>(coin_control->m_external_provider));
     }
-    return InferDescriptor(script_pubkey, providers);
+    return providers;
+}
+
+/** Infer a descriptor for the given output script. */
+static std::unique_ptr<Descriptor> GetDescriptor(const CWallet* wallet, const CCoinControl* coin_control,
+                                                 const CScript script_pubkey)
+{
+    return InferDescriptor(script_pubkey, GetSigningProvider(wallet, coin_control, script_pubkey));
 }
 
 /** Infer the maximum size of this input after it will be signed. */
@@ -157,15 +195,19 @@ TxSize CalculateMaximumSignedTxSize(const CTransaction &tx, const CWallet *walle
     for (const auto& txo : tx.vout) weight += GetSerializeSize(txo) * WITNESS_SCALE_FACTOR;
 
     // Add the size of the transaction inputs as if they were signed.
+    int64_t extra_weight{0};
     for (uint32_t i = 0; i < txouts.size(); i++) {
         const auto txin_weight = GetSignedTxinWeight(wallet, coin_control, tx.vin[i], txouts[i], is_segwit, wallet->CanGrindR());
         if (!txin_weight) return TxSize{-1, -1};
         assert(*txin_weight > -1);
         weight += *txin_weight;
+        if (g_one_of_n_key_penalty) {
+            extra_weight += MaximumOneOfNExtraWeight(txouts[i].scriptPubKey, GetSigningProvider(wallet, coin_control, txouts[i].scriptPubKey));
+        }
     }
 
     // It's ok to use 0 as the number of sigops since we never create any pathological transaction.
-    return TxSize{GetVirtualTransactionSize(weight, 0, 0), weight};
+    return TxSize{GetVirtualTransactionSize(weight + extra_weight, 0, 0), weight};
 }
 
 TxSize CalculateMaximumSignedTxSize(const CTransaction &tx, const CWallet *wallet, const CCoinControl* coin_control)
@@ -272,9 +314,6 @@ util::Result<PreSelectedInputs> FetchSelectedInputs(const CWallet& wallet, const
     std::map<COutPoint, CAmount> map_of_bump_fees = wallet.chain().calculateIndividualBumpFees(coin_control.ListSelected(), coin_selection_params.m_effective_feerate);
     for (const COutPoint& outpoint : coin_control.ListSelected()) {
         int64_t input_bytes = coin_control.GetInputWeight(outpoint).value_or(-1);
-        if (input_bytes != -1) {
-            input_bytes = GetVirtualTransactionSize(input_bytes, 0, 0);
-        }
         CTxOut txout;
         if (auto ptr_wtx = wallet.GetWalletTx(outpoint.hash)) {
             // Clearly invalid input, fail
@@ -293,6 +332,11 @@ util::Result<PreSelectedInputs> FetchSelectedInputs(const CWallet& wallet, const
             }
 
             txout = *out;
+        }
+
+        if (const auto input_weight = coin_control.GetInputWeight(outpoint)) {
+            const auto extra_weight = g_one_of_n_key_penalty ? MaximumOneOfNExtraWeight(txout.scriptPubKey, GetSigningProvider(&wallet, &coin_control, txout.scriptPubKey)) : 0;
+            input_bytes = GetVirtualTransactionSize(*input_weight + extra_weight, 0, 0);
         }
 
         if (input_bytes == -1) {

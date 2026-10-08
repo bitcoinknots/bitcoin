@@ -64,6 +64,8 @@ static constexpr unsigned int DEFAULT_BYTES_PER_SIGOP{20};
 static constexpr unsigned int DEFAULT_BYTES_PER_SIGOP_STRICT{20};
 /** Default for -datacarriercost (multiplied by WITNESS_SCALE_FACTOR) */
 static constexpr unsigned int DEFAULT_WEIGHT_PER_DATA_BYTE{4};
+/** Default for -oneofnkeypenalty */
+static constexpr bool DEFAULT_ONE_OF_N_KEY_PENALTY{true};
 /** Default for -rejecttokens */
 static constexpr bool DEFAULT_REJECT_TOKENS{true};
 /** Default for -subdustfeepenalty */
@@ -242,6 +244,12 @@ static inline int64_t GetVirtualTransactionInputSize(const CTxIn& tx)
 std::pair<CScript, unsigned int> GetScriptForTransactionInput(CScript prevScript, const CTxIn&);
 
 std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsViewCache& view);
+
+/** Policy weight needed to price all but one key in an exact 1-of-N witness script at one vbyte per byte. */
+int64_t GetOneOfNExtraWeight(const CScript& script);
+
+/** Additional key weight across witness inputs, used only to calculate the fee penalty. */
+int64_t GetOneOfNTxExtraWeight(const CTransaction& tx, const CCoinsViewCache& view);
 
 int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte);
 
