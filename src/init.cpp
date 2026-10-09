@@ -2038,23 +2038,21 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     // the reindex prompt below offers recovery, rather than running on (or
     // partially rewinding) an invalid chain.
     //
-    // Skip this on any reindex: both -reindex and -reindex-chainstate reconnect
-    // blocks through ConnectBlock, which re-runs the bad-version-blake2b header
-    // check (it is contextual/volatile) and rejects the offending blocks during
-    // the rebuild, so the correction is redundant. The same holds whenever the
-    // active chain has not been built yet (a coins database with no best block,
-    // reindex or not); the correction itself is a no-op in that state.
+    // Skipped only on a full -reindex, which re-accepts every header and so needs no
+    // correction. -reindex-chainstate IS corrected: the rebuild alone misses inherited
+    // retarget nBits (see ContextualCheckBlockHeaderVolatile), and with the coins
+    // database wiped there is no tip, so the call below marks without reorganizing.
     //
     // The block index is shared, so the invalid marks apply to any background
     // (assumeutxo) chainstate too; only the active chainstate is reorganized here.
-    // Safe while every snapshot base stays below the BLAKE2b fork height (as
-    // today); a future snapshot base above it would need re-review.
-    if (status == ChainstateLoadStatus::SUCCESS && !ShutdownRequested(node) &&
-            !do_reindex && !do_reindex_chainstate) {
-        bilingual_str rdts_error;
-        if (!node.chainman->ActiveChainstate().CorrectRdtsInvalidBlocks(rdts_error)) {
+    // Safe while every snapshot base stays below both the BLAKE2b fork height and
+    // TimewarpFixHeight (as today, the latter being unscheduled everywhere); a future
+    // snapshot base above either would need re-review.
+    if (status == ChainstateLoadStatus::SUCCESS && !ShutdownRequested(node) && !do_reindex) {
+        bilingual_str inherited_error;
+        if (!node.chainman->ActiveChainstate().CorrectInheritedInvalidBlocks(inherited_error)) {
             status = ChainstateLoadStatus::FAILURE;
-            error = rdts_error;
+            error = inherited_error;
         }
     }
 

@@ -118,6 +118,7 @@ add_executable(fuzz
   strprintf.cpp
   system.cpp
   timeoffsets.cpp
+  timewarp.cpp
   torcontrol.cpp
   transaction.cpp
   txdownloadman.cpp

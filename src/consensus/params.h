@@ -29,8 +29,9 @@ enum BuriedDeployment : int16_t {
     DEPLOYMENT_CSV,
     DEPLOYMENT_SEGWIT,
     DEPLOYMENT_BLAKE2B,
+    DEPLOYMENT_TIMEWARPFIX,
 };
-constexpr bool ValidDeployment(BuriedDeployment dep) { return dep <= DEPLOYMENT_BLAKE2B; }
+constexpr bool ValidDeployment(BuriedDeployment dep) { return dep <= DEPLOYMENT_TIMEWARPFIX; }
 
 enum DeploymentPos : uint16_t {
     DEPLOYMENT_TESTDUMMY,
@@ -139,6 +140,11 @@ struct Params {
     int Blake2bHeight{std::numeric_limits<int>::max()};
     std::vector<unsigned char> Blake2bHeadline;
     uint8_t Blake2bTargetShift{20};
+    /** Height from which contiguous retarget windows apply. Both rules key on the block
+     *  closing a window, so the first one actually affected is the first closing block at
+     *  or above this height, not the block at this height. Unscheduled by default: it is
+     *  a hardfork in its own right, and the BLAKE2b fork is already past. */
+    int TimewarpFixHeight{std::numeric_limits<int>::max()};
     /**
      * RDTS (BIP110 ReducedData Temporary Softfork) deployment expiry.
      *
@@ -216,6 +222,8 @@ struct Params {
             return SegwitHeight;
         case DEPLOYMENT_BLAKE2B:
             return Blake2bHeight;
+        case DEPLOYMENT_TIMEWARPFIX:
+            return TimewarpFixHeight;
         } // no default case, so the compiler can warn about missing cases
         return std::numeric_limits<int>::max();
     }
@@ -223,6 +231,11 @@ struct Params {
     bool IsBlake2bHeight(int height) const
     {
         return height >= Blake2bHeight;
+    }
+
+    bool IsTimewarpFixHeight(int height) const
+    {
+        return height >= TimewarpFixHeight;
     }
 
     /** RDTS activates at the BLAKE2b hardfork; there is no separate schedule. */

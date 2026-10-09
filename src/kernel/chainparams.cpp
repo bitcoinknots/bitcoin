@@ -546,6 +546,9 @@ public:
         consensus.SegwitHeight = 1;
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = options.pow_target_spacing;
+        if (options.timewarpfix_height) {
+            consensus.TimewarpFixHeight = *options.timewarpfix_height;
+        }
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.enforce_BIP94 = false;
         consensus.fPowNoRetargeting = false;
@@ -655,6 +658,15 @@ public:
             switch (dep) {
             case Consensus::BuriedDeployment::DEPLOYMENT_BLAKE2B:
                 consensus.Blake2bHeight = int{height};
+                break;
+            case Consensus::BuriedDeployment::DEPLOYMENT_TIMEWARPFIX:
+                // CalculateNextWorkRequired takes the BIP94 base target without the
+                // contiguous-window shift, so the fix would be only half applied here.
+                // Refuse rather than run a half-applied consensus rule.
+                if (consensus.enforce_BIP94) {
+                    throw std::runtime_error("timewarpfix activation cannot be combined with BIP94 enforcement");
+                }
+                consensus.TimewarpFixHeight = int{height};
                 break;
             case Consensus::BuriedDeployment::DEPLOYMENT_SEGWIT:
                 consensus.SegwitHeight = int{height};

@@ -2390,6 +2390,8 @@ void Chainstate::InvalidChainFound(CBlockIndex* pindexNew)
     // of that heuristic. Only inherited data directories hold such branches
     // (headers at or above the fork height are rejected at acceptance), and
     // this keeps them consistent with freshly synced nodes.
+    // A contiguous-window violator is deliberately NOT suppressed here: unlike BLAKE2b's,
+    // it only outweighs us if those miners hold more hash rate, which is worth warning about.
     if (!m_chainman.ContinuesSha256dPastFork(*pindexNew) &&
             (!m_chainman.m_best_invalid || pindexNew->nChainWork > m_chainman.m_best_invalid->nChainWork)) {
         m_chainman.m_best_invalid = pindexNew;
@@ -4780,8 +4782,10 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     return true;
 }
 
-/** Context-dependent validity checks, but rechecked in ConnectBlock().
- *  Note that -reindex-chainstate skips the validation that happens here!
+/** Context-dependent validity checks that ARE rechecked in ConnectBlock(), and so are
+ *  enforced again on every block replay, including -reindex-chainstate. That is the
+ *  difference from ContextualCheckBlockHeader, which ConnectBlock does not call: a rule
+ *  placed there is never re-derived for a header already in the block index.
  */
 static bool ContextualCheckBlockHeaderVolatile(const CBlockHeader& block, BlockValidationState& state, const ChainstateManager& chainman, const CBlockIndex* pindexPrev) EXCLUSIVE_LOCKS_REQUIRED(::cs_main)
 {
@@ -4795,6 +4799,16 @@ static bool ContextualCheckBlockHeaderVolatile(const CBlockHeader& block, BlockV
     } else {
         if (consensusParams.IsBlake2bHeight(height)) {
             return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-version-blake2b", "New blocks require BLAKE2b PoW");
+        }
+    }
+
+    // A block closing a retarget period may not precede the block that period was
+    // measured from; see MinimumClosingBlockTime. Unlike ContextualCheckBlockHeader,
+    // this is reached with a null pindexPrev for genesis, which it would dereference.
+    if (pindexPrev != nullptr) {
+        if (const std::optional<int64_t> min_time{MinimumClosingBlockTime(pindexPrev, consensusParams)};
+            min_time && block.GetBlockTime() < *min_time) {
+            return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "time-timewarp-closing", "block's timestamp precedes the start of its difficulty period");
         }
     }
 
@@ -5631,10 +5645,43 @@ std::vector<CBlockIndex*> ChainstateManager::FindInheritedInvalidBlocks()
     // change as other blocks are invalidated and one scan suffices.
     // Checkpoints are deliberately not consulted: separation is performed by
     // the PoW change, and checkpoints are optional (-checkpoints=0).
+    //
+    // Both contiguous-window rules need the same treatment: a connected chain is never
+    // revisited, so neither is re-derived for it. Both verdicts read stored timestamps
+    // and nBits, which no invalidation changes, so one pass suffices.
     for (auto& [_, index] : m_blockman.m_block_index) {
         if (index.nStatus & BLOCK_FAILED_MASK) continue;             // already handled
         if (params.IsBlake2bHeight(index.nHeight) && !index.m_header_v2) {
             violators.push_back(&index);
+            continue;
+        }
+        if (index.pprev == nullptr) continue;
+        // Both conditions below walk ancestry, which is only meaningful if the stored
+        // height agrees with the parent link. Nothing this software writes violates that
+        // (AddToBlockIndex always sets nHeight = pprev->nHeight + 1), but nHeight lives
+        // outside the PoW-committed header and LoadBlockIndex does not check it, and a
+        // dangling hashPrev mints a placeholder parent with nHeight 0 and nBits 0. Judging
+        // a block against either would invalidate a valid chain, so skip instead.
+        if (index.nHeight != index.pprev->nHeight + 1) continue;
+        // Rule B: the block closing a period may not precede the block that period was
+        // measured from. Self-gating: MinimumClosingBlockTime keys on this block's own
+        // height, so it must NOT be gated on the parent's height the way rule A is.
+        const std::optional<int64_t> floor{MinimumClosingBlockTime(index.pprev, params)};
+        if (floor && index.GetBlockTime() < *floor) {
+            violators.push_back(&index);
+            continue;
+        }
+        // Rule A: an inherited retarget block carries the legacy nBits. This is the
+        // likelier of the two, since it diverges on any honest chain at the first
+        // retarget after activation while the floor only bites under attack. Gated on the
+        // parent's height to match GetNextWorkRequired's gate, so pre-fork history is not
+        // re-judged.
+        if (params.IsTimewarpFixHeight(index.pprev->nHeight) &&
+            index.nHeight % params.DifficultyAdjustmentInterval() == 0) {
+            const CBlockHeader header{index.GetBlockHeader()};
+            if (index.nBits != GetNextWorkRequired(index.pprev, &header, params)) {
+                violators.push_back(&index);
+            }
         }
     }
 
@@ -5902,7 +5949,7 @@ bool Chainstate::RewindForChainstateRevalidation(bilingual_str& error)
     return true;
 }
 
-bool Chainstate::CorrectRdtsInvalidBlocks(bilingual_str& error)
+bool Chainstate::CorrectInheritedInvalidBlocks(bilingual_str& error)
 {
     AssertLockNotHeld(m_chainstate_mutex);
     AssertLockNotHeld(::cs_main);
@@ -5911,14 +5958,40 @@ bool Chainstate::CorrectRdtsInvalidBlocks(bilingual_str& error)
     bool tip_failed{false};
     {
         LOCK(cs_main);
-        // No active chain yet: the coins database had no best block (a
-        // chainstate directory removed by hand, or a run killed before its
-        // first flush), so LoadChainTip was skipped. There is nothing to
-        // reorganize away from, and InvalidateBlock and InvalidChainFound both
-        // require a tip. The rebuild that follows connects every block through
-        // ConnectBlock, which enforces the same rule; any header-only violator
-        // is corrected by the next normal startup.
-        if (m_chain.Tip() == nullptr) return true;
+        // No active chain yet: the coins database had no best block (-reindex-chainstate,
+        // a chainstate directory removed by hand, or a run killed before its first
+        // flush), so LoadChainTip was skipped. There is nothing to reorganize away from,
+        // and InvalidateBlock and InvalidChainFound both require a tip.
+        //
+        // The violators still have to be marked before the rebuild chooses a chain.
+        // ConnectBlock re-runs ContextualCheckBlockHeaderVolatile, so it rejects a
+        // closing-block floor violator on its own; it does NOT re-run
+        // ContextualCheckBlockHeader, so an inherited retarget block carrying the legacy
+        // contiguous-window nBits would be reconnected and the node would come back up on
+        // a chain the network rejects. Marking needs only the block index; it is the
+        // reorg that needs a tip.
+        if (m_chain.Tip() == nullptr) {
+            const std::vector<CBlockIndex*> pending{m_chainman.FindInheritedInvalidBlocks()};
+            int marked{0};
+            for (CBlockIndex* target : pending) {
+                if (target->nStatus & BLOCK_FAILED_MASK) continue;
+                target->nStatus |= BLOCK_FAILED_VALID;
+                m_blockman.m_dirty_blockindex.insert(target);
+                ++marked;
+            }
+            // Descendants are deliberately not walked here. FindMostWorkChain marks
+            // BLOCK_FAILED_CHILD, inserts dirty and drops candidates when it walks back
+            // onto a failed ancestor, and the rebuild that follows does exactly that.
+            // Doing it here instead would cost a full index scan per violator: unlike
+            // the tip path below there is no height ordering to make the skip above fire,
+            // and an inherited BLAKE2b chain has one violator per block.
+            if (marked > 0) {
+                LogPrintf("%d block(s) inherited from a client that was not enforcing this "
+                          "hardfork are invalid under it; marked before the chainstate "
+                          "rebuild so it cannot reconnect them\n", marked);
+            }
+            return true;
+        }
         const CBlockIndex& tip{*m_chain.Tip()};
         const Consensus::Params& params{m_chainman.GetConsensus()};
         // The expiry is a fixed date while the fork is a height: a fork
@@ -5957,8 +6030,8 @@ bool Chainstate::CorrectRdtsInvalidBlocks(bilingual_str& error)
                   "before the coins database was written); rewinding to the last valid block\n");
     }
     if (!violators.empty()) {
-        LogPrintf("RDTS: %d block(s) inherited from a client that was not enforcing the "
-                  "BLAKE2b hardfork are invalid under it; correcting\n", violators.size());
+        LogPrintf("%d block(s) inherited from a client that was not enforcing the hardfork "
+                  "rules in force here are invalid under them; correcting\n", violators.size());
     }
 
     bool invalidated{tip_failed};
@@ -5992,22 +6065,22 @@ bool Chainstate::CorrectRdtsInvalidBlocks(bilingual_str& error)
             }
         }
         if (needs_reindex) {
-            LogError("RDTS: cannot correct inherited invalid block %s at height %d: required block "
+            LogError("cannot correct inherited invalid block %s at height %d: required block "
                      "data has been pruned\n", target->GetBlockHash().ToString(), target->nHeight);
-            error = _("A block inherited from a client that was not enforcing the BLAKE2b hardfork is invalid under it, and correcting it needs block data that has been pruned");
+            error = _("A block inherited from a client that was not enforcing this hardfork is invalid under it, and correcting it needs block data that has been pruned");
             return false;
         }
 
-        LogPrintf("RDTS: block %s at height %d is invalid under the BLAKE2b "
-                  "hardfork and was inherited from a non-enforcing client; "
+        LogPrintf("block %s at height %d is invalid under the hardfork rules in "
+                  "force here and was inherited from a non-enforcing client; "
                   "marking it invalid%s\n",
                   target->GetBlockHash().ToString(), target->nHeight,
                   rewind ? strprintf(" and rewinding the active chain by %d block(s)", rewind) : "");
 
         BlockValidationState state;
         if (!InvalidateBlock(state, target) || !state.IsValid()) {
-            LogError("RDTS: failed to invalidate %s: %s\n", target->GetBlockHash().ToString(), state.ToString());
-            error = _("Failed to correct an inherited block that is invalid under the BLAKE2b hardfork");
+            LogError("failed to invalidate %s: %s\n", target->GetBlockHash().ToString(), state.ToString());
+            error = _("Failed to correct an inherited block that is invalid under this hardfork");
             return false;
         }
         invalidated = true;
@@ -6017,16 +6090,16 @@ bool Chainstate::CorrectRdtsInvalidBlocks(bilingual_str& error)
     if (invalidated) {
         BlockValidationState state;
         if (!ActivateBestChain(state) || !state.IsValid()) {
-            LogError("RDTS: failed to activate best chain after correction: %s\n", state.ToString());
-            error = _("Failed to correct an inherited block that is invalid under the BLAKE2b hardfork");
+            LogError("failed to activate best chain after correction: %s\n", state.ToString());
+            error = _("Failed to correct an inherited block that is invalid under this hardfork");
             return false;
         }
         // Make the corrected state durable now rather than at the next
         // periodic flush: a crash before then would have to repeat the rewind
         // (see LoadChainTip for how an interrupted flush is recovered).
         if (!FlushStateToDisk(state, FlushStateMode::ALWAYS)) {
-            LogError("RDTS: failed to flush the corrected chain state: %s\n", state.ToString());
-            error = _("Failed to correct an inherited block that is invalid under the BLAKE2b hardfork");
+            LogError("failed to flush the corrected chain state: %s\n", state.ToString());
+            error = _("Failed to correct an inherited block that is invalid under this hardfork");
             return false;
         }
     }

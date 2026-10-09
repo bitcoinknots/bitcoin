@@ -2010,6 +2010,10 @@ RPCHelpMan getdeploymentinfo()
                     {RPCResult::Type::NUM, "height", "the height the hardfork activates at"},
                     {RPCResult::Type::BOOL, "active", "whether the hardfork rules apply to the block after this one"},
                 }},
+                {RPCResult::Type::OBJ, "timewarpfix", /*optional=*/true, "contiguous retarget window schedule, present only when one is configured", {
+                    {RPCResult::Type::NUM, "height", "the height the rules activate at"},
+                    {RPCResult::Type::BOOL, "active", "whether the rules apply to the block after this one"},
+                }},
             }
         },
         RPCExamples{ HelpExampleCli("getdeploymentinfo", "") + HelpExampleRpc("getdeploymentinfo", "") },
@@ -2050,6 +2054,13 @@ RPCHelpMan getdeploymentinfo()
                 hf.pushKV("active", DeploymentActiveAfter(blockindex, chainman,
                                                           Consensus::DEPLOYMENT_BLAKE2B));
                 deploymentinfo.pushKV("blake2b", std::move(hf));
+            }
+            if (consensus.TimewarpFixHeight != std::numeric_limits<int>::max()) {
+                UniValue tw(UniValue::VOBJ);
+                tw.pushKV("height", consensus.TimewarpFixHeight);
+                tw.pushKV("active", DeploymentActiveAfter(blockindex, chainman,
+                                                          Consensus::DEPLOYMENT_TIMEWARPFIX));
+                deploymentinfo.pushKV("timewarpfix", std::move(tw));
             }
             return deploymentinfo;
         },

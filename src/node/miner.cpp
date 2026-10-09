@@ -31,8 +31,9 @@
 
 namespace node {
 
-int64_t GetMinimumTime(const CBlockIndex* pindexPrev, const int64_t difficulty_adjustment_interval)
+int64_t GetMinimumTime(const CBlockIndex* pindexPrev, const Consensus::Params& params)
 {
+    const int64_t difficulty_adjustment_interval{params.DifficultyAdjustmentInterval()};
     int64_t min_time{pindexPrev->GetMedianTimePast() + 1};
     // Height of block to be mined.
     const int height{pindexPrev->nHeight + 1};
@@ -41,13 +42,16 @@ int64_t GetMinimumTime(const CBlockIndex* pindexPrev, const int64_t difficulty_a
     if (height % difficulty_adjustment_interval == 0) {
         min_time = std::max<int64_t>(min_time, pindexPrev->GetBlockTime() - MAX_TIMEWARP);
     }
+    if (const std::optional<int64_t> closing_min{MinimumClosingBlockTime(pindexPrev, params)}) {
+        min_time = std::max<int64_t>(min_time, *closing_min);
+    }
     return min_time;
 }
 
 int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev)
 {
     int64_t nOldTime = pblock->nTime;
-    int64_t nNewTime{std::max<int64_t>(GetMinimumTime(pindexPrev, consensusParams.DifficultyAdjustmentInterval()),
+    int64_t nNewTime{std::max<int64_t>(GetMinimumTime(pindexPrev, consensusParams),
                                        TicksSinceEpoch<std::chrono::seconds>(NodeClock::now()))};
 
     if (nOldTime < nNewTime) {

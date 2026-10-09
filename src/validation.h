@@ -795,7 +795,7 @@ public:
      * invalidate/reorg failed); the caller should refuse to start and direct the
      * operator to -reindex rather than run on an invalid chain.
      */
-    [[nodiscard]] bool CorrectRdtsInvalidBlocks(bilingual_str& error)
+    [[nodiscard]] bool CorrectInheritedInvalidBlocks(bilingual_str& error)
         EXCLUSIVE_LOCKS_REQUIRED(!m_chainstate_mutex)
         LOCKS_EXCLUDED(::cs_main);
 
@@ -1051,7 +1051,7 @@ public:
      *  the BLAKE2b fork height (the index-side analog of bad-version-blake2b).
      *  The verdict is header-derived and independent of other blocks'
      *  validity, so a single scan is sufficient. Lives on the manager because
-     *  it needs only the block index. @sa Chainstate::CorrectRdtsInvalidBlocks */
+     *  it needs only the block index. @sa Chainstate::CorrectInheritedInvalidBlocks */
     [[nodiscard]] std::vector<CBlockIndex*> FindInheritedInvalidBlocks() EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     /** Whether the branch ending in @p index continued SHA256d proof-of-work
      *  at or past the BLAKE2b fork height, i.e. its block at that height is not

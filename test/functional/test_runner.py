@@ -86,6 +86,11 @@ EXTENDED_SCRIPTS = [
     'feature_pruning.py',
     'feature_dbcrash.py',
     'feature_index_prune.py',
+    # Both of these mine real signet blocks via bitcoin-util grind. One grind costs
+    # minutes under the sanitizer CI jobs, so they stay out of the default set; the
+    # extended CI job exercises them.
+    'feature_timewarp_activation.py',
+    'feature_timewarp_retarget.py',
     'wallet_pruning.py --legacy-wallet',
 ]
 
@@ -372,6 +377,8 @@ BASE_SCRIPTS = [
     'rpc_getblockstats.py',
     'feature_port.py',
     'feature_powchange.py',
+    'feature_timewarp.py',
+    'feature_timewarp_sync.py',
     'feature_bind_port_externalip.py',
     'wallet_create_tx.py --legacy-wallet',
     'wallet_send.py --legacy-wallet',

@@ -107,6 +107,7 @@ add_executable(test_bitcoin
   system_ram_tests.cpp
   system_tests.cpp
   timeoffsets_tests.cpp
+  timewarp_tests.cpp
   torcontrol_tests.cpp
   transaction_tests.cpp
   translation_tests.cpp
