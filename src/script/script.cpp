@@ -375,10 +375,42 @@ static int MultisigCount(const opcodetype opcode, const std::vector<unsigned cha
     return -1;
 }
 
+/**
+ * The k of a tapscript k-of-n, which allows far more keys than OP_CHECKMULTISIG does.
+ *
+ * A k from 1 to 16 is an OP_N as usual. Beyond the range OP_N reaches, k is instead a minimal
+ * push of the number: one byte up to 127, two beyond that, since a third would only ever hold
+ * the sign of a count that cannot be negative.
+ */
+static int MultiACount(const opcodetype opcode, const std::vector<unsigned char>& push_data)
+{
+    if (const int small{SmallIntValue(opcode)}; small > 0) return small;
+    if (opcode != 1 && opcode != 2) return -1;
+    if (push_data.size() != static_cast<size_t>(opcode)) return -1;
+    // A minimal push carries no redundant high byte, and the sign bit is never set here.
+    if (push_data.back() == 0 || (push_data.back() & 0x80)) return -1;
+    int value{push_data[0]};
+    if (push_data.size() == 2) value |= int{push_data[1]} << 8;
+    if (value <= 16 || value > int{MAX_PUBKEYS_PER_MULTI_A}) return -1;
+    return value;
+}
+
 static bool IsPubkeyPush(const opcodetype opcode, const std::vector<unsigned char>& push_data)
 {
     if (opcode > OP_PUSHDATA4) return false;
     return push_data.size() == CPubKey::COMPRESSED_SIZE || push_data.size() == CPubKey::SIZE;
+}
+
+/** A 32 byte push, which is an x-only key where a checksig-family opcode claims it as one. */
+static bool IsXOnlyPush(const opcodetype opcode, const std::vector<unsigned char>& push_data)
+{
+    return opcode <= OP_PUSHDATA4 && push_data.size() == XOnlyPubKey::size();
+}
+
+/** Opcodes that leave the stack as they found it, so the key below them is still on top. */
+static bool IsStackNeutralNop(const opcodetype opcode)
+{
+    return opcode == OP_NOP || (opcode >= OP_NOP1 && opcode <= OP_NOP10);
 }
 
 /** Mirror of the push run the caller counts when it is balanced by a drop. */
@@ -423,9 +455,15 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
     size_t run_keys{0};
     // Keys in the current push run, which the caller counts whole if a drop balances it.
     size_t push_run_keys{0};
-    int run_opened_by{-1}, last_count{-1};
+    // The current run of a tapscript k-of-n, which names its keys one at a time as
+    // <pubkey> OP_CHECKSIG (<pubkey> OP_CHECKSIGADD)* <k> OP_NUMEQUAL. Only that shape credits k.
+    size_t multi_a_keys{0};
+    int run_opened_by{-1}, last_count{-1}, last_a_count{-1};
     unsigned int inside_noop{0};
     bool last_is_push{false};
+    // Whether the item before this one was a key a checksig-family opcode can still claim, and
+    // whether it was the 32 byte kind that is only a key because one does.
+    bool last_is_key{false}, last_is_xonly{false};
     opcodetype opcode{OP_INVALIDOPCODE}, last_opcode{OP_INVALIDOPCODE};
     std::vector<unsigned char> push_data;
 
@@ -433,7 +471,10 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
         // The caller counts an unparsable script whole, and the iterator may not have advanced.
         if (!script.GetOp(it, opcode, push_data)) return 0;
         const bool is_pubkey{IsPubkeyPush(opcode, push_data)};
+        const bool is_xonly{IsXOnlyPush(opcode, push_data)};
         const int count{MultisigCount(opcode, push_data)};
+        const int a_count{MultiACount(opcode, push_data)};
+        bool is_key{false};
 
         if (inside_noop) {
             // A closed OP_FALSE OP_IF envelope is counted whole by the caller, so skip over it.
@@ -449,12 +490,37 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
             ++run_keys;
             ++push_run_keys;
             ++pubkeys;
+            is_key = true;
+        } else if (is_xonly) {
+            // Nothing tells an x-only key from a hash but the opcode that spends it, so this
+            // one is counted where a checksig-family opcode claims it rather than here. It
+            // stays out of the push run for the same reason: a drop never reaches it.
+            run_keys = 0;
+            is_key = true;
         } else if ((opcode == OP_DROP || opcode == OP_2DROP) && last_is_push) {
             // The caller counts the whole run as dropped data, so do not charge it again.
             pubkeys -= push_run_keys;
             run_keys = 0;
+            multi_a_keys = 0;
         } else if (opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY) {
+            if (last_is_xonly) ++pubkeys;
             ++provable;
+            run_keys = 0;
+            // <pubkey> OP_CHECKSIG opens a tapscript k-of-n; anything else there ends one.
+            multi_a_keys = (last_is_key && opcode == OP_CHECKSIG) ? 1 : 0;
+        } else if (opcode == OP_CHECKSIGADD) {
+            if (last_is_xonly) ++pubkeys;
+            // The run is credited the k it closes on, so a key earns nothing on its own here.
+            multi_a_keys = (multi_a_keys && last_is_key) ? multi_a_keys + 1 : 0;
+            run_keys = 0;
+        } else if ((opcode == OP_NUMEQUAL || opcode == OP_NUMEQUALVERIFY) && multi_a_keys) {
+            // Padding or reordering the keys forfeits the credit rather than earning one, and
+            // so does naming a k the run cannot satisfy. The OP_CHECKSIG that opened the run
+            // has credited one of the k already.
+            if (last_a_count > 0 && size_t(last_a_count) <= multi_a_keys) {
+                provable += size_t(last_a_count) - 1;
+            }
+            multi_a_keys = 0;
             run_keys = 0;
         } else if (opcode == OP_CHECKMULTISIG || opcode == OP_CHECKMULTISIGVERIFY) {
             // Padding or reordering the keys forfeits the credit rather than earning one.
@@ -462,21 +528,38 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
                 provable += size_t(run_opened_by);
             }
             run_keys = 0;
+            multi_a_keys = 0;
         } else if (count < 0) {
             // A key count sits on both ends of a multisig, so it does not break the run.
             run_keys = 0;
+            if (a_count < 0) multi_a_keys = 0;
         }
 
         const bool is_push{IsRunPush(opcode)};
         if (!is_push) push_run_keys = 0;
+        // An opcode that leaves the stack as it found it leaves the key below it on top, so it
+        // cannot hide that key from the opcode which spends it. It still breaks the run above:
+        // padding a k-of-n is what forfeits its credit.
+        if (!IsStackNeutralNop(opcode)) {
+            last_is_key = is_key;
+            last_is_xonly = is_xonly && !inside_noop;
+        }
         last_opcode = opcode;
         last_count = count;
+        last_a_count = a_count;
         last_is_push = is_push;
     }
 
     // A script can name more signatures than the spender supplies, including in branches that
     // never run. Where the witness carries the spend it is the honest count; a P2SH spend leaves
     // its signatures in the scriptSig, which is not visible here.
+    //
+    // A taproot script-path spend trails the script with a control block and, only when one is
+    // present, an annex, but CountWitnessSignatures excludes only the true last item. A control
+    // block can fall in the 64-73 byte range at a shallow merkle depth, so when an annex pushes
+    // it off the end, it may be miscounted as a signature. That can only inflate the count this
+    // rule caps against, never shrink it, so it can only undercharge, never overcharge: a
+    // documented imprecision, not a bug.
     if (witness && !witness->stack.empty()) {
         provable = std::min(provable, CountWitnessSignatures(*witness));
     }
