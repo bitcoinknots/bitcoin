@@ -24,7 +24,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, assert_raises_rpc_error
 from test_framework.wallet import MiniWallet
 
-LONG_START_HEIGHT = 2
+LONG_START_HEIGHT = 3
 LONG_ENFORCE_HEIGHT = LONG_START_HEIGHT + COINBASE_MATURITY + 2
 COINBASE_MATURITY_POLICY_TIME = 365 * 24 * 60 * 60
 DEPLOYMENT = "long_coinbase_maturity"
@@ -119,10 +119,31 @@ class LongCoinbaseMaturityReleaseTimeTest(BitcoinTestFramework):
         self.set_time(self.start_time)
 
         self.log.info("Build a common chain on which the rule is enforced")
-        self.generate(wallet, LONG_ENFORCE_HEIGHT + 1)
+        self.generate(wallet, 1)
+        if self.is_wallet_compiled():
+            pre_start_block = self.generatetoaddress(node_timed, 1, node_timed.getnewaddress())[0]
+            pre_start_coinbase = self.coinbase_of(node_timed, pre_start_block)
+            pre_start_value = node_timed.getblock(pre_start_block, 2)["tx"][0]["vout"][0]["value"]
+        else:
+            self.generate(wallet, 1)
+        self.generate(wallet, LONG_ENFORCE_HEIGHT - 1)
         self.assert_deployment(node_timed, active=True, release_time=self.release_time)
         assert DEPLOYMENT not in node_lax.getdeploymentinfo()["deployments"]
         self.assert_deployment(node_early, active=True, release_time=self.early_release_time)
+
+        self.log.info("Coinbases from before the start height keep ordinary maturity in policy and the wallet")
+        pre_start_spend = wallet.create_self_transfer(utxo_to_spend=wallet.get_utxo(txid=self.coinbase_of(node_timed, node_timed.getblockhash(1))))
+        node_timed.sendrawtransaction(pre_start_spend["hex"])
+        assert_equal(node_timed.getrawmempool(), [pre_start_spend["txid"]])
+        tip = node_timed.getbestblockhash()
+        node_timed.invalidateblock(tip)
+        assert_equal(node_timed.getrawmempool(), [pre_start_spend["txid"]])
+        node_timed.reconsiderblock(tip)
+        if self.is_wallet_compiled():
+            assert_equal(node_timed.gettransaction(pre_start_coinbase)["details"][0]["category"], "generate")
+            assert_equal(node_timed.getbalances()["mine"]["trusted"], pre_start_value)
+        self.generate(wallet, 1)
+        assert_equal(node_timed.getrawmempool(), [])
 
         self.log.info("Only the earlier release time is reached by the first jump of time")
         self.set_time(self.early_release_time + 100)
@@ -224,7 +245,7 @@ class LongCoinbaseMaturityReleaseTimeTest(BitcoinTestFramework):
             assert_equal(node_timed.gettransaction(wallet_coinbase)["details"][0]["category"], "immature")
             balances = node_timed.getbalances()["mine"]
             assert_equal(balances["immature"], wallet_coinbase_value)
-            assert_equal(balances["trusted"], 0)
+            assert_equal(balances["trusted"], pre_start_value)
 
         self.log.info("A year of median time past releases each coinbase on its own")
         late_spend_b = wallet.create_self_transfer(utxo_to_spend=wallet.get_utxo(txid=late_coinbase_b))
@@ -241,7 +262,7 @@ class LongCoinbaseMaturityReleaseTimeTest(BitcoinTestFramework):
             assert_equal(node_timed.gettransaction(wallet_coinbase)["details"][0]["category"], "generate")
             balances = node_timed.getbalances()["mine"]
             assert_equal(balances["immature"], 0)
-            assert_equal(balances["trusted"], wallet_coinbase_value)
+            assert_equal(balances["trusted"], wallet_coinbase_value + pre_start_value)
         self.generate(wallet, 1)
         assert_equal(node_timed.getrawmempool(), [])
         for node in self.nodes:

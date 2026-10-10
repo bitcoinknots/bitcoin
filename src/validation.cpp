@@ -450,6 +450,7 @@ void Chainstate::MaybeUpdateMempoolForReorg(
                     return true;
                 }
                 if (consensusParams.CoinbaseMaturityLongScheduled() &&
+                    coin.nHeight >= static_cast<uint32_t>(consensusParams.CoinbaseMaturityLongStartHeight) &&
                     Assert(m_chain[static_cast<int>(coin.nHeight)])->GetMedianTimePast() + TicksSeconds(COINBASE_MATURITY_POLICY_TIME) > tip.GetMedianTimePast()) {
                     return true;
                 }
@@ -1038,13 +1039,15 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     }
 
     // While the long coinbase maturity rule is scheduled, policy holds every
-    // coinbase for COINBASE_MATURITY_POLICY_TIME of median time past: covered
-    // coinbases then stay unspendable for at least that long whatever the
-    // block rate, and each of them is released on its own once its time is up
+    // coinbase from its start height on for COINBASE_MATURITY_POLICY_TIME of
+    // median time past: covered coinbases then stay unspendable for at least
+    // that long whatever the block rate, and each of them is released on its
+    // own once its time is up. Older coinbases keep the original maturity.
     if (consensusParams.CoinbaseMaturityLongScheduled()) {
         for (const CTxIn& txin : tx.vin) {
             const Coin& coin{m_view.AccessCoin(txin.prevout)};
             if (!coin.IsCoinBase()) continue;
+            if (coin.nHeight < static_cast<uint32_t>(consensusParams.CoinbaseMaturityLongStartHeight)) continue;
             const CBlockIndex& minting_block{*Assert(m_active_chainstate.m_chain[static_cast<int>(coin.nHeight)])};
             if (minting_block.GetMedianTimePast() + TicksSeconds(COINBASE_MATURITY_POLICY_TIME) > tip.GetMedianTimePast()) {
                 return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, "premature-spend-of-coinbase-long",

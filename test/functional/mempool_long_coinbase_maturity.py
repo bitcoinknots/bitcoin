@@ -85,23 +85,26 @@ class LongCoinbaseMaturityTest(BitcoinTestFramework):
         self.generate(wallet, COINBASE_MATURITY)
         self.assert_deployment(active=False)
 
-        self.log.info("Policy holds every generation spend for a year of median time past")
+        self.log.info("Policy relays spends of pre-window rewards at ordinary maturity")
         coinbase_txid = node.getblock(node.getblockhash(1))["tx"][0]
         coinbase_spend = wallet.create_self_transfer(utxo_to_spend=wallet.get_utxo(txid=coinbase_txid))
-        assert_raises_rpc_error(-26, REJECT_REASON_POLICY, node.sendrawtransaction, coinbase_spend["hex"])
+        node.sendrawtransaction(coinbase_spend["hex"])
+        assert_equal(node.getrawmempool(), [coinbase_spend["txid"]])
 
         self.log.info("Consensus accepts pre-window rewards at ordinary maturity")
         block = self.create_next_block([coinbase_spend["tx"]])
         assert_equal(node.submitblock(block.serialize().hex()), None)
         assert_equal(node.getblockcount(), LONG_ENFORCE_HEIGHT - 3)
+        assert_equal(node.getrawmempool(), [])
 
         block = self.create_next_block()
         assert_equal(node.submitblock(block.serialize().hex()), None)
         assert_equal(node.getblockcount(), LONG_ENFORCE_HEIGHT - 2)
 
-        self.log.info("Consensus still accepts covered rewards before the enforcement block")
+        self.log.info("Policy holds covered rewards for a year of median time past, while consensus still accepts them before the enforcement block")
         coinbase_txid = node.getblock(node.getblockhash(3))["tx"][0]
         coinbase_spend = wallet.create_self_transfer(utxo_to_spend=wallet.get_utxo(txid=coinbase_txid))
+        assert_raises_rpc_error(-26, f"{REJECT_REASON_POLICY}, tried to spend coinbase of block 3 less than 365 days", node.sendrawtransaction, coinbase_spend["hex"])
         block = self.create_next_block([coinbase_spend["tx"]])
         assert_equal(node.submitblock(block.serialize().hex()), None)
         assert_equal(node.getblockcount(), LONG_ENFORCE_HEIGHT - 1)

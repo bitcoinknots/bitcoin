@@ -555,7 +555,7 @@ public:
      */
     int GetTxBlocksToMaturity(const CWalletTx& wtx) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     /** Median time past at which the long coinbase maturity policy hold on a coinbase ends, if the rule is
-     *  scheduled and the median time past of its block is known */
+     *  scheduled, the coinbase is from its start height on and the median time past of its block is known */
     std::optional<int64_t> GetTxLongMaturityTime(const CWalletTx& wtx) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     /** Seconds of median time past the long coinbase maturity policy hold on a coinbase still has to run, 0 if none */
     int64_t GetTxMaturityTimeLeft(const CWalletTx& wtx) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
