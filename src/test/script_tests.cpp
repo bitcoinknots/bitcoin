@@ -1532,6 +1532,33 @@ static CScriptWitness MultisigWitness(const int sigs, const CScript& script)
     return witness;
 }
 
+/** <pubkey> OP_CHECKSIG (<pubkey> OP_CHECKSIGADD)*(n-1) <k> OP_NUMEQUAL, tapscript's k-of-n. */
+static CScript MultiAScript(const int k, const int n, const size_t key_size = 32,
+                            const opcodetype terminator = OP_NUMEQUAL)
+{
+    CScript script{CScript() << std::vector<unsigned char>(key_size, 1) << OP_CHECKSIG};
+    for (int i{1}; i < n; ++i) {
+        script << std::vector<unsigned char>(key_size, static_cast<unsigned char>(i + 1)) << OP_CHECKSIGADD;
+    }
+    return script << k << terminator;
+}
+
+/** A tapscript witness offering sigs signatures, as a spend of the given k-of-n would. */
+static CScriptWitness TapscriptWitness(const int sigs, const int n, const CScript& script)
+{
+    CScriptWitness witness;
+    // A key the spend does not sign for leaves an empty stack item in place of its signature.
+    for (int i{0}; i < n - sigs; ++i) {
+        witness.stack.emplace_back();
+    }
+    for (int i{0}; i < sigs; ++i) {
+        witness.stack.emplace_back(64, i + 1); // a BIP340 signature, which carries no sighash byte
+    }
+    witness.stack.emplace_back(script.begin(), script.end());
+    witness.stack.emplace_back(33, 0xc0); // the control block of a depth zero taproot leaf
+    return witness;
+}
+
 BOOST_AUTO_TEST_CASE(script_DataCarrierBytes)
 {
     using zeros = std::vector<unsigned char>;
@@ -1639,6 +1666,98 @@ BOOST_AUTO_TEST_CASE(script_DataCarrierBytes_unproven_pubkeys)
     BOOST_CHECK_EQUAL("0+171", DatacarrierBytesStr(CScript() << zeros(33) << zeros(33) << zeros(33)
                                                              << zeros(33) << zeros(33)
                                                              << OP_2DROP << OP_2DROP << OP_DROP));
+}
+
+BOOST_AUTO_TEST_CASE(script_DataCarrierBytes_tapscript_unproven_pubkeys)
+{
+    using zeros = std::vector<unsigned char>;
+
+    // The same payload costs the same whichever way it is written. A 1-of-15 under P2WSH and
+    // the taproot leaf that says the same thing are charged alike, where once the leaf was free
+    BOOST_CHECK_EQUAL("132+0", DatacarrierBytesStr(MultisigScript(1, 15), MultisigWitness(1, MultisigScript(1, 15))));
+    BOOST_CHECK_EQUAL("132+0", DatacarrierBytesStr(MultiAScript(1, 15), TapscriptWitness(1, 15, MultiAScript(1, 15))));
+
+    // An x-only key a signature is offered for is a spending condition, not data
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << zeros(32) << OP_CHECKSIG));
+    // Ordinary tapscript multisig keeps its spare keys, exactly as OP_CHECKMULTISIG does
+    for (const auto& [k, n] : {std::pair{2, 3}, std::pair{3, 5}, std::pair{1, 2}, std::pair{1, 3},
+                               std::pair{3, 3}, std::pair{5, 5}, std::pair{11, 15}, std::pair{20, 20}}) {
+        const CScript script{MultiAScript(k, n)};
+        BOOST_CHECK_EQUAL(DatacarrierBytesStr(MultisigScript(k, n)),
+                          DatacarrierBytesStr(script, TapscriptWitness(k, n, script)));
+    }
+    // Eleven keys behind one signature are free, as under OP_CHECKMULTISIG; past the tolerance
+    // every further key is payload, however honest the spend that offers it
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(MultiAScript(1, 11), TapscriptWitness(1, 11, MultiAScript(1, 11))));
+    BOOST_CHECK_EQUAL("33+0", DatacarrierBytesStr(MultiAScript(1, 12), TapscriptWitness(1, 12, MultiAScript(1, 12))));
+    BOOST_CHECK_EQUAL("66+0", DatacarrierBytesStr(MultiAScript(1, 13), TapscriptWitness(1, 13, MultiAScript(1, 13))));
+    BOOST_CHECK_EQUAL("33+0", DatacarrierBytesStr(MultiAScript(5, 16), TapscriptWitness(5, 16, MultiAScript(5, 16))));
+    for (const auto& [k, n] : {std::pair{1, 11}, std::pair{1, 12}, std::pair{1, 13}, std::pair{5, 16}}) {
+        const CScript script{MultiAScript(k, n)};
+        BOOST_CHECK_EQUAL(DatacarrierBytesStr(MultisigScript(k, n), MultisigWitness(k, MultisigScript(k, n))),
+                          DatacarrierBytesStr(script, TapscriptWitness(k, n, script)));
+    }
+    // Above 16 the key count is a minimal push rather than an OP_N, and still counts. A leaf may
+    // hold far more keys than OP_CHECKMULTISIG, so it is read up to MAX_PUBKEYS_PER_MULTI_A
+    BOOST_CHECK_EQUAL("33+0", DatacarrierBytesStr(MultiAScript(17, 28), TapscriptWitness(17, 28, MultiAScript(17, 28))));
+    // The credit is the shape of the run, not the size of its keys: a leaf may hold either
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(MultiAScript(3, 5, 33), TapscriptWitness(3, 5, MultiAScript(3, 5, 33))));
+    // A run closed by OP_NUMEQUALVERIFY says the same thing as one closed by OP_NUMEQUAL
+    const CScript verify{MultiAScript(3, 5, 32, OP_NUMEQUALVERIFY)};
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(verify, TapscriptWitness(3, 5, verify)));
+
+    // A 32 byte push is only a key where something spends it. The preimage of a hashlock and
+    // the hash it is checked against are neither of them keys, in a leaf or anywhere else
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << OP_SHA256 << zeros(32) << OP_EQUALVERIFY
+                                                           << zeros(33) << OP_CHECKSIG));
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << zeros(32) << OP_SHA256 << zeros(32)
+                                                           << OP_EQUALVERIFY << zeros(32) << OP_CHECKSIG));
+
+    // Padding the run forfeits the credit rather than earning one, so an 11-of-15 written the
+    // long way round is charged as though it proved nothing but the key it opens on
+    CScript padded{CScript() << zeros(32) << OP_CHECKSIG};
+    for (int i{1}; i < 15; ++i) {
+        padded << zeros(32) << OP_NOP << OP_CHECKSIGADD;
+    }
+    padded << 11 << OP_NUMEQUAL;
+    BOOST_CHECK_EQUAL("132+0", DatacarrierBytesStr(padded, TapscriptWitness(11, 15, padded)));
+    // ... while an OP_NOP does not hide the key beneath it from the opcode that spends it
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << zeros(32) << OP_NOP << OP_CHECKSIG));
+
+    // Naming a k the run cannot satisfy forfeits the credit too
+    CScript inflated{CScript() << zeros(32) << OP_CHECKSIG};
+    for (int i{1}; i < 15; ++i) {
+        inflated << zeros(32) << OP_CHECKSIGADD;
+    }
+    inflated << 20 << OP_NUMEQUAL;
+    BOOST_CHECK_EQUAL("132+0", DatacarrierBytesStr(inflated, TapscriptWitness(11, 15, inflated)));
+
+    // The OP_CHECKSIG a run opens on credits one of the k already, so a 1-of-n is credited once
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(MultiAScript(1, 3), TapscriptWitness(1, 3, MultiAScript(1, 3))));
+    // Naming more signatures than the spend offers earns nothing here as it does elsewhere
+    BOOST_CHECK_EQUAL("132+0", DatacarrierBytesStr(MultiAScript(11, 15), TapscriptWitness(1, 15, MultiAScript(11, 15))));
+
+    // A key inside an OP_FALSE OP_IF envelope is counted with the envelope, once
+    BOOST_CHECK_EQUAL("0+37", DatacarrierBytesStr(CScript() << OP_FALSE << OP_IF << zeros(32)
+                                                            << OP_CHECKSIG << OP_ENDIF));
+    // A dropped key is already counted as dropped data; it is not charged twice, and no credit
+    // drives the count below zero
+    BOOST_CHECK_EQUAL("0+35", DatacarrierBytesStr(CScript() << zeros(32) << OP_CHECKSIG << zeros(33) << OP_DROP));
+    CScript over_credited{MultiAScript(3, 3)};
+    over_credited << OP_3 << OP_NUMEQUAL << OP_3 << OP_NUMEQUAL;
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(over_credited));
+
+    // A 32 byte push nothing spends and no drop balances is reached by neither rule. It is
+    // stranded on the stack, which leaves the leaf unspendable, so it buys nothing.
+    CScript stranded;
+    for (int i{0}; i < 15; ++i) {
+        stranded << zeros(32);
+    }
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(stranded));
+    // Balance the same pushes with drops and the run rule charges them whole
+    BOOST_CHECK_EQUAL("0+496", DatacarrierBytesStr(CScript{stranded} << OP_2DROP << OP_2DROP << OP_2DROP
+                                                                     << OP_2DROP << OP_2DROP << OP_2DROP
+                                                                     << OP_2DROP << OP_DROP));
 }
 
 BOOST_AUTO_TEST_CASE(script_GetScriptForTransactionInput)
