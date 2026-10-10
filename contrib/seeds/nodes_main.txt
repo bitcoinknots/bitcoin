@@ -238,3 +238,5 @@ yuxihlx3hadxdxsfqalsqfeynp5j2iqjziy5fappgvcznwwdqv4mhwqd.onion:8333
 z3ouoic6rfubpdwtxjd6mledtn7vsoer7vzshjujol7rtbqy4642u3qd.onion:8333
 zjvyeke6hd5lk4snq2tzqt52gndn3ja5nvt7z34wryyckcnrqemgz5yd.onion:8333
 zk3zfk5x3hxzshyvb7cvh2uoplypb4vkfjw2fadn34fdhyb4shdkh6yd.onion:8333
+[fc4b:fb55:e1a7:aa60:17c4:b932:ea8d:b235]:8333
+[fccd:88ec:4a16:153b:2fd:913b:fae3:b55e]:8333
