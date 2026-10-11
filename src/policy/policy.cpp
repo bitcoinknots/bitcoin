@@ -571,6 +571,53 @@ bool SpendsNonAnchorWitnessProg(const CTransaction& tx, const CCoinsViewCache& p
     return false;
 }
 
+unsigned int CountMultisigSigOps(const CScript& script)
+{
+    unsigned int count{0};
+    CScript::const_iterator pc{script.begin()};
+    opcodetype last_opcode{OP_INVALIDOPCODE};
+    while (pc < script.end()) {
+        opcodetype opcode;
+        if (!script.GetOp(pc, opcode)) break;
+        if (opcode == OP_CHECKMULTISIG || opcode == OP_CHECKMULTISIGVERIFY) {
+            count += last_opcode >= OP_1 && last_opcode <= OP_16
+                ? CScript::DecodeOP_N(last_opcode)
+                : MAX_PUBKEYS_PER_MULTISIG;
+        }
+        last_opcode = opcode;
+    }
+    return count;
+}
+
+uint64_t CountTransactionInputMultisigSigOps(const CTransaction& tx, const CCoinsViewCache& prevouts)
+{
+    uint64_t count{0};
+    for (const CTxIn& txin : tx.vin) {
+        CScript script{prevouts.AccessCoin(txin.prevout).out.scriptPubKey};
+
+        if (script.IsPayToScriptHash()) {
+            std::vector<std::vector<unsigned char>> stack;
+            if (!EvalScript(stack, txin.scriptSig, SCRIPT_VERIFY_NONE, BaseSignatureChecker{}, SigVersion::BASE) || stack.empty()) {
+                continue;
+            }
+            script = CScript{stack.back().begin(), stack.back().end()};
+        }
+
+        int witness_version{0};
+        std::vector<unsigned char> witness_program;
+        if (script.IsWitnessProgram(witness_version, witness_program)) {
+            if (witness_version != 0 || witness_program.size() != WITNESS_V0_SCRIPTHASH_SIZE || txin.scriptWitness.stack.empty()) {
+                continue;
+            }
+            const auto& witness_script{txin.scriptWitness.stack.back()};
+            script = CScript{witness_script.begin(), witness_script.end()};
+        }
+
+        count += CountMultisigSigOps(script);
+    }
+    return count;
+}
+
 int64_t GetVirtualTransactionSize(int64_t nWeight, int64_t nSigOpCost, unsigned int bytes_per_sigop)
 {
     return (std::max(nWeight, nSigOpCost * bytes_per_sigop) + WITNESS_SCALE_FACTOR - 1) / WITNESS_SCALE_FACTOR;
