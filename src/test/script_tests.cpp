@@ -1700,6 +1700,18 @@ BOOST_AUTO_TEST_CASE(script_DataCarrierBytes_tapscript_unproven_pubkeys)
     // Above 16 the key count is a minimal push rather than an OP_N, and still counts. A leaf may
     // hold far more keys than OP_CHECKMULTISIG, so it is read up to MAX_PUBKEYS_PER_MULTI_A
     BOOST_CHECK_EQUAL("33+0", DatacarrierBytesStr(MultiAScript(17, 28), TapscriptWitness(17, 28, MultiAScript(17, 28))));
+    // From 128 the minimal push carries a zero high byte to keep the sign clear, as in 80 00
+    for (const int k : {127, 128, 255, 256}) {
+        const CScript script{MultiAScript(k, k + 2)};
+        BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(script, TapscriptWitness(k, k + 2, script)));
+    }
+    // ... while a zero high byte nothing needs is not minimal, and forfeits the credit
+    CScript non_minimal{CScript() << zeros(32) << OP_CHECKSIG};
+    for (int i{1}; i < 28; ++i) {
+        non_minimal << zeros(32) << OP_CHECKSIGADD;
+    }
+    non_minimal << std::vector<unsigned char>{17, 0} << OP_NUMEQUAL;
+    BOOST_CHECK_EQUAL("561+0", DatacarrierBytesStr(non_minimal, TapscriptWitness(17, 28, non_minimal)));
     // The credit is the shape of the run, not the size of its keys: a leaf may hold either
     BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(MultiAScript(3, 5, 33), TapscriptWitness(3, 5, MultiAScript(3, 5, 33))));
     // A run closed by OP_NUMEQUALVERIFY says the same thing as one closed by OP_NUMEQUAL

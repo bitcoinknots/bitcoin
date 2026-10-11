@@ -387,8 +387,10 @@ static int MultiACount(const opcodetype opcode, const std::vector<unsigned char>
     if (const int small{SmallIntValue(opcode)}; small > 0) return small;
     if (opcode != 1 && opcode != 2) return -1;
     if (push_data.size() != static_cast<size_t>(opcode)) return -1;
-    // A minimal push carries no redundant high byte, and the sign bit is never set here.
-    if (push_data.back() == 0 || (push_data.back() & 0x80)) return -1;
+    // The sign bit is never set here, and a zero high byte is minimal only where it keeps the
+    // byte below it from reading as the sign, as in 128 written 80 00.
+    if (push_data.back() & 0x80) return -1;
+    if (push_data.back() == 0 && (push_data.size() == 1 || !(push_data[0] & 0x80))) return -1;
     int value{push_data[0]};
     if (push_data.size() == 2) value |= int{push_data[1]} << 8;
     if (value <= 16 || value > int{MAX_PUBKEYS_PER_MULTI_A}) return -1;
