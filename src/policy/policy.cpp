@@ -607,6 +607,10 @@ uint64_t CountTransactionInputMultisigSigOps(const CTransaction& tx, const CCoin
 {
     uint64_t count{0};
     for (const CTxIn& txin : tx.vin) {
+        // Non-standard legacy inputs may execute opcodes from scriptSig. Standard
+        // scriptSigs and P2SH scriptSigs are push-only, so this is zero for them.
+        count += CountMultisigSigOps(txin.scriptSig);
+
         CScript script{prevouts.AccessCoin(txin.prevout).out.scriptPubKey};
 
         if (script.IsPayToScriptHash()) {
