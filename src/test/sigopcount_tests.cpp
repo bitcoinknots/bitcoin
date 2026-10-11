@@ -160,6 +160,18 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
         assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_CHECKMULTISIGVERIFY);
     }
 
+    // Multisig opcode in a non-push-only legacy scriptSig. This is only
+    // relayed when non-standard transactions are enabled, but the additional
+    // fee policy must not be bypassable in that configuration.
+    {
+        CScript scriptPubKey = CScript() << OP_TRUE;
+        CScript scriptSig = CScript() << OP_FALSE << OP_IF << OP_3 << OP_CHECKMULTISIG << OP_ENDIF;
+
+        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, CScriptWitness());
+        assert(CountTransactionInputMultisigSigOps(CTransaction(spendingTx), coins) == 3);
+        assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_OK);
+    }
+
     // P2WPKH witness program
     {
         CScript scriptPubKey = GetScriptForDestination(WitnessV0KeyHash(pubkey));
