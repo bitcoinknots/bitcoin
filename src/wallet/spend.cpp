@@ -8,6 +8,7 @@
 #include <common/system.h>
 #include <consensus/amount.h>
 #include <consensus/validation.h>
+#include <hash.h>
 #include <interfaces/chain.h>
 #include <node/types.h>
 #include <numeric>
@@ -107,8 +108,8 @@ int CalculateMaximumSignedInputSize(const CTxOut& txout, const CWallet* wallet, 
 }
 
 /** Infer a descriptor for the given output script. */
-static std::unique_ptr<Descriptor> GetDescriptor(const CWallet* wallet, const CCoinControl* coin_control,
-                                                 const CScript script_pubkey)
+static MultiSigningProvider GetSolvingProvider(const CWallet* wallet, const CCoinControl* coin_control,
+                                               const CScript& script_pubkey)
 {
     MultiSigningProvider providers;
     for (const auto spkman: wallet->GetScriptPubKeyMans(script_pubkey)) {
@@ -117,7 +118,34 @@ static std::unique_ptr<Descriptor> GetDescriptor(const CWallet* wallet, const CC
     if (coin_control) {
         providers.AddProvider(std::make_unique<FlatSigningProvider>(coin_control->m_external_provider));
     }
+    return providers;
+}
+
+static std::unique_ptr<Descriptor> GetDescriptor(const CWallet* wallet, const CCoinControl* coin_control,
+                                                 const CScript script_pubkey)
+{
+    const auto providers{GetSolvingProvider(wallet, coin_control, script_pubkey)};
     return InferDescriptor(script_pubkey, providers);
+}
+
+/** Count multisig sigops in the script that the wallet will use to spend an output. */
+static uint64_t CountWalletMultisigSigOps(const CWallet* wallet, const CCoinControl* coin_control,
+                                          const CScript& script_pubkey)
+{
+    const auto providers{GetSolvingProvider(wallet, coin_control, script_pubkey)};
+    CScript script{script_pubkey};
+    std::vector<std::vector<unsigned char>> solutions;
+
+    if (Solver(script, solutions) == TxoutType::SCRIPTHASH) {
+        if (solutions.empty() || !providers.GetCScript(CScriptID{uint160{solutions[0]}}, script)) return 0;
+    }
+
+    solutions.clear();
+    if (Solver(script, solutions) == TxoutType::WITNESS_V0_SCRIPTHASH) {
+        if (solutions.empty() || !providers.GetCScript(CScriptID{RIPEMD160(solutions[0])}, script)) return 0;
+    }
+
+    return CountMultisigSigOps(script);
 }
 
 /** Infer the maximum size of this input after it will be signed. */
@@ -1283,6 +1311,18 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
         return util::Error{_("Missing solving data for estimating transaction size")};
     }
     CAmount fee_needed = coin_selection_params.m_effective_feerate.GetFee(nBytes) + result.GetTotalBumpFees();
+    const CAmount fee_per_multisig_sigop{gArgs.GetIntArg("-minrelaymultisigsigopfee", DEFAULT_MIN_RELAY_MULTISIG_SIGOP_FEE)};
+    if (fee_per_multisig_sigop > 0) {
+        uint64_t multisig_sigops{0};
+        for (size_t i{0}; i < selected_coins.size(); ++i) {
+            multisig_sigops += CountMultisigSigOps(txNew.vin[i].scriptSig);
+            multisig_sigops += CountWalletMultisigSigOps(&wallet, &coin_control, selected_coins[i]->txout.scriptPubKey);
+        }
+        const CAmount multisig_sigop_fee{multisig_sigops > static_cast<uint64_t>(MAX_MONEY / fee_per_multisig_sigop)
+                ? MAX_MONEY
+                : static_cast<CAmount>(multisig_sigops) * fee_per_multisig_sigop};
+        fee_needed = std::max(fee_needed, multisig_sigop_fee);
+    }
     const CAmount output_value = CalculateOutputValue(txNew);
     Assume(recipients_sum + change_amount == output_value);
     CAmount current_fee = result.GetSelectedValue() - output_value;
