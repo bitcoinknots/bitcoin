@@ -589,6 +589,20 @@ unsigned int CountMultisigSigOps(const CScript& script)
     return count;
 }
 
+static std::optional<CScript> GetP2SHRedeemScript(const CScript& script_sig)
+{
+    CScript::const_iterator pc{script_sig.begin()};
+    std::vector<unsigned char> data;
+    while (pc < script_sig.end()) {
+        opcodetype opcode;
+        if (!script_sig.GetOp(pc, opcode, data) || opcode > OP_16) {
+            return std::nullopt;
+        }
+    }
+    if (data.empty()) return std::nullopt;
+    return CScript{data.begin(), data.end()};
+}
+
 uint64_t CountTransactionInputMultisigSigOps(const CTransaction& tx, const CCoinsViewCache& prevouts)
 {
     uint64_t count{0};
@@ -596,11 +610,9 @@ uint64_t CountTransactionInputMultisigSigOps(const CTransaction& tx, const CCoin
         CScript script{prevouts.AccessCoin(txin.prevout).out.scriptPubKey};
 
         if (script.IsPayToScriptHash()) {
-            std::vector<std::vector<unsigned char>> stack;
-            if (!EvalScript(stack, txin.scriptSig, SCRIPT_VERIFY_NONE, BaseSignatureChecker{}, SigVersion::BASE) || stack.empty()) {
-                continue;
-            }
-            script = CScript{stack.back().begin(), stack.back().end()};
+            const auto redeem_script{GetP2SHRedeemScript(txin.scriptSig)};
+            if (!redeem_script) continue;
+            script = *redeem_script;
         }
 
         int witness_version{0};
