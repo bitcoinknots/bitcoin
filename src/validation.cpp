@@ -1075,14 +1075,14 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
         return state.Invalid(TxValidationResult::TX_WITNESS_MUTATED, reason);
     }
 
-    if (m_pool.m_opts.min_relay_multisig_sigop_fee > 0 && !ignore_rejects.count(rejectmsg_lowfee_relay)) {
+    if (m_pool.m_opts.min_relay_multisig_sigop_fee > 0 && !ignore_rejects.count(rejectmsg_multisig_sigop_fee)) {
         const uint64_t multisig_sigops{CountTransactionInputMultisigSigOps(tx, m_view)};
         const CAmount fee_per_sigop{m_pool.m_opts.min_relay_multisig_sigop_fee};
         const CAmount required_fee{multisig_sigops > static_cast<uint64_t>(MAX_MONEY / fee_per_sigop)
                 ? MAX_MONEY
                 : static_cast<CAmount>(multisig_sigops) * fee_per_sigop};
         if (ws.m_base_fees < required_fee) {
-            return state.Invalid(TxValidationResult::TX_MEMPOOL_POLICY, "min multisig sigop fee not met",
+            return state.Invalid(TxValidationResult::TX_MEMPOOL_POLICY, rejectmsg_multisig_sigop_fee,
                                  strprintf("%d < %d (%u multisig sigops at %d sat each)",
                                            ws.m_base_fees, required_fee, multisig_sigops, fee_per_sigop));
         }
