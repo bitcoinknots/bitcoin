@@ -110,6 +110,7 @@ WalletTxStatus MakeWalletTxStatus(const CWallet& wallet, const CWalletTx& wtx)
         wtx.state<TxStateBlockConflicted>() ? wtx.state<TxStateBlockConflicted>()->conflicting_block_height :
         std::numeric_limits<int>::max();
     result.blocks_to_maturity = wallet.GetTxBlocksToMaturity(wtx);
+    result.maturity_time_left = wallet.GetTxMaturityTimeLeft(wtx);
     result.depth_in_main_chain = wallet.GetTxDepthInMainChain(wtx);
     result.time_received = wtx.nTimeReceived;
     result.lock_time = wtx.tx->nLockTime;

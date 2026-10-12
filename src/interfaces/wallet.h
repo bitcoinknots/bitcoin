@@ -429,6 +429,8 @@ struct WalletTxStatus
 {
     int block_height;
     int blocks_to_maturity;
+    //! Seconds of median time past the long coinbase maturity policy hold still has to run, 0 if none
+    int64_t maturity_time_left;
     int depth_in_main_chain;
     unsigned int time_received;
     uint32_t lock_time;

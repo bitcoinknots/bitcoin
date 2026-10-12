@@ -335,7 +335,7 @@ public:
         }
         return chainman().GetParams().GenesisBlock().GetBlockTime(); // Genesis block's time of current network
     }
-    int coinbaseMaturity() override { return chainman().GetConsensus().CoinbaseMaturityLong; }
+    bool coinbaseMaturityLongScheduled() override { return chainman().GetConsensus().CoinbaseMaturityLongScheduled(); }
     double getVerificationProgress() override
     {
         return chainman().GuessVerificationProgress(WITH_LOCK(chainman().GetMutex(), return chainman().ActiveChain().Tip()));
@@ -582,9 +582,9 @@ public:
         const CBlockIndex* block{chainman().ActiveChain()[height]};
         return block && ((block->nStatus & BLOCK_HAVE_DATA) != 0) && block->nTx > 0;
     }
-    int coinbaseMaturity() override
+    bool coinbaseMaturityLongScheduled() override
     {
-        return chainman().GetConsensus().CoinbaseMaturityLong;
+        return chainman().GetConsensus().CoinbaseMaturityLongScheduled();
     }
     bool pruneLockExists(const std::string& name) const override
     {

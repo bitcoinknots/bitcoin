@@ -224,6 +224,7 @@ BASE_SCRIPTS = [
     'interface_rest.py',
     'feature_chainstate_revalidation.py',
     'mempool_long_coinbase_maturity.py',
+    'feature_long_coinbase_maturity_release_time.py',
     'mempool_spend_coinbase.py',
     'wallet_avoid_mixing_output_types.py --descriptors',
     'mempool_reorg.py',

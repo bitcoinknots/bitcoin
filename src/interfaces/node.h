@@ -185,8 +185,8 @@ public:
     //! Get last block time.
     virtual int64_t getLastBlockTime() = 0;
 
-    //! Get coinbase maturity.
-    virtual int coinbaseMaturity() = 0;
+    //! Whether the long coinbase maturity rule is scheduled on this chain.
+    virtual bool coinbaseMaturityLongScheduled() = 0;
 
     //! Get verification progress.
     virtual double getVerificationProgress() = 0;

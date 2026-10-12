@@ -19,6 +19,8 @@
 #include <validation.h>
 #include <wallet/types.h>
 
+#include <algorithm>
+#include <limits>
 #include <stdint.h>
 #include <string>
 
@@ -28,6 +30,15 @@ using wallet::ISMINE_ALL;
 using wallet::ISMINE_SPENDABLE;
 using wallet::ISMINE_WATCH_ONLY;
 using wallet::isminetype;
+
+namespace {
+//! Whole days (rounded up) that a median-time-past hold still has to run
+int DaysLeft(int64_t seconds_left)
+{
+    constexpr int64_t SECONDS_PER_DAY{24 * 60 * 60};
+    return static_cast<int>(std::min<int64_t>((seconds_left + SECONDS_PER_DAY - 1) / SECONDS_PER_DAY, std::numeric_limits<int>::max()));
+}
+} // namespace
 
 QString TransactionDesc::FormatTxStatus(const interfaces::WalletTxStatus& status, bool inMempool)
 {
@@ -189,10 +200,17 @@ QString TransactionDesc::toHTML(interfaces::Node& node, interfaces::Wallet& wall
         for (const CTxOut& txout : wtx.tx->vout)
             nUnmatured += wallet.getCredit(txout, ISMINE_ALL);
         strHTML += "<b>" + tr("Credit") + ":</b> ";
-        if (status.is_in_main_chain)
-            strHTML += BitcoinUnits::formatHtmlWithUnit(font_for_money, unit, nUnmatured)+ " (" + tr("matures in %n more block(s)", "", status.blocks_to_maturity) + ")";
-        else
+        if (status.is_in_main_chain) {
+            strHTML += BitcoinUnits::formatHtmlWithUnit(font_for_money, unit, nUnmatured) + " (";
+            if (status.maturity_time_left > 0) {
+                strHTML += tr("matures in about %n day(s)", "", DaysLeft(status.maturity_time_left));
+            } else {
+                strHTML += tr("matures in %n more block(s)", "", status.blocks_to_maturity);
+            }
+            strHTML += ")";
+        } else {
             strHTML += "(" + tr("not accepted") + ")";
+        }
         strHTML += "<br>";
     }
     else if (nNet > 0)
@@ -329,8 +347,12 @@ QString TransactionDesc::toHTML(interfaces::Node& node, interfaces::Wallet& wall
 
     if (wtx.is_coinbase)
     {
-        const int numBlocksToMaturity{node.coinbaseMaturity() + 1};
-        strHTML += "<br>" + tr("Generated coins must mature %1 blocks before they can be spent. When you generated this block, it was broadcast to the network to be added to the block chain. If it fails to get into the chain, its state will change to \"not accepted\" and it won't be spendable. This may occasionally happen if another node generates a block within a few seconds of yours.").arg(QString::number(numBlocksToMaturity)) + "<br>";
+        const int numBlocksToMaturity{COINBASE_MATURITY + 1};
+        strHTML += "<br>" + tr("Generated coins must mature %1 blocks before they can be spent.").arg(QString::number(numBlocksToMaturity));
+        if (status.maturity_time_left > 0) {
+            strHTML += " " + tr("They must also be at least one year old, so these can be spent in about %n day(s).", "", DaysLeft(status.maturity_time_left));
+        }
+        strHTML += " " + tr("When you generated this block, it was broadcast to the network to be added to the block chain. If it fails to get into the chain, its state will change to \"not accepted\" and it won't be spendable. This may occasionally happen if another node generates a block within a few seconds of yours.") + "<br>";
     }
 
     //
