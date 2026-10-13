@@ -39,11 +39,11 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount)
     uint160 dummy;
     s1 << OP_1 << ToByteVector(dummy) << ToByteVector(dummy) << OP_2 << OP_CHECKMULTISIG;
     BOOST_CHECK_EQUAL(s1.GetSigOpCount(true), 2U);
-    BOOST_CHECK_EQUAL(CountMultisigSigOps(s1), 2U);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(s1), 0U);
     s1 << OP_IF << OP_CHECKSIG << OP_ENDIF;
     BOOST_CHECK_EQUAL(s1.GetSigOpCount(true), 3U);
     BOOST_CHECK_EQUAL(s1.GetSigOpCount(false), 21U);
-    BOOST_CHECK_EQUAL(CountMultisigSigOps(s1), 2U);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(s1), 0U);
 
     CScript p2sh = GetScriptForDestination(ScriptHash(s1));
     CScript scriptSig;
@@ -59,8 +59,8 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount)
     CScript s2 = GetScriptForMultisig(1, keys);
     BOOST_CHECK_EQUAL(s2.GetSigOpCount(true), 3U);
     BOOST_CHECK_EQUAL(s2.GetSigOpCount(false), 20U);
-    BOOST_CHECK_EQUAL(CountMultisigSigOps(s2), 3U);
-    BOOST_CHECK_EQUAL(CountMultisigSigOps(CScript() << OP_CHECKMULTISIG), MAX_PUBKEYS_PER_MULTISIG);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(s2), 1U);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(CScript() << OP_CHECKMULTISIG), 0U);
 
     p2sh = GetScriptForDestination(ScriptHash(s2));
     BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(true), 0U);
@@ -68,6 +68,52 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount)
     CScript scriptSig2;
     scriptSig2 << OP_1 << ToByteVector(dummy) << ToByteVector(dummy) << Serialize(s2);
     BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(scriptSig2), 3U);
+}
+
+BOOST_AUTO_TEST_CASE(CountMultisigExcessKeysBoundary)
+{
+    std::vector<CPubKey> keys;
+    for (int i{0}; i < MAX_PUBKEYS_PER_MULTISIG; ++i) {
+        keys.push_back(GenerateRandomKey().GetPubKey());
+    }
+
+    const auto multisig = [&](const int required, const int total) {
+        const std::vector<CPubKey> selected_keys{keys.begin(), keys.begin() + total};
+        return GetScriptForMultisig(required, selected_keys);
+    };
+
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(multisig(1, 1)), 0U);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(multisig(2, 2)), 0U);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(multisig(2, 3)), 0U);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(multisig(3, 3)), 0U);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(multisig(1, 3)), 1U);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(multisig(2, 5)), 2U);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(multisig(1, 15)), 13U);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(multisig(1, 20)), 18U);
+
+    const CScript wide_multisig{multisig(11, 15)};
+    CScriptWitness one_sig_witness;
+    one_sig_witness.stack.emplace_back(); // CHECKMULTISIG dummy
+    one_sig_witness.stack.emplace_back(72, 1); // signature-shaped item
+    one_sig_witness.stack.emplace_back(wide_multisig.begin(), wide_multisig.end());
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(wide_multisig), 3U);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(wide_multisig, &one_sig_witness), 13U);
+
+    CScript multi_a{CScript() << std::vector<unsigned char>(32, 1) << OP_CHECKSIG};
+    multi_a << std::vector<unsigned char>(32, 2) << OP_CHECKSIGADD;
+    multi_a << std::vector<unsigned char>(32, 3) << OP_CHECKSIGADD << OP_1 << OP_NUMEQUAL;
+    CScriptWitness tapscript_witness;
+    tapscript_witness.stack.emplace_back();
+    tapscript_witness.stack.emplace_back();
+    tapscript_witness.stack.emplace_back(64, 1);
+    tapscript_witness.stack.emplace_back(multi_a.begin(), multi_a.end());
+    tapscript_witness.stack.emplace_back(65, 0xc0);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(multi_a, &tapscript_witness, /*witness_suffix_items=*/2), 1U);
+
+    // Invalid, incomplete, and non-canonical shapes are not assigned a punitive fallback.
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(CScript() << OP_3 << ToByteVector(keys[0]) << ToByteVector(keys[1]) << OP_2 << OP_CHECKMULTISIG), 0U);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(CScript() << OP_1 << ToByteVector(keys[0]) << OP_2 << OP_CHECKMULTISIG), 0U);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(CScript() << OP_1 << OP_CHECKMULTISIG), 0U);
 }
 
 /**
@@ -131,17 +177,17 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
 
     // Multisig script (legacy counting)
     {
-        CScript scriptPubKey = CScript() << 1 << ToByteVector(pubkey) << ToByteVector(pubkey) << 2 << OP_CHECKMULTISIGVERIFY;
+        CScript scriptPubKey = CScript() << 1 << ToByteVector(pubkey) << ToByteVector(pubkey) << ToByteVector(pubkey) << 3 << OP_CHECKMULTISIGVERIFY;
         // Do not use a valid signature to avoid using wallet operations.
         CScript scriptSig = CScript() << OP_0 << OP_0;
 
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, CScriptWitness());
-        assert(CountTransactionInputMultisigSigOps(CTransaction(spendingTx), coins) == 2);
+        assert(CountTransactionInputMultisigExcessKeys(CTransaction(spendingTx), coins) == 1);
         // Legacy counting only includes signature operations in scriptSigs and scriptPubKeys
         // of a transaction and does not take the actual executed sig operations into account.
         // spendingTx in itself does not contain a signature operation.
         assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags) == 0);
-        // creationTx contains two signature operations in its scriptPubKey, but legacy counting
+        // creationTx contains three signature operations in its scriptPubKey, but legacy counting
         // is not accurate.
         assert(GetTransactionSigOpCost(CTransaction(creationTx), coins, flags) == MAX_PUBKEYS_PER_MULTISIG * WITNESS_SCALE_FACTOR);
         // Sanity check: script verification fails because of an invalid signature.
@@ -150,25 +196,24 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
 
     // Multisig nested in P2SH
     {
-        CScript redeemScript = CScript() << 1 << ToByteVector(pubkey) << ToByteVector(pubkey) << 2 << OP_CHECKMULTISIGVERIFY;
+        CScript redeemScript = CScript() << 1 << ToByteVector(pubkey) << ToByteVector(pubkey) << ToByteVector(pubkey) << 3 << OP_CHECKMULTISIGVERIFY;
         CScript scriptPubKey = GetScriptForDestination(ScriptHash(redeemScript));
         CScript scriptSig = CScript() << OP_0 << OP_0 << ToByteVector(redeemScript);
 
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, CScriptWitness());
-        assert(CountTransactionInputMultisigSigOps(CTransaction(spendingTx), coins) == 2);
-        assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags) == 2 * WITNESS_SCALE_FACTOR);
+        assert(CountTransactionInputMultisigExcessKeys(CTransaction(spendingTx), coins) == 1);
+        assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags) == 3 * WITNESS_SCALE_FACTOR);
         assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_CHECKMULTISIGVERIFY);
     }
 
-    // Multisig opcode in a non-push-only legacy scriptSig. This is only
-    // relayed when non-standard transactions are enabled, but the additional
-    // fee policy must not be bypassable in that configuration.
+    // An incomplete multisig shape in a non-push-only legacy scriptSig is not
+    // assigned a punitive excess-key fallback.
     {
         CScript scriptPubKey = CScript() << OP_TRUE;
         CScript scriptSig = CScript() << OP_FALSE << OP_IF << OP_3 << OP_CHECKMULTISIG << OP_ENDIF;
 
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, CScriptWitness());
-        assert(CountTransactionInputMultisigSigOps(CTransaction(spendingTx), coins) == 3);
+        assert(CountTransactionInputMultisigExcessKeys(CTransaction(spendingTx), coins) == 0);
         assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_OK);
     }
 
@@ -182,7 +227,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
 
 
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, scriptWitness);
-        assert(CountTransactionInputMultisigSigOps(CTransaction(spendingTx), coins) == 0);
+        assert(CountTransactionInputMultisigExcessKeys(CTransaction(spendingTx), coins) == 0);
         assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags) == 1);
         // No signature operations if we don't verify the witness.
         assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags & ~SCRIPT_VERIFY_WITNESS) == 0);
@@ -192,15 +237,33 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
         assert(scriptPubKey[0] == 0x00);
         scriptPubKey[0] = 0x51;
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, scriptWitness);
-        assert(CountTransactionInputMultisigSigOps(CTransaction(spendingTx), coins) == 0);
+        assert(CountTransactionInputMultisigExcessKeys(CTransaction(spendingTx), coins) == 0);
         assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags) == 0);
         scriptPubKey[0] = 0x00;
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, scriptWitness);
-        assert(CountTransactionInputMultisigSigOps(CTransaction(spendingTx), coins) == 0);
+        assert(CountTransactionInputMultisigExcessKeys(CTransaction(spendingTx), coins) == 0);
 
         // The witness of a coinbase transaction is not taken into account.
         spendingTx.vin[0].prevout.SetNull();
         assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags) == 0);
+    }
+
+    // Tapscript multi_a is counted, while its script and control block are not
+    // mistaken for signature-shaped witness items.
+    {
+        CScript multi_a{CScript() << std::vector<unsigned char>(32, 1) << OP_CHECKSIG};
+        multi_a << std::vector<unsigned char>(32, 2) << OP_CHECKSIGADD;
+        multi_a << std::vector<unsigned char>(32, 3) << OP_CHECKSIGADD << OP_1 << OP_NUMEQUAL;
+        CScript scriptPubKey{CScript() << OP_1 << std::vector<unsigned char>(32, 4)};
+        CScriptWitness scriptWitness;
+        scriptWitness.stack.emplace_back();
+        scriptWitness.stack.emplace_back();
+        scriptWitness.stack.emplace_back(64, 1);
+        scriptWitness.stack.emplace_back(multi_a.begin(), multi_a.end());
+        scriptWitness.stack.emplace_back(65, 0xc0);
+
+        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, CScript{}, scriptWitness);
+        assert(CountTransactionInputMultisigExcessKeys(CTransaction(spendingTx), coins) == 1);
     }
 
     // P2WPKH nested in P2SH
@@ -213,14 +276,14 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
         scriptWitness.stack.emplace_back(0);
 
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, scriptWitness);
-        assert(CountTransactionInputMultisigSigOps(CTransaction(spendingTx), coins) == 0);
+        assert(CountTransactionInputMultisigExcessKeys(CTransaction(spendingTx), coins) == 0);
         assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags) == 1);
         assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_EQUALVERIFY);
     }
 
     // P2WSH witness program
     {
-        CScript witnessScript = CScript() << 1 << ToByteVector(pubkey) << ToByteVector(pubkey) << 2 << OP_CHECKMULTISIGVERIFY;
+        CScript witnessScript = CScript() << 1 << ToByteVector(pubkey) << ToByteVector(pubkey) << ToByteVector(pubkey) << 3 << OP_CHECKMULTISIGVERIFY;
         CScript scriptPubKey = GetScriptForDestination(WitnessV0ScriptHash(witnessScript));
         CScript scriptSig = CScript();
         CScriptWitness scriptWitness;
@@ -229,15 +292,17 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
         scriptWitness.stack.emplace_back(witnessScript.begin(), witnessScript.end());
 
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, scriptWitness);
-        assert(CountTransactionInputMultisigSigOps(CTransaction(spendingTx), coins) == 2);
-        assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags) == 2);
+        // No signature-shaped witness item is supplied, so none of the three
+        // keys is proven and only the one-key allowance is free.
+        assert(CountTransactionInputMultisigExcessKeys(CTransaction(spendingTx), coins) == 2);
+        assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags) == 3);
         assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags & ~SCRIPT_VERIFY_WITNESS) == 0);
         assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_CHECKMULTISIGVERIFY);
     }
 
     // P2WSH nested in P2SH
     {
-        CScript witnessScript = CScript() << 1 << ToByteVector(pubkey) << ToByteVector(pubkey) << 2 << OP_CHECKMULTISIGVERIFY;
+        CScript witnessScript = CScript() << 1 << ToByteVector(pubkey) << ToByteVector(pubkey) << ToByteVector(pubkey) << 3 << OP_CHECKMULTISIGVERIFY;
         CScript redeemScript = GetScriptForDestination(WitnessV0ScriptHash(witnessScript));
         CScript scriptPubKey = GetScriptForDestination(ScriptHash(redeemScript));
         CScript scriptSig = CScript() << ToByteVector(redeemScript);
@@ -247,8 +312,8 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
         scriptWitness.stack.emplace_back(witnessScript.begin(), witnessScript.end());
 
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, scriptWitness);
-        assert(CountTransactionInputMultisigSigOps(CTransaction(spendingTx), coins) == 2);
-        assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags) == 2);
+        assert(CountTransactionInputMultisigExcessKeys(CTransaction(spendingTx), coins) == 2);
+        assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags) == 3);
         assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_CHECKMULTISIGVERIFY);
     }
 }
