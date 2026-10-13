@@ -11,6 +11,7 @@ from test_framework.script import (
     OP_2,
     OP_3,
     OP_CHECKMULTISIG,
+    OP_DROP,
     SIGHASH_ALL,
     SegwitV0SignatureHash,
 )
@@ -94,11 +95,16 @@ class MultisigSigOpFeeTest(BitcoinTestFramework):
         keys_3_of_5, script_3_of_5 = self.create_multisig(3, 5)
         keys_2_of_5, script_2_of_5 = self.create_multisig(2, 5)
         keys_1_of_15, script_1_of_15 = self.create_multisig(1, 15)
+        dropped_count_script = CScript([
+            1, *[key.get_pubkey().get_bytes() for key in keys_1_of_15],
+            15, OP_DROP, 15, OP_CHECKMULTISIG,
+        ])
         funding_2_of_2 = self.fund(script_2_of_2)
         funding_2_of_3 = self.fund(script_2_of_3)
         funding_3_of_5 = self.fund(script_3_of_5)
         funding_2_of_5 = self.fund(script_2_of_5)
         funding_1_of_15 = self.fund(script_1_of_15)
+        dropped_count_funding = self.fund(dropped_count_script)
         nested_funding_1_of_15 = self.fund(script_1_of_15, nested=True)
         multi_funding_2_of_5 = self.fund(script_2_of_5, count=3)
         self.generate(self.wallet, 1)
@@ -118,6 +124,10 @@ class MultisigSigOpFeeTest(BitcoinTestFramework):
         self.log.info("A valid signed 1-of-15 has thirteen charged excess keys")
         self.check_fee(funding_1_of_15, script_1_of_15, keys_1_of_15, 1, 12_999, False)
         self.check_fee(funding_1_of_15, script_1_of_15, keys_1_of_15, 1, 13_000, True)
+
+        self.log.info("Dropping and re-pushing the key count cannot bypass the floor")
+        self.check_fee(dropped_count_funding, dropped_count_script, keys_1_of_15, 1, 13_999, False)
+        self.check_fee(dropped_count_funding, dropped_count_script, keys_1_of_15, 1, 14_000, True)
 
         self.log.info("A valid signed nested P2SH-P2WSH spend is counted identically")
         self.check_fee(nested_funding_1_of_15, script_1_of_15, keys_1_of_15, 1, 12_999, False, nested=True)

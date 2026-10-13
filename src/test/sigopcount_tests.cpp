@@ -91,6 +91,20 @@ BOOST_AUTO_TEST_CASE(CountMultisigExcessKeysBoundary)
     BOOST_CHECK_EQUAL(CountMultisigExcessKeys(multisig(1, 15)), 13U);
     BOOST_CHECK_EQUAL(CountMultisigExcessKeys(multisig(1, 20)), 18U);
 
+    // Dropping and re-pushing n preserves the spend, but must not erase its
+    // public keys. Non-canonical forms conservatively lose their m credit.
+    CScript dropped_count{multisig(1, 15)};
+    dropped_count.pop_back(); // CHECKMULTISIG
+    dropped_count << OP_DROP << OP_15 << OP_CHECKMULTISIG;
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(dropped_count), 14U);
+
+    // The allowance applies once per script, not once per CHECKMULTISIG.
+    CScript two_multisigs{multisig(2, 3)};
+    two_multisigs.back() = OP_CHECKMULTISIGVERIFY;
+    const CScript second_multisig{multisig(2, 3)};
+    two_multisigs.insert(two_multisigs.end(), second_multisig.begin(), second_multisig.end());
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(two_multisigs), 1U);
+
     const CScript wide_multisig{multisig(11, 15)};
     CScriptWitness one_sig_witness;
     one_sig_witness.stack.emplace_back(); // CHECKMULTISIG dummy
@@ -109,6 +123,11 @@ BOOST_AUTO_TEST_CASE(CountMultisigExcessKeysBoundary)
     tapscript_witness.stack.emplace_back(multi_a.begin(), multi_a.end());
     tapscript_witness.stack.emplace_back(65, 0xc0);
     BOOST_CHECK_EQUAL(CountMultisigExcessKeys(multi_a, &tapscript_witness, /*witness_suffix_items=*/2), 1U);
+
+    tapscript_witness.stack[2].clear();
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(multi_a, &tapscript_witness, /*witness_suffix_items=*/2), 2U);
+    tapscript_witness.stack.emplace_back(65, ANNEX_TAG);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(multi_a, &tapscript_witness, /*witness_suffix_items=*/3), 2U);
 
     // Invalid, incomplete, and non-canonical shapes are not assigned a punitive fallback.
     BOOST_CHECK_EQUAL(CountMultisigExcessKeys(CScript() << OP_3 << ToByteVector(keys[0]) << ToByteVector(keys[1]) << OP_2 << OP_CHECKMULTISIG), 0U);
@@ -264,6 +283,18 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
 
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, CScript{}, scriptWitness);
         assert(CountTransactionInputMultisigExcessKeys(CTransaction(spendingTx), coins) == 1);
+
+        scriptWitness.stack.emplace_back(65, ANNEX_TAG);
+        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, CScript{}, scriptWitness);
+        assert(CountTransactionInputMultisigExcessKeys(CTransaction(spendingTx), coins) == 1);
+
+        scriptWitness.stack[4][0] = 0xc2; // a future leaf version is not tapscript
+        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, CScript{}, scriptWitness);
+        assert(CountTransactionInputMultisigExcessKeys(CTransaction(spendingTx), coins) == 0);
+
+        scriptWitness.stack.assign(1, std::vector<unsigned char>(64, 1));
+        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, CScript{}, scriptWitness);
+        assert(CountTransactionInputMultisigExcessKeys(CTransaction(spendingTx), coins) == 0);
     }
 
     // P2WPKH nested in P2SH

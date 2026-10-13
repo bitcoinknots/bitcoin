@@ -619,11 +619,6 @@ static bool IsStackNeutralNop(const opcodetype opcode)
     return opcode == OP_NOP || (opcode >= OP_NOP1 && opcode <= OP_NOP10);
 }
 
-static bool IsRunPush(const opcodetype opcode)
-{
-    return opcode <= OP_16 && opcode != OP_RESERVED;
-}
-
 static size_t CountWitnessSignatures(const CScriptWitness& witness, const size_t suffix_items)
 {
     if (suffix_items > witness.stack.size()) return 0;
@@ -638,10 +633,10 @@ static size_t CountWitnessSignatures(const CScriptWitness& witness, const size_t
 unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness* witness,
                                      const size_t witness_suffix_items)
 {
-    size_t pubkeys{0}, provable{0}, run_keys{0}, push_run_keys{0}, multi_a_keys{0};
+    size_t pubkeys{0}, provable{0}, run_keys{0}, multi_a_keys{0};
     int run_opened_by{-1}, last_count{-1}, last_a_count{-1};
     unsigned int inside_noop{0};
-    bool last_is_push{false}, last_is_key{false}, last_is_xonly{false};
+    bool last_is_key{false}, last_is_xonly{false};
     opcodetype opcode{OP_INVALIDOPCODE}, last_opcode{OP_INVALIDOPCODE};
     std::vector<unsigned char> push_data;
 
@@ -664,14 +659,15 @@ unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness
         } else if (is_pubkey) {
             if (!run_keys) run_opened_by = last_count;
             ++run_keys;
-            ++push_run_keys;
             ++pubkeys;
             is_key = true;
         } else if (is_xonly) {
             run_keys = 0;
             is_key = true;
-        } else if ((opcode == OP_DROP || opcode == OP_2DROP) && last_is_push) {
-            pubkeys -= push_run_keys;
+        } else if (opcode == OP_DROP || opcode == OP_2DROP) {
+            // Unlike #422, this fee counter has no companion rule charging an
+            // entire dropped push run. Never erase earlier keys here: dropping
+            // and re-pushing n must not make an m-of-n free.
             run_keys = 0;
             multi_a_keys = 0;
         } else if (opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY) {
@@ -700,8 +696,6 @@ unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness
             if (a_count < 0) multi_a_keys = 0;
         }
 
-        const bool is_push{IsRunPush(opcode)};
-        if (!is_push) push_run_keys = 0;
         if (!IsStackNeutralNop(opcode)) {
             last_is_key = is_key;
             last_is_xonly = is_xonly && !inside_noop;
@@ -709,7 +703,6 @@ unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness
         last_opcode = opcode;
         last_count = count;
         last_a_count = a_count;
-        last_is_push = is_push;
     }
 
     if (witness && !witness->stack.empty()) {
@@ -735,51 +728,58 @@ static std::optional<CScript> GetP2SHRedeemScript(const CScript& script_sig)
     return CScript{data.begin(), data.end()};
 }
 
+uint64_t CountInputMultisigExcessKeys(const CTxIn& txin, const CScript& prev_script)
+{
+    uint64_t count{0};
+    // Non-standard legacy inputs may execute opcodes from scriptSig. Standard
+    // scriptSigs and P2SH scriptSigs are push-only, so this is zero for them.
+    count += CountMultisigExcessKeys(txin.scriptSig);
+
+    CScript script{prev_script};
+    bool p2sh{false};
+
+    if (script.IsPayToScriptHash()) {
+        const auto redeem_script{GetP2SHRedeemScript(txin.scriptSig)};
+        if (!redeem_script) return count;
+        script = *redeem_script;
+        p2sh = true;
+    }
+
+    int witness_version{0};
+    std::vector<unsigned char> witness_program;
+    if (!script.IsWitnessProgram(witness_version, witness_program)) {
+        return count + CountMultisigExcessKeys(script);
+    }
+
+    if (witness_version == 0 && witness_program.size() == WITNESS_V0_SCRIPTHASH_SIZE && !txin.scriptWitness.stack.empty()) {
+        const auto& witness_script{txin.scriptWitness.stack.back()};
+        script = CScript{witness_script.begin(), witness_script.end()};
+        return count + CountMultisigExcessKeys(script, &txin.scriptWitness, /*witness_suffix_items=*/1);
+    }
+
+    if (witness_version == 1 && witness_program.size() == WITNESS_V1_TAPROOT_SIZE && !p2sh) {
+        Span stack{txin.scriptWitness.stack};
+        size_t suffix_items{2}; // tapscript and control block
+        if (stack.size() >= 2 && !stack.back().empty() && stack.back()[0] == ANNEX_TAG) {
+            SpanPopBack(stack);
+            ++suffix_items;
+        }
+        if (stack.size() < 2) return count; // key-path or invalid spend
+        const auto& control_block{SpanPopBack(stack)};
+        // Future leaf versions do not execute this script as tapscript.
+        if (control_block.empty() || (control_block[0] & TAPROOT_LEAF_MASK) != TAPROOT_LEAF_TAPSCRIPT) return count;
+        const auto& tapscript{stack.back()};
+        script = CScript{tapscript.begin(), tapscript.end()};
+        count += CountMultisigExcessKeys(script, &txin.scriptWitness, suffix_items);
+    }
+    return count;
+}
+
 uint64_t CountTransactionInputMultisigExcessKeys(const CTransaction& tx, const CCoinsViewCache& prevouts)
 {
     uint64_t count{0};
     for (const CTxIn& txin : tx.vin) {
-        // Non-standard legacy inputs may execute opcodes from scriptSig. Standard
-        // scriptSigs and P2SH scriptSigs are push-only, so this is zero for them.
-        count += CountMultisigExcessKeys(txin.scriptSig);
-
-        CScript script{prevouts.AccessCoin(txin.prevout).out.scriptPubKey};
-        bool p2sh{false};
-
-        if (script.IsPayToScriptHash()) {
-            const auto redeem_script{GetP2SHRedeemScript(txin.scriptSig)};
-            if (!redeem_script) continue;
-            script = *redeem_script;
-            p2sh = true;
-        }
-
-        int witness_version{0};
-        std::vector<unsigned char> witness_program;
-        if (!script.IsWitnessProgram(witness_version, witness_program)) {
-            count += CountMultisigExcessKeys(script);
-            continue;
-        }
-
-        if (witness_version == 0 && witness_program.size() == WITNESS_V0_SCRIPTHASH_SIZE && !txin.scriptWitness.stack.empty()) {
-            const auto& witness_script{txin.scriptWitness.stack.back()};
-            script = CScript{witness_script.begin(), witness_script.end()};
-            count += CountMultisigExcessKeys(script, &txin.scriptWitness, /*witness_suffix_items=*/1);
-            continue;
-        }
-
-        if (witness_version == 1 && witness_program.size() == WITNESS_V1_TAPROOT_SIZE && !p2sh) {
-            Span stack{txin.scriptWitness.stack};
-            size_t suffix_items{2}; // tapscript and control block
-            if (stack.size() >= 2 && !stack.back().empty() && stack.back()[0] == ANNEX_TAG) {
-                SpanPopBack(stack);
-                ++suffix_items;
-            }
-            if (stack.size() < 2) continue; // key-path or invalid spend
-            SpanPopBack(stack); // control block
-            const auto& tapscript{stack.back()};
-            script = CScript{tapscript.begin(), tapscript.end()};
-            count += CountMultisigExcessKeys(script, &txin.scriptWitness, suffix_items);
-        }
+        count += CountInputMultisigExcessKeys(txin, prevouts.AccessCoin(txin.prevout).out.scriptPubKey);
     }
     return count;
 }

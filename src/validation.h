@@ -261,7 +261,7 @@ struct PackageMempoolAcceptResult
 
 static const std::string rejectmsg_lowfee_mempool = "mempool min fee not met";
 static const std::string rejectmsg_lowfee_relay = "min relay fee not met";
-static const std::string rejectmsg_multisig_sigop_fee = "min multisig sigop fee not met";
+static const std::string rejectmsg_multisig_excess_key_fee = "min multisig excess key fee not met";
 static const std::string rejectmsg_mempoolfull = "mempool full";
 static const std::string rejectmsg_zero_mempool_entry_seq = "zero mempool entry sequence";
 

@@ -227,9 +227,14 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
  */
 bool SpendsNonAnchorWitnessProg(const CTransaction& tx, const CCoinsViewCache& prevouts);
 
-/** Count pubkeys no supplied signature can prove, after one free key. */
+/** Estimate unproven pubkeys statically, after one free key per script.
+ * Signature-shaped witness items cap the credit; no signatures are verified here.
+ */
 unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness* witness = nullptr,
                                      size_t witness_suffix_items = 1);
+
+/** Count excess keys in the scripts exposed by an input, including its witness. */
+uint64_t CountInputMultisigExcessKeys(const CTxIn& txin, const CScript& prev_script);
 
 /** Count excess multisig keys in the scripts exposed by all transaction inputs. */
 uint64_t CountTransactionInputMultisigExcessKeys(const CTransaction& tx, const CCoinsViewCache& prevouts);

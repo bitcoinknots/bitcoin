@@ -1075,16 +1075,16 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
         return state.Invalid(TxValidationResult::TX_WITNESS_MUTATED, reason);
     }
 
-    if (m_pool.m_opts.min_relay_multisig_sigop_fee > 0 && !ignore_rejects.count(rejectmsg_multisig_sigop_fee)) {
-        const uint64_t multisig_sigops{CountTransactionInputMultisigSigOps(tx, m_view)};
-        const CAmount fee_per_sigop{m_pool.m_opts.min_relay_multisig_sigop_fee};
-        const CAmount required_fee{multisig_sigops > static_cast<uint64_t>(MAX_MONEY / fee_per_sigop)
+    if (m_pool.m_opts.min_relay_multisig_excess_key_fee > 0 && !ignore_rejects.count(rejectmsg_multisig_excess_key_fee)) {
+        const uint64_t excess_keys{CountTransactionInputMultisigExcessKeys(tx, m_view)};
+        const CAmount fee_per_key{m_pool.m_opts.min_relay_multisig_excess_key_fee};
+        const CAmount required_fee{excess_keys > static_cast<uint64_t>(MAX_MONEY / fee_per_key)
                 ? MAX_MONEY
-                : static_cast<CAmount>(multisig_sigops) * fee_per_sigop};
+                : static_cast<CAmount>(excess_keys) * fee_per_key};
         if (ws.m_base_fees < required_fee) {
-            return state.Invalid(TxValidationResult::TX_MEMPOOL_POLICY, rejectmsg_multisig_sigop_fee,
-                                 strprintf("%d < %d (%u multisig sigops at %d sat each)",
-                                           ws.m_base_fees, required_fee, multisig_sigops, fee_per_sigop));
+            return state.Invalid(TxValidationResult::TX_MEMPOOL_POLICY, rejectmsg_multisig_excess_key_fee,
+                                 strprintf("%d < %d (%u excess multisig keys at %d sat each)",
+                                           ws.m_base_fees, required_fee, excess_keys, fee_per_key));
         }
     }
 
