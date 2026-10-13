@@ -717,9 +717,9 @@ bool LegacyDataSPKM::CanProvide(const CScript& script, SignatureData& sigdata)
     }
 }
 
-bool LegacyScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum) const
+bool LegacyScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum, std::vector<ScriptValidationMetrics>* execution_metrics) const
 {
-    return ::SignTransaction(tx, this, coins, sighash, input_errors, inputs_amount_sum);
+    return ::SignTransaction(tx, this, coins, sighash, input_errors, inputs_amount_sum, SighashRulesForSigning(), execution_metrics);
 }
 
 SigningResult LegacyScriptPubKeyMan::SignMessage(const MessageSignatureFormat format, const std::string& message, const CTxDestination& address, std::string& str_sig) const
@@ -2660,7 +2660,7 @@ bool DescriptorScriptPubKeyMan::CanProvide(const CScript& script, SignatureData&
     return IsMine(script);
 }
 
-bool DescriptorScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum) const
+bool DescriptorScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum, std::vector<ScriptValidationMetrics>* execution_metrics) const
 {
     std::unique_ptr<FlatSigningProvider> keys = std::make_unique<FlatSigningProvider>();
     for (const auto& coin_pair : coins) {
@@ -2671,7 +2671,7 @@ bool DescriptorScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const s
         keys->Merge(std::move(*coin_keys));
     }
 
-    return ::SignTransaction(tx, keys.get(), coins, sighash, input_errors, inputs_amount_sum);
+    return ::SignTransaction(tx, keys.get(), coins, sighash, input_errors, inputs_amount_sum, SighashRulesForSigning(), execution_metrics);
 }
 
 SigningResult DescriptorScriptPubKeyMan::SignMessage(const MessageSignatureFormat format, const std::string& message, const CTxDestination& address, std::string& str_sig) const

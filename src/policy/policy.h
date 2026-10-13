@@ -227,7 +227,16 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
  */
 bool SpendsNonAnchorWitnessProg(const CTransaction& tx, const CCoinsViewCache& prevouts);
 
-/** Estimate unproven pubkeys statically, after one free key per script.
+/** Count unproven key operands observed by successful VerifyScript execution.
+ * Applies one free operand per executed script. Never use failed/partial data.
+ */
+uint64_t CountExecutedMultisigExcessKeys(const ScriptValidationMetrics& metrics);
+
+/** Unsigned-wallet estimate only; NOT the mempool's authoritative counter.
+ * Estimate unproven pubkeys statically, after one free key per script.
+ * Only scripts containing CHECKMULTISIG (legacy/v0) or CHECKSIGADD (tapscript),
+ * outside statically skipped false arms, are in scope. Mixed scripts remain
+ * conservative: push-to-signature provenance is not proven.
  * DER-encoded ECDSA or 64/65-byte Schnorr witness items cap the credit;
  * no signatures are verified here. sigversion selects the witness encoding.
  * Bounded, proven identity blocks preserve static key/threshold recognition.
@@ -238,10 +247,10 @@ unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness
                                      size_t witness_suffix_items = 1,
                                      SigVersion sigversion = SigVersion::WITNESS_V0);
 
-/** Count excess keys in the scripts exposed by an input, including its witness. */
+/** Static unsigned-wallet estimate for an input; not authoritative for admission. */
 uint64_t CountInputMultisigExcessKeys(const CTxIn& txin, const CScript& prev_script);
 
-/** Count excess multisig keys in the scripts exposed by all transaction inputs. */
+/** Static unsigned-wallet estimate over transaction inputs; not an admission check. */
 uint64_t CountTransactionInputMultisigExcessKeys(const CTransaction& tx, const CCoinsViewCache& prevouts);
 
 /** Compute the virtual transaction size (weight reinterpreted as bytes). */

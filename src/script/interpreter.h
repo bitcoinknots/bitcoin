@@ -247,6 +247,21 @@ enum class SigVersion
     TAPSCRIPT = 3,   //!< Witness v1 with 32-byte program, not BIP16 P2SH-wrapped, script path spending, leaf version 0xc0; see BIP 342
 };
 
+/** Optional observations from an actual script execution, not consensus rules.
+ * Consumers must discard these observations unless VerifyScript succeeds.
+ * Counts refer to operand occurrences, not distinct public-key byte strings.
+ */
+struct ScriptExecutionMetrics {
+    SigVersion sigversion{SigVersion::BASE};
+    uint64_t multisig_unproven_keys{0};
+    uint64_t tapscript_unproven_keys{0};
+    bool has_checksigadd{false};
+};
+
+struct ScriptValidationMetrics {
+    std::vector<ScriptExecutionMetrics> scripts;
+};
+
 struct ScriptExecutionData
 {
     //! Whether m_tapleaf_hash is initialized.
@@ -440,9 +455,9 @@ uint256 ComputeTapbranchHash(Span<const unsigned char> a, Span<const unsigned ch
  *  Requires control block to have valid length (33 + k*32, with k in {0,1,..,128}). */
 uint256 ComputeTaprootMerkleRoot(Span<const unsigned char> control, const uint256& tapleaf_hash);
 
-bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& script, unsigned int flags, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* error = nullptr);
-bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& script, unsigned int flags, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptError* error = nullptr);
-bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const CScriptWitness* witness, unsigned int flags, const BaseSignatureChecker& checker, ScriptError* serror = nullptr);
+bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& script, unsigned int flags, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* error = nullptr, ScriptExecutionMetrics* metrics = nullptr);
+bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& script, unsigned int flags, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptError* error = nullptr, ScriptExecutionMetrics* metrics = nullptr);
+bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const CScriptWitness* witness, unsigned int flags, const BaseSignatureChecker& checker, ScriptError* serror = nullptr, ScriptValidationMetrics* metrics = nullptr);
 
 size_t CountWitnessSigOps(const CScript& scriptSig, const CScript& scriptPubKey, const CScriptWitness* witness, unsigned int flags);
 

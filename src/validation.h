@@ -36,6 +36,7 @@
 #include <versionbits.h>
 
 #include <atomic>
+#include <deque>
 #include <map>
 #include <memory>
 #include <optional>
@@ -364,10 +365,11 @@ private:
     bool cacheStore;
     PrecomputedTransactionData *txdata;
     SignatureCache* m_signature_cache;
+    ScriptValidationMetrics* m_metrics;
 
 public:
-    CScriptCheck(const CTxOut& outIn, const CTransaction& txToIn, SignatureCache& signature_cache, unsigned int nInIn, unsigned int nFlagsIn, bool cacheIn, PrecomputedTransactionData* txdataIn) :
-        m_tx_out(outIn), ptxTo(&txToIn), nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn), txdata(txdataIn), m_signature_cache(&signature_cache) { }
+    CScriptCheck(const CTxOut& outIn, const CTransaction& txToIn, SignatureCache& signature_cache, unsigned int nInIn, unsigned int nFlagsIn, bool cacheIn, PrecomputedTransactionData* txdataIn, ScriptValidationMetrics* metrics = nullptr) :
+        m_tx_out(outIn), ptxTo(&txToIn), nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn), txdata(txdataIn), m_signature_cache(&signature_cache), m_metrics(metrics) { }
 
     CScriptCheck(const CScriptCheck&) = delete;
     CScriptCheck& operator=(const CScriptCheck&) = delete;
@@ -391,10 +393,17 @@ class ValidationCache
 private:
     //! Pre-initialized hasher to avoid having to recreate it for every hash calculation.
     CSHA256 m_script_execution_cache_hasher;
+    // Bounded FIFO metadata for successful policy executions only. Guarded by
+    // cs_main, like the full execution cache. Key includes wtxid AND flags.
+    static constexpr size_t MAX_KEY_COUNT_CACHE{4096};
+    std::map<uint256, uint64_t> m_key_count_cache;
+    std::deque<uint256> m_key_count_order;
 
 public:
     CuckooCache::cache<uint256, SignatureCacheHasher> m_script_execution_cache;
     SignatureCache m_signature_cache;
+    std::optional<uint64_t> GetMultisigKeyCount(const uint256& key) const EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    void CacheMultisigKeyCount(const uint256& key, uint64_t count) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
     ValidationCache(size_t script_execution_cache_bytes, size_t signature_cache_bytes);
 

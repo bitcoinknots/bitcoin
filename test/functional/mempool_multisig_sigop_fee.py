@@ -2,12 +2,13 @@
 # Copyright (c) 2026 The Bitcoin Knots developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Test the minimum fee policy for excess keys in canonical multisig inputs."""
+"""Test observed multisig key fees, scope, wallet-independent spends and CPFP."""
 
 from test_framework.key import ECKey, sign_schnorr
-from test_framework.messages import COutPoint, CTransaction, CTxIn, CTxInWitness, CTxOut
+from test_framework.messages import COutPoint, CTransaction, CTxIn, CTxInWitness, CTxOut, from_hex
 from test_framework.script import (
     CScript,
+    OP_ADD,
     OP_2,
     OP_3,
     OP_CHECKMULTISIG,
@@ -79,13 +80,14 @@ class MultisigSigOpFeeTest(BitcoinTestFramework):
             for _ in range(count)
         ]
 
-    def make_spend(self, fundings, script, keys, required, fee, *, nested=False, witness_padding=0):
+    def make_spend(self, fundings, script, keys, required, fee, *, nested=False, witness_padding=0, output_script=None):
         tx = CTransaction()
         tx.vin = [
             CTxIn(COutPoint(int(funding["txid"], 16), funding["sent_vout"]))
             for funding in fundings
         ]
-        tx.vout = [CTxOut(FUNDING_VALUE * len(fundings) - fee, self.wallet.get_output_script())]
+        tx.vout = [CTxOut(FUNDING_VALUE * len(fundings) - fee,
+                         self.wallet.get_output_script() if output_script is None else output_script)]
         tx.wit.vtxinwit = [CTxInWitness() for _ in fundings]
 
         witness_program = script_to_p2wsh_script(script)
@@ -217,6 +219,104 @@ class MultisigSigOpFeeTest(BitcoinTestFramework):
                 result = self.nodes[0].testmempoolaccept([tx.serialize().hex()], 0)[0]
                 assert result["allowed"], f"{name}: {path}: {result}"
 
+    def check_scope_and_packages(self, keys, script):
+        node = self.nodes[0]
+        reason = "min multisig excess key fee not met"
+
+        # Pure data pushes are outside this multisig policy. They must not
+        # become charged merely because their lengths match public keys.
+        data_script = CScript([b"\xae" * 33, OP_HASH160, OP_DROP, b"\xae" * 65, OP_HASH160, OP_DROP, OP_TRUE])
+        data_funding = self.fund(data_script)[0]
+        mixed_script = CScript([keys[0].get_pubkey().get_bytes(), OP_HASH160, OP_DROP]) + script + CScript([
+            keys[0].get_pubkey().get_bytes(), OP_HASH160, OP_DROP,
+        ])
+        mixed_funding = self.fund(mixed_script)
+        fundings = self.fund(script, count=5)
+        self.generate(self.wallet, 1)
+        data_spend = CTransaction()
+        data_spend.vin = [CTxIn(COutPoint(int(data_funding["txid"], 16), data_funding["sent_vout"]))]
+        data_spend.vout = [CTxOut(FUNDING_VALUE - 500, self.wallet.get_output_script())]
+        data_spend.wit.vtxinwit = [CTxInWitness()]
+        data_spend.wit.vtxinwit[0].scriptWitness.stack = [bytes(data_script)]
+        # Ignore only the existing independent datacarrier policy, never the
+        # key-fee rule whose scope is under test.
+        scoped = node.testmempoolaccept([data_spend.serialize().hex()], 0,
+                                      ["txn-datacarrier-nonstandard", "txn-datacarrier-exceeded"])[0]
+        assert scoped["allowed"], scoped
+        self.check_fee(mixed_funding, mixed_script, keys, 1, 12_999, False,
+                       ignore_rejects=["txn-datacarrier-nonstandard", "txn-datacarrier-exceeded"])
+        self.check_fee(mixed_funding, mixed_script, keys, 1, 13_000, True,
+                       ignore_rejects=["txn-datacarrier-nonstandard", "txn-datacarrier-exceeded"])
+
+        def parent(index, fee=500, multisig_output=False):
+            return from_hex(CTransaction(), self.make_spend(
+                [fundings[index]], script, keys, 1, fee,
+                output_script=script_to_p2wsh_script(script) if multisig_output else None,
+            ))
+
+        def child(parents, fee, multisig_inputs=False):
+            tx = CTransaction()
+            tx.vin = [CTxIn(COutPoint(int(p.rehash(), 16), 0)) for p in parents]
+            tx.vout = [CTxOut(sum(p.vout[0].nValue for p in parents) - fee, self.wallet.get_output_script())]
+            if multisig_inputs:
+                tx.wit.vtxinwit = [CTxInWitness() for _ in parents]
+                for i, p in enumerate(parents):
+                    digest = SegwitV0SignatureHash(script, tx, i, SIGHASH_ALL, p.vout[0].nValue)
+                    tx.wit.vtxinwit[i].scriptWitness.stack = [
+                        b"", keys[0].sign_ecdsa(digest) + bytes([SIGHASH_ALL]), bytes(script),
+                    ]
+            else:
+                self.wallet.sign_tx(tx)
+            tx.rehash()
+            return tx
+
+        def submit(transactions, success, fee_failure=False):
+            result = node.submitpackage([tx.serialize().hex() for tx in transactions], maxfeerate=0)
+            assert_equal(result["package_msg"] == "success", success)
+            if fee_failure:
+                assert any(reason in r.get("error", "") for r in result["tx-results"].values()), result
+            if success:
+                assert all(tx.rehash() in node.getrawmempool() for tx in transactions)
+            return result
+
+        p = parent(0)
+        assert_equal(node.testmempoolaccept([p.serialize().hex()], 0)[0]["reject-reason"], reason)
+        # Real fees, not local prioritisetransaction deltas, meet this floor.
+        node.prioritisetransaction(p.rehash(), 0, 100_000)
+        submit([p, child([p], 12_499)], False, fee_failure=True)
+        assert p.rehash() not in node.getrawmempool()
+        node.prioritisetransaction(p.rehash(), 0, -100_000)
+
+        # A sufficiently paying but invalid child must not admit its parent.
+        invalid = child([p], 12_500)
+        invalid.wit.vtxinwit[0].scriptWitness.stack = []
+        invalid_result = submit([p, invalid], False)
+        assert "witness" in invalid_result["tx-results"][invalid.getwtxid()]["error"].lower(), invalid_result
+        assert p.rehash() not in node.getrawmempool()
+        c = child([p], 12_500)
+        submit([p, c], True)
+        submit([p, c], True)  # already in mempool: de-duplication
+
+        # The complete sum of both parent floors is due, not just the maximum.
+        parents = [parent(1), parent(2)]
+        submit(parents + [child(parents, 24_999)], False, fee_failure=True)
+        assert all(p.rehash() not in node.getrawmempool() for p in parents)
+        submit(parents + [child(parents, 25_000)], True)
+
+        # A charged child contributes its own 13,000-sat floor as well.
+        p = parent(3, multisig_output=True)
+        submit([p, child([p], 25_499, True)], False, fee_failure=True)
+        submit([p, child([p], 25_500, True)], True)
+
+        # Surplus fees of an already admitted parent cannot be reused to make
+        # a charged child pass. Only newly evaluated members pay the floor.
+        p = parent(4, fee=40_000, multisig_output=True)
+        node.sendrawtransaction(p.serialize().hex(), maxfeerate=0)
+        c = child([p], 500, True)
+        submit([p, c], False, fee_failure=True)
+        assert c.rehash() not in node.getrawmempool()
+        self.generate(self.wallet, 1)
+
     def run_test(self):
         self.wallet = MiniWallet(self.nodes[0])
         keys_2_of_2, script_2_of_2 = self.create_multisig(2, 2)
@@ -228,6 +328,10 @@ class MultisigSigOpFeeTest(BitcoinTestFramework):
             1, *[key.get_pubkey().get_bytes() for key in keys_1_of_15],
             15, OP_DROP, 15, OP_CHECKMULTISIG,
         ])
+        dynamic_count_script = CScript([
+            1, *[key.get_pubkey().get_bytes() for key in keys_1_of_15],
+            7, 8, OP_ADD, OP_CHECKMULTISIG,
+        ])
         padded_branch_script = CScript([OP_DROP] * 13) + script_1_of_15 + CScript(
             [OP_IF, OP_TRUE, OP_ELSE] + [OP_CHECKSIG] * 13 + [OP_ENDIF]
         )
@@ -237,6 +341,7 @@ class MultisigSigOpFeeTest(BitcoinTestFramework):
         funding_2_of_5 = self.fund(script_2_of_5)
         funding_1_of_15 = self.fund(script_1_of_15)
         dropped_count_funding = self.fund(dropped_count_script)
+        dynamic_count_funding = self.fund(dynamic_count_script)
         padded_branch_funding = self.fund(padded_branch_script)
         nested_funding_1_of_15 = self.fund(script_1_of_15, nested=True)
         multi_funding_2_of_5 = self.fund(script_2_of_5, count=3)
@@ -259,8 +364,12 @@ class MultisigSigOpFeeTest(BitcoinTestFramework):
         self.check_fee(funding_1_of_15, script_1_of_15, keys_1_of_15, 1, 13_000, True)
 
         self.log.info("Dropping and re-pushing the key count cannot bypass the floor")
-        self.check_fee(dropped_count_funding, dropped_count_script, keys_1_of_15, 1, 13_999, False)
-        self.check_fee(dropped_count_funding, dropped_count_script, keys_1_of_15, 1, 14_000, True)
+        self.check_fee(dropped_count_funding, dropped_count_script, keys_1_of_15, 1, 12_999, False)
+        self.check_fee(dropped_count_funding, dropped_count_script, keys_1_of_15, 1, 13_000, True)
+
+        self.log.info("A computed key count is charged from the actual multisig operands")
+        self.check_fee(dynamic_count_funding, dynamic_count_script, keys_1_of_15, 1, 12_999, False)
+        self.check_fee(dynamic_count_funding, dynamic_count_script, keys_1_of_15, 1, 13_000, True)
 
         self.log.info("Dropped witness padding and unused CHECKSIGs cannot cancel multisig keys")
         self.check_fee(padded_branch_funding, padded_branch_script, keys_1_of_15, 1, 12_999, False, witness_padding=13)
@@ -283,6 +392,9 @@ class MultisigSigOpFeeTest(BitcoinTestFramework):
 
         self.log.info("Standard Lightning close, recovery and HTLC paths have no key-fee floor")
         self.check_lightning_spends()
+
+        self.log.info("Multisig-only scope and CPFP fee accounting for new package members")
+        self.check_scope_and_packages(keys_1_of_15, script_1_of_15)
 
         self.log.info("The per-excess-key amount is configurable")
         self.restart_node(0, extra_args=["-minrelaymultisigexcesskeyfee=1500"])

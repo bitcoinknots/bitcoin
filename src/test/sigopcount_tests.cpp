@@ -209,6 +209,125 @@ BOOST_AUTO_TEST_CASE(CountMultisigExcessKeysBoundary)
     BOOST_CHECK_EQUAL(CountMultisigExcessKeys(CScript() << OP_1 << OP_CHECKMULTISIG), 0U);
 }
 
+BOOST_AUTO_TEST_CASE(ExecutedMultisigKeyOperands)
+{
+    const CKey key{GenerateRandomKey()};
+    const auto pubkey{ToByteVector(key.GetPubKey())};
+    const auto check = [&](const CScript& script, const CScript& satisfaction, uint64_t expected) {
+        ScriptValidationMetrics metrics;
+        ScriptError observed_error, plain_error;
+        const bool plain{VerifyScript(satisfaction, script, nullptr, STANDARD_SCRIPT_VERIFY_FLAGS, BaseSignatureChecker{}, &plain_error)};
+        const bool observed{VerifyScript(satisfaction, script, nullptr, STANDARD_SCRIPT_VERIFY_FLAGS, BaseSignatureChecker{}, &observed_error, &metrics)};
+        BOOST_REQUIRE(plain);
+        BOOST_REQUIRE(observed);
+        BOOST_CHECK_EQUAL(plain_error, observed_error);
+        BOOST_CHECK_EQUAL(CountExecutedMultisigExcessKeys(metrics), expected);
+    };
+    const CScript zero_of_three{CScript() << OP_0 << pubkey << pubkey << pubkey << OP_3 << OP_CHECKMULTISIG};
+    check(zero_of_three, CScript() << OP_0, 2);
+
+    // Equal-sized hashes/data are not signature operands, even before/after
+    // multisig or after non-identity arithmetic and stack transformations.
+    CScript mixed{CScript() << pubkey << OP_HASH160 << OP_DROP << pubkey << OP_SIZE << OP_NIP << OP_DROP};
+    mixed.insert(mixed.end(), zero_of_three.begin(), zero_of_three.end());
+    mixed << pubkey << OP_TOALTSTACK << OP_FROMALTSTACK << OP_HASH256 << OP_DROP;
+    check(mixed, CScript() << OP_0, 2);
+    CScript dynamic{CScript() << OP_0 << pubkey << pubkey << pubkey << OP_1 << OP_2 << OP_ADD << OP_CHECKMULTISIG};
+    check(dynamic, CScript() << OP_0, 2);
+    // Operands supplied by the satisfaction, rather than adjacent literals,
+    // receive exactly the same treatment.
+    check(CScript() << OP_3 << OP_CHECKMULTISIG, CScript() << OP_0 << OP_0 << pubkey << pubkey << pubkey, 2);
+    check(CScript() << OP_0 << OP_0 << pubkey << OP_1 << OP_CHECKMULTISIGVERIFY
+                    << OP_0 << OP_0 << pubkey << OP_1 << OP_CHECKMULTISIG,
+          CScript{}, 1); // one free key per script, not per opcode
+    CScript dead{CScript() << OP_FALSE << OP_IF};
+    dead.insert(dead.end(), zero_of_three.begin(), zero_of_three.end());
+    dead << OP_ENDIF << OP_TRUE;
+    check(dead, CScript{}, 0);
+
+    // A false CHECKMULTISIG result is legal when consumed by NOT. Empty
+    // signatures prove no keys; a structural m=1 must not grant credit.
+    check(CScript() << OP_1 << pubkey << pubkey << pubkey << OP_3 << OP_CHECKMULTISIG << OP_NOT,
+          CScript() << OP_0 << OP_0, 2);
+    check(CScript() << pubkey << OP_CHECKSIG << OP_NOT, CScript() << OP_0, 0);
+
+    // Real ECDSA verification: one proven key out of three, plus one free.
+    CMutableTransaction spend;
+    spend.vin.resize(1);
+    spend.vout.emplace_back(1, CScript() << OP_TRUE);
+    const CScript one_of_three{GetScriptForMultisig(1, std::vector<CPubKey>(3, key.GetPubKey()))};
+    std::vector<unsigned char> signature;
+    BOOST_REQUIRE(key.Sign(SignatureHash(one_of_three, spend, 0, SIGHASH_ALL, 0, SigVersion::BASE), signature));
+    signature.push_back(SIGHASH_ALL);
+    spend.vin[0].scriptSig = CScript() << OP_0 << signature;
+    const CTransaction tx{spend};
+    ScriptValidationMetrics metrics;
+    BOOST_REQUIRE(VerifyScript(tx.vin[0].scriptSig, one_of_three, nullptr, STANDARD_SCRIPT_VERIFY_FLAGS,
+        TransactionSignatureChecker(&tx, 0, 0, MissingDataBehavior::ASSERT_FAIL), nullptr, &metrics));
+    BOOST_CHECK_EQUAL(CountExecutedMultisigExcessKeys(metrics), 1U);
+
+    // Tapscript observes the actual CHECKSIG/CHECKSIGADD operands. Padding
+    // and both 32- and 33-byte hashed values remain unrelated to these keys.
+    const std::vector<unsigned char> xonly(32, 1);
+    const CScript tapscript{CScript() << pubkey << OP_HASH160 << OP_DROP << xonly << OP_HASH160 << OP_DROP
+        << xonly << OP_CHECKSIG << xonly << OP_CHECKSIGADD << xonly << OP_CHECKSIGADD << OP_0 << OP_NUMEQUAL};
+    std::vector<std::vector<unsigned char>> stack(3);
+    ScriptExecutionData execdata;
+    execdata.m_validation_weight_left_init = true;
+    execdata.m_validation_weight_left = 1000;
+    ScriptExecutionMetrics execution;
+    BOOST_REQUIRE(EvalScript(stack, tapscript, STANDARD_SCRIPT_VERIFY_FLAGS, BaseSignatureChecker{}, SigVersion::TAPSCRIPT, execdata, nullptr, &execution));
+    metrics.scripts = {execution};
+    BOOST_CHECK_EQUAL(CountExecutedMultisigExcessKeys(metrics), 2U);
+}
+
+BOOST_AUTO_TEST_CASE(CountMultisigExcessKeysScope)
+{
+    for (const size_t length : {size_t{33}, size_t{65}}) {
+        // Include opcode bytes inside data to rule out a raw-byte scope scan.
+        const std::vector<unsigned char> data(length, OP_CHECKMULTISIG);
+        const CScript data_only{CScript() << data << OP_HASH160 << OP_DROP << data << OP_HASH160 << OP_DROP << OP_TRUE};
+        BOOST_CHECK_EQUAL(CountMultisigExcessKeys(data_only), 0U);
+        BOOST_CHECK_EQUAL(CountMultisigExcessKeys(data_only, nullptr, 2, SigVersion::TAPSCRIPT), 0U);
+
+        CScript dead_multisig{data_only};
+        dead_multisig << OP_FALSE << OP_IF << OP_CHECKMULTISIG << OP_ENDIF;
+        BOOST_CHECK_EQUAL(CountMultisigExcessKeys(dead_multisig), 0U);
+        CScript dead_multi_a{data_only};
+        dead_multi_a << OP_FALSE << OP_IF << OP_CHECKSIGADD << OP_ENDIF;
+        BOOST_CHECK_EQUAL(CountMultisigExcessKeys(dead_multi_a, nullptr, 2, SigVersion::TAPSCRIPT), 0U);
+
+        // CHECKSIG alone is deliberately not a multisig construct.
+        const CScript single_sig{CScript() << data << OP_HASH160 << OP_DROP << data << OP_HASH160 << OP_DROP << data << OP_CHECKSIG};
+        BOOST_CHECK_EQUAL(CountMultisigExcessKeys(single_sig), 0U);
+        CScript wrong_version{data_only};
+        wrong_version << OP_CHECKMULTISIG;
+        BOOST_CHECK_EQUAL(CountMultisigExcessKeys(wrong_version, nullptr, 2, SigVersion::TAPSCRIPT), 0U);
+        wrong_version = data_only;
+        wrong_version << OP_CHECKSIGADD;
+        BOOST_CHECK_EQUAL(CountMultisigExcessKeys(wrong_version), 0U);
+    }
+    // Do not require a canonical threshold to activate scope: the existing
+    // conservative charge for dropped/re-pushed counts must remain intact.
+    const auto key{GenerateRandomKey().GetPubKey()};
+    const CScript canonical{GetScriptForMultisig(1, std::vector<CPubKey>(15, key))};
+    CScript noncanonical{canonical};
+    noncanonical.pop_back();
+    noncanonical << OP_DROP << OP_15 << OP_CHECKMULTISIG;
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(noncanonical), 14U);
+
+    // Proven dropped data is excluded even in mixed multisig scripts. Neither
+    // a whole key run nor a key surviving DUP DROP may be discarded, however.
+    CScript mixed{CScript() << ToByteVector(key) << OP_DROP};
+    mixed.insert(mixed.end(), canonical.begin(), canonical.end());
+    mixed << ToByteVector(key) << OP_DROP;
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(mixed), 13U);
+    CScript duplicated{canonical};
+    duplicated.pop_back();
+    duplicated << OP_DUP << OP_DROP << OP_CHECKMULTISIG;
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(duplicated), 13U);
+}
+
 BOOST_AUTO_TEST_CASE(CountMultisigExcessKeysLightning)
 {
     const auto local{ToByteVector(GenerateRandomKey().GetPubKey())};
@@ -251,19 +370,23 @@ BOOST_AUTO_TEST_CASE(CountMultisigExcessKeysLightning)
         CScriptWitness witness;
         witness.stack = {{}, Serialize(script)};
         BOOST_CHECK_EQUAL(CountMultisigExcessKeys(script, &witness), 0U);
-        BOOST_CHECK_EQUAL(CountMultisigExcessKeys(script, nullptr, 2, SigVersion::TAPSCRIPT), 1U);
+        // These legacy templates contain no tapscript CHECKSIGADD. Disabled
+        // CHECKMULTISIG opcodes must not activate the tapscript policy.
+        BOOST_CHECK_EQUAL(CountMultisigExcessKeys(script, nullptr, 2, SigVersion::TAPSCRIPT), 0U);
 
         CTxIn input;
         input.scriptWitness = witness;
         BOOST_CHECK_EQUAL(CountInputMultisigExcessKeys(input, GetScriptForDestination(WitnessV0ScriptHash{script})), 0U);
 
-        // Even neutral extra code forfeits the exact-template allowance.
+        // Extra code forfeits the template allowance, but to_local remains
+        // outside multisig scope regardless (it only contains CHECKSIG).
+        const unsigned int non_template_count{script.front() == OP_IF ? 0U : 1U};
         CScript suffix{script};
         suffix << OP_NOP;
-        BOOST_CHECK_EQUAL(CountMultisigExcessKeys(suffix), 1U);
+        BOOST_CHECK_EQUAL(CountMultisigExcessKeys(suffix), non_template_count);
         CScript prefix{CScript() << OP_NOP};
         prefix.insert(prefix.end(), script.begin(), script.end());
-        BOOST_CHECK_EQUAL(CountMultisigExcessKeys(prefix), 1U);
+        BOOST_CHECK_EQUAL(CountMultisigExcessKeys(prefix), non_template_count);
 
         // Neither a prefix nor suffix Lightning fragment can exempt a data
         // multisig or contribute credits that erase its charged keys.
@@ -292,7 +415,7 @@ BOOST_AUTO_TEST_CASE(CountMultisigExcessKeysLightning)
         }
     }
     for (const int64_t delay : {-1LL, 65536LL, 0x100000000LL}) {
-        BOOST_CHECK_EQUAL(CountMultisigExcessKeys(to_local(delay)), 1U);
+        BOOST_CHECK_EQUAL(CountMultisigExcessKeys(to_local(delay)), 0U);
     }
     for (const int64_t expiry : {-1LL, 0x100000000LL}) {
         BOOST_CHECK_EQUAL(CountMultisigExcessKeys(htlc(true, false, expiry)), 1U);
@@ -301,17 +424,17 @@ BOOST_AUTO_TEST_CASE(CountMultisigExcessKeysLightning)
     CScript nonminimal{CScript() << OP_IF << remote << OP_ELSE};
     nonminimal << std::vector<unsigned char>{1, 0} << OP_CHECKSEQUENCEVERIFY << OP_DROP
                << local << OP_ENDIF << OP_CHECKSIG;
-    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(nonminimal), 1U);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(nonminimal), 0U);
     CScript nonminimal_key{CScript() << OP_IF << OP_PUSHDATA1};
     nonminimal_key.push_back(33);
     nonminimal_key.insert(nonminimal_key.end(), remote.begin(), remote.end());
     nonminimal_key << OP_ELSE << OP_1 << OP_CHECKSEQUENCEVERIFY << OP_DROP << local << OP_ENDIF << OP_CHECKSIG;
-    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(nonminimal_key), 1U);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(nonminimal_key), 0U);
     auto wrong_key_encoding{remote};
     wrong_key_encoding[0] = 4; // Not a compressed-key encoding, despite its length.
     const CScript bad_key{CScript() << OP_IF << wrong_key_encoding << OP_ELSE << OP_1
                                     << OP_CHECKSEQUENCEVERIFY << OP_DROP << local << OP_ENDIF << OP_CHECKSIG};
-    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(bad_key), 1U);
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(bad_key), 0U);
     CScript truncated{htlc(true, true, 500)};
     truncated.pop_back(); // Missing the outer ENDIF.
     BOOST_CHECK_EQUAL(CountMultisigExcessKeys(truncated), 1U);

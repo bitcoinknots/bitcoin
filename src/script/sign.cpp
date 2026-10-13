@@ -614,7 +614,7 @@ bool ProduceSignature(const SigningProvider& provider, const BaseSignatureCreato
     const bool read_opted_in{creator.GetSighashRules() == SighashRules::UNIFIED ||
                              SighashRulesForVerifying() == SighashRules::UNIFIED};
     const unsigned int verify_flags{STANDARD_SCRIPT_VERIFY_FLAGS | (read_opted_in ? uint32_t{SCRIPT_VERIFY_UNIFIED_SIGHASH} : uint32_t{0})};
-    sigdata.complete = solved && VerifyScript(sigdata.scriptSig, fromPubKey, &sigdata.scriptWitness, verify_flags, creator.Checker());
+    sigdata.complete = solved && VerifyScript(sigdata.scriptSig, fromPubKey, &sigdata.scriptWitness, verify_flags, creator.Checker(), nullptr, &sigdata.execution_metrics);
     return sigdata.complete;
 }
 
@@ -666,7 +666,7 @@ SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nI
                                                           : MutableTransactionSignatureChecker{&tx, nIn, txout.nValue, MissingDataBehavior::FAIL}};
     SignatureExtractorChecker extractor_checker(data, tx_checker);
     const unsigned int extract_flags{STANDARD_SCRIPT_VERIFY_FLAGS | (sighash_rules == SighashRules::UNIFIED ? uint32_t{SCRIPT_VERIFY_UNIFIED_SIGHASH} : uint32_t{0})};
-    if (VerifyScript(data.scriptSig, txout.scriptPubKey, &data.scriptWitness, extract_flags, extractor_checker)) {
+    if (VerifyScript(data.scriptSig, txout.scriptPubKey, &data.scriptWitness, extract_flags, extractor_checker, nullptr, &data.execution_metrics)) {
         data.complete = true;
         return data;
     }
@@ -819,8 +819,9 @@ bool IsSegWitOutput(const SigningProvider& provider, const CScript& script)
     return false;
 }
 
-bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* keystore, const std::map<COutPoint, Coin>& coins, int nHashType, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum, SighashRules sighash_rules)
+bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* keystore, const std::map<COutPoint, Coin>& coins, int nHashType, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum, SighashRules sighash_rules, std::vector<ScriptValidationMetrics>* execution_metrics)
 {
+    if (execution_metrics) execution_metrics->assign(mtx.vin.size(), {});
     bool fHashSingle = ((nHashType & ~SIGHASH_ANYONECANPAY) == SIGHASH_SINGLE);
 
     // Asked for by name, so say why it cannot be given. Without this the signer
@@ -920,7 +921,7 @@ bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* keystore, 
 
         ScriptError serror = SCRIPT_ERR_OK;
         const unsigned int check_flags{STANDARD_SCRIPT_VERIFY_FLAGS | (SighashRulesForVerifying() == SighashRules::UNIFIED ? uint32_t{SCRIPT_VERIFY_UNIFIED_SIGHASH} : uint32_t{0})};
-        if (!sigdata.complete && !VerifyScript(txin.scriptSig, prevPubKey, &txin.scriptWitness, check_flags, TransactionSignatureChecker(&txConst, i, amount, txdata, MissingDataBehavior::FAIL), &serror)) {
+        if (!sigdata.complete && !VerifyScript(txin.scriptSig, prevPubKey, &txin.scriptWitness, check_flags, TransactionSignatureChecker(&txConst, i, amount, txdata, MissingDataBehavior::FAIL), &serror, &sigdata.execution_metrics)) {
             if (serror == SCRIPT_ERR_INVALID_STACK_OPERATION) {
                 // Unable to sign input and verification failed (possible attempt to partially sign).
                 input_errors[i] = Untranslated("Unable to sign input, invalid stack size (possibly missing key)");
@@ -933,6 +934,7 @@ bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* keystore, 
         } else {
             // If this input succeeds, make sure there is no error set for it
             input_errors.erase(i);
+            if (execution_metrics) (*execution_metrics)[i] = std::move(sigdata.execution_metrics);
         }
     }
     return input_errors.empty();

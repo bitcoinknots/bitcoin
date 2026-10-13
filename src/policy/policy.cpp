@@ -807,6 +807,19 @@ static bool IsStandardLightningKeyScript(const CScript& script)
     return match({OP_ENDIF}) && it == script.end();
 }
 
+uint64_t CountExecutedMultisigExcessKeys(const ScriptValidationMetrics& metrics)
+{
+    uint64_t excess{0};
+    for (const auto& execution : metrics.scripts) {
+        const uint64_t unproven{execution.sigversion == SigVersion::TAPSCRIPT
+            ? (execution.has_checksigadd ? execution.tapscript_unproven_keys : 0)
+            : execution.multisig_unproven_keys};
+        // No key-sized hash/data pushes, padding or inactive branches count.
+        if (unproven > 1) excess += unproven - 1;
+    }
+    return excess;
+}
+
 unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness* witness,
                                      const size_t witness_suffix_items, const SigVersion sigversion)
 {
@@ -817,7 +830,7 @@ unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness
     size_t pubkeys{0}, provable{0}, run_keys{0}, multi_a_keys{0};
     int run_opened_by{-1}, last_count{-1}, last_a_count{-1};
     unsigned int inside_noop{0};
-    bool last_is_key{false}, last_is_xonly{false};
+    bool last_is_key{false}, last_is_xonly{false}, has_multisig{false};
     opcodetype opcode{OP_INVALIDOPCODE}, last_opcode{OP_INVALIDOPCODE};
     std::vector<unsigned char> push_data;
 
@@ -852,9 +865,12 @@ unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness
             run_keys = 0;
             is_key = true;
         } else if (opcode == OP_DROP || opcode == OP_2DROP) {
-            // Unlike #422, this fee counter has no companion rule charging an
-            // entire dropped push run. Never erase earlier keys here: dropping
-            // and re-pushing n must not make an m-of-n free.
+            // A directly pushed key-sized value followed by DROP is data, not
+            // a multisig operand. Remove only that one proven dropped push,
+            // never its entire run. In particular, DROP after n must not erase
+            // the keys below n. Identity blocks (e.g. DUP DROP) were normalized
+            // above, so this cannot accidentally discard the surviving copy.
+            if (opcode == OP_DROP && last_is_key && !last_is_xonly && run_keys) --pubkeys;
             run_keys = 0;
             multi_a_keys = 0;
         } else if (opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY) {
@@ -866,6 +882,7 @@ unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness
             run_keys = 0;
             multi_a_keys = (last_is_key && opcode == OP_CHECKSIG) ? 1 : 0;
         } else if (opcode == OP_CHECKSIGADD) {
+            if (sigversion == SigVersion::TAPSCRIPT) has_multisig = true;
             if (last_is_xonly) ++pubkeys;
             multi_a_keys = (multi_a_keys && last_is_key) ? multi_a_keys + 1 : 0;
             run_keys = 0;
@@ -876,6 +893,7 @@ unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness
             multi_a_keys = 0;
             run_keys = 0;
         } else if (opcode == OP_CHECKMULTISIG || opcode == OP_CHECKMULTISIGVERIFY) {
+            if (sigversion != SigVersion::TAPSCRIPT) has_multisig = true;
             if (run_opened_by > 0 && last_count > 0 && size_t(last_count) == run_keys) {
                 // Even an invalid m > n shape cannot credit other key runs.
                 provable += std::min(size_t(run_opened_by), run_keys);
@@ -895,6 +913,13 @@ unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness
         last_count = count;
         last_a_count = a_count;
     }
+
+    // Script-level scope, not a general data-push tax. The opcode must be
+    // outside a statically skipped false arm and meaningful for this script
+    // version. Data bytes that merely encode an opcode cannot activate this.
+    // Within a mixed multisig script the counter remains conservative; this
+    // is not a proof that each counted push is consumed by a signature opcode.
+    if (!has_multisig) return 0;
 
     if (witness && !witness->stack.empty()) {
         provable = std::min(provable, CountWitnessSignatures(*witness, witness_suffix_items, sigversion));

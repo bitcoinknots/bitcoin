@@ -1,103 +1,133 @@
-# Draft: multisig key-fee accounting
+# Draft: executed multisig key-fee accounting
 
-This is an experimental relay-policy change, not a consensus change. The
-default remains 1,000 satoshis per charged key, with one free unproven key per
-inspected script. The fee floor is not added to the ordinary fee requirement;
-the larger of the two applies.
+This is an experimental relay-policy fee floor, not a new consensus rule.
+The default is 1,000 satoshis per charged key operand, with one free unproven
+operand per executed script. The fee floor is not added to the ordinary fee
+requirement; the larger requirement applies. Zero disables the setting;
+`-corepolicy` disables it unless explicitly overridden.
 
-## Lightning compatibility allowance
+## Authoritative admission counter
 
-The generic counter miscounts the standard BOLT #3 `to_local`, offered HTLC,
-and received HTLC scripts: their branches and stack operations prevent
-adjacent-key/threshold recognition. It previously charged one key (1,000 sats)
-per such input, including ordinary delayed sweeps and penalty transactions.
+The normal policy script-validation pass collects optional observations:
 
-The complete standard templates now have an explicit zero-key-fee allowance,
-including HTLC variants with and without anchors. This does not grant generic
-CHECKSIG credit. It does not assert that the witness proves the embedded keys:
-on the HTLC revocation path, both embedded HTLC keys really are unused and the
-signature authenticates a different, witness-supplied revocation key. Avoiding
-the fee on that path necessarily requires a compatibility policy choice, not
-just more accurate counting under the original formula.
+- Legacy/SegWit v0 CHECKMULTISIG and CHECKMULTISIGVERIFY contribute their
+  actual number of key operands minus successful signature matches. Dynamic
+  m/n values and stack transformations are handled by the interpreter itself.
+  A false result subsequently consumed by NOT does not earn structural m
+  credit for empty signatures.
+- In tapscript, a script is in scope only if CHECKSIGADD actually executes.
+  Its executed CHECKSIG, CHECKSIGVERIFY and CHECKSIGADD operands contribute
+  one unproven operand when no valid Schnorr signature authenticates them.
+  This includes the initial CHECKSIG of multi_a. It is a script-level scope
+  rule: it does not trace whether every CHECKSIG feeds the same accumulator.
+  Upgradable key types do not receive signature credit merely for succeeding
+  without verification when nonstandard flags permit them.
+- Each script contributes `max(0, unproven_operands - 1)`. Operations within
+  that script share the allowance. Counts accumulate across input scripts.
+  These are operand occurrences, not distinct public-key byte strings.
 
-Matching is whole-script and bounded to 160 bytes. It requires the exact
-opcodes, two minimally pushed compressed-key encodings, 20-byte hash fields,
-the fixed preimage length, and minimal nonnegative u16/u32 delay/expiry fields.
-No leading/trailing instructions, additional keys, larger data fields, or
-nonminimal encodings receive the allowance. Tapscript is excluded. Existing
-script validation still validates signatures, hashes, timelocks and execution;
-this matcher does not execute the script or declare a spend valid.
+For a successful canonical m-of-n spend, this is `max(0, n - m - 1)`:
+2-of-2 and 2-of-3 have no additional floor; 1-of-15 has thirteen charged
+operands and therefore a 13,000-sat floor at the default.
 
-This is a bounded compatibility exception, not reliable identification of
-Lightning or spam. An encoder can imitate these templates and put data in
-their fixed key/hash fields; the template does not establish that an actual
-channel exists. In particular, a revocation spend can leave two embedded keys
-uncharged. The general one-free-key allowance remains unchanged, but this is
-an explicit exception to it. A canonical bpub 1-of-15 still has thirteen
-charged keys. Adding a Lightning fragment to it does not exempt the script.
+Unrelated hashes, dropped data, signature-shaped witness padding and keys in
+unexecuted branches do not become operands merely because of their size.
+Standalone CHECKSIG, pure data scripts, Taproot key-path spends and outputs
+whose scripts are still hidden are outside this rule. P2SH, P2WSH, nested
+P2SH-P2WSH and tapscript observations use the actual validated execution path.
+There is no separate speculative EvalScript pass with relaxed flags.
 
-PR #422 at 177e5cad72982d875f2f4f4e2ed97599045b9f25 avoids this particular
-Lightning charge through its ten-key allowance and unconditional CHECKSIG
-credits. Even with zero credit, these two-key templates fit inside its free
-allowance. This does not mean #422 added a special CPFP repair. Here the
-supported Lightning templates no longer encounter this fee floor at all;
-other charged scripts still cannot use a child's fee to meet their own floor.
+No observations from a failed input validation are used for admission. The
+existing interpreter success/failure rules and signature checks remain in
+place. Block verification does not request observations or enforce this fee.
+Nevertheless, the optional instrumentation touches consensus-critical code
+and requires compilation, regression tests and independent review.
 
-Added regressions cover the exact templates, delay/expiry boundaries,
-nonminimal fields, larger hash fields, prepended/appended payloads, and signed
-P2WSH spends of all normal/revocation branches with and without anchors. These
-checks have not been executed. They do not establish compatibility with every
-Lightning implementation, future script variant, or package-relay scenario.
+## Cache and verification cost
 
-## Identity-preserving stack blocks
+Observed transaction counts are cached in a bounded 4,096-entry FIFO using
+the salted full-script cache key (wtxid and flags). A hit is used only alongside
+a full-script validity-cache hit. A cached valid bit with missing count
+metadata triggers normal execution to recover the count; it is never treated
+as zero. Existing signature caching remains usable. Cached values are counts,
+not fees, so the current configured price is applied after retrieval.
 
-The static counter now symbolically checks bounded, straight-line blocks of
-stack-only instructions. It skips a block only if the order and identity of
-every main-stack and altstack input is restored exactly. Actual script
-validation still checks stack availability and all other execution rules.
+Ordinary cheap admission/fee checks still precede script verification. This
+new floor is checked after successful policy script verification. It is not
+an early CPU-exhaustion defense, and no relay-CPU improvement is claimed.
 
-The supported instructions are NOP, DUP, 2DUP, 3DUP, DROP, 2DROP, OVER, NIP,
-TUCK, SWAP, ROT, 2SWAP, 2ROT, TOALTSTACK and FROMALTSTACK. At most 32 instructions
-are considered per candidate block. Values, signatures, conditions, dynamic
-indices, locktimes, and arbitrary script execution are not evaluated by this
-normalizer. Unsupported or non-identity blocks keep the previous counting
-behavior; they are not silently treated as identity.
+## Package admission
 
-Three families are covered:
+A transaction below its key-fee floor returns a reconsiderable fee failure.
+The existing child-with-unconfirmed-parents submission path can retry it with
+a child. Newly evaluated package members must collectively pay the sum of
+their key-fee floors in actual base fees. A charged child contributes its own
+floor. Already admitted/mempool transactions and local prioritisation deltas
+do not provide reusable fee credit. Ordinary fee, topology, signature,
+replacement, and mempool-limit checks still apply.
 
-- Permutations which restore order, such as SWAP/SWAP or ROT/ROT/ROT.
-- Duplication followed by removal, such as DUP/DROP or OVER/DROP.
-- Round trips through the altstack, such as TOALTSTACK/FROMALTSTACK.
+This does not make arbitrary packages relayable. `testmempoolaccept` retains
+individual-fee test semantics; use the supported `submitpackage` path for
+CPFP. The ordinary per-transaction minimum relay-fee restriction is unchanged.
+This is an admission check, not an ongoing parent/child binding or mining
+rule: it does not guarantee that the child is mined with its parent or that
+they remain together after eviction/replacement. No P2P interoperability
+validation has been performed for this revision.
 
-Compositions of these operations are supported when the entire examined block
-provably restores both stacks. Thus a key, m/n count, or multi_a threshold is
-not hidden merely by inserting such a block. Ordinary 32-byte hashes do not
-become public keys just because they have the same length as x-only keys.
+## Lightning
 
-## Comparison target
+Admission no longer needs the previous whole-template Lightning exception.
+Ordinary 2-of-2 funding spends prove both operands. A to_local spend has no
+multisig opcode. Standard offered/received HTLC 2-of-2 branches prove their
+two operands; their revocation/preimage paths do not execute CHECKMULTISIG.
+These paths therefore have no key-fee floor under the executed-operand rule.
+This is not a guarantee for every future channel script or presigned protocol.
 
-PR #422 at commit 177e5cad72982d875f2f4f4e2ed97599045b9f25 recognizes an x-only
-key using its association with a following signature opcode. The neutral stack
-blocks above can break that association in its static counter. Preserving the
-count across those equivalent forms is the specific improvement targeted here.
-This does not establish that the entire proposal is better than #422.
+## Wallet funding
 
-There is no defined or measured "3x" improvement. Three operation families are
-not a benchmark, and no performance or complete evasion-resistance claim is
-made.
+Signed transaction creation obtains observations from the existing signing
+verification, adjusts change or retries coin selection with bounded retries
+and maximum-fee checks, and signs the final transaction. Final observations
+are checked again against its actual fee. If a different final signing path
+requires more, creation fails rather than silently returning an underfunded
+transaction. No extra verification pass is added merely to count operands.
 
-## Validation and limitations
+Unsigned funding cannot know the final execution path. Its old static helper
+remains an estimate, including its bounded stack-identity normalization and
+exact BOLT #3 template allowance. It is not used for mempool admission and
+can overestimate or underestimate complex scripts. For unsigned Taproot
+funding, the largest estimate among known leaves is reserved unless
+`options.multisig_fee` specifies a nonnegative integer total key-fee floor in
+satoshis. Zero can express a planned key-path spend. This replaces only the
+unsigned estimate, not relay enforcement. External signers must check the
+eventual fee and may need to re-fund or use an eligible package.
 
-Added unit cases compare canonical and transformed key counts, check hash
-non-classification, and, when run, compare the supported identities with the
-real interpreter. Added functional cases sign canonical and transformed
-Taproot 1-of-15 and 2-of-3 spends and check the fee boundaries for all three
-families. These tests have not been run and this revision has not been built.
+## Relationship to #422 and limits
 
-This remains a partial static estimator. In particular, non-identity or
-unsupported stack manipulation, conditions, and false-branch payload require
-further design; there is no independent arbitrary-data accounting rule here.
-Encoding checks are not proof of which signatures authenticated which keys.
-The intentional one-key allowance permits a small amount of uncharged payload.
-The fee floor is per transaction and remains non-package-aware: a CPFP child
-cannot rescue a parent rejected by this floor.
+The design takes inspiration from #422's unproven-key concept, but applies a
+fee floor rather than classifying the excess as datacarrier usage. The new
+admission counter follows actual execution instead of static push/threshold
+recognition. Its treatment of dead branches and non-key data is deliberately
+narrower. This is a different tradeoff, not proof of overall superiority.
+
+The intentional free operand can carry a small payload. Dead-branch data,
+other encodings and non-multisig data are not comprehensively charged; other
+datacarrier rules remain independent. This is not an unbypassable general
+spam detector, and it does not identify legitimate intent. No historical
+transaction sample has been replayed under this revision. Presigned charged
+transactions and unsupported package shapes remain compatibility concerns.
+
+## Validation status
+
+This revision has not been compiled or run against a node. Windows CMake /
+vcpkg configuration was attempted but blocked before C++ compilation by
+dependency-tool process/handle access and SDK registry access errors.
+Python syntax checks are not functional test results.
+
+Added regression cases cover real ECDSA and Schnorr spends, dynamic counts,
+unrelated data in mixed scripts, witness-supplied operands, false multisig
+results, per-script allowances, cache metadata misses/eviction, flags and
+witness mutation, Lightning paths, and package fee boundaries/deduplication.
+The existing wallet and script-estimator cases are retained. These C++ and
+node-based cases still need to execute successfully before merge readiness
+can be assessed; the PR must remain a draft.

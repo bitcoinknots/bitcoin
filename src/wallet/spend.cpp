@@ -1347,14 +1347,15 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
     } else if (fee_per_excess_key > 0) {
         uint64_t excess_keys{0};
         CMutableTransaction fee_tx{txNew};
-        if (sign && !wallet.SignTransaction(fee_tx)) {
+        std::vector<ScriptValidationMetrics> fee_metrics;
+        if (sign && !wallet.SignTransaction(fee_tx, &fee_metrics)) {
             return util::Error{_("Signing transaction failed")};
         }
         for (size_t i{0}; i < selected_coins.size(); ++i) {
             if (sign) {
                 // Inspect the actual satisfaction chosen by the signer. Key
                 // path spends expose no leaves and therefore have no key fee.
-                excess_keys += CountInputMultisigExcessKeys(fee_tx.vin[i], selected_coins[i]->txout.scriptPubKey);
+                excess_keys += CountExecutedMultisigExcessKeys(fee_metrics.at(i));
             } else {
                 excess_keys += CountWalletMultisigExcessKeys(&wallet, &coin_control, txNew.vin[i], selected_coins[i]->txout.scriptPubKey);
             }
@@ -1467,8 +1468,18 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
         return util::Error{error};
     }
 
-    if (sign && !wallet.SignTransaction(txNew)) {
+    std::vector<ScriptValidationMetrics> final_metrics;
+    if (sign && !wallet.SignTransaction(txNew, &final_metrics)) {
         return util::Error{_("Signing transaction failed")};
+    }
+    if (sign && fee_per_excess_key > 0) {
+        uint64_t final_keys{0};
+        for (const auto& metrics : final_metrics) final_keys += CountExecutedMultisigExcessKeys(metrics);
+        // A different final signing path must not silently produce an
+        // underfunded transaction. No extra VerifyScript pass is needed.
+        if (final_keys > static_cast<uint64_t>(current_fee / fee_per_excess_key)) {
+            return util::Error{_("Final signing path requires a higher multisig key fee")};
+        }
     }
 
     // Return the constructed transaction data.

@@ -74,6 +74,7 @@
 #include <cassert>
 #include <chrono>
 #include <deque>
+#include <limits>
 #include <numeric>
 #include <optional>
 #include <ranges>
@@ -153,7 +154,8 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
                        bool cacheFullScriptStore, PrecomputedTransactionData& txdata,
                        ValidationCache& validation_cache,
                        std::vector<CScriptCheck>* pvChecks = nullptr,
-                       const std::vector<unsigned int>& flags_per_input = {})
+                       const std::vector<unsigned int>& flags_per_input = {},
+                       uint64_t* multisig_excess_keys = nullptr)
                        EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
 bool CheckFinalTxAtTip(const CBlockIndex& active_chain_tip, const CTransaction& tx)
@@ -715,6 +717,8 @@ private:
         CAmount m_base_fees;
         /** Base fees + any fee delta set by the user with prioritisetransaction. */
         CAmount m_modified_fees;
+        /** Additional absolute fee floor, aggregated over new package members only. */
+        CAmount m_multisig_key_fee{0};
 
         /** If we're doing package validation (i.e. m_package_feerates=true), the "effective"
          * package feerate of this transaction is the total fees divided by the total size of
@@ -1073,19 +1077,6 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     // Check for non-standard witnesses.
     if (tx.HasWitness() && m_pool.m_opts.require_standard && !IsWitnessStandard(tx, m_view, "bad-witness-", reason, ignore_rejects)) {
         return state.Invalid(TxValidationResult::TX_WITNESS_MUTATED, reason);
-    }
-
-    if (m_pool.m_opts.min_relay_multisig_excess_key_fee > 0 && !ignore_rejects.count(rejectmsg_multisig_excess_key_fee)) {
-        const uint64_t excess_keys{CountTransactionInputMultisigExcessKeys(tx, m_view)};
-        const CAmount fee_per_key{m_pool.m_opts.min_relay_multisig_excess_key_fee};
-        const CAmount required_fee{excess_keys > static_cast<uint64_t>(MAX_MONEY / fee_per_key)
-                ? MAX_MONEY
-                : static_cast<CAmount>(excess_keys) * fee_per_key};
-        if (ws.m_base_fees < required_fee) {
-            return state.Invalid(TxValidationResult::TX_MEMPOOL_POLICY, rejectmsg_multisig_excess_key_fee,
-                                 strprintf("%d < %d (%u excess multisig keys at %d sat each)",
-                                           ws.m_base_fees, required_fee, excess_keys, fee_per_key));
-        }
     }
 
     int64_t nSigOpsCost = GetTransactionSigOpCost(tx, m_view, STANDARD_SCRIPT_VERIFY_FLAGS);
@@ -1562,7 +1553,10 @@ bool MemPoolAccept::PolicyScriptChecks(const ATMPArgs& args, Workspace& ws)
 
     // Check input scripts and signatures.
     // This is done last to help prevent CPU exhaustion denial-of-service attacks.
-    if (!CheckInputScripts(tx, state, m_view, scriptVerifyFlags, true, false, ws.m_precomputed_txdata, GetValidationCache())) {
+    const CAmount fee_per_key{m_pool.m_opts.min_relay_multisig_excess_key_fee};
+    const bool count_keys{fee_per_key > 0 && !args.m_ignore_rejects.count(rejectmsg_multisig_excess_key_fee)};
+    uint64_t excess_keys{0};
+    if (!CheckInputScripts(tx, state, m_view, scriptVerifyFlags, true, false, ws.m_precomputed_txdata, GetValidationCache(), nullptr, {}, count_keys ? &excess_keys : nullptr)) {
         // Detect a failure due to a missing witness so that p2p code can handle rejection caching appropriately.
         if (!tx.HasWitness() && SpendsNonAnchorWitnessProg(tx, m_view)) {
             state.Invalid(TxValidationResult::TX_WITNESS_STRIPPED,
@@ -1571,6 +1565,10 @@ bool MemPoolAccept::PolicyScriptChecks(const ATMPArgs& args, Workspace& ws)
         return false; // state filled in by CheckInputScripts
     }
 
+    if (count_keys) {
+        ws.m_multisig_key_fee = excess_keys > static_cast<uint64_t>(MAX_MONEY / fee_per_key)
+            ? MAX_MONEY : static_cast<CAmount>(excess_keys) * fee_per_key;
+    }
     return true;
 }
 
@@ -1784,6 +1782,12 @@ MempoolAcceptResult MemPoolAccept::AcceptSingleTransaction(const CTransactionRef
     // those checks pass, to mitigate CPU exhaustion denial-of-service attacks.
     if (!PolicyScriptChecks(args, ws)) return MempoolAcceptResult::Failure(ws.m_state);
 
+    if (ws.m_base_fees < ws.m_multisig_key_fee) {
+        ws.m_state.Invalid(TxValidationResult::TX_RECONSIDERABLE, rejectmsg_multisig_excess_key_fee,
+                         strprintf("%d < %d", ws.m_base_fees, ws.m_multisig_key_fee));
+        return MempoolAcceptResult::FeeFailure(ws.m_state, CFeeRate(ws.m_modified_fees, ws.m_vsize), single_wtxid);
+    }
+
     if (!ConsensusScriptChecks(args, ws)) return MempoolAcceptResult::Failure(ws.m_state);
 
     const CFeeRate effective_feerate{ws.m_modified_fees, static_cast<uint32_t>(ws.m_vsize)};
@@ -1944,6 +1948,15 @@ PackageMempoolAcceptResult MemPoolAccept::AcceptMultipleTransactions(const std::
             return PackageMempoolAcceptResult(package_state, std::move(results));
         }
         if (args.m_test_accept) {
+            // testmempoolaccept deliberately keeps individual-fee semantics.
+            if (!args.m_package_feerates && ws.m_base_fees < ws.m_multisig_key_fee) {
+                ws.m_state.Invalid(TxValidationResult::TX_RECONSIDERABLE, rejectmsg_multisig_excess_key_fee,
+                                   strprintf("%d < %d", ws.m_base_fees, ws.m_multisig_key_fee));
+                package_state.Invalid(PackageValidationResult::PCKG_TX, "transaction failed");
+                results.emplace(ws.m_ptx->GetWitnessHash(), MempoolAcceptResult::FeeFailure(ws.m_state,
+                    CFeeRate(ws.m_modified_fees, ws.m_vsize), {ws.m_ptx->GetWitnessHash()}));
+                return PackageMempoolAcceptResult(package_state, std::move(results));
+            }
             const auto effective_feerate = args.m_package_feerates ? ws.m_package_feerate :
                 CFeeRate{ws.m_modified_fees, static_cast<uint32_t>(ws.m_vsize)};
             const auto effective_feerate_wtxids = args.m_package_feerates ? all_package_wtxids :
@@ -1952,6 +1965,24 @@ PackageMempoolAcceptResult MemPoolAccept::AcceptMultipleTransactions(const std::
                             MempoolAcceptResult::Success(std::move(m_subpackage.m_replaced_transactions),
                                                          ws.m_vsize, ws.m_base_fees, effective_feerate,
                                                          effective_feerate_wtxids));
+        }
+    }
+
+    // All scripts succeeded. Only now are the observed key fees authoritative.
+    if (args.m_package_feerates) {
+        // AcceptPackage removed already-admitted/mempool transactions. Count
+        // each new member's real fees and floor once, including the child.
+        static_assert(MAX_PACKAGE_COUNT <= std::numeric_limits<CAmount>::max() / MAX_MONEY);
+        const CAmount base_fees = std::accumulate(workspaces.cbegin(), workspaces.cend(), CAmount{0},
+            [](CAmount sum, const auto& ws) { return sum + ws.m_base_fees; });
+        const CAmount key_fee = std::accumulate(workspaces.cbegin(), workspaces.cend(), CAmount{0},
+            [](CAmount sum, const auto& ws) { return sum + ws.m_multisig_key_fee; });
+        if (base_fees < key_fee) {
+            placeholder_state.Invalid(TxValidationResult::TX_RECONSIDERABLE, rejectmsg_multisig_excess_key_fee,
+                                     strprintf("%d < %d (package)", base_fees, key_fee));
+            package_state.Invalid(PackageValidationResult::PCKG_TX, "transaction failed");
+            return PackageMempoolAcceptResult(package_state, {{workspaces.back().m_ptx->GetWitnessHash(),
+                MempoolAcceptResult::FeeFailure(placeholder_state, package_feerate, all_package_wtxids)}});
         }
     }
 
@@ -2456,7 +2487,7 @@ std::optional<std::pair<ScriptError, std::string>> CScriptCheck::operator()() {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
     const CScriptWitness *witness = &ptxTo->vin[nIn].scriptWitness;
     ScriptError error{SCRIPT_ERR_UNKNOWN_ERROR};
-    if (VerifyScript(scriptSig, m_tx_out.scriptPubKey, witness, nFlags, CachingTransactionSignatureChecker(ptxTo, nIn, m_tx_out.nValue, cacheStore, *m_signature_cache, *txdata), &error)) {
+    if (VerifyScript(scriptSig, m_tx_out.scriptPubKey, witness, nFlags, CachingTransactionSignatureChecker(ptxTo, nIn, m_tx_out.nValue, cacheStore, *m_signature_cache, *txdata), &error, m_metrics)) {
         return std::nullopt;
     } else {
         auto debug_str = strprintf("input %i of %s (wtxid %s), spending %s:%i", nIn, ptxTo->GetHash().ToString(), ptxTo->GetWitnessHash().ToString(), ptxTo->vin[nIn].prevout.hash.ToString(), ptxTo->vin[nIn].prevout.n);
@@ -2478,6 +2509,26 @@ ValidationCache::ValidationCache(const size_t script_execution_cache_bytes, cons
     const auto [num_elems, approx_size_bytes] = m_script_execution_cache.setup_bytes(script_execution_cache_bytes);
     LogPrintf("Using %zu MiB out of %zu MiB requested for script execution cache, able to store %zu elements\n",
               approx_size_bytes >> 20, script_execution_cache_bytes >> 20, num_elems);
+}
+
+std::optional<uint64_t> ValidationCache::GetMultisigKeyCount(const uint256& key) const
+{
+    AssertLockHeld(cs_main);
+    const auto it{m_key_count_cache.find(key)};
+    if (it == m_key_count_cache.end()) return std::nullopt;
+    return it->second;
+}
+
+void ValidationCache::CacheMultisigKeyCount(const uint256& key, uint64_t count)
+{
+    AssertLockHeld(cs_main);
+    if (m_key_count_cache.contains(key)) return;
+    if (m_key_count_cache.size() == MAX_KEY_COUNT_CACHE) {
+        m_key_count_cache.erase(m_key_count_order.front());
+        m_key_count_order.pop_front();
+    }
+    m_key_count_cache.emplace(key, count);
+    m_key_count_order.push_back(key);
 }
 
 /**
@@ -2508,8 +2559,15 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
                        bool cacheFullScriptStore, PrecomputedTransactionData& txdata,
                        ValidationCache& validation_cache,
                        std::vector<CScriptCheck>* pvChecks,
-                       const std::vector<unsigned int>& flags_per_input)
+                       const std::vector<unsigned int>& flags_per_input,
+                       uint64_t* multisig_excess_keys)
 {
+    if (multisig_excess_keys) {
+        *multisig_excess_keys = 0;
+        // Policy observations are collected synchronously, never by block
+        // script-check workers or with heterogeneous per-input flags.
+        assert(!pvChecks && flags_per_input.empty());
+    }
     if (tx.IsCoinBase()) return true;
 
     if (pvChecks) {
@@ -2525,8 +2583,14 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
     CSHA256 hasher = validation_cache.ScriptExecutionCacheHasher();
     hasher.Write(UCharCast(tx.GetWitnessHash().begin()), 32).Write((unsigned char*)&flags, sizeof(flags)).Finalize(hashCacheEntry.begin());
     AssertLockHeld(cs_main); //TODO: Remove this requirement by making CuckooCache not require external locks
-    if (validation_cache.m_script_execution_cache.contains(hashCacheEntry, !cacheFullScriptStore)) {
-        return true;
+    if (validation_cache.m_script_execution_cache.contains(hashCacheEntry, !cacheFullScriptStore && !multisig_excess_keys)) {
+        if (!multisig_excess_keys) return true;
+        if (const auto cached{validation_cache.GetMultisigKeyCount(hashCacheEntry)}) {
+            *multisig_excess_keys = *cached;
+            return true;
+        }
+        // A cached valid bit is not a cached key count. Collect missing
+        // observations through this execution, retaining signature caching.
     }
 
     if (!txdata.m_spent_outputs_ready) {
@@ -2557,7 +2621,8 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
         // spent being checked as a part of CScriptCheck.
 
         // Verify signature
-        CScriptCheck check(txdata.m_spent_outputs[i], tx, validation_cache.m_signature_cache, i, flags, cacheSigStore, &txdata);
+        ScriptValidationMetrics metrics;
+        CScriptCheck check(txdata.m_spent_outputs[i], tx, validation_cache.m_signature_cache, i, flags, cacheSigStore, &txdata, multisig_excess_keys ? &metrics : nullptr);
         if (pvChecks) {
             pvChecks->emplace_back(std::move(check));
         } else if (auto result = check(); result.has_value()) {
@@ -2573,12 +2638,14 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
                 return state.Invalid(TxValidationResult::TX_CONSENSUS, strprintf("mandatory-script-verify-flag-failed (%s)", ScriptErrorString(result->first)), result->second);
             }
         }
+        if (multisig_excess_keys) *multisig_excess_keys += CountExecutedMultisigExcessKeys(metrics);
     }
 
-    if (cacheFullScriptStore && (!pvChecks) && flags_per_input.empty()) {
+    if ((cacheFullScriptStore || multisig_excess_keys) && (!pvChecks) && flags_per_input.empty()) {
         // We executed all of the provided scripts, and were told to
         // cache the result. Do so now.
         validation_cache.m_script_execution_cache.insert(hashCacheEntry);
+        if (multisig_excess_keys) validation_cache.CacheMultisigKeyCount(hashCacheEntry, *multisig_excess_keys);
     }
 
     return true;
