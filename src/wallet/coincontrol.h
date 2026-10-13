@@ -97,6 +97,8 @@ public:
     bool fOverrideFeeRate = false;
     //! Override the wallet's m_pay_tx_fee if set
     std::optional<CFeeRate> m_feerate;
+    //! Planned total key-fee floor in satoshis for unsigned funding; not a relay-policy override.
+    std::optional<CAmount> m_multisig_fee;
     //! Override the default confirmation target if set
     std::optional<unsigned int> m_confirm_target;
     //! Override the wallet's m_signal_rbf if set

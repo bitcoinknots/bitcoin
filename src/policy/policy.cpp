@@ -653,6 +653,9 @@ unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness
                 ++inside_noop;
             } else if (opcode == OP_ENDIF) {
                 --inside_noop;
+            } else if (opcode == OP_ELSE && inside_noop == 1) {
+                // OP_FALSE only makes the IF arm unreachable, not its ELSE.
+                inside_noop = 0;
             }
         } else if (opcode == OP_IF && last_opcode == OP_FALSE) {
             inside_noop = 1;
@@ -672,7 +675,10 @@ unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness
             multi_a_keys = 0;
         } else if (opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY) {
             if (last_is_xonly) ++pubkeys;
-            ++provable;
+            // Credit only the adjacent key counted above. A bare CHECKSIG in
+            // an unexecuted arm must not cancel unrelated multisig keys, even
+            // when dropped witness padding looks like extra signatures.
+            if (last_is_key) ++provable;
             run_keys = 0;
             multi_a_keys = (last_is_key && opcode == OP_CHECKSIG) ? 1 : 0;
         } else if (opcode == OP_CHECKSIGADD) {
@@ -687,7 +693,8 @@ unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness
             run_keys = 0;
         } else if (opcode == OP_CHECKMULTISIG || opcode == OP_CHECKMULTISIGVERIFY) {
             if (run_opened_by > 0 && last_count > 0 && size_t(last_count) == run_keys) {
-                provable += size_t(run_opened_by);
+                // Even an invalid m > n shape cannot credit other key runs.
+                provable += std::min(size_t(run_opened_by), run_keys);
             }
             run_keys = 0;
             multi_a_keys = 0;

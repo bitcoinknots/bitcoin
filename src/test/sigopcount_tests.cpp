@@ -98,6 +98,34 @@ BOOST_AUTO_TEST_CASE(CountMultisigExcessKeysBoundary)
     dropped_count << OP_DROP << OP_15 << OP_CHECKMULTISIG;
     BOOST_CHECK_EQUAL(CountMultisigExcessKeys(dropped_count), 14U);
 
+    // Signature-shaped witness padding and bare CHECKSIGs in an unreachable
+    // ELSE arm cannot cancel the keys of the actual 1-of-15 spend.
+    CScript padded_branch;
+    for (int i{0}; i < 13; ++i) padded_branch << OP_DROP;
+    const CScript one_of_fifteen{multisig(1, 15)};
+    padded_branch.insert(padded_branch.end(), one_of_fifteen.begin(), one_of_fifteen.end());
+    padded_branch << OP_IF << OP_TRUE << OP_ELSE;
+    for (int i{0}; i < 13; ++i) padded_branch << OP_CHECKSIG;
+    padded_branch << OP_ENDIF;
+    CScriptWitness padded_witness;
+    padded_witness.stack.emplace_back();
+    padded_witness.stack.emplace_back(72, 1);
+    for (int i{0}; i < 13; ++i) padded_witness.stack.emplace_back(64, 1);
+    padded_witness.stack.emplace_back(padded_branch.begin(), padded_branch.end());
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(padded_branch, &padded_witness), 13U);
+
+    // A malformed dead branch cannot credit more keys than it contributes.
+    CScript invalid_branch{one_of_fifteen};
+    invalid_branch << OP_IF << OP_TRUE << OP_ELSE << OP_16;
+    invalid_branch << ToByteVector(keys[0]) << ToByteVector(keys[1]) << OP_2 << OP_CHECKMULTISIG << OP_ENDIF;
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(invalid_branch), 13U);
+
+    // The ELSE arm of OP_FALSE OP_IF is reachable and must still be counted.
+    CScript false_if_else{CScript() << OP_FALSE << OP_IF << OP_TRUE << OP_ELSE};
+    false_if_else.insert(false_if_else.end(), one_of_fifteen.begin(), one_of_fifteen.end());
+    false_if_else << OP_ENDIF;
+    BOOST_CHECK_EQUAL(CountMultisigExcessKeys(false_if_else), 13U);
+
     // The allowance applies once per script, not once per CHECKMULTISIG.
     CScript two_multisigs{multisig(2, 3)};
     two_multisigs.back() = OP_CHECKMULTISIGVERIFY;

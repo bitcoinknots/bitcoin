@@ -12,6 +12,11 @@ from test_framework.script import (
     OP_3,
     OP_CHECKMULTISIG,
     OP_DROP,
+    OP_CHECKSIG,
+    OP_ELSE,
+    OP_ENDIF,
+    OP_IF,
+    OP_TRUE,
     SIGHASH_ALL,
     SegwitV0SignatureHash,
 )
@@ -56,7 +61,7 @@ class MultisigSigOpFeeTest(BitcoinTestFramework):
             for _ in range(count)
         ]
 
-    def make_spend(self, fundings, script, keys, required, fee, *, nested=False):
+    def make_spend(self, fundings, script, keys, required, fee, *, nested=False, witness_padding=0):
         tx = CTransaction()
         tx.vin = [
             CTxIn(COutPoint(int(funding["txid"], 16), funding["sent_vout"]))
@@ -74,13 +79,13 @@ class MultisigSigOpFeeTest(BitcoinTestFramework):
                 key.sign_ecdsa(sighash) + bytes([SIGHASH_ALL])
                 for key in keys[:required]
             ]
-            tx.wit.vtxinwit[index].scriptWitness.stack = [b""] + signatures + [bytes(script)]
+            tx.wit.vtxinwit[index].scriptWitness.stack = [b""] + signatures + [b"\x01" * 64] * witness_padding + [bytes(script)]
         tx.rehash()
         return tx.serialize().hex()
 
-    def check_fee(self, fundings, script, keys, required, fee, allowed, *, nested=False, ignore_rejects=None):
+    def check_fee(self, fundings, script, keys, required, fee, allowed, *, nested=False, ignore_rejects=None, witness_padding=0):
         result = self.nodes[0].testmempoolaccept(
-            [self.make_spend(fundings, script, keys, required, fee, nested=nested)],
+            [self.make_spend(fundings, script, keys, required, fee, nested=nested, witness_padding=witness_padding)],
             0,
             ignore_rejects or [],
         )[0]
@@ -99,12 +104,16 @@ class MultisigSigOpFeeTest(BitcoinTestFramework):
             1, *[key.get_pubkey().get_bytes() for key in keys_1_of_15],
             15, OP_DROP, 15, OP_CHECKMULTISIG,
         ])
+        padded_branch_script = CScript([OP_DROP] * 13) + script_1_of_15 + CScript(
+            [OP_IF, OP_TRUE, OP_ELSE] + [OP_CHECKSIG] * 13 + [OP_ENDIF]
+        )
         funding_2_of_2 = self.fund(script_2_of_2)
         funding_2_of_3 = self.fund(script_2_of_3)
         funding_3_of_5 = self.fund(script_3_of_5)
         funding_2_of_5 = self.fund(script_2_of_5)
         funding_1_of_15 = self.fund(script_1_of_15)
         dropped_count_funding = self.fund(dropped_count_script)
+        padded_branch_funding = self.fund(padded_branch_script)
         nested_funding_1_of_15 = self.fund(script_1_of_15, nested=True)
         multi_funding_2_of_5 = self.fund(script_2_of_5, count=3)
         self.generate(self.wallet, 1)
@@ -128,6 +137,10 @@ class MultisigSigOpFeeTest(BitcoinTestFramework):
         self.log.info("Dropping and re-pushing the key count cannot bypass the floor")
         self.check_fee(dropped_count_funding, dropped_count_script, keys_1_of_15, 1, 13_999, False)
         self.check_fee(dropped_count_funding, dropped_count_script, keys_1_of_15, 1, 14_000, True)
+
+        self.log.info("Dropped witness padding and unused CHECKSIGs cannot cancel multisig keys")
+        self.check_fee(padded_branch_funding, padded_branch_script, keys_1_of_15, 1, 12_999, False, witness_padding=13)
+        self.check_fee(padded_branch_funding, padded_branch_script, keys_1_of_15, 1, 13_000, True, witness_padding=13)
 
         self.log.info("A valid signed nested P2SH-P2WSH spend is counted identically")
         self.check_fee(nested_funding_1_of_15, script_1_of_15, keys_1_of_15, 1, 12_999, False, nested=True)

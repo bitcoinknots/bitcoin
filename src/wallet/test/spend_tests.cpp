@@ -163,7 +163,7 @@ BOOST_FIXTURE_TEST_CASE(multisig_fee_uses_change_and_reselects, TestChain100Setu
     BOOST_CHECK(util::ErrorString(insufficient).original.find("Internal bug") == std::string::npos);
 }
 
-BOOST_FIXTURE_TEST_CASE(taproot_unsigned_fee_requires_selected_path, TestChain100Setup)
+BOOST_FIXTURE_TEST_CASE(taproot_unsigned_fee_reserve_and_hint, TestChain100Setup)
 {
     m_node.args->ForceSetArg("-minrelaymultisigexcesskeyfee", "1000");
     auto wallet = CreateSyncedWallet(*m_node.chain, WITH_LOCK(Assert(m_node.chainman)->GetMutex(), return m_node.chainman->ActiveChain()), coinbaseKey);
@@ -186,9 +186,22 @@ BOOST_FIXTURE_TEST_CASE(taproot_unsigned_fee_requires_selected_path, TestChain10
     for (const auto& key : keys) control.m_external_provider.pubkeys.emplace(key.GetID(), key);
     const std::vector<CRecipient> recipients{{PubKeyDestination(coinbaseKey.GetPubKey()), 100'000, false}};
 
-    auto ambiguous{CreateTransaction(*wallet, recipients, std::nullopt, control, /*sign=*/false)};
-    BOOST_REQUIRE(!ambiguous);
-    BOOST_CHECK(util::ErrorString(ambiguous).original.find("spending witness") != std::string::npos);
+    auto reserved{CreateTransaction(*wallet, recipients, std::nullopt, control, /*sign=*/false)};
+    BOOST_REQUIRE(reserved);
+    BOOST_CHECK_EQUAL(reserved->fee, 1000);
+
+    // Funding can specify its intended total key fee without a signed witness.
+    control.m_multisig_fee = 0;
+    auto hinted_key_path{CreateTransaction(*wallet, recipients, std::nullopt, control, /*sign=*/false)};
+    BOOST_REQUIRE(hinted_key_path);
+    BOOST_CHECK_LT(hinted_key_path->fee, 1000);
+    control.m_multisig_fee = 2000;
+    auto hinted_script_path{CreateTransaction(*wallet, recipients, std::nullopt, control, /*sign=*/false)};
+    BOOST_REQUIRE(hinted_script_path);
+    BOOST_CHECK_EQUAL(hinted_script_path->fee, 2000);
+    control.m_multisig_fee = -1;
+    BOOST_CHECK(!CreateTransaction(*wallet, recipients, std::nullopt, control, /*sign=*/false));
+    control.m_multisig_fee.reset();
 
     CScriptWitness witness;
     witness.stack.emplace_back(64, 1); // selected key path: no recovery leaf exposed

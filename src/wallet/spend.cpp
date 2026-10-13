@@ -128,9 +128,9 @@ static std::unique_ptr<Descriptor> GetDescriptor(const CWallet* wallet, const CC
     return InferDescriptor(script_pubkey, providers);
 }
 
-/** Estimate unsigned inputs. Taproot needs an explicit witness if the fee depends on the chosen leaf. */
-static std::optional<uint64_t> CountWalletMultisigExcessKeys(const CWallet* wallet, const CCoinControl* coin_control,
-                                                          const CTxIn& txin, const CScript& script_pubkey)
+/** Estimate unsigned inputs, reserving for the largest known Taproot leaf if no witness selects a path. */
+static uint64_t CountWalletMultisigExcessKeys(const CWallet* wallet, const CCoinControl* coin_control,
+                                           const CTxIn& txin, const CScript& script_pubkey)
 {
     if (!txin.scriptWitness.IsNull()) return CountInputMultisigExcessKeys(txin, script_pubkey);
 
@@ -153,16 +153,17 @@ static std::optional<uint64_t> CountWalletMultisigExcessKeys(const CWallet* wall
         TaprootSpendData spend_data;
         if (!providers.GetTaprootSpendData(XOnlyPubKey{solutions[0]}, spend_data)) return 0;
 
+        uint64_t excess_keys{0};
         for (const auto& entry : spend_data.scripts) {
             const auto& [script_bytes, leaf_version]{entry.first};
             if (leaf_version != TAPROOT_LEAF_TAPSCRIPT) continue;
             const CScript tapscript{script_bytes.begin(), script_bytes.end()};
-            // An unsigned input does not select key path versus script path.
-            // Do not charge for an unused recovery leaf or silently assume key
-            // path when a later signer may choose a leaf that requires a fee.
-            if (CountMultisigExcessKeys(tapscript) > 0) return std::nullopt;
+            excess_keys = std::max(excess_keys, uint64_t{CountMultisigExcessKeys(tapscript)});
         }
-        return 0;
+        // Funding a PSBT must not require an already signed witness. The caller
+        // can specify the planned total floor via multisig_fee instead (zero
+        // for key-path-only spends). Relay still checks the final witnesses.
+        return excess_keys;
     }
 
     return CountMultisigExcessKeys(txin.scriptSig) + CountMultisigExcessKeys(script);
@@ -1338,7 +1339,12 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
     CAmount fee_needed = coin_selection_params.m_effective_feerate.GetFee(nBytes) + result.GetTotalBumpFees();
     CAmount multisig_excess_key_fee{0};
     const CAmount fee_per_excess_key{gArgs.GetIntArg("-minrelaymultisigexcesskeyfee", DEFAULT_MIN_RELAY_MULTISIG_EXCESS_KEY_FEE)};
-    if (fee_per_excess_key > 0) {
+    if (!sign && coin_control.m_multisig_fee) {
+        if (!MoneyRange(*coin_control.m_multisig_fee)) {
+            return util::Error{_("Invalid multisig_fee: expected nonnegative satoshis within the money range")};
+        }
+        multisig_excess_key_fee = *coin_control.m_multisig_fee;
+    } else if (fee_per_excess_key > 0) {
         uint64_t excess_keys{0};
         CMutableTransaction fee_tx{txNew};
         if (sign && !wallet.SignTransaction(fee_tx)) {
@@ -1350,18 +1356,14 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
                 // path spends expose no leaves and therefore have no key fee.
                 excess_keys += CountInputMultisigExcessKeys(fee_tx.vin[i], selected_coins[i]->txout.scriptPubKey);
             } else {
-                const auto estimate{CountWalletMultisigExcessKeys(&wallet, &coin_control, txNew.vin[i], selected_coins[i]->txout.scriptPubKey)};
-                if (!estimate) {
-                    return util::Error{_("Cannot estimate the multisig fee for this Taproot input without its spending witness")};
-                }
-                excess_keys += *estimate;
+                excess_keys += CountWalletMultisigExcessKeys(&wallet, &coin_control, txNew.vin[i], selected_coins[i]->txout.scriptPubKey);
             }
         }
         multisig_excess_key_fee = excess_keys > static_cast<uint64_t>(MAX_MONEY / fee_per_excess_key)
                 ? MAX_MONEY
                 : static_cast<CAmount>(excess_keys) * fee_per_excess_key;
-        fee_needed = std::max(fee_needed, multisig_excess_key_fee);
     }
+    fee_needed = std::max(fee_needed, multisig_excess_key_fee);
     if (fee_needed > wallet.m_default_max_tx_fee) {
         return util::Error{TransactionErrorString(TransactionError::MAX_FEE_EXCEEDED)};
     }
