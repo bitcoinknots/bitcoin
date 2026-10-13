@@ -128,9 +128,9 @@ static std::unique_ptr<Descriptor> GetDescriptor(const CWallet* wallet, const CC
     return InferDescriptor(script_pubkey, providers);
 }
 
-/** Count multisig sigops in the script that the wallet will use to spend an output. */
-static uint64_t CountWalletMultisigSigOps(const CWallet* wallet, const CCoinControl* coin_control,
-                                          const CScript& script_pubkey)
+/** Count excess multisig keys in the script that the wallet will use to spend an output. */
+static uint64_t CountWalletMultisigExcessKeys(const CWallet* wallet, const CCoinControl* coin_control,
+                                              const CScript& script_pubkey)
 {
     const auto providers{GetSolvingProvider(wallet, coin_control, script_pubkey)};
     CScript script{script_pubkey};
@@ -145,7 +145,23 @@ static uint64_t CountWalletMultisigSigOps(const CWallet* wallet, const CCoinCont
         if (solutions.empty() || !providers.GetCScript(CScriptID{RIPEMD160(solutions[0])}, script)) return 0;
     }
 
-    return CountMultisigSigOps(script);
+    solutions.clear();
+    if (Solver(script, solutions) == TxoutType::WITNESS_V1_TAPROOT) {
+        if (solutions.empty()) return 0;
+        TaprootSpendData spend_data;
+        if (!providers.GetTaprootSpendData(XOnlyPubKey{solutions[0]}, spend_data)) return 0;
+
+        uint64_t max_excess_keys{0};
+        for (const auto& entry : spend_data.scripts) {
+            const auto& [script_bytes, leaf_version]{entry.first};
+            if (leaf_version != TAPROOT_LEAF_TAPSCRIPT) continue;
+            const CScript tapscript{script_bytes.begin(), script_bytes.end()};
+            max_excess_keys = std::max<uint64_t>(max_excess_keys, CountMultisigExcessKeys(tapscript));
+        }
+        return max_excess_keys;
+    }
+
+    return CountMultisigExcessKeys(script);
 }
 
 /** Infer the maximum size of this input after it will be signed. */
@@ -1311,17 +1327,17 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
         return util::Error{_("Missing solving data for estimating transaction size")};
     }
     CAmount fee_needed = coin_selection_params.m_effective_feerate.GetFee(nBytes) + result.GetTotalBumpFees();
-    const CAmount fee_per_multisig_sigop{gArgs.GetIntArg("-minrelaymultisigsigopfee", DEFAULT_MIN_RELAY_MULTISIG_SIGOP_FEE)};
-    if (fee_per_multisig_sigop > 0) {
-        uint64_t multisig_sigops{0};
+    const CAmount fee_per_excess_key{gArgs.GetIntArg("-minrelaymultisigexcesskeyfee", DEFAULT_MIN_RELAY_MULTISIG_EXCESS_KEY_FEE)};
+    if (fee_per_excess_key > 0) {
+        uint64_t excess_keys{0};
         for (size_t i{0}; i < selected_coins.size(); ++i) {
-            multisig_sigops += CountMultisigSigOps(txNew.vin[i].scriptSig);
-            multisig_sigops += CountWalletMultisigSigOps(&wallet, &coin_control, selected_coins[i]->txout.scriptPubKey);
+            excess_keys += CountMultisigExcessKeys(txNew.vin[i].scriptSig);
+            excess_keys += CountWalletMultisigExcessKeys(&wallet, &coin_control, selected_coins[i]->txout.scriptPubKey);
         }
-        const CAmount multisig_sigop_fee{multisig_sigops > static_cast<uint64_t>(MAX_MONEY / fee_per_multisig_sigop)
+        const CAmount multisig_excess_key_fee{excess_keys > static_cast<uint64_t>(MAX_MONEY / fee_per_excess_key)
                 ? MAX_MONEY
-                : static_cast<CAmount>(multisig_sigops) * fee_per_multisig_sigop};
-        fee_needed = std::max(fee_needed, multisig_sigop_fee);
+                : static_cast<CAmount>(excess_keys) * fee_per_excess_key};
+        fee_needed = std::max(fee_needed, multisig_excess_key_fee);
     }
     const CAmount output_value = CalculateOutputValue(txNew);
     Assume(recipients_sum + change_amount == output_value);
