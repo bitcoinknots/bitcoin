@@ -15,6 +15,7 @@
 #include <policy/feerate.h>
 #include <policy/settings.h>
 #include <primitives/transaction.h>
+#include <pubkey.h>
 #include <script/interpreter.h>
 #include <script/script.h>
 #include <script/solver.h>
@@ -571,22 +572,153 @@ bool SpendsNonAnchorWitnessProg(const CTransaction& tx, const CCoinsViewCache& p
     return false;
 }
 
-unsigned int CountMultisigSigOps(const CScript& script)
+/** Value of OP_1..OP_16, or -1 for any other opcode. */
+static int SmallIntValue(const opcodetype opcode)
 {
-    unsigned int count{0};
-    CScript::const_iterator pc{script.begin()};
-    opcodetype last_opcode{OP_INVALIDOPCODE};
-    while (pc < script.end()) {
-        opcodetype opcode;
-        if (!script.GetOp(pc, opcode)) break;
-        if (opcode == OP_CHECKMULTISIG || opcode == OP_CHECKMULTISIGVERIFY) {
-            count += last_opcode >= OP_1 && last_opcode <= OP_16
-                ? CScript::DecodeOP_N(last_opcode)
-                : MAX_PUBKEYS_PER_MULTISIG;
-        }
-        last_opcode = opcode;
+    if (opcode < OP_1 || opcode > OP_16) return -1;
+    return int{opcode} - int{OP_1 - 1};
+}
+
+/** The m or n of an m-of-n, including minimal one-byte counts above 16. */
+static int MultisigCount(const opcodetype opcode, const std::vector<unsigned char>& push_data)
+{
+    if (const int small{SmallIntValue(opcode)}; small > 0) return small;
+    if (opcode == 1 && push_data.size() == 1 && push_data[0] > 16 && push_data[0] <= MAX_PUBKEYS_PER_MULTISIG) {
+        return push_data[0];
+    }
+    return -1;
+}
+
+/** The k of a tapscript k-of-n, minimally encoded up to MAX_PUBKEYS_PER_MULTI_A. */
+static int MultiACount(const opcodetype opcode, const std::vector<unsigned char>& push_data)
+{
+    if (const int small{SmallIntValue(opcode)}; small > 0) return small;
+    if (opcode != 1 && opcode != 2) return -1;
+    if (push_data.size() != size_t{opcode}) return -1;
+    if (push_data.back() & 0x80) return -1;
+    if (push_data.back() == 0 && (push_data.size() == 1 || !(push_data[0] & 0x80))) return -1;
+    int value{push_data[0]};
+    if (push_data.size() == 2) value |= int{push_data[1]} << 8;
+    if (value <= 16 || value > int{MAX_PUBKEYS_PER_MULTI_A}) return -1;
+    return value;
+}
+
+static bool IsPubkeyPush(const opcodetype opcode, const std::vector<unsigned char>& push_data)
+{
+    return opcode <= OP_PUSHDATA4 &&
+           (push_data.size() == CPubKey::COMPRESSED_SIZE || push_data.size() == CPubKey::SIZE);
+}
+
+static bool IsXOnlyPush(const opcodetype opcode, const std::vector<unsigned char>& push_data)
+{
+    return opcode <= OP_PUSHDATA4 && push_data.size() == XOnlyPubKey::size();
+}
+
+static bool IsStackNeutralNop(const opcodetype opcode)
+{
+    return opcode == OP_NOP || (opcode >= OP_NOP1 && opcode <= OP_NOP10);
+}
+
+static bool IsRunPush(const opcodetype opcode)
+{
+    return opcode <= OP_16 && opcode != OP_RESERVED;
+}
+
+static size_t CountWitnessSignatures(const CScriptWitness& witness, const size_t suffix_items)
+{
+    if (suffix_items > witness.stack.size()) return 0;
+    size_t count{0};
+    for (size_t i{0}; i < witness.stack.size() - suffix_items; ++i) {
+        const size_t size{witness.stack[i].size()};
+        if (size >= 64 && size <= 73) ++count;
     }
     return count;
+}
+
+unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness* witness,
+                                     const size_t witness_suffix_items)
+{
+    size_t pubkeys{0}, provable{0}, run_keys{0}, push_run_keys{0}, multi_a_keys{0};
+    int run_opened_by{-1}, last_count{-1}, last_a_count{-1};
+    unsigned int inside_noop{0};
+    bool last_is_push{false}, last_is_key{false}, last_is_xonly{false};
+    opcodetype opcode{OP_INVALIDOPCODE}, last_opcode{OP_INVALIDOPCODE};
+    std::vector<unsigned char> push_data;
+
+    for (CScript::const_iterator it{script.begin()}; it < script.end();) {
+        if (!script.GetOp(it, opcode, push_data)) return 0;
+        const bool is_pubkey{IsPubkeyPush(opcode, push_data)};
+        const bool is_xonly{IsXOnlyPush(opcode, push_data)};
+        const int count{MultisigCount(opcode, push_data)};
+        const int a_count{MultiACount(opcode, push_data)};
+        bool is_key{false};
+
+        if (inside_noop) {
+            if (opcode == OP_IF || opcode == OP_NOTIF) {
+                ++inside_noop;
+            } else if (opcode == OP_ENDIF) {
+                --inside_noop;
+            }
+        } else if (opcode == OP_IF && last_opcode == OP_FALSE) {
+            inside_noop = 1;
+        } else if (is_pubkey) {
+            if (!run_keys) run_opened_by = last_count;
+            ++run_keys;
+            ++push_run_keys;
+            ++pubkeys;
+            is_key = true;
+        } else if (is_xonly) {
+            run_keys = 0;
+            is_key = true;
+        } else if ((opcode == OP_DROP || opcode == OP_2DROP) && last_is_push) {
+            pubkeys -= push_run_keys;
+            run_keys = 0;
+            multi_a_keys = 0;
+        } else if (opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY) {
+            if (last_is_xonly) ++pubkeys;
+            ++provable;
+            run_keys = 0;
+            multi_a_keys = (last_is_key && opcode == OP_CHECKSIG) ? 1 : 0;
+        } else if (opcode == OP_CHECKSIGADD) {
+            if (last_is_xonly) ++pubkeys;
+            multi_a_keys = (multi_a_keys && last_is_key) ? multi_a_keys + 1 : 0;
+            run_keys = 0;
+        } else if ((opcode == OP_NUMEQUAL || opcode == OP_NUMEQUALVERIFY) && multi_a_keys) {
+            if (last_a_count > 0 && size_t(last_a_count) <= multi_a_keys) {
+                provable += size_t(last_a_count) - 1;
+            }
+            multi_a_keys = 0;
+            run_keys = 0;
+        } else if (opcode == OP_CHECKMULTISIG || opcode == OP_CHECKMULTISIGVERIFY) {
+            if (run_opened_by > 0 && last_count > 0 && size_t(last_count) == run_keys) {
+                provable += size_t(run_opened_by);
+            }
+            run_keys = 0;
+            multi_a_keys = 0;
+        } else if (count < 0) {
+            run_keys = 0;
+            if (a_count < 0) multi_a_keys = 0;
+        }
+
+        const bool is_push{IsRunPush(opcode)};
+        if (!is_push) push_run_keys = 0;
+        if (!IsStackNeutralNop(opcode)) {
+            last_is_key = is_key;
+            last_is_xonly = is_xonly && !inside_noop;
+        }
+        last_opcode = opcode;
+        last_count = count;
+        last_a_count = a_count;
+        last_is_push = is_push;
+    }
+
+    if (witness && !witness->stack.empty()) {
+        provable = std::min(provable, CountWitnessSignatures(*witness, witness_suffix_items));
+    }
+
+    static constexpr size_t FREE_UNPROVEN_KEYS{1};
+    if (pubkeys <= provable + FREE_UNPROVEN_KEYS) return 0;
+    return static_cast<unsigned int>(pubkeys - provable - FREE_UNPROVEN_KEYS);
 }
 
 static std::optional<CScript> GetP2SHRedeemScript(const CScript& script_sig)
@@ -603,33 +735,51 @@ static std::optional<CScript> GetP2SHRedeemScript(const CScript& script_sig)
     return CScript{data.begin(), data.end()};
 }
 
-uint64_t CountTransactionInputMultisigSigOps(const CTransaction& tx, const CCoinsViewCache& prevouts)
+uint64_t CountTransactionInputMultisigExcessKeys(const CTransaction& tx, const CCoinsViewCache& prevouts)
 {
     uint64_t count{0};
     for (const CTxIn& txin : tx.vin) {
         // Non-standard legacy inputs may execute opcodes from scriptSig. Standard
         // scriptSigs and P2SH scriptSigs are push-only, so this is zero for them.
-        count += CountMultisigSigOps(txin.scriptSig);
+        count += CountMultisigExcessKeys(txin.scriptSig);
 
         CScript script{prevouts.AccessCoin(txin.prevout).out.scriptPubKey};
+        bool p2sh{false};
 
         if (script.IsPayToScriptHash()) {
             const auto redeem_script{GetP2SHRedeemScript(txin.scriptSig)};
             if (!redeem_script) continue;
             script = *redeem_script;
+            p2sh = true;
         }
 
         int witness_version{0};
         std::vector<unsigned char> witness_program;
-        if (script.IsWitnessProgram(witness_version, witness_program)) {
-            if (witness_version != 0 || witness_program.size() != WITNESS_V0_SCRIPTHASH_SIZE || txin.scriptWitness.stack.empty()) {
-                continue;
-            }
-            const auto& witness_script{txin.scriptWitness.stack.back()};
-            script = CScript{witness_script.begin(), witness_script.end()};
+        if (!script.IsWitnessProgram(witness_version, witness_program)) {
+            count += CountMultisigExcessKeys(script);
+            continue;
         }
 
-        count += CountMultisigSigOps(script);
+        if (witness_version == 0 && witness_program.size() == WITNESS_V0_SCRIPTHASH_SIZE && !txin.scriptWitness.stack.empty()) {
+            const auto& witness_script{txin.scriptWitness.stack.back()};
+            script = CScript{witness_script.begin(), witness_script.end()};
+            count += CountMultisigExcessKeys(script, &txin.scriptWitness, /*witness_suffix_items=*/1);
+            continue;
+        }
+
+        if (witness_version == 1 && witness_program.size() == WITNESS_V1_TAPROOT_SIZE && !p2sh) {
+            Span stack{txin.scriptWitness.stack};
+            size_t suffix_items{2}; // tapscript and control block
+            if (stack.size() >= 2 && !stack.back().empty() && stack.back()[0] == ANNEX_TAG) {
+                SpanPopBack(stack);
+                ++suffix_items;
+            }
+            if (stack.size() < 2) continue; // key-path or invalid spend
+            SpanPopBack(stack); // control block
+            const auto& tapscript{stack.back()};
+            script = CScript{tapscript.begin(), tapscript.end()};
+            count += CountMultisigExcessKeys(script, &txin.scriptWitness, suffix_items);
+        }
     }
     return count;
 }

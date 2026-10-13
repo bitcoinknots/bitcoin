@@ -12,6 +12,7 @@
 #include <script/interpreter.h>
 #include <script/solver.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <unordered_set>
@@ -106,8 +107,8 @@ static const int DEFAULT_DUST_RELAY_MULTIPLIER{3'000};
 static const std::string DEFAULT_SPKREUSE{"allow"};
 /** Default for -minrelaytxfee, minimum relay fee for transactions */
 static constexpr unsigned int DEFAULT_MIN_RELAY_TX_FEE{1000};
-/** Default minimum transaction fee per accurately counted multisig input sigop, in satoshis */
-static constexpr CAmount DEFAULT_MIN_RELAY_MULTISIG_SIGOP_FEE{500};
+/** Default minimum transaction fee per charged excess key in canonical multisig, in satoshis. */
+static constexpr CAmount DEFAULT_MIN_RELAY_MULTISIG_EXCESS_KEY_FEE{1000};
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
 static constexpr unsigned int DEFAULT_ANCESTOR_LIMIT{25};
 /** Default for -limitancestorsize, maximum kilobytes of tx + all in-mempool ancestors */
@@ -226,11 +227,12 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
  */
 bool SpendsNonAnchorWitnessProg(const CTransaction& tx, const CCoinsViewCache& prevouts);
 
-/** Count CHECKMULTISIG(VERIFY) sigops in a script using accurate multisig accounting. */
-unsigned int CountMultisigSigOps(const CScript& script);
+/** Count pubkeys no supplied signature can prove, after one free key. */
+unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness* witness = nullptr,
+                                     size_t witness_suffix_items = 1);
 
-/** Count multisig sigops in the scripts executed by all transaction inputs. */
-uint64_t CountTransactionInputMultisigSigOps(const CTransaction& tx, const CCoinsViewCache& prevouts);
+/** Count excess multisig keys in the scripts exposed by all transaction inputs. */
+uint64_t CountTransactionInputMultisigExcessKeys(const CTransaction& tx, const CCoinsViewCache& prevouts);
 
 /** Compute the virtual transaction size (weight reinterpreted as bytes). */
 int64_t GetVirtualTransactionSize(int64_t nWeight, int64_t nSigOpCost, unsigned int bytes_per_sigop);
