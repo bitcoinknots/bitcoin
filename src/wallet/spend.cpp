@@ -158,7 +158,7 @@ static uint64_t CountWalletMultisigExcessKeys(const CWallet* wallet, const CCoin
             const auto& [script_bytes, leaf_version]{entry.first};
             if (leaf_version != TAPROOT_LEAF_TAPSCRIPT) continue;
             const CScript tapscript{script_bytes.begin(), script_bytes.end()};
-            excess_keys = std::max(excess_keys, uint64_t{CountMultisigExcessKeys(tapscript)});
+            excess_keys = std::max(excess_keys, uint64_t{CountMultisigExcessKeys(tapscript, nullptr, 2, SigVersion::TAPSCRIPT)});
         }
         // Funding a PSBT must not require an already signed witness. The caller
         // can specify the planned total floor via multisig_fee instead (zero
@@ -166,7 +166,7 @@ static uint64_t CountWalletMultisigExcessKeys(const CWallet* wallet, const CCoin
         return excess_keys;
     }
 
-    return CountMultisigExcessKeys(txin.scriptSig) + CountMultisigExcessKeys(script);
+    return (txin.scriptSig.IsPushOnly() ? 0 : CountMultisigExcessKeys(txin.scriptSig)) + CountMultisigExcessKeys(script);
 }
 
 /** Infer the maximum size of this input after it will be signed. */

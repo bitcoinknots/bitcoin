@@ -316,6 +316,9 @@ public:
 template <class T>
 uint256 SignatureHash(const CScript& scriptCode, const T& txTo, unsigned int nIn, int32_t nHashType, const CAmount& amount, SigVersion sigversion, const PrecomputedTransactionData* cache = nullptr, SigHashCache* sighash_cache = nullptr);
 
+/** Check strict DER encoding including the trailing sighash byte, not cryptographic validity. */
+bool IsValidSignatureEncoding(const std::vector<unsigned char>& sig);
+
 class BaseSignatureChecker
 {
 public:

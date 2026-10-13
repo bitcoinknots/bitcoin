@@ -27,6 +27,8 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <optional>
 #include <string_view>
@@ -619,20 +621,199 @@ static bool IsStackNeutralNop(const opcodetype opcode)
     return opcode == OP_NOP || (opcode >= OP_NOP1 && opcode <= OP_NOP10);
 }
 
-static size_t CountWitnessSignatures(const CScriptWitness& witness, const size_t suffix_items)
+/** Prove that a bounded, straight-line block restores both stacks exactly.
+ *
+ * Negative symbols represent main-stack inputs, positive symbols altstack
+ * inputs. Missing inputs are introduced lazily, without reading witness data.
+ * This proves identity only if the block can execute without underflow; actual
+ * script validation still enforces that prerequisite. No values, conditions,
+ * signatures, locktimes or arbitrary opcodes are evaluated here.
+ */
+static bool SkipIdentityStackOps(CScript::const_iterator& it, const CScript::const_iterator end)
+{
+    static constexpr size_t MAX_IDENTITY_OPS{32};
+    std::vector<int> stack, altstack;
+    int main_inputs{0}, alt_inputs{0};
+    auto cursor{it};
+
+    const auto require = [](std::vector<int>& values, int& inputs, const size_t count, const int sign) {
+        while (values.size() < count) values.insert(values.begin(), sign * ++inputs);
+    };
+    const auto apply = [&](const opcodetype opcode) {
+        switch (opcode) {
+        case OP_NOP:
+            break;
+        case OP_DUP:
+            require(stack, main_inputs, 1, -1);
+            stack.push_back(stack.back());
+            break;
+        case OP_2DUP:
+        case OP_3DUP: {
+            const size_t count{opcode == OP_2DUP ? size_t{2} : size_t{3}};
+            require(stack, main_inputs, count, -1);
+            const size_t start{stack.size() - count};
+            for (size_t i{0}; i < count; ++i) stack.push_back(stack[start + i]);
+            break;
+        }
+        case OP_DROP:
+        case OP_2DROP: {
+            const size_t count{opcode == OP_DROP ? size_t{1} : size_t{2}};
+            require(stack, main_inputs, count, -1);
+            stack.resize(stack.size() - count);
+            break;
+        }
+        case OP_OVER:
+            require(stack, main_inputs, 2, -1);
+            stack.push_back(stack[stack.size() - 2]);
+            break;
+        case OP_NIP:
+            require(stack, main_inputs, 2, -1);
+            stack.erase(stack.end() - 2);
+            break;
+        case OP_TUCK: {
+            require(stack, main_inputs, 2, -1);
+            const int top{stack.back()};
+            stack.insert(stack.end() - 2, top);
+            break;
+        }
+        case OP_SWAP:
+            require(stack, main_inputs, 2, -1);
+            std::iter_swap(stack.end() - 2, stack.end() - 1);
+            break;
+        case OP_ROT:
+            require(stack, main_inputs, 3, -1);
+            std::rotate(stack.end() - 3, stack.end() - 2, stack.end());
+            break;
+        case OP_2SWAP:
+            require(stack, main_inputs, 4, -1);
+            std::rotate(stack.end() - 4, stack.end() - 2, stack.end());
+            break;
+        case OP_2ROT:
+            require(stack, main_inputs, 6, -1);
+            std::rotate(stack.end() - 6, stack.end() - 4, stack.end());
+            break;
+        case OP_TOALTSTACK:
+            require(stack, main_inputs, 1, -1);
+            altstack.push_back(stack.back());
+            stack.pop_back();
+            break;
+        case OP_FROMALTSTACK:
+            require(altstack, alt_inputs, 1, 1);
+            stack.push_back(altstack.back());
+            altstack.pop_back();
+            break;
+        default:
+            return false;
+        }
+        return true;
+    };
+    for (size_t ops{0}; ops < MAX_IDENTITY_OPS && cursor != end; ++ops) {
+        // A non-stack opcode ends the candidate block, not the script.
+        if (!apply(static_cast<opcodetype>(*cursor))) break;
+        ++cursor;
+    }
+    if (cursor == it || stack.size() != size_t(main_inputs) || altstack.size() != size_t(alt_inputs)) return false;
+    for (size_t i{0}; i < stack.size(); ++i) {
+        if (stack[i] != int(i) - main_inputs) return false;
+    }
+    for (size_t i{0}; i < altstack.size(); ++i) {
+        if (altstack[i] != alt_inputs - int(i)) return false;
+    }
+    it = cursor;
+    return true;
+}
+
+static size_t CountWitnessSignatures(const CScriptWitness& witness, const size_t suffix_items,
+                                    const SigVersion sigversion)
 {
     if (suffix_items > witness.stack.size()) return 0;
     size_t count{0};
     for (size_t i{0}; i < witness.stack.size() - suffix_items; ++i) {
-        const size_t size{witness.stack[i].size()};
-        if (size >= 64 && size <= 73) ++count;
+        const auto& signature{witness.stack[i]};
+        if (sigversion == SigVersion::TAPSCRIPT) {
+            if (signature.size() == 64 || signature.size() == 65) ++count;
+        } else if (IsValidSignatureEncoding(signature)) {
+            // Reuse the interpreter's DER check, including valid short (9-63
+            // byte) encodings. Length alone is neither necessary nor enough.
+            ++count;
+        }
     }
     return count;
 }
 
-unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness* witness,
-                                     const size_t witness_suffix_items)
+/** Match only the complete, bounded BOLT #3 to_local and HTLC scripts.
+ *
+ * This is a compatibility allowance, not proof that their embedded keys were
+ * signed for. In particular, the HTLC revocation path uses a witness-supplied
+ * key and leaves both embedded HTLC keys unused. Keep this separate from the
+ * generic credits: a Lightning fragment must never cancel other script keys.
+ * Extra instructions, nonminimal pushes, or larger fields fail the match.
+ */
+static bool IsStandardLightningKeyScript(const CScript& script)
 {
+    // The longest supported form is the received HTLC with anchors and a
+    // five-byte unsigned locktime. Bound parsing independently of input size.
+    if (script.size() > 160) return false;
+
+    enum Field : int { KEY = 256, HASH20, DELAY, LOCKTIME, PREIMAGE_SIZE };
+    auto it{script.begin()};
+    const auto match = [&](std::initializer_list<int> pattern) {
+        for (const int field : pattern) {
+            opcodetype op;
+            std::vector<unsigned char> data;
+            if (!script.GetOp(it, op, data)) return false;
+            if (field < KEY) {
+                if (int{op} != field) return false;
+            } else if (field == KEY) {
+                if (op != 33 || data.size() != 33 || (data[0] != 2 && data[0] != 3)) return false;
+            } else if (field == HASH20) {
+                if (op != 20 || data.size() != 20) return false;
+            } else if (field == PREIMAGE_SIZE) {
+                if (op != 1 || data.size() != 1 || data[0] != 32) return false;
+            } else {
+                // BOLT encodes to_self_delay as u16 and cltv_expiry as u32.
+                // Require the exact minimal, nonnegative Script number push;
+                // do not interpret arbitrary arithmetic or throw on overflow.
+                if (op == OP_0 || SmallIntValue(op) > 0) continue;
+                if (op < 1 || op > 5 || data.size() != size_t(op) || (data.back() & 0x80)) return false;
+                if ((data.back() & 0x7f) == 0 && (data.size() == 1 || !(data[data.size() - 2] & 0x80))) return false;
+                uint64_t value{0};
+                for (size_t i{0}; i < data.size(); ++i) value |= uint64_t{data[i]} << (8 * i);
+                const uint64_t maximum{field == DELAY ? uint64_t{0xffff} : uint64_t{0xffffffff}};
+                if (value <= 16 || value > maximum) return false;
+            }
+        }
+        return true;
+    };
+
+    if (match({OP_IF, KEY, OP_ELSE, DELAY, OP_CHECKSEQUENCEVERIFY, OP_DROP,
+               KEY, OP_ENDIF, OP_CHECKSIG}) && it == script.end()) return true;
+
+    it = script.begin();
+    if (!match({OP_DUP, OP_HASH160, HASH20, OP_EQUAL, OP_IF, OP_CHECKSIG,
+                OP_ELSE, KEY, OP_SWAP, OP_SIZE, PREIMAGE_SIZE, OP_EQUAL})) return false;
+
+    const auto branch_start{it};
+    if (!match({OP_NOTIF, OP_DROP, OP_2, OP_SWAP, KEY, OP_2, OP_CHECKMULTISIG,
+                OP_ELSE, OP_HASH160, HASH20, OP_EQUALVERIFY, OP_CHECKSIG, OP_ENDIF})) {
+        it = branch_start;
+        if (!match({OP_IF, OP_HASH160, HASH20, OP_EQUALVERIFY, OP_2, OP_SWAP,
+                    KEY, OP_2, OP_CHECKMULTISIG, OP_ELSE, OP_DROP, LOCKTIME,
+                    OP_CHECKLOCKTIMEVERIFY, OP_DROP, OP_CHECKSIG, OP_ENDIF})) return false;
+    }
+    // Anchors add this exact relative timelock inside the non-revocation arm.
+    if (it != script.end() && *it == OP_1 &&
+        !match({OP_1, OP_CHECKSEQUENCEVERIFY, OP_DROP})) return false;
+    return match({OP_ENDIF}) && it == script.end();
+}
+
+unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness* witness,
+                                     const size_t witness_suffix_items, const SigVersion sigversion)
+{
+    // Do not extend this allowance to fragments or tapscript, whose signature
+    // semantics differ. Consensus validation still checks every actual spend.
+    if (sigversion != SigVersion::TAPSCRIPT && IsStandardLightningKeyScript(script)) return 0;
+
     size_t pubkeys{0}, provable{0}, run_keys{0}, multi_a_keys{0};
     int run_opened_by{-1}, last_count{-1}, last_a_count{-1};
     unsigned int inside_noop{0};
@@ -641,6 +822,9 @@ unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness
     std::vector<unsigned char> push_data;
 
     for (CScript::const_iterator it{script.begin()}; it < script.end();) {
+        // Equivalent stack-only blocks must not hide a key or destroy the
+        // recognition of m/n/k. Leave unsupported/non-identity blocks intact.
+        if (!inside_noop && SkipIdentityStackOps(it, script.end())) continue;
         if (!script.GetOp(it, opcode, push_data)) return 0;
         const bool is_pubkey{IsPubkeyPush(opcode, push_data)};
         const bool is_xonly{IsXOnlyPush(opcode, push_data)};
@@ -713,7 +897,7 @@ unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness
     }
 
     if (witness && !witness->stack.empty()) {
-        provable = std::min(provable, CountWitnessSignatures(*witness, witness_suffix_items));
+        provable = std::min(provable, CountWitnessSignatures(*witness, witness_suffix_items, sigversion));
     }
 
     static constexpr size_t FREE_UNPROVEN_KEYS{1};
@@ -738,9 +922,9 @@ static std::optional<CScript> GetP2SHRedeemScript(const CScript& script_sig)
 uint64_t CountInputMultisigExcessKeys(const CTxIn& txin, const CScript& prev_script)
 {
     uint64_t count{0};
-    // Non-standard legacy inputs may execute opcodes from scriptSig. Standard
-    // scriptSigs and P2SH scriptSigs are push-only, so this is zero for them.
-    count += CountMultisigExcessKeys(txin.scriptSig);
+    // Only executable scriptSig code is inspected. A push-only scriptSig is
+    // satisfaction data: 33/65-byte signatures are not exposed script keys.
+    if (!txin.scriptSig.IsPushOnly()) count += CountMultisigExcessKeys(txin.scriptSig);
 
     CScript script{prev_script};
     bool p2sh{false};
@@ -777,7 +961,7 @@ uint64_t CountInputMultisigExcessKeys(const CTxIn& txin, const CScript& prev_scr
         if (control_block.empty() || (control_block[0] & TAPROOT_LEAF_MASK) != TAPROOT_LEAF_TAPSCRIPT) return count;
         const auto& tapscript{stack.back()};
         script = CScript{tapscript.begin(), tapscript.end()};
-        count += CountMultisigExcessKeys(script, &txin.scriptWitness, suffix_items);
+        count += CountMultisigExcessKeys(script, &txin.scriptWitness, suffix_items, SigVersion::TAPSCRIPT);
     }
     return count;
 }

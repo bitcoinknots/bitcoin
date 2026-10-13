@@ -4,21 +4,39 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test the minimum fee policy for excess keys in canonical multisig inputs."""
 
-from test_framework.key import ECKey
+from test_framework.key import ECKey, sign_schnorr
 from test_framework.messages import COutPoint, CTransaction, CTxIn, CTxInWitness, CTxOut
 from test_framework.script import (
     CScript,
     OP_2,
     OP_3,
     OP_CHECKMULTISIG,
+    OP_CHECKLOCKTIMEVERIFY,
+    OP_CHECKSEQUENCEVERIFY,
     OP_DROP,
     OP_CHECKSIG,
+    OP_CHECKSIGADD,
+    OP_DUP,
     OP_ELSE,
     OP_ENDIF,
+    OP_EQUAL,
+    OP_EQUALVERIFY,
+    OP_HASH160,
     OP_IF,
+    OP_FROMALTSTACK,
+    OP_NUMEQUAL,
+    OP_NOTIF,
+    OP_SIZE,
+    OP_SWAP,
+    OP_TOALTSTACK,
     OP_TRUE,
     SIGHASH_ALL,
     SegwitV0SignatureHash,
+    TaprootSignatureHash,
+    hash160,
+    ripemd160,
+    sha256,
+    taproot_construct,
 )
 from test_framework.script_util import script_to_p2sh_p2wsh_script, script_to_p2wsh_script
 from test_framework.test_framework import BitcoinTestFramework
@@ -93,6 +111,112 @@ class MultisigSigOpFeeTest(BitcoinTestFramework):
         if not allowed:
             assert_equal(result["reject-reason"], "min multisig excess key fee not met")
 
+    def check_taproot_identities(self, keys):
+        variants = []
+        identities = [[], [OP_SWAP, OP_SWAP], [OP_DUP, OP_DROP], [OP_TOALTSTACK, OP_FROMALTSTACK]]
+        for required, total, floor in [(1, 15, 13_000), (2, 3, 0)]:
+            selected = keys[:total]
+            for identity in identities:
+                script_items = []
+                for index, key in enumerate(selected):
+                    script_items += [key.get_pubkey().get_bytes()[1:]] + identity
+                    script_items += [OP_CHECKSIG if index == 0 else OP_CHECKSIGADD]
+                script = CScript(script_items + [required, OP_NUMEQUAL])
+                tap = taproot_construct(selected[0].get_pubkey().get_bytes()[1:], [("multisig", script)])
+                funding = self.wallet.send_to(
+                    from_node=self.nodes[0], scriptPubKey=tap.scriptPubKey, amount=FUNDING_VALUE,
+                )
+                variants.append((required, floor, selected, script, tap, funding))
+        self.generate(self.wallet, 1)
+
+        for required, floor, selected, script, tap, funding in variants:
+            for fee, allowed in ([(floor - 1, False), (floor, True)] if floor else [(500, True)]):
+                tx = CTransaction()
+                tx.vin = [CTxIn(COutPoint(int(funding["txid"], 16), funding["sent_vout"]))]
+                tx.vout = [CTxOut(FUNDING_VALUE - fee, self.wallet.get_output_script())]
+                sighash = TaprootSignatureHash(
+                    tx, [CTxOut(FUNDING_VALUE, tap.scriptPubKey)], 0,
+                    scriptpath=True, leaf_script=script,
+                )
+                signatures = [sign_schnorr(key.get_bytes(), sighash) if i < required else b"" for i, key in enumerate(selected)]
+                leaf = tap.leaves["multisig"]
+                control = bytes([leaf.version | tap.negflag]) + tap.internal_pubkey + leaf.merklebranch
+                tx.wit.vtxinwit = [CTxInWitness()]
+                tx.wit.vtxinwit[0].scriptWitness.stack = list(reversed(signatures)) + [bytes(script), control]
+                result = self.nodes[0].testmempoolaccept([tx.serialize().hex()], 0)[0]
+                assert_equal(result["allowed"], allowed)
+                if not allowed:
+                    assert_equal(result["reject-reason"], "min multisig excess key fee not met")
+
+    def check_lightning_spends(self):
+        """All BOLT #3 to_local/HTLC paths, including revocation and anchors."""
+        local, remote, revocation = [ECKey() for _ in range(3)]
+        for key in (local, remote, revocation):
+            key.generate(compressed=True)
+        local_pub, remote_pub, revocation_pub = [
+            key.get_pubkey().get_bytes() for key in (local, remote, revocation)
+        ]
+        preimage = sha256(b"Lightning key-fee regression")
+        payment_hash = ripemd160(sha256(preimage))
+        delay = 2
+        expiry = self.nodes[0].getblockcount()
+        cases = []
+        delayed = CScript([
+            OP_IF, revocation_pub, OP_ELSE, delay, OP_CHECKSEQUENCEVERIFY,
+            OP_DROP, local_pub, OP_ENDIF, OP_CHECKSIG,
+        ])
+        cases.append(("to_local", delayed, self.fund(delayed)[0], ["delayed", "revocation"]))
+        for anchors in (False, True):
+            for received in (False, True):
+                items = [
+                    OP_DUP, OP_HASH160, hash160(revocation_pub), OP_EQUAL,
+                    OP_IF, OP_CHECKSIG, OP_ELSE, remote_pub, OP_SWAP, OP_SIZE, 32, OP_EQUAL,
+                ]
+                if received:
+                    items += [
+                        OP_IF, OP_HASH160, payment_hash, OP_EQUALVERIFY,
+                        2, OP_SWAP, local_pub, 2, OP_CHECKMULTISIG,
+                        OP_ELSE, OP_DROP, expiry, OP_CHECKLOCKTIMEVERIFY,
+                        OP_DROP, OP_CHECKSIG, OP_ENDIF,
+                    ]
+                    paths = ["received_success", "received_timeout", "revocation"]
+                else:
+                    items += [
+                        OP_NOTIF, OP_DROP, 2, OP_SWAP, local_pub, 2, OP_CHECKMULTISIG,
+                        OP_ELSE, OP_HASH160, payment_hash, OP_EQUALVERIFY,
+                        OP_CHECKSIG, OP_ENDIF,
+                    ]
+                    paths = ["offered_timeout", "offered_preimage", "revocation"]
+                if anchors:
+                    items += [1, OP_CHECKSEQUENCEVERIFY, OP_DROP]
+                script = CScript(items + [OP_ENDIF])
+                cases.append((f"HTLC received={received} anchors={anchors}", script, self.fund(script)[0], paths))
+
+        self.generate(self.wallet, delay)
+        for name, script, funding, paths in cases:
+            for path in paths:
+                tx = CTransaction()
+                tx.nVersion = 2
+                tx.nLockTime = expiry
+                tx.vin = [CTxIn(COutPoint(int(funding["txid"], 16), funding["sent_vout"]), nSequence=delay)]
+                tx.vout = [CTxOut(FUNDING_VALUE - 500, self.wallet.get_output_script())]
+                sighash = SegwitV0SignatureHash(script, tx, 0, SIGHASH_ALL, FUNDING_VALUE)
+                local_sig, remote_sig, revocation_sig = [
+                    key.sign_ecdsa(sighash) + bytes([SIGHASH_ALL]) for key in (local, remote, revocation)
+                ]
+                stacks = {
+                    "delayed": [local_sig, b""],
+                    "revocation": [revocation_sig, b"\x01" if name == "to_local" else revocation_pub],
+                    "offered_timeout": [b"", remote_sig, local_sig, b""],
+                    "offered_preimage": [remote_sig, preimage],
+                    "received_success": [b"", remote_sig, local_sig, preimage],
+                    "received_timeout": [remote_sig, b""],
+                }
+                tx.wit.vtxinwit = [CTxInWitness()]
+                tx.wit.vtxinwit[0].scriptWitness.stack = stacks[path] + [bytes(script)]
+                result = self.nodes[0].testmempoolaccept([tx.serialize().hex()], 0)[0]
+                assert result["allowed"], f"{name}: {path}: {result}"
+
     def run_test(self):
         self.wallet = MiniWallet(self.nodes[0])
         keys_2_of_2, script_2_of_2 = self.create_multisig(2, 2)
@@ -153,6 +277,12 @@ class MultisigSigOpFeeTest(BitcoinTestFramework):
         self.log.info("Only the policy's own reject key bypasses it")
         self.check_fee(funding_1_of_15, script_1_of_15, keys_1_of_15, 1, 12_999, False, ignore_rejects=["min relay fee not met"])
         self.check_fee(funding_1_of_15, script_1_of_15, keys_1_of_15, 1, 12_999, True, ignore_rejects=["min multisig excess key fee not met"])
+
+        self.log.info("Three stack-identity families preserve signed Taproot key counts and the free key allowance")
+        self.check_taproot_identities(keys_1_of_15)
+
+        self.log.info("Standard Lightning close, recovery and HTLC paths have no key-fee floor")
+        self.check_lightning_spends()
 
         self.log.info("The per-excess-key amount is configurable")
         self.restart_node(0, extra_args=["-minrelaymultisigexcesskeyfee=1500"])

@@ -228,10 +228,15 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
 bool SpendsNonAnchorWitnessProg(const CTransaction& tx, const CCoinsViewCache& prevouts);
 
 /** Estimate unproven pubkeys statically, after one free key per script.
- * Signature-shaped witness items cap the credit; no signatures are verified here.
+ * DER-encoded ECDSA or 64/65-byte Schnorr witness items cap the credit;
+ * no signatures are verified here. sigversion selects the witness encoding.
+ * Bounded, proven identity blocks preserve static key/threshold recognition.
+ * Complete standard BOLT #3 to_local and HTLC templates have an explicit
+ * compatibility allowance (except in tapscript); this is not signature proof.
  */
 unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness* witness = nullptr,
-                                     size_t witness_suffix_items = 1);
+                                     size_t witness_suffix_items = 1,
+                                     SigVersion sigversion = SigVersion::WITNESS_V0);
 
 /** Count excess keys in the scripts exposed by an input, including its witness. */
 uint64_t CountInputMultisigExcessKeys(const CTxIn& txin, const CScript& prev_script);
