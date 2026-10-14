@@ -4,6 +4,8 @@
 
 #include <test/util/setup_common.h>
 
+#include <policy/settings.h>
+
 #include <addrman.h>
 #include <banman.h>
 #include <chainparams.h>
@@ -624,4 +626,14 @@ std::ostream& operator<<(std::ostream& os, const uint160& num)
 std::ostream& operator<<(std::ostream& os, const uint256& num)
 {
     return os << num.ToString();
+}
+
+ScopedUnknownScripts::ScopedUnknownScripts() : m_prev{g_reject_unknown_scripts}
+{
+    g_reject_unknown_scripts = false;
+}
+
+ScopedUnknownScripts::~ScopedUnknownScripts()
+{
+    g_reject_unknown_scripts = m_prev;
 }

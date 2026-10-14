@@ -66,6 +66,7 @@
 #include <policy/fees.h>
 #include <policy/fees_args.h>
 #include <policy/policy.h>
+#include <policy/scriptshape.h>
 #include <policy/settings.h>
 #include <protocol.h>
 #include <rpc/blockchain.h>
@@ -767,6 +768,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-minrelaytxfee=<amt>", strprintf("Fees (in %s/kvB) smaller than this are considered zero fee for relaying, mining and transaction creation (default: %s)",
         CURRENCY_UNIT, FormatMoney(DEFAULT_MIN_RELAY_TX_FEE)), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-rejectparasites", strprintf("Refuse to relay or mine parasitic overlay protocols (default: %u)", DEFAULT_REJECT_PARASITES), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
+    argsman.AddArg("-rejectunknownscripts", strprintf("Refuse to relay or mine transactions whose input scripts are not a known shape: sane miniscript, a known contract template (Lightning, swaps, Ark, Liquid), or one of those behind a timelock or hash check (default: %u)", DEFAULT_REJECT_UNKNOWN_SCRIPTS), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-rejecttokens",
                    strprintf("Refuse to relay or mine transactions involving non-bitcoin tokens (default: %u)",
                              DEFAULT_REJECT_TOKENS),
@@ -875,6 +877,7 @@ void InitParameterInteraction(ArgsManager& args)
         args.SoftSetArg("-permitbaremultisig", "1");
         args.SoftSetArg("-rejectparasites", "0");
         args.SoftSetArg("-rejecttokens", "0");
+        args.SoftSetArg("-rejectunknownscripts", "0");
         args.SoftSetArg("-subdustfeepenalty", "0");
         args.SoftSetArg("-datacarriercost", "0.25");
         args.SoftSetArg("-datacarrierfullcount", "0");
@@ -1220,6 +1223,7 @@ bool AppInitParameterInteraction(const ArgsManager& args)
     }
 
     g_script_size_policy_limit = args.GetIntArg("-maxscriptsize", g_script_size_policy_limit);
+    g_reject_unknown_scripts = args.GetBoolArg("-rejectunknownscripts", DEFAULT_REJECT_UNKNOWN_SCRIPTS);
 
     nBytesPerSigOp = args.GetIntArg("-bytespersigop", nBytesPerSigOp);
     nBytesPerSigOpStrict = args.GetIntArg("-bytespersigopstrict", nBytesPerSigOpStrict);

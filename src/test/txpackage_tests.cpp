@@ -589,6 +589,8 @@ BOOST_AUTO_TEST_CASE(package_single_tx)
 // the mempool.
 BOOST_AUTO_TEST_CASE(package_witness_swap_tests)
 {
+    // Spends OP_DROP OP_TRUE and OP_TRUE with witness items to vary wtxids; not known script shapes.
+    const ScopedUnknownScripts allow_unknown_scripts;
     // Mine blocks to mature coinbases.
     mineBlocks(5);
     MockMempoolMinFee(CFeeRate(5000));

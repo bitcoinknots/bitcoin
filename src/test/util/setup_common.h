@@ -314,4 +314,11 @@ static inline std::variant<MappingResult, MappingError> PCPRequestPortMap(const 
     return PCPRequestPortMap(nonce, gateway, bind, port, lifetime, interrupt, num_tries, timeout_per_try);
 }
 
+/** Relay unknown input script shapes for the lifetime of the object (tests that spend synthetic scripts). */
+struct ScopedUnknownScripts {
+    const bool m_prev;
+    ScopedUnknownScripts();
+    ~ScopedUnknownScripts();
+};
+
 #endif // BITCOIN_TEST_UTIL_SETUP_COMMON_H

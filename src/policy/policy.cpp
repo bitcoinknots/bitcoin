@@ -420,9 +420,42 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
             if (subscript.GetSigOpCount(true) > MAX_P2SH_SIGOPS) {
                 MaybeReject("scriptcheck-sigops");
             }
+            // Known-shape check for legacy P2SH; witness programs are checked in IsWitnessStandard
+            int wver{0};
+            std::vector<unsigned char> wprog;
+            if (!subscript.IsWitnessProgram(wver, wprog)) {
+                const scriptshape::Analysis shape{scriptshape::Analyze(subscript, scriptshape::Kind::P2SH, {stack.begin(), stack.end() - 1}, g_unproven_field_allowance)};
+                if (!shape.known) {
+                    if (g_reject_unknown_scripts) {
+                        MaybeReject(scriptshape::REJECT_UNKNOWN);
+                    } else {
+                        LogDebug(BCLog::MEMPOOL, "unknown P2SH redeem script shape in %s:%u: %s\n", tx.GetHash().ToString(), i, HexStr(subscript));
+                    }
+                } else if (!shape.items_typed && g_reject_unknown_scripts) {
+                    MaybeReject(scriptshape::REJECT_ITEM_TYPE);
+                }
+            }
         }
     }
 
+    return true;
+}
+
+/** The known-shape and witness-typing checks for one witness input; `kind` says which script the caller established. */
+static bool CheckScriptShape(const CTransaction& tx, unsigned int i, const CScript& prev_spk, scriptshape::Kind kind, const std::string& reason_prefix, std::string& out_reason, const ignore_rejects_type& ignore_rejects)
+{
+    const auto revealed{scriptshape::RevealedScript(prev_spk, tx.vin[i])};
+    if (!revealed || revealed->kind != kind) return true;
+    const scriptshape::Analysis shape{scriptshape::Analyze(revealed->script, revealed->kind, revealed->items, g_unproven_field_allowance)};
+    if (!shape.known) {
+        if (g_reject_unknown_scripts) {
+            MaybeReject(scriptshape::REJECT_UNKNOWN);
+        } else {
+            LogDebug(BCLog::MEMPOOL, "unknown %s script shape in %s:%u: %s\n", kind == scriptshape::Kind::TAPSCRIPT ? "tapscript" : "P2WSH", tx.GetHash().ToString(), i, HexStr(revealed->script));
+        }
+    } else if (!shape.items_typed && g_reject_unknown_scripts) {
+        MaybeReject(scriptshape::REJECT_ITEM_TYPE);
+    }
     return true;
 }
 
@@ -493,6 +526,7 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
                 if (tx.vin[i].scriptWitness.stack[j].size() > MAX_STANDARD_P2WSH_STACK_ITEM_SIZE)
                     MaybeReject("stackitem-size");
             }
+            if (!CheckScriptShape(tx, i, prev.scriptPubKey, scriptshape::Kind::P2WSH, reason_prefix, out_reason, ignore_rejects)) return false;
         }
 
         // Check policy limits for Taproot spends:
@@ -526,6 +560,7 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
                             }
                         }
                     }
+                    if (!CheckScriptShape(tx, i, prev.scriptPubKey, scriptshape::Kind::TAPSCRIPT, reason_prefix, out_reason, ignore_rejects)) return false;
                 }
             } else if (stack.size() == 1) {
                 // Key path spend (1 stack element after removing optional annex)
