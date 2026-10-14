@@ -12,4 +12,5 @@ This documentation is not an exhaustive list of all policy rules.
 - [Mempool Limits](mempool-limits.md)
 - [Mempool Replacements](mempool-replacements.md)
 - [Packages](packages.md)
+- [Input Script Shapes](script-shapes.md)
 

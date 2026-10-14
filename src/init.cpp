@@ -769,6 +769,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
         CURRENCY_UNIT, FormatMoney(DEFAULT_MIN_RELAY_TX_FEE)), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-rejectparasites", strprintf("Refuse to relay or mine parasitic overlay protocols (default: %u)", DEFAULT_REJECT_PARASITES), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-rejectunknownscripts", strprintf("Refuse to relay or mine transactions whose input scripts are not a known shape: sane miniscript, a known contract template (Lightning, swaps, Ark, Liquid), or one of those behind a timelock or hash check (default: %u)", DEFAULT_REJECT_UNKNOWN_SCRIPTS), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
+    argsman.AddArg("-unprovenfieldallowance", strprintf("Keys and hashes per input script that no witness item proves before the rest counts as datacarrier bytes (default: %u)", scriptshape::DEFAULT_UNPROVEN_FIELD_ALLOWANCE), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-rejecttokens",
                    strprintf("Refuse to relay or mine transactions involving non-bitcoin tokens (default: %u)",
                              DEFAULT_REJECT_TOKENS),
@@ -1224,6 +1225,7 @@ bool AppInitParameterInteraction(const ArgsManager& args)
 
     g_script_size_policy_limit = args.GetIntArg("-maxscriptsize", g_script_size_policy_limit);
     g_reject_unknown_scripts = args.GetBoolArg("-rejectunknownscripts", DEFAULT_REJECT_UNKNOWN_SCRIPTS);
+    g_unproven_field_allowance = args.GetIntArg("-unprovenfieldallowance", g_unproven_field_allowance);
 
     nBytesPerSigOp = args.GetIntArg("-bytespersigop", nBytesPerSigOp);
     nBytesPerSigOpStrict = args.GetIntArg("-bytespersigopstrict", nBytesPerSigOpStrict);

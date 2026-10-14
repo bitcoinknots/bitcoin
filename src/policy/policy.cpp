@@ -681,7 +681,9 @@ std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsV
         const CTxOut &utxo = view.AccessCoin(txin.prevout).out;
         auto[script, consensus_weight_per_byte] = GetScriptForTransactionInput(utxo.scriptPubKey, txin);
         const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness);
-        ret.first += dcb.first;
+        // The script-level count and the field budget both price what no signature proves: charge an input the
+        // stricter of the two, never the sum.
+        ret.first += std::max(dcb.first, scriptshape::FieldBudgetBytes(utxo.scriptPubKey, txin));
         ret.second += dcb.second;
     }
     for (size_t i{tx.vout.size()}; i; ) {
@@ -705,7 +707,7 @@ int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& vi
             auto[script, consensus_weight_per_byte] = GetScriptForTransactionInput(utxo.scriptPubKey, txin);
             if (weight_per_data_byte > consensus_weight_per_byte) {
                 const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness);
-                mod_weight += int64_t(dcb.first + dcb.second) * (weight_per_data_byte - consensus_weight_per_byte);
+                mod_weight += int64_t(dcb.first + dcb.second + scriptshape::FieldBudgetBytes(utxo.scriptPubKey, txin)) * (weight_per_data_byte - consensus_weight_per_byte);
             }
         }
         if (weight_per_data_byte > WITNESS_SCALE_FACTOR) {
