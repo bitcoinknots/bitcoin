@@ -7,6 +7,9 @@
 
 #include <policy/policy.h>
 
+#include <logging.h>
+#include <policy/scriptshape.h>
+
 #include <coins.h>
 #include <consensus/amount.h>
 #include <consensus/consensus.h>
@@ -33,6 +36,8 @@
 #include <vector>
 
 unsigned int g_script_size_policy_limit{DEFAULT_SCRIPT_SIZE_POLICY_LIMIT};
+bool g_reject_unknown_scripts{DEFAULT_REJECT_UNKNOWN_SCRIPTS};
+unsigned int g_unproven_field_allowance{scriptshape::DEFAULT_UNPROVEN_FIELD_ALLOWANCE};
 
 CAmount GetDustThreshold(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
 {

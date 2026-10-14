@@ -58,6 +58,8 @@ static constexpr unsigned int DEFAULT_INCREMENTAL_RELAY_FEE{1000};
 static constexpr CAmount CORE_INCREMENTAL_RELAY_FEE{100};
 /** Default for -maxscriptsize */
 static constexpr unsigned int DEFAULT_SCRIPT_SIZE_POLICY_LIMIT{1650};
+/** Default for -rejectunknownscripts: refuse input scripts that are not a known shape (see policy/scriptshape.h) */
+static constexpr bool DEFAULT_REJECT_UNKNOWN_SCRIPTS{true};
 /** Default for -bytespersigop */
 static constexpr unsigned int DEFAULT_BYTES_PER_SIGOP{20};
 /** Default for -bytespersigopstrict */
