@@ -93,6 +93,7 @@ add_executable(test_bitcoin
   script_segwit_tests.cpp
   script_standard_tests.cpp
   script_tests.cpp
+  scriptshape_tests.cpp
   scriptnum_tests.cpp
   serfloat_tests.cpp
   serialize_tests.cpp
@@ -141,6 +142,7 @@ target_json_data_sources(test_bitcoin
   data/key_io_invalid.json
   data/key_io_valid.json
   data/script_tests.json
+  data/scriptshape_vectors.json
   data/unified_sighash.json
   data/sighash.json
   data/tx_invalid.json
