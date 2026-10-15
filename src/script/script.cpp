@@ -559,7 +559,7 @@ DeadParts FindDeadParts(const CScript& script)
             break;
         }
         case OP_PICK: case OP_ROLL: {
-            int64_t n;
+            int64_t n{0};
             const bool known{values.Num(stack.Pop(), n)};
             if (!known || n < 0 || size_t(n) >= stack.size()) {
                 // Reaches below what is known, or the depth itself is unknown
@@ -587,7 +587,7 @@ DeadParts FindDeadParts(const CScript& script)
             break;
         }
         case OP_1ADD: case OP_1SUB: case OP_NEGATE: case OP_ABS: case OP_NOT: case OP_0NOTEQUAL: {
-            int64_t a;
+            int64_t a{0};
             if (!values.Num(stack.Pop(), a)) {
                 stack.Push(UNKNOWN);
                 break;
@@ -607,7 +607,7 @@ DeadParts FindDeadParts(const CScript& script)
         case OP_ADD: case OP_SUB: case OP_BOOLAND: case OP_BOOLOR: case OP_NUMEQUAL: case OP_NUMEQUALVERIFY:
         case OP_NUMNOTEQUAL: case OP_LESSTHAN: case OP_GREATERTHAN: case OP_LESSTHANOREQUAL:
         case OP_GREATERTHANOREQUAL: case OP_MIN: case OP_MAX: {
-            int64_t a, b;
+            int64_t a{0}, b{0};
             const bool known_b{values.Num(stack.Pop(), b)};
             const bool known_a{values.Num(stack.Pop(), a)};
             if (opcode == OP_NUMEQUALVERIFY) break;
@@ -634,7 +634,7 @@ DeadParts FindDeadParts(const CScript& script)
             break;
         }
         case OP_WITHIN: {
-            int64_t hi, lo, x;
+            int64_t hi{0}, lo{0}, x{0};
             const bool known_hi{values.Num(stack.Pop(), hi)};
             const bool known_lo{values.Num(stack.Pop(), lo)};
             const bool known_x{values.Num(stack.Pop(), x)};
@@ -661,7 +661,7 @@ DeadParts FindDeadParts(const CScript& script)
             stack.Push(UNKNOWN);
             break;
         case OP_CHECKMULTISIG: case OP_CHECKMULTISIGVERIFY: {
-            int64_t keys, sigs;
+            int64_t keys{0}, sigs{0};
             if (!values.Num(stack.Pop(), keys) || keys < 0 || keys > MAX_PUBKEYS_PER_MULTISIG) {
                 stack.Forget();
             } else {
