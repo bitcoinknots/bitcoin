@@ -249,7 +249,11 @@ size_t BPUBBytes(const CTransaction& tx);
 
 std::pair<CScript, unsigned int> GetScriptForTransactionInput(CScript prevScript, const CTxIn&);
 
-std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsViewCache& view);
+/**
+ * @param[in] verified_keys  One set per input of the keys a signature verified against, from the policy
+ *                           script check, or nullptr when none was observed. See CScript::DatacarrierBytes.
+ */
+std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsViewCache& view, const std::vector<VerifiedKeys>* verified_keys = nullptr);
 
 int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte);
 

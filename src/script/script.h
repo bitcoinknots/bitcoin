@@ -583,7 +583,17 @@ public:
 
     size_t OPNetWitnessSize(const CScriptWitness& witness) const;
     size_t IsOLGA(size_t remaining_outputs) const;
-    std::pair<size_t, size_t> DatacarrierBytes(size_t remaining_outputs, const CScriptWitness* witness = nullptr, bool dead_branches = false) const;
+    /**
+     * @param[in] verified_keys  Public keys (as pushed: 33/65 bytes ECDSA, 32 bytes x-only) that a non-empty
+     *                           signature verified against while this spend ran through the policy script
+     *                           check. When given, a key earns credit only if it is in the set, and the
+     *                           unproven-key charge is at least what the static count alone would give.
+     *                           nullptr means nothing was observed, and the static count alone applies.
+     */
+    std::pair<size_t, size_t> DatacarrierBytes(size_t remaining_outputs, const CScriptWitness* witness = nullptr, bool dead_branches = false, const VerifiedKeys* verified_keys = nullptr) const;
+    /** A pointer passed as dead_branches would convert to bool, with no warning for a pointer variable; this makes it a compile error. */
+    template <typename T>
+    std::pair<size_t, size_t> DatacarrierBytes(size_t remaining_outputs, const CScriptWitness* witness, T* dead_branches, const VerifiedKeys* verified_keys = nullptr) const = delete;
 
     void clear()
     {
