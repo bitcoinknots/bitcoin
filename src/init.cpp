@@ -639,6 +639,7 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
                    strprintf("Relay and mine non-OP_RETURN datacarrier injection (default: %u)",
                              DEFAULT_ACCEPT_NON_STD_DATACARRIER),
                    ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
+    argsman.AddArg("-rejectbpub", strprintf("Count the witness scripts of inputs that carry a BPUB file as non-standard data carrier bytes (default: %u)", DEFAULT_REJECT_BPUB), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-acceptnonstdtxn", strprintf("Relay and mine \"non-standard\" transactions (default: %u)", DEFAULT_ACCEPT_NON_STD_TXN), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-acceptunknownwitness",
                    strprintf("Relay transactions sending to unknown/future witness script versions (default: %u)", DEFAULT_ACCEPTUNKNOWNWITNESS),
@@ -1081,6 +1082,7 @@ bool AppInitParameterInteraction(const ArgsManager& args)
     if (auto parsed = args.GetFixedPointArg("-datacarriercost", 2)) {
         g_weight_per_data_byte = ((*parsed * WITNESS_SCALE_FACTOR) + 99) / 100;
     }
+    g_reject_bpub = args.GetBoolArg("-rejectbpub", DEFAULT_REJECT_BPUB);
 
     nBytesPerSigOp = args.GetIntArg("-bytespersigop", nBytesPerSigOp);
     nBytesPerSigOpStrict = args.GetIntArg("-bytespersigopstrict", nBytesPerSigOpStrict);

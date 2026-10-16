@@ -11,9 +11,11 @@
 #include <consensus/amount.h>
 #include <consensus/consensus.h>
 #include <consensus/validation.h>
+#include <crypto/common.h>
 #include <kernel/mempool_options.h>
 #include <policy/feerate.h>
 #include <primitives/transaction.h>
+#include <pubkey.h>
 #include <script/interpreter.h>
 #include <script/script.h>
 #include <script/solver.h>
@@ -444,6 +446,7 @@ std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsV
         ret.first += dcb.first;
         ret.second += dcb.second;
     }
+    if (::g_reject_bpub) ret.second += BPUBBytes(tx);
     for (size_t i{tx.vout.size()}; i; ) {
         const CTxOut& txout = tx.vout[--i];
         const auto dcb = txout.scriptPubKey.DatacarrierBytes(tx.vout.size() - i);
@@ -468,6 +471,7 @@ int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& vi
                 mod_weight += int64_t(dcb.first + dcb.second) * (weight_per_data_byte - consensus_weight_per_byte);
             }
         }
+        if (::g_reject_bpub) mod_weight += int64_t(BPUBBytes(tx)) * (weight_per_data_byte - 1);
         if (weight_per_data_byte > WITNESS_SCALE_FACTOR) {
             for (size_t i{tx.vout.size()}; i; ) {
                 const CTxOut& txout = tx.vout[--i];
@@ -478,4 +482,73 @@ int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& vi
     }
 
     return int32_t(std::min(mod_weight, int64_t{std::numeric_limits<int32_t>::max()}));
+}
+
+bool g_reject_bpub{DEFAULT_REJECT_BPUB};
+
+static bool IsBPUBHeader(const std::vector<unsigned char>& head)
+{
+    if (head.size() < 10) return false;
+    if (std::equal(head.begin(), head.begin() + 4, "BPUB")) return head[4] == 1;
+    if (head[4] != 4 && head[4] != 5) return false;
+    // The body opens with a 44 byte header and fits in a block, and DEFLATE inflates at most
+    // 1032 times, so the high half of its 64 bit uncompressed size is always zero.
+    const uint32_t body_len{ReadBE32(head.data())};
+    return body_len >= 44 && body_len <= MAX_BLOCK_SERIALIZED_SIZE && ReadBE32(head.data() + 6) == 0;
+}
+
+size_t BPUBBytes(const CTransaction& tx)
+{
+    // A BPUB reader joins, in input order, each input whose witness ends in a 1-of-N multisig
+    // with the same last key, taking each key but the last, less its first and last bytes, and
+    // reads the result as a stream that opens with a header. Nothing checks those keys, since the
+    // last one signs first, so one reader takes pushes of any size but OP_0, and N as any opcode
+    // valued 0x50 + N; another takes only compressed keys and OP_N, skipping any other input.
+    struct Input {
+        std::vector<unsigned char> control, head;
+        bool compressed_keys;
+        size_t bytes;
+    };
+    std::vector<Input> inputs;
+    std::vector<unsigned char> push_data;
+    for (const CTxIn& txin : tx.vin) {
+        const auto& stack{txin.scriptWitness.stack};
+        if (stack.size() < 2) continue;
+        const CScript script(stack.back().begin(), stack.back().end());
+        CScript::const_iterator it{script.begin()};
+        opcodetype opcode;
+        if (!script.GetOp(it, opcode) || opcode != OP_1) continue;
+        Input input{{}, {}, true, script.size()};
+        size_t keys{0};
+        bool parsed;
+        while ((parsed = script.GetOp(it, opcode, push_data)) && opcode > OP_0 && opcode <= OP_PUSHDATA4) {
+            if (keys++ && input.head.size() < 10 && input.control.size() > 2) {
+                input.head.insert(input.head.end(), input.control.begin() + 1, input.control.begin() + 1 + std::min(10 - input.head.size(), input.control.size() - 2));
+            }
+            input.compressed_keys &= push_data.size() == CPubKey::COMPRESSED_SIZE;
+            input.control.swap(push_data);
+        }
+        if (!parsed || keys < 2 || static_cast<size_t>(opcode) != 0x50 + keys) continue;
+        input.compressed_keys &= keys <= 16;
+        if (!script.GetOp(it, opcode) || opcode != OP_CHECKMULTISIG || it != script.end()) continue;
+        inputs.push_back(std::move(input));
+    }
+
+    std::stable_sort(inputs.begin(), inputs.end(), [](const Input& a, const Input& b) { return a.control < b.control; });
+    size_t bytes{0};
+    for (auto stream{inputs.begin()}; stream != inputs.end();) {
+        const auto end{std::find_if(stream, inputs.end(), [&](const Input& input) { return input.control != stream->control; })};
+        std::vector<unsigned char> head, compressed_head;
+        size_t stream_bytes{0};
+        for (auto input{stream}; input != end; ++input) {
+            if (head.size() < 10) head.insert(head.end(), input->head.begin(), input->head.end());
+            if (input->compressed_keys && compressed_head.size() < 10) {
+                compressed_head.insert(compressed_head.end(), input->head.begin(), input->head.end());
+            }
+            stream_bytes += input->bytes;
+        }
+        if (IsBPUBHeader(head) || IsBPUBHeader(compressed_head)) bytes += stream_bytes;
+        stream = end;
+    }
+    return bytes;
 }
