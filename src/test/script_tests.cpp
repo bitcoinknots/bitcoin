@@ -7,6 +7,7 @@
 #include <test/data/script_tests.json.h>
 #include <test/data/bip341_wallet_vectors.json.h>
 
+#include <coins.h>
 #include <common/system.h>
 #include <core_io.h>
 #include <key.h>
@@ -2127,6 +2128,323 @@ BOOST_AUTO_TEST_CASE(script_DataCarrierBytes_tapscript_unproven_pubkeys)
     BOOST_CHECK_EQUAL("0+496", DatacarrierBytesStr(CScript{stranded} << OP_2DROP << OP_2DROP << OP_2DROP
                                                                      << OP_2DROP << OP_2DROP << OP_2DROP
                                                                      << OP_2DROP << OP_DROP));
+}
+
+/** Unproven-key bytes of a script, given the keys a signature verified against (or none observed). */
+static size_t UnprovenBytes(const CScript& script, const CScriptWitness& witness, const VerifiedKeys* verified = nullptr)
+{
+    return script.DatacarrierBytes(0, &witness, /*dead_branches=*/false, verified).first;
+}
+
+/** The keys MultisigScript and MultiAScript use, numbered from first to last inclusive, from 1. */
+static VerifiedKeys KeysUpTo(const int last, const size_t key_size = 33, const int first = 1)
+{
+    VerifiedKeys keys;
+    for (int i{first}; i <= last; ++i) keys.insert(std::vector<unsigned char>(key_size, i));
+    return keys;
+}
+
+/**
+ * A decoy that credits every key of an n-key multisig but never runs, which a witness of
+ * signature-shaped items then pays for. OP_1 OP_NOTIF <n-1 checks> OP_ENDIF <drops> <1-of-n>.
+ */
+static CScript DecoyMultisig(const int n, const int m = 1, const size_t key_size = 33)
+{
+    CScript script{CScript() << OP_1 << OP_NOTIF};
+    for (int i{0}; i < n - 1; ++i) script << OP_CHECKSIG;
+    script << OP_ENDIF;
+    for (int i{0}; i < (n - 1) / 2; ++i) script << OP_2DROP;
+    if ((n - 1) % 2) script << OP_DROP;
+    const CScript multisig{MultisigScript(m, n, key_size)};
+    script.insert(script.end(), multisig.begin(), multisig.end());
+    return script;
+}
+
+BOOST_AUTO_TEST_CASE(script_DatacarrierBytes_verified_keys)
+{
+    // The posted proof of concept: 14 checks that never run credit 15 keys, one signature is real.
+    const CScript poc{DecoyMultisig(15)};
+    const CScriptWitness poc_witness{MultisigWitness(15, poc)};
+    // Static count alone is fooled.
+    BOOST_CHECK_EQUAL(0U, UnprovenBytes(poc, poc_witness));
+    // Only the key that signed is credited: 14 unproven, 4 beyond the allowance of 10.
+    VerifiedKeys one{KeysUpTo(1)};
+    BOOST_CHECK_EQUAL(132U, UnprovenBytes(poc, poc_witness, &one));
+    // Observing nothing verified at all is an observation, and it is charged more, not less.
+    VerifiedKeys none;
+    BOOST_CHECK_EQUAL(165U, UnprovenBytes(poc, poc_witness, &none));
+    // Not observing anything (nullptr) falls back to the static count and never reads as verified.
+    BOOST_CHECK_EQUAL(0U, UnprovenBytes(poc, poc_witness, nullptr));
+    // Keys that are not in the script, or differ in a single byte, earn nothing.
+    VerifiedKeys foreign{KeysUpTo(30, 33, 16)};
+    BOOST_CHECK_EQUAL(165U, UnprovenBytes(poc, poc_witness, &foreign));
+    VerifiedKeys off_by_one;
+    off_by_one.insert(std::vector<unsigned char>(32, 1));
+    off_by_one.insert(std::vector<unsigned char>(34, 1));
+    BOOST_CHECK_EQUAL(165U, UnprovenBytes(poc, poc_witness, &off_by_one));
+    // All keys verified is free, and so is a spend within the allowance of 10 unverified keys.
+    VerifiedKeys all{KeysUpTo(15)};
+    BOOST_CHECK_EQUAL(0U, UnprovenBytes(poc, poc_witness, &all));
+    VerifiedKeys five{KeysUpTo(5)};
+    BOOST_CHECK_EQUAL(0U, UnprovenBytes(poc, poc_witness, &five));
+    VerifiedKeys four{KeysUpTo(4)};
+    BOOST_CHECK_EQUAL(33U, UnprovenBytes(poc, poc_witness, &four));
+
+    // The live shape from the #422 review: junk dropped up front, then 14 live OP_CHECKSIG OP_DROP pairs
+    // that take a key and an empty signature from the witness, then a 1-of-15 with one real signature.
+    // No pushed key sits beside a signature check, so the static count finds nothing to charge.
+    {
+        CScript live{CScript() << OP_2DROP << OP_2DROP << OP_2DROP << OP_2DROP << OP_2DROP << OP_2DROP << OP_2DROP};
+        for (int i{0}; i < 14; ++i) live << OP_CHECKSIG << OP_DROP;
+        const CScript multisig{MultisigScript(1, 15)};
+        live.insert(live.end(), multisig.begin(), multisig.end());
+        CScriptWitness live_witness;
+        live_witness.stack.emplace_back();                       // the CHECKMULTISIG dummy
+        live_witness.stack.emplace_back(72, 1);                  // the one real signature
+        for (int i{0}; i < 14; ++i) {
+            live_witness.stack.emplace_back();                   // an empty signature
+            live_witness.stack.emplace_back(33, 0x80 + i);       // the key CHECKSIG takes
+        }
+        for (int i{0}; i < 14; ++i) live_witness.stack.emplace_back(72, 2); // junk, dropped up front
+        live_witness.stack.emplace_back(live.begin(), live.end());
+        BOOST_CHECK_EQUAL(0U, UnprovenBytes(live, live_witness));
+        BOOST_CHECK_EQUAL(132U, UnprovenBytes(live, live_witness, &one));
+        BOOST_CHECK_EQUAL(0U, live.DatacarrierBytes(0, &live_witness, /*dead_branches=*/false, &one).second);
+        // The junk is 14 * 72 witness bytes that nothing charges.
+    }
+
+    // Allowance edge: 10 unverified is free, 11 costs one key, alone or beside verified keys.
+    for (const int verified_count : {1, 3}) {
+        const VerifiedKeys verified{KeysUpTo(verified_count)};
+        for (const int unproven : {9, 10, 11, 12}) {
+            const CScript script{DecoyMultisig(verified_count + unproven, verified_count)};
+            const CScriptWitness witness{MultisigWitness(verified_count + unproven, script)};
+            BOOST_CHECK_EQUAL(0U, UnprovenBytes(script, witness));
+            BOOST_CHECK_EQUAL(size_t(unproven > 10 ? unproven - 10 : 0) * 33, UnprovenBytes(script, witness, &verified));
+        }
+    }
+
+    // Key count boundaries of CHECKMULTISIG: 0, 1, 16, 17, 20.
+    const CScript empty_multisig{MultisigScript(0, 0)};
+    BOOST_CHECK_EQUAL(0U, UnprovenBytes(empty_multisig, MultisigWitness(0, empty_multisig), &none));
+    for (const auto& [n, expected] : std::vector<std::pair<int, size_t>>{{1, 0}, {16, 165}, {17, 198}, {20, 297}}) {
+        const CScript script{DecoyMultisig(n)};
+        const CScriptWitness witness{MultisigWitness(n, script)};
+        BOOST_CHECK_EQUAL(0U, UnprovenBytes(script, witness));
+        BOOST_CHECK_EQUAL(expected, UnprovenBytes(script, witness, &one));
+    }
+
+    // Honest multisig is free whenever the signing keys are what was verified.
+    const CScript m11{MultisigScript(11, 15)};
+    VerifiedKeys eleven{KeysUpTo(11)};
+    BOOST_CHECK_EQUAL(0U, UnprovenBytes(m11, MultisigWitness(11, m11), &eleven));
+    const CScript m2{MultisigScript(2, 3)};
+    VerifiedKeys two{KeysUpTo(2)};
+    BOOST_CHECK_EQUAL(0U, UnprovenBytes(m2, MultisigWitness(2, m2), &two));
+    // A 65 byte push in a witness multisig script is never a key: segwit policy refuses an uncompressed
+    // key wherever it checks one, so the odd-push rule counts every such slot as data in full, outside the
+    // allowance, whether or not a signature was observed against it. All 15 slots of this 1-of-15 are 65
+    // byte pushes, so the whole 15 * 65 = 975 bytes are charged, by the static count alone and unchanged by
+    // any set of verified keys. The allowance (10 compressed keys) applies only to key-sized pushes.
+    const CScript wide_poc{DecoyMultisig(15, 1, 65)};
+    VerifiedKeys wide_one{KeysUpTo(1, 65)};
+    BOOST_CHECK_EQUAL(975U, UnprovenBytes(wide_poc, MultisigWitness(15, wide_poc)));
+    BOOST_CHECK_EQUAL(975U, UnprovenBytes(wide_poc, MultisigWitness(15, wide_poc), &wide_one));
+    // A verified set never rescues a 65 byte witness slot, so a 33 byte entry (or any entry) leaves it full.
+    VerifiedKeys narrow_one{KeysUpTo(1, 33)};
+    BOOST_CHECK_EQUAL(975U, UnprovenBytes(wide_poc, MultisigWitness(15, wide_poc), &narrow_one));
+    // 1-of-11 and 1-of-6 of 65 byte slots: all 11 * 65 = 715 and all 6 * 65 = 390 bytes are data in full.
+    const CScript wide_11{DecoyMultisig(11, 1, 65)};
+    BOOST_CHECK_EQUAL(715U, UnprovenBytes(wide_11, MultisigWitness(11, wide_11), &wide_one));
+    const CScript wide_6{DecoyMultisig(6, 1, 65)};
+    BOOST_CHECK_EQUAL(390U, UnprovenBytes(wide_6, MultisigWitness(6, wide_6), &wide_one));
+    const CScript narrow_11{DecoyMultisig(11)};
+    BOOST_CHECK_EQUAL(0U, UnprovenBytes(narrow_11, MultisigWitness(11, narrow_11), &one));
+
+    // One key named many times and verified once: every push has the same bytes, so all are credited.
+    // This carries no data, since only one key's worth of bytes is repeated. Where the static count
+    // already charges for it, the larger of the two stands.
+    const std::vector<unsigned char> key(33, 7);
+    CScript repeated{CScript() << 1};
+    for (int i{0}; i < 15; ++i) repeated << key;
+    repeated << 15 << OP_CHECKMULTISIG;
+    VerifiedKeys the_key;
+    the_key.insert(key);
+    BOOST_CHECK_EQUAL(132U, UnprovenBytes(repeated, MultisigWitness(1, repeated)));
+    BOOST_CHECK_EQUAL(132U, UnprovenBytes(repeated, MultisigWitness(1, repeated), &the_key));
+    CScript repeated_decoy{CScript() << OP_1 << OP_NOTIF};
+    for (int i{0}; i < 14; ++i) repeated_decoy << key << OP_CHECKSIG;
+    repeated_decoy << OP_ENDIF;
+    for (int i{0}; i < 7; ++i) repeated_decoy << OP_2DROP;
+    repeated_decoy << key << OP_CHECKSIG;
+    CScriptWitness repeated_witness;
+    repeated_witness.stack.emplace_back(72, 1);
+    for (int i{0}; i < 14; ++i) repeated_witness.stack.emplace_back(72, 2);
+    repeated_witness.stack.emplace_back(repeated_decoy.begin(), repeated_decoy.end());
+    BOOST_CHECK_EQUAL(0U, UnprovenBytes(repeated_decoy, repeated_witness));
+    BOOST_CHECK_EQUAL(0U, UnprovenBytes(repeated_decoy, repeated_witness, &the_key));
+    BOOST_CHECK_EQUAL(165U, UnprovenBytes(repeated_decoy, repeated_witness, &none));
+
+    // A dropped run of keys is counted whole by the caller as data, and is not charged again here,
+    // with or without a verified set, whatever it holds.
+    const CScript dropped{CScript() << std::vector<unsigned char>(33, 1) << std::vector<unsigned char>(33, 2) << OP_2DROP};
+    VerifiedKeys first_dropped{KeysUpTo(1)};
+    for (const VerifiedKeys* verified : std::initializer_list<const VerifiedKeys*>{nullptr, &none, &first_dropped}) {
+        const auto dcb{dropped.DatacarrierBytes(0, nullptr, /*dead_branches=*/false, verified)};
+        BOOST_CHECK_EQUAL(0U, dcb.first);
+        BOOST_CHECK_EQUAL(dropped.DatacarrierBytes(0).second, dcb.second);
+    }
+
+    // Tapscript k-of-n. Honest 2-of-3 is free, and near the wide end a witness claiming more
+    // signatures than verified is caught.
+    const CScript multi_a{MultiAScript(2, 3)};
+    VerifiedKeys first_two{KeysUpTo(2, 32)};
+    BOOST_CHECK_EQUAL(0U, UnprovenBytes(multi_a, TapscriptWitness(2, 3, multi_a), &first_two));
+    for (const int n : {127, 128}) {
+        const CScript wide_a{MultiAScript(n, n)};
+        const CScriptWitness all_signed{TapscriptWitness(n, n, wide_a)};
+        VerifiedKeys everyone{KeysUpTo(n, 32)};
+        BOOST_CHECK_EQUAL(0U, UnprovenBytes(wide_a, all_signed));
+        BOOST_CHECK_EQUAL(0U, UnprovenBytes(wide_a, all_signed, &everyone));
+        // 117 of the n keys verified, so n - 117 are unproven: 10 or 11 for these n. They are 32 byte
+        // pushes, so ten of them (320) fit the allowance of 330 bytes and eleven (352) are over by 22.
+        VerifiedKeys most_of_them{KeysUpTo(117, 32)};
+        BOOST_CHECK_EQUAL(size_t(n - 117) * 32 > 330 ? size_t(n - 117) * 32 - 330 : 0, UnprovenBytes(wide_a, all_signed, &most_of_them));
+    }
+    // 128 keys, a witness showing 128 signatures, but only 117 keys verified: 11 unproven, 22 bytes over.
+    const CScript wide_a{MultiAScript(128, 128)};
+    VerifiedKeys most{KeysUpTo(117, 32)};
+    BOOST_CHECK_EQUAL(22U, UnprovenBytes(wide_a, TapscriptWitness(128, 128, wide_a), &most));
+}
+
+BOOST_AUTO_TEST_CASE(script_DatacarrierBytes_tx_verified_keys)
+{
+    // A transaction of P2WSH inputs, each spending the given script with the given witness.
+    const CScript honest{MultisigScript(1, 3)};
+    const CScript decoy{DecoyMultisig(15)};
+    const CScriptWitness honest_witness{MultisigWitness(1, honest)};
+    const CScriptWitness decoy_witness{MultisigWitness(15, decoy)};
+    const CScript p2wsh{CScript() << OP_0 << std::vector<unsigned char>(32, 1)};
+
+    CCoinsView dummy;
+    CCoinsViewCache view{&dummy};
+    const auto make_tx{[&](const std::vector<const CScriptWitness*>& witnesses) {
+        CMutableTransaction mtx;
+        for (size_t i{0}; i < witnesses.size(); ++i) {
+            const COutPoint prevout{Txid::FromUint256(uint256{static_cast<unsigned char>(i + 1)}), 0};
+            view.AddCoin(prevout, Coin{CTxOut{COIN, p2wsh}, 1, false}, true);
+            mtx.vin.emplace_back(prevout);
+            mtx.vin.back().scriptWitness = *witnesses[i];
+        }
+        mtx.vout.emplace_back(COIN, CScript() << OP_TRUE);
+        return CTransaction{mtx};
+    }};
+    VerifiedKeys one{KeysUpTo(1)};
+    const std::vector<VerifiedKeys> verified_both{one, one};
+
+    // The decoy sits in input 1 only. The set of input 1 is the one that is consulted for it, and the
+    // honest input 0 with its own set adds nothing.
+    {
+        const CTransaction tx{make_tx({&honest_witness, &decoy_witness})};
+        BOOST_CHECK_EQUAL(0U, DatacarrierBytes(tx, view).first);
+        BOOST_CHECK_EQUAL(132U, DatacarrierBytes(tx, view, &verified_both).first);
+        // Sets crossed over the inputs: input 1 verified all of its keys, input 0 verified none of its own.
+        const std::vector<VerifiedKeys> crossed{VerifiedKeys{}, KeysUpTo(15)};
+        BOOST_CHECK_EQUAL(0U, DatacarrierBytes(tx, view, &crossed).first);
+        const std::vector<VerifiedKeys> only_first_input{KeysUpTo(15), VerifiedKeys{}};
+        BOOST_CHECK_EQUAL(165U, DatacarrierBytes(tx, view, &only_first_input).first);
+    }
+    // And in input 0 only, with the honest one after it.
+    {
+        const CTransaction tx{make_tx({&decoy_witness, &honest_witness})};
+        BOOST_CHECK_EQUAL(132U, DatacarrierBytes(tx, view, &verified_both).first);
+    }
+    // Two decoys add up.
+    {
+        const CTransaction tx{make_tx({&decoy_witness, &decoy_witness})};
+        BOOST_CHECK_EQUAL(264U, DatacarrierBytes(tx, view, &verified_both).first);
+    }
+    // Nothing observed (an empty vector) or a vector that does not have one set per input is not an
+    // observation, whatever it holds, and the static count stands.
+    {
+        const CTransaction tx{make_tx({&honest_witness, &decoy_witness})};
+        const std::vector<VerifiedKeys> empty;
+        BOOST_CHECK(DatacarrierBytes(tx, view, &empty) == DatacarrierBytes(tx, view));
+        const std::vector<VerifiedKeys> too_short{one};
+        BOOST_CHECK(DatacarrierBytes(tx, view, &too_short) == DatacarrierBytes(tx, view));
+        const std::vector<VerifiedKeys> too_long{one, one, one};
+        BOOST_CHECK(DatacarrierBytes(tx, view, &too_long) == DatacarrierBytes(tx, view));
+        BOOST_CHECK_EQUAL(0U, DatacarrierBytes(tx, view, &empty).first);
+    }
+}
+
+/** A checker that answers as told, so the recorder can be seen to change nothing. */
+class FixedAnswerChecker : public BaseSignatureChecker
+{
+public:
+    bool answer;
+    explicit FixedAnswerChecker(bool a) : answer{a} {}
+    bool CheckECDSASignature(const std::vector<unsigned char>&, const std::vector<unsigned char>&, const CScript&, SigVersion, SighashRules) const override { return answer; }
+    bool CheckSchnorrSignature(Span<const unsigned char>, Span<const unsigned char>, SigVersion, ScriptExecutionData&, ScriptError*, SighashRules) const override { return answer; }
+    bool CheckLockTime(const CScriptNum&) const override { return answer; }
+    bool CheckSequence(const CScriptNum&) const override { return answer; }
+};
+
+/** A checker that accepts a signature only under the given signature hash rules. */
+class RulesOnlyChecker : public BaseSignatureChecker
+{
+public:
+    SighashRules accepted;
+    explicit RulesOnlyChecker(SighashRules r) : accepted{r} {}
+    bool CheckECDSASignature(const std::vector<unsigned char>&, const std::vector<unsigned char>&, const CScript&, SigVersion, SighashRules rules) const override { return rules == accepted; }
+    bool CheckSchnorrSignature(Span<const unsigned char>, Span<const unsigned char>, SigVersion, ScriptExecutionData&, ScriptError*, SighashRules rules) const override { return rules == accepted; }
+};
+
+BOOST_AUTO_TEST_CASE(key_recording_signature_checker)
+{
+    const std::vector<unsigned char> sig(72, 1), key(33, 2), xonly(32, 3);
+    const CScript code;
+    ScriptExecutionData execdata;
+    for (const bool answer : {true, false}) {
+        FixedAnswerChecker inner{answer};
+        VerifiedKeys keys;
+        KeyRecordingSignatureChecker recorder{inner, keys};
+        // Answers pass through unchanged, and only the keys that verified are noted.
+        BOOST_CHECK_EQUAL(answer, recorder.CheckECDSASignature(sig, key, code, SigVersion::WITNESS_V0));
+        BOOST_CHECK_EQUAL(answer, recorder.CheckSchnorrSignature(sig, xonly, SigVersion::TAPSCRIPT, execdata));
+        BOOST_CHECK_EQUAL(answer, recorder.CheckLockTime(CScriptNum{1}));
+        BOOST_CHECK_EQUAL(answer, recorder.CheckSequence(CScriptNum{1}));
+        BOOST_CHECK_EQUAL(keys.size(), answer ? 2U : 0U);
+        if (answer) {
+            BOOST_CHECK(keys.count(key));
+            BOOST_CHECK(keys.count(xonly));
+        }
+    }
+
+    // Past the cap further keys go unnoticed, but every answer is still passed through.
+    FixedAnswerChecker inner{true};
+    VerifiedKeys keys;
+    KeyRecordingSignatureChecker recorder{inner, keys};
+    for (unsigned int i{0}; i < MAX_PUBKEYS_PER_MULTI_A + 10; ++i) {
+        std::vector<unsigned char> k(33, 2);
+        k[1] = i & 0xff;
+        k[2] = i >> 8;
+        BOOST_CHECK(recorder.CheckECDSASignature(sig, k, code, SigVersion::WITNESS_V0));
+    }
+    BOOST_CHECK_EQUAL(keys.size(), size_t{MAX_PUBKEYS_PER_MULTI_A});
+
+    // The signature hash rules reach the wrapped checker as given, and a key is noted under either set.
+    for (const SighashRules accepted : {SighashRules::LEGACY, SighashRules::UNIFIED}) {
+        RulesOnlyChecker rules_inner{accepted};
+        for (const SighashRules asked : {SighashRules::LEGACY, SighashRules::UNIFIED}) {
+            VerifiedKeys rules_keys;
+            KeyRecordingSignatureChecker rules_recorder{rules_inner, rules_keys};
+            const bool expected{asked == accepted};
+            BOOST_CHECK_EQUAL(expected, rules_recorder.CheckECDSASignature(sig, key, code, SigVersion::WITNESS_V0, asked));
+            BOOST_CHECK_EQUAL(expected, rules_recorder.CheckSchnorrSignature(sig, xonly, SigVersion::TAPSCRIPT, execdata, nullptr, asked));
+            BOOST_CHECK_EQUAL(rules_keys.size(), expected ? 2U : 0U);
+        }
+    }
 }
 
 BOOST_AUTO_TEST_CASE(script_GetScriptForTransactionInput)

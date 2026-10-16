@@ -467,4 +467,120 @@ BOOST_FIXTURE_TEST_CASE(checkinputs_flags_per_input_cache_safety, Dersig100Setup
     BOOST_CHECK(!run_check({}));
 }
 
+BOOST_FIXTURE_TEST_CASE(checkinputs_records_verified_keys, TestChain100Setup)
+{
+    // A pay-to-pubkey spend with a real signature
+    const CScript spk{CScript() << ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG};
+    CMutableTransaction mtx;
+    mtx.version = 2;
+    mtx.vin.resize(1);
+    mtx.vin[0].prevout = COutPoint{m_coinbase_txns[0]->GetHash(), 0};
+    mtx.vout.emplace_back(CENT, spk);
+    std::vector<unsigned char> sig;
+    BOOST_REQUIRE(coinbaseKey.Sign(SignatureHash(spk, mtx, 0, SIGHASH_ALL, 0, SigVersion::BASE), sig));
+    sig.push_back(SIGHASH_ALL);
+    mtx.vin[0].scriptSig << sig;
+    const CTransaction tx{mtx};
+
+    LOCK(cs_main);
+    CCoinsViewCache& coins{m_node.chainman->ActiveChainstate().CoinsTip()};
+    ValidationCache& cache{m_node.chainman->m_validation_cache};
+    const unsigned int flags{SCRIPT_VERIFY_P2SH};
+    const auto key_bytes{ToByteVector(coinbaseKey.GetPubKey())};
+
+    // The result is the same with and without a recorder, and the key that verified is noted.
+    {
+        TxValidationState state;
+        PrecomputedTransactionData txdata;
+        BOOST_CHECK(CheckInputScripts(tx, state, &coins, flags, true, false, txdata, cache, nullptr));
+    }
+    for (int round{0}; round < 2; ++round) {
+        // The second round finds the signature in the signature cache, and still records it.
+        TxValidationState state;
+        PrecomputedTransactionData txdata;
+        std::vector<VerifiedKeys> keys;
+        BOOST_CHECK(CheckInputScripts(tx, state, &coins, flags, true, false, txdata, cache, nullptr, {}, &keys));
+        BOOST_REQUIRE_EQUAL(keys.size(), 1U);
+        BOOST_CHECK_EQUAL(keys[0].size(), 1U);
+        BOOST_CHECK(keys[0].count(key_bytes));
+    }
+
+    // Queued checks are block validation's, which never records.
+    {
+        TxValidationState state;
+        PrecomputedTransactionData txdata;
+        std::vector<VerifiedKeys> keys;
+        std::vector<CScriptCheck> checks;
+        BOOST_CHECK(CheckInputScripts(tx, state, &coins, flags, true, false, txdata, cache, &checks, {}, &keys));
+        BOOST_CHECK_EQUAL(checks.size(), 1U);
+        BOOST_CHECK(keys.empty());
+    }
+
+    // Once the script execution cache has it, a check that records still runs the scripts and records,
+    // and leaves the entry in place. A queued check that finds the entry queues nothing, which shows it is there.
+    const auto queued_without_recorder{[&]() EXCLUSIVE_LOCKS_REQUIRED(::cs_main) {
+        TxValidationState state;
+        PrecomputedTransactionData txdata;
+        std::vector<CScriptCheck> checks;
+        BOOST_CHECK(CheckInputScripts(tx, state, &coins, flags, true, true, txdata, cache, &checks));
+        return checks.size();
+    }};
+    BOOST_CHECK_EQUAL(queued_without_recorder(), 1U);
+    {
+        TxValidationState state;
+        PrecomputedTransactionData txdata;
+        BOOST_CHECK(CheckInputScripts(tx, state, &coins, flags, true, true, txdata, cache, nullptr));
+    }
+    BOOST_CHECK_EQUAL(queued_without_recorder(), 0U);
+    for (const bool cache_full_script_store : {true, false}) {
+        TxValidationState state;
+        PrecomputedTransactionData txdata;
+        // stale content must not survive
+        std::vector<VerifiedKeys> keys{VerifiedKeys{std::vector<unsigned char>(33, 2)}, VerifiedKeys{}};
+        BOOST_CHECK(CheckInputScripts(tx, state, &coins, flags, true, cache_full_script_store, txdata, cache, nullptr, {}, &keys));
+        BOOST_REQUIRE_EQUAL(keys.size(), 1U);
+        BOOST_CHECK(keys[0] == VerifiedKeys{key_bytes});
+        BOOST_CHECK_EQUAL(queued_without_recorder(), 0U);
+    }
+
+    // A failing script fails the same way, recorder or not.
+    CMutableTransaction bad{mtx};
+    bad.vin[0].scriptSig = CScript() << std::vector<unsigned char>(72, 1);
+    {
+        TxValidationState state;
+        PrecomputedTransactionData txdata;
+        std::vector<VerifiedKeys> keys;
+        BOOST_CHECK(!CheckInputScripts(CTransaction{bad}, state, &coins, flags, true, false, txdata, cache, nullptr, {}, &keys));
+    }
+
+    // Under the unified signature hash rules a signature is recorded like any other, when the flags select
+    // those rules. Without them the same signature does not verify, so nothing is recorded.
+    {
+        const CTxOut spent_out{coins.AccessCoin(mtx.vin[0].prevout).out};
+        CMutableTransaction umtx{mtx};
+        umtx.vin[0].scriptSig = CScript{};
+        PrecomputedTransactionData sign_data;
+        sign_data.Init(umtx, {spent_out}, /*force=*/true);
+        const int hash_type{SIGHASH_ALL | SIGHASH_UNIFIED};
+        uint256 hash;
+        BOOST_REQUIRE(SignatureHashUnified(hash, spk, umtx, 0, hash_type, SigVersion::BASE, sign_data));
+        std::vector<unsigned char> usig;
+        BOOST_REQUIRE(coinbaseKey.Sign(hash, usig));
+        usig.push_back(static_cast<unsigned char>(hash_type));
+        umtx.vin[0].scriptSig << usig;
+        const CTransaction utx{umtx};
+        for (const bool unified : {true, false}) {
+            TxValidationState state;
+            PrecomputedTransactionData txdata;
+            std::vector<VerifiedKeys> keys;
+            const unsigned int uflags{unified ? flags | SCRIPT_VERIFY_UNIFIED_SIGHASH : flags};
+            BOOST_CHECK_EQUAL(CheckInputScripts(utx, state, &coins, uflags, true, false, txdata, cache, nullptr, {}, &keys), unified);
+            if (unified) {
+                BOOST_REQUIRE_EQUAL(keys.size(), 1U);
+                BOOST_CHECK(keys[0] == VerifiedKeys{key_bytes});
+            }
+        }
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
