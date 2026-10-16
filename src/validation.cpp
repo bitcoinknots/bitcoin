@@ -1565,6 +1565,21 @@ bool MemPoolAccept::PolicyScriptChecks(const ATMPArgs& args, Workspace& ws)
         return false; // state filled in by CheckInputScripts
     }
 
+    // PreChecks counted the unproven pubkeys of each input from the script alone, before any script ran,
+    // and a signature-check opcode in code that never runs, or that runs and fails, fools that count.
+    // Now that the scripts have run, count again from the keys a signature really verified against.
+    // The recount can only add to what PreChecks charged. datacarriercost pricing is not redone.
+    // Recording keeps CheckInputScripts out of the script execution cache, so every input ran and has
+    // its set, and an input that verified no key is recounted with an empty one. Only a result without
+    // one set per input would be no observation, and the static count would stand.
+    if (m_pool.m_opts.datacarrier_fullcount && !args.m_ignore_rejects.count("txn-datacarrier-exceeded") &&
+        ws.m_verified_keys.size() == tx.vin.size()) {
+        const auto dcb = DatacarrierBytes(tx, m_view, &ws.m_verified_keys);
+        if (dcb.first + dcb.second > m_pool.m_opts.max_datacarrier_bytes.value_or(0)) {
+            return state.Invalid(TxValidationResult::TX_NOT_STANDARD, "txn-datacarrier-exceeded");
+        }
+    }
+
     return true;
 }
 
