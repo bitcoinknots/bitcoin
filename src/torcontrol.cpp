@@ -33,6 +33,7 @@
 #include <algorithm>
 #include <cassert>
 #include <chrono>
+#include <csignal>
 #include <cstdint>
 #include <cstdlib>
 #include <deque>
@@ -369,6 +370,11 @@ TorController::~TorController()
 #ifdef ENABLE_TOR_SUBPROCESS
     if (m_process) {
         conn.Command("SIGNAL SHUTDOWN");
+        try {
+            m_process->kill(SIGTERM);
+        } catch (...) {
+            // ignore any exceptions
+        }
         delete m_process;
     }
 #endif
@@ -697,6 +703,8 @@ std::string TorController::LaunchTor()
     while (!fs::exists(controlport_env_filepath)) {
         if (m_process->poll() != -1) {
             LogDebug(BCLog::TOR, "tor: Tor process died before making control port file\n");
+            delete m_process;
+            m_process = nullptr;
             throw std::runtime_error("tor process died");
         }
         std::this_thread::sleep_for(std::chrono::seconds(1));
