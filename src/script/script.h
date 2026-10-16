@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <set>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -36,6 +37,9 @@ static const int MAX_PUBKEYS_PER_MULTISIG = 20;
 
 /** The limit of keys in OP_CHECKSIGADD-based scripts. It is due to the stack limit in BIP342. */
 static constexpr unsigned int MAX_PUBKEYS_PER_MULTI_A = 999;
+
+/** The public keys a non-empty signature verified against while one input was executed. */
+using VerifiedKeys = std::set<std::vector<unsigned char>>;
 
 // Maximum script length in bytes
 static const int MAX_SCRIPT_SIZE = 10000;
