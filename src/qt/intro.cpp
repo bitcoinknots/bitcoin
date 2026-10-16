@@ -5,6 +5,7 @@
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
 #include <chainparams.h>
+#include <chainparamsbase.h>
 #include <qt/intro.h>
 #include <qt/forms/ui_intro.h>
 #include <util/chaintype.h>
@@ -24,6 +25,7 @@
 #include <QFileDialog>
 #include <QSettings>
 #include <QMessageBox>
+#include <QSignalBlocker>
 
 #include <cmath>
 #include <cstdlib>
@@ -47,7 +49,8 @@ public:
 
     enum Status {
         ST_OK,
-        ST_ERROR
+        ST_ERROR,
+        ST_EXISTING_CHAIN,
     };
 
 public Q_SLOTS:
@@ -93,7 +96,10 @@ void FreespaceChecker::check()
         freeBytesAvailable = fs::space(parentDir).available;
         if(fs::exists(dataDir))
         {
-            if(fs::is_directory(dataDir))
+            if (fs::is_directory(dataDir) && fs::exists(dataDir / intro->m_net_datadir / "chainstate")) {
+                replyStatus = ST_EXISTING_CHAIN;
+                replyMessage = tr("Existing block chain data found. Its pruning setting will be kept.");
+            } else if(fs::is_directory(dataDir))
             {
                 QString separator = "<code>" + QDir::toNativeSeparators("/") + tr("name") + "</code>";
                 replyStatus = ST_OK;
@@ -127,7 +133,8 @@ Intro::Intro(QWidget *parent, int64_t blockchain_size_gb, int64_t chain_state_si
     ui(new Ui::Intro),
     m_blockchain_size_gb(blockchain_size_gb),
     m_chain_state_size_gb(chain_state_size_gb),
-    m_prune_target_mib{GetPruneTargetMiB()}
+    m_prune_target_mib{GetPruneTargetMiB()},
+    m_net_datadir{fs::PathFromString(BaseParams().DataDir())}
 {
     ui->setupUi(this);
     ui->welcomeLabel->setText(ui->welcomeLabel->text().arg(CLIENT_NAME));
@@ -329,6 +336,7 @@ void Intro::setStatus(int status, const QString &message, quint64 bytesAvailable
     switch(status)
     {
     case FreespaceChecker::ST_OK:
+    case FreespaceChecker::ST_EXISTING_CHAIN:
         ui->errorMessage->setText(message);
         ui->errorMessage->setStyleSheet("");
         break;
@@ -337,6 +345,20 @@ void Intro::setStatus(int status, const QString &message, quint64 bytesAvailable
         ui->errorMessage->setStyleSheet("QLabel { color: #800000 }");
         break;
     }
+    const bool existing_chain = status == FreespaceChecker::ST_EXISTING_CHAIN;
+    if (existing_chain != m_existing_chain) {
+        const QSignalBlocker blocker(ui->prune);
+        if (existing_chain) {
+            m_prune_state_before_existing_chain = ui->prune->checkState();
+            ui->prune->setCheckState(Qt::Unchecked);
+        } else {
+            ui->prune->setCheckState(m_prune_state_before_existing_chain);
+        }
+        m_existing_chain = existing_chain;
+        UpdatePruneLabels(ui->prune->checkState() == Qt::Checked);
+    }
+    ui->prune->setEnabled(!m_existing_chain);
+    ui->pruneMiB->setEnabled(!m_existing_chain && ui->prune->checkState() == Qt::Checked);
     /* Indicate number of bytes available */
     if(status == FreespaceChecker::ST_ERROR)
     {
