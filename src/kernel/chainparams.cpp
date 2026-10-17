@@ -82,7 +82,11 @@ static void AddLongCoinbaseMaturityRevalidationDeployment(Consensus::Params& con
     consensus.chainstate_revalidation_deployments.push_back({
         .name = "long_coinbase_maturity",
         .start_height = consensus.CoinbaseMaturityLongEnforceHeight,
-        .stop_height = consensus.CoinbaseMaturityLongReleaseHeight - 1,
+        // Extending the existing marker makes #419 nodes revalidate from
+        // the old release height, even on upgrade after expiry. With no marker,
+        // start at enforcement. Expired blocks still inherit demoted ancestors.
+        .stop_height = consensus.CoinbaseMaturityLongUntilRdts ? std::numeric_limits<int>::max() : consensus.CoinbaseMaturityLongReleaseHeight - 1,
+        .stop_time = consensus.CoinbaseMaturityLongUntilRdts ? consensus.RdtsExpiryTime : std::numeric_limits<int64_t>::max(),
     });
 }
 
@@ -143,6 +147,7 @@ public:
         consensus.CoinbaseMaturityLongStartHeight = 973440;
         consensus.CoinbaseMaturityLongEnforceHeight = 973440;
         consensus.CoinbaseMaturityLongReleaseHeight = 979920;
+        consensus.CoinbaseMaturityLongUntilRdts = true;
         consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
         AddLongCoinbaseMaturityRevalidationDeployment(consensus);
 
@@ -690,7 +695,9 @@ public:
             consensus.CoinbaseMaturityLongStartHeight = *opts.coinbase_maturity_long_start_height;
             consensus.CoinbaseMaturityLongEnforceHeight = *opts.coinbase_maturity_long_enforce_height;
             consensus.CoinbaseMaturityLongReleaseHeight = *opts.coinbase_maturity_long_release_height;
-            consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
+            consensus.CoinbaseMaturityLong = opts.coinbase_maturity_long_maturity.value_or(consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight);
+            consensus.CoinbaseMaturityLongUntilRdts = true;
+            consensus.RdtsExpiryTime = opts.coinbase_maturity_long_expiry_time.value_or(opts.rdts_expiry_time.value_or(std::numeric_limits<int64_t>::max()));
             AddLongCoinbaseMaturityRevalidationDeployment(consensus);
         }
 

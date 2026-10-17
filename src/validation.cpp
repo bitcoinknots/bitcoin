@@ -3009,8 +3009,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         }
     }
 
-    const bool long_maturity_consensus_active{consensusParams.CoinbaseMaturityLongActiveAt(pindex->nHeight)};
-    const int long_maturity_start_height{long_maturity_consensus_active ? consensusParams.CoinbaseMaturityLongStartHeight : std::numeric_limits<int>::max()};
+    const int long_maturity{consensusParams.CoinbaseMaturityLongAt(pindex->nHeight, pindex->pprev->GetMedianTimePast())};
 
     std::vector<int> prevheights;
     CAmount nFees = 0;
@@ -3030,8 +3029,8 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
             CAmount txfee = 0;
             TxValidationState tx_state;
             if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, chk_input_rules,
-                                          consensusParams.CoinbaseMaturityLong,
-                                          long_maturity_start_height)) {
+                                          long_maturity,
+                                          consensusParams.CoinbaseMaturityLongStartHeight)) {
                 // Any transaction validation failure in ConnectBlock is a block consensus failure
                 state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
                               tx_state.GetRejectReason(),
@@ -5652,6 +5651,21 @@ bool ChainstateManager::ContinuesSha256dPastFork(const CBlockIndex& index) const
     return fork_block != nullptr && !fork_block->m_header_v2;
 }
 
+namespace {
+int RevalidationStopHeight(const CChain& chain, const Consensus::ChainstateRevalidationDeployment& deployment)
+{
+    int last{std::min(chain.Height(), deployment.stop_height)};
+    if (deployment.stop_time == std::numeric_limits<int64_t>::max()) return last;
+    int first{std::max(1, deployment.start_height)};
+    while (first <= last) {
+        const int mid{first + (last - first) / 2};
+        if (chain[mid]->pprev->GetMedianTimePast() < deployment.stop_time) first = mid + 1;
+        else last = mid - 1;
+    }
+    return last;
+}
+} // namespace
+
 bool Chainstate::UpdateChainstateRevalidationMarkers(BlockValidationState& state)
 {
     AssertLockHeld(cs_main);
@@ -5669,10 +5683,9 @@ bool Chainstate::UpdateChainstateRevalidationMarkers(BlockValidationState& state
     }
     for (const auto& deployment : m_chainman.GetConsensus().chainstate_revalidation_deployments) {
         if (tip.nHeight < deployment.start_height) continue;
-        if (deployment.stop_height < first_validated_height) continue;
-
+        const int checked_height{RevalidationStopHeight(m_chain, deployment)};
         const int start_height{std::max(deployment.start_height, first_validated_height)};
-        const int checked_height{std::min(tip.nHeight, deployment.stop_height)};
+        if (checked_height < start_height) continue;
         const CBlockIndex* checked_block{m_chain[checked_height]};
         node::ChainstateRevalidationMarker marker{
             .start_height = start_height,
@@ -5682,7 +5695,7 @@ bool Chainstate::UpdateChainstateRevalidationMarkers(BlockValidationState& state
 
         auto current_marker{m_blockman.m_chainstate_revalidation_markers.find(deployment.name)};
         if (current_marker != m_blockman.m_chainstate_revalidation_markers.end()) {
-            if (current_marker->second.stop_height > checked_height) {
+            if (current_marker->second.stop_height > checked_height && deployment.stop_time == std::numeric_limits<int64_t>::max()) {
                 const auto& current_stop_block_index{m_chain[current_marker->second.stop_height]};
                 if (current_stop_block_index && current_marker->second.block_hash == current_stop_block_index->GetBlockHash()) {
                     // A newer version enforced the rule longer. Don't undo that
@@ -5777,6 +5790,7 @@ bool Chainstate::RewindForChainstateRevalidation(bilingual_str& error)
                         const auto& deployment{deployments.at(deployment_n)};
                         if (block_index.nHeight < deployment.start_height) continue;
                         if (block_index.nHeight > deployment.stop_height) continue;
+                        if (block_index.pprev->GetMedianTimePast() >= deployment.stop_time) continue;
 
                         if (m_chain.Contains(&block_index)) {
                             const auto& valid_range{valid_in_main_chain.at(deployment_n)};
