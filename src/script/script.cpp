@@ -350,11 +350,6 @@ public:
     }
 };
 
-/** Byte offsets of the OP_IF/OP_NOTIF whose first part, and the OP_ELSE whose part, a constant guard makes unreachable */
-struct DeadParts {
-    std::vector<bool> at_if, at_else;
-};
-
 /** The top of the stack as far as constants determine it; below it nothing is known */
 class KnownStack
 {
@@ -379,12 +374,8 @@ public:
     void Forget() { m_items.clear(); }
 };
 
-/**
- * Follow the script as far as constants determine it and mark the conditional
- * parts that can never run. Anything read from the witness, a signature check,
- * a hash or an opcode not modeled here is unknown, and an unknown condition
- * marks nothing, so a spendable script is never read as dead.
- */
+} // namespace
+
 DeadParts FindDeadParts(const CScript& script)
 {
     DeadParts dead{std::vector<bool>(script.size()), std::vector<bool>(script.size())};
@@ -686,7 +677,6 @@ DeadParts FindDeadParts(const CScript& script)
     }
     return dead;
 }
-} // namespace
 
 size_t CScript::IsOLGA(const size_t remaining_outputs) const
 {

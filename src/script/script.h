@@ -588,6 +588,19 @@ public:
     }
 };
 
+/** Byte offsets of the OP_IF/OP_NOTIF whose first part, and the OP_ELSE whose part, a constant guard makes unreachable */
+struct DeadParts {
+    std::vector<bool> at_if, at_else;
+};
+
+/**
+ * Follow the script as far as constants determine it and mark the conditional
+ * parts that can never run. Anything read from the witness, a signature check,
+ * a hash or an opcode not modeled here is unknown, and an unknown condition
+ * marks nothing, so a spendable script is never read as dead.
+ */
+DeadParts FindDeadParts(const CScript& script);
+
 struct CScriptWitness
 {
     // Note that this encodes the data elements being pushed, rather than
