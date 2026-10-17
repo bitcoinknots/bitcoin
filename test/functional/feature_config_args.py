@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import subprocess
 import tempfile
 import time
 
@@ -458,6 +459,86 @@ class ConfArgsTest(BitcoinTestFramework):
             f'is being used instead.') + r"[\s\S]*", env=env, match=ErrorMatch.FULL_REGEX)
         node.args = node_args
 
+    def test_missing_default_conf_warning(self) -> None:
+        # Windows does not support overriding the default datadir this way.
+        if platform.system() == "Windows":
+            return
+
+        node_args = [
+            self.nodes[0].binary, "-regtest", "-stopafterblockimport", "-printtoconsole=1",
+            "-connect=0", "-listen=0", "-dnsseed=0", "-discover=0", "-server=0",
+        ]
+
+        self.log.info("Warn only when a config at the default datadir is ignored")
+        cases: list[tuple[bool, bool, bool, list[str], bool]] = [
+            # default config, custom config, use custom datadir, extra args, warning
+            (False, False, False, [], False),
+            (True, False, True, [], True),
+            (True, True, True, [], False),
+            (False, False, True, [], False),
+            (True, False, True, ["-noconf"], False),
+        ]
+        for index, (default_conf, custom_conf, use_custom, extra_args, warn) in enumerate(cases):
+            root = Path(self.options.tmpdir, f"missing_conf_{index}")
+            env, default_datadir = util.get_temp_default_datadir(root / "home")
+            default_datadir.mkdir(parents=True)
+            custom_datadir = root / "custom"
+            custom_datadir.mkdir()
+            if default_conf:
+                (default_datadir / "bitcoin.conf").write_text("# default config\n")
+            if custom_conf:
+                (custom_datadir / "bitcoin.conf").write_text("# custom config\n")
+            args = list(node_args)
+            if use_custom:
+                args.append(f"-datadir={custom_datadir}")
+            result = subprocess.run(
+                args + extra_args, env=env, capture_output=True, text=True,
+                timeout=self.rpc_timeout, check=True,
+            )
+            warnings = [line for line in result.stdout.splitlines() if "[warning] Config file" in line]
+            util.assert_equal(bool(warnings), warn)
+            if warn:
+                assert str(default_datadir / "bitcoin.conf") in warnings[0]
+                assert str(custom_datadir / "bitcoin.conf") in warnings[0]
+
+        # Root ignores file permissions, so these cases need a normal user.
+        if os.geteuid() != 0:
+            self.log.info("Start normally when the default datadir cannot be accessed")
+            root = Path(self.options.tmpdir, "missing_conf_inaccessible")
+            env, default_datadir = util.get_temp_default_datadir(root / "home")
+            default_datadir.mkdir(parents=True)
+            (default_datadir / "bitcoin.conf").write_text("# default config\n")
+            custom_datadir = root / "custom"
+            custom_datadir.mkdir()
+            default_datadir.chmod(0)
+            try:
+                result = subprocess.run(
+                    node_args + [f"-datadir={custom_datadir}"], env=env, capture_output=True, text=True,
+                    timeout=self.rpc_timeout, check=True,
+                )
+            finally:
+                default_datadir.chmod(0o700)
+            assert "[warning] Config file" not in result.stdout
+
+            self.log.info("Do not warn when the datadir in use is the default one under another name")
+            root = Path(self.options.tmpdir, "missing_conf_symlink")
+            env, default_datadir = util.get_temp_default_datadir(root / "home")
+            default_datadir.mkdir(parents=True)
+            conf_file = default_datadir / "bitcoin.conf"
+            conf_file.write_text("# default config\n")
+            link = root / "link"
+            link.symlink_to(default_datadir, target_is_directory=True)
+            # Make the config unreadable so it is not read through the symlink either.
+            conf_file.chmod(0)
+            try:
+                result = subprocess.run(
+                    node_args + [f"-datadir={link}"], env=env, capture_output=True, text=True,
+                    timeout=self.rpc_timeout, check=True,
+                )
+            finally:
+                conf_file.chmod(0o600)
+            assert "[warning] Config file" not in result.stdout
+
     def test_acceptstalefeeestimates_arg_support(self):
         self.log.info("Test -acceptstalefeeestimates option support")
         conf_file = self.nodes[0].datadir_path / "bitcoin.conf"
@@ -502,6 +583,7 @@ class ConfArgsTest(BitcoinTestFramework):
         self.test_invalid_command_line_options()
         self.test_ignored_conf()
         self.test_ignored_default_conf()
+        self.test_missing_default_conf_warning()
         self.test_testnet3_deprecation_msg()
 
         # Remove the -datadir argument so it doesn't override the config file
