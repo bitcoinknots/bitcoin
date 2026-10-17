@@ -137,10 +137,13 @@ def parseline(line: str) -> Union[dict, None]:
     }
 
 def dedup(ips: list[dict]) -> list[dict]:
-    """ Remove duplicates from `ips` where multiple ips share address and port. """
-    d = {}
+    """ Remove duplicates from `ips` where multiple ips share address and port,
+    keeping the entry with the best uptime (and latest success as tie breaker). """
+    d: dict[tuple[str, int], dict] = {}
     for ip in ips:
-        d[ip['ip'],ip['port']] = ip
+        key = (ip['ip'], ip['port'])
+        if key not in d or (ip['uptime'], ip['lastsuccess']) > (d[key]['uptime'], d[key]['lastsuccess']):
+            d[key] = ip
     return list(d.values())
 
 def filtermultiport(ips: list[dict]) -> list[dict]:
@@ -231,9 +234,6 @@ def main():
     # Skip entries with invalid address.
     ips = [ip for ip in ips if ip is not None]
     print(f'{ip_stats(ips):s} Skip entries with invalid address', file=sys.stderr)
-    # Skip duplicates (in case multiple seeds files were concatenated)
-    ips = dedup(ips)
-    print(f'{ip_stats(ips):s} After removing duplicates', file=sys.stderr)
     # Enforce minimal number of blocks.
     ips = [ip for ip in ips if ip['blocks'] >= args.minblocks]
     print(f'{ip_stats(ips):s} Enforce minimal number of blocks', file=sys.stderr)
@@ -258,6 +258,11 @@ def main():
     # Require a known and recent user agent.
     ips = [ip for ip in ips if PATTERN_AGENT.match(ip['agent'])]
     print(f'{ip_stats(ips):s} Require a known and recent user agent', file=sys.stderr)
+    # Skip duplicates (several seeders may list the same node). This runs after
+    # the filters above so a node is kept if any seeder's entry for it passes
+    # them, rather than depending on which seeder's entry survives the shuffle.
+    ips = dedup(ips)
+    print(f'{ip_stats(ips):s} After removing duplicates', file=sys.stderr)
     # Sort by availability (and use last success as tie breaker)
     ips.sort(key=lambda x: (x['uptime'], x['lastsuccess'], x['ip']), reverse=True)
     # Filter out hosts with multiple bitcoin ports, these are likely abusive
