@@ -415,6 +415,18 @@ static bool IsStackNeutralNop(const opcodetype opcode)
     return opcode == OP_NOP || (opcode >= OP_NOP1 && opcode <= OP_NOP10);
 }
 
+/** Opcodes that neither read the stack nor change it. A timelock check reads the number on top. */
+static bool IsNoOp(const opcodetype opcode)
+{
+    return opcode == OP_CODESEPARATOR || (IsStackNeutralNop(opcode) && opcode != OP_CHECKLOCKTIMEVERIFY && opcode != OP_CHECKSEQUENCEVERIFY);
+}
+
+/** A push of 5 bytes or less, which is a number where the opcode after it reads one. */
+static bool IsShortPush(const opcodetype opcode, const std::vector<unsigned char>& push_data)
+{
+    return opcode <= OP_PUSHDATA4 && push_data.size() <= 5;
+}
+
 /** Mirror of the push run the caller counts when it is balanced by a drop. */
 static bool IsRunPush(const opcodetype opcode)
 {
@@ -436,6 +448,39 @@ static size_t CountWitnessSignatures(const CScriptWitness& witness)
     return count;
 }
 
+/** The size of the digest an opcode hashes the top item into, or 0 for any other opcode. */
+static size_t DigestSize(const opcodetype opcode)
+{
+    switch (opcode) {
+    case OP_RIPEMD160: case OP_SHA1: case OP_HASH160: return 20;
+    case OP_SHA256: case OP_HASH256: return 32;
+    default: return 0;
+    }
+}
+
+/**
+ * A push of 6 or more bytes that is no key a spend can check: longer than any number a script reads,
+ * and neither a compressed key nor, outside a witness script, an uncompressed one. Segwit policy refuses
+ * an uncompressed key wherever it checks one, so in a witness script 65 bytes is never a key either.
+ */
+static bool IsOddPush(const opcodetype opcode, const std::vector<unsigned char>& push_data, const bool witness_script)
+{
+    if (opcode > OP_PUSHDATA4 || push_data.size() <= 5 || push_data.size() == CPubKey::COMPRESSED_SIZE) return false;
+    return witness_script || push_data.size() != CPubKey::SIZE;
+}
+
+/**
+ * Bytes of the odd pushes in a push run that ends at `next`, less those something else accounts for.
+ * A hash lock compares a digest with OP_EQUAL or OP_EQUALVERIFY: the last push of the run, sized as
+ * the hash opcode before it outputs. The caller counts a run that a drop balances.
+ */
+static size_t OddRunBytes(const size_t run_bytes, const size_t last_bytes, const bool last_is_digest, const opcodetype next)
+{
+    if ((next == OP_EQUAL || next == OP_EQUALVERIFY) && last_is_digest) return run_bytes - last_bytes;
+    if (next == OP_DROP || next == OP_2DROP) return 0;
+    return run_bytes;
+}
+
 /**
  * Bytes a script carries in pubkeys that no signature can prove.
  *
@@ -443,6 +488,13 @@ static size_t CountWitnessSignatures(const CScriptWitness& witness)
  * rather than a spending condition. That is how a file is published as a chain of ground
  * secp256k1 points, each carrying 31 bytes and hiding behind a hash until it is spent. Ordinary
  * multisig carries a couple of such keys itself, hence the tolerance.
+ *
+ * A key slot the spend never examines takes a push of any size, not only a key, so in a script that
+ * runs OP_CHECKMULTISIG every odd push counts as data in full, outside the tolerance. So does a short
+ * push with another push after it, no-ops aside: a script reads a number with the opcode after it, and
+ * only a key count sits under keys, so a key count is left alone. None of the multisig spends
+ * from block 961640 to 977870 has either that a hash lock, a drop or an OP_FALSE OP_IF envelope does
+ * not account for, and none in a witness script has a 65 byte push.
  */
 static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* witness)
 {
@@ -468,11 +520,43 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
     bool last_is_key{false}, last_is_xonly{false};
     opcodetype opcode{OP_INVALIDOPCODE}, last_opcode{OP_INVALIDOPCODE};
     std::vector<unsigned char> push_data;
+    // Odd pushes counted so far, and those of the current push run, which its end decides.
+    size_t odd_bytes{0}, odd_run_bytes{0}, odd_last_bytes{0};
+    bool odd_last_is_digest{false};
+    // The last short push, which counts if a push comes next, and whether a no-op has come between,
+    // which leaves it outside the push run that the next push is in.
+    size_t short_bytes{0};
+    bool short_carried{false};
+
+    // Odd pushes are this rule's only where the script runs OP_CHECKMULTISIG. A redeem script comes
+    // with an empty witness, so a script with witness items here is a witness script.
+    bool has_multisig{false};
+    {
+        unsigned int envelope{0};
+        opcodetype op, last{OP_INVALIDOPCODE};
+        std::vector<unsigned char> data;
+        for (CScript::const_iterator it{script.begin()}; it < script.end(); last = op) {
+            if (!script.GetOp(it, op, data)) return 0;
+            if (envelope) {
+                if (op == OP_IF || op == OP_NOTIF) {
+                    ++envelope;
+                } else if (op == OP_ENDIF) {
+                    --envelope;
+                }
+            } else if (op == OP_IF && last == OP_FALSE) {
+                envelope = 1;
+            } else if (op == OP_CHECKMULTISIG || op == OP_CHECKMULTISIGVERIFY) {
+                has_multisig = true;
+            }
+        }
+    }
+    const bool segwit_multisig{has_multisig && witness && !witness->stack.empty()};
 
     for (CScript::const_iterator it{script.begin()}; it < script.end();) {
         // The caller counts an unparsable script whole, and the iterator may not have advanced.
         if (!script.GetOp(it, opcode, push_data)) return 0;
-        const bool is_pubkey{IsPubkeyPush(opcode, push_data)};
+        const bool enveloped{inside_noop != 0};
+        const bool is_pubkey{IsPubkeyPush(opcode, push_data) && !(segwit_multisig && push_data.size() == CPubKey::SIZE)};
         const bool is_xonly{IsXOnlyPush(opcode, push_data)};
         const int count{MultisigCount(opcode, push_data)};
         const int a_count{MultiACount(opcode, push_data)};
@@ -539,6 +623,33 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
 
         const bool is_push{IsRunPush(opcode)};
         if (!is_push) push_run_keys = 0;
+        // The caller counts an OP_FALSE OP_IF envelope whole, so what is inside it is left to the caller.
+        if (has_multisig && !enveloped) {
+            if (is_push) {
+                // The short push before this one is no number, so it joins the run the caller may
+                // count as dropped, unless a no-op ended that run first.
+                if (short_carried) {
+                    odd_bytes += short_bytes;
+                } else {
+                    odd_run_bytes += short_bytes;
+                }
+                short_bytes = IsShortPush(opcode, push_data) && count < 0 ? push_data.size() : 0;
+                short_carried = false;
+                odd_last_bytes = IsOddPush(opcode, push_data, segwit_multisig) ? push_data.size() : 0;
+                odd_last_is_digest = odd_last_bytes && DigestSize(last_opcode) == push_data.size();
+                odd_run_bytes += odd_last_bytes;
+            } else {
+                odd_bytes += OddRunBytes(odd_run_bytes, odd_last_bytes, odd_last_is_digest, opcode);
+                odd_run_bytes = odd_last_bytes = 0;
+                odd_last_is_digest = false;
+                // A no-op reads nothing, so the short push before it waits on the opcode after it.
+                if (IsNoOp(opcode)) {
+                    short_carried = true;
+                } else {
+                    short_bytes = 0;
+                }
+            }
+        }
         // An opcode that leaves the stack as it found it leaves the key below it on top, so it
         // cannot hide that key from the opcode which spends it. It still breaks the run above:
         // padding a k-of-n is what forfeits its credit.
@@ -566,10 +677,12 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
         provable = std::min(provable, CountWitnessSignatures(*witness));
     }
 
-    if (pubkeys < provable + MAX_UNPROVEN_PUBKEYS) return 0;
+    if (has_multisig) odd_bytes += OddRunBytes(odd_run_bytes, odd_last_bytes, odd_last_is_digest, OP_INVALIDOPCODE);
+
+    if (pubkeys < provable + MAX_UNPROVEN_PUBKEYS) return odd_bytes;
     // An uncompressed key carries no more payload than a compressed one, since only the x
     // coordinate is free, so the compressed size is the unit.
-    return (pubkeys - provable - MAX_UNPROVEN_PUBKEYS) * CPubKey::COMPRESSED_SIZE;
+    return (pubkeys - provable - MAX_UNPROVEN_PUBKEYS) * CPubKey::COMPRESSED_SIZE + odd_bytes;
 }
 
 std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outputs, const CScriptWitness* witness) const
