@@ -107,6 +107,8 @@ struct ChainstateRevalidationDeployment {
     int start_height{std::numeric_limits<int>::max()};
     /** Last block height whose cached validation may be invalidated. */
     int stop_height{std::numeric_limits<int>::max()};
+    /** Exclude blocks whose parent median time past has reached this time. */
+    int64_t stop_time{std::numeric_limits<int64_t>::max()};
 };
 
 /**
@@ -153,13 +155,25 @@ struct Params {
      * behaviour is unchanged on chains that do not set it.
      */
     int64_t RdtsExpiryTime{std::numeric_limits<int64_t>::min()};
+    // Only opted-in chains continue rolling maturity until RDTS expires.
     int CoinbaseMaturityLong{COINBASE_MATURITY};
+    bool CoinbaseMaturityLongUntilRdts{false};
     int CoinbaseMaturityLongStartHeight{std::numeric_limits<int>::max()};
     int CoinbaseMaturityLongEnforceHeight{std::numeric_limits<int>::max()};
     int CoinbaseMaturityLongReleaseHeight{std::numeric_limits<int>::max()};
-    bool CoinbaseMaturityLongActiveAt(int height) const
+    int CoinbaseMaturityLongAt(int height, int64_t mtp_prev) const
     {
-        return height >= CoinbaseMaturityLongEnforceHeight && height < CoinbaseMaturityLongReleaseHeight;
+        if (height < CoinbaseMaturityLongEnforceHeight) return COINBASE_MATURITY;
+        if (CoinbaseMaturityLongUntilRdts) return mtp_prev < RdtsExpiryTime ? CoinbaseMaturityLong : COINBASE_MATURITY;
+        return height < CoinbaseMaturityLongReleaseHeight ? CoinbaseMaturityLong : COINBASE_MATURITY;
+    }
+    bool CoinbaseMaturityLongActiveAt(int height, int64_t mtp_prev) const
+    {
+        return CoinbaseMaturityLongAt(height, mtp_prev) > COINBASE_MATURITY;
+    }
+    int CoinbaseMaturityAt(int coin_height, int spend_height, int64_t mtp_prev) const
+    {
+        return coin_height >= CoinbaseMaturityLongStartHeight ? CoinbaseMaturityLongAt(spend_height, mtp_prev) : COINBASE_MATURITY;
     }
     std::vector<ChainstateRevalidationDeployment> chainstate_revalidation_deployments;
     /** Don't warn about unknown BIP 9 activations below this height.

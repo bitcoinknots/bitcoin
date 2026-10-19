@@ -51,7 +51,8 @@ class LongCoinbaseMaturityTest(BitcoinTestFramework):
         deployment = node.getdeploymentinfo()["deployments"][DEPLOYMENT]
         assert_equal(deployment["type"], "flagday")
         assert_equal(deployment["height"], LONG_ENFORCE_HEIGHT)
-        assert_equal(deployment["height_end"], LONG_RELEASE_HEIGHT - 1)
+        assert "height_end" not in deployment
+        assert_equal(deployment["expiry_time"], 9223372036854775807)
         assert_equal(deployment["coinbase_start_height"], LONG_START_HEIGHT)
         assert_equal(deployment["maturity"], LONG_MATURITY)
         assert_equal(deployment["active"], active)
@@ -119,13 +120,17 @@ class LongCoinbaseMaturityTest(BitcoinTestFramework):
             block = self.create_next_block()
             assert_equal(node.submitblock(block.serialize().hex()), None)
         assert_equal(node.getblockcount(), LONG_RELEASE_HEIGHT - 1)
-        self.assert_deployment(active=False)
+        self.assert_deployment(active=True)
 
-        self.log.info("Consensus accepts covered rewards at the release height")
+        self.log.info("Covered rewards keep their individual long maturity at the former release")
         coinbase_txid = node.getblock(node.getblockhash(LONG_START_HEIGHT))["tx"][0]
         release_spend = wallet.create_self_transfer(utxo_to_spend=wallet.get_utxo(txid=coinbase_txid))
         node.sendrawtransaction(release_spend["hex"])
         block = self.create_next_block([release_spend["tx"], coinbase_spend["tx"]])
+        assert_equal(node.submitblock(block.serialize().hex()), "bad-txns-premature-spend-of-coinbase")
+        self.generate(wallet, 2)
+        node.sendrawtransaction(coinbase_spend["hex"])
+        block = self.create_next_block([coinbase_spend["tx"]])
         assert_equal(node.submitblock(block.serialize().hex()), None)
 
 
