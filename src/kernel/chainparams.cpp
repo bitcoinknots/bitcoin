@@ -80,7 +80,7 @@ static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits
 static void AddLongCoinbaseMaturityRevalidationDeployment(Consensus::Params& consensus)
 {
     consensus.chainstate_revalidation_deployments.push_back({
-        .name = consensus.CoinbaseMaturityLongUntilRdts ? "rolling_coinbase_maturity_180d" : "long_coinbase_maturity",
+        .name = consensus.CoinbaseMaturityLongUntilRdts ? "rolling_coinbase_maturity_180d_v2" : "long_coinbase_maturity",
         .start_height = consensus.CoinbaseMaturityLongEnforceHeight,
         .stop_height = consensus.CoinbaseMaturityLongUntilRdts ? std::numeric_limits<int>::max() : consensus.CoinbaseMaturityLongReleaseHeight - 1,
     });
@@ -140,8 +140,16 @@ public:
         // reaching ACTIVE, and that deployment has been removed.)
         consensus.RdtsExpiryTime = 1819756800; // September 1st, 2027 00:00 UTC
 
-        consensus.CoinbaseMaturityLongStartHeight = 973440;
-        consensus.CoinbaseMaturityLongEnforceHeight = 973440;
+        // Retain #419's historical consensus checks and validation marker.
+        consensus.CoinbaseMaturityHistoricalStartHeight = 973440;
+        consensus.CoinbaseMaturityHistoricalReleaseHeight = 979920;
+        consensus.chainstate_revalidation_deployments.push_back({
+            .name = "long_coinbase_maturity",
+            .start_height = consensus.CoinbaseMaturityHistoricalStartHeight,
+            .stop_height = consensus.CoinbaseMaturityHistoricalReleaseHeight - 1,
+        });
+        consensus.CoinbaseMaturityLongStartHeight = 979919;
+        consensus.CoinbaseMaturityLongEnforceHeight = 979919;
         // Each covered reward matures independently after approximately 180 days.
         // Expiry only ends coverage of newly mined rewards; it never releases old ones.
         consensus.CoinbaseMaturityLongUntilRdts = true;
