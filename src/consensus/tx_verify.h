@@ -6,6 +6,7 @@
 #define BITCOIN_CONSENSUS_TX_VERIFY_H
 
 #include <consensus/amount.h>
+#include <consensus/consensus.h>
 
 #include <limits>
 #include <stdint.h>
@@ -66,12 +67,18 @@ bool CheckOutputSizes(const CTransaction& tx, TxValidationState& state);
  * @param[in] long_maturity_start_height First coinbase height requiring coinbase_maturity_long,
  *                                      or std::numeric_limits<int>::max() to disable.
  * @param[in] long_maturity_end_height Exclusive upper coinbase height covered by long maturity.
+ * @param[in] coinbase_maturity_before_start Policy depth for rewards before the start height.
  * Preconditions: tx.IsCoinBase() is false.
  */
 [[nodiscard]] bool CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, CheckTxInputsRules rules,
                                  int coinbase_maturity_long,
                                  int long_maturity_start_height,
-                                 int long_maturity_end_height = std::numeric_limits<int>::max());
+                                 int long_maturity_end_height = std::numeric_limits<int>::max(),
+                                 int coinbase_maturity_before_start = COINBASE_MATURITY);
+/** Check consensus inputs against both the historical and rolling maturity schedules. */
+[[nodiscard]] bool CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs,
+                                int spend_height, CAmount& txfee, CheckTxInputsRules rules, const Params& params,
+                                int long_maturity_end_height = std::numeric_limits<int>::max());
 } // namespace Consensus
 
 /** Auxiliary functions for transaction validation (ideally should not be exposed) */

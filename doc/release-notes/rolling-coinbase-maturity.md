@@ -1,24 +1,28 @@
 Rolling coinbase maturity
 -------------------------
 
-On mainnet, coinbase rewards mined at height 973440 or later whose mining
+On mainnet, coinbase rewards mined at height 979919 or later whose mining
 block's parent median time past (MTP) is below the existing RDTS expiry,
 1819756800 (1 September 2027, 00:00 UTC), require 25920 blocks of maturity.
 This is approximately 180 days at the target block interval, not a wall-clock
-waiting period. Each reward matures independently. The former height-based
-release at 979920 no longer applies.
+waiting period. Each reward matures independently. The first covered reward
+can be spent at height 1005839. The new rule does not expire at height 979920.
 
 Covered rewards retain the full 25920-block requirement after RDTS expires.
 Rewards mined with parent MTP at or above expiry require 100 blocks instead.
-Rewards mined before height 973440 retain their existing 100-block consensus
-maturity. All coinbase outputs, including transaction fees, follow these rules.
+The existing rule for rewards mined from height 973440 remains enforced
+through spending height 979919, with its original release at 979920.
+Rewards mined before height 979919 are not subject to the new 180-day rule;
+after the original release they require 100-block consensus maturity. All
+coinbase outputs, including transaction fees, follow these rules.
 The expiry boundary is determined on the branch being validated, including
 during reorganizations; candidate block timestamps do not determine coverage.
 
 Relay and wallet maturity also return to 100 blocks for rewards mined after
-expiry. For earlier rewards they use the long depth, retaining the existing
-stricter policy for rewards mined before activation. The wallet retains its
-existing one-confirmation safety margin for available credit.
+expiry. Pre-activation rewards retain the existing 6480-block relay/wallet
+policy; only covered rewards mined from 979919 use the new 25920-block depth.
+The wallet retains its existing one-confirmation safety margin for available
+credit.
 
 `getdeploymentinfo` reports `coinbase_expiry_time` rather than `height_end`.
 The deployment remains active, and `getblocktemplate` continues to advertise
@@ -29,8 +33,10 @@ unchanged. Regtest can opt into rolling maturity with
 `-testcoinbasematuritylongexpiry=time`; the rolling depth is `release - start`.
 If RDTS is also configured, its expiry must agree.
 
-An upgrade uses a new `rolling_coinbase_maturity_180d` validation marker and
-rechecks history from enforcement, including when the tip is past expiry.
+An upgrade uses a new `rolling_coinbase_maturity_180d_v2` validation marker and
+rechecks the new rule from height 979919, including when the tip is past expiry.
+The existing `long_coinbase_maturity` marker continues to cover the historical
+rule. Nodes without that historical marker still need to validate that history.
 Legacy maturity markers cannot certify this stronger rule. Pruned nodes that
 lack the block or undo data needed to rewind must reindex and redownload the
 missing history. Experimental rules that previously marked now-valid blocks
