@@ -407,6 +407,7 @@ BASE_SCRIPTS = [
     'feature_fastprune.py',
     'feature_framework_miniwallet.py',
     'feature_sync_coins_tip_after_chain_sync.py',
+    'feature_sync_coins_tip_after_chain_sync.py --crash-recovery',
     'mempool_unbroadcast.py',
     'mempool_compatibility.py',
     'mempool_accept_wtxid.py',
