@@ -1,14 +1,22 @@
-Rolling coinbase maturity until RDTS expiry
-------------------------------------------
+RDTS continues; rolling 40320-block coinbase maturity
+----------------------------------------------------
 
-On mainnet, rewards mined from height 973440 require a rolling 6480-block
-maturity while the spending block's parent median time past is below
-`RdtsExpiryTime` (2027-09-01 00:00 UTC). Every reward matures individually;
-there is no hold until expiry. At expiry, consensus maturity returns to
-100 for all rewards, including rewards mined immediately before expiry.
-Until expiry, the rule matches #419 before height 979920 and only restricts
-#419's valid-block set from 979920 onward. Testnet4 keeps its original
-height-based window; other public networks and default regtest are unchanged.
+On mainnet, RDTS (BIP110) no longer expires: `RdtsExpiryTime` was
+1819756800 (2027-09-01 00:00 UTC) and is now `INT64_MAX`. Its rules (the
+800000-weight block limit, 34-byte output scripts, the OP_RETURN data limit
+and the input rules it gates) stay in force at every height from the BLAKE2b
+fork. Keeping rules in force is strictly more restrictive than letting them
+lapse, so this is a soft fork.
+
+The rolling coinbase maturity continues with RDTS, as #467 made it, at 40320
+blocks (~280 days, about the length of a human pregnancy) instead of 6480
+(~45 days). Rewards mined from height 973440 each mature 40320 blocks after
+the block that mined them; there is no hold until a date and no release. The
+rule matches #419's valid-block set before height 979920 (no covered reward
+can reach 6480 confirmations sooner) and only restricts it from 979920
+onward, where #419 returns covered rewards to 100 and #467 keeps 6480 until
+2027-09-01. Testnet4 keeps its original height-based window; other public
+networks and default regtest are unchanged.
 
 The existing revalidation marker extends beyond #419's height window, bounded
 by parent MTP. A #419 node upgrading after 979920 rewinds to 979919, even

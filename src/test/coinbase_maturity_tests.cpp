@@ -12,28 +12,39 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <algorithm>
 #include <limits>
 
 BOOST_AUTO_TEST_SUITE(coinbase_maturity_tests)
 
 BOOST_AUTO_TEST_CASE(until_rdts_schedule_boundaries)
 {
+    // Mainnet: rolling 40320 from 973440, continuing with RDTS, which no longer expires.
     const auto main{CChainParams::Main()};
     const auto& p{main->GetConsensus()};
     BOOST_CHECK_EQUAL(p.CoinbaseMaturityLongStartHeight, 973440);
     BOOST_CHECK_EQUAL(p.CoinbaseMaturityLongEnforceHeight, 973440);
     BOOST_CHECK_EQUAL(p.CoinbaseMaturityLongReleaseHeight, 979920);
+    BOOST_CHECK(p.CoinbaseMaturityLongUntilRdts);
+    BOOST_CHECK_EQUAL(p.CoinbaseMaturityLong, 40320);
+    BOOST_CHECK_EQUAL(p.RdtsExpiryTime, std::numeric_limits<int64_t>::max());
     BOOST_CHECK(!p.CoinbaseMaturityLongActiveAt(973439, 0));
-    for (const int height : {973440, 979919, 979920, 979921, 2000000, std::numeric_limits<int>::max()}) {
-        BOOST_CHECK(p.CoinbaseMaturityLongActiveAt(height, 0));
-        BOOST_CHECK_EQUAL(p.CoinbaseMaturityAt(973439, height, 0), 100);
-        BOOST_CHECK_EQUAL(p.CoinbaseMaturityAt(973440, height, 0), 6480);
-        BOOST_CHECK_EQUAL(p.CoinbaseMaturityAt(973441, height, 0), 6480);
-    }
-    for (const int height : {973440, 979919, 979920, 979921, 2000000}) {
-        for (const int64_t mtp : {p.RdtsExpiryTime - 1, p.RdtsExpiryTime, p.RdtsExpiryTime + 1}) {
-            BOOST_CHECK_EQUAL(p.CoinbaseMaturityLongAt(height, mtp), mtp < p.RdtsExpiryTime ? 6480 : 100);
+    for (const int64_t mtp : {int64_t{0}, int64_t{1819756799}, int64_t{1819756800}, int64_t{1819756801}, int64_t{4102444800}}) {
+        BOOST_CHECK_EQUAL(p.CoinbaseMaturityLongAt(973439, mtp), 100);
+        for (const int height : {973440, 979919, 979920, 979921, 2000000, std::numeric_limits<int>::max()}) {
+            BOOST_CHECK(p.CoinbaseMaturityLongActiveAt(height, mtp));
+            BOOST_CHECK_EQUAL(p.CoinbaseMaturityLongAt(height, mtp), 40320);
             BOOST_CHECK_EQUAL(p.CoinbaseMaturityAt(973439, height, mtp), 100);
+            BOOST_CHECK_EQUAL(p.CoinbaseMaturityAt(973440, height, mtp), 40320);
+            BOOST_CHECK_EQUAL(p.CoinbaseMaturityAt(973441, height, mtp), 40320);
+        }
+    }
+    // Soft fork: never looser than merged #419 (6480 from 973440, back to 100 at 979920) or #467 (6480 until 2027-09-01).
+    for (int height{973000}; height <= 990000; ++height) {
+        for (const int64_t mtp : {int64_t{0}, int64_t{1819756800}}) {
+            const int base419{height >= 973440 && height < 979920 ? 6480 : 100};
+            const int base467{height >= 973440 && mtp < 1819756800 ? 6480 : 100};
+            BOOST_CHECK_GE(p.CoinbaseMaturityLongAt(height, mtp), std::max(base419, base467));
         }
     }
     const auto testnet4{CChainParams::TestNet4()};
@@ -48,7 +59,7 @@ BOOST_AUTO_TEST_CASE(until_rdts_schedule_boundaries)
         BOOST_CHECK_EQUAL(d.name, "long_coinbase_maturity");
         BOOST_CHECK_EQUAL(d.start_height, c.CoinbaseMaturityLongEnforceHeight);
         BOOST_CHECK_EQUAL(d.stop_height, chain == main.get() ? std::numeric_limits<int>::max() : 158110);
-        BOOST_CHECK_EQUAL(d.stop_time, chain == main.get() ? c.RdtsExpiryTime : std::numeric_limits<int64_t>::max());
+        BOOST_CHECK_EQUAL(d.stop_time, std::numeric_limits<int64_t>::max());
     }
     const auto testnet3{CChainParams::TestNet()};
     const auto signet{CChainParams::SigNet({})};
@@ -94,10 +105,10 @@ BOOST_FIXTURE_TEST_CASE(until_rdts_input_depth_boundaries, BasicTestingSetup)
         CMutableTransaction tx;
         tx.vin.emplace_back(prevout);
         tx.vout.emplace_back(9000, CScript{} << OP_TRUE);
-        for (const int64_t mtp : {p.RdtsExpiryTime - 1, p.RdtsExpiryTime, p.RdtsExpiryTime + 1}) {
-            for (const int depth : {99, 100, 6479, 6480, 6481}) {
+        for (const int64_t mtp : {int64_t{1819756799}, int64_t{1819756800}, int64_t{4102444800}}) {
+            for (const int depth : {99, 100, 6479, 6480, 6481, 40319, 40320, 40321}) {
                 const int height{coin_height + depth};
-                const bool expected{depth >= (coin_height < 973440 || mtp >= p.RdtsExpiryTime ? 100 : 6480)};
+                const bool expected{depth >= (coin_height < 973440 ? 100 : 40320)};
                 TxValidationState state;
                 CAmount fee{0};
                 BOOST_CHECK_EQUAL(Consensus::CheckTxInputs(CTransaction{tx}, state, coins, height, fee, CheckTxInputsRules::None,

@@ -138,17 +138,24 @@ public:
         consensus.Blake2bTargetShift = 22;
 
         // RDTS: its rules apply to every block from Blake2bHeight (the
-        // flag-day activation, set at release cut) until the parent block's
-        // median-time-past reaches RdtsExpiryTime. (RDTS previously activated
+        // flag-day activation, set at release cut). (RDTS previously activated
         // via versionbits; the stall at 961633 prevented it from ever
         // reaching ACTIVE, and that deployment has been removed.)
-        consensus.RdtsExpiryTime = 1819756800; // September 1st, 2027 00:00 UTC
+        //
+        // RDTS continues: no expiry. It was scheduled to end when the parent
+        // block's median-time-past reached 1819756800 (September 1st, 2027
+        // 00:00 UTC); keeping its rules in force is strictly more restrictive
+        // than letting them lapse, so this remains a soft fork.
+        consensus.RdtsExpiryTime = std::numeric_limits<int64_t>::max();
 
+        // The rolling coinbase maturity continues with RDTS (as in #467), at
+        // 40320 blocks (~280 days) instead of 6480 (~45 days). With RDTS
+        // continuing, the rolling rule does not lapse either.
         consensus.CoinbaseMaturityLongStartHeight = 973440;
         consensus.CoinbaseMaturityLongEnforceHeight = 973440;
         consensus.CoinbaseMaturityLongReleaseHeight = 979920;
         consensus.CoinbaseMaturityLongUntilRdts = true;
-        consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
+        consensus.CoinbaseMaturityLong = 40320;
         AddLongCoinbaseMaturityRevalidationDeployment(consensus);
 
         consensus.nMinimumChainWork = uint256{"00000000000000000000000000000000000000013e00277374c9f9eeadc70200"};
