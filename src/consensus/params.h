@@ -157,9 +157,11 @@ struct Params {
     int CoinbaseMaturityLongStartHeight{std::numeric_limits<int>::max()};
     int CoinbaseMaturityLongEnforceHeight{std::numeric_limits<int>::max()};
     int CoinbaseMaturityLongReleaseHeight{std::numeric_limits<int>::max()};
+    /** Bind long maturity to the mining block's parent MTP, retaining it after RDTS expires. */
+    bool CoinbaseMaturityLongUntilRdts{false};
     bool CoinbaseMaturityLongActiveAt(int height) const
     {
-        return height >= CoinbaseMaturityLongEnforceHeight && height < CoinbaseMaturityLongReleaseHeight;
+        return height >= CoinbaseMaturityLongEnforceHeight && (CoinbaseMaturityLongUntilRdts || height < CoinbaseMaturityLongReleaseHeight);
     }
     std::vector<ChainstateRevalidationDeployment> chainstate_revalidation_deployments;
     /** Don't warn about unknown BIP 9 activations below this height.

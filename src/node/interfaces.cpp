@@ -10,6 +10,7 @@
 #include <chainparamsbase.h>
 #include <common/args.h>
 #include <common/pcp.h>
+#include <consensus/tx_verify.h>
 #include <consensus/merkle.h>
 #include <consensus/validation.h>
 #include <deploymentstatus.h>
@@ -335,7 +336,11 @@ public:
         }
         return chainman().GetParams().GenesisBlock().GetBlockTime(); // Genesis block's time of current network
     }
-    int coinbaseMaturity() override { return chainman().GetConsensus().CoinbaseMaturityLong; }
+    int coinbaseMaturity(int coin_height) override
+    {
+        LOCK(::cs_main);
+        return Consensus::CoinbaseMaturityPolicy(chainman().GetConsensus(), chainman().ActiveChain()[coin_height]);
+    }
     double getVerificationProgress() override
     {
         return chainman().GuessVerificationProgress(WITH_LOCK(chainman().GetMutex(), return chainman().ActiveChain().Tip()));
@@ -582,9 +587,10 @@ public:
         const CBlockIndex* block{chainman().ActiveChain()[height]};
         return block && ((block->nStatus & BLOCK_HAVE_DATA) != 0) && block->nTx > 0;
     }
-    int coinbaseMaturity() override
+    int coinbaseMaturity(const uint256& block_hash) override
     {
-        return chainman().GetConsensus().CoinbaseMaturityLong;
+        LOCK(::cs_main);
+        return Consensus::CoinbaseMaturityPolicy(chainman().GetConsensus(), chainman().m_blockman.LookupBlockIndex(block_hash));
     }
     bool pruneLockExists(const std::string& name) const override
     {
