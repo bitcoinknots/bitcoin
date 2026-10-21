@@ -1392,7 +1392,8 @@ static void SyncCoinsTipAfterChainSync(const NodeContext& node)
     LogDebug(BCLog::COINDB, "Finished syncing to tip, syncing chainstate to disk\n");
     // Persist block/undo data and the block index before the coins database.
     // An interrupted coins batch needs those entries to replay during recovery.
-    node.chainman->ActiveChainstate().ForceFlushStateToDisk();
+    BlockValidationState state;
+    node.chainman->ActiveChainstate().FlushStateToDisk(state, FlushStateMode::FORCE_SYNC);
 }
 
 bool AppInitInterfaces(NodeContext& node)
