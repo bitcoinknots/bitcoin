@@ -158,6 +158,12 @@ class SyncCoinsTipAfterChainSyncTest(BitcoinTestFramework):
         else:
             with node.assert_debug_log(["Finished syncing to tip, syncing chainstate to disk"]):
                 node.mockscheduler(SYNC_CHECK_INTERVAL)
+            # Connecting another block reports the cache size. All three
+            # existing coins must remain cached after the scheduled sync.
+            block = create_block(blocks[-1].sha256, create_coinbase(NUM_BLOCKS + 1), block_time)
+            block.solve()
+            with node.assert_debug_log([f"MiB({NUM_BLOCKS + 1}txo)"]):
+                assert_equal(node.submitblock(block.serialize().hex()), None)
 
 
 if __name__ == "__main__":
