@@ -145,6 +145,11 @@ class DumptxoutsetTest(BitcoinTestFramework):
         out = node.cli.dumptxoutset('cli_latest.dat', 'latest')
         assert_equal(out['base_height'], 100)
 
+        self.log.info("Test a named format with rollback and no type")
+        out = node.dumptxoutset(path='rollback_hr.dat', rollback=99, format=[])
+        assert_equal(out['base_height'], 99)
+        with open(node.chain_path / 'rollback_hr.dat', 'r', encoding='utf-8') as f:
+            assert f.readline().startswith('#(blockhash {} )'.format(node.getblockhash(99)))
 
 if __name__ == '__main__':
     DumptxoutsetTest(__file__).main()
