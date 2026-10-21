@@ -80,7 +80,21 @@ class RollingCoinbaseMaturityTest(BitcoinTestFramework):
         assert_raises_rpc_error(-26, "bad-txns-premature-spend-of-coinbase", node.sendrawtransaction, spend["hex"])
         self.submit(self.block())
         node.sendrawtransaction(spend["hex"])
-        self.submit(self.block([spend["tx"]]))
+        self.log.info("A one-block rollback evicts a newly mature mempool spend and its child")
+        child = self.mini.create_self_transfer(utxo_to_spend=spend["new_utxo"])
+        node.sendrawtransaction(child["hex"])
+        assert_equal(set(node.getrawmempool()), {spend["txid"], child["txid"]})
+        maturity_tip = node.getbestblockhash()
+        # Keep both transactions unmined: this exercises removal of existing
+        # mempool entries, rather than admission of disconnected transactions.
+        node.invalidateblock(maturity_tip)
+        assert_equal(node.getblockcount(), 120)
+        assert_equal(node.getrawmempool(), [])
+        assert_raises_rpc_error(-26, "bad-txns-premature-spend-of-coinbase", node.sendrawtransaction, spend["hex"])
+        node.reconsiderblock(maturity_tip)
+        node.sendrawtransaction(spend["hex"])
+        node.sendrawtransaction(child["hex"])
+        self.submit(self.block([spend["tx"], child["tx"]]))
         # This reward is not released at the former height-based release.
         spend = self.spend(4)
         self.submit(self.block([spend["tx"]]), "bad-txns-premature-spend-of-coinbase")
