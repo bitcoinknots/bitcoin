@@ -141,5 +141,10 @@ class DumptxoutsetTest(BitcoinTestFramework):
         assert_raises_rpc_error(
             -8, 'unable to find item \'sample\'',  node.dumptxoutset, path='xxx', type='latest', format=['sample'])
 
+        self.log.info("Test that bitcoin-cli passes the type positionally as a string")
+        out = node.cli.dumptxoutset('cli_latest.dat', 'latest')
+        assert_equal(out['base_height'], 100)
+
+
 if __name__ == '__main__':
     DumptxoutsetTest(__file__).main()
