@@ -140,17 +140,26 @@ public:
         // reaching ACTIVE, and that deployment has been removed.)
         consensus.RdtsExpiryTime = 1819756800; // September 1st, 2027 00:00 UTC
 
-        // Historical window is subsumed by the 180-day rule starting at 973440.
-        consensus.CoinbaseMaturityHistoricalStartHeight = std::numeric_limits<int>::max();
-        consensus.CoinbaseMaturityHistoricalReleaseHeight = std::numeric_limits<int>::max();
-        // Start the 180-day rolling rule at the original #419 window instead of 979919.
+        // Keep the historical 6480 rule so the existing long_coinbase_maturity
+        // marker continues to cover 973440–979919. Pruned nodes that lack the
+        // earlier block/undo data can still start.
+        consensus.CoinbaseMaturityHistoricalStartHeight = 973440;
+        consensus.CoinbaseMaturityHistoricalReleaseHeight = 979920;
+        // 180-day rolling rule covers coins created from the original #419 window.
         consensus.CoinbaseMaturityLongStartHeight = 973440;
         consensus.CoinbaseMaturityLongEnforceHeight = 973440;
         // Each covered reward matures independently after approximately 180 days.
         // Expiry only ends coverage of newly mined rewards; it never releases old ones.
         consensus.CoinbaseMaturityLongUntilRdts = true;
         consensus.CoinbaseMaturityLong = 180 * 144;
-        AddLongCoinbaseMaturityRevalidationDeployment(consensus);
+        // Revalidation starts at 979920 (not 973440) so pruned nodes do not fail.
+        // Rename the marker so a previous v2 marker cannot certify this schedule.
+        consensus.chainstate_revalidation_deployments.push_back({
+            .name = "rolling_coinbase_maturity_180d_v3",
+            .start_height = 979920,
+            .stop_height = std::numeric_limits<int>::max(),
+        });
+
 
         consensus.nMinimumChainWork = uint256{"00000000000000000000000000000000000000013e00277374c9f9eeadc70200"};
         consensus.defaultAssumeValid = uint256{"0000000000000078ed1e20cac1acf78df6d1060c78059fb6331e17141c881fc8"}; // 964264
