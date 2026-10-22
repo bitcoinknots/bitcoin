@@ -155,6 +155,13 @@ public:
         consensus.CoinbaseMaturityLongUntilRdts = true;
         consensus.CoinbaseMaturityLong = 180 * 144;
         AddLongCoinbaseMaturityRevalidationDeployment(consensus);
+        // #477 extends the historical requirement beyond its old release.
+        // Neither the historical marker nor an earlier #468 marker certifies it.
+        consensus.chainstate_revalidation_deployments.push_back({
+            .name = "rolling_coinbase_maturity_45d",
+            .start_height = consensus.CoinbaseMaturityHistoricalReleaseHeight,
+            .stop_height = consensus.CoinbaseMaturityHistoricalReleaseHeight - 1 + consensus.CoinbaseMaturityBeforeRolling() - 1,
+        });
 
         consensus.nMinimumChainWork = uint256{"00000000000000000000000000000000000000013e00277374c9f9eeadc70200"};
         consensus.defaultAssumeValid = uint256{"0000000000000078ed1e20cac1acf78df6d1060c78059fb6331e17141c881fc8"}; // 964264

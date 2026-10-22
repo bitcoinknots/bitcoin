@@ -10,11 +10,14 @@ can be spent at height 1005839. The new rule does not expire at height 979920.
 
 Covered rewards retain the full 25920-block requirement after RDTS expires.
 Rewards mined with parent MTP at or above expiry require 100 blocks instead.
-The existing rule for rewards mined from height 973440 remains enforced
-through spending height 979919, with its original release at 979920.
-Rewards mined before height 979919 are not subject to the new 180-day rule;
-after the original release they require 100-block consensus maturity. All
-coinbase outputs, including transaction fees, follow these rules.
+With PR #477 included, rewards mined in the original historical window retain
+6480-block maturity (approximately 45 days) after height 979920. Rewards at
+heights 973440 through 979918 therefore mature individually: the reward at
+973440 matures at 979920, and the reward at 979918 matures at 986398. They are
+not subject to the 180-day rule. The overlapping reward at 979919 remains
+subject to the longer 25920-block requirement when covered by the RDTS cutoff.
+Rewards before 973440 retain 100-block consensus maturity. All coinbase
+outputs, including transaction fees, follow these rules.
 The expiry boundary is determined on the branch being validated, including
 during reorganizations; candidate block timestamps do not determine coverage.
 
@@ -37,6 +40,9 @@ An upgrade uses a new `rolling_coinbase_maturity_180d_v2` validation marker and
 rechecks the new rule from height 979919, including when the tip is past expiry.
 The existing `long_coinbase_maturity` marker continues to cover the historical
 rule. Nodes without that historical marker still need to validate that history.
+The additional `rolling_coinbase_maturity_45d` marker rechecks spending heights
+979920 through 986398 for the historical-window extension. Previous #468
+markers cannot certify this added requirement.
 Legacy maturity markers cannot certify this stronger rule. Pruned nodes that
 lack the block or undo data needed to rewind must reindex and redownload the
 missing history. Experimental rules that previously marked now-valid blocks
