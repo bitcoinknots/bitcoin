@@ -80,9 +80,9 @@ static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits
 static void AddLongCoinbaseMaturityRevalidationDeployment(Consensus::Params& consensus)
 {
     consensus.chainstate_revalidation_deployments.push_back({
-        .name = "long_coinbase_maturity",
+        .name = consensus.CoinbaseMaturityLongUntilRdts ? "rolling_coinbase_maturity_180d_v2" : "long_coinbase_maturity",
         .start_height = consensus.CoinbaseMaturityLongEnforceHeight,
-        .stop_height = consensus.CoinbaseMaturityLongReleaseHeight - 1,
+        .stop_height = consensus.CoinbaseMaturityLongUntilRdts ? std::numeric_limits<int>::max() : consensus.CoinbaseMaturityLongReleaseHeight - 1,
     });
 }
 
@@ -140,11 +140,26 @@ public:
         // reaching ACTIVE, and that deployment has been removed.)
         consensus.RdtsExpiryTime = 1819756800; // September 1st, 2027 00:00 UTC
 
+        // Keep the historical 6480 rule so the existing long_coinbase_maturity
+        // marker continues to cover 973440–979919. Pruned nodes that lack the
+        // earlier block/undo data can still start.
+        consensus.CoinbaseMaturityHistoricalStartHeight = 973440;
+        consensus.CoinbaseMaturityHistoricalReleaseHeight = 979920;
+        // 180-day rolling rule covers coins created from the original #419 window.
         consensus.CoinbaseMaturityLongStartHeight = 973440;
         consensus.CoinbaseMaturityLongEnforceHeight = 973440;
-        consensus.CoinbaseMaturityLongReleaseHeight = 979920;
-        consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
-        AddLongCoinbaseMaturityRevalidationDeployment(consensus);
+        // Each covered reward matures independently after approximately 180 days.
+        // Expiry only ends coverage of newly mined rewards; it never releases old ones.
+        consensus.CoinbaseMaturityLongUntilRdts = true;
+        consensus.CoinbaseMaturityLong = 180 * 144;
+        // Revalidation starts at 979920 (not 973440) so pruned nodes do not fail.
+        // Rename the marker so a previous v2 marker cannot certify this schedule.
+        consensus.chainstate_revalidation_deployments.push_back({
+            .name = "rolling_coinbase_maturity_180d_v3",
+            .start_height = 979920,
+            .stop_height = std::numeric_limits<int>::max(),
+        });
+
 
         consensus.nMinimumChainWork = uint256{"00000000000000000000000000000000000000013e00277374c9f9eeadc70200"};
         consensus.defaultAssumeValid = uint256{"0000000000000078ed1e20cac1acf78df6d1060c78059fb6331e17141c881fc8"}; // 964264
@@ -691,6 +706,10 @@ public:
             consensus.CoinbaseMaturityLongEnforceHeight = *opts.coinbase_maturity_long_enforce_height;
             consensus.CoinbaseMaturityLongReleaseHeight = *opts.coinbase_maturity_long_release_height;
             consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
+            if (opts.coinbase_maturity_long_expiry) {
+                consensus.CoinbaseMaturityLongUntilRdts = true;
+                consensus.RdtsExpiryTime = *opts.coinbase_maturity_long_expiry;
+            }
             AddLongCoinbaseMaturityRevalidationDeployment(consensus);
         }
 
