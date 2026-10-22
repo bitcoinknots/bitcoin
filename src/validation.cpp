@@ -1356,9 +1356,30 @@ bool MemPoolAccept::ReplacementChecks(ATMPArgs& args, Workspace& ws)
     if (!args.m_ignore_rejects.count("insufficient fee")) {
     if (const auto err_string{PaysForRBF(m_subpackage.m_conflicting_fees, ws.m_modified_fees, ws.m_vsize,
                                          m_pool.m_opts.incremental_relay_feerate, hash)}) {
-        // Result may change in a package context
-        return state.Invalid(TxValidationResult::TX_RECONSIDERABLE,
-                             strprintf("insufficient fee%s", ws.m_sibling_eviction ? " (including sibling eviction)" : ""), *err_string);
+        bool next_block_exception{false};
+        // Package RBF stays excluded. Direct conflicts require the separate,
+        // narrowly scoped shared-P2A-anchor experiment.
+        if (m_pool.m_opts.truc_sibling_nextblock && m_pool.m_opts.truc_policy == TRUCPolicy::Enforce &&
+            m_pool.m_opts.truc_nextblock_miner_compatible && m_pool.m_opts.rbf_policy != RBFPolicy::Never &&
+            !args.m_package_submission && !args.m_package_feerates && args.m_ignore_rejects.empty() &&
+            all_conflicts.size() == 1 && ws.m_ancestors.size() == 1) {
+            const bool policy_sibling = ws.m_sibling_eviction &&
+                std::none_of(tx.vin.begin(), tx.vin.end(), [&](const auto& input) {
+                    return m_pool.GetConflictTx(input.prevout) != nullptr;
+                });
+            const bool shared_anchor = m_pool.m_opts.truc_shared_anchor_nextblock &&
+                IsTrucSharedAnchorConflict(tx, (*all_conflicts.begin())->GetTx(), (*ws.m_ancestors.begin())->GetTx());
+            const auto* tip = Assert(m_active_chainstate.m_chain.Tip());
+            const auto max_weight = args.m_chainparams.GetConsensus().RdtsActiveAt(tip->nHeight + 1, tip->GetMedianTimePast())
+                ? REDUCED_DATA_MAX_BLOCK_WEIGHT : MAX_BLOCK_WEIGHT;
+            next_block_exception = (policy_sibling || shared_anchor) && TrucSiblingNextBlock(m_pool, *ws.m_tx_handle,
+                **all_conflicts.begin(), **ws.m_ancestors.begin(), max_weight);
+        }
+        if (!next_block_exception) {
+            // Result may change in a package context
+            return state.Invalid(TxValidationResult::TX_RECONSIDERABLE,
+                                 strprintf("insufficient fee%s", ws.m_sibling_eviction ? " (including sibling eviction)" : ""), *err_string);
+        }
     }
     }  // ignore_rejects
 

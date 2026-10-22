@@ -739,6 +739,8 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-mempoolfullrbf", strprintf("Accept transaction replace-by-fee without requiring replaceability signaling (default: %u)", (DEFAULT_MEMPOOL_RBF_POLICY == RBFPolicy::Always)), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-mempoolreplacement", strprintf("Set to 0 to disable RBF entirely, \"fee,optin\" to honour RBF opt-out signal, or \"fee,-optin\" to always RBF aka full RBF (default: %s)", "fee,-optin"), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-mempooltruc", strprintf("Behaviour for transactions requesting TRUC limits: \"reject\" the transactions entirely, \"accept\" them just like any other, or \"enforce\" to impose their requested restrictions (default: %s)", "accept"), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
+    argsman.AddArg("-trucsiblingnextblock", "Experimental next-block fee exception for single TRUC sibling eviction; only effective with -mempooltruc=enforce (default: 0)", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::NODE_RELAY);
+    argsman.AddArg("-trucsharedanchornextblock", "Experimental shared P2A anchor extension; requires -trucsiblingnextblock (default: 0)", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-permitbareanchor",
                    strprintf("Relay transactions that only have ephemeral anchor outputs (default: %u)", DEFAULT_PERMITBAREANCHOR),
                    ArgsManager::ALLOW_ANY,

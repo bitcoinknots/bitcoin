@@ -14,6 +14,7 @@
 #include <kernel/chainparams.h>
 #include <logging.h>
 #include <node/interface_ui.h>
+#include <node/miner.h>
 #include <policy/feerate.h>
 #include <policy/fees.h>
 #include <policy/policy.h>
@@ -305,6 +306,22 @@ util::Result<void> ApplyArgsManOptions(const ArgsManager& argsman, const CChainP
         } else {  // accept or -enforce
             mempool_opts.truc_policy = TRUCPolicy::Accept;
         }
+    }
+
+    mempool_opts.truc_sibling_nextblock = argsman.GetBoolArg("-trucsiblingnextblock", false);
+    mempool_opts.truc_shared_anchor_nextblock = argsman.GetBoolArg("-trucsharedanchornextblock", false);
+    // Use the miner's own argument parser. This is a conservative compatibility
+    // guard, NOT a claim that our selector reproduces BlockAssembler exactly.
+    node::BlockAssembler::Options mining;
+    node::ApplyArgsManOptions(argsman, mining);
+    mempool_opts.truc_nextblock_miner_compatible =
+        argsman.GetIntArg("-blockprioritysize", DEFAULT_BLOCK_PRIORITY_SIZE) == 0 &&
+        mining.nBlockMaxSize == MAX_BLOCK_SERIALIZED_SIZE &&
+        mining.nBlockMaxWeight == MAX_BLOCK_WEIGHT &&
+        mining.block_reserved_weight == DEFAULT_BLOCK_RESERVED_WEIGHT &&
+        mining.blockMinFeeRate == mempool_opts.min_relay_feerate;
+    if (mempool_opts.truc_sibling_nextblock && !mempool_opts.truc_nextblock_miner_compatible) {
+        LogInfo("TRUC next-block exception inactive: mining settings differ from the experimental fee-only profile\n");
     }
 
     if (argsman.IsArgSet("-permitephemeral")) {
