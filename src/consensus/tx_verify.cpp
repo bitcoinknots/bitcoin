@@ -208,9 +208,11 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, 
                               int spend_height, CAmount& txfee, CheckTxInputsRules rules, const Params& params,
                               int long_maturity_end_height)
 {
-    if (params.CoinbaseMaturityHistoricalActiveAt(spend_height) &&
+    // Lock-sticks: coins created in the historical window keep the 6480 maturity forever.
+    if (params.CoinbaseMaturityHistoricalStartHeight != std::numeric_limits<int>::max() &&
         !CheckTxInputs(tx, state, inputs, spend_height, txfee, rules,
-                       params.CoinbaseMaturityBeforeRolling(), params.CoinbaseMaturityHistoricalStartHeight)) {
+                       params.CoinbaseMaturityBeforeRolling(), params.CoinbaseMaturityHistoricalStartHeight,
+                       params.CoinbaseMaturityHistoricalReleaseHeight)) {
         return false;
     }
     const int start{params.CoinbaseMaturityLongActiveAt(spend_height)
