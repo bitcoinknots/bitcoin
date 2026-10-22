@@ -167,15 +167,20 @@ BOOST_FIXTURE_TEST_CASE(mainnet_later_activation_preserves_history, BasicTesting
         CAmount fee;
         return Consensus::CheckTxInputs(CTransaction{tx}, state, view, spend_height, fee, CheckTxInputsRules::None, params);
     };
-    // Preserve the old rule, including its overlap with activation at 979919.
+    // Lock-sticks: coins created in [973440, 979919) keep 6480 maturity forever.
+    // 973440 + 6480 = 979920, so the first coin still matures exactly at the old release.
     BOOST_CHECK(check(973439, 973539));
     BOOST_CHECK(!check(973440, 973540));
     BOOST_CHECK(!check(973440, 979918));
     BOOST_CHECK(!check(973440, 979919));
-    BOOST_CHECK(check(973440, 979920));
-    BOOST_CHECK(check(979820, 979920));
+    BOOST_CHECK(check(973440, 979920));          // 973440 + 6480
+    BOOST_CHECK(!check(973450, 979921));         // 973450 + 6480 = 979930; not yet
+    BOOST_CHECK(check(973450, 979930));          // exactly mature
+    BOOST_CHECK(!check(979820, 979920));         // 979820 + 6480 = 986300
     BOOST_CHECK(!check(979918, 979918 + 99));
-    BOOST_CHECK(check(979918, 979918 + 100));
+    BOOST_CHECK(!check(979918, 979918 + 100));   // still needs 6480
+    BOOST_CHECK(check(979918, 979918 + 6480));
+    // 180-day rule from 979919 is unchanged
     BOOST_CHECK(!check(979919, 979919 + 100));
     BOOST_CHECK(!check(979919, 979919 + 25919));
     BOOST_CHECK(check(979919, 979919 + 25920));
