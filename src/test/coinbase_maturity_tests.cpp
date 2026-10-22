@@ -47,17 +47,17 @@ BOOST_AUTO_TEST_CASE(long_maturity_derived_from_schedule)
 
     const auto& main_consensus{main->GetConsensus()};
     BOOST_CHECK_EQUAL(main_consensus.CoinbaseMaturityLong, 25920);
-    BOOST_CHECK_EQUAL(main_consensus.CoinbaseMaturityLongStartHeight, 979919);
+    BOOST_CHECK_EQUAL(main_consensus.CoinbaseMaturityLongStartHeight, 973440);
     BOOST_CHECK_EQUAL(main_consensus.RdtsExpiryTime, 1819756800);
     BOOST_CHECK(main_consensus.CoinbaseMaturityLongUntilRdts);
-    BOOST_CHECK(!main_consensus.CoinbaseMaturityLongActiveAt(979918));
+    BOOST_CHECK(main_consensus.CoinbaseMaturityLongActiveAt(973440));
     BOOST_CHECK(main_consensus.CoinbaseMaturityLongActiveAt(979919));
     BOOST_CHECK(main_consensus.CoinbaseMaturityLongActiveAt(979920));
-    BOOST_CHECK_EQUAL(main_consensus.CoinbaseMaturityLongEnforceHeight, 979919);
-    BOOST_REQUIRE_EQUAL(main_consensus.chainstate_revalidation_deployments.size(), 2);
-    BOOST_CHECK_EQUAL(main_consensus.chainstate_revalidation_deployments[1].name, "rolling_coinbase_maturity_180d_v2");
-    BOOST_CHECK_EQUAL(main_consensus.chainstate_revalidation_deployments[1].start_height, 979919);
-    BOOST_CHECK_EQUAL(main_consensus.chainstate_revalidation_deployments[1].stop_height, std::numeric_limits<int>::max());
+    BOOST_CHECK_EQUAL(main_consensus.CoinbaseMaturityLongEnforceHeight, 973440);
+    BOOST_REQUIRE_EQUAL(main_consensus.chainstate_revalidation_deployments.size(), 1);
+    BOOST_CHECK_EQUAL(main_consensus.chainstate_revalidation_deployments[0].name, "rolling_coinbase_maturity_180d_v2");
+    BOOST_CHECK_EQUAL(main_consensus.chainstate_revalidation_deployments[0].start_height, 973440);
+    BOOST_CHECK_EQUAL(main_consensus.chainstate_revalidation_deployments[0].stop_height, std::numeric_limits<int>::max());
 
     const auto regtest_default{CChainParams::RegTest({})};
     const auto& default_consensus{regtest_default->GetConsensus()};
@@ -152,9 +152,9 @@ BOOST_FIXTURE_TEST_CASE(mainnet_later_activation_preserves_history, BasicTesting
 {
     const auto main{CChainParams::Main()};
     const auto& params{main->GetConsensus()};
-    BOOST_CHECK_EQUAL(params.chainstate_revalidation_deployments[0].name, "long_coinbase_maturity");
+    BOOST_CHECK_EQUAL(params.chainstate_revalidation_deployments[0].name, "rolling_coinbase_maturity_180d_v2");
     BOOST_CHECK_EQUAL(params.chainstate_revalidation_deployments[0].start_height, 973440);
-    BOOST_CHECK_EQUAL(params.chainstate_revalidation_deployments[0].stop_height, 979919);
+    BOOST_CHECK_EQUAL(params.chainstate_revalidation_deployments[0].stop_height, std::numeric_limits<int>::max());
 
     auto check = [&](int coin_height, int spend_height) {
         CCoinsView base;
@@ -167,15 +167,14 @@ BOOST_FIXTURE_TEST_CASE(mainnet_later_activation_preserves_history, BasicTesting
         CAmount fee;
         return Consensus::CheckTxInputs(CTransaction{tx}, state, view, spend_height, fee, CheckTxInputsRules::None, params);
     };
-    // Preserve the old rule, including its overlap with activation at 979919.
+    // 180-day rolling rule now starts at 973440 (historical 6480 window removed).
     BOOST_CHECK(check(973439, 973539));
-    BOOST_CHECK(!check(973440, 973540));
-    BOOST_CHECK(!check(973440, 979918));
-    BOOST_CHECK(!check(973440, 979919));
-    BOOST_CHECK(check(973440, 979920));
-    BOOST_CHECK(check(979820, 979920));
-    BOOST_CHECK(!check(979918, 979918 + 99));
-    BOOST_CHECK(check(979918, 979918 + 100));
+    BOOST_CHECK(!check(973440, 973440 + 100));
+    BOOST_CHECK(!check(973440, 973440 + 6480));
+    BOOST_CHECK(!check(973440, 973440 + 25919));
+    BOOST_CHECK(check(973440, 973440 + 25920));
+    BOOST_CHECK(!check(973450, 973450 + 25919));
+    BOOST_CHECK(check(973450, 973450 + 25920));
     BOOST_CHECK(!check(979919, 979919 + 100));
     BOOST_CHECK(!check(979919, 979919 + 25919));
     BOOST_CHECK(check(979919, 979919 + 25920));
@@ -186,8 +185,8 @@ BOOST_FIXTURE_TEST_CASE(mainnet_later_activation_preserves_history, BasicTesting
     parent.nTime = params.RdtsExpiryTime - 1;
     CBlockIndex reward;
     reward.pprev = &parent;
-    reward.nHeight = 979918;
-    BOOST_CHECK_EQUAL(Consensus::CoinbaseMaturityPolicy(params, &reward), 6480);
+    reward.nHeight = 973440;
+    BOOST_CHECK_EQUAL(Consensus::CoinbaseMaturityPolicy(params, &reward), 25920);
     reward.nHeight = 979919;
     BOOST_CHECK_EQUAL(Consensus::CoinbaseMaturityPolicy(params, &reward), 25920);
     parent.nTime = params.RdtsExpiryTime;
