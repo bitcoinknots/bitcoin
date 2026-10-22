@@ -164,6 +164,13 @@ struct Params {
     {
         return height >= CoinbaseMaturityHistoricalStartHeight && height < CoinbaseMaturityHistoricalReleaseHeight;
     }
+    // Short 100-block band between the historical 180-day window and the resumed 180-day rule.
+    int CoinbaseMaturityShortStartHeight{std::numeric_limits<int>::max()};
+    int CoinbaseMaturityShortEndHeight{std::numeric_limits<int>::max()};
+    bool CoinbaseMaturityShortActiveAt(int height) const
+    {
+        return height >= CoinbaseMaturityShortStartHeight && height < CoinbaseMaturityShortEndHeight;
+    }
     int CoinbaseMaturityBeforeRolling() const
     {
         return CoinbaseMaturityHistoricalStartHeight != std::numeric_limits<int>::max()

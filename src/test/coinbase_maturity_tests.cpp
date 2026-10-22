@@ -167,27 +167,31 @@ BOOST_FIXTURE_TEST_CASE(mainnet_later_activation_preserves_history, BasicTesting
         CAmount fee;
         return Consensus::CheckTxInputs(CTransaction{tx}, state, view, spend_height, fee, CheckTxInputsRules::None, params);
     };
-    // Preserve the old rule, including its overlap with activation at 979919.
+    // Historical window (973440-979919): 180-day.
+    // Short band (979920-986399): 100.
+    // After 986400: 180-day again.
     BOOST_CHECK(check(973439, 973539));
-    BOOST_CHECK(!check(973440, 973540));
-    BOOST_CHECK(!check(973440, 979918));
-    BOOST_CHECK(!check(973440, 979919));
-    BOOST_CHECK(check(973440, 979920));
-    BOOST_CHECK(check(979820, 979920));
-    BOOST_CHECK(!check(979918, 979918 + 99));
-    BOOST_CHECK(check(979918, 979918 + 100));
+    BOOST_CHECK(!check(973440, 973440 + 100));
+    BOOST_CHECK(!check(973440, 973440 + 25919));
+    BOOST_CHECK(check(973440, 973440 + 25920));
     BOOST_CHECK(!check(979919, 979919 + 100));
-    BOOST_CHECK(!check(979919, 979919 + 25919));
     BOOST_CHECK(check(979919, 979919 + 25920));
-    BOOST_CHECK(!check(979920, 979920 + 25919));
-    BOOST_CHECK(check(979920, 979920 + 25920));
+    // short band
+    BOOST_CHECK(check(979920, 979920 + 100));
+    BOOST_CHECK(!check(979920, 979920 + 99));
+    BOOST_CHECK(check(986399, 986399 + 100));
+    BOOST_CHECK(!check(986399, 986399 + 99));
+    // back to 180-day
+    BOOST_CHECK(!check(986400, 986400 + 100));
+    BOOST_CHECK(!check(986400, 986400 + 25919));
+    BOOST_CHECK(check(986400, 986400 + 25920));
 
     CBlockIndex parent;
     parent.nTime = params.RdtsExpiryTime - 1;
     CBlockIndex reward;
     reward.pprev = &parent;
     reward.nHeight = 979918;
-    BOOST_CHECK_EQUAL(Consensus::CoinbaseMaturityPolicy(params, &reward), 6480);
+    BOOST_CHECK_EQUAL(Consensus::CoinbaseMaturityPolicy(params, &reward), 25920);
     reward.nHeight = 979919;
     BOOST_CHECK_EQUAL(Consensus::CoinbaseMaturityPolicy(params, &reward), 25920);
     parent.nTime = params.RdtsExpiryTime;

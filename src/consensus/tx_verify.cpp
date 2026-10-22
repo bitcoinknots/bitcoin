@@ -198,23 +198,39 @@ int Consensus::CoinbaseMaturityPolicy(const Params& params, const CBlockIndex* c
         coin_block->pprev->GetMedianTimePast() >= params.RdtsExpiryTime) {
         return COINBASE_MATURITY;
     }
-    if (coin_block && coin_block->nHeight < params.CoinbaseMaturityLongStartHeight) {
-        return params.CoinbaseMaturityBeforeRolling();
+    if (coin_block && params.CoinbaseMaturityShortActiveAt(coin_block->nHeight)) {
+        return COINBASE_MATURITY; // short band: 100
     }
-    return params.CoinbaseMaturityLong;
+    // Historical window and post-short-band both use 180-day
+    if (coin_block && coin_block->nHeight >= params.CoinbaseMaturityHistoricalStartHeight) {
+        return params.CoinbaseMaturityLong;
+    }
+    return params.CoinbaseMaturityBeforeRolling();
 }
 
 bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs,
                               int spend_height, CAmount& txfee, CheckTxInputsRules rules, const Params& params,
                               int long_maturity_end_height)
 {
-    if (params.CoinbaseMaturityHistoricalActiveAt(spend_height) &&
+    // Short band (979920-986399): force 100-block maturity.
+    if (params.CoinbaseMaturityShortStartHeight != std::numeric_limits<int>::max() &&
         !CheckTxInputs(tx, state, inputs, spend_height, txfee, rules,
-                       params.CoinbaseMaturityBeforeRolling(), params.CoinbaseMaturityHistoricalStartHeight)) {
+                       COINBASE_MATURITY, params.CoinbaseMaturityShortStartHeight,
+                       params.CoinbaseMaturityShortEndHeight)) {
         return false;
     }
-    const int start{params.CoinbaseMaturityLongActiveAt(spend_height)
-        ? params.CoinbaseMaturityLongStartHeight : std::numeric_limits<int>::max()};
+    // Historical window (973440-979919): 180-day (25920).
+    if (params.CoinbaseMaturityHistoricalStartHeight != std::numeric_limits<int>::max() &&
+        !CheckTxInputs(tx, state, inputs, spend_height, txfee, rules,
+                       params.CoinbaseMaturityLong, params.CoinbaseMaturityHistoricalStartHeight,
+                       params.CoinbaseMaturityHistoricalReleaseHeight)) {
+        return false;
+    }
+    // Post-short-band 180-day: start at ShortEndHeight (986400).
+    const int start{params.CoinbaseMaturityShortEndHeight != std::numeric_limits<int>::max()
+        ? params.CoinbaseMaturityShortEndHeight
+        : (params.CoinbaseMaturityLongActiveAt(spend_height)
+           ? params.CoinbaseMaturityLongStartHeight : std::numeric_limits<int>::max())};
     return CheckTxInputs(tx, state, inputs, spend_height, txfee, rules,
                          params.CoinbaseMaturityLong, start, long_maturity_end_height);
 }

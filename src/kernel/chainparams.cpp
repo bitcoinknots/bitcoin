@@ -140,7 +140,8 @@ public:
         // reaching ACTIVE, and that deployment has been removed.)
         consensus.RdtsExpiryTime = 1819756800; // September 1st, 2027 00:00 UTC
 
-        // Retain #419's historical consensus checks and validation marker.
+        // Historical window (973440-979919) uses 180-day maturity.
+        // Then a 6480-block 100-maturity band, then 180-day resumes.
         consensus.CoinbaseMaturityHistoricalStartHeight = 973440;
         consensus.CoinbaseMaturityHistoricalReleaseHeight = 979920;
         consensus.chainstate_revalidation_deployments.push_back({
@@ -148,6 +149,9 @@ public:
             .start_height = consensus.CoinbaseMaturityHistoricalStartHeight,
             .stop_height = consensus.CoinbaseMaturityHistoricalReleaseHeight - 1,
         });
+        // Short band: 100-block maturity for exactly 6480 blocks after the historical window.
+        consensus.CoinbaseMaturityShortStartHeight = 979920;
+        consensus.CoinbaseMaturityShortEndHeight = 979920 + 6480; // 986400
         consensus.CoinbaseMaturityLongStartHeight = 979919;
         consensus.CoinbaseMaturityLongEnforceHeight = 979919;
         // Each covered reward matures independently after approximately 180 days.
