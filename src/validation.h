@@ -466,7 +466,8 @@ enum class FlushStateMode {
     NONE,
     IF_NEEDED,
     PERIODIC,
-    ALWAYS
+    ALWAYS,
+    FORCE_SYNC, //!< Write block data, index and coins while retaining the coins cache.
 };
 
 /**
