@@ -140,16 +140,12 @@ public:
         // reaching ACTIVE, and that deployment has been removed.)
         consensus.RdtsExpiryTime = 1819756800; // September 1st, 2027 00:00 UTC
 
-        // Retain #419's historical consensus checks and validation marker.
-        consensus.CoinbaseMaturityHistoricalStartHeight = 973440;
-        consensus.CoinbaseMaturityHistoricalReleaseHeight = 979920;
-        consensus.chainstate_revalidation_deployments.push_back({
-            .name = "long_coinbase_maturity",
-            .start_height = consensus.CoinbaseMaturityHistoricalStartHeight,
-            .stop_height = consensus.CoinbaseMaturityHistoricalReleaseHeight - 1,
-        });
-        consensus.CoinbaseMaturityLongStartHeight = 979919;
-        consensus.CoinbaseMaturityLongEnforceHeight = 979919;
+        // Historical window is subsumed by the 180-day rule starting at 973440.
+        consensus.CoinbaseMaturityHistoricalStartHeight = std::numeric_limits<int>::max();
+        consensus.CoinbaseMaturityHistoricalReleaseHeight = std::numeric_limits<int>::max();
+        // Start the 180-day rolling rule at the original #419 window instead of 979919.
+        consensus.CoinbaseMaturityLongStartHeight = 973440;
+        consensus.CoinbaseMaturityLongEnforceHeight = 973440;
         // Each covered reward matures independently after approximately 180 days.
         // Expiry only ends coverage of newly mined rewards; it never releases old ones.
         consensus.CoinbaseMaturityLongUntilRdts = true;
