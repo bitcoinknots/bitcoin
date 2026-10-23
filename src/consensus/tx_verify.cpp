@@ -194,11 +194,20 @@ int Consensus::CoinbaseMaturityLongEndHeight(const Params& params, const CBlockI
 
 int Consensus::CoinbaseMaturityPolicy(const Params& params, const CBlockIndex* coin_block)
 {
-    if (params.CoinbaseMaturityLongUntilRdts && coin_block && coin_block->pprev &&
+    if (!coin_block) return params.CoinbaseMaturityLong;
+
+    // Historical window sticks to the creating height, even after RDTS expiry.
+    // Strictly [HistoricalStart, LongStart) so the rolling rule begins cleanly at 979919.
+    if (coin_block->nHeight >= params.CoinbaseMaturityHistoricalStartHeight &&
+        coin_block->nHeight < params.CoinbaseMaturityLongStartHeight) {
+        return params.CoinbaseMaturityBeforeRolling();
+    }
+
+    if (params.CoinbaseMaturityLongUntilRdts && coin_block->pprev &&
         coin_block->pprev->GetMedianTimePast() >= params.RdtsExpiryTime) {
         return COINBASE_MATURITY;
     }
-    if (coin_block && coin_block->nHeight < params.CoinbaseMaturityLongStartHeight) {
+    if (coin_block->nHeight < params.CoinbaseMaturityLongStartHeight) {
         return params.CoinbaseMaturityBeforeRolling();
     }
     return params.CoinbaseMaturityLong;

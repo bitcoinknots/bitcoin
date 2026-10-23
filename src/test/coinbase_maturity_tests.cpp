@@ -202,6 +202,23 @@ BOOST_FIXTURE_TEST_CASE(mainnet_later_activation_preserves_history, BasicTesting
     BOOST_CHECK_EQUAL(Consensus::CoinbaseMaturityPolicy(params, &reward), 25920);
     parent.nTime = params.RdtsExpiryTime;
     BOOST_CHECK_EQUAL(Consensus::CoinbaseMaturityPolicy(params, &reward), 100);
+
+    // Use a real parent at the expiry boundary: a null parent would skip the
+    // old expiry shortcut and fail to detect a regression to 100-block policy.
+    CBlockIndex hist_coin;
+    hist_coin.pprev = &parent;
+    for (const auto time : {params.RdtsExpiryTime - 1, params.RdtsExpiryTime, params.RdtsExpiryTime + 1}) {
+        parent.nTime = time;
+        BOOST_CHECK_EQUAL(parent.GetMedianTimePast(), time);
+        for (const int height : {973440, 973450, 979918}) {
+            hist_coin.nHeight = height;
+            BOOST_CHECK_EQUAL(Consensus::CoinbaseMaturityPolicy(params, &hist_coin), 6480);
+        }
+        // The first rolling reward must still use the mining-time cutoff.
+        BOOST_CHECK_EQUAL(Consensus::CoinbaseMaturityPolicy(params, &reward),
+                          time < params.RdtsExpiryTime ? 25920 : 100);
+    }
+    BOOST_CHECK_EQUAL(Consensus::CoinbaseMaturityPolicy(params, nullptr), 25920);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
