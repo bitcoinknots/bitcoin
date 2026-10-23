@@ -24,7 +24,10 @@ policy; only covered rewards mined from 979919 use the new 25920-block depth.
 The wallet retains its existing one-confirmation safety margin for available
 credit.
 
-`getdeploymentinfo` reports `coinbase_expiry_time` rather than `height_end`.
+For the rolling phase, `getdeploymentinfo` reports `coinbase_expiry_time`
+rather than `height_end`. Before that phase activates, it describes the
+historical rule with its original activation, release height and 6480-block
+maturity. The active flag refers to the block after the queried block.
 The deployment remains active, and `getblocktemplate` continues to advertise
 `long_coinbase_maturity`, after expiry because old rewards remain subject to
 the rule. Testnet4's existing height-based schedule and other networks are
