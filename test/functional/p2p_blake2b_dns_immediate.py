@@ -11,6 +11,7 @@ Case B: same + 1 NODE_BLAKE2B (few HF) -> FEW-peers delay ("Waiting 11 seconds")
 from test_framework.messages import NODE_NETWORK, NODE_WITNESS, NODE_BLAKE2B
 from test_framework.netutil import UNREACHABLE_PROXY_ARG
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import assert_equal
 
 NON_HF = NODE_NETWORK | NODE_WITNESS
 HF = NODE_NETWORK | NODE_WITNESS | NODE_BLAKE2B
@@ -53,11 +54,16 @@ class Blake2bDnsImmediate(BitcoinTestFramework):
             self.restart_node(0)
         self.log.info("PASS A: queries DNS right away")
 
-        self.log.info("Add one NODE_BLAKE2B address")
-        node.addpeeraddress("8.8.8.8", 8333, False, HF)
+        self.log.info("Give one existing address NODE_BLAKE2B services")
+        # A new address can collide with an occupied addrman bucket slot.
+        # Updating a resident entry merges its services even when the RPC
+        # reports no new insertion. Check the resulting services below.
+        existing = next(iter(node.getrawaddrman()["new"].values()))
+        node.addpeeraddress(existing["address"], existing["port"], False, HF)
         total, hf = self._counts()
         self.log.info(f"addrman: {total} entries, {hf} NODE_BLAKE2B")
-        assert total > 1000 and hf >= 1
+        assert total > 1000
+        assert_equal(hf, 1)
 
         self.log.info("Case B: 1 NODE_BLAKE2B among >1000 total -> FEW delay (HF-count, not size)")
         with node.assert_debug_log(
