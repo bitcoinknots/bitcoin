@@ -197,6 +197,13 @@ BOOST_FIXTURE_TEST_CASE(mainnet_later_activation_preserves_history, BasicTesting
     BOOST_CHECK_EQUAL(Consensus::CoinbaseMaturityPolicy(params, &reward), 25920);
     parent.nTime = params.RdtsExpiryTime;
     BOOST_CHECK_EQUAL(Consensus::CoinbaseMaturityPolicy(params, &reward), 100);
+
+    // Policy must match consensus for the historical window even after simulated RDTS expiry.
+    CBlockIndex hist_coin;
+    hist_coin.nHeight = 973450;
+    hist_coin.pprev = nullptr;
+    BOOST_CHECK_EQUAL(Consensus::CoinbaseMaturityPolicy(params, &hist_coin),
+                      params.CoinbaseMaturityBeforeRolling());
 }
 
 BOOST_AUTO_TEST_SUITE_END()
