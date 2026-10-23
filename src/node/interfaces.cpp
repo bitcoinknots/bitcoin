@@ -67,6 +67,7 @@
 
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
+#include <algorithm>
 #include <any>
 #include <memory>
 #include <optional>
@@ -591,6 +592,11 @@ public:
     {
         LOCK(::cs_main);
         return Consensus::CoinbaseMaturityPolicy(chainman().GetConsensus(), chainman().m_blockman.LookupBlockIndex(block_hash));
+    }
+    int maxCoinbaseMaturity() override
+    {
+        const auto& params{chainman().GetConsensus()};
+        return std::max({COINBASE_MATURITY, params.CoinbaseMaturityLong, params.CoinbaseMaturityBeforeRolling()});
     }
     bool pruneLockExists(const std::string& name) const override
     {
