@@ -8,6 +8,7 @@
 #include <coins.h>
 #include <consensus/amount.h>
 #include <consensus/consensus.h>
+#include <consensus/params.h>
 #include <consensus/validation.h>
 #include <primitives/transaction.h>
 #include <script/interpreter.h>
@@ -172,9 +173,68 @@ bool Consensus::CheckOutputSizes(const CTransaction& tx, TxValidationState& stat
     return true;
 }
 
+int Consensus::CoinbaseMaturityLongEndHeight(const Params& params, const CBlockIndex* tip)
+{
+    if (!params.CoinbaseMaturityLongUntilRdts || !tip || tip->GetMedianTimePast() < params.RdtsExpiryTime) {
+        return std::numeric_limits<int>::max();
+    }
+    // MTP is monotone along a valid branch. Find the first parent at expiry.
+    // Use the spending branch, never the active chain or the candidate's MTP.
+    int low{0}, high{tip->nHeight};
+    while (low < high) {
+        const int mid{low + (high - low) / 2};
+        if (tip->GetAncestor(mid)->GetMedianTimePast() < params.RdtsExpiryTime) {
+            low = mid + 1;
+        } else {
+            high = mid;
+        }
+    }
+    return low + 1;
+}
+
+int Consensus::CoinbaseMaturityPolicy(const Params& params, const CBlockIndex* coin_block)
+{
+    if (!coin_block) return params.CoinbaseMaturityLong;
+
+    // Historical window sticks to the creating height, even after RDTS expiry.
+    // Strictly [HistoricalStart, LongStart) so the rolling rule begins cleanly at 979919.
+    if (coin_block->nHeight >= params.CoinbaseMaturityHistoricalStartHeight &&
+        coin_block->nHeight < params.CoinbaseMaturityLongStartHeight) {
+        return params.CoinbaseMaturityBeforeRolling();
+    }
+
+    if (params.CoinbaseMaturityLongUntilRdts && coin_block->pprev &&
+        coin_block->pprev->GetMedianTimePast() >= params.RdtsExpiryTime) {
+        return COINBASE_MATURITY;
+    }
+    if (coin_block->nHeight < params.CoinbaseMaturityLongStartHeight) {
+        return params.CoinbaseMaturityBeforeRolling();
+    }
+    return params.CoinbaseMaturityLong;
+}
+
+bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs,
+                              int spend_height, CAmount& txfee, CheckTxInputsRules rules, const Params& params,
+                              int long_maturity_end_height)
+{
+    // Lock-sticks: coins created in the historical window keep the 6480 maturity forever.
+    if (params.CoinbaseMaturityHistoricalStartHeight != std::numeric_limits<int>::max() &&
+        !CheckTxInputs(tx, state, inputs, spend_height, txfee, rules,
+                       params.CoinbaseMaturityBeforeRolling(), params.CoinbaseMaturityHistoricalStartHeight,
+                       params.CoinbaseMaturityHistoricalReleaseHeight)) {
+        return false;
+    }
+    const int start{params.CoinbaseMaturityLongActiveAt(spend_height)
+        ? params.CoinbaseMaturityLongStartHeight : std::numeric_limits<int>::max()};
+    return CheckTxInputs(tx, state, inputs, spend_height, txfee, rules,
+                         params.CoinbaseMaturityLong, start, long_maturity_end_height);
+}
+
 bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, const CheckTxInputsRules rules,
                               const int coinbase_maturity_long,
-                              const int long_maturity_start_height)
+                              const int long_maturity_start_height,
+                              const int long_maturity_end_height,
+                              const int coinbase_maturity_before_start)
 {
     // are the actual inputs available?
     if (!inputs.HaveInputs(tx)) {
@@ -196,7 +256,8 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, 
         // If prev is coinbase, check that it's matured
         if (coin.IsCoinBase()) {
             const int actual_maturity{nSpendHeight - (int)coin.nHeight};
-            const int required_maturity{(coin.nHeight >= long_maturity_start_height) ? coinbase_maturity_long : COINBASE_MATURITY};
+            const int required_maturity{coin.nHeight >= long_maturity_end_height ? COINBASE_MATURITY :
+                (coin.nHeight >= long_maturity_start_height ? coinbase_maturity_long : coinbase_maturity_before_start)};
             if (actual_maturity < required_maturity) {
                 return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, "bad-txns-premature-spend-of-coinbase",
                     strprintf("tried to spend coinbase at depth %d", actual_maturity));

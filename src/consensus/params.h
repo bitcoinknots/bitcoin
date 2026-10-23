@@ -157,9 +157,24 @@ struct Params {
     int CoinbaseMaturityLongStartHeight{std::numeric_limits<int>::max()};
     int CoinbaseMaturityLongEnforceHeight{std::numeric_limits<int>::max()};
     int CoinbaseMaturityLongReleaseHeight{std::numeric_limits<int>::max()};
+    // Preserve mainnet's pre-existing height-bounded rule when adding a later rule.
+    int CoinbaseMaturityHistoricalStartHeight{std::numeric_limits<int>::max()};
+    int CoinbaseMaturityHistoricalReleaseHeight{std::numeric_limits<int>::max()};
+    bool CoinbaseMaturityHistoricalActiveAt(int height) const
+    {
+        return height >= CoinbaseMaturityHistoricalStartHeight && height < CoinbaseMaturityHistoricalReleaseHeight;
+    }
+    int CoinbaseMaturityBeforeRolling() const
+    {
+        return CoinbaseMaturityHistoricalStartHeight != std::numeric_limits<int>::max()
+            ? CoinbaseMaturityHistoricalReleaseHeight - CoinbaseMaturityHistoricalStartHeight
+            : CoinbaseMaturityLong;
+    }
+    /** Bind long maturity to the mining block's parent MTP, retaining it after RDTS expires. */
+    bool CoinbaseMaturityLongUntilRdts{false};
     bool CoinbaseMaturityLongActiveAt(int height) const
     {
-        return height >= CoinbaseMaturityLongEnforceHeight && height < CoinbaseMaturityLongReleaseHeight;
+        return height >= CoinbaseMaturityLongEnforceHeight && (CoinbaseMaturityLongUntilRdts || height < CoinbaseMaturityLongReleaseHeight);
     }
     std::vector<ChainstateRevalidationDeployment> chainstate_revalidation_deployments;
     /** Don't warn about unknown BIP 9 activations below this height.
