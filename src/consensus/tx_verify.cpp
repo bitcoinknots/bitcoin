@@ -194,20 +194,11 @@ int Consensus::CoinbaseMaturityLongEndHeight(const Params& params, const CBlockI
 
 int Consensus::CoinbaseMaturityPolicy(const Params& params, const CBlockIndex* coin_block)
 {
-    if (!coin_block) return params.CoinbaseMaturityLong;
-
-    // Historical window sticks to the creating height, even after RDTS expiry.
-    // Strictly [HistoricalStart, LongStart) so the rolling rule begins cleanly at 979919.
-    if (coin_block->nHeight >= params.CoinbaseMaturityHistoricalStartHeight &&
-        coin_block->nHeight < params.CoinbaseMaturityLongStartHeight) {
-        return params.CoinbaseMaturityBeforeRolling();
-    }
-
-    if (params.CoinbaseMaturityLongUntilRdts && coin_block->pprev &&
+    if (params.CoinbaseMaturityLongUntilRdts && coin_block && coin_block->pprev &&
         coin_block->pprev->GetMedianTimePast() >= params.RdtsExpiryTime) {
         return COINBASE_MATURITY;
     }
-    if (coin_block->nHeight < params.CoinbaseMaturityLongStartHeight) {
+    if (coin_block && coin_block->nHeight < params.CoinbaseMaturityLongStartHeight) {
         return params.CoinbaseMaturityBeforeRolling();
     }
     return params.CoinbaseMaturityLong;
@@ -217,11 +208,9 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, 
                               int spend_height, CAmount& txfee, CheckTxInputsRules rules, const Params& params,
                               int long_maturity_end_height)
 {
-    // Lock-sticks: coins created in the historical window keep the 6480 maturity forever.
-    if (params.CoinbaseMaturityHistoricalStartHeight != std::numeric_limits<int>::max() &&
+    if (params.CoinbaseMaturityHistoricalActiveAt(spend_height) &&
         !CheckTxInputs(tx, state, inputs, spend_height, txfee, rules,
-                       params.CoinbaseMaturityBeforeRolling(), params.CoinbaseMaturityHistoricalStartHeight,
-                       params.CoinbaseMaturityHistoricalReleaseHeight)) {
+                       params.CoinbaseMaturityBeforeRolling(), params.CoinbaseMaturityHistoricalStartHeight)) {
         return false;
     }
     const int start{params.CoinbaseMaturityLongActiveAt(spend_height)
