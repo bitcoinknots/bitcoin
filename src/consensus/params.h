@@ -176,6 +176,27 @@ struct Params {
     {
         return height >= CoinbaseMaturityLongEnforceHeight && (CoinbaseMaturityLongUntilRdts || height < CoinbaseMaturityLongReleaseHeight);
     }
+    /**
+     * Rolling coinbase maturity: from CoinbaseMaturityRollingActivationHeight on, every
+     * reward mined at a height in [CoinbaseMaturityRollingStartHeight, CoinbaseMaturityRollingEndHeight)
+     * needs CoinbaseMaturityRolling confirmations, counted from its own block. Heights only:
+     * it does not depend on RDTS. It is combined with the other maturity rules by taking the
+     * maximum, so it never shortens them.
+     */
+    int CoinbaseMaturityRolling{COINBASE_MATURITY};
+    int CoinbaseMaturityRollingStartHeight{std::numeric_limits<int>::max()};
+    int CoinbaseMaturityRollingEndHeight{std::numeric_limits<int>::max()};
+    int CoinbaseMaturityRollingActivationHeight{std::numeric_limits<int>::max()};
+    bool CoinbaseMaturityRollingActiveAt(int height) const
+    {
+        return height >= CoinbaseMaturityRollingActivationHeight;
+    }
+    /** Maturity the rolling rule alone requires for a reward mined at coin_height. */
+    int CoinbaseMaturityRollingRequired(int coin_height) const
+    {
+        return coin_height >= CoinbaseMaturityRollingStartHeight && coin_height < CoinbaseMaturityRollingEndHeight
+            ? CoinbaseMaturityRolling : COINBASE_MATURITY;
+    }
     std::vector<ChainstateRevalidationDeployment> chainstate_revalidation_deployments;
     /** Don't warn about unknown BIP 9 activations below this height.
      * This prevents us from warning about the CSV and segwit activations. */

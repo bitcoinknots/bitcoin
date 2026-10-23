@@ -1025,6 +1025,14 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
                                   consensusParams.CoinbaseMaturityBeforeRolling())) {
         return false; // state filled in by CheckTxInputs
     }
+    // Rolling coinbase maturity: relay holds covered rewards to the rolling depth as soon as it is scheduled.
+    if (consensusParams.CoinbaseMaturityRollingActivationHeight != std::numeric_limits<int>::max() &&
+        !Consensus::CheckTxInputs(tx, state, m_view, block_height_next, ws.m_base_fees, CheckTxInputsRules::OutputSizeLimit,
+                                  consensusParams.CoinbaseMaturityRolling,
+                                  consensusParams.CoinbaseMaturityRollingStartHeight,
+                                  consensusParams.CoinbaseMaturityRollingEndHeight)) {
+        return false; // state filled in by CheckTxInputs
+    }
 
     if (m_pool.m_opts.minrelaymaturity) {
         auto max_coin_height = block_height_next - m_pool.m_opts.minrelaymaturity;
