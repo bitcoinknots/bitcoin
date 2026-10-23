@@ -142,8 +142,8 @@ public:
 
         consensus.CoinbaseMaturityLongStartHeight = 973440;
         consensus.CoinbaseMaturityLongEnforceHeight = 973440;
-        consensus.CoinbaseMaturityLongReleaseHeight = 979920;
-        consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
+        consensus.CoinbaseMaturityLongReleaseHeight = std::numeric_limits<int>::max();
+        consensus.CoinbaseMaturityLong = 6480;
         AddLongCoinbaseMaturityRevalidationDeployment(consensus);
 
         consensus.nMinimumChainWork = uint256{"00000000000000000000000000000000000000013e00277374c9f9eeadc70200"};
