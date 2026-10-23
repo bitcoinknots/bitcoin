@@ -1910,6 +1910,28 @@ RPCHelpMan getblockchaininfo()
     };
 }
 
+UniValue GetCoinbaseMaturityDeploymentInfo(const Consensus::Params& params, int next_block_height)
+{
+    if (params.CoinbaseMaturityLongEnforceHeight == std::numeric_limits<int>::max()) return NullUniValue;
+
+    // Describe the original rule until the rolling rule takes over. All fields
+    // must agree with the rule being reported, not just the active flag.
+    const bool historical{params.CoinbaseMaturityHistoricalStartHeight != std::numeric_limits<int>::max() &&
+                          next_block_height < params.CoinbaseMaturityLongEnforceHeight};
+    UniValue rv(UniValue::VOBJ);
+    rv.pushKV("type", "flagday");
+    rv.pushKV("height", historical ? params.CoinbaseMaturityHistoricalStartHeight : params.CoinbaseMaturityLongEnforceHeight);
+    if (!historical && params.CoinbaseMaturityLongUntilRdts) {
+        rv.pushKV("coinbase_expiry_time", params.RdtsExpiryTime);
+    } else {
+        rv.pushKV("height_end", (historical ? params.CoinbaseMaturityHistoricalReleaseHeight : params.CoinbaseMaturityLongReleaseHeight) - 1);
+    }
+    rv.pushKV("coinbase_start_height", historical ? params.CoinbaseMaturityHistoricalStartHeight : params.CoinbaseMaturityLongStartHeight);
+    rv.pushKV("maturity", historical ? params.CoinbaseMaturityBeforeRolling() : params.CoinbaseMaturityLong);
+    rv.pushKV("active", historical ? params.CoinbaseMaturityHistoricalActiveAt(next_block_height) : params.CoinbaseMaturityLongActiveAt(next_block_height));
+    return rv;
+}
+
 namespace {
 const std::vector<RPCResult> RPCHelpForDeployment{
     {RPCResult::Type::STR, "type", "one of \"buried\", \"bip9\", \"flagday\""},
@@ -1965,24 +1987,6 @@ void RdtsFlagDayDescPushBack(const CBlockIndex* blockindex, UniValue& softforks,
     softforks.pushKV("reduced_data", std::move(rv));
 }
 
-void LongCoinbaseMaturityDescPushBack(const CBlockIndex* blockindex, UniValue& softforks, const ChainstateManager& chainman)
-{
-    const Consensus::Params& params{chainman.GetConsensus()};
-    if (params.CoinbaseMaturityLongEnforceHeight == std::numeric_limits<int>::max()) return;
-
-    UniValue rv(UniValue::VOBJ);
-    rv.pushKV("type", "flagday");
-    rv.pushKV("height", params.CoinbaseMaturityLongEnforceHeight);
-    if (params.CoinbaseMaturityLongUntilRdts) {
-        rv.pushKV("coinbase_expiry_time", params.RdtsExpiryTime);
-    } else {
-        rv.pushKV("height_end", params.CoinbaseMaturityLongReleaseHeight - 1);
-    }
-    rv.pushKV("coinbase_start_height", params.CoinbaseMaturityLongStartHeight);
-    rv.pushKV("maturity", params.CoinbaseMaturityLong);
-    rv.pushKV("active", params.CoinbaseMaturityLongActiveAt(blockindex->nHeight + 1));
-    softforks.pushKV("long_coinbase_maturity", std::move(rv));
-}
 
 UniValue DeploymentInfo(const CBlockIndex* blockindex, const ChainstateManager& chainman)
 {
@@ -1995,7 +1999,8 @@ UniValue DeploymentInfo(const CBlockIndex* blockindex, const ChainstateManager& 
     SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_TESTDUMMY);
     SoftForkDescPushBack(blockindex, softforks, chainman, Consensus::DEPLOYMENT_TAPROOT);
     RdtsFlagDayDescPushBack(blockindex, softforks, chainman);
-    LongCoinbaseMaturityDescPushBack(blockindex, softforks, chainman);
+    UniValue maturity{GetCoinbaseMaturityDeploymentInfo(chainman.GetConsensus(), blockindex->nHeight + 1)};
+    if (!maturity.isNull()) softforks.pushKV("long_coinbase_maturity", std::move(maturity));
     return softforks;
 }
 } // anon namespace

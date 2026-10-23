@@ -38,6 +38,9 @@ using coinascii_cb_t = std::function<std::string(const COutPoint&, const Coin&)>
  */
 double GetDifficulty(const CBlockIndex& blockindex);
 
+/** Describe the coinbase maturity deployment for the next block, or null if unconfigured. */
+UniValue GetCoinbaseMaturityDeploymentInfo(const Consensus::Params& params, int next_block_height);
+
 /** Block description to JSON */
 UniValue blockToJSON(node::BlockManager& blockman, const CBlock& block, const CBlockIndex& tip, const CBlockIndex& blockindex, TxVerbosity verbosity, const uint256 pow_limit) LOCKS_EXCLUDED(cs_main);
 

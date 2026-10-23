@@ -5,10 +5,12 @@
 #include <boost/test/unit_test.hpp>
 
 #include <chain.h>
+#include <kernel/chainparams.h>
 #include <node/blockstorage.h>
 #include <rpc/blockchain.h>
 #include <sync.h>
 #include <test/util/setup_common.h>
+#include <univalue.h>
 #include <util/string.h>
 
 #include <cstdlib>
@@ -52,6 +54,40 @@ static void TestDifficulty(uint32_t nbits, double expected_difficulty)
 }
 
 BOOST_FIXTURE_TEST_SUITE(blockchain_tests, BasicTestingSetup)
+
+BOOST_AUTO_TEST_CASE(coinbase_maturity_deployment_boundaries)
+{
+    const auto main{CChainParams::Main()};
+    const auto& params{main->GetConsensus()};
+    for (const int height : {973439, 973440, 979918}) {
+        const auto info{GetCoinbaseMaturityDeploymentInfo(params, height)};
+        BOOST_CHECK_EQUAL(info["height"].getInt<int>(), 973440);
+        BOOST_CHECK_EQUAL(info["height_end"].getInt<int>(), 979919);
+        BOOST_CHECK_EQUAL(info["coinbase_start_height"].getInt<int>(), 973440);
+        BOOST_CHECK_EQUAL(info["maturity"].getInt<int>(), 6480);
+        BOOST_CHECK_EQUAL(info["active"].get_bool(), height >= 973440);
+        BOOST_CHECK(info["coinbase_expiry_time"].isNull());
+    }
+    for (const int height : {979919, 979920, 1005839}) {
+        const auto info{GetCoinbaseMaturityDeploymentInfo(params, height)};
+        BOOST_CHECK_EQUAL(info["height"].getInt<int>(), 979919);
+        BOOST_CHECK_EQUAL(info["coinbase_start_height"].getInt<int>(), 979919);
+        BOOST_CHECK_EQUAL(info["maturity"].getInt<int>(), 25920);
+        BOOST_CHECK(info["active"].get_bool());
+        BOOST_CHECK_EQUAL(info["coinbase_expiry_time"].getInt<int64_t>(), params.RdtsExpiryTime);
+        BOOST_CHECK(info["height_end"].isNull());
+    }
+    const auto testnet4{CChainParams::TestNet4()};
+    const auto& test_params{testnet4->GetConsensus()};
+    for (const int height : {test_params.CoinbaseMaturityLongEnforceHeight - 1, test_params.CoinbaseMaturityLongEnforceHeight,
+                             test_params.CoinbaseMaturityLongReleaseHeight - 1, test_params.CoinbaseMaturityLongReleaseHeight}) {
+        const auto info{GetCoinbaseMaturityDeploymentInfo(test_params, height)};
+        BOOST_CHECK_EQUAL(info["active"].get_bool(), test_params.CoinbaseMaturityLongActiveAt(height));
+        BOOST_CHECK_EQUAL(info["height_end"].getInt<int>(), test_params.CoinbaseMaturityLongReleaseHeight - 1);
+        BOOST_CHECK(info["coinbase_expiry_time"].isNull());
+    }
+    BOOST_CHECK(GetCoinbaseMaturityDeploymentInfo(CChainParams::RegTest({})->GetConsensus(), 0).isNull());
+}
 
 BOOST_AUTO_TEST_CASE(get_difficulty_for_very_low_target)
 {
