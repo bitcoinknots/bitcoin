@@ -1964,12 +1964,13 @@ void RdtsFlagDayDescPushBack(const CBlockIndex* blockindex, UniValue& softforks,
 void LongCoinbaseMaturityDescPushBack(const CBlockIndex* blockindex, UniValue& softforks, const ChainstateManager& chainman)
 {
     const Consensus::Params& params{chainman.GetConsensus()};
-    if (params.CoinbaseMaturityLongReleaseHeight == std::numeric_limits<int>::max()) return;
-
+    if (params.CoinbaseMaturityLongEnforceHeight == std::numeric_limits<int>::max()) return;
     UniValue rv(UniValue::VOBJ);
     rv.pushKV("type", "flagday");
     rv.pushKV("height", params.CoinbaseMaturityLongEnforceHeight);
-    rv.pushKV("height_end", params.CoinbaseMaturityLongReleaseHeight - 1);
+    if (params.CoinbaseMaturityLongReleaseHeight != std::numeric_limits<int>::max()) {
+        rv.pushKV("height_end", params.CoinbaseMaturityLongReleaseHeight - 1);
+    }
     rv.pushKV("coinbase_start_height", params.CoinbaseMaturityLongStartHeight);
     rv.pushKV("maturity", params.CoinbaseMaturityLong);
     rv.pushKV("active", params.CoinbaseMaturityLongActiveAt(blockindex->nHeight + 1));

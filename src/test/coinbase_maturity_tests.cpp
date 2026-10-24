@@ -28,17 +28,24 @@ BOOST_AUTO_TEST_CASE(long_maturity_window_boundaries)
 BOOST_AUTO_TEST_CASE(long_maturity_derived_from_schedule)
 {
     const auto main{CChainParams::Main()};
+    const auto& main_consensus{main->GetConsensus()};
+    BOOST_CHECK_EQUAL(main_consensus.CoinbaseMaturityLong, 6480);
+    BOOST_CHECK_EQUAL(main_consensus.CoinbaseMaturityLongReleaseHeight, std::numeric_limits<int>::max());
+    BOOST_REQUIRE_EQUAL(main_consensus.chainstate_revalidation_deployments.size(), 1);
+    const auto& main_deployment{main_consensus.chainstate_revalidation_deployments.front()};
+    BOOST_CHECK_EQUAL(main_deployment.name, "long_coinbase_maturity");
+    BOOST_CHECK_EQUAL(main_deployment.start_height, main_consensus.CoinbaseMaturityLongEnforceHeight);
+    BOOST_CHECK_EQUAL(main_deployment.stop_height, main_consensus.CoinbaseMaturityLongReleaseHeight - 1);
+
     const auto testnet4{CChainParams::TestNet4()};
-    for (const auto* params : {main.get(), testnet4.get()}) {
-        const auto& consensus{params->GetConsensus()};
-        BOOST_CHECK_EQUAL(consensus.CoinbaseMaturityLong, consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight);
-        BOOST_CHECK_GT(consensus.CoinbaseMaturityLong, COINBASE_MATURITY);
-        BOOST_REQUIRE_EQUAL(consensus.chainstate_revalidation_deployments.size(), 1);
-        const auto& deployment{consensus.chainstate_revalidation_deployments.front()};
-        BOOST_CHECK_EQUAL(deployment.name, "long_coinbase_maturity");
-        BOOST_CHECK_EQUAL(deployment.start_height, consensus.CoinbaseMaturityLongEnforceHeight);
-        BOOST_CHECK_EQUAL(deployment.stop_height, consensus.CoinbaseMaturityLongReleaseHeight - 1);
-    }
+    const auto& test_consensus{testnet4->GetConsensus()};
+    BOOST_CHECK_EQUAL(test_consensus.CoinbaseMaturityLong, test_consensus.CoinbaseMaturityLongReleaseHeight - test_consensus.CoinbaseMaturityLongStartHeight);
+    BOOST_CHECK_GT(test_consensus.CoinbaseMaturityLong, COINBASE_MATURITY);
+    BOOST_REQUIRE_EQUAL(test_consensus.chainstate_revalidation_deployments.size(), 1);
+    const auto& test_deployment{test_consensus.chainstate_revalidation_deployments.front()};
+    BOOST_CHECK_EQUAL(test_deployment.name, "long_coinbase_maturity");
+    BOOST_CHECK_EQUAL(test_deployment.start_height, test_consensus.CoinbaseMaturityLongEnforceHeight);
+    BOOST_CHECK_EQUAL(test_deployment.stop_height, test_consensus.CoinbaseMaturityLongReleaseHeight - 1);
 
     const auto regtest_default{CChainParams::RegTest({})};
     const auto& default_consensus{regtest_default->GetConsensus()};
