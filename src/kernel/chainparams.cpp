@@ -86,6 +86,17 @@ static void AddLongCoinbaseMaturityRevalidationDeployment(Consensus::Params& con
     });
 }
 
+static void AddHistoricalCoinbaseMaturity(Consensus::Params& consensus, int start_height, int release_height)
+{
+    consensus.CoinbaseMaturityHistoricalStartHeight = start_height;
+    consensus.CoinbaseMaturityHistoricalReleaseHeight = release_height;
+    consensus.chainstate_revalidation_deployments.push_back({
+        .name = "long_coinbase_maturity",
+        .start_height = start_height,
+        .stop_height = release_height - 1,
+    });
+}
+
 /**
  * Main network on which people trade goods and services.
  */
@@ -142,13 +153,7 @@ public:
         consensus.RdtsExpiryTime = 1819756800; // September 1st, 2027 00:00 UTC
 
         // Retain #419's historical consensus checks and validation marker.
-        consensus.CoinbaseMaturityHistoricalStartHeight = 973440;
-        consensus.CoinbaseMaturityHistoricalReleaseHeight = 979920;
-        consensus.chainstate_revalidation_deployments.push_back({
-            .name = "long_coinbase_maturity",
-            .start_height = consensus.CoinbaseMaturityHistoricalStartHeight,
-            .stop_height = consensus.CoinbaseMaturityHistoricalReleaseHeight - 1,
-        });
+        AddHistoricalCoinbaseMaturity(consensus, 973440, 979920);
         consensus.CoinbaseMaturityLongStartHeight = 979919;
         consensus.CoinbaseMaturityLongEnforceHeight = 979919;
         // Each covered reward matures independently after approximately 180 days.

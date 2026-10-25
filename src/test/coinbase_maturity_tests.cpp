@@ -60,6 +60,11 @@ BOOST_AUTO_TEST_CASE(long_maturity_derived_from_schedule)
     BOOST_CHECK(main_consensus.CoinbaseMaturityLongActiveAt(979920));
     BOOST_CHECK_EQUAL(main_consensus.CoinbaseMaturityLongEnforceHeight, 979919);
     BOOST_REQUIRE_EQUAL(main_consensus.chainstate_revalidation_deployments.size(), 2);
+    BOOST_CHECK_EQUAL(main_consensus.CoinbaseMaturityHistoricalStartHeight, 973440);
+    BOOST_CHECK_EQUAL(main_consensus.CoinbaseMaturityHistoricalReleaseHeight, 979920);
+    BOOST_CHECK_EQUAL(main_consensus.chainstate_revalidation_deployments[0].name, "long_coinbase_maturity");
+    BOOST_CHECK_EQUAL(main_consensus.chainstate_revalidation_deployments[0].start_height, 973440);
+    BOOST_CHECK_EQUAL(main_consensus.chainstate_revalidation_deployments[0].stop_height, 979919);
     BOOST_CHECK_EQUAL(main_consensus.chainstate_revalidation_deployments[1].name, "rolling_coinbase_maturity_180d_v2");
     BOOST_CHECK_EQUAL(main_consensus.chainstate_revalidation_deployments[1].start_height, 979919);
     BOOST_CHECK_EQUAL(main_consensus.chainstate_revalidation_deployments[1].stop_height, std::numeric_limits<int>::max());
