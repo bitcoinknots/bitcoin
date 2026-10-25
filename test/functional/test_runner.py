@@ -81,6 +81,10 @@ TEST_EXIT_SKIPPED = 77
 TEST_FRAMEWORK_UNIT_TESTS = 'feature_framework_unit_tests.py'
 
 EXTENDED_SCRIPTS = [
+    'feature_coinbase_maturity_rolling.py --descriptors --full-depth',
+    'feature_coinbase_maturity_rolling.py --descriptors --full-depth --before-boundary',
+    'feature_coinbase_maturity_upgrade.py',
+    'feature_coinbase_maturity_upgrade.py --after-expiry',
     # These tests are not run by default.
     # Longest test should go first, to favor running tests in parallel
     'feature_pruning.py',
@@ -223,7 +227,12 @@ BASE_SCRIPTS = [
     'p2p_1p1c_network.py',
     'interface_rest.py',
     'feature_chainstate_revalidation.py',
+    'feature_coinbase_maturity_pruned.py',
+    'wallet_coinbase_maturity_policy.py --descriptors',
+    'wallet_coinbase_maturity_policy.py --descriptors --after-expiry',
     'mempool_long_coinbase_maturity.py',
+    'feature_coinbase_maturity_rolling.py --descriptors',
+    'feature_coinbase_maturity_rolling.py --descriptors --before-boundary',
     'mempool_spend_coinbase.py',
     'wallet_avoid_mixing_output_types.py --descriptors',
     'mempool_reorg.py',

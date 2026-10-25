@@ -669,7 +669,7 @@ BOOST_FIXTURE_TEST_CASE(chainstatemanager_snapshot_init, SnapshotTestSetup)
 
 struct SnapshotRevalidationTestSetup : SnapshotTestSetup {
     SnapshotRevalidationTestSetup()
-        : SnapshotTestSetup{{"-testcoinbasematuritylong=1:2:103"}}
+        : SnapshotTestSetup{{"-testcoinbasematuritylong=1:2:150"}}
     {
     }
 };
@@ -684,25 +684,154 @@ BOOST_FIXTURE_TEST_CASE(chainstatemanager_snapshot_revalidation_waits_for_backgr
         return chainman.m_blockman.m_block_tree_db->ReadChainstateRevalidationMarker("long_coinbase_maturity", marker);
     };
 
-    // The deployment ends before the snapshot base, so the active snapshot
-    // chainstate must not claim to have revalidated it. The background
-    // chainstate is responsible for validating pre-snapshot history.
-    BOOST_CHECK(!WITH_LOCK(::cs_main, return has_marker()));
+    // Simulate #419's bounded, post-snapshot marker. Background validation
+    // has not reached the snapshot base yet and cannot certify older history.
+    auto* background = chainman.GetAll().front();
+    {
+        DisconnectedBlockTransactions pool{MAX_DISCONNECTED_TX_POOL_BYTES};
+        BlockValidationState state;
+        LOCK2(::cs_main, background->MempoolMutex());
+        BOOST_REQUIRE(background->DisconnectTip(state, &pool));
+        pool.clear();
+        // Direct DisconnectTip bypasses ActivateBestChain candidate maintenance.
+        background->setBlockIndexCandidates.insert(background->m_chain.Tip());
+        BOOST_CHECK_EQUAL(background->m_chain.Height(), 109);
+        marker = {.start_height = 111, .stop_height = 149,
+                  .block_hash = chainman.ActiveChain()[149]->GetBlockHash()};
+        BOOST_REQUIRE(chainman.m_blockman.m_block_tree_db->WriteChainstateRevalidationMarker("long_coinbase_maturity", marker));
+    }
 
     bilingual_str error;
-    BOOST_CHECK(chainman.ActiveChainstate().RewindForChainstateRevalidation(error));
+    {
+        ASSERT_DEBUG_LOG("(height 149)");
+        BOOST_REQUIRE(chainman.ActiveChainstate().RewindForChainstateRevalidation(error));
+    }
     BOOST_CHECK(error.empty());
     BOOST_CHECK_EQUAL(WITH_LOCK(::cs_main, return chainman.ActiveHeight()), 210);
-    BOOST_CHECK(!WITH_LOCK(::cs_main, return has_marker()));
+    BOOST_CHECK_EQUAL(WITH_LOCK(::cs_main, return background->m_chain.Height()), 109);
+    BOOST_REQUIRE(WITH_LOCK(::cs_main, return has_marker()));
+    BOOST_CHECK_EQUAL(marker.start_height, 111);
+    BOOST_CHECK_EQUAL(marker.stop_height, 210);
+    BOOST_CHECK_EQUAL(WITH_LOCK(::cs_main, return chainman.MaybeCompleteSnapshotValidation()), SnapshotCompletionResult::SKIPPED);
 
-    SnapshotCompletionResult res;
-    res = WITH_LOCK(::cs_main, return chainman.MaybeCompleteSnapshotValidation());
-    BOOST_CHECK_EQUAL(res, SnapshotCompletionResult::SUCCESS);
+    // The extended post-snapshot marker survives another startup rewind check.
+    BOOST_REQUIRE(chainman.ActiveChainstate().RewindForChainstateRevalidation(error));
+    BOOST_CHECK_EQUAL(WITH_LOCK(::cs_main, return chainman.ActiveHeight()), 210);
+    BlockValidationState state;
+    BOOST_REQUIRE(background->ActivateBestChain(state));
+    if (!WITH_LOCK(::cs_main, return chainman.IsSnapshotValidated())) {
+        BOOST_CHECK_EQUAL(WITH_LOCK(::cs_main, return chainman.MaybeCompleteSnapshotValidation()), SnapshotCompletionResult::SUCCESS);
+    }
+    BOOST_CHECK(WITH_LOCK(::cs_main, return chainman.IsSnapshotValidated()));
     BOOST_REQUIRE(WITH_LOCK(::cs_main, return has_marker()));
     BOOST_CHECK_EQUAL(marker.start_height, 2);
-    BOOST_CHECK_EQUAL(marker.stop_height, 102);
+    BOOST_CHECK_EQUAL(marker.stop_height, 210);
     const uint256 marker_block_hash = WITH_LOCK(::cs_main, return chainman.ActiveChain()[marker.stop_height]->GetBlockHash());
     BOOST_CHECK_EQUAL(marker.block_hash, marker_block_hash);
+}
+
+struct RollingRevalidationTestSetup : TestChain100Setup {
+    RollingRevalidationTestSetup()
+        : TestChain100Setup{ChainType::REGTEST, {.extra_args = {"-testcoinbasematuritylong=2:2:103"}}}
+    {
+        mineBlocks(20);
+    }
+};
+
+BOOST_FIXTURE_TEST_CASE(chainstatemanager_extends_bounded_maturity_marker, RollingRevalidationTestSetup)
+{
+    auto& chainman{*m_node.chainman};
+    const auto* tip{WITH_LOCK(::cs_main, return chainman.ActiveTip())};
+    {
+        LOCK(::cs_main);
+        const node::ChainstateRevalidationMarker old_marker{
+            .start_height = 2, .stop_height = 102,
+            .block_hash = chainman.ActiveChain()[102]->GetBlockHash()};
+        BOOST_REQUIRE(chainman.m_blockman.m_block_tree_db->WriteChainstateRevalidationMarker("long_coinbase_maturity", old_marker));
+    }
+    bilingual_str error;
+    {
+        ASSERT_DEBUG_LOG("(height 102)");
+        BOOST_REQUIRE(chainman.ActiveChainstate().RewindForChainstateRevalidation(error));
+    }
+    BOOST_CHECK(error.empty());
+    BOOST_CHECK_EQUAL(WITH_LOCK(::cs_main, return chainman.ActiveTip()), tip);
+    node::ChainstateRevalidationMarker marker;
+    BOOST_REQUIRE(WITH_LOCK(::cs_main, return chainman.m_blockman.m_block_tree_db->ReadChainstateRevalidationMarker("long_coinbase_maturity", marker)));
+    BOOST_CHECK_EQUAL(marker.start_height, 2);
+    BOOST_CHECK_EQUAL(marker.stop_height, 120);
+    BOOST_CHECK_EQUAL(marker.block_hash, tip->GetBlockHash());
+    BOOST_REQUIRE(chainman.ActiveChainstate().RewindForChainstateRevalidation(error));
+    BOOST_CHECK_EQUAL(WITH_LOCK(::cs_main, return chainman.ActiveTip()), tip);
+}
+
+struct ExpiringRevalidationTestSetup : TestChain100Setup {
+    ExpiringRevalidationTestSetup()
+        : TestChain100Setup{ChainType::REGTEST, {.extra_args = {
+              "-testcoinbasematuritylong=2:2:103", "-testcoinbasematuritylongexpiry=1598888058"}}}
+    {
+        mineBlocks(20);
+    }
+};
+
+BOOST_FIXTURE_TEST_CASE(chainstatemanager_expiry_bounds_marker_and_rewind, ExpiringRevalidationTestSetup)
+{
+    auto& chainman{*m_node.chainman};
+    auto& active{chainman.ActiveChainstate()};
+    const auto* tip{WITH_LOCK(::cs_main, return chainman.ActiveTip())};
+    const auto expiry{chainman.GetConsensus().RdtsExpiryTime};
+    int last_required{0};
+    {
+        LOCK(::cs_main);
+        for (int height{2}; height <= tip->nHeight; ++height) {
+            if (chainman.ActiveChain()[height]->pprev->GetMedianTimePast() < expiry) last_required = height;
+        }
+        BOOST_REQUIRE_GT(last_required, 102);
+        BOOST_REQUIRE_LT(last_required, tip->nHeight);
+        BOOST_CHECK_EQUAL(chainman.ActiveChain()[last_required]->pprev->GetMedianTimePast(), expiry - 1);
+        BOOST_CHECK_EQUAL(chainman.ActiveChain()[last_required + 1]->pprev->GetMedianTimePast(), expiry);
+        const node::ChainstateRevalidationMarker old_marker{
+            .start_height = 2, .stop_height = 102,
+            .block_hash = chainman.ActiveChain()[102]->GetBlockHash()};
+        BOOST_REQUIRE(chainman.m_blockman.m_block_tree_db->WriteChainstateRevalidationMarker("long_coinbase_maturity", old_marker));
+    }
+    bilingual_str error;
+    {
+        // Upgrade after expiry must still rewind pre-expiry history.
+        ASSERT_DEBUG_LOG("(height 102)");
+        BOOST_REQUIRE(active.RewindForChainstateRevalidation(error));
+    }
+    auto check_marker = [&](int height) {
+        LOCK(::cs_main);
+        node::ChainstateRevalidationMarker marker;
+        BOOST_REQUIRE(chainman.m_blockman.m_block_tree_db->ReadChainstateRevalidationMarker("long_coinbase_maturity", marker));
+        BOOST_CHECK_EQUAL(marker.start_height, 2);
+        BOOST_CHECK_EQUAL(marker.stop_height, height);
+        BOOST_CHECK_EQUAL(marker.block_hash, chainman.ActiveChain()[height]->GetBlockHash());
+    };
+    BOOST_CHECK_EQUAL(WITH_LOCK(::cs_main, return chainman.ActiveTip()), tip);
+    check_marker(last_required);
+    BOOST_REQUIRE(active.RewindForChainstateRevalidation(error));
+    check_marker(last_required);
+    {
+        DisconnectedBlockTransactions pool{MAX_DISCONNECTED_TX_POOL_BYTES};
+        BlockValidationState state;
+        LOCK2(::cs_main, active.MempoolMutex());
+        while (active.m_chain.Height() >= last_required) BOOST_REQUIRE(active.DisconnectTip(state, &pool));
+        pool.clear();
+        active.setBlockIndexCandidates.insert(active.m_chain.Tip());
+    }
+    // Across expiry backwards: shared validated ancestry prevents a spurious rewind.
+    BOOST_CHECK_EQUAL(WITH_LOCK(::cs_main, return active.m_chain.Height()), last_required - 1);
+    BOOST_REQUIRE(active.RewindForChainstateRevalidation(error));
+    BOOST_CHECK_EQUAL(WITH_LOCK(::cs_main, return chainman.ActiveTip()), tip);
+    BlockValidationState state;
+    BOOST_REQUIRE(active.ActivateBestChain(state));
+    BOOST_CHECK_EQUAL(WITH_LOCK(::cs_main, return chainman.ActiveTip()), tip);
+    check_marker(last_required);
+    // More expired blocks must not extend the marker.
+    mineBlocks(3);
+    check_marker(last_required);
 }
 
 BOOST_FIXTURE_TEST_CASE(chainstatemanager_snapshot_completion, SnapshotTestSetup)

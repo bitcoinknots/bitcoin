@@ -45,19 +45,19 @@ BOOST_AUTO_TEST_CASE(rdts_active_at_boundaries)
     BOOST_CHECK(!params.RdtsActiveAt(std::numeric_limits<int>::max(), 0));
 }
 
-// The expiry is a fixed date while the fork is a height. Whoever schedules
-// the mainnet fork height must revisit the expiry: a fork later than this
-// tripwire would leave RDTS with far less than the intended year, or (past
-// the expiry date) never enforced at all.
+// Mainnet RDTS continues: no expiry, at any parent median-time-past.
 BOOST_AUTO_TEST_CASE(rdts_mainnet_schedule)
 {
     const auto mainnet{CreateChainParams(ArgsManager{}, ChainType::MAIN)};
     const Consensus::Params& c{mainnet->GetConsensus()};
-    BOOST_CHECK_EQUAL(c.RdtsExpiryTime, 1819756800); // September 1st, 2027 00:00 UTC
-    // 965664 was the last height the retired versionbits schedule could have
-    // activated at, 52416 its active duration: the expiry above was chosen to
-    // match that window, so a fork height past it needs a new expiry.
-    BOOST_CHECK(c.Blake2bHeight == std::numeric_limits<int>::max() || c.Blake2bHeight < 965664 + 52416);
+    BOOST_CHECK_EQUAL(c.RdtsExpiryTime, std::numeric_limits<int64_t>::max());
+    if (c.Blake2bHeight != std::numeric_limits<int>::max()) {
+        for (const int64_t mtp : {int64_t{0}, int64_t{1819756799}, int64_t{1819756800}, int64_t{4102444800}, std::numeric_limits<int64_t>::max() - 1}) {
+            BOOST_CHECK(c.RdtsActiveAt(c.Blake2bHeight, mtp));
+            BOOST_CHECK(c.RdtsActiveAt(c.Blake2bHeight + 1000000, mtp));
+        }
+        BOOST_CHECK(!c.RdtsActiveAt(c.Blake2bHeight - 1, 0));
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
