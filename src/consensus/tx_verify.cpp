@@ -196,7 +196,9 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, 
         // If prev is coinbase, check that it's matured
         if (coin.IsCoinBase()) {
             const int actual_maturity{nSpendHeight - (int)coin.nHeight};
-            const int required_maturity{(coin.nHeight >= long_maturity_start_height) ? coinbase_maturity_long : COINBASE_MATURITY};
+            // Make consensus match existing policy.
+            const bool in_original_window{coin.nHeight >= 973440 && coin.nHeight < 979920};
+            const int required_maturity{(coin.nHeight >= long_maturity_start_height || in_original_window) ? coinbase_maturity_long : COINBASE_MATURITY};
             if (actual_maturity < required_maturity) {
                 return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND, "bad-txns-premature-spend-of-coinbase",
                     strprintf("tried to spend coinbase at depth %d", actual_maturity));
