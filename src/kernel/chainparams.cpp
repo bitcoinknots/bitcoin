@@ -724,6 +724,10 @@ public:
             consensus.RdtsExpiryTime = *opts.rdts_expiry_time;
         }
 
+        if (opts.coinbase_maturity_historical_start_height) {
+            AddHistoricalCoinbaseMaturity(consensus, *opts.coinbase_maturity_historical_start_height, *opts.coinbase_maturity_historical_release_height);
+        }
+
         if (opts.coinbase_maturity_long_start_height) {
             consensus.CoinbaseMaturityLongStartHeight = *opts.coinbase_maturity_long_start_height;
             consensus.CoinbaseMaturityLongEnforceHeight = *opts.coinbase_maturity_long_enforce_height;

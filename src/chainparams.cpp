@@ -151,6 +151,22 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         options.coinbase_maturity_long_expiry = expiry;
     }
 
+    if (const auto arg{args.GetArg("-testcoinbasematurityhistorical")}; arg) {
+        const auto values{SplitString(*arg, ':')};
+        int32_t start_height;
+        int32_t release_height;
+        // As on mainnet, release at most one block after the rolling start. Relay applies the
+        // rolling depth to rolling rewards, so a later release could relay spends consensus rejects.
+        if (!options.coinbase_maturity_long_expiry || values.size() != 2 ||
+            !ParseInt32(values[0], &start_height) || start_height < 0 ||
+            !ParseInt32(values[1], &release_height) || release_height > *options.coinbase_maturity_long_start_height + 1 ||
+            int64_t{release_height} - start_height <= COINBASE_MATURITY) {
+            throw std::runtime_error(strprintf("Invalid historical coinbase maturity (%s): requires -testcoinbasematuritylongexpiry and <start_height>:<release_height> with release_height - start_height above COINBASE_MATURITY and release_height at most one above the rolling start height.", *arg));
+        }
+        options.coinbase_maturity_historical_start_height = start_height;
+        options.coinbase_maturity_historical_release_height = release_height;
+    }
+
     for (const std::string& strDeployment : args.GetArgs("-vbparams")) {
         std::vector<std::string> vDeploymentParams = SplitString(strDeployment, ':');
         if (vDeploymentParams.size() < 3 || 7 < vDeploymentParams.size()) {

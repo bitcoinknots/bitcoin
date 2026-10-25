@@ -99,6 +99,25 @@ BOOST_AUTO_TEST_CASE(long_maturity_derived_from_schedule)
     BOOST_CHECK(rolling_consensus.CoinbaseMaturityLongActiveAt(150));
     BOOST_CHECK(rolling_consensus.CoinbaseMaturityLongUntilRdts);
     BOOST_CHECK_EQUAL(rolling_consensus.RdtsExpiryTime, 1819756800);
+
+    CChainParams::RegTestOptions mainnet_shape;
+    mainnet_shape.coinbase_maturity_long_start_height = 119;
+    mainnet_shape.coinbase_maturity_long_enforce_height = 119;
+    mainnet_shape.coinbase_maturity_long_release_height = 269;
+    mainnet_shape.coinbase_maturity_long_expiry = 1819756800;
+    mainnet_shape.coinbase_maturity_historical_start_height = 5;
+    mainnet_shape.coinbase_maturity_historical_release_height = 120;
+    const auto historical{CChainParams::RegTest(mainnet_shape)};
+    const auto& historical_consensus{historical->GetConsensus()};
+    BOOST_CHECK_EQUAL(historical_consensus.CoinbaseMaturityBeforeRolling(), 115);
+    BOOST_CHECK(historical_consensus.CoinbaseMaturityHistoricalActiveAt(119));
+    BOOST_CHECK(!historical_consensus.CoinbaseMaturityHistoricalActiveAt(120));
+    BOOST_REQUIRE_EQUAL(historical_consensus.chainstate_revalidation_deployments.size(), 2);
+    BOOST_CHECK_EQUAL(historical_consensus.chainstate_revalidation_deployments[0].name, "long_coinbase_maturity");
+    BOOST_CHECK_EQUAL(historical_consensus.chainstate_revalidation_deployments[0].start_height, 5);
+    BOOST_CHECK_EQUAL(historical_consensus.chainstate_revalidation_deployments[0].stop_height, 119);
+    BOOST_CHECK_EQUAL(historical_consensus.chainstate_revalidation_deployments[1].name, "rolling_coinbase_maturity_180d_v2");
+    BOOST_CHECK_EQUAL(historical_consensus.chainstate_revalidation_deployments[1].start_height, 119);
 }
 
 BOOST_FIXTURE_TEST_CASE(rolling_maturity_mining_parent_mtp, BasicTestingSetup)
