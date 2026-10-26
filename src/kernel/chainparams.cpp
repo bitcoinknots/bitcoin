@@ -127,6 +127,7 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 709632; // Approximately November 12th, 2021
 
         consensus.Blake2bHeight = 961640;
+        m_stale_peer_common_height = 961631;
         {
             constexpr std::string_view headline = "8-30 NYPost Deride And Conquer";
             consensus.Blake2bHeadline.assign(headline.begin(), headline.end());
@@ -417,6 +418,7 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_TAPROOT].min_activation_height = 0; // No activation delay
 
         consensus.Blake2bHeight = 150308;
+        m_stale_peer_common_height = consensus.Blake2bHeight - 1;
         // Extended from 1791903600 (October 13th, 2026 15:00:00 UTC) after
         // that time had passed; see the revalidation deployment below.
         consensus.RdtsExpiryTime = 1806537600; // April 1st, 2027 00:00:00 UTC
@@ -688,6 +690,9 @@ public:
 
         if (opts.blake2b_headline) {
             consensus.Blake2bHeadline = *opts.blake2b_headline;
+        }
+        if (consensus.Blake2bHeight > 0 && consensus.Blake2bHeight != std::numeric_limits<int>::max()) {
+            m_stale_peer_common_height = opts.stale_peer_common_height.value_or(consensus.Blake2bHeight - 1);
         }
 
         // Optionally schedule the RDTS deployment (see -rdtsexpiry). RDTS

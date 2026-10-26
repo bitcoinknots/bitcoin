@@ -121,6 +121,8 @@ public:
     ChainType GetChainType() const { return m_chain_type; }
     /** Return the list of hostnames to look up for DNS seeds */
     const std::vector<std::string>& DNSSeeds() const { return vSeeds; }
+    /** Highest block height used for stale-peer block exchange. */
+    int StalePeerCommonHeight() const { return m_stale_peer_common_height; }
     const std::vector<unsigned char>& Base58Prefix(Base58Type type) const { return base58Prefixes[type]; }
     const std::string& Bech32HRP() const { return bech32_hrp; }
     const std::vector<uint8_t>& FixedSeeds() const { return vFixedSeeds; }
@@ -166,6 +168,7 @@ public:
         std::unordered_map<Consensus::BuriedDeployment, int> activation_heights{};
         bool fastprune{false};
         bool enforce_bip94{false};
+        std::optional<int> stale_peer_common_height{};
         //! If set, RDTS rules apply to blocks from the blake2b activation
         //! height until the parent block's median-time-past reaches this
         //! value (see -rdtsexpiry). Requires a blake2b activation height.
@@ -199,6 +202,7 @@ protected:
     std::vector<uint8_t> vFixedSeeds;
     bool fDefaultConsistencyChecks;
     bool m_is_mockable_chain;
+    int m_stale_peer_common_height{std::numeric_limits<int>::max()};
     CCheckpointData checkpointData;
     std::vector<AssumeutxoData> m_assumeutxo_data;
     ChainTxData chainTxData;
