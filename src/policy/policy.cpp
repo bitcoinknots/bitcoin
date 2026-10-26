@@ -7,6 +7,9 @@
 
 #include <policy/policy.h>
 
+#include <logging.h>
+#include <policy/scriptshape.h>
+
 #include <coins.h>
 #include <consensus/amount.h>
 #include <consensus/consensus.h>
@@ -33,6 +36,8 @@
 #include <vector>
 
 unsigned int g_script_size_policy_limit{DEFAULT_SCRIPT_SIZE_POLICY_LIMIT};
+bool g_reject_unknown_scripts{DEFAULT_REJECT_UNKNOWN_SCRIPTS};
+unsigned int g_unproven_field_allowance{scriptshape::DEFAULT_UNPROVEN_FIELD_ALLOWANCE};
 
 CAmount GetDustThreshold(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
 {
@@ -415,9 +420,42 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
             if (subscript.GetSigOpCount(true) > MAX_P2SH_SIGOPS) {
                 MaybeReject("scriptcheck-sigops");
             }
+            // Known-shape check for legacy P2SH; witness programs are checked in IsWitnessStandard
+            int wver{0};
+            std::vector<unsigned char> wprog;
+            if (!subscript.IsWitnessProgram(wver, wprog)) {
+                const scriptshape::Analysis shape{scriptshape::Analyze(subscript, scriptshape::Kind::P2SH, {stack.begin(), stack.end() - 1}, g_unproven_field_allowance)};
+                if (!shape.known) {
+                    if (g_reject_unknown_scripts) {
+                        MaybeReject(scriptshape::REJECT_UNKNOWN);
+                    } else {
+                        LogDebug(BCLog::MEMPOOL, "unknown P2SH redeem script shape in %s:%u: %s\n", tx.GetHash().ToString(), i, HexStr(subscript));
+                    }
+                } else if (!shape.items_typed && g_reject_unknown_scripts) {
+                    MaybeReject(scriptshape::REJECT_ITEM_TYPE);
+                }
+            }
         }
     }
 
+    return true;
+}
+
+/** The known-shape and witness-typing checks for one witness input; `kind` says which script the caller established. */
+static bool CheckScriptShape(const CTransaction& tx, unsigned int i, const CScript& prev_spk, scriptshape::Kind kind, const std::string& reason_prefix, std::string& out_reason, const ignore_rejects_type& ignore_rejects)
+{
+    const auto revealed{scriptshape::RevealedScript(prev_spk, tx.vin[i])};
+    if (!revealed || revealed->kind != kind) return true;
+    const scriptshape::Analysis shape{scriptshape::Analyze(revealed->script, revealed->kind, revealed->items, g_unproven_field_allowance)};
+    if (!shape.known) {
+        if (g_reject_unknown_scripts) {
+            MaybeReject(scriptshape::REJECT_UNKNOWN);
+        } else {
+            LogDebug(BCLog::MEMPOOL, "unknown %s script shape in %s:%u: %s\n", kind == scriptshape::Kind::TAPSCRIPT ? "tapscript" : "P2WSH", tx.GetHash().ToString(), i, HexStr(revealed->script));
+        }
+    } else if (!shape.items_typed && g_reject_unknown_scripts) {
+        MaybeReject(scriptshape::REJECT_ITEM_TYPE);
+    }
     return true;
 }
 
@@ -488,6 +526,7 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
                 if (tx.vin[i].scriptWitness.stack[j].size() > MAX_STANDARD_P2WSH_STACK_ITEM_SIZE)
                     MaybeReject("stackitem-size");
             }
+            if (!CheckScriptShape(tx, i, prev.scriptPubKey, scriptshape::Kind::P2WSH, reason_prefix, out_reason, ignore_rejects)) return false;
         }
 
         // Check policy limits for Taproot spends:
@@ -521,6 +560,7 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
                             }
                         }
                     }
+                    if (!CheckScriptShape(tx, i, prev.scriptPubKey, scriptshape::Kind::TAPSCRIPT, reason_prefix, out_reason, ignore_rejects)) return false;
                 }
             } else if (stack.size() == 1) {
                 // Key path spend (1 stack element after removing optional annex)
@@ -641,7 +681,9 @@ std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsV
         const CTxOut &utxo = view.AccessCoin(txin.prevout).out;
         auto[script, consensus_weight_per_byte] = GetScriptForTransactionInput(utxo.scriptPubKey, txin);
         const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness);
-        ret.first += dcb.first;
+        // The script-level count and the field budget both price what no signature proves: charge an input the
+        // stricter of the two, never the sum.
+        ret.first += std::max(dcb.first, scriptshape::FieldBudgetBytes(utxo.scriptPubKey, txin));
         ret.second += dcb.second;
     }
     for (size_t i{tx.vout.size()}; i; ) {
@@ -665,7 +707,7 @@ int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& vi
             auto[script, consensus_weight_per_byte] = GetScriptForTransactionInput(utxo.scriptPubKey, txin);
             if (weight_per_data_byte > consensus_weight_per_byte) {
                 const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness);
-                mod_weight += int64_t(dcb.first + dcb.second) * (weight_per_data_byte - consensus_weight_per_byte);
+                mod_weight += int64_t(dcb.first + dcb.second + scriptshape::FieldBudgetBytes(utxo.scriptPubKey, txin)) * (weight_per_data_byte - consensus_weight_per_byte);
             }
         }
         if (weight_per_data_byte > WITNESS_SCALE_FACTOR) {

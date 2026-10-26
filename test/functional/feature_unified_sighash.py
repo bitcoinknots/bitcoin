@@ -93,6 +93,8 @@ class UnifiedSighashTest(BitcoinTestFramework):
         args = [
             f"-testactivationheight=blake2b@{ACTIVATION_HEIGHT}",
             "-corepolicy=0",
+            # this test spends synthetic scripts (OP_CODESEPARATOR, tampering cases), not known script shapes
+            "-rejectunknownscripts=0",
         ]
         self.extra_args = [args, list(args)]
 

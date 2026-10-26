@@ -42,8 +42,10 @@ add_library(bitcoinkernel
   ../policy/feerate.cpp
   ../policy/packages.cpp
   ../policy/policy.cpp
+  ../policy/scriptshape.cpp
   ../policy/rbf.cpp
   ../policy/settings.cpp
+  ../script/miniscript.cpp
   ../policy/truc_policy.cpp
   ../pow.cpp
   ../primitives/block.cpp

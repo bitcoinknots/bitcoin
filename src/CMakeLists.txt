@@ -180,6 +180,7 @@ add_library(bitcoin_common STATIC EXCLUDE_FROM_ALL
   policy/coin_age_priority.cpp
   policy/feerate.cpp
   policy/policy.cpp
+  policy/scriptshape.cpp
   pow.cpp
   protocol.cpp
   psbt.cpp

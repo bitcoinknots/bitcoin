@@ -1171,6 +1171,8 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
 
 BOOST_AUTO_TEST_CASE(max_standard_legacy_sigops)
 {
+    // The redeem script below is a synthetic sigop filler, not a known script shape; this test is about the sigop limit.
+    const ScopedUnknownScripts allow_unknown_scripts;
     CCoinsView coins_dummy;
     CCoinsViewCache coins(&coins_dummy);
     CKey key;
