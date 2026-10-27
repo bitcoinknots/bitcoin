@@ -211,7 +211,7 @@ static std::vector<CAddress> ConvertSeeds(const std::vector<uint8_t> &vSeedsIn)
     while (!s.eof()) {
         CService endpoint;
         s >> endpoint;
-        CAddress addr{endpoint, SeedsServiceFlags()};
+        CAddress addr{endpoint, SeedsAssumedServiceFlags()};
         addr.nTime = rng.rand_uniform_delay(Now<NodeSeconds>() - one_week, -one_week);
         LogDebug(BCLog::NET, "Added hardcoded seed: %s\n", addr.ToStringAddrPort());
         vSeedsOut.push_back(addr);
@@ -1666,7 +1666,11 @@ std::pair<size_t, bool> CConnman::SocketSendData(CNode& node) const
         }
     }
 
-    node.fPauseSend = node.m_send_memusage + node.m_transport->GetSendMemoryUsage() > nSendBufferMaxSize;
+    const bool pause_send{node.m_send_memusage + node.m_transport->GetSendMemoryUsage() > nSendBufferMaxSize};
+    if (pause_send && !node.fPauseSend) {
+        node.m_pause_send_since = GetTime<std::chrono::seconds>();
+    }
+    node.fPauseSend = pause_send;
 
     if (it == node.vSendMsg.end()) {
         assert(node.m_send_memusage == 0);
@@ -2041,6 +2045,17 @@ bool CConnman::InactivityCheck(const CNode& node) const
         return true;
     }
 
+    if (node.fPauseSend) {
+        const auto last_pause{node.m_pause_send_since.load()};
+        if (now > last_pause + TIMEOUT_INTERVAL) {
+            LogDebug(BCLog::NET,
+                "send buffer full for %is, %s", Ticks<std::chrono::seconds>(now - last_pause),
+                node.DisconnectMsg(fLogIPs)
+            );
+            return true;
+        }
+    }
+
     if (!node.fSuccessfullyConnected) {
         if (node.m_transport->GetInfo().transport_type == TransportProtocolType::DETECTING) {
             LogDebug(BCLog::NET, "V2 handshake timeout, %s\n", node.DisconnectMsg(fLogIPs));
@@ -2363,7 +2378,7 @@ void CConnman::ThreadDNSAddressSeed()
                 const auto addresses{LookupHost(host, nMaxIPs, true)};
                 if (!addresses.empty()) {
                     for (const CNetAddr& ip : addresses) {
-                        CAddress addr = CAddress(CService(ip, m_params.GetDefaultPort()), requiredServiceBits);
+                        CAddress addr = CAddress(CService(ip, m_params.GetDefaultPort()), SeedsAssumedServiceFlags());
                         addr.nTime = rng.rand_uniform_delay(Now<NodeSeconds>() - 3 * 24h, -4 * 24h); // use a random age between 3 and 7 days old
                         vAdd.push_back(addr);
                         found++;
@@ -3899,7 +3914,10 @@ void CConnman::PushMessage(CNode* pnode, CSerializedNetMsg&& msg)
 
         // Update memory usage of send buffer.
         pnode->m_send_memusage += msg.GetMemoryUsage();
-        if (pnode->m_send_memusage + pnode->m_transport->GetSendMemoryUsage() > nSendBufferMaxSize) pnode->fPauseSend = true;
+        if (pnode->m_send_memusage + pnode->m_transport->GetSendMemoryUsage() > nSendBufferMaxSize && !pnode->fPauseSend) {
+            pnode->m_pause_send_since = GetTime<std::chrono::seconds>();
+            pnode->fPauseSend = true;
+        }
         // Move message to vSendMsg queue.
         pnode->vSendMsg.push_back(std::move(msg));
 
