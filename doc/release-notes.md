@@ -1,15 +1,8 @@
-*The release notes draft is a temporary file that can be added to by anyone. See
-[/doc/developer-notes.md#release-notes](/doc/developer-notes.md#release-notes)
-for the process.*
+Bitcoin Core version 29.5 is now available from:
 
-*version* Release Notes Draft
-===============================
+  <https://bitcoincore.org/bin/bitcoin-core-29.5/>
 
-Bitcoin Core version *version* is now available from:
-
-  <https://bitcoincore.org/bin/bitcoin-core-*version*/>
-
-This release includes new features, various bug fixes and performance
+This release includes various bug fixes and performance
 improvements, as well as updated translations.
 
 Please report bugs using the issue tracker at GitHub:
@@ -44,56 +37,39 @@ unsupported systems.
 Notable changes
 ===============
 
-P2P and network changes
------------------------
+### P2P
 
-Updated RPCs
-------------
+- #35691 chainparams: delete my DNS seed
+- #35766 p2p: Assume v2transport for addresses from seeds
 
+### Net
 
-Changes to wallet related RPCs can be found in the Wallet section below.
+- #36665 sock: align exception monitoring between poll() and select() backends
+- #36667 net: enforce timeout interval for paused send peers
 
-New RPCs
---------
+### Util
 
-Build System
-------------
+- #36669 refactor: store positions as a 64 bits integer in flatfiles
 
-Updated settings
-----------------
+### Build
 
+- #36218 build: avoid pipe2 on Darwin (for now)
 
-Changes to GUI or wallet related settings can be found in the GUI or Wallet section below.
+### Doc
 
-New settings
-------------
-
-Tools and Utilities
--------------------
-
-Wallet
-------
-
-GUI changes
------------
-
-Low-level changes
-=================
-
-RPC
----
-
-Tests
------
-
-*version* change log
-====================
+- #34252 doc: add 433 (Pay to Anchor) to bips.md
+- #36377 doc: add 461 (Deterministic ECDSA signatures with low-R grinding) to bips.md
 
 Credits
 =======
 
 Thanks to everyone who directly contributed to this release:
 
+- darosior
+- fanquake
+- Martin Zumsande
+- Sebastian Falbesoner
+- sipa
 
 As well as to everyone that helped with translations on
-[Transifex](https://www.transifex.com/bitcoin/bitcoin/).
+[Transifex](https://explore.transifex.com/bitcoin/bitcoin/).
