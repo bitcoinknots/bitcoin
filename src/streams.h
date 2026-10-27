@@ -472,7 +472,7 @@ public:
     void SetIdlePriority();
 
     /** Wrapper around TruncateFile(). */
-    bool Truncate(unsigned size);
+    bool Truncate(uint64_t size);
 
     void AdviseSequential()
     {
