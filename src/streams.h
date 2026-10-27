@@ -470,7 +470,7 @@ public:
     bool Commit();
 
     /** Wrapper around TruncateFile(). */
-    bool Truncate(unsigned size);
+    bool Truncate(uint64_t size);
 
     void AdviseSequential()
     {
