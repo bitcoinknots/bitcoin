@@ -205,6 +205,8 @@ util::Result<void> ApplyArgsManOptions(const ArgsManager& argsman, const CChainP
 
     mempool_opts.reject_tokens = argsman.GetBoolArg("-rejecttokens", DEFAULT_REJECT_TOKENS);
 
+    mempool_opts.reject_fake_outputs = argsman.GetBoolArg("-rejectfakeoutputs", DEFAULT_REJECT_FAKE_OUTPUTS);
+
     mempool_opts.subdustfeepenalty = argsman.GetBoolArg("-subdustfeepenalty", DEFAULT_SUBDUSTFEEPENALTY);
 
     if (argsman.GetBoolArg("-datacarrier", DEFAULT_ACCEPT_DATACARRIER)) {

@@ -80,6 +80,7 @@ struct MemPoolOptions {
      */
     std::optional<unsigned> max_datacarrier_bytes{DEFAULT_ACCEPT_DATACARRIER ? std::optional{MAX_OP_RETURN_RELAY} : std::nullopt};
     bool datacarrier_fullcount{DEFAULT_DATACARRIER_FULLCOUNT};
+    bool reject_fake_outputs{DEFAULT_REJECT_FAKE_OUTPUTS};
     bool permitbaredatacarrier{DEFAULT_PERMITBAREDATACARRIER};
     bool permitbareanchor{DEFAULT_PERMITBAREANCHOR};
     bool permit_bare_pubkey{DEFAULT_PERMIT_BAREPUBKEY};
