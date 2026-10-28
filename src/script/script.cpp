@@ -1057,6 +1057,48 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
     return (pubkeys - provable - MAX_UNPROVEN_PUBKEYS) * CPubKey::COMPRESSED_SIZE + odd_bytes;
 }
 
+/**
+ * The to_local revocation leaf of an LND simple taproot channel, which commits the local delayed
+ * key by pushing and dropping it, so that a third party can read the key and sweep the anchor:
+ *
+ *     <local_delayedpubkey> OP_DROP <revocationkey> OP_CHECKSIG
+ *
+ * (lnd input/script_utils.go, TaprootLocalCommitRevokeScript). The drop rule reads that key as
+ * non-standard data and keeps the penalty spend of a revoked commitment out of the mempool. The
+ * key is still 32 bytes the spender chose, so for this exact leaf in a taproot script path spend
+ * the drop counts toward the -datacarriersize budget instead, like an OP_RETURN payload: the 34
+ * bytes the drop rule reads, push opcode, key and OP_DROP, as an OP_RETURN output counts its own
+ * opcodes (83 for an 80 byte payload). A node that accepts non-standard data carriers sees the
+ * same count as before, in the budgeted member. One such input fits the default 83 and a
+ * -datacarriersize of 42; a justice transaction has one per revoked commitment. Three, 102 bytes,
+ * are refused with txn-datacarrier-exceeded, and -datacarriersize=0 refuses the first. With
+ * -datacarrierfullcount=0 nothing checks the budget and the spend relays at any count.
+ * -datacarriercost weights the 34 bytes as data. A push of another size, a second push, anything
+ * before the leaf or after its OP_CHECKSIG, or the same script under P2WSH, where OP_CHECKSIG
+ * takes no 32 byte key, stay non-standard data as before.
+ */
+bool IsLnTaprootRevokeLeaf(const CScript& script, const CScriptWitness& witness)
+{
+    if (script.size() != 68 || script[0] != 32 || script[33] != OP_DROP || script[34] != 32 || script[67] != OP_CHECKSIG) {
+        return false;
+    }
+    // A script path spend puts the leaf under its control block, and under the annex if it has one.
+    // The prevout is not checked: IsWitnessStandard and consensus refuse a witness on any input
+    // that is not a witness program.
+    const auto& stack{witness.stack};
+    size_t top{stack.size()};
+    if (top >= 2 && !stack[top - 1].empty() && stack[top - 1][0] == ANNEX_TAG) --top;
+    if (top < 2) return false;
+    const auto& control{stack[top - 1]};
+    if (control.size() < TAPROOT_CONTROL_BASE_SIZE || control.size() > TAPROOT_CONTROL_MAX_SIZE ||
+        (control.size() - TAPROOT_CONTROL_BASE_SIZE) % TAPROOT_CONTROL_NODE_SIZE != 0 ||
+        (control[0] & TAPROOT_LEAF_MASK) != TAPROOT_LEAF_TAPSCRIPT) {
+        return false;
+    }
+    const auto& leaf{stack[top - 2]};
+    return std::equal(script.begin(), script.end(), leaf.begin(), leaf.end());
+}
+
 std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outputs, const CScriptWitness* witness, const bool dead_branches) const
 {
     if (size_t olga_bytes = IsOLGA(remaining_outputs); olga_bytes) {
@@ -1071,6 +1113,10 @@ std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outpu
 
     // Where a constant guard makes part of a conditional unreachable
     const DeadParts dead{dead_branches ? FindDeadParts(*this) : DeadParts{}};
+    // The one dropped push that counts toward the budget instead of as non-standard data: the key
+    // LND reveals in its revocation leaf
+    const bool ln_revoke_leaf{witness && IsLnTaprootRevokeLeaf(*this, *witness)};
+    size_t budgeted{0};
     // A span that began at a conditional counts its guard push too; one that began at OP_ELSE does not
     size_t span_guard{1};
     size_t counted{0};
@@ -1138,10 +1184,14 @@ std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outpu
         } else if (is_push(opcode)) {
             if (!is_push(last_opcode)) data_began = opcode_it;  // only reset at the start of a push run
         } else if ((opcode == OP_DROP || opcode == OP_2DROP) && is_push(last_opcode)) {
-            counted += it - data_began;
+            if (ln_revoke_leaf) {
+                budgeted += it - data_began;
+            } else {
+                counted += it - data_began;
+            }
         }
     }
-    return {UnprovenPubkeyBytes(*this, witness), counted};
+    return {UnprovenPubkeyBytes(*this, witness) + budgeted, counted};
 }
 
 bool GetScriptOp(CScriptBase::const_iterator& pc, CScriptBase::const_iterator end, opcodetype& opcodeRet, std::vector<unsigned char>* pvchRet)

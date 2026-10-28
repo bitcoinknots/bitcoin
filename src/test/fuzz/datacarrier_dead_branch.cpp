@@ -17,8 +17,8 @@ namespace {
 /**
  * The non-standard count of CScript::DatacarrierBytes before the dead-branch
  * rule. The first member is set where that function returned early with both
- * counts; the unproven pubkey count is otherwise left to the real function,
- * since the rule does not touch it.
+ * counts; the budgeted count is otherwise left to the real function, since
+ * the rule does not touch it.
  */
 std::pair<std::optional<size_t>, size_t> ReferenceDatacarrierBytes(const CScript& self, const size_t remaining_outputs, const CScriptWitness* witness)
 {
@@ -71,7 +71,8 @@ std::pair<std::optional<size_t>, size_t> ReferenceDatacarrierBytes(const CScript
         } else if (is_push(opcode)) {
             if (!is_push(last_opcode)) data_began = opcode_it;
         } else if ((opcode == OP_DROP || opcode == OP_2DROP) && is_push(last_opcode)) {
-            counted += it - data_began;
+            // The one dropped push that goes to the budgeted count, in a script path spend only
+            if (!(witness && IsLnTaprootRevokeLeaf(self, *witness))) counted += it - data_began;
         }
     }
     return {std::nullopt, counted};
@@ -98,7 +99,7 @@ FUZZ_TARGET(datacarrier_dead_branch)
     }
     const CScriptWitness* w{witness ? &*witness : nullptr};
 
-    // With the rule off the count is the old one, and the rule never changes the unproven pubkey count
+    // With the rule off the count is the old one, and the rule never changes the budgeted count
     const auto off{script.DatacarrierBytes(remaining, w, false)};
     const auto on{script.DatacarrierBytes(remaining, w, true)};
     const auto [early, ref_counted] = ReferenceDatacarrierBytes(script, remaining, w);
