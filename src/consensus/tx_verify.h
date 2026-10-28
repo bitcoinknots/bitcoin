@@ -79,6 +79,15 @@ bool CheckOutputSizes(const CTransaction& tx, TxValidationState& state);
 [[nodiscard]] bool CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs,
                                 int spend_height, CAmount& txfee, CheckTxInputsRules rules, const Params& params,
                                 int long_maturity_end_height = std::numeric_limits<int>::max());
+
+/** Check coinbase maturity using the candidate chain's ancestry.
+ * DCBM is applied only when enabled in consensus parameters.
+ * Existing historical maturity checks must remain enforced.
+ */
+[[nodiscard]] bool CheckTxInputs(const CTransaction& tx, TxValidationState& state,
+                                const CCoinsViewCache& inputs, int spend_height,
+                                CAmount& txfee, CheckTxInputsRules rules,
+                                const Params& params, const CBlockIndex* parent_block);
 } // namespace Consensus
 
 /** Auxiliary functions for transaction validation (ideally should not be exposed) */

@@ -178,6 +178,9 @@ public:
         std::optional<int> coinbase_maturity_long_enforce_height{};
         std::optional<int> coinbase_maturity_long_release_height{};
         std::optional<int64_t> coinbase_maturity_long_expiry{};
+        bool dynamic_coinbase_maturity{false};
+        bool dynamic_coinbase_maturity_retarget{false};
+        std::optional<int64_t> dynamic_coinbase_maturity_initial{};
     };
 
     static std::unique_ptr<const CChainParams> RegTest(const RegTestOptions& options);

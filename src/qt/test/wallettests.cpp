@@ -8,6 +8,7 @@
 #include <wallet/coincontrol.h>
 #include <interfaces/chain.h>
 #include <interfaces/node.h>
+#include <interfaces/wallet.h>
 #include <key_io.h>
 #include <qt/bitcoinamountfield.h>
 #include <qt/bitcoinunits.h>
@@ -22,6 +23,7 @@
 #include <qt/recentrequeststablemodel.h>
 #include <qt/sendcoinsdialog.h>
 #include <qt/sendcoinsentry.h>
+#include <qt/transactionrecord.h>
 #include <qt/transactiontablemodel.h>
 #include <qt/transactionview.h>
 #include <qt/walletmodel.h>
@@ -33,6 +35,7 @@
 
 #include <chrono>
 #include <memory>
+#include <limits>
 
 #include <QAbstractButton>
 #include <QAction>
@@ -527,4 +530,39 @@ void WalletTests::walletTests()
     }
 #endif
     TestGUI(m_node);
+}
+
+void WalletTests::dynamicCoinbaseMaturityStatus()
+{
+    // The GUI must use each reward's wallet-provided maturity, including
+    // values above the ordinary 100-block or fixed long-maturity limits.
+    TransactionRecord record;
+    record.type = TransactionRecord::Generated;
+    interfaces::WalletTxStatus reward{};
+    reward.is_coinbase = true;
+    reward.is_in_main_chain = true;
+    reward.is_trusted = true;
+    reward.block_height = 288;
+    reward.depth_in_main_chain = 121;
+    for (const int remaining : {30, 280, 1, std::numeric_limits<int>::max()}) {
+        reward.blocks_to_maturity = remaining;
+        record.updateStatus(reward, uint256::ONE, 408, 0);
+        QCOMPARE(record.status.status, TransactionStatus::Immature);
+        QCOMPARE(record.status.matures_in, remaining);
+        QVERIFY(!record.status.countsForBalance);
+    }
+    reward.blocks_to_maturity = 0;
+    record.updateStatus(reward, uint256::ONE, 687, 0);
+    QCOMPARE(record.status.status, TransactionStatus::Confirmed);
+    QVERIFY(record.status.countsForBalance);
+
+    // A reorg can make an already mature reward immature again.
+    reward.blocks_to_maturity = 1;
+    record.updateStatus(reward, uint256{}, 686, 0);
+    QCOMPARE(record.status.status, TransactionStatus::Immature);
+    QCOMPARE(record.status.matures_in, 1);
+    QVERIFY(!record.status.countsForBalance);
+    reward.is_in_main_chain = false;
+    record.updateStatus(reward, uint256{}, 686, 0);
+    QCOMPARE(record.status.status, TransactionStatus::NotAccepted);
 }

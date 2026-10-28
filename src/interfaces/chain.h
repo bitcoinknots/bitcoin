@@ -152,6 +152,9 @@ public:
     //! Does not acquire cs_main or look up a block.
     virtual int maxCoinbaseMaturity() = 0;
 
+    //! Whether coinbase maturity varies with difficulty history.
+    virtual bool isDynamicCoinbaseMaturity() = 0;
+
     virtual bool pruneLockExists(const std::string& name) const = 0;
     virtual bool updatePruneLock(const std::string& name, const node::PruneLockInfo& lock_info, bool sync=false) = 0;
     virtual bool deletePruneLock(const std::string& name) = 0;

@@ -484,8 +484,9 @@ QVariant TransactionTableModel::txStatusDecoration(const TransactionRecord *wtx)
     case TransactionStatus::Conflicted:
         return QIcon(":/icons/transaction_conflicted");
     case TransactionStatus::Immature: {
-        int total = wtx->status.depth + wtx->status.matures_in;
-        int part = (wtx->status.depth * 4 / total) + 1;
+        // A saturated DCBM reward can require INT_MAX + 1 confirmations.
+        const qint64 total = wtx->status.depth + wtx->status.matures_in;
+        const qint64 part = (wtx->status.depth * 4 / total) + 1;
         return QIcon(QString(":/icons/transaction_%1").arg(part));
         }
     case TransactionStatus::NotAccepted:
