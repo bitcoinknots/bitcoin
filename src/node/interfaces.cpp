@@ -10,6 +10,7 @@
 #include <chainparamsbase.h>
 #include <common/args.h>
 #include <common/pcp.h>
+#include <consensus/dynamic_cbm.h>
 #include <consensus/tx_verify.h>
 #include <consensus/merkle.h>
 #include <consensus/validation.h>
@@ -340,7 +341,17 @@ public:
     int coinbaseMaturity(int coin_height) override
     {
         LOCK(::cs_main);
-        return Consensus::CoinbaseMaturityPolicy(chainman().GetConsensus(), chainman().ActiveChain()[coin_height]);
+        const auto& params{chainman().GetConsensus()};
+        const CBlockIndex* block{
+            coin_height >= 0 && coin_height <= chainman().ActiveChain().Height()
+                ? chainman().ActiveChain()[coin_height]
+                : nullptr};
+
+        if (params.CoinbaseMaturityDynamic && block &&
+            block->nHeight >= params.CoinbaseMaturityLongStartHeight) {
+            return static_cast<int>(DynamicCBMMaturityForBlock(params, block));
+        }
+        return Consensus::CoinbaseMaturityPolicy(params, block);
     }
     double getVerificationProgress() override
     {
@@ -591,12 +602,24 @@ public:
     int coinbaseMaturity(const uint256& block_hash) override
     {
         LOCK(::cs_main);
-        return Consensus::CoinbaseMaturityPolicy(chainman().GetConsensus(), chainman().m_blockman.LookupBlockIndex(block_hash));
+        const auto& params{chainman().GetConsensus()};
+        const CBlockIndex* block{
+            chainman().m_blockman.LookupBlockIndex(block_hash)};
+
+        if (params.CoinbaseMaturityDynamic && block &&
+            block->nHeight >= params.CoinbaseMaturityLongStartHeight) {
+            return static_cast<int>(DynamicCBMMaturityForBlock(params, block));
+        }
+        return Consensus::CoinbaseMaturityPolicy(params, block);
     }
     int maxCoinbaseMaturity() override
     {
         const auto& params{chainman().GetConsensus()};
         return std::max({COINBASE_MATURITY, params.CoinbaseMaturityLong, params.CoinbaseMaturityBeforeRolling()});
+    }
+    bool isDynamicCoinbaseMaturity() override
+    {
+        return chainman().GetConsensus().CoinbaseMaturityDynamic;
     }
     bool pruneLockExists(const std::string& name) const override
     {

@@ -8,6 +8,7 @@
 #include <coins.h>
 #include <consensus/amount.h>
 #include <consensus/consensus.h>
+#include <consensus/dynamic_cbm.h>
 #include <consensus/params.h>
 #include <consensus/validation.h>
 #include <primitives/transaction.h>
@@ -217,6 +218,73 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, 
         ? params.CoinbaseMaturityLongStartHeight : std::numeric_limits<int>::max()};
     return CheckTxInputs(tx, state, inputs, spend_height, txfee, rules,
                          params.CoinbaseMaturityLong, start, long_maturity_end_height);
+}
+
+bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state,
+                              const CCoinsViewCache& inputs, int spend_height,
+                              CAmount& txfee, CheckTxInputsRules rules,
+                              const Params& params, const CBlockIndex* parent_block)
+{
+    // DCBM requires an explicit candidate chain. Never fall back to
+    // the active chain or validate against incomplete ancestry.
+    if (params.CoinbaseMaturityDynamic &&
+        (!parent_block || parent_block->nHeight != spend_height - 1)) {
+        return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND,
+                             "bad-txns-missing-dcbm-chain-context");
+    }
+
+    // Preserve existing RC5 validation and historical maturity checks.
+    const int long_maturity_end_height{
+        CoinbaseMaturityLongEndHeight(params, parent_block)};
+
+    // Under DCBM, the rolling maturity check is performed below using
+    // the mining block's difficulty history. Preserve the separate
+    // historical maturity check and all ordinary transaction checks.
+    const int legacy_end_height{
+        params.CoinbaseMaturityDynamic
+            ? params.CoinbaseMaturityLongStartHeight
+            : long_maturity_end_height};
+
+    if (!CheckTxInputs(tx, state, inputs, spend_height, txfee, rules,
+                       params, legacy_end_height)) {
+        return false;
+    }
+
+    if (!params.CoinbaseMaturityDynamic ||
+        !params.CoinbaseMaturityLongActiveAt(spend_height)) {
+        return true;
+    }
+
+    for (const CTxIn& txin : tx.vin) {
+        const Coin& coin = inputs.AccessCoin(txin.prevout);
+        if (!coin.IsCoinBase()) continue;
+
+        const CBlockIndex* coin_block{
+            parent_block->GetAncestor(static_cast<int>(coin.nHeight))};
+
+        if (!coin_block) {
+            return state.Invalid(TxValidationResult::TX_PREMATURE_SPEND,
+                                 "bad-txns-missing-dcbm-coinbase-ancestor");
+        }
+
+        // Rewards outside the long-maturity schedule retain RC5 behavior.
+        if (coin_block->nHeight < params.CoinbaseMaturityLongStartHeight) {
+            continue;
+        }
+
+        const int64_t required_maturity{DynamicCBMMaturityForBlock(params, coin_block)};
+        const int actual_maturity{spend_height - coin_block->nHeight};
+
+        if (actual_maturity < required_maturity) {
+            return state.Invalid(
+                TxValidationResult::TX_PREMATURE_SPEND,
+                "bad-txns-premature-spend-of-coinbase",
+                strprintf("DCBM: tried to spend coinbase at depth %d; required %d",
+                          actual_maturity, required_maturity));
+        }
+    }
+
+    return true;
 }
 
 bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, const CheckTxInputsRules rules,
