@@ -1560,12 +1560,12 @@ BOOST_AUTO_TEST_CASE(bpub_bytes)
         const auto& script{tx.vin[i].scriptWitness.stack.back()};
         coins.AddCoin(tx.vin[i].prevout, Coin{CTxOut{1000, GetScriptForDestination(WitnessV0ScriptHash{CScript(script.begin(), script.end())})}, 1, false}, false);
     }
-    BOOST_CHECK_EQUAL(DatacarrierBytes(CTransaction{tx}, coins).second, bytes);
-    BOOST_CHECK_EQUAL(CalculateExtraTxWeight(CTransaction{tx}, coins, 4), int32_t(bytes * 3));
+    BOOST_CHECK_EQUAL(DatacarrierBytes(CTransaction{tx}, coins, DataOutputBytes(CTransaction{tx}, &coins)).second, bytes);
+    BOOST_CHECK_EQUAL(CalculateExtraTxWeight(CTransaction{tx}, coins, 4, DataOutputBytes(CTransaction{tx}, &coins)), int32_t(bytes * 3));
     // -rejectbpub=0 counts none of it
     g_reject_bpub = false;
-    BOOST_CHECK_EQUAL(DatacarrierBytes(CTransaction{tx}, coins).second, 0U);
-    BOOST_CHECK_EQUAL(CalculateExtraTxWeight(CTransaction{tx}, coins, 4), 0);
+    BOOST_CHECK_EQUAL(DatacarrierBytes(CTransaction{tx}, coins, DataOutputBytes(CTransaction{tx}, &coins)).second, 0U);
+    BOOST_CHECK_EQUAL(CalculateExtraTxWeight(CTransaction{tx}, coins, 4, DataOutputBytes(CTransaction{tx}, &coins)), 0);
     g_reject_bpub = true;
 
     // Other multisig, and other spends, are not BPUB
@@ -1580,6 +1580,233 @@ BOOST_AUTO_TEST_CASE(bpub_bytes)
     AddBpubInputs(two_of_n, v5, 31, 14, control);
     for (auto& txin : two_of_n.vin) txin.scriptWitness.stack.back()[0] = OP_2;
     BOOST_CHECK_EQUAL(BPUBBytes(CTransaction{two_of_n}), 0U);
+}
+
+BOOST_AUTO_TEST_CASE(tx_DataOutputBytes)
+{
+    // Block 965,224, tx f93ee9d2a8d6fc0dce7889732d8e288ca64dacfe4c94c6cd76eb85037daea09c:
+    // an "ACME" payload in four P2WSH outputs at 330 sat (OLGA framing with a
+    // different magic), then a taproot and two P2WPKH change outputs.
+    CMutableTransaction acme_mtx;
+    BOOST_REQUIRE(DecodeHexTx(acme_mtx, "02000000000104478044ee1b430fea5cb8ff1671b670ef9c5b9ae32eea5baef589514ec0a899e60800000000fdffffffbfc7b0134900db70018a0df2fad0f1e5e142213697e8117900f3a8c5937961eb0200000000fdffffffa5296edb74af3c092e4242f47ebb49e6935b84b5ff8b555dc1df205342a17f570200000000fdffffffb37dc44d0fda93e76e10a567b6e30ff16bc0dd84795210b5de9c70ce61026d3a0000000000fdffffff074a01000000000000220020007741434d4501001400789c0160009fff0110000c464f524745544d454b4e4f4a0100000000000022002054020400080000000000000001030800010004100000050800010006080001004a0100000000000022002007100009746578742f68746d6c08110020780f09eb3c8c53dc0a91ed8777c5194a01000000000000220020d06576f8bfe44a149acd6a56bcc81dca9ef91f18abe4cf51a6000000000000001e24000000000000225120f76c46bc64b22b4643971b7b6f93a552bd99b62ed2903fe7903ba74c8a9938df7803000000000000160014b9034eaf3a6cadd9b8687bdc95fa4e2e696ad349d403000000000000160014f05ca0933738059e830756042263a8d8182b9f24024830450221008bc36479a37702f5abc206931f39efcde9d1f98561ebe3733e97478205c4168a022032a6ba41e4609d7be2dd6120a2f24a10160c7caab3a7721b80b13c1e008e453401210273756d05687e8d9a4002940e915bf699c587553859e88a5b5870c5dce6f87f2f0247304402203a2c81569bef2606deccc47c5968b5f07c3a69fa2e6a060098f78be002d96f3702206a10ffda52252ba0c05c3d9ae92181e3d7806e3de5eb390c9bd6c2e508584c8b01210273756d05687e8d9a4002940e915bf699c587553859e88a5b5870c5dce6f87f2f02483045022100edd2b635984b47243124c6aa4bb30b25940f1bfba3d80af0207574a70911a69902206907be25d22a94746bf49d72f61c17a154cce0beb46f13e2e920da028cfeef2601210273756d05687e8d9a4002940e915bf699c587553859e88a5b5870c5dce6f87f2f02473044022018898be34c777e2b8618fde94260a239085a60fe43b82a2e7d46f7f4476f43e50220373634c96189ee47fa639a134599fd31d8872c421f0f75532caec035e07eb6ff01210273756d05687e8d9a4002940e915bf699c587553859e88a5b5870c5dce6f87f2f00000000"));
+    const CTransaction acme{acme_mtx};
+    const std::vector<size_t> acme_expect{41, 41, 41, 41, 0, 0, 0};
+    const auto acme_bytes{DataOutputBytes(acme)};
+    BOOST_CHECK_EQUAL_COLLECTIONS(acme_bytes.begin(), acme_bytes.end(), acme_expect.begin(), acme_expect.end());
+
+    // The whole-transaction count sees the same 164 bytes; the P2WPKH inputs add nothing.
+    CCoinsView coins_dummy;
+    CCoinsViewCache coins(&coins_dummy);
+    const CScript acme_prevout_spk{CScript() << OP_0 << "f05ca0933738059e830756042263a8d8182b9f24"_hex};
+    for (const CTxIn& txin : acme.vin) {
+        coins.AddCoin(txin.prevout, Coin{CTxOut{1000, acme_prevout_spk}, 1, false}, false);
+    }
+    const auto acme_dcb{DatacarrierBytes(acme, coins, acme_bytes)};
+    BOOST_CHECK_EQUAL(acme_dcb.first, 0U);
+    BOOST_CHECK_EQUAL(acme_dcb.second, 164U);
+    BOOST_CHECK_EQUAL(CalculateExtraTxWeight(acme, coins, 2 * WITNESS_SCALE_FACTOR, acme_bytes), 164 * WITNESS_SCALE_FACTOR);
+
+    // An OLGA header that also trips a byte tell still counts its whole
+    // payload (0x64 = 100 bytes, so four outputs), once: the detector covers
+    // header and chunks, so DataOutputBytes leaves them all to it
+    std::vector<unsigned char> stamp_header{0x00, 0x64, 's', 't', 'a', 'm', 'p', ':'};
+    stamp_header.resize(32, 0);
+    CMutableTransaction olga_mtx;
+    for (const auto& program : {stamp_header, "e9f85819906b6bc0b5f5d902c68cd2298679883ce2b3f8552b029f462c0a0d17"_hex_v_u8, "becb6d3c0662dca214c45cde70e4ce022ade14bac12bfed3aa4811b5b3bde49f"_hex_v_u8, "e2c8d6303cf2cad3a00e0ec1b61aa1355c32dca119c357f5e7ad499781052e3f"_hex_v_u8}) {
+        olga_mtx.vout.emplace_back(olga_mtx.vout.empty() ? 330 : 1000, CScript() << OP_0 << program);
+    }
+    const CTransaction olga{olga_mtx};
+    const std::vector<size_t> olga_expect{0, 0, 0, 0};
+    const auto olga_bytes{DataOutputBytes(olga)};
+    BOOST_CHECK_EQUAL_COLLECTIONS(olga_bytes.begin(), olga_bytes.end(), olga_expect.begin(), olga_expect.end());
+    BOOST_CHECK_EQUAL(DatacarrierBytes(olga, coins, olga_bytes).second, 164U);
+    BOOST_CHECK_EQUAL(CalculateExtraTxWeight(olga, coins, 2 * WITNESS_SCALE_FACTOR, olga_bytes), 164 * WITNESS_SCALE_FACTOR);
+    // The same stamp with its chunks at the threshold, the real layout: still
+    // 164, not 164 plus three chunks caught by the dust run
+    for (CTxOut& txout : olga_mtx.vout) txout.nValue = 330;
+    const CTransaction olga_dust{olga_mtx};
+    const auto olga_dust_bytes{DataOutputBytes(olga_dust)};
+    BOOST_CHECK_EQUAL_COLLECTIONS(olga_dust_bytes.begin(), olga_dust_bytes.end(), olga_expect.begin(), olga_expect.end());
+    BOOST_CHECK_EQUAL(DatacarrierBytes(olga_dust, coins, olga_dust_bytes).second, 164U);
+
+    // Random 32-byte hashes and x-only keys (on and off the curve)
+    const std::vector<unsigned char> hash_a{"e9f85819906b6bc0b5f5d902c68cd2298679883ce2b3f8552b029f462c0a0d17"_hex_v_u8};
+    const std::vector<unsigned char> hash_b{"becb6d3c0662dca214c45cde70e4ce022ade14bac12bfed3aa4811b5b3bde49f"_hex_v_u8};
+    const std::vector<unsigned char> hash_c{"e2c8d6303cf2cad3a00e0ec1b61aa1355c32dca119c357f5e7ad499781052e3f"_hex_v_u8};
+    const std::vector<unsigned char> hash_d{"af6adc4480e64dd58e59424f43b6144267d1c4347a58ad0f09013fb9053b307b"_hex_v_u8};
+    const std::vector<unsigned char> hash_e{"02c7539d864d18c81557338387d5300f60cb8cc75054c2cfc985ddc401269122"_hex_v_u8};
+    const std::vector<unsigned char> key_on_a{"9f537de0a7f7403067880d3d62d3f8d20889c4f77b74b612406d7d5ce0a9b206"_hex_v_u8};
+    const std::vector<unsigned char> key_on_b{"4d6abe64a78cd5dcb98a719490753a84a061274cc6f7ecefea0aedad967676ba"_hex_v_u8};
+    const std::vector<unsigned char> key_on_c{"44d8f2d6c1d5f3d2b53fda185d92462adf0ec0f4a66a6e31680b731ddbca111d"_hex_v_u8};
+    const std::vector<unsigned char> key_off{"4420f4cd273fe68ccc6df6aaf1bd40d6f879884882386754e2c2e55cfad0b0bb"_hex_v_u8};
+    const auto p2wsh = [](const std::vector<unsigned char>& program) { return CScript() << OP_0 << program; };
+    const auto p2tr = [](const std::vector<unsigned char>& key) { return CScript() << OP_1 << key; };
+    const auto check = [](const CMutableTransaction& mtx, const std::vector<size_t>& expect) {
+        const auto got{DataOutputBytes(CTransaction{mtx})};
+        BOOST_CHECK_EQUAL_COLLECTIONS(got.begin(), got.end(), expect.begin(), expect.end());
+    };
+    CMutableTransaction t;
+
+    // A Lightning commitment: two 330-sat anchors, to_local, to_remote, a small HTLC
+    t.vout = {CTxOut{330, p2wsh(hash_a)}, CTxOut{330, p2wsh(hash_b)}, CTxOut{50000, p2wsh(hash_c)}, CTxOut{70000, p2wsh(hash_d)}, CTxOut{400, p2wsh(hash_e)}};
+    check(t, {0, 0, 0, 0, 0});
+
+    // A third P2WSH output at the same small value makes a data run
+    t.vout = {CTxOut{330, p2wsh(hash_a)}, CTxOut{330, p2wsh(hash_b)}, CTxOut{330, p2wsh(hash_c)}, CTxOut{100000, p2wsh(hash_d)}};
+    check(t, {41, 41, 41, 0});
+    // Different values do not add up
+    t.vout[2].nValue = 331;
+    check(t, {0, 0, 0, 0});
+    // Up to DATA_OUTPUT_RUN_MAX_VALUE, as the fake-key encoder pays 546 sat per chunk
+    for (auto& txout : t.vout) txout.nValue = DATA_OUTPUT_RUN_MAX_VALUE;
+    t.vout[3].nValue = 100000;
+    check(t, {41, 41, 41, 0});
+    for (auto& txout : t.vout) txout.nValue = DATA_OUTPUT_RUN_MAX_VALUE + 1;
+    check(t, {0, 0, 0, 0});
+    // A Lightning commitment with two anchors and two small HTLCs of different amounts
+    t.vout = {CTxOut{330, p2wsh(hash_a)}, CTxOut{330, p2wsh(hash_b)}, CTxOut{400, p2wsh(hash_c)}, CTxOut{450, p2wsh(hash_d)}};
+    check(t, {0, 0, 0, 0});
+    // The run counts distinct scripts: padding or consolidation that repeats
+    // one script at the threshold is not a spread payload
+    t.vout = {CTxOut{330, p2wsh(hash_a)}, CTxOut{330, p2wsh(hash_a)}, CTxOut{330, p2wsh(hash_a)}, CTxOut{330, p2wsh(hash_b)}};
+    check(t, {0, 0, 0, 0});
+    t.vout.emplace_back(330, p2wsh(hash_c));
+    check(t, {41, 41, 41, 41, 41});
+    // Small taproot runs are ordinals postage and are left to the curve check, and mixed types do not add up
+    t.vout = {CTxOut{330, p2tr(key_on_a)}, CTxOut{330, p2tr(key_on_b)}, CTxOut{330, p2tr(key_on_c)}};
+    check(t, {0, 0, 0});
+    t.vout = {CTxOut{330, p2wsh(hash_a)}, CTxOut{330, p2wsh(hash_b)}, CTxOut{330, p2tr(key_on_a)}};
+    check(t, {0, 0, 0});
+
+    // A taproot key that is not on the curve can never be spent
+    t.vout = {CTxOut{100000, p2tr(key_off)}};
+    check(t, {41});
+    t.vout = {CTxOut{100000, p2tr(key_on_a)}};
+    check(t, {0});
+    // Only the first DATA_OUTPUT_CURVE_CHECKS taproot outputs are checked
+    t.vout.assign(DATA_OUTPUT_CURVE_CHECKS - 1, CTxOut{1000, p2tr(key_on_a)});
+    t.vout.emplace_back(2000, p2tr(key_off));
+    std::vector<size_t> capped(DATA_OUTPUT_CURVE_CHECKS, 0);
+    capped.back() = 41;
+    check(t, capped);
+    t.vout.insert(t.vout.begin(), CTxOut{1000, p2tr(key_on_b)});
+    capped.assign(DATA_OUTPUT_CURVE_CHECKS + 1, 0);
+    check(t, capped);
+
+    // Eight of one byte value trips the multiplicity tell, seven do not
+    std::vector<unsigned char> program{hash_a};
+    for (size_t k{0}; k < 8; ++k) program[4 * k] = 0x5a;
+    t.vout = {CTxOut{100000, p2wsh(program)}};
+    check(t, {41});
+    program = hash_a;
+    for (size_t k{0}; k < 7; ++k) program[4 * k] = 0x5a;
+    t.vout = {CTxOut{100000, p2wsh(program)}};
+    check(t, {0});
+
+    // Six identical bytes in a row trip the run tell, five do not
+    std::vector<unsigned char> run6{hash_b};
+    std::fill(run6.begin() + 10, run6.begin() + 16, 0x77);
+    t.vout = {CTxOut{100000, p2wsh(run6)}};
+    check(t, {41});
+    program = hash_b;
+    std::fill(program.begin() + 10, program.begin() + 15, 0x77);
+    t.vout = {CTxOut{100000, p2wsh(program)}};
+    check(t, {0});
+
+    // A caught chunk marks its siblings of the same type and value, nothing else
+    t.vout = {CTxOut{1000, p2wsh(hash_c)}, CTxOut{1000, p2wsh(run6)}, CTxOut{1000, p2wsh(hash_d)}, CTxOut{2000, p2wsh(hash_e)}, CTxOut{1000, p2tr(key_on_a)}};
+    check(t, {41, 41, 41, 0, 0});
+
+    // 20-byte hashes get the same tells, and a random hash at the same value is
+    // marked as its sibling, at another value not
+    std::vector<unsigned char> padded20(hash_a.begin(), hash_a.begin() + 20);
+    std::fill(padded20.begin() + 11, padded20.end(), 0xff);
+    const CScript padded_p2wpkh{CScript() << OP_0 << padded20};
+    const CScript p2wpkh{CScript() << OP_0 << std::vector<unsigned char>(hash_a.begin(), hash_a.begin() + 20)};
+    t.vout = {CTxOut{294, padded_p2wpkh}, CTxOut{294, p2wpkh}};
+    check(t, {29, 29});
+    t.vout = {CTxOut{294, padded_p2wpkh}, CTxOut{500, p2wpkh}};
+    check(t, {29, 0});
+    // The all-zero hash is the conventional burn address, not a payload, and marks no siblings
+    const CScript burn{CScript() << OP_0 << std::vector<unsigned char>(20, 0)};
+    const CScript burn_p2pkh{CScript() << OP_DUP << OP_HASH160 << std::vector<unsigned char>(20, 0) << OP_EQUALVERIFY << OP_CHECKSIG};
+    t.vout = {CTxOut{294, burn}, CTxOut{294, p2wpkh}, CTxOut{20000, burn_p2pkh}};
+    check(t, {0, 0, 0});
+
+    // Block 976,048, tx e2031ff1826b019dd59ece1bf1b20cb2ab43c63c2de674f5d8275b246d5319d0:
+    // spends from the vanity address 11111119536NnU2vPAvoQhvkheQ8ejYJ, whose hash
+    // starts with six zero bytes, and pays change back to it. Without the coins
+    // the run tell counts the change; with them it is a script the spender holds.
+    CMutableTransaction vanity_mtx;
+    BOOST_REQUIRE(DecodeHexTx(vanity_mtx, "02000000010387f422907c82855e4e53f8684610ed1ce82a989fa6d7220ca264fc79e9c24d010000006a47304402206d1b0c9185144d8265912f6604286e5c00b55a5f7c6212af53580ad7b20bf9cb0220589565b65bd13413ea639f7e357469c8abee7584c780974c4dcf5033c80643ec012102256dc642d51313476a3d419ae000f711761e72588f0427a3d48a1b3ff81eb0a9fdffffff02ec660000000000001976a914007e89662caa492338b6de553ba80de8b24c435388ac75dc0200000000001976a914000000000000c28e3cf80c3f84064ab17a0593b588ac2ece0e00"));
+    const CTransaction vanity{vanity_mtx};
+    const auto vanity_spk_bytes{"76a914000000000000c28e3cf80c3f84064ab17a0593b588ac"_hex_v_u8};
+    const CScript vanity_spk(vanity_spk_bytes.begin(), vanity_spk_bytes.end());
+    BOOST_CHECK(vanity.vout[1].scriptPubKey == vanity_spk);
+    const std::vector<size_t> vanity_counted{0, 29};
+    const std::vector<size_t> vanity_real{0, 0};
+    const auto vanity_no_view{DataOutputBytes(vanity)};
+    BOOST_CHECK_EQUAL_COLLECTIONS(vanity_no_view.begin(), vanity_no_view.end(), vanity_counted.begin(), vanity_counted.end());
+    CCoinsViewCache vanity_coins(&coins_dummy);
+    vanity_coins.AddCoin(vanity.vin[0].prevout, Coin{CTxOut{214264, vanity_spk}, 1, false}, false);
+    const auto vanity_bytes{DataOutputBytes(vanity, &vanity_coins)};
+    BOOST_CHECK_EQUAL_COLLECTIONS(vanity_bytes.begin(), vanity_bytes.end(), vanity_real.begin(), vanity_real.end());
+    BOOST_CHECK_EQUAL(DatacarrierBytes(vanity, vanity_coins, vanity_bytes).second, 0U);
+    // The same output spending a coin of another script is still counted
+    CCoinsViewCache other_coins(&coins_dummy);
+    other_coins.AddCoin(vanity.vin[0].prevout, Coin{CTxOut{214264, burn_p2pkh}, 1, false}, false);
+    const auto other_bytes{DataOutputBytes(vanity, &other_coins)};
+    BOOST_CHECK_EQUAL_COLLECTIONS(other_bytes.begin(), other_bytes.end(), vanity_counted.begin(), vanity_counted.end());
+
+    // Paying the spent script exempts that output only: a data output beside it
+    // still counts, and the exempt output is not marked as a sibling of one
+    t = vanity_mtx;
+    t.vout = {CTxOut{294, vanity_spk}, CTxOut{294, padded_p2wpkh}};
+    std::vector<size_t> got{DataOutputBytes(CTransaction{t}, &vanity_coins)};
+    std::vector<size_t> expect{0, 29};
+    BOOST_CHECK_EQUAL_COLLECTIONS(got.begin(), got.end(), expect.begin(), expect.end());
+    const CScript zeros_p2pkh{CScript() << OP_DUP << OP_HASH160 << "000000000000aa8e3cf80c3f84064ab17a0593b5"_hex_v_u8 << OP_EQUALVERIFY << OP_CHECKSIG};
+    t.vout = {CTxOut{5000, zeros_p2pkh}, CTxOut{5000, vanity_spk}};
+    got = DataOutputBytes(CTransaction{t}, &vanity_coins);
+    expect = {29, 0};
+    BOOST_CHECK_EQUAL_COLLECTIONS(got.begin(), got.end(), expect.begin(), expect.end());
+    // A spent script still counts toward a dust run, so it cannot break one up
+    CCoinsViewCache run_coins(&coins_dummy);
+    run_coins.AddCoin(vanity.vin[0].prevout, Coin{CTxOut{330, p2wsh(hash_a)}, 1, false}, false);
+    t.vout = {CTxOut{330, p2wsh(hash_a)}, CTxOut{330, p2wsh(hash_b)}, CTxOut{330, p2wsh(hash_c)}};
+    got = DataOutputBytes(CTransaction{t}, &run_coins);
+    expect = {0, 41, 41};
+    BOOST_CHECK_EQUAL_COLLECTIONS(got.begin(), got.end(), expect.begin(), expect.end());
+    // Two inputs spending one script and one spending another exempt every output
+    // that pays either script, and nothing else; the third input's script looks
+    // like data, so it is only exempt if that input is still looked up
+    const COutPoint second{vanity.vin[0].prevout.hash, vanity.vin[0].prevout.n + 1};
+    const COutPoint third{vanity.vin[0].prevout.hash, vanity.vin[0].prevout.n + 2};
+    CCoinsViewCache many_coins(&coins_dummy);
+    many_coins.AddCoin(vanity.vin[0].prevout, Coin{CTxOut{1000, vanity_spk}, 1, false}, false);
+    many_coins.AddCoin(second, Coin{CTxOut{1000, vanity_spk}, 1, false}, false);
+    many_coins.AddCoin(third, Coin{CTxOut{1000, p2wsh(run6)}, 1, false}, false);
+    t.vin = {vanity.vin[0], CTxIn{second}, CTxIn{third}};
+    t.vout = {CTxOut{5000, vanity_spk}, CTxOut{5000, zeros_p2pkh}, CTxOut{5000, vanity_spk}, CTxOut{5000, p2wsh(run6)}};
+    got = DataOutputBytes(CTransaction{t}, &many_coins);
+    expect = {0, 29, 0, 0};
+    BOOST_CHECK_EQUAL_COLLECTIONS(got.begin(), got.end(), expect.begin(), expect.end());
+    t.vin = {vanity.vin[0]};
+    // Only hash and key outputs are looked at, so a bare script that repeats a
+    // spent coin's, such as bare multisig with data keys, counts as before
+    std::vector<unsigned char> real_key{0x02}, data_key{0x03};
+    real_key.insert(real_key.end(), hash_e.begin(), hash_e.end());
+    data_key.insert(data_key.end(), 32, 'A');
+    const CScript bare_multisig{CScript() << OP_1 << real_key << data_key << OP_2 << OP_CHECKMULTISIG};
+    std::vector<std::vector<unsigned char>> bare_solutions;
+    BOOST_CHECK(Solver(bare_multisig, bare_solutions) == TxoutType::MULTISIG);
+    CCoinsViewCache bare_coins(&coins_dummy);
+    bare_coins.AddCoin(vanity.vin[0].prevout, Coin{CTxOut{1000, bare_multisig}, 1, false}, false);
+    t.vout = {CTxOut{1000, bare_multisig}};
+    const auto bare_no_view{DataOutputBytes(CTransaction{t})};
+    const auto bare_view{DataOutputBytes(CTransaction{t}, &bare_coins)};
+    BOOST_CHECK_EQUAL_COLLECTIONS(bare_view.begin(), bare_view.end(), bare_no_view.begin(), bare_no_view.end());
+    BOOST_CHECK(DatacarrierBytes(CTransaction{t}, bare_coins, bare_view) == DatacarrierBytes(CTransaction{t}, bare_coins, bare_no_view));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
