@@ -677,7 +677,7 @@ private:
      */
     bool MaybeSendGetHeaders(CNode& pfrom, const CBlockLocator& locator, Peer& peer, const uint256& hash_stop = {}) EXCLUSIVE_LOCKS_REQUIRED(g_msgproc_mutex);
     /** Highest block height we may share with this peer. */
-    int PeerBlockSharingHeightLimit(const Peer& peer) const;
+    int PeerBlockSharingHeightLimit(const CNode& node, const Peer& peer) const;
     /** Whether we may sync headers from this peer (always, unless BLAKE2b is scheduled). */
     bool CanSyncHeadersFrom(const Peer& peer) const;
     /** Potentially fetch blocks from this peer upon receipt of a new headers tip */
@@ -1119,9 +1119,20 @@ static bool CanServeHeaders(const Peer& peer)
     return peer.m_their_services & NODE_BLAKE2B;
 }
 
-int PeerManagerImpl::PeerBlockSharingHeightLimit(const Peer& peer) const
+/** Whether we may serve this peer headers and blocks past the BLAKE2b fork.
+ *  The download permission counts as well as NODE_BLAKE2B: the operator
+ *  whitelisted the peer, and an indexer there may not advertise the bit.
+ *  Serving it the 164-byte headers costs no more than serving any other
+ *  download peer. This decides only what we serve; what we sync from stays
+ *  with CanSyncHeadersFrom. */
+static bool MayServeBlake2bBlocks(const CNode& node, const Peer& peer)
 {
-    return CanServeHeaders(peer) ? std::numeric_limits<int>::max() : m_chainparams.StalePeerCommonHeight();
+    return CanServeHeaders(peer) || node.HasPermission(NetPermissionFlags::Download);
+}
+
+int PeerManagerImpl::PeerBlockSharingHeightLimit(const CNode& node, const Peer& peer) const
+{
+    return MayServeBlake2bBlocks(node, peer) ? std::numeric_limits<int>::max() : m_chainparams.StalePeerCommonHeight();
 }
 
 bool PeerManagerImpl::CanSyncHeadersFrom(const Peer& peer) const
@@ -2091,7 +2102,7 @@ void PeerManagerImpl::NewPoWValidBlock(const CBlockIndex *pindex, const std::sha
             return;
         if (pindex->nHeight > m_chainparams.StalePeerCommonHeight()) {
             const PeerRef peer{GetPeerRef(pnode->GetId())};
-            if (!peer || !CanServeHeaders(*peer)) return;
+            if (!peer || !MayServeBlake2bBlocks(*pnode, *peer)) return;
         }
         ProcessBlockAvailability(pnode->GetId());
         CNodeState &state = *State(pnode->GetId());
@@ -2314,7 +2325,7 @@ void PeerManagerImpl::ProcessGetBlockData(CNode& pfrom, Peer& peer, const CInv& 
         if (!pindex) {
             return;
         }
-        const int block_sharing_height_limit{PeerBlockSharingHeightLimit(peer)};
+        const int block_sharing_height_limit{PeerBlockSharingHeightLimit(pfrom, peer)};
         if (pindex->nHeight > block_sharing_height_limit) {
             return;
         }
@@ -4170,7 +4181,7 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         if (pindex)
             pindex = m_chainman.ActiveChain().Next(pindex);
         int nLimit = 500;
-        const int block_sharing_height_limit{PeerBlockSharingHeightLimit(*peer)};
+        const int block_sharing_height_limit{PeerBlockSharingHeightLimit(pfrom, *peer)};
         LogDebug(BCLog::NET, "getblocks %d to %s limit %d from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop.IsNull() ? "end" : hashStop.ToString(), nLimit, pfrom.GetId());
         for (; pindex && pindex->nHeight <= block_sharing_height_limit; pindex = m_chainman.ActiveChain().Next(pindex))
         {
@@ -4314,7 +4325,7 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         // we must use CBlocks, as CBlockHeaders won't include the 0x00 nTx count at the end
         std::vector<CBlock> vHeaders;
         int nLimit = m_opts.max_headers_result;
-        const int block_sharing_height_limit{PeerBlockSharingHeightLimit(*peer)};
+        const int block_sharing_height_limit{PeerBlockSharingHeightLimit(pfrom, *peer)};
         LogDebug(BCLog::NET, "getheaders %d to %s from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop.IsNull() ? "end" : hashStop.ToString(), pfrom.GetId());
         for (; pindex && pindex->nHeight <= block_sharing_height_limit; pindex = m_chainman.ActiveChain().Next(pindex))
         {
@@ -5687,7 +5698,7 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
             // blocks, or if the peer doesn't want headers, just
             // add all to the inv queue.
             LOCK(peer->m_block_inv_mutex);
-            const int block_sharing_height_limit{PeerBlockSharingHeightLimit(*peer)};
+            const int block_sharing_height_limit{PeerBlockSharingHeightLimit(*pto, *peer)};
             if (block_sharing_height_limit != std::numeric_limits<int>::max()) {
                 std::erase_if(peer->m_blocks_for_headers_relay, [&](const uint256& hash) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
                     const CBlockIndex* pindex = m_chainman.m_blockman.LookupBlockIndex(hash);

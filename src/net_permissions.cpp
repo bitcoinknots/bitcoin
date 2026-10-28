@@ -17,7 +17,7 @@ const std::vector<std::string> NET_PERMISSIONS_DOC{
     "forcerelay (relay transactions that are already in the mempool; implies relay)",
     "relay (relay even in -blocksonly mode, and unlimited transaction announcements)",
     "mempool (allow requesting BIP35 mempool contents)",
-    "download (allow getheaders during IBD, no disconnect after maxuploadtarget limit)",
+    "download (allow getheaders during IBD, no disconnect after maxuploadtarget limit, blocks past the BLAKE2b fork without advertising NODE_BLAKE2B)",
     "addr (responses to GETADDR avoid hitting the cache and contain random records with the most up-to-date info)",
     "forceinbound (when connections are full, attempt to evict a random unprotected inbound peer to open a slot; implies noban)"
 };
