@@ -8,6 +8,7 @@
 #include <common/system.h>
 #include <consensus/amount.h>
 #include <consensus/validation.h>
+#include <hash.h>
 #include <interfaces/chain.h>
 #include <node/types.h>
 #include <numeric>
@@ -107,8 +108,8 @@ int CalculateMaximumSignedInputSize(const CTxOut& txout, const CWallet* wallet, 
 }
 
 /** Infer a descriptor for the given output script. */
-static std::unique_ptr<Descriptor> GetDescriptor(const CWallet* wallet, const CCoinControl* coin_control,
-                                                 const CScript script_pubkey)
+static MultiSigningProvider GetSolvingProvider(const CWallet* wallet, const CCoinControl* coin_control,
+                                               const CScript& script_pubkey)
 {
     MultiSigningProvider providers;
     for (const auto spkman: wallet->GetScriptPubKeyMans(script_pubkey)) {
@@ -117,7 +118,55 @@ static std::unique_ptr<Descriptor> GetDescriptor(const CWallet* wallet, const CC
     if (coin_control) {
         providers.AddProvider(std::make_unique<FlatSigningProvider>(coin_control->m_external_provider));
     }
+    return providers;
+}
+
+static std::unique_ptr<Descriptor> GetDescriptor(const CWallet* wallet, const CCoinControl* coin_control,
+                                                 const CScript script_pubkey)
+{
+    const auto providers{GetSolvingProvider(wallet, coin_control, script_pubkey)};
     return InferDescriptor(script_pubkey, providers);
+}
+
+/** Estimate unsigned inputs, reserving for the largest known Taproot leaf if no witness selects a path. */
+static uint64_t CountWalletMultisigExcessKeys(const CWallet* wallet, const CCoinControl* coin_control,
+                                           const CTxIn& txin, const CScript& script_pubkey)
+{
+    if (!txin.scriptWitness.IsNull()) return CountInputMultisigExcessKeys(txin, script_pubkey);
+
+    const auto providers{GetSolvingProvider(wallet, coin_control, script_pubkey)};
+    CScript script{script_pubkey};
+    std::vector<std::vector<unsigned char>> solutions;
+
+    if (Solver(script, solutions) == TxoutType::SCRIPTHASH) {
+        if (solutions.empty() || !providers.GetCScript(CScriptID{uint160{solutions[0]}}, script)) return 0;
+    }
+
+    solutions.clear();
+    if (Solver(script, solutions) == TxoutType::WITNESS_V0_SCRIPTHASH) {
+        if (solutions.empty() || !providers.GetCScript(CScriptID{RIPEMD160(solutions[0])}, script)) return 0;
+    }
+
+    solutions.clear();
+    if (Solver(script, solutions) == TxoutType::WITNESS_V1_TAPROOT) {
+        if (solutions.empty()) return 0;
+        TaprootSpendData spend_data;
+        if (!providers.GetTaprootSpendData(XOnlyPubKey{solutions[0]}, spend_data)) return 0;
+
+        uint64_t excess_keys{0};
+        for (const auto& entry : spend_data.scripts) {
+            const auto& [script_bytes, leaf_version]{entry.first};
+            if (leaf_version != TAPROOT_LEAF_TAPSCRIPT) continue;
+            const CScript tapscript{script_bytes.begin(), script_bytes.end()};
+            excess_keys = std::max(excess_keys, uint64_t{CountMultisigExcessKeys(tapscript, nullptr, 2, SigVersion::TAPSCRIPT)});
+        }
+        // Funding a PSBT must not require an already signed witness. The caller
+        // can specify the planned total floor via multisig_fee instead (zero
+        // for key-path-only spends). Relay still checks the final witnesses.
+        return excess_keys;
+    }
+
+    return (txin.scriptSig.IsPushOnly() ? 0 : CountMultisigExcessKeys(txin.scriptSig)) + CountMultisigExcessKeys(script);
 }
 
 /** Infer the maximum size of this input after it will be signed. */
@@ -1039,7 +1088,8 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
         const std::vector<CRecipient>& vecSend,
         std::optional<unsigned int> change_pos,
         const CCoinControl& coin_control,
-        bool sign) EXCLUSIVE_LOCKS_REQUIRED(wallet.cs_wallet)
+        bool sign,
+        CAmount& policy_fee_reserve) EXCLUSIVE_LOCKS_REQUIRED(wallet.cs_wallet)
 {
     AssertLockHeld(wallet.cs_wallet);
 
@@ -1161,6 +1211,10 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
     // Include the fees for things that aren't inputs, excluding the change output
     const CAmount not_input_fees = coin_selection_params.m_effective_feerate.GetFee(coin_selection_params.m_subtract_fee_outputs ? 0 : coin_selection_params.tx_noinputs_size);
     CAmount selection_target = recipients_sum + not_input_fees;
+    if (policy_fee_reserve > MAX_MONEY - selection_target) {
+        return util::Error{_("Insufficient funds for the multisig fee")};
+    }
+    selection_target += policy_fee_reserve;
 
     // This can only happen if feerate is 0, and requested destinations are value of 0 (e.g. OP_RETURN)
     // and no pre-selected inputs. This will result in 0-input transaction, which is consensus-invalid anyways
@@ -1283,6 +1337,37 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
         return util::Error{_("Missing solving data for estimating transaction size")};
     }
     CAmount fee_needed = coin_selection_params.m_effective_feerate.GetFee(nBytes) + result.GetTotalBumpFees();
+    CAmount multisig_excess_key_fee{0};
+    const CAmount fee_per_excess_key{gArgs.GetIntArg("-minrelaymultisigexcesskeyfee", DEFAULT_MIN_RELAY_MULTISIG_EXCESS_KEY_FEE)};
+    if (!sign && coin_control.m_multisig_fee) {
+        if (!MoneyRange(*coin_control.m_multisig_fee)) {
+            return util::Error{_("Invalid multisig_fee: expected nonnegative satoshis within the money range")};
+        }
+        multisig_excess_key_fee = *coin_control.m_multisig_fee;
+    } else if (fee_per_excess_key > 0) {
+        uint64_t excess_keys{0};
+        CMutableTransaction fee_tx{txNew};
+        std::vector<ScriptValidationMetrics> fee_metrics;
+        if (sign && !wallet.SignTransaction(fee_tx, &fee_metrics)) {
+            return util::Error{_("Signing transaction failed")};
+        }
+        for (size_t i{0}; i < selected_coins.size(); ++i) {
+            if (sign) {
+                // Inspect the actual satisfaction chosen by the signer. Key
+                // path spends expose no leaves and therefore have no key fee.
+                excess_keys += CountExecutedMultisigExcessKeys(fee_metrics.at(i));
+            } else {
+                excess_keys += CountWalletMultisigExcessKeys(&wallet, &coin_control, txNew.vin[i], selected_coins[i]->txout.scriptPubKey);
+            }
+        }
+        multisig_excess_key_fee = excess_keys > static_cast<uint64_t>(MAX_MONEY / fee_per_excess_key)
+                ? MAX_MONEY
+                : static_cast<CAmount>(excess_keys) * fee_per_excess_key;
+    }
+    fee_needed = std::max(fee_needed, multisig_excess_key_fee);
+    if (fee_needed > wallet.m_default_max_tx_fee) {
+        return util::Error{TransactionErrorString(TransactionError::MAX_FEE_EXCEEDED)};
+    }
     const CAmount output_value = CalculateOutputValue(txNew);
     Assume(recipients_sum + change_amount == output_value);
     CAmount current_fee = result.GetSelectedValue() - output_value;
@@ -1290,6 +1375,37 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
     // Sanity check that the fee cannot be negative as that means we have more output value than input value
     if (current_fee < 0) {
         return util::Error{Untranslated(STR_INTERNAL_BUG("Fee paid < 0"))};
+    }
+
+    if (!coin_selection_params.m_subtract_fee_outputs && fee_needed > current_fee) {
+        const CAmount shortfall{fee_needed - current_fee};
+        if (change_pos) {
+            auto& change{txNew.vout.at(*change_pos)};
+            if (change.nValue >= shortfall && change.nValue - shortfall >= coin_selection_params.min_viable_change) {
+                change.nValue -= shortfall;
+                current_fee = fee_needed;
+            } else {
+                // A sub-dust remainder cannot be kept as change. Removing it
+                // also reduces the size fee, so recompute before reselecting.
+                current_fee += change.nValue;
+                txNew.vout.erase(txNew.vout.begin() + *change_pos);
+                change_pos.reset();
+                tx_sizes = CalculateMaximumSignedTxSize(CTransaction(txNew), &wallet, &coin_control);
+                nBytes = tx_sizes.vsize;
+                if (nBytes == -1) return util::Error{_("Missing solving data for estimating transaction size")};
+                fee_needed = std::max(coin_selection_params.m_effective_feerate.GetFee(nBytes) + result.GetTotalBumpFees(), multisig_excess_key_fee);
+            }
+        }
+        if (fee_needed > current_fee) {
+            const CAmount missing_fee{fee_needed - current_fee};
+            if (missing_fee > MAX_MONEY - policy_fee_reserve) {
+                return util::Error{_("Insufficient funds for the multisig fee")};
+            }
+            // The caller retries coin selection with a larger fee budget. No
+            // signatures or wallet transactions from this attempt are saved.
+            policy_fee_reserve += missing_fee;
+            return util::Error{_("Insufficient funds for the multisig fee")};
+        }
     }
 
     // If there is a change output and we overpay the fees then increase the change to match the fee needed
@@ -1352,8 +1468,18 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
         return util::Error{error};
     }
 
-    if (sign && !wallet.SignTransaction(txNew)) {
+    std::vector<ScriptValidationMetrics> final_metrics;
+    if (sign && !wallet.SignTransaction(txNew, &final_metrics)) {
         return util::Error{_("Signing transaction failed")};
+    }
+    if (sign && fee_per_excess_key > 0) {
+        uint64_t final_keys{0};
+        for (const auto& metrics : final_metrics) final_keys += CountExecutedMultisigExcessKeys(metrics);
+        // A different final signing path must not silently produce an
+        // underfunded transaction. No extra VerifyScript pass is needed.
+        if (final_keys > static_cast<uint64_t>(current_fee / fee_per_excess_key)) {
+            return util::Error{_("Final signing path requires a higher multisig key fee")};
+        }
     }
 
     // Return the constructed transaction data.
@@ -1411,7 +1537,18 @@ util::Result<CreatedTransactionResult> CreateTransaction(
 
     LOCK(wallet.cs_wallet);
 
-    auto res = CreateTransactionInternal(wallet, vecSend, change_pos, coin_control, sign);
+    const auto create_with_policy_fee = [&](const CCoinControl& control) -> util::Result<CreatedTransactionResult> {
+        CAmount reserve{0};
+        // Bound retries even if randomized coin selection keeps changing the
+        // set of inputs and hence the required key fee.
+        for (unsigned int attempt{0}; attempt < 100; ++attempt) {
+            const CAmount previous_reserve{reserve};
+            auto result{CreateTransactionInternal(wallet, vecSend, change_pos, control, sign, reserve)};
+            if (result || reserve == previous_reserve) return result;
+        }
+        return util::Error{_("Could not select coins to cover the multisig fee")};
+    };
+    auto res = create_with_policy_fee(coin_control);
     TRACEPOINT(coin_selection, normal_create_tx_internal,
            wallet.GetName().c_str(),
            bool(res),
@@ -1430,7 +1567,7 @@ util::Result<CreatedTransactionResult> CreateTransaction(
             ExtractDestination(txr_ungrouped.tx->vout[*txr_ungrouped.change_pos].scriptPubKey, tmp_cc.destChange);
         }
 
-        auto txr_grouped = CreateTransactionInternal(wallet, vecSend, change_pos, tmp_cc, sign);
+        auto txr_grouped = create_with_policy_fee(tmp_cc);
         // if fee of this alternative one is within the range of the max fee, we use this one
         const bool use_aps{txr_grouped.has_value() ? (txr_grouped->fee <= txr_ungrouped.fee + wallet.m_max_aps_fee) : false};
         TRACEPOINT(coin_selection, aps_create_tx_internal,

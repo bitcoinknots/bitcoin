@@ -64,6 +64,8 @@ struct MemPoolOptions {
     CFeeRate incremental_relay_feerate{DEFAULT_INCREMENTAL_RELAY_FEE};
     /** A fee rate smaller than this is considered zero fee (for relaying, mining and transaction creation) */
     CFeeRate min_relay_feerate{DEFAULT_MIN_RELAY_TX_FEE};
+    /** Minimum fee per observed excess unproven multisig key operand, in satoshis. */
+    CAmount min_relay_multisig_excess_key_fee{DEFAULT_MIN_RELAY_MULTISIG_EXCESS_KEY_FEE};
     CFeeRate dust_relay_feerate{DUST_RELAY_TX_FEE};
     CFeeRate dust_relay_feerate_floor{DUST_RELAY_TX_FEE};
     /** Negative for a target number of blocks, positive for target kB into current mempool. */
