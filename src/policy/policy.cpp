@@ -12,6 +12,7 @@
 #include <consensus/consensus.h>
 #include <consensus/validation.h>
 #include <crypto/common.h>
+#include <crypto/hex_base.h>
 #include <kernel/mempool_options.h>
 #include <policy/feerate.h>
 #include <policy/settings.h>
@@ -30,6 +31,7 @@
 #include <cstddef>
 #include <limits>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -176,6 +178,147 @@ static bool IsCounterpartyMessage(const CScript& scriptPubKey, const std::array<
     return true;
 }
 
+/** The data pushes after an OP_RETURN, joined, and the length of the first one. */
+struct NullDataPushes {
+    std::string joined;
+    size_t first_len{0};
+};
+
+/**
+ * Pushnums carry no bytes and are skipped, as Omni Core's own reader skips them, so an OP_1 in
+ * front of a payload does not hide it. Solver only calls a script NULL_DATA when everything
+ * after the OP_RETURN is a push. One pass over the script; the payload is copied once.
+ */
+static std::optional<NullDataPushes> GetNullDataPushes(const CScript& scriptPubKey)
+{
+    opcodetype opcode;
+    std::vector<unsigned char> data;
+    NullDataPushes pushes;
+    bool seen{false};
+    CScript::const_iterator pc{scriptPubKey.begin()};
+    if (!scriptPubKey.GetOp(pc, opcode) || opcode != OP_RETURN) return std::nullopt;
+    while (pc < scriptPubKey.end()) {
+        if (!scriptPubKey.GetOp(pc, opcode, data)) return std::nullopt;
+        if (opcode > OP_PUSHDATA4) continue;
+        if (!seen) pushes.first_len = data.size();
+        seen = true;
+        pushes.joined.append(data.begin(), data.end());
+    }
+    return pushes;
+}
+
+static bool IsJsonSpace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
+
+/**
+ * Read the JSON string that starts at s[i], a '"', and leave i after its closing quote. Escapes
+ * below U+0080 are decoded, so "p" reads as "p"; anything above becomes '\x80', which no key
+ * we look for contains. Other bytes are taken as they are, whether or not they are valid UTF-8.
+ */
+static std::optional<std::string> ReadJsonString(std::string_view s, size_t& i)
+{
+    std::string out;
+    for (++i; i < s.size();) {
+        const char c{s[i++]};
+        if (c == '"') return out;
+        if (c != '\\') {
+            out += c;
+            continue;
+        }
+        if (i >= s.size()) return std::nullopt;
+        const char e{s[i++]};
+        switch (e) {
+        case '"': case '\\': case '/': out += e; break;
+        case 'b': out += '\b'; break;
+        case 'f': out += '\f'; break;
+        case 'n': out += '\n'; break;
+        case 'r': out += '\r'; break;
+        case 't': out += '\t'; break;
+        case 'u': {
+            if (s.size() - i < 4) return std::nullopt;
+            unsigned int cp{0};
+            for (int k{0}; k < 4; ++k) {
+                const int d{HexDigit(s[i++])};
+                if (d < 0) return std::nullopt;
+                cp = cp * 16 + d;
+            }
+            out += cp < 0x80 ? char(cp) : '\x80';
+            break;
+        }
+        default: return std::nullopt;
+        }
+    }
+    return std::nullopt;
+}
+
+/** Skip the JSON value that starts at s[i]; false if it is cut off or empty. */
+static bool SkipJsonValue(std::string_view s, size_t& i)
+{
+    if (s[i] == '"') return ReadJsonString(s, i).has_value();
+    if (s[i] == '{' || s[i] == '[') {
+        int depth{0};
+        while (i < s.size()) {
+            const char c{s[i]};
+            if (c == '"') {
+                if (!ReadJsonString(s, i)) return false;
+                continue;
+            }
+            ++i;
+            if (c == '{' || c == '[') ++depth;
+            if ((c == '}' || c == ']') && --depth == 0) return true;
+        }
+        return false;
+    }
+    const size_t start{i};
+    while (i < s.size() && s[i] != ',' && s[i] != '}' && !IsJsonSpace(s[i])) ++i;
+    return i > start;
+}
+
+/**
+ * BRC-20 and the protocols copied from it, ico-20 and crc-20 among them, write each operation as
+ * a JSON object whose "p" member names the protocol: {"p":"ico-20","op":"mint","tick":"LEAF"}.
+ * This matches an object with a top-level "p" member whose value is a string. It also matches
+ * with a UTF-8 byte order mark in front, duplicate keys (any "p" with a string value counts),
+ * escaped key characters, bytes that are not valid UTF-8, or anything after the "p" member,
+ * some of which a strict parser rejects. Data that only begins with '{' does not match. Linear
+ * in the payload, which IsStandard has already capped at -datacarriersize.
+ */
+static bool IsJsonTokenMessage(std::string_view s)
+{
+    size_t i{s.starts_with("\xEF\xBB\xBF") ? 3u : 0u};
+    const auto skip_space = [&] { while (i < s.size() && IsJsonSpace(s[i])) ++i; };
+    skip_space();
+    if (i >= s.size() || s[i] != '{') return false;
+    ++i;
+    while (true) {
+        skip_space();
+        if (i >= s.size() || s[i] != '"') return false;
+        const auto key{ReadJsonString(s, i)};
+        if (!key) return false;
+        skip_space();
+        if (i >= s.size() || s[i] != ':') return false;
+        ++i;
+        skip_space();
+        if (i >= s.size()) return false;
+        if (*key == "p" && s[i] == '"') return ReadJsonString(s, i).has_value();
+        if (!SkipJsonValue(s, i)) return false;
+        skip_space();
+        if (i >= s.size() || s[i] != ',') return false;
+        ++i;
+    }
+}
+
+/**
+ * Omni Layer messages in an OP_RETURN (its class C encoding). Omni Core takes the output when the
+ * first data push begins with "omni", then joins the pushes and reads a big-endian 16-bit version
+ * (0 or 1 so far) and a 16-bit type after the marker. Requiring the version's zero high byte
+ * keeps text that starts with "omni" out.
+ */
+static bool IsOmniMessage(const NullDataPushes& pushes)
+{
+    // The marker is in the first push when that push holds at least its four bytes
+    return pushes.first_len >= 4 && pushes.joined.starts_with("omni") && pushes.joined.size() >= 8 && pushes.joined[4] == '\0';
+}
+
 static inline bool MaybeReject_(std::string& out_reason, const std::string& reason, const std::string& reason_prefix, const ignore_rejects_type& ignore_rejects) {
     if (ignore_rejects.count(reason_prefix + reason)) {
         return false;
@@ -235,6 +378,7 @@ bool IsStandardTx(const CTransaction& tx, const kernel::MemPoolOptions& opts, st
     unsigned int n_monetary{0};
     TxoutType whichType;
     std::optional<std::array<unsigned char, CNTRPRTY.size()>> cntrprty_keystream;
+    std::vector<size_t> null_data_outs;
     for (size_t i{tx.vout.size()}; i; ) {
         const CTxOut& txout = tx.vout[--i];
 
@@ -277,6 +421,7 @@ bool IsStandardTx(const CTransaction& tx, const kernel::MemPoolOptions& opts, st
                         MaybeReject("tokens-counterparty");
                     }
                 }
+                null_data_outs.push_back(i);
             }
             nDataOut++;
             continue;
@@ -300,6 +445,30 @@ bool IsStandardTx(const CTransaction& tx, const kernel::MemPoolOptions& opts, st
     // only one OP_RETURN txout is permitted
     if (nDataOut > 1) {
         MaybeReject("multi-op-return");
+    }
+
+    // Token messages are looked for only after the check above, so a peer can make this read one
+    // OP_RETURN script per transaction, not every output of a transaction refused anyway; only an
+    // RPC caller can ignore multi-op-return, and then every OP_RETURN output is read. The bound per
+    // script: IsStandard above has refused any OP_RETURN script over -datacarriersize (at most
+    // MAX_OUTPUT_DATA_SIZE bytes), GetNullDataPushes walks it once and copies its pushes once, and
+    // each reader walks that copy left to right once, decoding keys into strings no longer than
+    // the copy. Nothing recurses, and beyond the index list (one entry per OP_RETURN output, filled
+    // only with -rejecttokens on) nothing is allocated that does not come from the script. The JSON
+    // scanner reads the pushes joined only: the first push is a prefix of them and the scanner
+    // returns true before it needs a byte past the "p" value, so a match on the first push alone
+    // is a match on the joined pushes.
+    if (opts.reject_tokens) {
+        for (const size_t i : null_data_outs) {
+            if (const auto pushes{GetNullDataPushes(tx.vout[i].scriptPubKey)}) {
+                if (IsJsonTokenMessage(pushes->joined)) {
+                    MaybeReject("tokens-json");
+                }
+                if (IsOmniMessage(*pushes)) {
+                    MaybeReject("tokens-omni");
+                }
+            }
+        }
     }
 
     if (!n_monetary) {
