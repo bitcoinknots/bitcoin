@@ -12,6 +12,7 @@ Knots even while it's waiting on Core.
 <!--
 Please provide clear motivation for your patch and explain how it improves
 Bitcoin Knots user experience or Bitcoin Knots developer experience
+Bitcoin Knots user experience or Bitcoin Knots developer experience
 significantly:
 
 * Any test improvements or new tests that improve coverage are always welcome.

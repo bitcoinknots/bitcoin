@@ -1,41 +1,41 @@
-Bitcoin Knots
-=============
+Bitcoin Knots integration/staging tree
+=====================================
 
-https://bitcoinknots.org
+https://bitcoinknots.org/
 
 For an immediately usable, binary version of the Bitcoin Knots software, see
-the website.
+https://bitcoinknots.org/#download.
 
 What is Bitcoin Knots?
-----------------------
+---------------------
 
+Bitcoin Knots connects to the Bitcoin peer-to-peer network to download and fully
 Bitcoin Knots connects to the Bitcoin peer-to-peer network to download and fully
 validate blocks and transactions. It also includes a wallet and graphical user
 interface, which can be optionally built.
 
+Further information about Bitcoin Knots is available in the [doc folder](/doc).
 Further information about Bitcoin Knots is available in the [doc folder](/doc).
 
 License
 -------
 
 Bitcoin Knots is released under the terms of the MIT license. See [COPYING](COPYING) for more
+Bitcoin Knots is released under the terms of the MIT license. See [COPYING](COPYING) for more
 information or see https://opensource.org/licenses/MIT.
 
 Development Process
 -------------------
 
-Development generally takes place as part of [Bitcoin Core](https://github.com/bitcoin/bitcoin), and is merged into
-Knots for each release.
+The `29.x-knots` branch is regularly built (see `doc/build-*.md` for instructions) and tested, but it is not guaranteed to be
+completely stable. [Tags](https://github.com/bitcoinknots/bitcoin/tags) are created
+regularly from release branches to indicate new official, stable release versions of Bitcoin Knots.
 
-Even if your pull request to Core is closed, or if your feature is not
-suitable for Core (eg, because it builds on a feature not supported in Core;
-relies on centralised services; etc), it may still be eligible for inclusion
-in Bitcoin Knots. In this case, a pull request may be opened on the
-[Knots GitHub](https://github.com/bitcoinknots/bitcoin) for review and consideration.
-When accepted, you are expected to maintain the submitted branch in your own
-repository, and it will be automatically merged into new releases of Knots.
+At the moment we do not have a repository that is used exclusively for the
+development of the GUI.
 
-Developer IRC can be found on Freenode at #bitcoin-dev.
+The contribution workflow is described in [CONTRIBUTING.md](CONTRIBUTING.md)
+and useful hints for developers can be found in [doc/developer-notes.md](doc/developer-notes.md).
 
 Testing
 -------

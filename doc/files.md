@@ -1,4 +1,4 @@
-# Bitcoin Core file system
+# Bitcoin Knots file system
 
 **Contents**
 
@@ -20,7 +20,7 @@
 
 ## Data directory location
 
-The data directory is the default location where the Bitcoin Core files are stored.
+The data directory is the default location where The Bitcoin Knots files are stored.
 
 1. The default data directory paths for supported platforms are:
 
@@ -113,7 +113,7 @@ You can change this with the `-guisettingsdir=<path>` option. It will use the cr
 
 ## Legacy subdirectories and files
 
-These subdirectories and files are no longer used by Bitcoin Core:
+These subdirectories and files are no longer used by Bitcoin Knots:
 
 Path           | Description | Repository notes
 ---------------|-------------|-----------------

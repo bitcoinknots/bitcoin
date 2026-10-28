@@ -1,8 +1,8 @@
-# Fuzzing Bitcoin Core using libFuzzer
+# Fuzzing Bitcoin Knots using libFuzzer
 
 ## Quickstart guide
 
-To quickly get started fuzzing Bitcoin Core using [libFuzzer](https://llvm.org/docs/LibFuzzer.html):
+To quickly get started fuzzing Bitcoin Knots using [libFuzzer](https://llvm.org/docs/LibFuzzer.html):
 
 ```sh
 $ git clone https://github.com/bitcoin/bitcoin
@@ -21,9 +21,9 @@ See [further](#run-without-sanitizers-for-increased-throughput) for more informa
 There is also a runner script to execute all fuzz targets. Refer to
 `./build_fuzz/test/fuzz/test_runner.py --help` for more details.
 
-## Overview of Bitcoin Core fuzzing
+## Overview of Bitcoin Knots fuzzing
 
-[Google](https://github.com/google/fuzzing/) has a good overview of fuzzing in general, with contributions from key architects of some of the most-used fuzzers. [This paper](https://agroce.github.io/bitcoin_report.pdf) includes an external overview of the status of Bitcoin Core fuzzing, as of summer 2021.  [John Regehr](https://blog.regehr.org/archives/1687) provides good advice on writing code that assists fuzzers in finding bugs, which is useful for developers to keep in mind.
+[Google](https://github.com/google/fuzzing/) has a good overview of fuzzing in general, with contributions from key architects of some of the most-used fuzzers. [This paper](https://agroce.github.io/bitcoin_report.pdf) includes an external overview of the status of Bitcoin Knots fuzzing, as of summer 2021.  [John Regehr](https://blog.regehr.org/archives/1687) provides good advice on writing code that assists fuzzers in finding bugs, which is useful for developers to keep in mind.
 
 ## Fuzzing harnesses and output
 
@@ -106,8 +106,8 @@ INFO: seed corpus: files: 991 min: 1b max: 1858b total: 288291b rss: 150Mb
 MSan [requires](https://clang.llvm.org/docs/MemorySanitizer.html#handling-external-code)
 that all linked code be instrumented. The exact steps to achieve this may vary
 but involve compiling `clang` from source, using the built `clang` to compile
-an instrumentalized libc++, then using it to build [Bitcoin Core dependencies
-from source](../depends/README.md) and finally the Bitcoin Core fuzz binary
+an instrumentalized libc++, then using it to build [Bitcoin Knots dependencies
+from source](../depends/README.md) and finally The Bitcoin Knots fuzz binary
 itself. One can use the MSan CI job as an example for how to perform these
 steps.
 
@@ -141,7 +141,7 @@ Patience is useful; even with improved throughput, libFuzzer may need days and
 
 If you find coverage increasing inputs when fuzzing you are highly encouraged to submit them for inclusion in the [`bitcoin-core/qa-assets`](https://github.com/bitcoin-core/qa-assets) repo.
 
-Every single pull request submitted against the Bitcoin Core repo is automatically tested against all inputs in the [`bitcoin-core/qa-assets`](https://github.com/bitcoin-core/qa-assets) repo. Contributing new coverage increasing inputs is an easy way to help make Bitcoin Core more robust.
+Every single pull request submitted against The Bitcoin Knots repo is automatically tested against all inputs in the [`bitcoin-core/qa-assets`](https://github.com/bitcoin-core/qa-assets) repo. Contributing new coverage increasing inputs is an easy way to help make Bitcoin Knots more robust.
 
 ## macOS hints for libFuzzer
 
@@ -167,11 +167,11 @@ $ cmake --preset=libfuzzer \
 
 Read the [libFuzzer documentation](https://llvm.org/docs/LibFuzzer.html) for more information. This [libFuzzer tutorial](https://github.com/google/fuzzing/blob/master/tutorial/libFuzzerTutorial.md) might also be of interest.
 
-# Fuzzing Bitcoin Core using afl++
+# Fuzzing Bitcoin Knots using afl++
 
 ## Quickstart guide
 
-To quickly get started fuzzing Bitcoin Core using [afl++](https://github.com/AFLplusplus/AFLplusplus):
+To quickly get started fuzzing Bitcoin Knots using [afl++](https://github.com/AFLplusplus/AFLplusplus):
 
 ```sh
 $ git clone https://github.com/bitcoin/bitcoin
@@ -196,11 +196,11 @@ $ FUZZ=bech32 ./AFLplusplus/afl-fuzz -i inputs/ -o outputs/ -- build_fuzz/bin/fu
 
 Read the [afl++ documentation](https://github.com/AFLplusplus/AFLplusplus) for more information.
 
-# Fuzzing Bitcoin Core using Honggfuzz
+# Fuzzing Bitcoin Knots using Honggfuzz
 
 ## Quickstart guide
 
-To quickly get started fuzzing Bitcoin Core using [Honggfuzz](https://github.com/google/honggfuzz):
+To quickly get started fuzzing Bitcoin Knots using [Honggfuzz](https://github.com/google/honggfuzz):
 
 ```sh
 $ git clone https://github.com/bitcoin/bitcoin
@@ -223,10 +223,10 @@ Read the [Honggfuzz documentation](https://github.com/google/honggfuzz/blob/mast
 
 # OSS-Fuzz
 
-Bitcoin Core participates in Google's [OSS-Fuzz](https://github.com/google/oss-fuzz/tree/master/projects/bitcoin-core)
+Bitcoin Knots participates in Google's [OSS-Fuzz](https://github.com/google/oss-fuzz/tree/master/projects/bitcoin-core)
 program, which includes a dashboard of [publicly disclosed vulnerabilities](https://issues.oss-fuzz.com/issues?q=bitcoin-core%20status:open).
 
-Bitcoin Core follows its [security disclosure policy](https://bitcoincore.org/en/security-advisories/),
+Bitcoin Knots follows its [security disclosure policy](https://bitcoincore.org/en/security-advisories/),
 which may differ from Google's standard
 [90-day disclosure window](https://google.github.io/oss-fuzz/getting-started/bug-disclosure-guidelines/)
 .

@@ -1,12 +1,12 @@
 # Dependencies
 
-These are the dependencies used by Bitcoin Core.
+These are the dependencies used by Bitcoin Knots.
 You can find installation instructions in the `build-*.md` file for your platform.
 "Runtime" and "Version Used" are both in reference to the release binaries.
 
 ## Compiler
 
-Bitcoin Core requires one of the following compilers.
+Bitcoin Knots requires one of the following compilers.
 
 | Dependency | Minimum required |
 | --- | --- |

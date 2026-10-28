@@ -1,4 +1,4 @@
-// Copyright (c) 2016 The Bitcoin Core developers
+// Copyright (c) 2016 The Bitcoin Knots developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -243,7 +243,7 @@ void MempoolStats::drawChart()
     int bottom = ui->graphicsView->size().height()-GRAPH_PADDING_BOTTOM;
     qreal maxwidth = ui->graphicsView->size().width()-GRAPH_PADDING_LEFT-GRAPH_PADDING_RIGHT;
     qreal maxheightG = ui->graphicsView->size().height()-GRAPH_PADDING_TOP-GRAPH_PADDING_TOP_LABEL-LABEL_HEIGHT;
-    float paddingTopSizeFactor = 1.2f;
+    const qreal paddingTopSizeFactor = 1.2;
     qreal step = maxwidth/(double)vSamples.size();
 
     // make sure we skip samples that would be drawn narrower then 1px

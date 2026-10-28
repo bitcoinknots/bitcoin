@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2018-2022 The Bitcoin Core developers
+# Copyright (c) 2018-2022 The Bitcoin Knots developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Backwards compatibility functional test
@@ -108,7 +108,7 @@ class BackwardsCompatibilityTest(BitcoinTestFramework):
         assert wallet.getaddressinfo(address_18075)["solvable"]
         node_v19.unloadwallet("w1_v19")
 
-        # Copy the 0.19 wallet to the last Bitcoin Core version and open it:
+        # Copy the 0.19 wallet to the last Bitcoin Knots version and open it:
         shutil.copytree(
             os.path.join(node_v19.wallets_path, "w1_v19"),
             os.path.join(node_master.wallets_path, "w1_v19")

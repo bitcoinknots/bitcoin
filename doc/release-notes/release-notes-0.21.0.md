@@ -1,7 +1,7 @@
 0.21.0 Release Notes
 ====================
 
-Bitcoin Core version 0.21.0 is now available from:
+Bitcoin Knots version 0.21.0 is now available from:
 
   <https://bitcoincore.org/bin/bitcoin-core-0.21.0/>
 
@@ -24,21 +24,21 @@ shut down (which might take a few minutes in some cases), then run the
 installer (on Windows) or just copy over `/Applications/Bitcoin-Qt` (on Mac)
 or `bitcoind`/`bitcoin-qt` (on Linux).
 
-Upgrading directly from a version of Bitcoin Core that has reached its EOL is
+Upgrading directly from a version of Bitcoin Knots that has reached its EOL is
 possible, but it might take some time if the data directory needs to be migrated. Old
-wallet versions of Bitcoin Core are generally supported.
+wallet versions of Bitcoin Knots are generally supported.
 
 Compatibility
 ==============
 
-Bitcoin Core is supported and extensively tested on operating systems
+Bitcoin Knots is supported and extensively tested on operating systems
 using the Linux kernel, macOS 10.12+, and Windows 7 and newer.  Bitcoin
 Core should also work on most other Unix-like systems but is not as
-frequently tested on them.  It is not recommended to use Bitcoin Core on
+frequently tested on them.  It is not recommended to use Bitcoin Knots on
 unsupported systems.
 
-From Bitcoin Core 0.20.0 onwards, macOS versions earlier than 10.12 are no
-longer supported. Additionally, Bitcoin Core does not yet change appearance
+From Bitcoin Knots 0.20.0 onwards, macOS versions earlier than 10.12 are no
+longer supported. Additionally, Bitcoin Knots does not yet change appearance
 when macOS "dark mode" is activated.
 
 The node's known peers are persisted to disk in a file called `peers.dat`. The
@@ -74,7 +74,7 @@ P2P and network changes
 - This release adds support for Tor version 3 hidden services, and rumoring them
   over the network to other peers using
   [BIP155](https://github.com/bitcoin/bips/blob/master/bip-0155.mediawiki).
-  Version 2 hidden services are still fully supported by Bitcoin Core, but the
+  Version 2 hidden services are still fully supported by Bitcoin Knots, but the
   Tor network will start
   [deprecating](https://blog.torproject.org/v2-deprecation-timeline) them in the
   coming months. (#19954)
@@ -83,7 +83,7 @@ P2P and network changes
   `-listenonion` configuration parameter will now be created as a Tor v3 service
   instead of Tor v2. The private key that was used for Tor v2 (if any) will be
   left untouched in the `onion_private_key` file in the data directory (see
-  `-datadir`) and can be removed if not needed. Bitcoin Core will no longer
+  `-datadir`) and can be removed if not needed. Bitcoin Knots will no longer
   attempt to read it. The private key for the Tor v3 service will be saved in a
   file named `onion_v3_private_key`. To use the deprecated Tor v2 service (not
   recommended), the `onion_private_key` can be copied over
@@ -253,7 +253,7 @@ New settings
 ------------
 
 - The `startupnotify` option is used to specify a command to
-  execute when Bitcoin Core has finished with its startup
+  execute when Bitcoin Knots has finished with its startup
   sequence. (#15367)
 
 Wallet
@@ -325,11 +325,11 @@ Wallet
 
 ### Automatic wallet creation removed
 
-Bitcoin Core will no longer automatically create new wallets on startup. It will
+Bitcoin Knots will no longer automatically create new wallets on startup. It will
 load existing wallets specified by `-wallet` options on the command line or in
 `bitcoin.conf` or `settings.json` files. And by default it will also load a
 top-level unnamed ("") wallet. However, if specified wallets don't exist,
-Bitcoin Core will now just log warnings instead of creating new wallets with
+Bitcoin Knots will now just log warnings instead of creating new wallets with
 new keys and addresses like previous releases did.
 
 New wallets can be created through the GUI (which has a more prominent create
@@ -351,9 +351,9 @@ of "mine" for scripts which is simpler and more intuitive than that used by Lega
 Descriptor Wallets also uses different semantics for watch-only things and imports.
 
 As Descriptor Wallets are a new type of wallet, their introduction does not affect existing wallets.
-Users who already have a Bitcoin Core wallet can continue to use it as they did before without
+Users who already have a Bitcoin Knots wallet can continue to use it as they did before without
 any change in behavior. Newly created Legacy Wallets (which remains the default type of wallet) will
-behave as they did in previous versions of Bitcoin Core.
+behave as they did in previous versions of Bitcoin Knots.
 
 The differences between Descriptor Wallets and Legacy Wallets are largely limited to non user facing
 things. They are intended to behave similarly except for the import/export and watchonly functionality
@@ -448,7 +448,7 @@ descriptors with private keys for now as explained earlier.
 
 #### BIP 44/49/84 Support
 
-The change to using descriptors changes the default derivation paths used by Bitcoin Core
+The change to using descriptors changes the default derivation paths used by Bitcoin Knots
 to adhere to BIP 44/49/84. Descriptors with different derivation paths can be imported without
 issue.
 
@@ -492,7 +492,7 @@ GUI changes
 -----------
 
 - Wallets created or loaded in the GUI will now be automatically loaded on
-  startup, so they don't need to be manually reloaded next time Bitcoin Core is
+  startup, so they don't need to be manually reloaded next time Bitcoin Knots is
   started. The list of wallets to load on startup is stored in
   `\<datadir\>/settings.json` and augments any command line or `bitcoin.conf`
   `-wallet=` settings that specify more wallets to load. Wallets that are
@@ -1132,7 +1132,7 @@ Tests
 - #18709 Note why we can't use `thread_local` with glibc back compat (fanquake)
 - #18410 Improve commenting for coins.cpp|h (jnewbery)
 - #18157 fixing init.md documentation to not require rpcpassword (jkcd)
-- #18739 Document how to fuzz Bitcoin Core using Honggfuzz (practicalswift)
+- #18739 Document how to fuzz Bitcoin Knots using Honggfuzz (practicalswift)
 - #18779 Better explain GNU ld's dislike of ld64's options (fanquake)
 - #18663 Mention build docs in README.md (saahilshangle)
 - #18810 Update rest info on block size and json (chrisabrams)

@@ -1,6 +1,6 @@
 # Translation Strings Policy
 
-This document provides guidelines for internationalization of the Bitcoin Core software.
+This document provides guidelines for internationalization of The Bitcoin Knots software.
 
 ## How to translate?
 
