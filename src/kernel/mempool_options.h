@@ -92,6 +92,12 @@ struct MemPoolOptions {
     bool acceptunknownwitness{DEFAULT_ACCEPTUNKNOWNWITNESS};
     RBFPolicy rbf_policy{DEFAULT_MEMPOOL_RBF_POLICY};
     TRUCPolicy truc_policy{DEFAULT_MEMPOOL_TRUC_POLICY};
+    /** Experimental next-block exception for single TRUC sibling eviction. */
+    bool truc_sibling_nextblock{false};
+    /** Separate research opt-in for conflicts spending the same P2A anchor. */
+    bool truc_shared_anchor_nextblock{false};
+    /** Fail closed if local mining settings differ from the projection profile. */
+    bool truc_nextblock_miner_compatible{false};
     bool permitephemeral_anchor{DEFAULT_PERMITEPHEMERAL_ANCHOR};
     bool permitephemeral_send{DEFAULT_PERMITEPHEMERAL_SEND};
     bool permitephemeral_dust{DEFAULT_PERMITEPHEMERAL_DUST};

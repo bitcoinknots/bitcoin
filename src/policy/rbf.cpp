@@ -5,9 +5,12 @@
 #include <policy/rbf.h>
 
 #include <consensus/amount.h>
+#include <consensus/consensus.h>
 #include <kernel/mempool_entry.h>
+#include <logging.h>
 #include <policy/feerate.h>
 #include <policy/policy.h>
+#include <policy/truc_policy.h>
 #include <primitives/transaction.h>
 #include <sync.h>
 #include <tinyformat.h>
@@ -18,6 +21,8 @@
 #include <util/rbf.h>
 
 #include <limits>
+#include <map>
+#include <set>
 #include <vector>
 
 #include <compare>
@@ -204,4 +209,181 @@ std::optional<std::pair<DiagramCheckError, std::string>> ImprovesFeerateDiagram(
         return std::make_pair(DiagramCheckError::FAILURE, "insufficient feerate: does not improve feerate diagram");
     }
     return std::nullopt;
+}
+
+bool IsTrucSharedAnchorConflict(const CTransaction& replacement, const CTransaction& previous,
+                               const CTransaction& parent)
+{
+    if (replacement.version != TRUC_VERSION || previous.version != TRUC_VERSION || parent.version != TRUC_VERSION) return false;
+    std::set<COutPoint> old_inputs;
+    size_t old_parent_inputs{0}, new_parent_inputs{0}, shared{0};
+    for (const auto& input : previous.vin) {
+        old_inputs.insert(input.prevout);
+        old_parent_inputs += input.prevout.hash == parent.GetHash();
+    }
+    for (const auto& input : replacement.vin) {
+        new_parent_inputs += input.prevout.hash == parent.GetHash();
+        if (!old_inputs.count(input.prevout)) continue;
+        if (input.prevout.hash != parent.GetHash() || input.prevout.n >= parent.vout.size() ||
+            !parent.vout[input.prevout.n].scriptPubKey.IsPayToAnchor()) return false;
+        ++shared;
+    }
+    return shared == 1 && old_parent_inputs == 1 && new_parent_inputs == 1;
+}
+
+bool TrucSiblingNextBlock(const CTxMemPool& pool, const CTxMemPoolEntry& replacement,
+                          const CTxMemPoolEntry& sibling, const CTxMemPoolEntry& parent,
+                          int64_t block_weight_limit)
+{
+    AssertLockHeld(pool.cs);
+    // Fail closed. These are prototype resource bounds, not new transaction limits.
+    constexpr size_t MAX_ENTRIES{10000};
+    constexpr size_t MAX_WORK{2000000};
+    if (pool.size() > MAX_ENTRIES || block_weight_limit <= DEFAULT_BLOCK_RESERVED_WEIGHT) return false;
+    if (replacement.GetTx().version != TRUC_VERSION || sibling.GetTx().version != TRUC_VERSION ||
+        parent.GetTx().version != TRUC_VERSION || parent.GetCountWithAncestors() != 1 ||
+        parent.GetCountWithDescendants() != 2 || sibling.GetCountWithAncestors() != 2 ||
+        sibling.GetCountWithDescendants() != 1 || sibling.GetMemPoolParentsConst().size() != 1 ||
+        &sibling.GetMemPoolParentsConst().begin()->get() != &parent ||
+        replacement.GetTxSize() > TRUC_CHILD_MAX_VSIZE || sibling.GetTxSize() > TRUC_CHILD_MAX_VSIZE ||
+        parent.GetTxSize() > TRUC_MAX_VSIZE) return false;
+
+    // No operator fee deltas may manufacture eligibility. Other entries are also
+    // evaluated at actual fees, rather than local prioritisetransaction deltas.
+    for (const auto* entry : {&replacement, &sibling, &parent}) {
+        if (entry->GetFee() != entry->GetModifiedFee() || !MoneyRange(entry->GetFee())) return false;
+    }
+    // A deliberately narrow first experiment: strictly shrinking children only.
+    if (replacement.GetTxSize() >= sibling.GetTxSize()) return false;
+    // Keep an independent fee floor. This is NOT proof that aggregate relay is paid for.
+    const auto relay_floor = pool.m_opts.min_relay_feerate.GetFee(replacement.GetTxSize()) +
+                             pool.m_opts.incremental_relay_feerate.GetFee(replacement.GetTxSize());
+    if (replacement.GetFee() < relay_floor) return false;
+    // At least 25% improvement at BOTH child and parent-package levels. FeeFrac
+    // uses wide multiplication; multiplying valid fees by four/five is safe.
+    if (FeeFrac{replacement.GetFee() * 4, replacement.GetTxSize()} <<
+        FeeFrac{sibling.GetFee() * 5, sibling.GetTxSize()}) return false;
+    if (FeeFrac{(replacement.GetFee() + parent.GetFee()) * 4, replacement.GetTxSize() + parent.GetTxSize()} <<
+        FeeFrac{(sibling.GetFee() + parent.GetFee()) * 5, sibling.GetTxSize() + parent.GetTxSize()}) return false;
+
+    std::vector<TrucProjectionEntry> entries;
+    std::map<Txid, size_t> positions;
+    for (const auto& entry : pool.mapTx) {
+        // Local fee deltas on competitors can also change the miner's boundary.
+        if (entry.GetFee() != entry.GetModifiedFee()) return false;
+        positions.emplace(entry.GetTx().GetHash(), entries.size());
+        entries.push_back({{entry.GetFee(), entry.GetTxSize()}, entry.GetTxWeight() + entry.GetExtraWeight(),
+            entry.GetSigOpCost(), entry.GetTx().GetHash(), {}});
+    }
+    for (const auto& entry : pool.mapTx) {
+        auto& parents = entries[positions.at(entry.GetTx().GetHash())].parents;
+        for (const auto& ancestor : entry.GetMemPoolParentsConst()) {
+            parents.push_back(positions.at(ancestor.get().GetTx().GetHash()));
+        }
+    }
+    const size_t parent_pos = positions.at(parent.GetTx().GetHash());
+    const size_t sibling_pos = positions.at(sibling.GetTx().GetHash());
+    const size_t replacement_pos = entries.size();
+    entries.push_back({{replacement.GetFee(), replacement.GetTxSize()}, replacement.GetTxWeight() + replacement.GetExtraWeight(),
+        replacement.GetSigOpCost(), replacement.GetTx().GetHash(), {parent_pos}});
+    size_t work{0};
+    const auto project = [&](bool replacing) {
+        return ProjectTrucBlock(entries, replacing ? sibling_pos : replacement_pos,
+            block_weight_limit - DEFAULT_BLOCK_RESERVED_WEIGHT - 1, MAX_BLOCK_SIGOPS_COST - 401,
+            pool.m_opts.min_relay_feerate, work, MAX_WORK);
+    };
+    const auto before = project(false);
+    // Stronger than checking the old child's standalone feerate: neither old
+    // package member may already be selected. In particular, a high-fee parent
+    // must not be hidden by averaging it with a low-fee child.
+    if (!before || before->count(sibling_pos) || before->count(parent_pos)) return false;
+    const auto after = project(true);
+    return after && after->count(replacement_pos) && after->count(parent_pos);
+}
+
+std::optional<std::set<size_t>> ProjectTrucBlock(const std::vector<TrucProjectionEntry>& entries,
+    size_t excluded, int64_t weight_left, int64_t sigops_left, const CFeeRate& minimum,
+    size_t& work, size_t max_work)
+{
+    if (entries.size() > 10001 || weight_left < 0 || sigops_left < 0) return std::nullopt;
+    const auto charge = [&]() {
+        if (work < max_work) { ++work; return true; }
+        LogDebug(BCLog::MEMPOOL, "TRUC sibling next-block projection work budget exhausted\n");
+        return false;
+    };
+    struct Package {
+        std::set<size_t> members;
+        FeeFrac rate{0, 0};
+        int64_t weight{0}, sigops{0};
+    };
+    std::vector<Package> packages(entries.size());
+    std::vector<std::vector<size_t>> dependents(entries.size());
+    const auto better = [&](size_t a, size_t b) {
+        const auto comparison = FeeRateCompare(packages[a].rate, packages[b].rate);
+        if (comparison != 0) return comparison > 0;
+        if (entries[a].id != entries[b].id) return entries[a].id < entries[b].id;
+        return a < b;
+    };
+    std::set<size_t, decltype(better)> ready(better);
+    // Construct each ancestor closure once. Reverse membership lets selection
+    // update only affected descendants; unrelated packages never need rescoring.
+    for (size_t i = 0; i < entries.size(); ++i) {
+        if (!charge()) return std::nullopt;
+        if (i == excluded) continue;
+        auto& package = packages[i];
+        std::vector<size_t> pending{i};
+        bool valid{true};
+        while (!pending.empty()) {
+            if (!charge()) return std::nullopt;
+            const size_t j = pending.back();
+            pending.pop_back();
+            if (j >= entries.size()) return std::nullopt;
+            if (j == excluded) { valid = false; break; }
+            if (!package.members.insert(j).second) continue;
+            const auto& entry = entries[j];
+            if (!MoneyRange(entry.rate.fee) || entry.rate.size <= 0 || entry.weight <= 0 || entry.sigops < 0) return std::nullopt;
+            if (entry.rate.fee > MAX_MONEY - package.rate.fee ||
+                entry.rate.size > std::numeric_limits<int32_t>::max() - package.rate.size ||
+                entry.weight > std::numeric_limits<int64_t>::max() - package.weight ||
+                entry.sigops > std::numeric_limits<int64_t>::max() - package.sigops) return std::nullopt;
+            package.rate += entry.rate;
+            package.weight += entry.weight;
+            package.sigops += entry.sigops;
+            pending.insert(pending.end(), entry.parents.begin(), entry.parents.end());
+        }
+        if (!valid) { package.members.clear(); continue; }
+        for (size_t j : package.members) dependents[j].push_back(i);
+        ready.insert(i);
+    }
+    std::set<size_t> selected;
+    while (!ready.empty()) {
+        if (!charge()) return std::nullopt;
+        const size_t best = *ready.begin();
+        ready.erase(ready.begin());
+        const auto& package = packages[best];
+        if (package.weight > weight_left || package.sigops > sigops_left ||
+            package.rate.fee < minimum.GetFee(package.rate.size)) continue;
+        const auto added = package.members;
+        selected.insert(added.begin(), added.end());
+        weight_left -= package.weight;
+        sigops_left -= package.sigops;
+        for (size_t j : added) ready.erase(j);
+        for (size_t j : added) {
+            for (size_t dependent : dependents[j]) {
+                if (!charge()) return std::nullopt;
+                if (selected.count(dependent)) continue;
+                // Erase before changing comparator keys. A previously skipped
+                // package may become viable after an ancestor is selected.
+                ready.erase(dependent);
+                auto& updated = packages[dependent];
+                if (updated.members.erase(j)) {
+                    updated.rate -= entries[j].rate;
+                    updated.weight -= entries[j].weight;
+                    updated.sigops -= entries[j].sigops;
+                }
+                ready.insert(dependent);
+            }
+        }
+    }
+    return selected;
 }
