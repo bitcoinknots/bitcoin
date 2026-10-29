@@ -1,5 +1,6 @@
 // Copyright 2014 BitPay Inc.
-// Copyright (c) 2015-present The Bitcoin Core developers
+// Copyright (c) 2015-2025 The Bitcoin Core developers
+// Copyright (c) 2026-present The Bitcoin Knots developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://opensource.org/licenses/mit-license.php.
 
@@ -72,6 +73,69 @@ static std::string rtrim(std::string s)
     return s;
 }
 
+/**
+ * @brief Canonicalizes JSON string representations for direct byte-level comparisons.
+ *
+ * Normalizes Unicode escape sequences (`\uXXXX`) within a raw JSON string to establish
+ * a consistent canonical form for test assertions. This accounts for variations permitted
+ * by the RFC 8259 / ECMA-404 JSON standards:
+ *  - **Case Insensitivity (RFC 8259 section 7 / ECMA-404 section 9):** Hexadecimal digits
+ *    in `\uXXXX` escapes are case-insensitive on input. All valid `\uXXXX` hex digits are
+ *    normalized to lowercase.
+ *
+ * Malformed or truncated escape sequences (e.g., `\u12` or non-hex characters) are left
+ * untouched to guarantee memory safety.
+ *
+ * @param s The input JSON string to be normalized.
+ * @return std::string A canonicalized copy of the string ready for comparison.
+ */
+
+static std::string canonicalize_json_string(const std::string& s) {
+    std::string result;
+    result.reserve(s.length());
+
+    const size_t len = s.length();
+
+    for (size_t i = 0; i < len; ++i) {
+        // Handle literal backslash pair (\\).
+        // Skip over the second backslash so it isn't misread as the start of a \u sequence.
+        if (s[i] == '\\' && i + 1 < len && s[i + 1] == '\\') {
+            result.push_back(s[i]);
+            result.push_back(s[i + 1]);
+            i += 1; // Advance past the second backslash
+            continue;
+        }
+
+        // Check if we have a \uXXXX sequence with 4 hex digits
+        if (s[i] == '\\' && i + 5 < len && s[i + 1] == 'u') {
+            bool valid_hex = true;
+            for (size_t j = i + 2; j < i + 6; ++j) {
+                const unsigned char h = static_cast<unsigned char>(s[j]);
+                if (!((h >= '0' && h <= '9') || (h >= 'a' && h <= 'f') || (h >= 'A' && h <= 'F'))) {
+                    valid_hex = false;
+                    break;
+                }
+            }
+
+            if (valid_hex) {
+                // Standard normalization: keep \uXXXX but force digits to lowercase
+                result += "\\u";
+                for (size_t j = i + 2; j < i + 6; ++j) {
+                    const char h = s[j];
+                    result.push_back((h >= 'A' && h <= 'F') ? static_cast<char>(h - 'A' + 'a') : h);
+                }
+                i += 5;
+                continue;
+            }
+        }
+
+        // Append normal character
+        result.push_back(s[i]);
+    }
+
+    return result;
+}
+
 static void runtest(std::string filename, const std::string& jdata)
 {
     std::string prefix = filename.substr(0, 4);
@@ -91,8 +155,9 @@ static void runtest(std::string filename, const std::string& jdata)
     }
 
     if (wantRoundTrip) {
-        std::string odata = val.write(0, 0);
-        assert(odata == rtrim(jdata));
+        const std::string idata = canonicalize_json_string(rtrim(jdata));
+        const std::string odata = canonicalize_json_string(val.write(0, 0));
+        assert(idata == odata);
     }
 }
 
