@@ -327,19 +327,6 @@ void SignVerifyMessageDialog::updateThemeColors()
     // Update status labels
     updateStatusLabelColor(ui->statusLabel_SM);
     updateStatusLabelColor(ui->statusLabel_VM);
-
-    // Re-trigger validation on all input fields to update their styling
-    // including background and text color
-    // Use setText to trigger validation
-    if (ui->addressIn_SM) {
-        ui->addressIn_SM->setText(ui->addressIn_SM->text());
-    }
-    if (ui->addressIn_VM) {
-        ui->addressIn_VM->setText(ui->addressIn_VM->text());
-    }
-    if (ui->signatureIn_VM) {
-        ui->signatureIn_VM->setText(ui->signatureIn_VM->text());
-    }
 }
 
 void SignVerifyMessageDialog::updateStatusLabelColor(QLabel* label)
