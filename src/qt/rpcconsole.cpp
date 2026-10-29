@@ -46,6 +46,7 @@
 #include <QLocale>
 #include <QMenu>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QScreen>
 #include <QScrollBar>
 #include <QSettings>
@@ -527,6 +528,7 @@ RPCConsole::RPCConsole(interfaces::Node& node, const PlatformStyle *_platformSty
     m_peer_widget_header_state = settings.value("PeersTabPeerHeaderState_Knots23").toByteArray();
     m_banlist_widget_header_state = settings.value("PeersTabBanlistHeaderState").toByteArray();
     m_alternating_row_colors = settings.value("PeersTabAlternatingRowColors").toBool();
+    m_banlist_collapsed = settings.value("PeersTabBanlistCollapsed_Knots").toBool();
 
     {
         // Move everything down a row to make room
@@ -756,6 +758,7 @@ RPCConsole::~RPCConsole()
 
     settings.setValue("PeersTabPeerHeaderState_Knots23", m_peer_widget_header_state);
     settings.setValue("PeersTabBanlistHeaderState", m_banlist_widget_header_state);
+    settings.setValue("PeersTabBanlistCollapsed_Knots", m_banlist_collapsed);
 
     WriteCommandHistory();
 
@@ -766,6 +769,23 @@ RPCConsole::~RPCConsole()
 
 bool RPCConsole::eventFilter(QObject* obj, QEvent *event)
 {
+    if (obj == ui->banHeading) { // "Banned peers" heading acts as a collapse/expand toggle
+        if (event->type() == QEvent::MouseButtonRelease &&
+            static_cast<QMouseEvent*>(event)->button() == Qt::LeftButton) {
+            toggleBanlistCollapsed();
+            return true;
+        }
+        if (event->type() == QEvent::KeyPress) {
+            switch (static_cast<QKeyEvent*>(event)->key()) {
+            case Qt::Key_Space:
+            case Qt::Key_Return:
+            case Qt::Key_Enter:
+                toggleBanlistCollapsed();
+                return true;
+            }
+        }
+    }
+
     if(event->type() == QEvent::KeyPress) // Special key handling
     {
         QKeyEvent *keyevt = static_cast<QKeyEvent*>(event);
@@ -922,6 +942,10 @@ void RPCConsole::setClientModel(ClientModel *model, int bestblock_height, int64_
         connect(ui->banlistWidget, &QTableView::clicked, this, &RPCConsole::clearSelectedNode);
         // ban table signal handling - ensure ban table is shown or hidden (if empty)
         connect(model->getBanTableModel(), &BanTableModel::layoutChanged, this, &RPCConsole::showOrHideBanTableIfRequired);
+
+        // make the "Banned peers" heading a click/keyboard toggle that collapses the ban list
+        ui->banHeading->setFocusPolicy(Qt::StrongFocus);
+        ui->banHeading->installEventFilter(this);
         showOrHideBanTableIfRequired();
 
         // Provide initial values
@@ -1580,9 +1604,23 @@ void RPCConsole::showOrHideBanTableIfRequired()
     if (!clientModel)
         return;
 
-    bool visible = clientModel->getBanTableModel()->shouldShow();
-    ui->banlistWidget->setVisible(visible);
-    ui->banHeading->setVisible(visible);
+    const bool has_bans = clientModel->getBanTableModel()->shouldShow();
+    ui->banHeading->setVisible(has_bans);
+    ui->banlistWidget->setVisible(has_bans && !m_banlist_collapsed);
+    updateBanHeadingText();
+}
+
+void RPCConsole::toggleBanlistCollapsed()
+{
+    m_banlist_collapsed = !m_banlist_collapsed;
+    showOrHideBanTableIfRequired();
+}
+
+void RPCConsole::updateBanHeadingText()
+{
+    // Disclosure triangle: U+25B8 collapsed, U+25BE expanded. Kept outside tr().
+    const QString indicator = m_banlist_collapsed ? QStringLiteral("▸  ") : QStringLiteral("▾  ");
+    ui->banHeading->setText(indicator + tr("Banned peers"));
 }
 
 std::vector<RPCConsole::TabTypes> RPCConsole::tabs() const

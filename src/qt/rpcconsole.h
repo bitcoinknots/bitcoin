@@ -115,8 +115,12 @@ private Q_SLOTS:
     void showPeersTableContextMenu(const QPoint& point);
     /** Show custom context menu on Bans tab */
     void showBanTableContextMenu(const QPoint& point);
-    /** Hides ban table if no bans are present */
+    /** Hides ban table if no bans are present, and honours the user's collapsed choice */
     void showOrHideBanTableIfRequired();
+    /** Toggle the collapsed/expanded state of the banned peers list */
+    void toggleBanlistCollapsed();
+    /** Refresh the "Banned peers" heading text and its disclosure indicator */
+    void updateBanHeadingText();
     /** clear the selected node */
     void clearSelectedNode();
     /** reset all fields in UI detailed information to N/A */
@@ -202,6 +206,7 @@ private:
     QByteArray m_peer_widget_header_state;
     QByteArray m_banlist_widget_header_state;
     bool m_alternating_row_colors{false};
+    bool m_banlist_collapsed{false};
 
     // Theme Colors
     const ThemeColors *m_theme_colors;

@@ -23,6 +23,7 @@
 #include <QString>
 #include <QTest>
 #include <QTextEdit>
+#include <QWidget>
 #include <QtGlobal>
 #include <QtTest/QtTestWidgets>
 #include <QtTest/QtTestGui>
@@ -49,6 +50,60 @@ void TestRpcCommand(RPCConsole* console)
     const QString output = messagesWidget->toPlainText();
     const QString pattern = QStringLiteral("\"chain\": \"(\\w+)\"");
     QCOMPARE(FindInConsole(output, pattern), QString("regtest"));
+}
+
+//! Run an RPC command through the console line edit and wait for it to be processed.
+void RunConsoleCommand(RPCConsole* console, const QString& command)
+{
+    QLineEdit* lineEdit = console->findChild<QLineEdit*>("lineEdit");
+    QTextEdit* messagesWidget = console->findChild<QTextEdit*>("messagesWidget");
+    QSignalSpy mw_spy(messagesWidget, &QTextEdit::textChanged);
+    QVERIFY(mw_spy.isValid());
+    QTest::keyClicks(lineEdit, command);
+    QTest::keyClick(lineEdit, Qt::Key_Return);
+    QVERIFY(mw_spy.wait(1000));
+}
+
+//! Check the "Banned peers" heading collapses the ban table and both hide when empty.
+//!
+//! The RPCConsole window is not shown during this test and the Peers tab is not
+//! the current tab, so isVisible() is always false here. isHidden() instead
+//! reports whether a widget was explicitly hidden via setVisible(false), which
+//! is exactly the show/hide decision under test.
+void TestBanlistCollapse(RPCConsole* console)
+{
+    QWidget* banHeading = console->findChild<QWidget*>("banHeading");
+    QWidget* banlistWidget = console->findChild<QWidget*>("banlistWidget");
+    QVERIFY(banHeading);
+    QVERIFY(banlistWidget);
+
+    // No bans: heading and table are hidden (pre-existing behaviour).
+    QTRY_VERIFY(banHeading->isHidden());
+    QTRY_VERIFY(banlistWidget->isHidden());
+
+    // Adding a ban shows the heading and the table.
+    RunConsoleCommand(console, "setban 192.0.2.1 add");
+    QTRY_VERIFY(!banHeading->isHidden());
+    QTRY_VERIFY(!banlistWidget->isHidden());
+
+    // Clicking the heading collapses the table but keeps the heading.
+    QTest::mouseClick(banHeading, Qt::LeftButton);
+    QTRY_VERIFY(!banHeading->isHidden());
+    QTRY_VERIFY(banlistWidget->isHidden());
+
+    // A further ban does not force the collapsed table back open.
+    RunConsoleCommand(console, "setban 192.0.2.2 add");
+    QTRY_VERIFY(!banHeading->isHidden());
+    QTRY_VERIFY(banlistWidget->isHidden());
+
+    // Clicking again expands it.
+    QTest::mouseClick(banHeading, Qt::LeftButton);
+    QTRY_VERIFY(!banlistWidget->isHidden());
+
+    // Clearing all bans hides the heading and the table again.
+    RunConsoleCommand(console, "clearbanned");
+    QTRY_VERIFY(banHeading->isHidden());
+    QTRY_VERIFY(banlistWidget->isHidden());
 }
 } // namespace
 
@@ -108,6 +163,7 @@ void AppTests::consoleTests(RPCConsole* console)
 {
     HandleCallback callback{"consoleTests", *this};
     TestRpcCommand(console);
+    TestBanlistCollapse(console);
 }
 
 //! Destructor to shut down after the last expected callback completes.
