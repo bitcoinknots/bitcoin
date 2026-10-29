@@ -179,7 +179,7 @@ BOOST_AUTO_TEST_CASE(v2onlyclearnet_inbound_v1)
     // Hacky way to test an onion inbound: inbound_onion alone makes
     // CNode::ConnectedThroughNetwork() report NET_ONION, so the peer can keep this
     // clearnet address and still be treated as onion.
-    const CAddress addr{ip(0xa0b0c001), NODE_NONE};
+    const CAddress addr{ip(htonl(0xa0b0c001)), NODE_NONE};
     NodeId id{0};
 
     // A v1 peer reaching us over clearnet is disconnected while its version message is processed.
@@ -258,7 +258,7 @@ BOOST_AUTO_TEST_CASE(v2onlyclearnet_inbound_v1)
     {
         CNode node{++id,
                    /*sock=*/std::make_shared<StaticContentsSock>(""),
-                   CAddress{ip(0x0100007f), NODE_NONE},
+                   CAddress{ip(htonl(INADDR_LOOPBACK)), NODE_NONE},
                    /*nKeyedNetGroupIn=*/0,
                    /*nLocalHostNonceIn=*/0,
                    CAddress{},
