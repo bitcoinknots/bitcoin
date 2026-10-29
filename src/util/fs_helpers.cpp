@@ -237,7 +237,7 @@ void AllocateFileRange(FILE* file, uint64_t offset, unsigned int length)
                 return;
             }
             memset(&buf[rlen], 0, now - rlen);
-            if (0 != fseek(file, -rlen, SEEK_CUR)) {
+            if (0 != FileSeek64(file, -static_cast<int64_t>(rlen), SEEK_CUR)) {
                 return;
             }
         }
