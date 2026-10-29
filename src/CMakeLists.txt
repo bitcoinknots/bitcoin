@@ -358,6 +358,7 @@ if(BUILD_DAEMON)
     core_interface
     bitcoin_node
     $<TARGET_NAME_IF_EXISTS:bitcoin_wallet>
+    $<TARGET_NAME_IF_EXISTS:Jemalloc::Jemalloc>
   )
   install_binary_component(bitcoind HAS_MANPAGE)
 endif()
@@ -371,6 +372,7 @@ if(WITH_MULTIPROCESS AND BUILD_DAEMON)
     bitcoin_node
     bitcoin_ipc
     $<TARGET_NAME_IF_EXISTS:bitcoin_wallet>
+    $<TARGET_NAME_IF_EXISTS:Jemalloc::Jemalloc>
   )
   install_binary_component(bitcoin-node)
 endif()
