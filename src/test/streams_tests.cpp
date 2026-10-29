@@ -223,6 +223,25 @@ BOOST_AUTO_TEST_CASE(streams_vector_writer)
     vch.clear();
 }
 
+BOOST_AUTO_TEST_CASE(autofile_seek_failure)
+{
+    FILE* raw_file{fsbridge::fopen(m_args.GetDataDirBase() / "seek_failure_tmp", "w+b")};
+    AutoFile file{raw_file};
+    BOOST_REQUIRE(!file.IsNull());
+
+    for (const int origin : {SEEK_SET, SEEK_CUR, SEEK_END}) {
+        file.seek(7, SEEK_SET);
+        BOOST_CHECK_EXCEPTION(file.seek(-1, SEEK_SET), std::ios_base::failure, HasReason{"AutoFile::seek: fseek failed"});
+        BOOST_CHECK_EXCEPTION(file.tell(), std::ios_base::failure, HasReason{"AutoFile::tell: position unknown"});
+
+        // Establish a known native position without restoring the cache.
+        BOOST_REQUIRE_EQUAL(std::fseek(raw_file, 11, SEEK_SET), 0);
+        file.seek(0, origin);
+        BOOST_CHECK_EQUAL(file.tell(), origin == SEEK_CUR ? 11 : 0);
+        BOOST_CHECK_EQUAL(file.tell(), std::ftell(raw_file));
+    }
+}
+
 BOOST_AUTO_TEST_CASE(streams_vector_reader)
 {
     std::vector<unsigned char> vch = {1, 255, 3, 4, 5, 6};
