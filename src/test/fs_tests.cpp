@@ -142,6 +142,29 @@ BOOST_AUTO_TEST_CASE(rename)
     fs::remove(path2);
 }
 
+BOOST_AUTO_TEST_CASE(allocate_file_range_stream)
+{
+    // A writer allocating ahead keeps its buffered data and its position.
+    // posix_fallocate leaves the stream alone, so this checks the Windows
+    // code and the fallback on platforms without posix_fallocate.
+    const fs::path path{m_args.GetDataDirBase() / "allocate_stream"};
+    FILE* file{fsbridge::fopen(path, "wb+")};
+    BOOST_REQUIRE(file);
+    BOOST_REQUIRE_EQUAL(std::fwrite("abc", 1, 3, file), 3U);
+    AllocateFileRange(file, 3, 100000);
+    BOOST_CHECK_EQUAL(FileTell64(file), 3);
+    BOOST_REQUIRE_EQUAL(std::fwrite("def", 1, 3, file), 3U);
+    BOOST_REQUIRE_EQUAL(std::fclose(file), 0);
+    BOOST_CHECK_EQUAL(fs::file_size(path), 100003U);
+    {
+        std::ifstream in{path, std::ios_base::binary};
+        std::string head(6, '\0');
+        BOOST_REQUIRE(in.read(head.data(), head.size()));
+        BOOST_CHECK_EQUAL(head, "abcdef");
+    }
+    fs::remove(path);
+}
+
 #ifndef WIN32
 BOOST_AUTO_TEST_CASE(allocate_file_range_fallback)
 {
@@ -157,6 +180,17 @@ BOOST_AUTO_TEST_CASE(allocate_file_range_fallback)
         BOOST_CHECK_EQUAL(std::fclose(file), 0);
         BOOST_CHECK(data == expected);
     }
+
+    // The fallback reads and writes, and must still leave a writer where it was
+    std::vector<char> data(200000, 'x');
+    FILE* file{fmemopen(data.data(), data.size(), "rb+")};
+    BOOST_REQUIRE(file);
+    BOOST_REQUIRE_EQUAL(std::fwrite("abc", 1, 3, file), 3U);
+    AllocateFileRange(file, 3, 100000);
+    BOOST_CHECK_EQUAL(FileTell64(file), 3);
+    BOOST_REQUIRE_EQUAL(std::fwrite("def", 1, 3, file), 3U);
+    BOOST_CHECK_EQUAL(std::fclose(file), 0);
+    BOOST_CHECK_EQUAL(std::string(data.data(), 7), "abcdefx");
 }
 #endif
 
