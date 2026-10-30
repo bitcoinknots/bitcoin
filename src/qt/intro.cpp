@@ -377,7 +377,9 @@ void Intro::setStatus(int status, const QString &message, quint64 bytesAvailable
 void Intro::UpdateFreeSpaceLabel()
 {
     QString freeString = tr("%n GB of space available", "", m_bytes_available / GB_BYTES);
-    if (m_bytes_available < m_required_space_gb * GB_BYTES) {
+    if (m_existing_chain) {
+        ui->freeSpace->setStyleSheet("");
+    } else if (m_bytes_available < m_required_space_gb * GB_BYTES) {
         freeString += " " + tr("(of %n GB needed)", "", m_required_space_gb);
         ui->freeSpace->setStyleSheet("QLabel { color: #800000 }");
     } else if (m_bytes_available / GB_BYTES - m_required_space_gb < 10) {
