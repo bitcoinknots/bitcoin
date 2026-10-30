@@ -596,7 +596,7 @@ public:
     int maxCoinbaseMaturity() override
     {
         const auto& params{chainman().GetConsensus()};
-        return std::max({COINBASE_MATURITY, params.CoinbaseMaturityLong, params.CoinbaseMaturityBeforeRolling()});
+        return std::max({COINBASE_MATURITY, params.CoinbaseMaturityLong, params.CoinbaseMaturityBeforeRolling(), params.CoinbaseMaturityRolling});
     }
     bool pruneLockExists(const std::string& name) const override
     {

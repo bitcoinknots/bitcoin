@@ -15,6 +15,9 @@
 #include <util/check.h>
 #include <util/moneystr.h>
 
+#include <algorithm>
+#include <limits>
+
 bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime)
 {
     if (tx.nLockTime == 0)
@@ -194,14 +197,18 @@ int Consensus::CoinbaseMaturityLongEndHeight(const Params& params, const CBlockI
 
 int Consensus::CoinbaseMaturityPolicy(const Params& params, const CBlockIndex* coin_block)
 {
+    // Policy applies the rolling depth to covered rewards as soon as it is scheduled.
+    // An unknown block conservatively gets the full rolling depth.
+    const int rolling{params.CoinbaseMaturityRollingActivationHeight == std::numeric_limits<int>::max() ? COINBASE_MATURITY
+        : coin_block ? params.CoinbaseMaturityRollingRequired(coin_block->nHeight) : params.CoinbaseMaturityRolling};
     if (params.CoinbaseMaturityLongUntilRdts && coin_block && coin_block->pprev &&
         coin_block->pprev->GetMedianTimePast() >= params.RdtsExpiryTime) {
-        return COINBASE_MATURITY;
+        return std::max(COINBASE_MATURITY, rolling);
     }
     if (coin_block && coin_block->nHeight < params.CoinbaseMaturityLongStartHeight) {
-        return params.CoinbaseMaturityBeforeRolling();
+        return std::max(params.CoinbaseMaturityBeforeRolling(), rolling);
     }
-    return params.CoinbaseMaturityLong;
+    return std::max(params.CoinbaseMaturityLong, rolling);
 }
 
 bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs,
@@ -215,8 +222,14 @@ bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, 
     }
     const int start{params.CoinbaseMaturityLongActiveAt(spend_height)
         ? params.CoinbaseMaturityLongStartHeight : std::numeric_limits<int>::max()};
+    if (!CheckTxInputs(tx, state, inputs, spend_height, txfee, rules,
+                       params.CoinbaseMaturityLong, start, long_maturity_end_height)) {
+        return false;
+    }
+    if (!params.CoinbaseMaturityRollingActiveAt(spend_height)) return true;
     return CheckTxInputs(tx, state, inputs, spend_height, txfee, rules,
-                         params.CoinbaseMaturityLong, start, long_maturity_end_height);
+                         params.CoinbaseMaturityRolling, params.CoinbaseMaturityRollingStartHeight,
+                         params.CoinbaseMaturityRollingEndHeight);
 }
 
 bool Consensus::CheckTxInputs(const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee, const CheckTxInputsRules rules,
