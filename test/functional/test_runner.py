@@ -229,6 +229,7 @@ BASE_SCRIPTS = [
     'mempool_long_coinbase_maturity.py',
     'feature_rolling_coinbase_maturity.py',
     'feature_rolling_coinbase_upgrade.py',
+    'feature_historical_coinbase_maturity.py',
     'mempool_spend_coinbase.py',
     'wallet_avoid_mixing_output_types.py --descriptors',
     'mempool_reorg.py',
