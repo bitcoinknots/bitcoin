@@ -14,6 +14,7 @@
 #include <util/hash_type.h>
 
 #include <algorithm>
+#include <map>
 #include <string>
 
 CScriptID::CScriptID(const CScript& in) : BaseHash(Hash160(in)) {}
@@ -324,25 +325,45 @@ namespace {
 using KnownValue = size_t;
 constexpr KnownValue UNKNOWN{0};
 
-/** The values FindDeadParts has seen; the stacks hold indexes, so copying a value costs nothing */
+/**
+ * The values FindDeadParts has seen; the stacks hold indexes, so copying a value costs nothing.
+ * Each distinct value is kept once, so equal values share an index and comparing them, or
+ * judging one again, costs nothing either.
+ */
 class KnownValues
 {
-    std::vector<std::vector<unsigned char>> m_values{{}};
+    const std::vector<unsigned char> m_unknown;
+    std::map<std::vector<unsigned char>, KnownValue> m_index;
+    std::vector<const std::vector<unsigned char>*> m_values{&m_unknown};
+    std::vector<bool> m_true{false};
 
 public:
+    KnownValues() = default;
+    KnownValues(const KnownValues&) = delete; // m_values points into this object
+    KnownValues& operator=(const KnownValues&) = delete;
     KnownValue Add(std::vector<unsigned char> v)
     {
-        m_values.push_back(std::move(v));
-        return m_values.size() - 1;
+        const auto [it, added]{m_index.try_emplace(std::move(v), m_values.size())};
+        if (added) {
+            m_values.push_back(&it->first);
+            m_true.push_back(DataCarrierCastToBool(it->first));
+        }
+        return it->second;
     }
     KnownValue AddNum(int64_t n) { return Add(CScriptNum{n}.getvch()); }
-    const std::vector<unsigned char>& Get(KnownValue v) const { return m_values[v]; }
+    const std::vector<unsigned char>& Get(KnownValue v) const { return *m_values[v]; }
+    bool True(KnownValue v) const { return m_true[v]; }
     /** The value as a script number, if it is known and a valid one */
     bool Num(KnownValue v, int64_t& out) const
     {
         if (v == UNKNOWN) return false;
+        // Reject what CScriptNum would throw on before constructing one, since an
+        // exception costs far more than the opcode asking for the number
+        const auto& vch{Get(v)};
+        if (vch.size() > CScriptNum::nDefaultMaxNumSize) return false;
+        if (!vch.empty() && (vch.back() & 0x7f) == 0 && (vch.size() <= 1 || (vch[vch.size() - 2] & 0x80) == 0)) return false;
         try {
-            out = CScriptNum{m_values[v], /*fRequireMinimal=*/true}.GetInt64();
+            out = CScriptNum{vch, /*fRequireMinimal=*/true}.GetInt64();
             return true;
         } catch (const scriptnum_error&) {
             return false;
@@ -407,7 +428,7 @@ DeadParts FindDeadParts(const CScript& script)
             }
             const KnownValue cond{stack.Pop()};
             if (cond != UNKNOWN) {
-                const bool runs{DataCarrierCastToBool(values.Get(cond)) == (opcode == OP_IF)};
+                const bool runs{values.True(cond) == (opcode == OP_IF)};
                 if (!runs) {
                     dead.at_if[offset] = true;
                     ++not_running;
@@ -503,7 +524,7 @@ DeadParts FindDeadParts(const CScript& script)
             const KnownValue top{stack.Peek(0)};
             if (top == UNKNOWN) {
                 stack.Forget(); // whether it duplicates is not known, so neither is the depth
-            } else if (DataCarrierCastToBool(values.Get(top))) {
+            } else if (values.True(top)) {
                 stack.Push(top);
             }
             break;
@@ -573,7 +594,7 @@ DeadParts FindDeadParts(const CScript& script)
         case OP_EQUAL: case OP_EQUALVERIFY: {
             const KnownValue b{stack.Pop()}, a{stack.Pop()};
             if (opcode == OP_EQUAL) {
-                stack.Push(a == UNKNOWN || b == UNKNOWN ? UNKNOWN : values.Add(values.Get(a) == values.Get(b) ? std::vector<unsigned char>{1} : std::vector<unsigned char>{}));
+                stack.Push(a == UNKNOWN || b == UNKNOWN ? UNKNOWN : values.Add(a == b ? std::vector<unsigned char>{1} : std::vector<unsigned char>{}));
             }
             break;
         }
