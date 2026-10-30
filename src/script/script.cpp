@@ -867,8 +867,15 @@ static size_t OddRunBytes(const size_t run_bytes, const size_t last_bytes, const
  * only a key count sits under keys, so a key count is left alone. None of the multisig spends
  * from block 961640 to 977870 has either that a hash lock, a drop or an OP_FALSE OP_IF envelope does
  * not account for, and none in a witness script has a 65 byte push.
+ *
+ * Which keys a signature can prove is first guessed from the script alone: a signature-check opcode
+ * beside a key, capped by the signatures the witness carries. That guess is cheap and early, but it
+ * trusts opcodes that may sit in code that never runs, or run and fail harmlessly. When the keys a
+ * signature really verified against are known, a key counts as proven only if it is among them, and
+ * the charge is the larger of the two, so knowing more can only ever add to it. Odd pushes are no key
+ * under either guess, so they are counted as data the same way regardless.
  */
-static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* witness)
+static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* witness, const VerifiedKeys* verified_keys)
 {
     /** Unproven pubkeys a script may carry before the rest are counted as data. Set so that ordinary
      *  multisig, including wide federations, is charged nothing at all: the budget is per
@@ -876,6 +883,9 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
     static constexpr size_t MAX_UNPROVEN_PUBKEYS{10};
 
     size_t pubkeys{0}, provable{0};
+    // The bytes of the counted pubkeys that no verified signature vouches for, and the share of those
+    // in the current push run. Without a set of verified keys every counted push is unverified.
+    size_t unverified_bytes{0}, push_run_unverified_bytes{0};
     // The current run of adjacent pubkey pushes, and the count that opened it. A well-formed
     // m-of-n closes as <m> <pubkey>*n <n> OP_CHECKMULTISIG, and only that shape credits m.
     size_t run_keys{0};
@@ -889,7 +899,8 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
     bool last_is_push{false};
     // Whether the item before this one was a key a checksig-family opcode can still claim, and
     // whether it was the 32 byte kind that is only a key because one does.
-    bool last_is_key{false}, last_is_xonly{false};
+    bool last_is_key{false}, last_is_xonly{false}, last_is_verified{false};
+    size_t last_key_size{0};
     opcodetype opcode{OP_INVALIDOPCODE}, last_opcode{OP_INVALIDOPCODE};
     std::vector<unsigned char> push_data;
     // Odd pushes counted so far, and those of the current push run, which its end decides.
@@ -932,6 +943,9 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
         const bool is_xonly{IsXOnlyPush(opcode, push_data)};
         const int count{MultisigCount(opcode, push_data)};
         const int a_count{MultiACount(opcode, push_data)};
+        // Exactly these bytes were checked against a signature that verified. No other key, and no
+        // other bytes of the same key, can borrow it.
+        const bool is_verified{verified_keys && (is_pubkey || is_xonly) && verified_keys->count(push_data)};
         bool is_key{false};
 
         if (inside_noop) {
@@ -948,6 +962,10 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
             ++run_keys;
             ++push_run_keys;
             ++pubkeys;
+            if (!is_verified) {
+                push_run_unverified_bytes += push_data.size();
+                unverified_bytes += push_data.size();
+            }
             is_key = true;
         } else if (is_xonly) {
             // Nothing tells an x-only key from a hash but the opcode that spends it, so this
@@ -958,16 +976,23 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
         } else if ((opcode == OP_DROP || opcode == OP_2DROP) && last_is_push) {
             // The caller counts the whole run as dropped data, so do not charge it again.
             pubkeys -= push_run_keys;
+            unverified_bytes -= push_run_unverified_bytes;
             run_keys = 0;
             multi_a_keys = 0;
         } else if (opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY) {
-            if (last_is_xonly) ++pubkeys;
+            if (last_is_xonly) {
+                ++pubkeys;
+                if (!last_is_verified) unverified_bytes += last_key_size;
+            }
             ++provable;
             run_keys = 0;
             // <pubkey> OP_CHECKSIG opens a tapscript k-of-n; anything else there ends one.
             multi_a_keys = (last_is_key && opcode == OP_CHECKSIG) ? 1 : 0;
         } else if (opcode == OP_CHECKSIGADD) {
-            if (last_is_xonly) ++pubkeys;
+            if (last_is_xonly) {
+                ++pubkeys;
+                if (!last_is_verified) unverified_bytes += last_key_size;
+            }
             // The run is credited the k it closes on, so a key earns nothing on its own here.
             multi_a_keys = (multi_a_keys && last_is_key) ? multi_a_keys + 1 : 0;
             run_keys = 0;
@@ -994,7 +1019,7 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
         }
 
         const bool is_push{IsRunPush(opcode)};
-        if (!is_push) push_run_keys = 0;
+        if (!is_push) push_run_keys = push_run_unverified_bytes = 0;
         // The caller counts an OP_FALSE OP_IF envelope whole, so what is inside it is left to the caller.
         if (has_multisig && !enveloped) {
             if (is_push) {
@@ -1028,6 +1053,8 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
         if (!IsStackNeutralNop(opcode)) {
             last_is_key = is_key;
             last_is_xonly = is_xonly && !inside_noop;
+            last_is_verified = is_verified;
+            last_key_size = push_data.size();
         }
         last_opcode = opcode;
         last_count = count;
@@ -1051,13 +1078,27 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
 
     if (has_multisig) odd_bytes += OddRunBytes(odd_run_bytes, odd_last_bytes, odd_last_is_digest, OP_INVALIDOPCODE);
 
-    if (pubkeys < provable + MAX_UNPROVEN_PUBKEYS) return odd_bytes;
-    // An uncompressed key carries no more payload than a compressed one, since only the x
-    // coordinate is free, so the compressed size is the unit.
-    return (pubkeys - provable - MAX_UNPROVEN_PUBKEYS) * CPubKey::COMPRESSED_SIZE + odd_bytes;
+    // The static count uses the compressed size as the unit for every key, which holds for a key a
+    // signature can check. An uncompressed key carries no more payload than a compressed one, since
+    // only the x coordinate is free, so the compressed size is the unit. Odd pushes are data in full,
+    // outside the allowance, and are added on top whichever count applies.
+    const size_t static_charge{(pubkeys < provable + MAX_UNPROVEN_PUBKEYS ? 0 : (pubkeys - provable - MAX_UNPROVEN_PUBKEYS) * CPubKey::COMPRESSED_SIZE) + odd_bytes};
+    if (!verified_keys) return static_charge;
+
+    // What was seen to verify replaces what the script merely claims. Each guess can be fooled where
+    // the other cannot, so a spend pays the larger. Odd pushes are no key under either guess, so they
+    // are charged in full on both sides and the larger is taken over the key charge alone.
+    //
+    // A push nothing verified need not be a point at all (a key slot that CHECKMULTISIG never reaches
+    // is never parsed), so it can hold as many bytes as it is long and is charged by its length. The
+    // allowance is the same MAX_UNPROVEN_PUBKEYS compressed keys, so a run of 33 byte pushes costs
+    // exactly what it did, and 65 byte or x-only pushes cost what they hold.
+    static constexpr size_t UNPROVEN_ALLOWANCE{MAX_UNPROVEN_PUBKEYS * CPubKey::COMPRESSED_SIZE};
+    const size_t verified_charge{(unverified_bytes < UNPROVEN_ALLOWANCE ? 0 : unverified_bytes - UNPROVEN_ALLOWANCE) + odd_bytes};
+    return std::max(static_charge, verified_charge);
 }
 
-std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outputs, const CScriptWitness* witness, const bool dead_branches) const
+std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outputs, const CScriptWitness* witness, const bool dead_branches, const VerifiedKeys* verified_keys) const
 {
     if (size_t olga_bytes = IsOLGA(remaining_outputs); olga_bytes) {
         return {0, olga_bytes};
@@ -1141,7 +1182,7 @@ std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outpu
             counted += it - data_began;
         }
     }
-    return {UnprovenPubkeyBytes(*this, witness), counted};
+    return {UnprovenPubkeyBytes(*this, witness, verified_keys), counted};
 }
 
 bool GetScriptOp(CScriptBase::const_iterator& pc, CScriptBase::const_iterator end, opcodetype& opcodeRet, std::vector<unsigned char>* pvchRet)
