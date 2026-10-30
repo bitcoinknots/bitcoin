@@ -757,42 +757,55 @@ void CWallet::Close()
     GetDatabase().Close();
 }
 
-void CWallet::SyncMetaData(std::pair<TxSpends::iterator, TxSpends::iterator> range)
+std::set<CWalletTx*, WalletTxOrderComparator> CWallet::GetMalleatedVariants(const CWalletTx& wtx)
 {
-    // We want all the wallet transactions in range to have the same metadata as
-    // the oldest (smallest nOrderPos).
-    // So: find smallest nOrderPos:
+    AssertLockHeld(cs_wallet);
+    std::set<CWalletTx*, WalletTxOrderComparator> txs;
 
-    int nMinOrderPos = std::numeric_limits<int>::max();
-    const CWalletTx* copyFrom = nullptr;
-    for (TxSpends::iterator it = range.first; it != range.second; ++it) {
-        const CWalletTx* wtx = &mapWallet.at(it->second);
-        if (wtx->nOrderPos < nMinOrderPos) {
-            nMinOrderPos = wtx->nOrderPos;
-            copyFrom = wtx;
+    // Coinbases cannot be malleated
+    if (wtx.IsCoinBase()) return txs;
+
+    // Only transactions that have non-witness inputs can be malleated
+    if (std::ranges::none_of(wtx.tx->vin, [](const CTxIn& in) { return in.scriptWitness.IsNull(); })) {
+        return txs;
+    }
+
+    // All variants spend wtx's first input, so a single lookup finds every candidate
+    bool found_self = false;
+    const auto [begin, end] = mapTxSpends.equal_range(wtx.tx->vin.front().prevout);
+    for (auto it = begin; it != end; ++it) {
+        auto entry = mapWallet.find(it->second);
+        if (!Assume(entry != mapWallet.end())) continue; // sanity-check: mapTxSpends has txs that are in mapWallet
+        const bool is_self = &entry->second == &wtx;
+        found_self |= is_self;
+        if (is_self || wtx.IsMalleation(entry->second)) {
+            Assume(txs.insert(&entry->second).second);
         }
     }
+    // wtx should always be found as this function is always called after AddToSpends
+    Assert(found_self);
+    return txs;
+}
 
-    if (!copyFrom) {
-        return;
-    }
+void CWallet::SyncMalleatedTxMetadata(WalletBatch& batch, const CWalletTx& wtx)
+{
+    const auto txs = GetMalleatedVariants(wtx);
+    if (txs.size() <= 1) return; // no variants, nothing to do
+
+    // First tx is the oldest one (smallest nOrderPos)
+    const CWalletTx* copyFrom = *txs.begin();
+
+    // The metadata that is kept in sync between malleated variants.
+    // fTimeReceivedIsTxTime, nTimeReceived, nOrderPos and cached members are not copied on purpose.
+    const auto metadata = [](auto& tx) {
+        return std::tie(tx.mapValue, tx.vOrderForm, tx.nTimeSmart, tx.fFromMe);
+    };
 
     // Now copy data from copyFrom to rest:
-    for (TxSpends::iterator it = range.first; it != range.second; ++it)
-    {
-        const uint256& hash = it->second;
-        CWalletTx* copyTo = &mapWallet.at(hash);
-        if (copyFrom == copyTo) continue;
-        assert(copyFrom && "Oldest wallet transaction in range assumed to have been found.");
-        if (!copyFrom->IsEquivalentTo(*copyTo)) continue;
-        copyTo->mapValue = copyFrom->mapValue;
-        copyTo->vOrderForm = copyFrom->vOrderForm;
-        // fTimeReceivedIsTxTime not copied on purpose
-        // nTimeReceived not copied on purpose
-        copyTo->nTimeSmart = copyFrom->nTimeSmart;
-        copyTo->fFromMe = copyFrom->fFromMe;
-        // nOrderPos not copied on purpose
-        // cached members not copied on purpose
+    for (CWalletTx* copyTo : txs) {
+        if (copyTo == copyFrom) continue;
+        metadata(*copyTo) = metadata(*copyFrom);
+        (void)batch.WriteTx(*copyTo);
     }
 }
 
@@ -827,10 +840,6 @@ void CWallet::AddToSpends(const COutPoint& outpoint, const uint256& wtxid, Walle
         WalletBatch temp_batch(GetDatabase());
         UnlockCoin(outpoint, &temp_batch);
     }
-
-    std::pair<TxSpends::iterator, TxSpends::iterator> range;
-    range = mapTxSpends.equal_range(outpoint);
-    SyncMetaData(range);
 }
 
 
@@ -1105,6 +1114,17 @@ bool CWallet::MarkReplaced(const uint256& originalHash, const uint256& newHash)
         success = false;
     }
 
+    // The new transaction also replaces any malleated variants of wtx,
+    // so bumpfee refuses to bump them afterwards
+    for (CWalletTx* variant : GetMalleatedVariants(wtx)) {
+        if (variant == &wtx) continue;
+        variant->mapValue["replaced_by_txid"] = newHash.ToString();
+        if (!batch.WriteTx(*variant)) {
+            WalletLogPrintf("%s: Updating variant tx %s failed\n", __func__, variant->GetHash().ToString());
+            success = false;
+        }
+    }
+
     NotifyTransactionChanged(originalHash, CT_UPDATED);
 
     return success;
@@ -1190,6 +1210,7 @@ CWalletTx* CWallet::AddToWallet(CTransactionRef tx, const TxState& state, const 
         wtx.m_it_wtxOrdered = wtxOrdered.insert(std::make_pair(wtx.nOrderPos, &wtx));
         wtx.nTimeSmart = ComputeTimeSmart(wtx, rescanning_old_block);
         AddToSpends(wtx, &batch);
+        SyncMalleatedTxMetadata(batch, wtx);
 
         // Update birth time when tx time is older than it.
         MaybeUpdateBirthTime(wtx.GetTxTime());
