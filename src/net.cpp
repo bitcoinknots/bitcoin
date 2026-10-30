@@ -2699,6 +2699,8 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect, Spa
     auto next_feeler = start + rng.rand_exp_duration(FEELER_INTERVAL);
     auto next_extra_block_relay = start + rng.rand_exp_duration(EXTRA_BLOCK_RELAY_ONLY_PEER_INTERVAL);
     auto next_extra_network_peer{start + rng.rand_exp_duration(EXTRA_NETWORK_PEER_INTERVAL)};
+    // Set when the last search for a NODE_BLAKE2B peer found none.
+    bool blake2b_search_failed{false};
     const bool dnsseed = gArgs.GetBoolArg("-dnsseed", DEFAULT_DNSSEED);
     bool add_fixed_seeds = gArgs.GetBoolArg("-fixedseeds", DEFAULT_FIXEDSEEDS);
     const bool use_seednodes{!gArgs.GetArgs("-seednode").empty()};
@@ -2850,16 +2852,25 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect, Spa
         // block-relay-only peer (to confirm our tip is current, see below) or the next_feeler
         // timer to decide if we should open a FEELER.
 
+        // A connection that would no longer tolerate a stale peer can only go to
+        // a NODE_BLAKE2B one, which may not exist. After a search for one came
+        // up empty, give this pass to a feeler if one is due, so stale peers
+        // holding the target never keep feelers from being made. Only a feeler:
+        // it is short-lived, while the other extra connections would keep the
+        // spare outbound slot that the stale-tip peer needs.
+        const bool skip_blake2b_only{std::exchange(blake2b_search_failed, false)};
+        const auto may_open{[&](ConnectionType type) { return !skip_blake2b_only || m_msgproc->CanTolerateStaleOutbound(type); }};
+
         if (!m_anchors.empty() && (nOutboundBlockRelay < m_max_outbound_block_relay)) {
             conn_type = ConnectionType::BLOCK_RELAY;
             anchor = true;
-        } else if (nOutboundFullRelay < m_max_outbound_full_relay) {
+        } else if (nOutboundFullRelay < m_max_outbound_full_relay && may_open(ConnectionType::OUTBOUND_FULL_RELAY)) {
             // OUTBOUND_FULL_RELAY
-        } else if (nOutboundBlockRelay < m_max_outbound_block_relay) {
+        } else if (nOutboundBlockRelay < m_max_outbound_block_relay && may_open(ConnectionType::BLOCK_RELAY)) {
             conn_type = ConnectionType::BLOCK_RELAY;
-        } else if (GetTryNewOutboundPeer()) {
+        } else if (GetTryNewOutboundPeer() && may_open(ConnectionType::OUTBOUND_FULL_RELAY)) {
             // OUTBOUND_FULL_RELAY
-        } else if (now > next_extra_block_relay && m_start_extra_block_relay_peers) {
+        } else if (now > next_extra_block_relay && m_start_extra_block_relay_peers && !skip_blake2b_only) {
             // Periodically connect to a peer (using regular outbound selection
             // methodology from addrman) and stay connected long enough to sync
             // headers, but not much else.
@@ -2887,7 +2898,7 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect, Spa
             next_feeler = now + rng.rand_exp_duration(FEELER_INTERVAL);
             conn_type = ConnectionType::FEELER;
             fFeeler = true;
-        } else if (nOutboundFullRelay == m_max_outbound_full_relay &&
+        } else if (!skip_blake2b_only && nOutboundFullRelay == m_max_outbound_full_relay &&
                    m_max_outbound_full_relay == MAX_OUTBOUND_FULL_RELAY_CONNECTIONS &&
                    now > next_extra_network_peer &&
                    MaybePickPreferredNetwork(preferred_net)) {
@@ -3027,6 +3038,8 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect, Spa
             addrConnect = addr;
             break;
         }
+
+        blake2b_search_failed = blake2b_required && !addrConnect.IsValid();
 
         if (addrConnect.IsValid()) {
             if (fFeeler) {
