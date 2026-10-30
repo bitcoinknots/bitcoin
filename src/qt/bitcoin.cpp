@@ -34,6 +34,7 @@
 #include <stats/stats.h>
 #include <uint256.h>
 #include <util/exception.h>
+#include <util/fs.h>
 #include <util/string.h>
 #include <util/threadnames.h>
 #include <util/translation.h>
@@ -689,7 +690,7 @@ int GuiMain(int argc, char* argv[])
 
     if (intro) {
         // Store intro dialog settings other than datadir (network specific)
-        app.InitPruneSetting(intro->getPruneMiB());
+        if (!fs::exists(gArgs.GetDataDirNet() / "chainstate")) app.InitPruneSetting(intro->getPruneMiB());
         gArgs.ForceSetArg("-assumevalid", intro->getAssumeValid().toStdString());
     }
 
