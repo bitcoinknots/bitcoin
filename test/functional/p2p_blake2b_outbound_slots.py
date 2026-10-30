@@ -12,7 +12,9 @@ addrman is dialed for real and answered by a python peer with chosen services.
 
 Case A: no fork-capable peer exists. The node fills the outbound target with
         stale peers and then stops dialing, instead of connecting to and
-        dropping one peer after another.
+        dropping one peer after another. It still makes feelers, also once
+        the tip is stale, rather than spending every pass on a search for a
+        fork-capable peer that cannot succeed.
 Case B: fork-capable peers exist and no stale peer would be tolerated
         (-maxstaleoutbound=0). Every outbound-full-relay and block-relay slot
         goes to a NODE_BLAKE2B peer, and no peer without it takes one.
@@ -27,9 +29,13 @@ Case D: the same claim, but the peer never completes a handshake. addrman is
 Case E: the extra peers opened past a full target, here the stale-tip one. A
         peer without the bit is refused outright there, so only a fork-capable
         one is dialed for it. Feelers stay ungated so addrman keeps being probed.
+Case F: stale peers hold the target and fork-capable peers exist, but addrman
+        only knows them as pre-fork. A feeler's handshake is what corrects
+        that, after which they take outbound-full-relay slots.
 """
 
 import os
+import shutil
 import socket
 import threading
 import time
@@ -78,6 +84,13 @@ NUM_DEAD = 5
 # enough that no peer trips the 20 minute inactivity timeout.
 STALE_TIP_STEP = 8 * 60
 STALE_TIP_STEPS = 4
+# Case A steps that far again, a few times at most, to wait for a feeler.
+FEELER_TRIES = 3
+# Case F keeps the stale-peer addresses few, so feelers soon reach the
+# fork-capable ones among them, and steps the clock a minute at a time.
+NUM_STALE_ADDRS = 12
+NUM_UNKNOWN = 6
+RECOVERY_STEPS = 60
 # Long enough for the two connections per second the dial loop used to make.
 QUIET_SECONDS = 15
 # The last slot can fill while a connection is already on its way, so let that
@@ -227,6 +240,25 @@ class Blake2bOutboundSlots(BitcoinTestFramework):
             f.seek(offset)
             return f.read()
 
+    def non_feeler_dials(self, node, offset):
+        """Dials since self.dialed was last cleared, less the feelers logged
+        from `offset`, taken at that same point. A feeler is short-lived and
+        not the redialing these cases check for."""
+        def count():
+            feelers = self.log_since(node, offset).count("Making feeler connection to ")
+            with self.lock:
+                return len(self.dialed) - feelers
+        # A feeler is logged just before it is dialed, so only trust a count
+        # that holds across a second read.
+        last = count()
+        for _ in range(10):
+            time.sleep(1)
+            current = count()
+            if current == last:
+                return current
+            last = current
+        raise AssertionError("dial count never settled")
+
     def log_count(self, node, needle):
         with open(node.debug_log_path, encoding="utf8") as f:
             return f.read().count(needle)
@@ -256,15 +288,48 @@ class Blake2bOutboundSlots(BitcoinTestFramework):
         assert_equal(len(self.outbound(node, "outbound-full-relay")), target)
 
         time.sleep(SETTLE_SECONDS)
-        with self.lock:
-            dialed = len(self.dialed)
+        # debug.log starts with this case
+        dialed = self.non_feeler_dials(node, 0)
         refused = self.log_count(node, REFUSED)
         time.sleep(QUIET_SECONDS)
-        with self.lock:
-            assert_equal(len(self.dialed), dialed)
+        assert_equal(self.non_feeler_dials(node, 0), dialed)
         assert_equal(self.log_count(node, REFUSED), refused)
         assert_equal(self.exhausted, [])
         self.log.info(f"stopped after {dialed} dials, nothing further in {QUIET_SECONDS}s")
+
+        # The stale peers hold the full-relay target and, once the tip has gone
+        # stale, the extra outbound peer is wanted too, but neither can be
+        # filled without a fork-capable peer. That must not keep the node from
+        # the feelers that probe addrman for one.
+        mark = node.debug_log_path.stat().st_size
+        now = int(time.time())
+
+        def step():
+            nonlocal now
+            now += STALE_TIP_STEP
+            node.setmocktime(now)
+            # the ping this triggers refreshes lastrecv, so the next step cannot
+            # trip the inactivity timeout
+            self.wait_serving(lambda: all(p["lastrecv"] >= now - 60 for p in node.getpeerinfo()
+                                          if p["connection_type"] == "outbound-full-relay"), timeout=60)
+
+        for _ in range(STALE_TIP_STEPS + 1):
+            step()
+        # The stale tip check runs on a real-time timer, not the mocked clock.
+        self.wait_serving(lambda: "Potential stale tip detected" in self.log_since(node, mark), timeout=120)
+        # A feeler can come due on any step, so require one after the tip went
+        # stale, with the extra outbound peer already wanted. Each step is four
+        # feeler intervals, so one rarely needs a second.
+        mark = node.debug_log_path.stat().st_size
+        for _ in range(FEELER_TRIES):
+            step()
+            try:
+                self.wait_serving(lambda: "Making feeler connection to " in self.log_since(node, mark), timeout=20)
+                break
+            except AssertionError:
+                pass
+        assert "Making feeler connection to " in self.log_since(node, mark), "no feeler while stale peers hold the target"
+        self.log.info("still made a feeler with stale peers holding the target and the tip stale")
 
         self.log.info("Case B: with -maxstaleoutbound=0, every slot goes to a fork-capable peer")
         self.stop_node(0)
@@ -297,6 +362,7 @@ class Blake2bOutboundSlots(BitcoinTestFramework):
             (node.chain_path / stale).unlink(missing_ok=True)
         self.lying = True
         self.dialed.clear()
+        mark = node.debug_log_path.stat().st_size
         self.arm_listeners({PRE_FORK: NUM_LISTENERS})
         self.start_node(0)
         for n in range(NUM_LYING):
@@ -304,12 +370,10 @@ class Blake2bOutboundSlots(BitcoinTestFramework):
         # Each one costs a connection to disprove, after which the handshake has
         # corrected addrman and it is not picked again.
         self.wait_serving(lambda: self.dialing_stopped(), timeout=240)
-        with self.lock:
-            dialed = len(self.dialed)
+        dialed = self.non_feeler_dials(node, mark)
         assert dialed <= NUM_LYING + 2, f"{dialed} dials for {NUM_LYING} addresses looks like a loop"
         time.sleep(QUIET_SECONDS)
-        with self.lock:
-            assert_equal(len(self.dialed), dialed)
+        assert_equal(self.non_feeler_dials(node, mark), dialed)
         assert_equal(self.exhausted, [])
         self.log.info(f"worked through {dialed} of them and stopped, "
                       f"nothing further in {QUIET_SECONDS}s")
@@ -326,16 +390,15 @@ class Blake2bOutboundSlots(BitcoinTestFramework):
         # address's netgroup occupied and hide the re-dialing this checks for.
         self.proxy.keep_alive = False
         self.dead = True
+        mark = node.debug_log_path.stat().st_size
         self.start_node(0, extra_args=self.extra_args[0] + ["-maxstaleoutbound=0"])
         for n in range(NUM_DEAD):
             node.addpeeraddress(f"250.{n}.0.1", 8333, False, FORK_CAPABLE)
         self.wait_serving(lambda: self.dialing_stopped(), timeout=240)
-        with self.lock:
-            dialed = len(self.dialed)
+        dialed = self.non_feeler_dials(node, mark)
         assert dialed <= NUM_DEAD + 2, f"{dialed} dials for {NUM_DEAD} addresses looks like a loop"
         time.sleep(QUIET_SECONDS)
-        with self.lock:
-            assert_equal(len(self.dialed), dialed)
+        assert_equal(self.non_feeler_dials(node, mark), dialed)
         self.log.info(f"tried each of {NUM_DEAD} once ({dialed} dials) and backed off, "
                       f"nothing further in {QUIET_SECONDS}s")
 
@@ -405,6 +468,44 @@ class Blake2bOutboundSlots(BitcoinTestFramework):
         assert_equal(wasted, [])
         self.log.info(f"stale-tip peer dialed only fork-capable addresses, "
                       f"{len(feelers)} feeler(s) unaffected")
+
+        self.log.info("Case F: fork-capable peers that addrman does not know as such")
+        self.stop_node(0)
+        for stale in ("peers.dat", "anchors.dat"):
+            (node.chain_path / stale).unlink(missing_ok=True)
+        # Back to genesis, as in case A: with case E's tip, peers that never
+        # announce it would be evicted for that before this could be observed.
+        for stale in ("blocks", "chainstate"):
+            shutil.rmtree(node.chain_path / stale)
+        self.dialed.clear()
+        self.arm_listeners({PRE_FORK: NUM_PRE_FORK_LISTENERS + target, FORK_CAPABLE: NUM_UNKNOWN})
+        mark = node.debug_log_path.stat().st_size
+        self.start_node(0)
+        for n in range(NUM_STALE_ADDRS):
+            node.addpeeraddress(f"251.{n}.0.1", 8333, False, PRE_FORK)
+        self.wait_serving(lambda: f"connected to stale outbound peer ({DEFAULT_MAXSTALEOUTBOUND}/"
+                          in self.log_since(node, mark), timeout=60)
+        mark = node.debug_log_path.stat().st_size
+        # The proxy answers these with NODE_BLAKE2B, so only a connection made
+        # without requiring the bit can find out they have it.
+        for n in range(NUM_UNKNOWN):
+            node.addpeeraddress(f"250.{n}.0.1", 8333, False, PRE_FORK)
+
+        def recovered():
+            return len(self.outbound(node, "outbound-full-relay", fork_capable=True)) >= 1
+
+        now = int(time.time())
+        for _ in range(RECOVERY_STEPS):
+            now += 60
+            node.setmocktime(now)
+            try:
+                self.wait_serving(recovered, timeout=3)
+                break
+            except AssertionError:
+                pass
+        assert recovered(), "never found the fork-capable peers"
+        assert "Making feeler connection to 250." in self.log_since(node, mark)
+        self.log.info("a feeler found the fork-capable peers, which then took full-relay slots")
 
 
 if __name__ == '__main__':
