@@ -237,11 +237,14 @@ void AllocateFileRange(FILE* file, uint64_t offset, unsigned int length)
                 return;
             }
             memset(&buf[rlen], 0, now - rlen);
-            if (0 != FileSeek64(file, -static_cast<int64_t>(rlen), SEEK_CUR)) {
-                return;
-            }
+        }
+        if (0 != FileSeek64(file, -static_cast<int64_t>(rlen), SEEK_CUR)) {
+            return;
         }
         fwrite(buf, 1, now, file); // allowed to fail; this function is advisory anyway
+        if (0 != FileSeek64(file, 0, SEEK_CUR)) {
+            return;
+        }
         length -= now;
     }
 #endif

@@ -8,9 +8,12 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <cstdio>
 #include <fstream>
 #include <ios>
 #include <string>
+#include <utility>
+#include <vector>
 
 BOOST_FIXTURE_TEST_SUITE(fs_tests, BasicTestingSetup)
 
@@ -138,6 +141,24 @@ BOOST_AUTO_TEST_CASE(rename)
     }
     fs::remove(path2);
 }
+
+#ifndef WIN32
+BOOST_AUTO_TEST_CASE(allocate_file_range_fallback)
+{
+    // A memory stream has no file descriptor, so posix_fallocate fails and
+    // the fallback has to leave existing data in place
+    for (const auto& [offset, length] : {std::pair{4U, 3U}, {0U, 200000U}, {70000U, 130000U}}) {
+        std::vector<char> data(200000);
+        for (size_t i = 0; i < data.size(); ++i) data[i] = char(i * 7 + i / 251);
+        const std::vector<char> expected{data};
+        FILE* file{fmemopen(data.data(), data.size(), "rb+")};
+        BOOST_REQUIRE(file);
+        AllocateFileRange(file, offset, length);
+        BOOST_CHECK_EQUAL(std::fclose(file), 0);
+        BOOST_CHECK(data == expected);
+    }
+}
+#endif
 
 #ifndef __MINGW64__ // no symlinks on mingw
 BOOST_AUTO_TEST_CASE(create_directories)
