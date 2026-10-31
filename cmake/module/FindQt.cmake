@@ -49,7 +49,11 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY BOTH)
 # When using the depends toolchain with NO_QT=1, Qt is not in the
 # depends prefix. Allow find_package to search system paths so that
 # system-installed Qt (e.g., qt5-qtbase-devel on CentOS) can be found.
-set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE BOTH)
+# Never do this when cross-compiling, where the system Qt is the build
+# machine's.
+if(NOT CMAKE_CROSSCOMPILING)
+  set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE BOTH)
+endif()
 
 find_package(Qt${Qt_FIND_VERSION_MAJOR} ${Qt_FIND_VERSION}
   COMPONENTS ${Qt_FIND_COMPONENTS}
