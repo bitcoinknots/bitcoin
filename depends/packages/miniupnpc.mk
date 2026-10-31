@@ -1,10 +1,10 @@
 package=miniupnpc
-$(package)_version=2.3.4_pre20260407
-$(package)_commithash=f83b5e2e21aa8dfa393ff80ea287ac4fca1a4df1
+$(package)_version=2.3.4_pre20260906
+$(package)_commithash=2cb87d04034587bdb0f51549b3936e0d9e143bcb
 $(package)_download_path=https://github.com/miniupnp/miniupnp/archive/
 $(package)_download_file=$($(package)_commithash).tar.gz
 $(package)_file_name=$(package)-$($(package)_version).tar.gz
-$(package)_sha256_hash=89dcf15c4ded25e86ec0600854dcc01aaf791b7747850cb65472142e64b3f925
+$(package)_sha256_hash=0990cbae425c16e3739b2b79f67b5c7c5d333c13513f6b7ff3b16b2567837da2
 $(package)_patches=dont_leak_info.patch
 $(package)_build_subdir=build
 
