@@ -49,6 +49,21 @@ void ReadSigNetArgs(const ArgsManager& args, CChainParams::SigNetOptions& option
         }
         options.pow_target_spacing = *signetblocktime;
     }
+    if (args.IsArgSet("-signettimewarpfixheight")) {
+        if (!args.IsArgSet("-signetchallenge")) {
+            throw std::runtime_error("-signettimewarpfixheight cannot be set without -signetchallenge");
+        }
+        // Parsed from the raw string rather than via GetIntArg, which funnels through
+        // LocaleIndependentAtoi and yields 0 for anything unparseable: a typo would then
+        // silently schedule the fork at genesis and split this signet from its peers.
+        // Same treatment -testactivationheight already gets.
+        int height{0};
+        const std::string value{args.GetArg("-signettimewarpfixheight", "")};
+        if (!ParseInt32(value, &height) || height < 0 || height >= std::numeric_limits<int>::max()) {
+            throw std::runtime_error(strprintf("Invalid height value (%s) for -signettimewarpfixheight.", value));
+        }
+        options.timewarpfix_height = height;
+    }
 }
 
 void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& options)

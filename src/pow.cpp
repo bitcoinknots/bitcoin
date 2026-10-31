@@ -60,6 +60,12 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     } else {
         // Go back by what we want to be 14 days worth of blocks
         int nHeightFirst = pindexLast->nHeight - (params.DifficultyAdjustmentInterval()-1);
+        if (params.IsTimewarpFixHeight(pindexLast->nHeight) && nHeightFirst > 0) {
+            // Measure from the previous window's last block, so windows share an
+            // endpoint and the seam between them is no longer unmeasured. Gated on
+            // pindexLast, the block MinimumClosingBlockTime floors: both must name it.
+            --nHeightFirst;
+        }
         assert(nHeightFirst >= 0);
         const CBlockIndex* pindexFirst = pindexLast->GetAncestor(nHeightFirst);
         assert(pindexFirst);
@@ -73,6 +79,18 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     }
 
     return nBits;
+}
+
+std::optional<int64_t> MinimumClosingBlockTime(const CBlockIndex* pindexPrev, const Consensus::Params& params)
+{
+    const int height{pindexPrev->nHeight + 1};
+    // Only the block closing a window, and only once windows are contiguous. Gate first:
+    // FindInheritedInvalidBlocks calls this for every entry in the block index.
+    if (!params.IsTimewarpFixHeight(height)) return std::nullopt;
+    const int64_t interval{params.DifficultyAdjustmentInterval()};
+    if (height < interval || height % interval != interval - 1) return std::nullopt;
+    // Non-null by the guard above: 0 <= height - interval <= pindexPrev->nHeight.
+    return Assert(pindexPrev->GetAncestor(static_cast<int>(height - interval)))->GetBlockTime();
 }
 
 unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nFirstBlockTime, const Consensus::Params& params)
@@ -91,7 +109,8 @@ unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nF
     const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
     arith_uint256 bnNew;
 
-    // Special difficulty rule for Testnet4
+    // Special difficulty rule for Testnet4. Note: no contiguous-window decrement here, so
+    // the fix would be half applied on a BIP94 chain; chainparams refuses that combination.
     if (params.enforce_BIP94) {
         // Here we use the first block of the difficulty period. This way
         // the real difficulty is always preserved in the first block as

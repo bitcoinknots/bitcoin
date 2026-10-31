@@ -35,6 +35,8 @@ std::string DeploymentName(Consensus::BuriedDeployment dep)
         return "segwit";
     case Consensus::DEPLOYMENT_BLAKE2B:
         return "blake2b";
+    case Consensus::DEPLOYMENT_TIMEWARPFIX:
+        return "timewarpfix";
     } // no default case, so the compiler can warn about missing cases
     return "";
 }
@@ -53,6 +55,8 @@ std::optional<Consensus::BuriedDeployment> GetBuriedDeployment(const std::string
         return Consensus::BuriedDeployment::DEPLOYMENT_CSV;
     } else if (name == "blake2b") {
         return Consensus::BuriedDeployment::DEPLOYMENT_BLAKE2B;
+    } else if (name == "timewarpfix") {
+        return Consensus::BuriedDeployment::DEPLOYMENT_TIMEWARPFIX;
     }
     return std::nullopt;
 }

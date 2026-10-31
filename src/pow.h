@@ -28,6 +28,19 @@ class arith_uint256;
 std::optional<arith_uint256> DeriveTarget(unsigned int nBits, const uint256 pow_limit);
 
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params&) ARG_NONNULL(1) ARG_NONNULL(2);
+
+/** Earliest timestamp the block after pindexPrev may carry on account of the retarget
+ *  window it closes, or nullopt where nothing beyond the usual timestamp rules applies.
+ *
+ *  With contiguous windows the block closing one is where the next starts measuring, so
+ *  stamping it earlier lets the next window re-measure time the previous one already did.
+ *  The clamps do not prevent that: a negative span is credited as nPowTargetTimespan/4,
+ *  which RAISES difficulty, and an attacker spends that rise to buy two 4x drops.
+ *
+ *  Enforced from ContextualCheckBlockHeaderVolatile (see there for why); mirrored in
+ *  GetMinimumTime so a template cannot be built that validation would reject. */
+std::optional<int64_t> MinimumClosingBlockTime(const CBlockIndex* pindexPrev, const Consensus::Params& params) ARG_NONNULL(1);
+
 unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nFirstBlockTime, const Consensus::Params&);
 
 /** Check whether a block hash satisfies the proof-of-work requirement specified by nBits */
