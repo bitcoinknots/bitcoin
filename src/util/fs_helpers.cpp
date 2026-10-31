@@ -147,10 +147,10 @@ void DirectoryCommit(const fs::path& dirname)
 #endif
 }
 
-bool TruncateFile(FILE* file, unsigned int length)
+bool TruncateFile(FILE* file, uint64_t length)
 {
 #if defined(WIN32)
-    return _chsize(_fileno(file), length) == 0;
+    return _chsize_s(_fileno(file), length) == 0;
 #else
     return ftruncate(fileno(file), length) == 0;
 #endif
@@ -180,22 +180,21 @@ int RaiseFileDescriptorLimit(int nMinFD)
 #endif
 }
 
-/**
- * this function tries to make a particular range of a file allocated (corresponding to disk space)
- * it is advisory, and the range specified in the arguments will never contain live data
- */
-void AllocateFileRange(FILE* file, unsigned int offset, unsigned int length)
+static void AllocateFileRangeUnsynced(FILE* file, uint64_t offset, unsigned int length)
 {
 #if defined(WIN32)
     // Windows-specific version
     HANDLE hFile = (HANDLE)_get_osfhandle(_fileno(file));
     LARGE_INTEGER nFileSize;
     int64_t nEndPos = (int64_t)offset + length;
-    nFileSize.u.LowPart = nEndPos & 0xFFFFFFFF;
-    nFileSize.u.HighPart = nEndPos >> 32;
-    SetFilePointerEx(hFile, nFileSize, 0, FILE_BEGIN);
-    SetEndOfFile(hFile);
-#elif defined(__APPLE__)
+    if (GetFileSizeEx(hFile, &nFileSize) && (int64_t{nFileSize.u.HighPart} << 32 | nFileSize.u.LowPart) <= nEndPos) {
+        nFileSize.u.LowPart = nEndPos & 0xFFFFFFFF;
+        nFileSize.u.HighPart = nEndPos >> 32;
+        if (SetFilePointerEx(hFile, nFileSize, 0, FILE_BEGIN)) {
+            SetEndOfFile(hFile);
+        }
+    }
+#elif 0
     // OSX specific version
     // NOTE: Contrary to other OS versions, the OSX version assumes that
     // NOTE: offset is the size of the file.
@@ -213,23 +212,54 @@ void AllocateFileRange(FILE* file, unsigned int offset, unsigned int length)
 #else
 #if defined(HAVE_POSIX_FALLOCATE)
     // Version using posix_fallocate
-    off_t nEndPos = (off_t)offset + length;
-    if (0 == posix_fallocate(fileno(file), 0, nEndPos)) return;
+    if (0 == posix_fallocate(fileno(file), offset, length)) return;
 #endif
     // Fallback version
     // TODO: just write one byte per block
-    static const char buf[65536] = {};
-    if (fseek(file, offset, SEEK_SET)) {
+    uint8_t buf[65536];
+    if (FileSeek64(file, offset, SEEK_SET)) {
         return;
     }
+    clearerr(file);
     while (length > 0) {
         unsigned int now = 65536;
         if (length < now)
             now = length;
+        const size_t rlen = fread(buf, 1, now, file);
+        if (rlen < now) {
+            if (ferror(file)) {
+                // Don't clobber anything, just give up
+                clearerr(file);
+                return;
+            }
+            memset(&buf[rlen], 0, now - rlen);
+        }
+        if (0 != FileSeek64(file, -static_cast<int64_t>(rlen), SEEK_CUR)) {
+            return;
+        }
         fwrite(buf, 1, now, file); // allowed to fail; this function is advisory anyway
+        if (0 != FileSeek64(file, 0, SEEK_CUR)) {
+            return;
+        }
         length -= now;
     }
 #endif
+}
+
+/**
+ * this function tries to make a particular range of a file allocated (corresponding to disk space)
+ * it is advisory, and the range specified in the arguments will never contain live data
+ */
+void AllocateFileRange(FILE* file, uint64_t offset, unsigned int length)
+{
+    // The platform code bypasses the stream, and the Windows code and the
+    // fallback move the file position, so write out anything buffered first
+    // (seeking does that, and unlike fflush is also valid after a read) and
+    // put the stream back afterwards
+    const int64_t pos{FileTell64(file)};
+    if (pos < 0 || FileSeek64(file, pos, SEEK_SET) != 0) return;
+    AllocateFileRangeUnsynced(file, offset, length);
+    FileSeek64(file, pos, SEEK_SET);
 }
 
 FILE* AdviseSequential(FILE *file) {
