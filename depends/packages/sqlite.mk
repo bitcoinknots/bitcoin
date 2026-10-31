@@ -1,8 +1,8 @@
 package=sqlite
-$(package)_version=3500400
-$(package)_download_path=https://sqlite.org/2025/
+$(package)_version=3540100
+$(package)_download_path=https://sqlite.org/2026/
 $(package)_file_name=sqlite-autoconf-$($(package)_version).tar.gz
-$(package)_sha256_hash=a3db587a1b92ee5ddac2f66b3edb41b26f9c867275782d46c3a088977d6a5b18
+$(package)_sha256_hash=926ef8d3eab93fbf6e06011901273eec076b25594a4e1cdadd50c987f4f6d64e
 $(package)_patches = autosetup-fixup.patch
 
 define $(package)_set_vars
