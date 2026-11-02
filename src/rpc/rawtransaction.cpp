@@ -69,10 +69,6 @@ static void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& 
     // available to code in bitcoin-common, so we query them here and push the
     // data into the returned UniValue.
 
-    if (policy_vsize == POLICY_VSIZE_DEFAULT && txundo && !tx.IsCoinBase()) {
-        policy_vsize = node::GetPolicyVirtualTransactionSize(tx, *txundo);
-    }
-
     TxToUniv(tx, /*block_hash=*/uint256(), entry, /*include_hex=*/true, txundo, verbosity, policy_vsize);
 
     if (!hashBlock.IsNull()) {
