@@ -24,7 +24,7 @@ from test_framework.script import (
     taproot_construct,
 )
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal
+from test_framework.util import assert_equal, assert_greater_than
 from test_framework.wallet import MiniWallet
 
 
@@ -32,6 +32,7 @@ class PolicyVSizeOPNetTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.extra_args = [[
+            '-corepolicy=0',
             '-datacarriercost=2',
             '-acceptnonstddatacarrier=1',
             '-datacarrierfullcount',
@@ -79,6 +80,7 @@ class PolicyVSizeOPNetTest(BitcoinTestFramework):
         mempool_vsize = node.getmempoolentry(txid)['vsize']
         self.log.info(f"unconfirmed getrawtransaction vsize={unconfirmed_vsize} mempoolentry vsize={mempool_vsize}")
         assert_equal(unconfirmed_vsize, mempool_vsize)
+        assert_greater_than(mempool_vsize, (node.decoderawtransaction(spend_tx.serialize().hex())['weight'] + 3) // 4)
 
         self.generate(node, 1)
         confirmed_vsize = node.getrawtransaction(txid, True)['vsize']
