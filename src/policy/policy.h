@@ -209,7 +209,7 @@ static inline int64_t GetVirtualTransactionInputSize(const CTxIn& tx)
 /** Default for -rejectbpub */
 static constexpr bool DEFAULT_REJECT_BPUB{true};
 extern bool g_reject_bpub;
-/** Witness script bytes of the inputs that carry a BPUB stream. */
+/** Witness script bytes of the inputs whose 1-of-N multisig keys carry BPUB spam. */
 size_t BPUBBytes(const CTransaction& tx);
 
 std::pair<CScript, unsigned int> GetScriptForTransactionInput(CScript prevScript, const CTxIn&);

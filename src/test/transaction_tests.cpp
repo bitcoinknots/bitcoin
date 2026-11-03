@@ -1053,7 +1053,7 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     CheckIsNotStandard(t, "dust");
 }
 
-/** Spend 1-of-N inputs whose keys carry `stream` in `chunk` bytes each, as a BPUB encoder does. */
+/** Spend 1-of-N inputs whose keys carry `stream` in `chunk` bytes each. */
 static size_t AddBpubInputs(CMutableTransaction& tx, const std::vector<unsigned char>& stream, const size_t chunk, const size_t per_input, const std::vector<unsigned char>& control)
 {
     std::vector<std::vector<unsigned char>> keys;
@@ -1077,7 +1077,7 @@ static size_t AddBpubInputs(CMutableTransaction& tx, const std::vector<unsigned 
 
 BOOST_AUTO_TEST_CASE(bpub_bytes)
 {
-    // A BPUB v5 stream, as its encoder writes it
+    // A version 5 BPUB stream as seen on mainnet
     const auto v5{ParseHex("000000ca05030000000000000180b25870e5538d2124919e1345dcb4674cab44d42456ad164038eb93f5e4f9969d006976a654abd02a15e1b2c15177f6e73f72ca9c2b339a651509ebf29bf1299d3bcf8c6df6aa2695cd184ad61eb1dd462f000a40ec28b0c273677fa0ef8b8a49540319ab20d0912a5ee05e445f98f078087d5532c24bb4c1e2704c913bcc6801ad6464d35d4fae82e95a5020a035e89da5d512011a4da91b2734737ea3cea48260b798faa33ce4aa13806859a490644a60d834964fb01829605702b9c3b3bf53")};
     const std::vector<unsigned char> control(33, 3), other(33, 2);
     const auto bytes_of = [&](const std::vector<unsigned char>& stream, size_t chunk, size_t per_input) {
@@ -1096,7 +1096,7 @@ BOOST_AUTO_TEST_CASE(bpub_bytes)
     // Any 1-of-N reads the same
     BOOST_CHECK(counted(v5, 31, 10));
     BOOST_CHECK(counted(v5, 31, 1));
-    // Readers take keys of any size, and the header can span inputs
+    // Keys of any size are read, and the header can span inputs
     BOOST_CHECK(counted(v5, 518, 6));
     BOOST_CHECK(counted(v5, 3, 1));
     BOOST_CHECK(counted(v5, 200000, 1));
@@ -1126,7 +1126,7 @@ BOOST_AUTO_TEST_CASE(bpub_bytes)
     stream[9] = 1; // uncompressed size no body can inflate to
     BOOST_CHECK(ignored(stream));
     stream = v5;
-    stream.insert(stream.begin(), 0); // header not where a reader looks
+    stream.insert(stream.begin(), 0); // header not at the start
     BOOST_CHECK(ignored(stream));
 
     // Inputs signed by another key are another stream, so they neither hide the header nor count
@@ -1144,20 +1144,20 @@ BOOST_AUTO_TEST_CASE(bpub_bytes)
     }
     BOOST_CHECK_EQUAL(BPUBBytes(CTransaction{mixed}), real_bytes);
 
-    // An input only one reader takes cannot hide the header from the other
+    // An input taken by only one way of reading the keys cannot hide the header from the other
     CMutableTransaction decoyed;
     const CScript decoy_script{CScript() << OP_1 << std::vector<unsigned char>(34, 0) << control << OP_2 << OP_CHECKMULTISIG};
     decoyed.vin.emplace_back().scriptWitness.stack = {{}, std::vector<unsigned char>(72, 1), {decoy_script.begin(), decoy_script.end()}};
     const size_t decoyed_bytes{decoy_script.size() + AddBpubInputs(decoyed, v5, 31, 14, control)};
     BOOST_CHECK_EQUAL(BPUBBytes(CTransaction{decoyed}), decoyed_bytes);
-    // Neither reader takes an input with an OP_0 key, so it cannot hide the header either
+    // Neither way takes an input with an OP_0 key, so it cannot hide the header either
     CMutableTransaction zero_key;
     const CScript zero_key_script{CScript() << OP_1 << OP_0 << std::vector<unsigned char>(34, 0) << control << OP_3 << OP_CHECKMULTISIG};
     zero_key.vin.emplace_back().scriptWitness.stack = {{}, std::vector<unsigned char>(72, 1), {zero_key_script.begin(), zero_key_script.end()}};
     BOOST_CHECK_EQUAL(BPUBBytes(CTransaction{zero_key}), 0U);
     const size_t zero_key_bytes{AddBpubInputs(zero_key, v5, 3, 1, control)};
     BOOST_CHECK_EQUAL(BPUBBytes(CTransaction{zero_key}), zero_key_bytes);
-    // One reader takes N as any opcode valued 0x50 + N, so 17 keys end in OP_NOP
+    // N is read as any opcode valued 0x50 + N, so 17 keys end in OP_NOP
     CScript nop_script{CScript() << OP_1};
     for (size_t i{0}; i < 16; ++i) {
         std::vector<unsigned char> key(13);

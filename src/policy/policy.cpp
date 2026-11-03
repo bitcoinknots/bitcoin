@@ -499,11 +499,12 @@ static bool IsBPUBHeader(const std::vector<unsigned char>& head)
 
 size_t BPUBBytes(const CTransaction& tx)
 {
-    // A BPUB reader joins, in input order, each input whose witness ends in a 1-of-N multisig
-    // with the same last key, taking each key but the last, less its first and last bytes, and
-    // reads the result as a stream that opens with a header. Nothing checks those keys, since the
-    // last one signs first, so one reader takes pushes of any size but OP_0, and N as any opcode
-    // valued 0x50 + N; another takes only compressed keys and OP_N, skipping any other input.
+    // Spam can be pushed as the keys of a 1-of-N multisig, since nothing checks the other keys
+    // once the last one signs. Inputs whose witness ends in such a script with the same last key
+    // are joined in input order, taking each key but the last less its first and last bytes, and
+    // counted when the result opens with a known spam header. Keys are taken both as pushes of
+    // any size but OP_0, with N as any opcode valued 0x50 + N, and as compressed keys with OP_N
+    // only, skipping any other input.
     struct Input {
         std::vector<unsigned char> control, head;
         bool compressed_keys;
