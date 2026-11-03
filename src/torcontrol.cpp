@@ -480,6 +480,7 @@ void TorController::auth_cb(TorControlConnection& _conn, const TorControlReply& 
 {
     if (reply.code == 250) {
         LogDebug(BCLog::TOR, "Authentication successful\n");
+        reconnect_timeout = RECONNECT_TIMEOUT_START;
 
 #ifdef ENABLE_TOR_SUBPROCESS
         if (m_process) {
@@ -652,7 +653,6 @@ void TorController::protocolinfo_cb(TorControlConnection& _conn, const TorContro
 void TorController::connected_cb(TorControlConnection& _conn)
 {
     m_try_exec = false;
-    reconnect_timeout = RECONNECT_TIMEOUT_START;
     // First send a PROTOCOLINFO command to figure out what authentication is expected
     if (!_conn.Command("PROTOCOLINFO 1", std::bind(&TorController::protocolinfo_cb, this, std::placeholders::_1, std::placeholders::_2)))
         LogWarning("tor: Error sending initial protocolinfo command");
@@ -731,6 +731,7 @@ void TorController::disconnected_cb(TorControlConnection& _conn)
 #ifdef ENABLE_TOR_SUBPROCESS
     if (m_try_exec && !m_execute.empty()) {
         LogDebug(BCLog::TOR, "tor: Not connected to Tor control port %s, trying to launch via %s\n", m_current_tor_control_center, m_execute);
+        m_try_exec = false;
         try {
             m_current_tor_control_center = LaunchTor();
             Reconnect();
