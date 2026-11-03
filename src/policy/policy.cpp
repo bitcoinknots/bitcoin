@@ -446,7 +446,7 @@ std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsV
         ret.first += dcb.first;
         ret.second += dcb.second;
     }
-    if (::g_reject_bpub) ret.second += BPUBBytes(tx);
+    ret.second += MultisigKeyDataBytes(tx);
     for (size_t i{tx.vout.size()}; i; ) {
         const CTxOut& txout = tx.vout[--i];
         const auto dcb = txout.scriptPubKey.DatacarrierBytes(tx.vout.size() - i);
@@ -471,7 +471,7 @@ int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& vi
                 mod_weight += int64_t(dcb.first + dcb.second) * (weight_per_data_byte - consensus_weight_per_byte);
             }
         }
-        if (::g_reject_bpub) mod_weight += int64_t(BPUBBytes(tx)) * (weight_per_data_byte - 1);
+        mod_weight += int64_t(MultisigKeyDataBytes(tx)) * (weight_per_data_byte - 1);
         if (weight_per_data_byte > WITNESS_SCALE_FACTOR) {
             for (size_t i{tx.vout.size()}; i; ) {
                 const CTxOut& txout = tx.vout[--i];
@@ -484,9 +484,7 @@ int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& vi
     return int32_t(std::min(mod_weight, int64_t{std::numeric_limits<int32_t>::max()}));
 }
 
-bool g_reject_bpub{DEFAULT_REJECT_BPUB};
-
-static bool IsBPUBHeader(const std::vector<unsigned char>& head)
+static bool IsKeyDataHeader(const std::vector<unsigned char>& head)
 {
     if (head.size() < 10) return false;
     if (std::equal(head.begin(), head.begin() + 4, "BPUB")) return head[4] == 1;
@@ -497,13 +495,14 @@ static bool IsBPUBHeader(const std::vector<unsigned char>& head)
     return body_len >= 44 && body_len <= MAX_BLOCK_SERIALIZED_SIZE && ReadBE32(head.data() + 6) == 0;
 }
 
-size_t BPUBBytes(const CTransaction& tx)
+size_t MultisigKeyDataBytes(const CTransaction& tx)
 {
-    // A BPUB reader joins, in input order, each input whose witness ends in a 1-of-N multisig
-    // with the same last key, taking each key but the last, less its first and last bytes, and
-    // reads the result as a stream that opens with a header. Nothing checks those keys, since the
-    // last one signs first, so one reader takes pushes of any size but OP_0, and N as any opcode
-    // valued 0x50 + N; another takes only compressed keys and OP_N, skipping any other input.
+    // Spam can be pushed as the keys of a 1-of-N multisig, since nothing checks the other keys
+    // once the last one signs. Inputs whose witness ends in such a script with the same last key
+    // are joined in input order, taking each key but the last less its first and last bytes, and
+    // counted when the result opens with a known spam header. Keys are taken both as pushes of
+    // any size but OP_0, with N as any opcode valued 0x50 + N, and as compressed keys with OP_N
+    // only, skipping any other input.
     struct Input {
         std::vector<unsigned char> control, head;
         bool compressed_keys;
@@ -547,7 +546,7 @@ size_t BPUBBytes(const CTransaction& tx)
             }
             stream_bytes += input->bytes;
         }
-        if (IsBPUBHeader(head) || IsBPUBHeader(compressed_head)) bytes += stream_bytes;
+        if (IsKeyDataHeader(head) || IsKeyDataHeader(compressed_head)) bytes += stream_bytes;
         stream = end;
     }
     return bytes;
