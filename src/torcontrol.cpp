@@ -679,6 +679,7 @@ std::string TorController::LaunchTor()
     if (m_process) {
         try {
             m_process->kill();
+            m_process->wait();
         } catch (...) {
             // ignore any exceptions
         }
@@ -708,6 +709,7 @@ std::string TorController::LaunchTor()
     if (portline.compare(0, 5, "PORT=")) {
         LogDebug(BCLog::TOR, "tor: Unrecognized control port line in file\n");
         m_process->kill();
+        m_process->wait();
         delete m_process;
         m_process = nullptr;
         throw std::runtime_error("port line unrecognized");
