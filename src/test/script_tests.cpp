@@ -1719,7 +1719,7 @@ BOOST_AUTO_TEST_CASE(script_DataCarrierBytes)
     BOOST_CHECK_EQUAL("0+82", DatacarrierBytesStr(olga_header, 3));
 
     // A dead branch guarded by a true constant before OP_NOTIF is data, the
-    // mirror of the OP_FALSE OP_IF envelope above (JXL-n-hide witness shape).
+    // mirror of the OP_FALSE OP_IF envelope above.
     BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_1 << OP_NOTIF << OP_7 << OP_ENDIF));
     BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_16 << OP_NOTIF << OP_7 << OP_ENDIF));
     // Empty dead branch counts its span, same as OP_FALSE OP_IF OP_ENDIF.
@@ -1757,12 +1757,12 @@ BOOST_AUTO_TEST_CASE(script_DataCarrierBytes)
     BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << "00"_hex << OP_IF << OP_7 << OP_ENDIF));
     BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << "01"_hex << OP_NOTIF << OP_7 << OP_ENDIF));
     BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << "01"_hex << OP_IF << OP_7 << OP_ENDIF));
-    // The witness script shape from JXL-n-hide tx 23e8f946...: OP_1 OP_NOTIF,
+    // The witness script shape from mainnet tx 23e8f946...: OP_1 OP_NOTIF,
     // six 255-byte pushes, OP_ENDIF OP_1. The whole dead branch is counted.
-    CScript jxl_witness = CScript() << OP_1 << OP_NOTIF;
-    for (int i = 0; i < 6; ++i) jxl_witness << std::vector<unsigned char>(255, 0xab);
-    jxl_witness << OP_ENDIF << OP_1;
-    BOOST_CHECK_EQUAL("0+1545", DatacarrierBytesStr(jxl_witness));
+    CScript dead_notif_witness = CScript() << OP_1 << OP_NOTIF;
+    for (int i = 0; i < 6; ++i) dead_notif_witness << std::vector<unsigned char>(255, 0xab);
+    dead_notif_witness << OP_ENDIF << OP_1;
+    BOOST_CHECK_EQUAL("0+1545", DatacarrierBytesStr(dead_notif_witness));
 
     // OP_ELSE switches between the counted and the live part: the live else of
     // a dead branch is not data, and the dead else of a live one is
@@ -1776,8 +1776,8 @@ BOOST_AUTO_TEST_CASE(script_DataCarrierBytes)
     // A dead branch nested in a live else is found
     BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_DUP << OP_IF << OP_ELSE << OP_0 << OP_IF << OP_7 << OP_ENDIF << OP_ENDIF));
 
-    // With -rejectdeadbranches=0 only the OP_FALSE OP_IF envelope counts, as before, through its OP_ENDIF
-    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(jxl_witness, 0, false));
+    // Without following constants only the OP_FALSE OP_IF envelope counts, as before, through its OP_ENDIF
+    BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(dead_notif_witness, 0, false));
     BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << OP_1 << OP_NOTIF << OP_7 << OP_ENDIF, 0, false));
     BOOST_CHECK_EQUAL("0+0", DatacarrierBytesStr(CScript() << "00"_hex << OP_IF << OP_7 << OP_ENDIF, 0, false));
     BOOST_CHECK_EQUAL("0+4", DatacarrierBytesStr(CScript() << OP_FALSE << OP_IF << OP_7 << OP_ENDIF, 0, false));

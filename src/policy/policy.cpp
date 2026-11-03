@@ -33,7 +33,6 @@
 #include <vector>
 
 unsigned int g_script_size_policy_limit{DEFAULT_SCRIPT_SIZE_POLICY_LIMIT};
-bool g_reject_dead_branches{DEFAULT_REJECT_DEAD_BRANCHES};
 
 CAmount GetDustThreshold(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
 {
@@ -641,7 +640,7 @@ std::pair<CScript, unsigned int> GetScriptForTransactionInput(CScript prevScript
  */
 static bool FollowDeadBranches(const CTxIn& txin)
 {
-    return ::g_reject_dead_branches && GetSerializeSize(txin.scriptWitness.stack) <= g_script_size_policy_limit;
+    return GetSerializeSize(txin.scriptWitness.stack) <= g_script_size_policy_limit;
 }
 
 std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsViewCache& view)
