@@ -2,11 +2,11 @@
 # Copyright (c) 2020-2021 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Script for verifying Bitcoin Core release binaries.
+"""Script for verifying Bitcoin Knots release binaries.
 
 This script attempts to download the sum file SHA256SUMS and corresponding
-signature file SHA256SUMS.asc from bitcoincore.org and bitcoin.org and
-compares them.
+signature file SHA256SUMS.asc from bitcoinknots.org and github.com. The hosts
+must agree on SHA256SUMS. Signatures are read from bitcoinknots.org.
 
 The sum-signature file is signed by a number of builder keys. This script
 ensures that there is a minimum threshold of signatures from pubkeys that
@@ -15,7 +15,7 @@ here, but by default is based upon local GPG trust settings.
 
 The builder keys are available in the guix.sigs repo:
 
-    https://github.com/bitcoin-core/guix.sigs/tree/main/builder-keys
+    https://github.com/bitcoinknots/guix.sigs/tree/knots/builder-keys
 
 If a minimum good, trusted signature threshold is met on the sum file, we then
 download the files specified in SHA256SUMS, and check if the hashes of these
@@ -46,9 +46,8 @@ from hashlib import sha256
 from pathlib import PurePath, Path
 
 # The primary host; this will fail if we can't retrieve files from here.
-HOST1 = "https://bitcoincore.org"
-HOST2 = "https://bitcoin.org"
-VERSIONPREFIX = "bitcoin-core-"
+HOST1 = "https://bitcoinknots.org"
+HOST2 = "https://github.com"
 SUMS_FILENAME = 'SHA256SUMS'
 SIGNATUREFILENAME = f"{SUMS_FILENAME}.asc"
 
@@ -96,8 +95,18 @@ def bool_from_env(key, default=False) -> bool:
     raise ValueError(f"Unrecognized environment value {key}={raw!r}")
 
 
-VERSION_FORMAT = "<major>.<minor>[.<patch>][-rc[0-9]][-platform]"
-VERSION_EXAMPLE = "22.0 or 23.1-rc1-darwin.dmg or 27.0-x86_64-linux-gnu"
+VERSION_FORMAT = "<major>.<minor>[.<patch>].knots<YYYYMMDD>[rc[0-9]][-platform]"
+VERSION_EXAMPLE = (
+    "29.4.1.knots20260508 or 29.4.1.knots20260508rc1 "
+    "or 29.4.1.knots20260508-x86_64-linux-gnu.tar.gz")
+
+# Knots releases are versioned "<major>.<minor>[.<patch>].knots<YYYYMMDD>", with
+# release candidates appending "rc<N>" directly (no separator). See
+# CLIENT_VERSION_SUFFIX / CLIENT_VERSION_STRING in the top-level CMakeLists.txt.
+# The date is not the date of the release: it comes from the version suffix and
+# is carried across later point releases, so it cannot be derived or predicted.
+VERSION_RE = re.compile(
+    r'^(?P<base>(?P<major>\d+)\.\d+(?:\.\d+)?\.knots\d{8})(?:rc(?P<rc>\d+))?$')
 
 def parse_version_string(version_str):
     # "<version>[-rcN][-platform]"
@@ -259,24 +268,31 @@ def files_are_equal(filename1, filename2):
 
 
 def get_files_from_hosts_and_compare(
-    hosts: list[str], path: str, filename: str, require_all: bool = False
-) -> ReturnCode:
+    hosts: list[str], paths: list[str], filename: str, require_all: bool = False,
+    must_match: bool = True,
+) -> tuple[ReturnCode, bool]:
     """
     Retrieve the same file from a number of hosts and ensure they have the same contents.
     The first host given will be treated as the "primary" host, and is required to succeed.
 
+    Returns the status, and whether every host provided the file.
+
     Args:
+        paths: the path to the file on each host, in the same order as hosts;
+            the hosts lay their releases out differently.
         filename: for writing the file locally.
+        must_match: if false, a difference between hosts is a warning, not an error.
     """
     assert len(hosts) > 1
+    assert len(hosts) == len(paths)
     primary_host = hosts[0]
     other_hosts = hosts[1:]
     got_files = []
 
-    def join_url(host: str) -> str:
+    def join_url(host: str, path: str) -> str:
         return host.rstrip('/') + '/' + path.lstrip('/')
 
-    url = join_url(primary_host)
+    url = join_url(primary_host, paths[0])
     success, output = download_with_wget(url, filename)
     if not success:
         log.error(
@@ -285,13 +301,13 @@ def get_files_from_hosts_and_compare(
             f"{VERSION_FORMAT} "
             f"(example: {VERSION_EXAMPLE})\n"
             f"wget output:\n{indent(output)}")
-        return ReturnCode.FILE_GET_FAILED
+        return ReturnCode.FILE_GET_FAILED, False
     else:
         log.info(f"got file {url} as {filename}")
         got_files.append(filename)
 
     for i, host in enumerate(other_hosts):
-        url = join_url(host)
+        url = join_url(host, paths[i + 1])
         fname = filename + f'.{i + 2}'
         success, output = download_with_wget(url, fname)
 
@@ -299,7 +315,7 @@ def get_files_from_hosts_and_compare(
             log.error(
                 f"{host} failed to provide file ({url}), but {primary_host} did?\n"
                 f"wget output:\n{indent(output)}")
-            return ReturnCode.FILE_MISSING_FROM_ONE_HOST
+            return ReturnCode.FILE_MISSING_FROM_ONE_HOST, False
         elif not success:
             log.warning(
                 f"{host} failed to provide file ({url}). "
@@ -314,10 +330,13 @@ def get_files_from_hosts_and_compare(
 
         compare_to = got_files[i + 1]
         if not files_are_equal(got_file, compare_to):
-            log.error(f"files not equal: {got_file} and {compare_to}")
-            return ReturnCode.FILES_NOT_EQUAL
+            if must_match:
+                log.error(f"files not equal: {got_file} and {compare_to}")
+                return ReturnCode.FILES_NOT_EQUAL, False
+            log.warning(f"files not equal: {got_file} and {compare_to}. "
+                        f"Using the copy from {primary_host}.")
 
-    return ReturnCode.SUCCESS
+    return ReturnCode.SUCCESS, len(got_files) == len(hosts)
 
 
 def check_multisig(sums_file: str, sigfilename: str, args: argparse.Namespace) -> tuple[int, str, list[SigData], list[SigData], list[SigData]]:
@@ -461,20 +480,38 @@ def verify_published_handler(args: argparse.Namespace) -> ReturnCode:
         shutil.rmtree(WORKINGDIR)
 
     # determine remote dir dependent on provided version string
-    try:
-        version_base, version_rc, os_filter = parse_version_string(args.version)
-        version_tuple = [int(i) for i in version_base.split('.')]
-    except Exception as e:
-        log.debug(e)
+    # A "-rcN" separated by a dash is Bitcoin Core's spelling. Knots appends "rcN"
+    # directly, so reject the dashed form rather than silently verifying the final
+    # release instead of the release candidate that was asked for.
+    version_base, dashed_rc, os_filter = parse_version_string(args.version)
+    parsed_version = VERSION_RE.match(version_base)
+    if dashed_rc or not parsed_version:
         log.error(f"unable to parse version; expected format is {VERSION_FORMAT}")
         log.error(f"  e.g. {VERSION_EXAMPLE}")
         return ReturnCode.BAD_VERSION
 
-    remote_dir = f"/bin/{VERSIONPREFIX}{version_base}/"
+    version_major = int(parsed_version.group('major'))
+    version_rc = parsed_version.group('rc')
+
+    # 21.x releases (the newest major below this threshold; no 22.x files were published)
+    # ship a clearsigned sums file, which this script cannot verify.
+    if version_major < 22:
+        log.error("Version too old - single sig not supported. Use a previous "
+                  "version of this script from the repo.")
+        return ReturnCode.BAD_VERSION
+
+    # Release candidates live in a subdirectory of the final release's directory,
+    # so the "rcN" suffix is part of the filenames but not of the directory name.
+    remote_dir = f"/files/{version_major}.x/{parsed_version.group('base')}/"
     if version_rc:
-        remote_dir += f"test.{version_rc}/"
-    remote_sigs_path = remote_dir + SIGNATUREFILENAME
-    remote_sums_path = remote_dir + SUMS_FILENAME
+        remote_dir += f"test/rc{version_rc}/"
+
+    # Only final releases are published on GitHub, and it lays them out differently,
+    # so each host needs its own path. For a release candidate the GitHub download
+    # simply fails and the primary host is used alone.
+    github_dir = f"/bitcoinknots/bitcoin/releases/download/v{version_base}/"
+    remote_sigs_paths = [remote_dir + SIGNATUREFILENAME, github_dir + SIGNATUREFILENAME]
+    remote_sums_paths = [remote_dir + SUMS_FILENAME, github_dir + SUMS_FILENAME]
 
     # create working directory
     os.makedirs(WORKINGDIR, exist_ok=True)
@@ -482,21 +519,21 @@ def verify_published_handler(args: argparse.Namespace) -> ReturnCode:
 
     hosts = [HOST1, HOST2]
 
-    got_sig_status = get_files_from_hosts_and_compare(
-        hosts, remote_sigs_path, SIGNATUREFILENAME, args.require_all_hosts)
-    if got_sig_status != ReturnCode.SUCCESS:
-        return got_sig_status
-
-    # Multi-sig verification is available after 22.0.
-    if version_tuple[0] < 22:
-        log.error("Version too old - single sig not supported. Use a previous "
-                  "version of this script from the repo.")
-        return ReturnCode.BAD_VERSION
-
-    got_sums_status = get_files_from_hosts_and_compare(
-        hosts, remote_sums_path, SUMS_FILENAME, args.require_all_hosts)
+    got_sums_status, sums_on_all_hosts = get_files_from_hosts_and_compare(
+        hosts, remote_sums_paths, SUMS_FILENAME, args.require_all_hosts)
     if got_sums_status != ReturnCode.SUCCESS:
         return got_sums_status
+
+    # Builders can add signatures after a release, so the hosts' signature files
+    # may differ. That is safe once both hosts have provided the same SHA256SUMS,
+    # because each signature is checked against that file. Some older releases
+    # have no SHA256SUMS on GitHub. For those, matching signature files are the
+    # only check that a second host gives.
+    got_sig_status, _ = get_files_from_hosts_and_compare(
+        hosts, remote_sigs_paths, SIGNATUREFILENAME, args.require_all_hosts,
+        must_match=not sums_on_all_hosts)
+    if got_sig_status != ReturnCode.SUCCESS:
+        return got_sig_status
 
     # Verify the signature on the SHA256SUMS file
     sigs_status, good_trusted, good_untrusted, unknown, bad = verify_shasums_signature(SIGNATUREFILENAME, SUMS_FILENAME, args)
@@ -513,15 +550,16 @@ def verify_published_handler(args: argparse.Namespace) -> ReturnCode:
         log.error(f"No files matched the platform specified. Did you mean: {closest_match}")
         return ReturnCode.NO_BINARIES_MATCH
 
-    # remove binaries that are known not to be hosted by bitcoincore.org
-    fragments_to_remove = ['-unsigned', '-debug', '-codesignatures']
+    # Skip intermediate build artifacts. These are hosted, but they are only of
+    # interest to developers and the debug archives are very large.
+    fragments_to_remove = ['-unsigned', '-debug', '-codesigning', '-codesignatures']
     for fragment in fragments_to_remove:
         nobinaries = [i for i in hashes_to_verify if fragment in i[1]]
         if nobinaries:
             remove_str = ', '.join(i[1] for i in nobinaries)
             log.info(
                 f"removing *{fragment} binaries ({remove_str}) from verification "
-                f"since {HOST1} does not host *{fragment} binaries")
+                "since they are build artifacts, not release binaries")
             hashes_to_verify = [i for i in hashes_to_verify if fragment not in i[1]]
 
     # download binaries
@@ -673,7 +711,7 @@ def main():
     pub_parser.set_defaults(func=verify_published_handler)
     pub_parser.add_argument(
         'version', type=str, help=(
-            f'version of the bitcoin release to download; of the format '
+            f'version of the Bitcoin Knots release to download; of the format '
             f'{VERSION_FORMAT}. Example: {VERSION_EXAMPLE}')
     )
     pub_parser.add_argument(
@@ -686,7 +724,7 @@ def main():
         default=bool_from_env('BINVERIFY_REQUIRE_ALL_HOSTS'),
         help=(
             f'If set, require all hosts ({HOST1}, {HOST2}) to provide signatures. '
-            '(Sometimes bitcoin.org lags behind bitcoincore.org.)')
+            '(Release candidates are not published on GitHub.)')
     )
 
     bin_parser = subparsers.add_parser("bin", help="Verify local binaries.")
