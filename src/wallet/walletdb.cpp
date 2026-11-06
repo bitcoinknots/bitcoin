@@ -1239,6 +1239,9 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
     if (any_unordered)
         result = pwallet->ReorderTransactions();
 
+    // Needs nOrderPos set on every transaction, so it runs after reordering
+    if (result == DBErrors::LOAD_OK) pwallet->MarkMalleationsReplaced(*this);
+
     // Upgrade all of the wallet keymetadata to have the hd master key id
     // This operation is not atomic, but if it fails, updated entries are still backwards compatible with older software
     try {

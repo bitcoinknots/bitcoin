@@ -328,8 +328,9 @@ public:
         m_is_cache_empty = true;
     }
 
-    /** True if only scriptSigs are different */
-    bool IsEquivalentTo(const CWalletTx& tx) const;
+    /** True if tx is a malleation of this, i.e. it has the exact same version, locktime,
+     * input order, input outpoints, input sequences, and outputs. Input scriptSigs and input scriptWitnesses may differ. */
+    bool IsMalleation(const CWalletTx& tx) const;
 
     bool InMempool() const;
 
