@@ -151,6 +151,35 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         options.coinbase_maturity_long_expiry = expiry;
     }
 
+    if (const auto arg{args.GetArg("-testcoinbasematurityrolling")}; arg) {
+        const auto values{SplitString(*arg, ':')};
+        if (values.size() != 4) {
+            throw std::runtime_error(strprintf("Invalid format (%s) for -testcoinbasematurityrolling=<activation_height>:<start_height>:<end_height>:<maturity>.", *arg));
+        }
+
+        int32_t activation_height;
+        int32_t start_height;
+        int32_t end_height;
+        int32_t maturity;
+        if (!ParseInt32(values[0], &activation_height) || activation_height < 2 || activation_height >= std::numeric_limits<int>::max()) {
+            throw std::runtime_error(strprintf("Invalid activation height (%s) for -testcoinbasematurityrolling=<activation_height>:<start_height>:<end_height>:<maturity>.", values[0]));
+        }
+        if (!ParseInt32(values[1], &start_height) || start_height < 0 || start_height >= std::numeric_limits<int>::max()) {
+            throw std::runtime_error(strprintf("Invalid start height (%s) for -testcoinbasematurityrolling=<activation_height>:<start_height>:<end_height>:<maturity>.", values[1]));
+        }
+        if (!ParseInt32(values[2], &end_height) || end_height <= start_height || end_height >= std::numeric_limits<int>::max()) {
+            throw std::runtime_error(strprintf("Invalid end height (%s) for -testcoinbasematurityrolling=<activation_height>:<start_height>:<end_height>:<maturity>.", values[2]));
+        }
+        if (!ParseInt32(values[3], &maturity) || maturity <= COINBASE_MATURITY) {
+            throw std::runtime_error(strprintf("Invalid maturity (%s) for -testcoinbasematurityrolling=<activation_height>:<start_height>:<end_height>:<maturity>: must exceed COINBASE_MATURITY.", values[3]));
+        }
+
+        options.coinbase_maturity_rolling_activation_height = activation_height;
+        options.coinbase_maturity_rolling_start_height = start_height;
+        options.coinbase_maturity_rolling_end_height = end_height;
+        options.coinbase_maturity_rolling = maturity;
+    }
+
     for (const std::string& strDeployment : args.GetArgs("-vbparams")) {
         std::vector<std::string> vDeploymentParams = SplitString(strDeployment, ':');
         if (vDeploymentParams.size() < 3 || 7 < vDeploymentParams.size()) {
