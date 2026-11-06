@@ -440,6 +440,11 @@ BOOST_AUTO_TEST_CASE(blake2b_256_testvectors)
 
     test("", "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8");
     test("abc", "bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319");
+    test(std::string(127, 'a'), "59e2f1aba240f20aa591016f5ef429990bc9c2131dcd0d30f0ffd75ed18f317d");
+    test(std::string(128, 'a'), "ae2aa48507885c4c950fb809b2076f959cde9f8ea6da260d9a3587df33dac450");
+    test(std::string(129, 'a'), "2f64744a6de0d2c0b56e64cf6e29a5aaa255010d415d51c75ccc82f73dccd865");
+    test(std::string(256, 'a'), "eae4d3a7627549b383179dc18049964f91a6fed14c9f3fb26705eda3eeda5558");
+    test(std::string(1000000, 'a'), "0741850f36cba4259628355d1073e24ddb9ca0e1bfac36fd39ae5dc2101e23a4");
 }
 
 BOOST_AUTO_TEST_CASE(sha512_testvectors) {
