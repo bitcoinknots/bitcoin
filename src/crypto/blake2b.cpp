@@ -81,7 +81,7 @@ static void blake2b_init0( blake2b_state *S )
 }
 
 /* init xors IV with input parameter block */
-int blake2b_init_param( blake2b_state *S, const blake2b_param *P )
+static int blake2b_init_param( blake2b_state *S, const blake2b_param *P )
 {
   const uint8_t *p = ( const uint8_t * )( P );
   size_t i;
