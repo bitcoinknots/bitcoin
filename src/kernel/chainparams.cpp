@@ -441,7 +441,7 @@ public:
 
         consensus.CoinbaseMaturityLongStartHeight = 151406;
         consensus.CoinbaseMaturityLongEnforceHeight = 151550;
-        consensus.CoinbaseMaturityLongReleaseHeight = 158111;
+        consensus.CoinbaseMaturityLongReleaseHeight = 154801;
         consensus.CoinbaseMaturityLong = consensus.CoinbaseMaturityLongReleaseHeight - consensus.CoinbaseMaturityLongStartHeight;
         AddLongCoinbaseMaturityRevalidationDeployment(consensus);
 
