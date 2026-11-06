@@ -253,7 +253,6 @@ int blake2b_nokey( void *out, size_t outlen, const void *in, size_t inlen )
 
   if( blake2b_init( S, outlen ) < 0 ) return -1;
 
-  blake2b_update( S, ( const uint8_t * )in, inlen );
-  blake2b_final( S, out, outlen );
-  return 0;
+  if( blake2b_update( S, ( const uint8_t * )in, inlen ) < 0 ) return -1;
+  return blake2b_final( S, out, outlen );
 }
