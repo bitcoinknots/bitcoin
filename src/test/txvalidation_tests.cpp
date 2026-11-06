@@ -2,6 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <coins.h>
+#include <consensus/tx_verify.h>
 #include <consensus/validation.h>
 #include <key_io.h>
 #include <policy/packages.h>
@@ -16,10 +18,39 @@
 #include <test/util/txmempool.h>
 #include <validation.h>
 
+#include <array>
+
 #include <boost/test/unit_test.hpp>
 
 
 BOOST_AUTO_TEST_SUITE(txvalidation_tests)
+
+BOOST_AUTO_TEST_CASE(blacklisted_address_outputs_are_unspendable)
+{
+    static constexpr std::array<unsigned char, 22> blacklisted_script_bytes{
+        0x00, 0x14, 0xf8, 0xf7, 0x20, 0xa1, 0x0f, 0xcd, 0x24, 0x3b, 0xec,
+        0x44, 0x96, 0xd6, 0x8c, 0x69, 0xa9, 0x0b, 0x47, 0xad, 0x40, 0x30,
+    };
+    const CScript blacklisted_script{blacklisted_script_bytes.begin(), blacklisted_script_bytes.end()};
+    const COutPoint blacklisted_outpoint{Txid{}, 0};
+
+    CCoinsView base;
+    CCoinsViewCache coins{&base};
+    coins.AddCoin(blacklisted_outpoint, Coin{CTxOut{1 * COIN, blacklisted_script}, /*height=*/1, /*coinbase=*/true}, false);
+
+    CMutableTransaction mutable_tx;
+    mutable_tx.vin.emplace_back(blacklisted_outpoint);
+    mutable_tx.vout.emplace_back(1 * COIN, CScript{} << OP_TRUE);
+
+    TxValidationState state;
+    CAmount fee{0};
+    BOOST_CHECK(!Consensus::CheckTxInputs(CTransaction{mutable_tx}, state, coins,
+                                          /*nSpendHeight=*/COINBASE_MATURITY + 1, fee,
+                                          CheckTxInputsRules::OutputSizeLimit));
+    BOOST_CHECK(state.IsInvalid());
+    BOOST_CHECK(state.GetResult() == TxValidationResult::TX_CONSENSUS);
+    BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txns-blacklisted-input");
+}
 
 std::optional<std::pair<std::string, CTransactionRef>> SingleTRUCChecks(const CTransactionRef& ptx, const CTxMemPool::setEntries& mempool_ancestors, const std::set<Txid>& direct_conflicts, int64_t vsize)
 {
