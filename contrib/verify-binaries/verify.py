@@ -5,8 +5,8 @@
 """Script for verifying Bitcoin Knots release binaries.
 
 This script attempts to download the sum file SHA256SUMS and corresponding
-signature file SHA256SUMS.asc from bitcoinknots.org and github.com and
-compares them.
+signature file SHA256SUMS.asc from bitcoinknots.org and github.com. The hosts
+must agree on SHA256SUMS. Signatures are read from bitcoinknots.org.
 
 The sum-signature file is signed by a number of builder keys. This script
 ensures that there is a minimum threshold of signatures from pubkeys that
@@ -268,16 +268,20 @@ def files_are_equal(filename1, filename2):
 
 
 def get_files_from_hosts_and_compare(
-    hosts: list[str], paths: list[str], filename: str, require_all: bool = False
-) -> ReturnCode:
+    hosts: list[str], paths: list[str], filename: str, require_all: bool = False,
+    must_match: bool = True,
+) -> tuple[ReturnCode, bool]:
     """
     Retrieve the same file from a number of hosts and ensure they have the same contents.
     The first host given will be treated as the "primary" host, and is required to succeed.
+
+    Returns the status, and whether every host provided the file.
 
     Args:
         paths: the path to the file on each host, in the same order as hosts;
             the hosts lay their releases out differently.
         filename: for writing the file locally.
+        must_match: if false, a difference between hosts is a warning, not an error.
     """
     assert len(hosts) > 1
     assert len(hosts) == len(paths)
@@ -297,7 +301,7 @@ def get_files_from_hosts_and_compare(
             f"{VERSION_FORMAT} "
             f"(example: {VERSION_EXAMPLE})\n"
             f"wget output:\n{indent(output)}")
-        return ReturnCode.FILE_GET_FAILED
+        return ReturnCode.FILE_GET_FAILED, False
     else:
         log.info(f"got file {url} as {filename}")
         got_files.append(filename)
@@ -311,7 +315,7 @@ def get_files_from_hosts_and_compare(
             log.error(
                 f"{host} failed to provide file ({url}), but {primary_host} did?\n"
                 f"wget output:\n{indent(output)}")
-            return ReturnCode.FILE_MISSING_FROM_ONE_HOST
+            return ReturnCode.FILE_MISSING_FROM_ONE_HOST, False
         elif not success:
             log.warning(
                 f"{host} failed to provide file ({url}). "
@@ -326,10 +330,13 @@ def get_files_from_hosts_and_compare(
 
         compare_to = got_files[i + 1]
         if not files_are_equal(got_file, compare_to):
-            log.error(f"files not equal: {got_file} and {compare_to}")
-            return ReturnCode.FILES_NOT_EQUAL
+            if must_match:
+                log.error(f"files not equal: {got_file} and {compare_to}")
+                return ReturnCode.FILES_NOT_EQUAL, False
+            log.warning(f"files not equal: {got_file} and {compare_to}. "
+                        f"Using the copy from {primary_host}.")
 
-    return ReturnCode.SUCCESS
+    return ReturnCode.SUCCESS, len(got_files) == len(hosts)
 
 
 def check_multisig(sums_file: str, sigfilename: str, args: argparse.Namespace) -> tuple[int, str, list[SigData], list[SigData], list[SigData]]:
@@ -486,6 +493,13 @@ def verify_published_handler(args: argparse.Namespace) -> ReturnCode:
     version_major = int(parsed_version.group('major'))
     version_rc = parsed_version.group('rc')
 
+    # 21.x releases (the newest major below this threshold; no 22.x files were published)
+    # ship a clearsigned sums file, which this script cannot verify.
+    if version_major < 22:
+        log.error("Version too old - single sig not supported. Use a previous "
+                  "version of this script from the repo.")
+        return ReturnCode.BAD_VERSION
+
     # Release candidates live in a subdirectory of the final release's directory,
     # so the "rcN" suffix is part of the filenames but not of the directory name.
     remote_dir = f"/files/{version_major}.x/{parsed_version.group('base')}/"
@@ -505,22 +519,21 @@ def verify_published_handler(args: argparse.Namespace) -> ReturnCode:
 
     hosts = [HOST1, HOST2]
 
-    got_sig_status = get_files_from_hosts_and_compare(
-        hosts, remote_sigs_paths, SIGNATUREFILENAME, args.require_all_hosts)
-    if got_sig_status != ReturnCode.SUCCESS:
-        return got_sig_status
-
-    # 21.x releases (the newest major below this threshold; there was no 22.x)
-    # ship a clearsigned sums file, which this script cannot verify.
-    if version_major < 22:
-        log.error("Version too old - single sig not supported. Use a previous "
-                  "version of this script from the repo.")
-        return ReturnCode.BAD_VERSION
-
-    got_sums_status = get_files_from_hosts_and_compare(
+    got_sums_status, sums_on_all_hosts = get_files_from_hosts_and_compare(
         hosts, remote_sums_paths, SUMS_FILENAME, args.require_all_hosts)
     if got_sums_status != ReturnCode.SUCCESS:
         return got_sums_status
+
+    # Builders can add signatures after a release, so the hosts' signature files
+    # may differ. That is safe once both hosts have provided the same SHA256SUMS,
+    # because each signature is checked against that file. Some older releases
+    # have no SHA256SUMS on GitHub. For those, matching signature files are the
+    # only check that a second host gives.
+    got_sig_status, _ = get_files_from_hosts_and_compare(
+        hosts, remote_sigs_paths, SIGNATUREFILENAME, args.require_all_hosts,
+        must_match=not sums_on_all_hosts)
+    if got_sig_status != ReturnCode.SUCCESS:
+        return got_sig_status
 
     # Verify the signature on the SHA256SUMS file
     sigs_status, good_trusted, good_untrusted, unknown, bad = verify_shasums_signature(SIGNATUREFILENAME, SUMS_FILENAME, args)

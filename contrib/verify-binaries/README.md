@@ -20,12 +20,24 @@ You can obtain these keys by
   - you can run the packaged `verify.py --import-keys ...` script to
     have it automatically retrieve unrecognized keys.
 
+Note that `--trusted-keys` only affects how already-valid signatures are labelled; it
+does not import anything. A key must be present in your local GPG keyring before its
+signature can count towards the threshold.
+
 #### Usage
 
 This script attempts to download the checksum file (`SHA256SUMS`) and corresponding
 signature file `SHA256SUMS.asc` from https://bitcoinknots.org and https://github.com.
 Only final releases are published on GitHub, so for a release candidate the check falls
 back to bitcoinknots.org alone.
+
+The two copies of the checksum file must match. The signature file is read from
+bitcoinknots.org, because builders can add signatures after a release; if GitHub's copy
+differs, the script warns and continues. Where GitHub has no checksum file, as for some
+older releases, the two signature files must match instead.
+
+`26.1.knots20240325` and `23.0.knots20220529` cannot pass these checks, because their
+files differ between the hosts.
 
 It first checks if the checksum file is valid based upon a plurality of signatures, and
 then downloads the release files specified in the checksum file, and checks if the
@@ -58,8 +70,8 @@ Get JSON output and don't prompt for user input (no auto key import):
 ./contrib/verify-binaries/verify.py --json pub 29.4.1.knots20260508rc1-linux-gnu
 ```
 
-Rely only on local GPG state and manually specified keys, while requiring a
-threshold of at least 5 good signatures:
+Mark specific keys as trusted, while requiring a threshold of at least 5 good
+signatures. Other good signatures still count towards the threshold:
 ```sh
 ./contrib/verify-binaries/verify.py \
     --trusted-keys <fingerprint>,<fingerprint> \
