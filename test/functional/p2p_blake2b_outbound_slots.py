@@ -36,6 +36,9 @@ Case G: stale peers hold the target and addrman fills with addresses that
         claim NODE_BLAKE2B and never answer. Each search for a fork-capable
         peer then finds one to dial, so it never comes up empty, and feelers
         still have to be made.
+Case H: stale peers hold the target and addrman holds no NODE_BLAKE2B
+        address. The node stops walking addrman twice a second, and still
+        dials one learned while it waits.
 """
 
 import os
@@ -98,6 +101,11 @@ RECOVERY_STEPS = 60
 # Case G: each pass of the dial loop either dials one of these or makes the
 # feeler, so a feeler must come long before this many of them are dialed.
 NUM_DEAD_CLAIMS = 200
+# Case H: one search walks at most 100 addresses and a feeler at most as many
+# again, where walking twice a second over the quiet window is a few thousand.
+MAX_SELECTED = 200
+# src/net.cpp BLAKE2B_SEARCH_INTERVAL
+BLAKE2B_SEARCH_INTERVAL = 30
 # Long enough for the two connections per second the dial loop used to make.
 QUIET_SECONDS = 15
 # The last slot can fill while a connection is already on its way, so let that
@@ -556,6 +564,46 @@ class Blake2bOutboundSlots(BitcoinTestFramework):
             self.wait_until(lambda: feeler_made() or len(self.dialed) > dials)
         assert feeler_made(), f"no feeler in {claim_dials()} dials of addresses that never answer"
         self.log.info(f"made a feeler after {claim_dials()} dials of the {NUM_DEAD_CLAIMS} claims")
+
+        self.log.info("Case H: with no NODE_BLAKE2B address in addrman, wait instead of walking it")
+        self.stop_node(0)
+        for stale in ("peers.dat", "anchors.dat"):
+            (node.chain_path / stale).unlink(missing_ok=True)
+        self.proxy.keep_alive = True
+        self.dead = False
+        self.dialed.clear()
+        self.arm_listeners({PRE_FORK: NUM_PRE_FORK_LISTENERS + target, FORK_CAPABLE: 1})
+        mark = node.debug_log_path.stat().st_size
+        self.start_node(0)
+        for n in range(NUM_STALE_ADDRS):
+            node.addpeeraddress(f"251.{n}.0.1", 8333, False, PRE_FORK)
+        self.wait_serving(lambda: f"connected to stale outbound peer ({DEFAULT_MAXSTALEOUTBOUND}/"
+                          in self.log_since(node, mark), timeout=60)
+        time.sleep(SETTLE_SECONDS)
+        node.logging(include=["addrman"])
+        mark = node.debug_log_path.stat().st_size
+        time.sleep(QUIET_SECONDS)
+        node.logging(exclude=["addrman"])
+        selected = self.log_since(node, mark).count("Selected ")
+        assert selected <= MAX_SELECTED, f"{selected} addrman selections in {QUIET_SECONDS}s"
+
+        mark = node.debug_log_path.stat().st_size
+        node.addpeeraddress("250.0.0.1", 8333, False, FORK_CAPABLE)
+        start = time.time()
+
+        def dialed():
+            return len(self.outbound(node, "outbound-full-relay", fork_capable=True)) == 1
+
+        try:
+            self.wait_serving(dialed, timeout=BLAKE2B_SEARCH_INTERVAL + 30)
+        except AssertionError:
+            # A feeler can reach it first, after which the search passes over
+            # it as recently tried for 10 minutes.
+            assert "Making feeler connection to 250.0.0.1" in self.log_since(node, mark)
+            node.setmocktime(int(time.time()) + 11 * 60)
+            self.wait_serving(dialed, timeout=60)
+        self.log.info(f"{selected} addrman selections in {QUIET_SECONDS}s, then dialed a "
+                      f"NODE_BLAKE2B address {time.time() - start:.0f}s after it was learned")
 
 
 if __name__ == '__main__':

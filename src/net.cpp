@@ -2699,6 +2699,8 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect, Spa
     auto next_feeler = start + rng.rand_exp_duration(FEELER_INTERVAL);
     auto next_extra_block_relay = start + rng.rand_exp_duration(EXTRA_BLOCK_RELAY_ONLY_PEER_INTERVAL);
     auto next_extra_network_peer{start + rng.rand_exp_duration(EXTRA_NETWORK_PEER_INTERVAL)};
+    constexpr auto BLAKE2B_SEARCH_INTERVAL{30s};
+    auto next_blake2b_search{start};
     const bool dnsseed = gArgs.GetBoolArg("-dnsseed", DEFAULT_DNSSEED);
     bool add_fixed_seeds = gArgs.GetBoolArg("-fixedseeds", DEFAULT_FIXEDSEEDS);
     const bool use_seednodes{!gArgs.GetArgs("-seednode").empty()};
@@ -2854,10 +2856,12 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect, Spa
         // a NODE_BLAKE2B one. There may be none, or only addresses that claim the
         // bit and never complete a handshake, so such a connection waits while a
         // feeler is due: stale peers holding the target then never keep feelers
-        // from being made. A connection that may still go to a stale peer goes
-        // ahead as usual.
+        // from being made. It also waits after addrman was found to hold no
+        // NODE_BLAKE2B address at all, rather than walking it twice a second. A
+        // connection that may still go to a stale peer goes ahead as usual.
         const bool feeler_due{now > next_feeler};
-        const auto may_open{[&](ConnectionType type) { return !feeler_due || m_msgproc->CanTolerateStaleOutbound(type); }};
+        const bool blake2b_wait{now < next_blake2b_search};
+        const auto may_open{[&](ConnectionType type) { return !(feeler_due || blake2b_wait) || m_msgproc->CanTolerateStaleOutbound(type); }};
 
         if (!m_anchors.empty() && (nOutboundBlockRelay < m_max_outbound_block_relay)) {
             conn_type = ConnectionType::BLOCK_RELAY;
@@ -3035,6 +3039,12 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect, Spa
 
             addrConnect = addr;
             break;
+        }
+
+        // A pass that missed may only have been unlucky, so wait only while
+        // addrman holds no NODE_BLAKE2B address at all.
+        if (blake2b_required && !addrConnect.IsValid() && nTries > 100 && addrman.CountAddr(NODE_BLAKE2B, 1) == 0) {
+            next_blake2b_search = now + BLAKE2B_SEARCH_INTERVAL;
         }
 
         if (addrConnect.IsValid()) {
