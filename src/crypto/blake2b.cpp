@@ -81,7 +81,7 @@ static void blake2b_init0( blake2b_state *S )
 }
 
 /* init xors IV with input parameter block */
-int blake2b_init_param( blake2b_state *S, const blake2b_param *P )
+static int blake2b_init_param( blake2b_state *S, const blake2b_param *P )
 {
   const uint8_t *p = ( const uint8_t * )( P );
   size_t i;
@@ -253,7 +253,6 @@ int blake2b_nokey( void *out, size_t outlen, const void *in, size_t inlen )
 
   if( blake2b_init( S, outlen ) < 0 ) return -1;
 
-  blake2b_update( S, ( const uint8_t * )in, inlen );
-  blake2b_final( S, out, outlen );
-  return 0;
+  if( blake2b_update( S, ( const uint8_t * )in, inlen ) < 0 ) return -1;
+  return blake2b_final( S, out, outlen );
 }
