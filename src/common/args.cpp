@@ -272,6 +272,18 @@ std::optional<unsigned int> ArgsManager::GetArgFlags(const std::string& name) co
     return std::nullopt;
 }
 
+std::optional<std::string> ArgsManager::GetArgHelpText(const std::string& name) const
+{
+    LOCK(cs_args);
+    for (const auto& arg_map : m_available_args) {
+        const auto search = arg_map.second.find(name);
+        if (search != arg_map.second.end()) {
+            return search->second.m_help_text;
+        }
+    }
+    return std::nullopt;
+}
+
 fs::path ArgsManager::GetPathArg(std::string arg, const fs::path& default_value) const
 {
     if (IsArgNegated(arg)) return fs::path{};

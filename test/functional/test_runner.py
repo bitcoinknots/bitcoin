@@ -223,6 +223,7 @@ BASE_SCRIPTS = [
     'mining_priority_fee.py',
     'rpc_getchaintips.py',
     'rpc_misc.py',
+    'rpc_settings.py',
     'p2p_1p1c_network.py',
     'interface_rest.py',
     'feature_chainstate_revalidation.py',

@@ -27,6 +27,7 @@
 #include <node/chainstatemanager_args.h>
 #include <node/context.h>
 #include <node/mempool_args.h> // for ParseDustDynamicOpt
+#include <node/policy_settings.h>
 #include <outputtype.h>
 #include <policy/settings.h>
 #include <util/moneystr.h> // for FormatMoney
@@ -823,8 +824,19 @@ bool OptionsModel::setOption(OptionID option, const QVariant& value, const std::
 {
     auto changed = [&] { return value.isValid() && value != getOption(option, suffix); };
     auto update = [&](const common::SettingsValue& value) { return UpdateRwSetting(node(), option, suffix, value); };
-
     bool successful = true; /* set to false on parse error */
+
+    // Apply a corepolicy/mempool setting through the shared node-side interface
+    // that setsettings/dumpsettings also use, so RPC and GUI change settings via
+    // the same code. Config-named (not GUI-inverted); invert at the call site.
+    auto apply_policy = [&](std::string_view name, const common::SettingsValue& v) {
+        if (!changed()) return;
+        if (auto result = node::UpdatePolicySetting(*node().context(), name, v); !result) {
+            qWarning() << "OptionsModel::setOption:" << QString::fromStdString(util::ErrorString(result).original);
+            successful = false;
+        }
+    };
+
     QSettings settings;
 
     switch (option) {
@@ -1123,38 +1135,11 @@ bool OptionsModel::setOption(OptionID option, const QVariant& value, const std::
         break;
     }
     case mempoolreplacement:
-    {
-        if (changed()) {
-            QString nv = value.toString();
-            if (nv == "never") {
-                node().mempool().m_opts.rbf_policy = RBFPolicy::Never;
-                node().updateRwSetting("mempoolfullrbf", "0");
-            } else if (nv == "fee,optin") {
-                node().mempool().m_opts.rbf_policy = RBFPolicy::OptIn;
-                node().updateRwSetting("mempoolfullrbf", "0");
-            } else {  // "fee,-optin"
-                node().mempool().m_opts.rbf_policy = RBFPolicy::Always;
-                node().updateRwSetting("mempoolfullrbf", "1");
-            }
-            gArgs.ModifyRWConfigFile("mempoolreplacement", nv.toStdString());
-        }
+        apply_policy("mempoolreplacement", UniValue(value.toString().toStdString()));
         break;
-    }
     case mempooltruc:
-    {
-        if (changed()) {
-            QString nv = value.toString();
-            if (nv == "reject") {
-                node().mempool().m_opts.truc_policy = TRUCPolicy::Reject;
-            } else if (nv == "accept") {
-                node().mempool().m_opts.truc_policy = TRUCPolicy::Accept;
-            } else if (nv == "enforce") {
-                node().mempool().m_opts.truc_policy = TRUCPolicy::Enforce;
-            }
-            node().updateRwSetting("mempooltruc", nv.toStdString());
-        }
+        apply_policy("mempooltruc", UniValue(value.toString().toStdString()));
         break;
-    }
     case maxorphantx:
     {
         if (changed()) {
@@ -1171,283 +1156,100 @@ bool OptionsModel::setOption(OptionID option, const QVariant& value, const std::
         break;
     }
     case maxmempool:
-    {
-        if (changed()) {
-            long long nOldValue = node().mempool().m_opts.max_size_bytes;
-            long long nNv = value.toLongLong();
-            std::string strNv = value.toString().toStdString();
-            node().mempool().m_opts.max_size_bytes = nNv * 1'000'000;
-            gArgs.ForceSetArg("-maxmempool", strNv);
-            gArgs.ModifyRWConfigFile("maxmempool", strNv);
-            if (nNv < nOldValue) {
-                LOCK(cs_main);
-                auto node_ctx = node().context();
-                assert(node_ctx && node_ctx->mempool && node_ctx->chainman);
-                auto& active_chainstate = node_ctx->chainman->ActiveChainstate();
-                LOCK(node_ctx->mempool->cs);
-                LimitMempoolSize(*node_ctx->mempool, active_chainstate.CoinsTip());
-            }
-        }
+        apply_policy("maxmempool", UniValue((int64_t)value.toLongLong()));
         break;
-    }
     case incrementalrelayfee:
-        if (changed()) {
-            CAmount nNv = value.toLongLong();
-            gArgs.ModifyRWConfigFile("incrementalrelayfee", FormatMoney(nNv));
-            node().mempool().m_opts.incremental_relay_feerate = CFeeRate(nNv);
-        }
+        apply_policy("incrementalrelayfee", UniValue(FormatMoney(value.toLongLong())));
         break;
     case mempoolexpiry:
-    {
-        if (changed()) {
-            const auto old_value = node().mempool().m_opts.expiry;
-            const std::chrono::hours new_value{value.toLongLong()};
-            std::string strNv = value.toString().toStdString();
-            node().mempool().m_opts.expiry = new_value;
-            gArgs.ForceSetArg("-mempoolexpiry", strNv);
-            gArgs.ModifyRWConfigFile("mempoolexpiry", strNv);
-            if (new_value < old_value) {
-                LOCK(cs_main);
-                auto node_ctx = node().context();
-                assert(node_ctx && node_ctx->mempool && node_ctx->chainman);
-                auto& active_chainstate = node_ctx->chainman->ActiveChainstate();
-                LOCK(node_ctx->mempool->cs);
-                LimitMempoolSize(*node_ctx->mempool, active_chainstate.CoinsTip());
-            }
-        }
+        apply_policy("mempoolexpiry", UniValue((int64_t)value.toLongLong()));
         break;
-    }
     case rejectunknownscripts:
-    {
-        if (changed()) {
-            const bool fNewValue = value.toBool();
-            node().mempool().m_opts.require_standard = fNewValue;
-            // This option is inverted in the config:
-            gArgs.ModifyRWConfigFile("acceptnonstdtxn", strprintf("%d", ! fNewValue));
-        }
+        // Inverted: GUI "reject unknown scripts" == config "acceptnonstdtxn" off.
+        apply_policy("acceptnonstdtxn", UniValue(!value.toBool()));
         break;
-    }
     case rejectunknownwitness:
-        if (changed()) {
-            // This option is inverted
-            const bool new_value = ! value.toBool();
-            node().updateRwSetting("acceptunknownwitness" + suffix, new_value);
-            node().mempool().m_opts.acceptunknownwitness = new_value;
-        }
+        apply_policy("acceptunknownwitness", UniValue(!value.toBool()));
         break;
     case rejectparasites:
-    {
-        if (changed()) {
-            const bool nv = value.toBool();
-            node().mempool().m_opts.reject_parasites = nv;
-            node().updateRwSetting("rejectparasites", nv);
-        }
+        apply_policy("rejectparasites", UniValue(value.toBool()));
         break;
-    }
     case rejecttokens:
-    {
-        if (changed()) {
-            const bool nv = value.toBool();
-            node().mempool().m_opts.reject_tokens = nv;
-            node().updateRwSetting("rejecttokens", nv);
-        }
+        apply_policy("rejecttokens", UniValue(value.toBool()));
         break;
-    }
     case subdustfeepenalty:
-    {
-        if (changed()) {
-            const bool nv = value.toBool();
-            node().mempool().m_opts.subdustfeepenalty = nv;
-            node().updateRwSetting("subdustfeepenalty", nv);
-        }
+        apply_policy("subdustfeepenalty", UniValue(value.toBool()));
         break;
-    }
     case rejectspkreuse:
         if (changed()) {
             const bool fNewValue = value.toBool();
-            gArgs.ModifyRWConfigFile("spkreuse", fNewValue ? "conflict" : "allow");
+            apply_policy("spkreuse", UniValue(fNewValue ? "conflict" : "allow"));
             f_rejectspkreuse = fNewValue;
             setRestartRequired(true);
         }
         break;
     case minrelaytxfee:
-        if (changed()) {
-            CAmount nNv = value.toLongLong();
-            gArgs.ModifyRWConfigFile("minrelaytxfee", FormatMoney(nNv));
-            node().mempool().m_opts.min_relay_feerate = CFeeRate(nNv);
-        }
+        apply_policy("minrelaytxfee", UniValue(FormatMoney(value.toLongLong())));
         break;
     case minrelaycoinblocks:
-        if (changed()) {
-            uint64_t nNv = value.toLongLong();
-            update(nNv);
-            node().mempool().m_opts.minrelaycoinblocks = nNv;
-        }
+        apply_policy("minrelaycoinblocks", UniValue((int64_t)value.toLongLong()));
         break;
     case minrelaymaturity:
-        if (changed()) {
-            int nNv = value.toInt();
-            update(nNv);
-            node().mempool().m_opts.minrelaymaturity = nNv;
-        }
+        apply_policy("minrelaymaturity", UniValue((int64_t)value.toInt()));
         break;
     case bytespersigop:
-        if (changed()) {
-            gArgs.ModifyRWConfigFile("bytespersigop", value.toString().toStdString());
-            nBytesPerSigOp = value.toLongLong();
-        }
+        apply_policy("bytespersigop", UniValue((int64_t)value.toLongLong()));
         break;
     case bytespersigopstrict:
-        if (changed()) {
-            gArgs.ModifyRWConfigFile("bytespersigopstrict", value.toString().toStdString());
-            nBytesPerSigOpStrict = value.toLongLong();
-        }
+        apply_policy("bytespersigopstrict", UniValue((int64_t)value.toLongLong()));
         break;
     case limitancestorcount:
-        if (changed()) {
-            long long nNv = value.toLongLong();
-            std::string strNv = value.toString().toStdString();
-            node().mempool().m_opts.limits.ancestor_count = nNv;
-            gArgs.ForceSetArg("-limitancestorcount", strNv);
-            gArgs.ModifyRWConfigFile("limitancestorcount", strNv);
-        }
+        apply_policy("limitancestorcount", UniValue((int64_t)value.toLongLong()));
         break;
     case limitancestorsize:
-        if (changed()) {
-            long long nNv = value.toLongLong();
-            std::string strNv = value.toString().toStdString();
-            node().mempool().m_opts.limits.ancestor_size_vbytes = nNv * 1'000;
-            gArgs.ForceSetArg("-limitancestorsize", strNv);
-            gArgs.ModifyRWConfigFile("limitancestorsize", strNv);
-        }
+        apply_policy("limitancestorsize", UniValue((int64_t)value.toLongLong()));
         break;
     case limitdescendantcount:
-        if (changed()) {
-            long long nNv = value.toLongLong();
-            std::string strNv = value.toString().toStdString();
-            node().mempool().m_opts.limits.descendant_count = nNv;
-            gArgs.ForceSetArg("-limitdescendantcount", strNv);
-            gArgs.ModifyRWConfigFile("limitdescendantcount", strNv);
-        }
+        apply_policy("limitdescendantcount", UniValue((int64_t)value.toLongLong()));
         break;
     case limitdescendantsize:
-        if (changed()) {
-            long long nNv = value.toLongLong();
-            std::string strNv = value.toString().toStdString();
-            node().mempool().m_opts.limits.descendant_size_vbytes = nNv * 1'000;
-            gArgs.ForceSetArg("-limitdescendantsize", strNv);
-            gArgs.ModifyRWConfigFile("limitdescendantsize", strNv);
-        }
+        apply_policy("limitdescendantsize", UniValue((int64_t)value.toLongLong()));
         break;
     case rejectbarepubkey:
-        if (changed()) {
-            // The config and internal option is inverted
-            const bool nv = ! value.toBool();
-            node().mempool().m_opts.permit_bare_pubkey = nv;
-            node().updateRwSetting("permitbarepubkey", nv);
-        }
+        apply_policy("permitbarepubkey", UniValue(!value.toBool()));
         break;
     case rejectbaremultisig:
-        if (changed()) {
-            // The config and internal option is inverted
-            const bool fNewValue = ! value.toBool();
-            node().mempool().m_opts.permit_bare_multisig = fNewValue;
-            gArgs.ModifyRWConfigFile("permitbaremultisig", strprintf("%d", fNewValue));
-        }
+        apply_policy("permitbaremultisig", UniValue(!value.toBool()));
         break;
     case permitephemeral:
-    {
-        if (changed()) {
-            std::string nv = value.toString().toStdString();
-            ApplyPermitEphemeralOption(nv, node().mempool().m_opts);
-            update(nv);
-        }
+        apply_policy("permitephemeral", UniValue(value.toString().toStdString()));
         break;
-    }
     case rejectbareanchor:
-        if (changed()) {
-            // The config and internal option is inverted
-            const bool nv = ! value.toBool();
-            node().mempool().m_opts.permitbareanchor = nv;
-            node().updateRwSetting("permitbareanchor", nv);
-        }
+        apply_policy("permitbareanchor", UniValue(!value.toBool()));
         break;
     case rejectbaredatacarrier:
-        if (changed()) {
-            // The config and internal option is inverted
-            const bool nv = ! value.toBool();
-            node().mempool().m_opts.permitbaredatacarrier = nv;
-            node().updateRwSetting("permitbaredatacarrier", nv);
-        }
+        apply_policy("permitbaredatacarrier", UniValue(!value.toBool()));
         break;
     case maxscriptsize:
-        if (changed()) {
-            const auto nv = value.toLongLong();
-            update(nv);
-            ::g_script_size_policy_limit = nv;
-        }
+        apply_policy("maxscriptsize", UniValue((int64_t)value.toLongLong()));
         break;
     case maxtxlegacysigops:
-        if (changed()) {
-            const auto nv = value.toLongLong();
-            update(nv);
-            node().mempool().m_opts.maxtxlegacysigops = nv;
-        }
+        apply_policy("maxtxlegacysigops", UniValue((int64_t)value.toLongLong()));
         break;
     case datacarriercost:
-        if (changed()) {
-            const double nNewSize = value.toDouble();
-            update(nNewSize);
-            ::g_weight_per_data_byte = nNewSize * WITNESS_SCALE_FACTOR;
-        }
+        apply_policy("datacarriercost", UniValue(value.toString().toStdString()));
         break;
     case datacarriersize:
-        if (changed()) {
-            const int nNewSize = value.toInt();
-            const bool fNewEn = (nNewSize > 0);
-            if (fNewEn) {
-                if (!node().mempool().m_opts.max_datacarrier_bytes.has_value()) {
-                    gArgs.ModifyRWConfigFile("datacarrier", strprintf("%d", fNewEn));
-                }
-                gArgs.ModifyRWConfigFile("datacarriersize", value.toString().toStdString());
-                node().mempool().m_opts.max_datacarrier_bytes = nNewSize;
-            } else {
-                gArgs.ModifyRWConfigFile("datacarrier", "0");
-                node().mempool().m_opts.max_datacarrier_bytes = std::nullopt;
-            }
-        }
+        apply_policy("datacarriersize", UniValue((int64_t)value.toInt()));
         break;
     case rejectnonstddatacarrier:
-        if (changed()) {
-            // This option is inverted
-            const bool new_value = ! value.toBool();
-            node().updateRwSetting("acceptnonstddatacarrier" + suffix, new_value);
-            node().mempool().m_opts.accept_non_std_datacarrier = new_value;
-        }
+        apply_policy("acceptnonstddatacarrier", UniValue(!value.toBool()));
         break;
     case dustrelayfee:
-        if (changed()) {
-            CAmount nNv = value.toLongLong();
-            gArgs.ModifyRWConfigFile("dustrelayfee", FormatMoney(nNv));
-            CFeeRate feerate{nNv};
-            node().mempool().m_opts.dust_relay_feerate_floor = feerate;
-            if (node().mempool().m_opts.dust_relay_feerate < feerate || !node().mempool().m_opts.dust_relay_target) {
-                node().mempool().m_opts.dust_relay_feerate = feerate;
-            } else {
-                node().mempool().UpdateDynamicDustFeerate();
-            }
-        }
+        apply_policy("dustrelayfee", UniValue(FormatMoney(value.toLongLong())));
         break;
     case dustdynamic:
-        if (changed()) {
-            const std::string newvalue_str = value.toString().toStdString();
-            const util::Result<std::pair<int32_t, int>> parsed = ParseDustDynamicOpt(newvalue_str, 1008 /* FIXME: get from estimator */);
-            assert(parsed);  // FIXME: what to do if it fails to parse?
-            // FIXME: save -prev-<type> for each type
-            update(newvalue_str);
-            node().mempool().m_opts.dust_relay_target = parsed->first;
-            node().mempool().m_opts.dust_relay_multiplier = parsed->second;
-        }
+        apply_policy("dustdynamic", UniValue(value.toString().toStdString()));
         break;
     case blockmintxfee:
         if (changed()) {
