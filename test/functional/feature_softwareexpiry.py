@@ -56,6 +56,25 @@ class SoftwareExpiryTest(BitcoinTestFramework):
         alerts_path.unlink()
         return stderr.rstrip()
 
+    def _test_getdisabledexpiry(self):
+        self.restart_node(0, extra_args=[
+            f'-mocktime={self.mocktime}',
+            '-softwareexpiry=3000000000',
+        ])
+        expiry = self.nodes[0].getgeneralinfo()
+        assert_equal(expiry['expiry'], 3000000000)
+        self.restart_node(0, extra_args=[
+            f'-mocktime={self.mocktime}',
+            '-softwareexpiry=0',
+        ])
+        expiry = self.nodes[0].getgeneralinfo()
+        assert_equal(expiry['expiry'], 0)
+        self.restart_node(0, extra_args=[
+            f'-mocktime={self.mocktime}',
+            '-softwareexpiry=-1',
+        ])
+        assert_equal(expiry['expiry'], 0)
+
     def run_test(self):
         nodes = self.nodes
         addr = nodes[0].get_deterministic_priv_key().address  # what address is irrelevant
@@ -149,6 +168,8 @@ class SoftwareExpiryTest(BitcoinTestFramework):
         self.log.info("Checking no unexpected alerts were triggered")
         assert not alerts_path.exists()
 
+        self.log.info("Checking expiry field when softwareexpiry is disabled in getgeneralinfo")
+        self._test_getdisabledexpiry()
 
 if __name__ == "__main__":
     SoftwareExpiryTest(__file__).main()
