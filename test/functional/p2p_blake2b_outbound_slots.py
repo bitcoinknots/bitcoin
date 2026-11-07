@@ -351,6 +351,7 @@ class Blake2bOutboundSlots(BitcoinTestFramework):
         self.dialed.clear()
         self.arm_listeners({FORK_CAPABLE: NUM_FORK_CAPABLE_LISTENERS,
                             PRE_FORK: NUM_PRE_FORK_LISTENERS})
+        case_start = node.debug_log_path.stat().st_size
         self.start_node(0, extra_args=self.extra_args[0] + ["-maxstaleoutbound=0"])
         self.seed_addrman(node, fork_capable=NUM_FORK_CAPABLE)
         self.wait_serving(lambda: len(
@@ -376,8 +377,8 @@ class Blake2bOutboundSlots(BitcoinTestFramework):
 
         for step in range(STALE_TIP_STEPS):
             if step == STALE_TIP_STEPS - 1:
-                # offset first: a feeler logged between here and the clear would
-                # otherwise reach the proxy unaccounted for and read as wasted
+                # offset first, so a dial after the clear has its log lines in
+                # the window
                 mark = node.debug_log_path.stat().st_size
                 with self.lock:
                     self.dialed.clear()
@@ -396,11 +397,18 @@ class Blake2bOutboundSlots(BitcoinTestFramework):
         self.wait_serving(lambda: len(self.outbound(node, "outbound-full-relay")) > target,
                           timeout=180)
 
-        window = self.log_since(node, mark)
-        feelers = {line.split("Making feeler connection to ")[1].split(":")[0]
-                   for line in window.splitlines() if "Making feeler connection to " in line}
+        # dials first: a feeler is logged before it reaches the proxy, so one
+        # that lands while the log is read is then still accounted for
         with self.lock:
-            wasted = [a for a in self.dialed if not a.startswith("250.") and a not in feelers]
+            dialed = list(self.dialed)
+        window = self.log_since(node, mark)
+        # A feeler logged several steps before the clear can still reach the
+        # proxy after it when the proxy is slow to answer, so read feelers from
+        # the whole case.
+        feelers = {line.split("Making feeler connection to ")[1].split(":")[0]
+                   for line in self.log_since(node, case_start).splitlines()
+                   if "Making feeler connection to " in line}
+        wasted = [a for a in dialed if not a.startswith("250.") and a not in feelers]
         assert_equal(window.count(REFUSED), 0)
         assert_equal(wasted, [])
         self.log.info(f"stale-tip peer dialed only fork-capable addresses, "
