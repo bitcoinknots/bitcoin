@@ -5,6 +5,8 @@
 #ifndef BITCOIN_QT_INTRO_H
 #define BITCOIN_QT_INTRO_H
 
+#include <util/fs.h>
+
 #include <QDialog>
 #include <QMutex>
 #include <QThread>
@@ -68,6 +70,8 @@ private Q_SLOTS:
 private:
     Ui::Intro *ui;
     bool m_prune_checkbox_is_default{true};
+    bool m_existing_chain{false};
+    Qt::CheckState m_prune_state_before_existing_chain{Qt::Unchecked};
     QThread* thread{nullptr};
     QMutex mutex;
     bool signalled{false};
@@ -78,6 +82,7 @@ private:
     int64_t m_required_space_gb{0};
     uint64_t m_bytes_available{0};
     int64_t m_prune_target_mib;
+    const fs::path m_net_datadir;
 
     void startThread();
     void checkPath(const QString &dataDir);
