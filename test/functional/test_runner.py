@@ -439,6 +439,7 @@ BASE_SCRIPTS = [
     'p2p_permissions.py',
     'feature_blocksdir.py',
     'wallet_startup.py',
+    'wallet_log_injection.py',
     'feature_remove_pruned_files_on_startup.py',
     'feature_prune_stale_fork.py',
     'p2p_i2p_ports.py',
