@@ -199,6 +199,9 @@ FUZZ_TARGET(muhash)
         },
         [&] {
             // Test that dividing a MuHash by itself brings it back to it's initial state
+            // Insert only multiplies the numerator, so without the Remove the denominator
+            // is still 1 and the division is trivially correct
+            muhash.Remove(data);
 
             // See note about clang + self-assignment in test/uint256_tests.cpp
             #if defined(__clang__)
