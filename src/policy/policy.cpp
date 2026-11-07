@@ -646,14 +646,23 @@ static bool FollowDeadBranches(const CTxIn& txin)
     return ::g_reject_dead_branches && GetSerializeSize(txin.scriptWitness.stack) <= g_script_size_policy_limit;
 }
 
-std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsViewCache& view)
+std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsViewCache& view, const std::vector<VerifiedKeys>* verified_keys)
 {
     std::pair<size_t, size_t> ret{0, 0};
+    // A set per input or none at all. A partial one is not an observation.
+    if (verified_keys && verified_keys->size() != tx.vin.size()) verified_keys = nullptr;
 
-    for (const CTxIn& txin : tx.vin) {
+    for (size_t i{0}; i < tx.vin.size(); ++i) {
+        const CTxIn& txin = tx.vin[i];
         const CTxOut &utxo = view.AccessCoin(txin.prevout).out;
         auto[script, consensus_weight_per_byte] = GetScriptForTransactionInput(utxo.scriptPubKey, txin);
-        const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness, FollowDeadBranches(txin));
+        // Recount from the verified keys only for an input whose counted script came from the witness:
+        // native P2WSH, a tapscript leaf, and P2SH-wrapped P2WSH, which GetScriptForTransactionInput
+        // returns with a per-byte weight of 1. The witness-based bypass lives there. A script taken from
+        // the scriptSig (legacy P2SH, bare multisig, P2PKH) comes back at WITNESS_SCALE_FACTOR, and keeps
+        // the static count unchanged, byte for byte.
+        const VerifiedKeys* input_keys{(verified_keys && consensus_weight_per_byte == 1) ? &(*verified_keys)[i] : nullptr};
+        const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness, FollowDeadBranches(txin), input_keys);
         ret.first += dcb.first;
         ret.second += dcb.second;
     }
