@@ -7,6 +7,7 @@
 
 #include <common/system.h>
 
+#include <httpnotify.h>
 #include <logging.h>
 #include <util/string.h>
 #include <util/time.h>
@@ -45,10 +46,16 @@ std::string ShellEscape(const std::string& arg)
 }
 #endif
 
-#if HAVE_SYSTEM
 void runCommand(const std::string& strCommand)
 {
     if (strCommand.empty()) return;
+
+    if (strCommand.starts_with("http://")) {
+        HttpNotify(strCommand);
+        return;
+    }
+
+#if HAVE_SYSTEM
 #ifndef WIN32
     int nErr = ::system(strCommand.c_str());
 #else
@@ -57,8 +64,10 @@ void runCommand(const std::string& strCommand)
     if (nErr) {
         LogWarning("runCommand error: system(%s) returned %d", strCommand, nErr);
     }
-}
+#else
+    LogWarning("runCommand: configured command was not run because shell execution is unavailable: %s", strCommand);
 #endif
+}
 
 void SetupEnvironment()
 {
