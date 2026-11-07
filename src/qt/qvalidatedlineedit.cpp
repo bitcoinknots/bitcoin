@@ -10,10 +10,13 @@
 
 #include <QColor>
 #include <QCoreApplication>
+#include <QEvent>
+#include <QFocusEvent>
 #include <QFont>
 #include <QInputMethodEvent>
 #include <QList>
 #include <QTextCharFormat>
+#include <QValidator>
 
 QValidatedLineEdit::QValidatedLineEdit(QWidget* parent)
     : QLineEdit(parent)
@@ -92,8 +95,13 @@ void QValidatedLineEdit::setValid(bool _valid, bool with_warning, const std::vec
 
 void QValidatedLineEdit::focusInEvent(QFocusEvent *evt)
 {
-    // Clear invalid flag on focus
-    setValid(true);
+    if (!m_allow_validation_while_editing) {
+        // Clear invalid flag on focus for normal fields
+        setValid(true);
+    } else {
+        // For validation-while-editing fields, recheck validity
+        checkValidity();
+    }
 
     QLineEdit::focusInEvent(evt);
 }
@@ -105,10 +113,27 @@ void QValidatedLineEdit::focusOutEvent(QFocusEvent *evt)
     QLineEdit::focusOutEvent(evt);
 }
 
+void QValidatedLineEdit::changeEvent(QEvent *e)
+{
+    if (e->type() == QEvent::PaletteChange) {
+        if (!valid) {
+            // Refresh styling using setValid function
+            setValid(valid);
+        }
+    }
+
+    QLineEdit::changeEvent(e);
+}
+
 void QValidatedLineEdit::markValid()
 {
     // As long as a user is typing ensure we display state as valid
-    setValid(true);
+    // unless we're validating while editing
+    if (m_allow_validation_while_editing) {
+        checkValidity();
+    } else {
+        setValid(true);
+    }
 }
 
 void QValidatedLineEdit::clear()
@@ -122,6 +147,9 @@ void QValidatedLineEdit::setEnabled(bool enabled)
     if (!enabled)
     {
         // A disabled QValidatedLineEdit should be marked valid
+        // Clear focus first to trigger focusOutEvent
+        // required to properly clear invalid visual state
+        if (hasFocus()) { clearFocus(); }
         setValid(true);
     }
     else
@@ -138,7 +166,7 @@ void QValidatedLineEdit::checkValidity()
     const bool has_warning = checkWarning();
     if (text().isEmpty())
     {
-        setValid(true);
+        setValid(m_allow_empty_input);
     }
     else if (hasAcceptableInput())
     {

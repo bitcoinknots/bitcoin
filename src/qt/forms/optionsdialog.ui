@@ -473,7 +473,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QLineEdit" name="proxyPort">
+          <widget class="QValidatedLineEdit" name="proxyPort">
            <property name="minimumSize">
             <size>
              <width>55</width>
@@ -660,7 +660,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QLineEdit" name="proxyPortTor">
+          <widget class="QValidatedLineEdit" name="proxyPortTor">
            <property name="minimumSize">
             <size>
              <width>55</width>
