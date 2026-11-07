@@ -276,6 +276,7 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   node/context.cpp
   node/database_args.cpp
   node/eviction.cpp
+  node/extrapool_persist.cpp
   node/interface_ui.cpp
   node/interfaces.cpp
   node/kernel_notifications.cpp
