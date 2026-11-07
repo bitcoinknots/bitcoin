@@ -140,6 +140,16 @@ For more information on ZMQ, see: [zmq.md](zmq.md)
 
 ---
 
+#### jemalloc Dependencies
+
+Support for jemalloc requires the following dependency:
+
+``` bash
+brew install jemalloc
+```
+
+---
+
 #### Test Suite Dependencies
 
 There is an included test suite that is useful for testing code changes when developing.
