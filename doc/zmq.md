@@ -172,8 +172,9 @@ hosts as well. If needed, this option has to be set on the client side too.
 
 From the perspective of bitcoind, the ZeroMQ socket is write-only; PUB
 sockets don't even have a read function. Thus, there is no state
-introduced into bitcoind directly. Furthermore, no information is
-broadcast that wasn't already received from the public P2P network.
+introduced into bitcoind directly. Block and transaction notifications
+relay data received from the public P2P network; wallet notifications
+relay data from the local wallet.
 
 No authentication or authorization is done on connecting clients; it
 is assumed that the ZeroMQ port is exposed only to trusted entities,
