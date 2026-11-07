@@ -12,8 +12,12 @@
 
 #include <variant>
 
+class CBlock;
 class CBlockIndex;
+class CBlockUndo;
+class Coin;
 class CTxMemPool;
+class CTxUndo;
 namespace Consensus {
 struct Params;
 }
@@ -67,6 +71,17 @@ static const CAmount DEFAULT_MAX_BURN_AMOUNT{0};
  * @returns                    The tx if found, otherwise nullptr
  */
 CTransactionRef GetTransaction(const CBlockIndex* const block_index, const CTxMemPool* const mempool, const uint256& hash, uint256& hashBlock, const BlockManager& blockman);
+
+/** Find the CTxUndo entry for a non-coinbase transaction within a block.
+ * Returns nullptr if the transaction is not found or is the coinbase.
+ */
+const CTxUndo* FindTxUndo(const CTransaction& tx, const CBlock& block, const CBlockUndo& block_undo);
+
+/** Compute policy-adjusted virtual transaction size.
+ * Accounts for sigop cost (-bytespersigop) and datacarrier cost (-datacarriercost).
+ */
+int64_t GetPolicyVirtualTransactionSize(const CTransaction& tx, const std::vector<Coin>& prevouts);
+int64_t GetPolicyVirtualTransactionSize(const CTransaction& tx, const CTxUndo& txundo);
 } // namespace node
 
 #endif // BITCOIN_NODE_TRANSACTION_H

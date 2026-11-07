@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <chainparams.h>
+#include <coins.h>
 #include <common/args.h>
 #include <common/sighash_rules.h>
 #include <common/messages.h>
@@ -1085,8 +1086,17 @@ RPCHelpMan signrawtransactionwithwallet()
     std::optional<CAmount> inputs_amount_sum;
 
     bool complete = pwallet->SignTransaction(mtx, coins, nHashType, input_errors, &inputs_amount_sum);
+
+    std::vector<Coin> prevouts;
+    prevouts.reserve(mtx.vin.size());
+    for (const CTxIn& txin : mtx.vin) {
+        auto it = coins.find(txin.prevout);
+        prevouts.push_back(it != coins.end() ? it->second : Coin());
+    }
+    int64_t policy_vsize = pwallet->chain().getPolicyVirtualTransactionSize(CTransaction(mtx), prevouts);
+
     UniValue result(UniValue::VOBJ);
-    SignTransactionResultToJSON(mtx, complete, coins, input_errors, result, inputs_amount_sum);
+    SignTransactionResultToJSON(mtx, complete, coins, input_errors, result, inputs_amount_sum, policy_vsize);
     return result;
 },
     };

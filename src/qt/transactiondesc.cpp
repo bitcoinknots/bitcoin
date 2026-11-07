@@ -302,7 +302,13 @@ QString TransactionDesc::toHTML(interfaces::Node& node, interfaces::Wallet& wall
 
     strHTML += "<b>" + tr("Transaction ID") + ":</b> " + rec->getTxHash() + "<br>";
     strHTML += "<b>" + tr("Transaction total size") + ":</b> " + QString::number(wtx.tx->GetTotalSize()) + " bytes<br>";
-    strHTML += "<b>" + tr("Transaction virtual size") + ":</b> " + QString::number(GetVirtualTransactionSize(*wtx.tx)) + " bytes<br>";
+    {
+        int64_t policy_vsize = wallet.getPolicyVirtualTransactionSize(rec->hash);
+        if (policy_vsize < 0 && wtx.tx->IsCoinBase()) policy_vsize = GetVirtualTransactionSize(*wtx.tx);
+        if (policy_vsize >= 0) {
+            strHTML += "<b>" + tr("Transaction virtual size") + ":</b> " + QString::number(policy_vsize) + " bytes<br>";
+        }
+    }
     strHTML += "<b>" + tr("Output index") + ":</b> " + QString::number(rec->getOutputIndex()) + "<br>";
 
     // Message from normal bitcoin:URI (bitcoin:123...?message=example)

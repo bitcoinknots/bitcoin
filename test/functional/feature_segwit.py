@@ -338,7 +338,8 @@ class SegWitTest(BitcoinTestFramework):
         raw = self.nodes[0].createrawtransaction([{"txid" : txid, "vout" : n}], [{self.nodes[0].getnewaddress() : value_out}])
         signed = self.nodes[0].signrawtransactionwithwallet(raw)
         assert_equal(signed["complete"], True)
-        txsize = self.nodes[0].decoderawtransaction(signed['hex'])['vsize']
+        decoded = self.nodes[0].decoderawtransaction(signed['hex'])
+        txsize = decoded.get('vsize', (decoded['weight'] + 3) // 4)
         exp_feerate = 1000 * fee / Decimal(txsize)
         assert_approx(signed["feerate"], exp_feerate, Decimal("0.00000010"))
         # discrepancy = 100000000 * (exp_feerate - signed["feerate"])

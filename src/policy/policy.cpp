@@ -668,15 +668,16 @@ std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsV
     return ret;
 }
 
-int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte)
+template <typename SpentScript>
+static int32_t ExtraTxWeight(const CTransaction& tx, SpentScript spent_script, const unsigned int weight_per_data_byte)
 {
     int64_t mod_weight{0};
 
     // Add in any extra weight for data bytes
     if (weight_per_data_byte > 1) {
-        for (const CTxIn& txin : tx.vin) {
-            const CTxOut &utxo = view.AccessCoin(txin.prevout).out;
-            auto[script, consensus_weight_per_byte] = GetScriptForTransactionInput(utxo.scriptPubKey, txin);
+        for (size_t i{0}; i < tx.vin.size(); ++i) {
+            const CTxIn& txin{tx.vin[i]};
+            auto[script, consensus_weight_per_byte] = GetScriptForTransactionInput(spent_script(i), txin);
             if (weight_per_data_byte > consensus_weight_per_byte) {
                 const auto dcb = script.DatacarrierBytes(0, &txin.scriptWitness, FollowDeadBranches(txin));
                 mod_weight += int64_t(dcb.first + dcb.second) * (weight_per_data_byte - consensus_weight_per_byte);
@@ -693,6 +694,16 @@ int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& vi
     }
 
     return int32_t(std::min(mod_weight, int64_t{std::numeric_limits<int32_t>::max()}));
+}
+
+int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte)
+{
+    return ExtraTxWeight(tx, [&](size_t i) -> const CScript& { return view.AccessCoin(tx.vin[i].prevout).out.scriptPubKey; }, weight_per_data_byte);
+}
+
+int32_t CalculateExtraTxWeight(const CTransaction& tx, const std::vector<Coin>& prevouts, const unsigned int weight_per_data_byte)
+{
+    return ExtraTxWeight(tx, [&](size_t i) -> const CScript& { return prevouts.at(i).out.scriptPubKey; }, weight_per_data_byte);
 }
 
 bool g_reject_bpub{DEFAULT_REJECT_BPUB};
