@@ -3646,12 +3646,20 @@ int CWallet::GetTxBlocksToMaturity(const CWalletTx& wtx) const
     }
     int chain_depth = GetTxDepthInMainChain(wtx);
     assert(chain_depth >= 0); // coinbase tx should not be conflicted
+    const bool dynamic_maturity{HaveChain() && chain().isDynamicCoinbaseMaturity()};
     const int max_maturity{HaveChain() ? chain().maxCoinbaseMaturity() : COINBASE_MATURITY};
-    // Retain the extra-confirmation margin, but avoid taking cs_main for old rewards.
-    if (chain_depth > max_maturity) return 0;
+
+    // The fixed maximum is valid for RC5, but not for DCBM.
+    if (!dynamic_maturity && chain_depth > max_maturity) return 0;
+
     const auto* confirmed{wtx.state<TxStateConfirmed>()};
     const int maturity{HaveChain() ? chain().coinbaseMaturity(confirmed ? confirmed->confirmed_block_hash : uint256{}) : COINBASE_MATURITY};
-    return std::max(0, (maturity + 1) - chain_depth);
+
+    // Avoid overflow when maturity approaches INT_MAX.
+    const int64_t remaining{
+        static_cast<int64_t>(maturity) + 1 - chain_depth};
+
+    return static_cast<int>(std::clamp<int64_t>(remaining, 0, std::numeric_limits<int>::max()));
 }
 
 bool CWallet::IsTxImmatureCoinBase(const CWalletTx& wtx) const

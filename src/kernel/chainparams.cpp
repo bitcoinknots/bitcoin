@@ -653,9 +653,19 @@ public:
         consensus.powLimit = uint256{"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
         consensus.nPowTargetTimespan = 24 * 60 * 60; // one day
         consensus.nPowTargetSpacing = 10 * 60;
-        consensus.fPowAllowMinDifficultyBlocks = true;
+        consensus.fPowAllowMinDifficultyBlocks =
+            !opts.dynamic_coinbase_maturity_retarget;
+        if (opts.dynamic_coinbase_maturity_retarget) {
+            // Isolated DCBM fixture: leave enough headroom for the existing
+            // 256-bit retarget multiplication (at most 4 * 144). The usual
+            // regtest target 0x207fffff overflows when retargeting is enabled.
+            consensus.powLimit = uint256{"003fffff00000000000000000000000000000000000000000000000000000000"};
+            consensus.nPowTargetTimespan = 144;
+            consensus.nPowTargetSpacing = 1;
+        }
         consensus.enforce_BIP94 = opts.enforce_bip94;
-        consensus.fPowNoRetargeting = true;
+        consensus.fPowNoRetargeting =
+            !opts.dynamic_coinbase_maturity_retarget;
         consensus.nRuleChangeActivationThreshold = 108; // 75% for testchains
         consensus.nMinerConfirmationWindow = 144; // Faster than normal for regtest (144 instead of 2016)
 
@@ -731,6 +741,27 @@ public:
             AddLongCoinbaseMaturityRevalidationDeployment(consensus);
         }
 
+        if (opts.dynamic_coinbase_maturity) {
+            if (!opts.coinbase_maturity_long_expiry) {
+                throw std::runtime_error(
+                    "Dynamic CBM requires a rolling maturity expiry.");
+            }
+            consensus.CoinbaseMaturityDynamic = true;
+        }
+
+        if (opts.dynamic_coinbase_maturity_initial) {
+            if (!opts.dynamic_coinbase_maturity) {
+                throw std::runtime_error(
+                    "Dynamic CBM initial maturity requires DCBM to be enabled.");
+            }
+            const int64_t initial = *opts.dynamic_coinbase_maturity_initial;
+            if (initial < 100 || initial > 25920) {
+                throw std::runtime_error(
+                    "Dynamic CBM initial maturity must be between 100 and 25920.");
+            }
+            consensus.CoinbaseMaturityDynamicInitial = initial;
+        }
+
         for (const auto& [deployment_pos, version_bits_params] : opts.version_bits_parameters) {
             consensus.vDeployments[deployment_pos].nStartTime = version_bits_params.start_time;
             consensus.vDeployments[deployment_pos].nTimeout = version_bits_params.timeout;
@@ -748,6 +779,11 @@ public:
         consensus.hashGenesisBlock = genesis.GetHash();
         assert(consensus.hashGenesisBlock == uint256{"0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"});
         assert(genesis.hashMerkleRoot == uint256{"4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"});
+        if (opts.dynamic_coinbase_maturity_retarget) {
+            genesis = CreateGenesisBlock(1296688602, 341, 0x1f3fffff, 1, 50 * COIN);
+            consensus.hashGenesisBlock = genesis.GetHash();
+            assert(consensus.hashGenesisBlock == uint256{"001cf5986eb6355563ec8a7291da70acc05a1ea2d6f8a0fce3dad97775c93f23"});
+        }
 
         vFixedSeeds.clear(); //!< Regtest mode doesn't have any fixed seeds.
         vSeeds.clear();
@@ -758,7 +794,7 @@ public:
 
         checkpointData = {
             {
-                {0, uint256{"0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"}},
+                {0, consensus.hashGenesisBlock},
             }
         };
 
@@ -784,6 +820,11 @@ public:
                 .blockhash = consteval_ctor(uint256{"3bb7ce5eba0be48939b7a521ac1ba9316afee2c7bada3a0cca24188e6d7d96c0"}),
             },
         };
+
+        if (opts.dynamic_coinbase_maturity_retarget) {
+            // Snapshots of ordinary regtest do not belong to this fixture.
+            m_assumeutxo_data.clear();
+        }
 
         chainTxData = ChainTxData{
             0,

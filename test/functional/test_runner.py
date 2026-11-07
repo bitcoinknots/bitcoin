@@ -227,6 +227,8 @@ BASE_SCRIPTS = [
     'interface_rest.py',
     'feature_chainstate_revalidation.py',
     'mempool_long_coinbase_maturity.py',
+    'feature_dynamic_coinbase_maturity.py',
+    'feature_dynamic_cbm_retarget.py',
     'feature_rolling_coinbase_maturity.py',
     'feature_rolling_coinbase_upgrade.py',
     'mempool_spend_coinbase.py',

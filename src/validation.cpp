@@ -13,6 +13,7 @@
 #include <clientversion.h>
 #include <consensus/amount.h>
 #include <consensus/consensus.h>
+#include <consensus/dynamic_cbm.h>
 #include <consensus/merkle.h>
 #include <consensus/tx_check.h>
 #include <consensus/tx_verify.h>
@@ -440,8 +441,17 @@ void Chainstate::MaybeUpdateMempoolForReorg(
                 const Coin& coin{CoinsTip().AccessCoin(txin.prevout)};
                 assert(!coin.IsSpent());
                 const auto mempool_spend_height{m_chain.Tip()->nHeight + 1};
-                if (coin.IsCoinBase() && mempool_spend_height - coin.nHeight < Consensus::CoinbaseMaturityPolicy(consensusParams, m_chain[coin.nHeight])) {
-                    return true;
+                if (coin.IsCoinBase()) {
+                    const CBlockIndex* coin_block{m_chain[coin.nHeight]};
+                    const int64_t required_maturity{
+                        consensusParams.CoinbaseMaturityDynamic &&
+                        coin_block->nHeight >= consensusParams.CoinbaseMaturityLongStartHeight
+                            ? DynamicCBMMaturityForBlock(consensusParams, coin_block)
+                            : Consensus::CoinbaseMaturityPolicy(consensusParams, coin_block)};
+
+                    if (mempool_spend_height - coin.nHeight < required_maturity) {
+                        return true;
+                    }
                 }
             }
         }
@@ -1018,11 +1028,21 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     const auto block_height_current = m_active_chainstate.m_chain.Height();
     const auto block_height_next = block_height_current + 1;
     const auto& consensusParams{args.m_chainparams.GetConsensus()};
-    if (!Consensus::CheckTxInputs(tx, state, m_view, block_height_next, ws.m_base_fees, CheckTxInputsRules::OutputSizeLimit,
-                                  consensusParams.CoinbaseMaturityLong,
-                                  consensusParams.CoinbaseMaturityLongStartHeight,
-                                  Consensus::CoinbaseMaturityLongEndHeight(consensusParams, m_active_chainstate.m_chain.Tip()),
-                                  consensusParams.CoinbaseMaturityBeforeRolling())) {
+    const bool inputs_valid = consensusParams.CoinbaseMaturityDynamic
+        ? Consensus::CheckTxInputs(
+            tx, state, m_view, block_height_next, ws.m_base_fees,
+            CheckTxInputsRules::OutputSizeLimit,
+            consensusParams, m_active_chainstate.m_chain.Tip())
+        : Consensus::CheckTxInputs(
+            tx, state, m_view, block_height_next, ws.m_base_fees,
+            CheckTxInputsRules::OutputSizeLimit,
+            consensusParams.CoinbaseMaturityLong,
+            consensusParams.CoinbaseMaturityLongStartHeight,
+            Consensus::CoinbaseMaturityLongEndHeight(
+                consensusParams, m_active_chainstate.m_chain.Tip()),
+            consensusParams.CoinbaseMaturityBeforeRolling());
+
+    if (!inputs_valid) {
         return false; // state filled in by CheckTxInputs
     }
 
@@ -3028,8 +3048,15 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         {
             CAmount txfee = 0;
             TxValidationState tx_state;
-            if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, chk_input_rules,
-                                          consensusParams, long_maturity_end_height)) {
+            const bool inputs_valid = consensusParams.CoinbaseMaturityDynamic
+                ? Consensus::CheckTxInputs(
+                    tx, tx_state, view, pindex->nHeight, txfee,
+                    chk_input_rules, consensusParams, pindex->pprev)
+                : Consensus::CheckTxInputs(
+                    tx, tx_state, view, pindex->nHeight, txfee,
+                    chk_input_rules, consensusParams, long_maturity_end_height);
+
+            if (!inputs_valid) {
                 // Any transaction validation failure in ConnectBlock is a block consensus failure
                 state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
                               tx_state.GetRejectReason(),
