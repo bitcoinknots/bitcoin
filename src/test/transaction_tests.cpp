@@ -918,6 +918,97 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     g_mempool_opts.reject_tokens = true;
     t.vin[0].prevout.hash = dummy_txid;
 
+    // Test rejecttokens catching a JSON token mint, as written on mainnet in transaction
+    // 715863e04b618a6818eaec826b8ea900a75a43a5c22859c6b408c68246c4ebcb
+    const auto json_mint{"7b2270223a2269636f2d3230222c226f70223a226d696e74222c227469636b223a224c454146227d"_hex};
+    const auto json = [](std::string_view s) { return std::vector<unsigned char>(s.begin(), s.end()); };
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << json_mint;
+    g_mempool_opts.reject_tokens = false;
+    CheckIsStandard(t);
+    g_mempool_opts.reject_tokens = true;
+    CheckIsNotStandard(t, "tokens-json");
+    // Split across two pushes, and with pushnums before or after it
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << std::span{json_mint}.first(10) << std::span{json_mint}.subspan(10);
+    CheckIsNotStandard(t, "tokens-json");
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << OP_1 << json_mint;
+    CheckIsNotStandard(t, "tokens-json");
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << json_mint << OP_1;
+    CheckIsNotStandard(t, "tokens-json");
+    // A valid first push followed by anything still counts
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << json_mint << json("x");
+    CheckIsNotStandard(t, "tokens-json");
+    // In a PUSHDATA1 push, as longer messages are
+    const auto long_transfer{json(R"({"p":"brc-20","op":"transfer","tick":"ordi","amt":"10000000000000000000000"})")};
+    BOOST_CHECK_GE(long_transfer.size(), 76U);
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << long_transfer;
+    BOOST_CHECK_EQUAL(t.vout[0].scriptPubKey[1], OP_PUSHDATA1);
+    CheckIsNotStandard(t, "tokens-json");
+    // Whitespace and a byte order mark in front, duplicate keys, an escaped key, invalid UTF-8,
+    // trailing bytes
+    for (const std::string_view s : {" \n{\"p\":\"brc-20\",\"op\":\"transfer\"}", "\xEF\xBB\xBF{\"p\":\"ico-20\",\"op\":\"mint\"}",
+                                     R"({"p":0,"p":"ico-20","op":"mint","tick":"LEAF"})", "{\"\\u0070\":\"ico-20\",\"op\":\"mint\"}",
+                                     "{\"op\":\"\xff\",\"p\":\"ico-20\"}", R"({"p":"ico-20","op":"mint"}x)",
+                                     R"({"op":"mint","amt":[1,{"a":"}"}],"p":"crc-20"})"}) {
+        t.vout[0].scriptPubKey = CScript() << OP_RETURN << json(s);
+        CheckIsNotStandard(t, "tokens-json");
+    }
+    // Not a token message: no "p" member with a string value at the top level, or not an object
+    for (const std::string_view s : {R"({"op":"mint","tick":"LEAF"})", R"({"p":1})", R"([{"p":"brc-20"}])",
+                                     R"({"x":{"p":"brc-20"}})", R"({})", R"({"p":"ico-20)", R"({"p" "ico-20"})", "{"}) {
+        t.vout[0].scriptPubKey = CScript() << OP_RETURN << json(s);
+        CheckIsStandard(t);
+    }
+    // Binary data that begins with '{' (mainnet transaction
+    // 444c708b2b6e41d170d37ad9dbbdd2e7d2e942072be27f398b347b830c9a2255)
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << "7ba0149edc5646e8b3385eb62c9d2dbe"_hex;
+    CheckIsStandard(t);
+
+    // Test rejecttokens catching an Omni Layer simple send (mainnet transaction
+    // 7134e618c5970bc3d7346cb4dce83aaf081213c122601caa8e64ff5e32296f38)
+    const auto omni_send{"6f6d6e690000000000000003000000000000009d"_hex};
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << omni_send;
+    CheckIsNotStandard(t, "tokens-omni");
+    g_mempool_opts.reject_tokens = false;
+    CheckIsStandard(t);
+    g_mempool_opts.reject_tokens = true;
+    // Omni Core skips pushnums, wants the marker at the start of the first data push, and reads the
+    // version and type from all the pushes joined
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << OP_1 << omni_send;
+    CheckIsNotStandard(t, "tokens-omni");
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << std::span{omni_send}.first(4) << std::span{omni_send}.subspan(4);
+    CheckIsNotStandard(t, "tokens-omni");
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << std::span{omni_send}.first(2) << std::span{omni_send}.subspan(2);
+    CheckIsStandard(t);
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << OP_0 << omni_send;
+    CheckIsStandard(t);
+    // Text that starts with "omni", and a marker too short to hold a version and type
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << json("omnibus note");
+    CheckIsStandard(t);
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << "6f6d6e69000000"_hex;
+    CheckIsStandard(t);
+    // A second OP_RETURN output is refused before either one is read, so a peer can make the
+    // filter read one OP_RETURN script per transaction
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN << json_mint;
+    const CTxOut second_op_return{t.vout[0]};
+    t.vout.insert(t.vout.begin(), second_op_return);
+    CheckIsNotStandard(t, "multi-op-return");
+    t.vout.erase(t.vout.begin());
+    CheckIsNotStandard(t, "tokens-json");
+    // An RPC caller that ignores multi-op-return gets every OP_RETURN output read: a token message
+    // in the second one is still refused, and two plain memos pass
+    {
+        const ignore_rejects_type ignore_multi{"multi-op-return"};
+        std::string reason;
+        t.vout.insert(t.vout.begin(), CTxOut{0, CScript() << OP_RETURN << json("memo")});
+        BOOST_CHECK(!IsStandardTx(CTransaction{t}, g_mempool_opts, reason, ignore_multi));
+        BOOST_CHECK_EQUAL(reason, "tokens-json");
+        t.vout[1].scriptPubKey = CScript() << OP_RETURN << json("memo");
+        reason.clear();
+        BOOST_CHECK(IsStandardTx(CTransaction{t}, g_mempool_opts, reason, ignore_multi));
+        BOOST_CHECK(reason.empty());
+        t.vout.erase(t.vout.begin());
+    }
+
     // Test rejecttokens applying to OLGA
     const auto olga_header = CScript() << OP_0 << "003e7374616d703a000000000000000000000000000000000000000000000000"_hex;
     t.vout[0].scriptPubKey = olga_header;
