@@ -2129,6 +2129,58 @@ BOOST_AUTO_TEST_CASE(script_DataCarrierBytes_tapscript_unproven_pubkeys)
                                                                      << OP_2DROP << OP_DROP));
 }
 
+BOOST_AUTO_TEST_CASE(script_DataCarrierBytes_ln_taproot_revoke)
+{
+    using zeros = std::vector<unsigned char>;
+
+    // The to_local revocation leaf of an LND simple taproot channel pushes and drops the local
+    // delayed key. In a script path spend the 34 bytes the drop rule reads count toward the
+    // budget; anywhere else they are non-standard data
+    const CScript leaf{CScript() << zeros(32, 1) << OP_DROP << zeros(32, 2) << OP_CHECKSIG};
+    BOOST_CHECK_EQUAL("34+0", DatacarrierBytesStr(leaf, TapscriptWitness(1, 1, leaf)));
+    BOOST_CHECK_EQUAL("0+34", DatacarrierBytesStr(leaf));
+    BOOST_CHECK_EQUAL("0+34", DatacarrierBytesStr(leaf, CScriptWitness()));
+    // ... under P2WSH the script is the last witness item, with no control block over it
+    {
+        CScriptWitness p2wsh;
+        p2wsh.stack.emplace_back(64, 1);
+        p2wsh.stack.emplace_back(leaf.begin(), leaf.end());
+        BOOST_CHECK_EQUAL("0+34", DatacarrierBytesStr(leaf, p2wsh));
+    }
+    // The control block may be any depth, and an annex may follow it
+    {
+        CScriptWitness deep{TapscriptWitness(1, 1, leaf)};
+        deep.stack.back().resize(TAPROOT_CONTROL_BASE_SIZE + 3 * TAPROOT_CONTROL_NODE_SIZE, 0xab);
+        BOOST_CHECK_EQUAL("34+0", DatacarrierBytesStr(leaf, deep));
+        CScriptWitness annexed{TapscriptWitness(1, 1, leaf)};
+        annexed.stack.emplace_back(zeros{0x50});
+        BOOST_CHECK_EQUAL("34+0", DatacarrierBytesStr(leaf, annexed));
+    }
+    // ... while a control block of the wrong size or of another leaf version is no script path spend
+    {
+        CScriptWitness odd{TapscriptWitness(1, 1, leaf)};
+        odd.stack.back().resize(TAPROOT_CONTROL_BASE_SIZE + 1);
+        BOOST_CHECK_EQUAL("0+34", DatacarrierBytesStr(leaf, odd));
+        CScriptWitness version{TapscriptWitness(1, 1, leaf)};
+        version.stack.back()[0] = 0xc2;
+        BOOST_CHECK_EQUAL("0+34", DatacarrierBytesStr(leaf, version));
+    }
+    // Nothing near it goes to the budget: a push of another size on either side, a second push,
+    // anything before the leaf or after its OP_CHECKSIG, or OP_CHECKSIGVERIFY in its place
+    for (const auto& [expected, script] : std::vector<std::pair<std::string, CScript>>{
+             {"0+35", CScript() << zeros(33, 1) << OP_DROP << zeros(32, 2) << OP_CHECKSIG},
+             {"0+33", CScript() << zeros(31, 1) << OP_DROP << zeros(32, 2) << OP_CHECKSIG},
+             {"0+34", CScript() << zeros(32, 1) << OP_DROP << zeros(33, 2) << OP_CHECKSIG},
+             {"0+67", CScript() << zeros(32, 1) << zeros(32, 3) << OP_2DROP << zeros(32, 2) << OP_CHECKSIG},
+             {"0+68", CScript() << zeros(32, 1) << OP_DROP << zeros(32, 3) << OP_DROP << zeros(32, 2) << OP_CHECKSIG},
+             {"0+34", CScript() << OP_NOP << zeros(32, 1) << OP_DROP << zeros(32, 2) << OP_CHECKSIG},
+             {"0+34", CScript() << zeros(32, 1) << OP_DROP << zeros(32, 2) << OP_CHECKSIG << OP_NOP},
+             {"0+34", CScript() << zeros(32, 1) << OP_DROP << zeros(32, 2) << OP_CHECKSIGVERIFY << OP_1},
+         }) {
+        BOOST_CHECK_EQUAL(expected, DatacarrierBytesStr(script, TapscriptWitness(1, 1, script)));
+    }
+}
+
 BOOST_AUTO_TEST_CASE(script_GetScriptForTransactionInput)
 {
     using zeros = std::vector<unsigned char>;

@@ -602,6 +602,9 @@ struct DeadParts {
  */
 DeadParts FindDeadParts(const CScript& script);
 
+/** Whether the witness has the form of a taproot script path spend of LND's to_local revocation leaf, whose dropped key counts toward the -datacarriersize budget rather than as non-standard data */
+bool IsLnTaprootRevokeLeaf(const CScript& script, const CScriptWitness& witness);
+
 struct CScriptWitness
 {
     // Note that this encodes the data elements being pushed, rather than
