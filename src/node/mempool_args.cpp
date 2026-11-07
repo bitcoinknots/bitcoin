@@ -172,6 +172,13 @@ util::Result<void> ApplyArgsManOptions(const ArgsManager& argsman, const CChainP
         LogPrintf("Increasing minrelaytxfee to %s to match incrementalrelayfee\n", mempool_opts.min_relay_feerate.ToString());
     }
 
+    if (auto fee = argsman.GetIntArg("-minrelaymultisigexcesskeyfee")) {
+        if (*fee < 0 || !MoneyRange(*fee)) {
+            return util::Error{strprintf(_("Invalid amount for -minrelaymultisigexcesskeyfee: %s"), *fee)};
+        }
+        mempool_opts.min_relay_multisig_excess_key_fee = *fee;
+    }
+
     // Feerate used to define dust.  Shouldn't be changed lightly as old
     // implementations may inadvertently create non-standard transactions
     if (argsman.IsArgSet("-dustrelayfee")) {

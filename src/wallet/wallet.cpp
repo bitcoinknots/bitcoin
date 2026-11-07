@@ -2304,7 +2304,7 @@ void MaybeResendWalletTxs(WalletContext& context)
  * @{
  */
 
-bool CWallet::SignTransaction(CMutableTransaction& tx) const
+bool CWallet::SignTransaction(CMutableTransaction& tx, std::vector<ScriptValidationMetrics>* execution_metrics) const
 {
     AssertLockHeld(cs_wallet);
 
@@ -2320,17 +2320,17 @@ bool CWallet::SignTransaction(CMutableTransaction& tx) const
         coins[input.prevout] = Coin(wtx.tx->vout[input.prevout.n], prev_height, wtx.IsCoinBase());
     }
     std::map<int, bilingual_str> input_errors;
-    return SignTransaction(tx, coins, SIGHASH_DEFAULT, input_errors);
+    return SignTransaction(tx, coins, SIGHASH_DEFAULT, input_errors, nullptr, execution_metrics);
 }
 
-bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum) const
+bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum, std::vector<ScriptValidationMetrics>* execution_metrics) const
 {
 
     // Try to sign with all ScriptPubKeyMans
     for (ScriptPubKeyMan* spk_man : GetAllScriptPubKeyMans()) {
         // spk_man->SignTransaction will return true if the transaction is complete,
         // so we can exit early and return true if that happens
-        if (spk_man->SignTransaction(tx, coins, sighash, input_errors, inputs_amount_sum)) {
+        if (spk_man->SignTransaction(tx, coins, sighash, input_errors, inputs_amount_sum, execution_metrics)) {
             return true;
         }
     }

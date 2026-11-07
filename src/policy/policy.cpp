@@ -28,6 +28,8 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <optional>
 #include <string_view>
@@ -572,6 +574,432 @@ bool SpendsNonAnchorWitnessProg(const CTransaction& tx, const CCoinsViewCache& p
     }
 
     return false;
+}
+
+/** Value of OP_1..OP_16, or -1 for any other opcode. */
+static int SmallIntValue(const opcodetype opcode)
+{
+    if (opcode < OP_1 || opcode > OP_16) return -1;
+    return int{opcode} - int{OP_1 - 1};
+}
+
+/** The m or n of an m-of-n, including minimal one-byte counts above 16. */
+static int MultisigCount(const opcodetype opcode, const std::vector<unsigned char>& push_data)
+{
+    if (const int small{SmallIntValue(opcode)}; small > 0) return small;
+    if (opcode == 1 && push_data.size() == 1 && push_data[0] > 16 && push_data[0] <= MAX_PUBKEYS_PER_MULTISIG) {
+        return push_data[0];
+    }
+    return -1;
+}
+
+/** The k of a tapscript k-of-n, minimally encoded up to MAX_PUBKEYS_PER_MULTI_A. */
+static int MultiACount(const opcodetype opcode, const std::vector<unsigned char>& push_data)
+{
+    if (const int small{SmallIntValue(opcode)}; small > 0) return small;
+    if (opcode != 1 && opcode != 2) return -1;
+    if (push_data.size() != size_t{opcode}) return -1;
+    if (push_data.back() & 0x80) return -1;
+    if (push_data.back() == 0 && (push_data.size() == 1 || !(push_data[0] & 0x80))) return -1;
+    int value{push_data[0]};
+    if (push_data.size() == 2) value |= int{push_data[1]} << 8;
+    if (value <= 16 || value > int{MAX_PUBKEYS_PER_MULTI_A}) return -1;
+    return value;
+}
+
+static bool IsPubkeyPush(const opcodetype opcode, const std::vector<unsigned char>& push_data)
+{
+    return opcode <= OP_PUSHDATA4 &&
+           (push_data.size() == CPubKey::COMPRESSED_SIZE || push_data.size() == CPubKey::SIZE);
+}
+
+static bool IsXOnlyPush(const opcodetype opcode, const std::vector<unsigned char>& push_data)
+{
+    return opcode <= OP_PUSHDATA4 && push_data.size() == XOnlyPubKey::size();
+}
+
+static bool IsStackNeutralNop(const opcodetype opcode)
+{
+    return opcode == OP_NOP || (opcode >= OP_NOP1 && opcode <= OP_NOP10);
+}
+
+/** Prove that a bounded, straight-line block restores both stacks exactly.
+ *
+ * Negative symbols represent main-stack inputs, positive symbols altstack
+ * inputs. Missing inputs are introduced lazily, without reading witness data.
+ * This proves identity only if the block can execute without underflow; actual
+ * script validation still enforces that prerequisite. No values, conditions,
+ * signatures, locktimes or arbitrary opcodes are evaluated here.
+ */
+static bool SkipIdentityStackOps(CScript::const_iterator& it, const CScript::const_iterator end)
+{
+    static constexpr size_t MAX_IDENTITY_OPS{32};
+    std::vector<int> stack, altstack;
+    int main_inputs{0}, alt_inputs{0};
+    auto cursor{it};
+
+    const auto require = [](std::vector<int>& values, int& inputs, const size_t count, const int sign) {
+        while (values.size() < count) values.insert(values.begin(), sign * ++inputs);
+    };
+    const auto apply = [&](const opcodetype opcode) {
+        switch (opcode) {
+        case OP_NOP:
+            break;
+        case OP_DUP:
+            require(stack, main_inputs, 1, -1);
+            stack.push_back(stack.back());
+            break;
+        case OP_2DUP:
+        case OP_3DUP: {
+            const size_t count{opcode == OP_2DUP ? size_t{2} : size_t{3}};
+            require(stack, main_inputs, count, -1);
+            const size_t start{stack.size() - count};
+            for (size_t i{0}; i < count; ++i) stack.push_back(stack[start + i]);
+            break;
+        }
+        case OP_DROP:
+        case OP_2DROP: {
+            const size_t count{opcode == OP_DROP ? size_t{1} : size_t{2}};
+            require(stack, main_inputs, count, -1);
+            stack.resize(stack.size() - count);
+            break;
+        }
+        case OP_OVER:
+            require(stack, main_inputs, 2, -1);
+            stack.push_back(stack[stack.size() - 2]);
+            break;
+        case OP_NIP:
+            require(stack, main_inputs, 2, -1);
+            stack.erase(stack.end() - 2);
+            break;
+        case OP_TUCK: {
+            require(stack, main_inputs, 2, -1);
+            const int top{stack.back()};
+            stack.insert(stack.end() - 2, top);
+            break;
+        }
+        case OP_SWAP:
+            require(stack, main_inputs, 2, -1);
+            std::iter_swap(stack.end() - 2, stack.end() - 1);
+            break;
+        case OP_ROT:
+            require(stack, main_inputs, 3, -1);
+            std::rotate(stack.end() - 3, stack.end() - 2, stack.end());
+            break;
+        case OP_2SWAP:
+            require(stack, main_inputs, 4, -1);
+            std::rotate(stack.end() - 4, stack.end() - 2, stack.end());
+            break;
+        case OP_2ROT:
+            require(stack, main_inputs, 6, -1);
+            std::rotate(stack.end() - 6, stack.end() - 4, stack.end());
+            break;
+        case OP_TOALTSTACK:
+            require(stack, main_inputs, 1, -1);
+            altstack.push_back(stack.back());
+            stack.pop_back();
+            break;
+        case OP_FROMALTSTACK:
+            require(altstack, alt_inputs, 1, 1);
+            stack.push_back(altstack.back());
+            altstack.pop_back();
+            break;
+        default:
+            return false;
+        }
+        return true;
+    };
+    for (size_t ops{0}; ops < MAX_IDENTITY_OPS && cursor != end; ++ops) {
+        // A non-stack opcode ends the candidate block, not the script.
+        if (!apply(static_cast<opcodetype>(*cursor))) break;
+        ++cursor;
+    }
+    if (cursor == it || stack.size() != size_t(main_inputs) || altstack.size() != size_t(alt_inputs)) return false;
+    for (size_t i{0}; i < stack.size(); ++i) {
+        if (stack[i] != int(i) - main_inputs) return false;
+    }
+    for (size_t i{0}; i < altstack.size(); ++i) {
+        if (altstack[i] != alt_inputs - int(i)) return false;
+    }
+    it = cursor;
+    return true;
+}
+
+static size_t CountWitnessSignatures(const CScriptWitness& witness, const size_t suffix_items,
+                                    const SigVersion sigversion)
+{
+    if (suffix_items > witness.stack.size()) return 0;
+    size_t count{0};
+    for (size_t i{0}; i < witness.stack.size() - suffix_items; ++i) {
+        const auto& signature{witness.stack[i]};
+        if (sigversion == SigVersion::TAPSCRIPT) {
+            if (signature.size() == 64 || signature.size() == 65) ++count;
+        } else if (IsValidSignatureEncoding(signature)) {
+            // Reuse the interpreter's DER check, including valid short (9-63
+            // byte) encodings. Length alone is neither necessary nor enough.
+            ++count;
+        }
+    }
+    return count;
+}
+
+/** Match only the complete, bounded BOLT #3 to_local and HTLC scripts.
+ *
+ * This is a compatibility allowance, not proof that their embedded keys were
+ * signed for. In particular, the HTLC revocation path uses a witness-supplied
+ * key and leaves both embedded HTLC keys unused. Keep this separate from the
+ * generic credits: a Lightning fragment must never cancel other script keys.
+ * Extra instructions, nonminimal pushes, or larger fields fail the match.
+ */
+static bool IsStandardLightningKeyScript(const CScript& script)
+{
+    // The longest supported form is the received HTLC with anchors and a
+    // five-byte unsigned locktime. Bound parsing independently of input size.
+    if (script.size() > 160) return false;
+
+    enum Field : int { KEY = 256, HASH20, DELAY, LOCKTIME, PREIMAGE_SIZE };
+    auto it{script.begin()};
+    const auto match = [&](std::initializer_list<int> pattern) {
+        for (const int field : pattern) {
+            opcodetype op;
+            std::vector<unsigned char> data;
+            if (!script.GetOp(it, op, data)) return false;
+            if (field < KEY) {
+                if (int{op} != field) return false;
+            } else if (field == KEY) {
+                if (op != 33 || data.size() != 33 || (data[0] != 2 && data[0] != 3)) return false;
+            } else if (field == HASH20) {
+                if (op != 20 || data.size() != 20) return false;
+            } else if (field == PREIMAGE_SIZE) {
+                if (op != 1 || data.size() != 1 || data[0] != 32) return false;
+            } else {
+                // BOLT encodes to_self_delay as u16 and cltv_expiry as u32.
+                // Require the exact minimal, nonnegative Script number push;
+                // do not interpret arbitrary arithmetic or throw on overflow.
+                if (op == OP_0 || SmallIntValue(op) > 0) continue;
+                if (op < 1 || op > 5 || data.size() != size_t(op) || (data.back() & 0x80)) return false;
+                if ((data.back() & 0x7f) == 0 && (data.size() == 1 || !(data[data.size() - 2] & 0x80))) return false;
+                uint64_t value{0};
+                for (size_t i{0}; i < data.size(); ++i) value |= uint64_t{data[i]} << (8 * i);
+                const uint64_t maximum{field == DELAY ? uint64_t{0xffff} : uint64_t{0xffffffff}};
+                if (value <= 16 || value > maximum) return false;
+            }
+        }
+        return true;
+    };
+
+    if (match({OP_IF, KEY, OP_ELSE, DELAY, OP_CHECKSEQUENCEVERIFY, OP_DROP,
+               KEY, OP_ENDIF, OP_CHECKSIG}) && it == script.end()) return true;
+
+    it = script.begin();
+    if (!match({OP_DUP, OP_HASH160, HASH20, OP_EQUAL, OP_IF, OP_CHECKSIG,
+                OP_ELSE, KEY, OP_SWAP, OP_SIZE, PREIMAGE_SIZE, OP_EQUAL})) return false;
+
+    const auto branch_start{it};
+    if (!match({OP_NOTIF, OP_DROP, OP_2, OP_SWAP, KEY, OP_2, OP_CHECKMULTISIG,
+                OP_ELSE, OP_HASH160, HASH20, OP_EQUALVERIFY, OP_CHECKSIG, OP_ENDIF})) {
+        it = branch_start;
+        if (!match({OP_IF, OP_HASH160, HASH20, OP_EQUALVERIFY, OP_2, OP_SWAP,
+                    KEY, OP_2, OP_CHECKMULTISIG, OP_ELSE, OP_DROP, LOCKTIME,
+                    OP_CHECKLOCKTIMEVERIFY, OP_DROP, OP_CHECKSIG, OP_ENDIF})) return false;
+    }
+    // Anchors add this exact relative timelock inside the non-revocation arm.
+    if (it != script.end() && *it == OP_1 &&
+        !match({OP_1, OP_CHECKSEQUENCEVERIFY, OP_DROP})) return false;
+    return match({OP_ENDIF}) && it == script.end();
+}
+
+uint64_t CountExecutedMultisigExcessKeys(const ScriptValidationMetrics& metrics)
+{
+    uint64_t excess{0};
+    for (const auto& execution : metrics.scripts) {
+        const uint64_t unproven{execution.sigversion == SigVersion::TAPSCRIPT
+            ? (execution.has_checksigadd ? execution.tapscript_unproven_keys : 0)
+            : execution.multisig_unproven_keys};
+        // No key-sized hash/data pushes, padding or inactive branches count.
+        if (unproven > 1) excess += unproven - 1;
+    }
+    return excess;
+}
+
+unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness* witness,
+                                     const size_t witness_suffix_items, const SigVersion sigversion)
+{
+    // Do not extend this allowance to fragments or tapscript, whose signature
+    // semantics differ. Consensus validation still checks every actual spend.
+    if (sigversion != SigVersion::TAPSCRIPT && IsStandardLightningKeyScript(script)) return 0;
+
+    size_t pubkeys{0}, provable{0}, run_keys{0}, multi_a_keys{0};
+    int run_opened_by{-1}, last_count{-1}, last_a_count{-1};
+    unsigned int inside_noop{0};
+    bool last_is_key{false}, last_is_xonly{false}, has_multisig{false};
+    opcodetype opcode{OP_INVALIDOPCODE}, last_opcode{OP_INVALIDOPCODE};
+    std::vector<unsigned char> push_data;
+
+    for (CScript::const_iterator it{script.begin()}; it < script.end();) {
+        // Equivalent stack-only blocks must not hide a key or destroy the
+        // recognition of m/n/k. Leave unsupported/non-identity blocks intact.
+        if (!inside_noop && SkipIdentityStackOps(it, script.end())) continue;
+        if (!script.GetOp(it, opcode, push_data)) return 0;
+        const bool is_pubkey{IsPubkeyPush(opcode, push_data)};
+        const bool is_xonly{IsXOnlyPush(opcode, push_data)};
+        const int count{MultisigCount(opcode, push_data)};
+        const int a_count{MultiACount(opcode, push_data)};
+        bool is_key{false};
+
+        if (inside_noop) {
+            if (opcode == OP_IF || opcode == OP_NOTIF) {
+                ++inside_noop;
+            } else if (opcode == OP_ENDIF) {
+                --inside_noop;
+            } else if (opcode == OP_ELSE && inside_noop == 1) {
+                // OP_FALSE only makes the IF arm unreachable, not its ELSE.
+                inside_noop = 0;
+            }
+        } else if (opcode == OP_IF && last_opcode == OP_FALSE) {
+            inside_noop = 1;
+        } else if (is_pubkey) {
+            if (!run_keys) run_opened_by = last_count;
+            ++run_keys;
+            ++pubkeys;
+            is_key = true;
+        } else if (is_xonly) {
+            run_keys = 0;
+            is_key = true;
+        } else if (opcode == OP_DROP || opcode == OP_2DROP) {
+            // A directly pushed key-sized value followed by DROP is data, not
+            // a multisig operand. Remove only that one proven dropped push,
+            // never its entire run. In particular, DROP after n must not erase
+            // the keys below n. Identity blocks (e.g. DUP DROP) were normalized
+            // above, so this cannot accidentally discard the surviving copy.
+            if (opcode == OP_DROP && last_is_key && !last_is_xonly && run_keys) --pubkeys;
+            run_keys = 0;
+            multi_a_keys = 0;
+        } else if (opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY) {
+            if (last_is_xonly) ++pubkeys;
+            // Credit only the adjacent key counted above. A bare CHECKSIG in
+            // an unexecuted arm must not cancel unrelated multisig keys, even
+            // when dropped witness padding looks like extra signatures.
+            if (last_is_key) ++provable;
+            run_keys = 0;
+            multi_a_keys = (last_is_key && opcode == OP_CHECKSIG) ? 1 : 0;
+        } else if (opcode == OP_CHECKSIGADD) {
+            if (sigversion == SigVersion::TAPSCRIPT) has_multisig = true;
+            if (last_is_xonly) ++pubkeys;
+            multi_a_keys = (multi_a_keys && last_is_key) ? multi_a_keys + 1 : 0;
+            run_keys = 0;
+        } else if ((opcode == OP_NUMEQUAL || opcode == OP_NUMEQUALVERIFY) && multi_a_keys) {
+            if (last_a_count > 0 && size_t(last_a_count) <= multi_a_keys) {
+                provable += size_t(last_a_count) - 1;
+            }
+            multi_a_keys = 0;
+            run_keys = 0;
+        } else if (opcode == OP_CHECKMULTISIG || opcode == OP_CHECKMULTISIGVERIFY) {
+            if (sigversion != SigVersion::TAPSCRIPT) has_multisig = true;
+            if (run_opened_by > 0 && last_count > 0 && size_t(last_count) == run_keys) {
+                // Even an invalid m > n shape cannot credit other key runs.
+                provable += std::min(size_t(run_opened_by), run_keys);
+            }
+            run_keys = 0;
+            multi_a_keys = 0;
+        } else if (count < 0) {
+            run_keys = 0;
+            if (a_count < 0) multi_a_keys = 0;
+        }
+
+        if (!IsStackNeutralNop(opcode)) {
+            last_is_key = is_key;
+            last_is_xonly = is_xonly && !inside_noop;
+        }
+        last_opcode = opcode;
+        last_count = count;
+        last_a_count = a_count;
+    }
+
+    // Script-level scope, not a general data-push tax. The opcode must be
+    // outside a statically skipped false arm and meaningful for this script
+    // version. Data bytes that merely encode an opcode cannot activate this.
+    // Within a mixed multisig script the counter remains conservative; this
+    // is not a proof that each counted push is consumed by a signature opcode.
+    if (!has_multisig) return 0;
+
+    if (witness && !witness->stack.empty()) {
+        provable = std::min(provable, CountWitnessSignatures(*witness, witness_suffix_items, sigversion));
+    }
+
+    static constexpr size_t FREE_UNPROVEN_KEYS{1};
+    if (pubkeys <= provable + FREE_UNPROVEN_KEYS) return 0;
+    return static_cast<unsigned int>(pubkeys - provable - FREE_UNPROVEN_KEYS);
+}
+
+static std::optional<CScript> GetP2SHRedeemScript(const CScript& script_sig)
+{
+    CScript::const_iterator pc{script_sig.begin()};
+    std::vector<unsigned char> data;
+    while (pc < script_sig.end()) {
+        opcodetype opcode;
+        if (!script_sig.GetOp(pc, opcode, data) || opcode > OP_16) {
+            return std::nullopt;
+        }
+    }
+    if (data.empty()) return std::nullopt;
+    return CScript{data.begin(), data.end()};
+}
+
+uint64_t CountInputMultisigExcessKeys(const CTxIn& txin, const CScript& prev_script)
+{
+    uint64_t count{0};
+    // Only executable scriptSig code is inspected. A push-only scriptSig is
+    // satisfaction data: 33/65-byte signatures are not exposed script keys.
+    if (!txin.scriptSig.IsPushOnly()) count += CountMultisigExcessKeys(txin.scriptSig);
+
+    CScript script{prev_script};
+    bool p2sh{false};
+
+    if (script.IsPayToScriptHash()) {
+        const auto redeem_script{GetP2SHRedeemScript(txin.scriptSig)};
+        if (!redeem_script) return count;
+        script = *redeem_script;
+        p2sh = true;
+    }
+
+    int witness_version{0};
+    std::vector<unsigned char> witness_program;
+    if (!script.IsWitnessProgram(witness_version, witness_program)) {
+        return count + CountMultisigExcessKeys(script);
+    }
+
+    if (witness_version == 0 && witness_program.size() == WITNESS_V0_SCRIPTHASH_SIZE && !txin.scriptWitness.stack.empty()) {
+        const auto& witness_script{txin.scriptWitness.stack.back()};
+        script = CScript{witness_script.begin(), witness_script.end()};
+        return count + CountMultisigExcessKeys(script, &txin.scriptWitness, /*witness_suffix_items=*/1);
+    }
+
+    if (witness_version == 1 && witness_program.size() == WITNESS_V1_TAPROOT_SIZE && !p2sh) {
+        Span stack{txin.scriptWitness.stack};
+        size_t suffix_items{2}; // tapscript and control block
+        if (stack.size() >= 2 && !stack.back().empty() && stack.back()[0] == ANNEX_TAG) {
+            SpanPopBack(stack);
+            ++suffix_items;
+        }
+        if (stack.size() < 2) return count; // key-path or invalid spend
+        const auto& control_block{SpanPopBack(stack)};
+        // Future leaf versions do not execute this script as tapscript.
+        if (control_block.empty() || (control_block[0] & TAPROOT_LEAF_MASK) != TAPROOT_LEAF_TAPSCRIPT) return count;
+        const auto& tapscript{stack.back()};
+        script = CScript{tapscript.begin(), tapscript.end()};
+        count += CountMultisigExcessKeys(script, &txin.scriptWitness, suffix_items, SigVersion::TAPSCRIPT);
+    }
+    return count;
+}
+
+uint64_t CountTransactionInputMultisigExcessKeys(const CTransaction& tx, const CCoinsViewCache& prevouts)
+{
+    uint64_t count{0};
+    for (const CTxIn& txin : tx.vin) {
+        count += CountInputMultisigExcessKeys(txin, prevouts.AccessCoin(txin.prevout).out.scriptPubKey);
+    }
+    return count;
 }
 
 int64_t GetVirtualTransactionSize(int64_t nWeight, int64_t nSigOpCost, unsigned int bytes_per_sigop)

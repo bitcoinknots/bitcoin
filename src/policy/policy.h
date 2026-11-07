@@ -12,6 +12,7 @@
 #include <script/interpreter.h>
 #include <script/solver.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <unordered_set>
@@ -108,6 +109,8 @@ static const int DEFAULT_DUST_RELAY_MULTIPLIER{3'000};
 static const std::string DEFAULT_SPKREUSE{"allow"};
 /** Default for -minrelaytxfee, minimum relay fee for transactions */
 static constexpr unsigned int DEFAULT_MIN_RELAY_TX_FEE{1000};
+/** Default minimum transaction fee per charged excess key in canonical multisig, in satoshis. */
+static constexpr CAmount DEFAULT_MIN_RELAY_MULTISIG_EXCESS_KEY_FEE{1000};
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
 static constexpr unsigned int DEFAULT_ANCESTOR_LIMIT{25};
 /** Default for -limitancestorsize, maximum kilobytes of tx + all in-mempool ancestors */
@@ -225,6 +228,32 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs,
  * May return `false` early for consensus-invalid transactions.
  */
 bool SpendsNonAnchorWitnessProg(const CTransaction& tx, const CCoinsViewCache& prevouts);
+
+/** Count unproven key operands observed by successful VerifyScript execution.
+ * Applies one free operand per executed script. Never use failed/partial data.
+ */
+uint64_t CountExecutedMultisigExcessKeys(const ScriptValidationMetrics& metrics);
+
+/** Unsigned-wallet estimate only; NOT the mempool's authoritative counter.
+ * Estimate unproven pubkeys statically, after one free key per script.
+ * Only scripts containing CHECKMULTISIG (legacy/v0) or CHECKSIGADD (tapscript),
+ * outside statically skipped false arms, are in scope. Mixed scripts remain
+ * conservative: push-to-signature provenance is not proven.
+ * DER-encoded ECDSA or 64/65-byte Schnorr witness items cap the credit;
+ * no signatures are verified here. sigversion selects the witness encoding.
+ * Bounded, proven identity blocks preserve static key/threshold recognition.
+ * Complete standard BOLT #3 to_local and HTLC templates have an explicit
+ * compatibility allowance (except in tapscript); this is not signature proof.
+ */
+unsigned int CountMultisigExcessKeys(const CScript& script, const CScriptWitness* witness = nullptr,
+                                     size_t witness_suffix_items = 1,
+                                     SigVersion sigversion = SigVersion::WITNESS_V0);
+
+/** Static unsigned-wallet estimate for an input; not authoritative for admission. */
+uint64_t CountInputMultisigExcessKeys(const CTxIn& txin, const CScript& prev_script);
+
+/** Static unsigned-wallet estimate over transaction inputs; not an admission check. */
+uint64_t CountTransactionInputMultisigExcessKeys(const CTransaction& tx, const CCoinsViewCache& prevouts);
 
 /** Compute the virtual transaction size (weight reinterpreted as bytes). */
 int64_t GetVirtualTransactionSize(int64_t nWeight, int64_t nSigOpCost, unsigned int bytes_per_sigop);

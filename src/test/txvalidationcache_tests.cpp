@@ -3,8 +3,10 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <addresstype.h>
+#include <coins.h>
 #include <consensus/validation.h>
 #include <key.h>
+#include <policy/policy.h>
 #include <random.h>
 #include <script/interpreter.h>
 #include <script/sigcache.h>
@@ -27,10 +29,67 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
                        bool cacheFullScriptStore, PrecomputedTransactionData& txdata,
                        ValidationCache& validation_cache,
                        std::vector<CScriptCheck>* pvChecks,
-                       const std::vector<unsigned int>& flags_per_input = {}
+                       const std::vector<unsigned int>& flags_per_input = {},
+                       uint64_t* multisig_excess_keys = nullptr
 ) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
 BOOST_AUTO_TEST_SUITE(txvalidationcache_tests)
+
+BOOST_FIXTURE_TEST_CASE(multisig_key_count_cache, BasicTestingSetup)
+{
+    const auto key{ToByteVector(GenerateRandomKey().GetPubKey())};
+    const CScript script{CScript() << OP_0 << key << key << key << OP_3 << OP_CHECKMULTISIG};
+    CMutableTransaction funding;
+    funding.vin.resize(1);
+    funding.vout.emplace_back(10000, GetScriptForDestination(WitnessV0ScriptHash{script}));
+    CCoinsView dummy;
+    CCoinsViewCache coins{&dummy};
+    AddCoins(coins, CTransaction{funding}, 0);
+    CMutableTransaction spending;
+    spending.vin.emplace_back(COutPoint{funding.GetHash(), 0});
+    spending.vin[0].scriptWitness.stack = {{}, ToByteVector(script)};
+    spending.vout.emplace_back(9000, CScript() << OP_TRUE);
+
+    LOCK(cs_main);
+    ValidationCache cache{/*script_execution_cache_bytes=*/1 << 20, /*signature_cache_bytes=*/1 << 20};
+    const auto run = [&](const CMutableTransaction& mtx, unsigned int flags, uint64_t* count) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
+        const CTransaction tx{mtx};
+        TxValidationState state;
+        PrecomputedTransactionData txdata;
+        return CheckInputScripts(tx, state, coins, flags, true, true, txdata, cache, nullptr, {}, count);
+    };
+    // A valid-bit-only entry must not masquerade as an observed zero count.
+    BOOST_REQUIRE(run(spending, STANDARD_SCRIPT_VERIFY_FLAGS, nullptr));
+    uint64_t count{999};
+    BOOST_REQUIRE(run(spending, STANDARD_SCRIPT_VERIFY_FLAGS, &count));
+    BOOST_CHECK_EQUAL(count, 2U);
+    count = 999;
+    BOOST_REQUIRE(run(spending, STANDARD_SCRIPT_VERIFY_FLAGS, &count));
+    BOOST_CHECK_EQUAL(count, 2U);
+
+    // Witness mutation changes the cache key, even though txid is unchanged.
+    CMutableTransaction invalid{spending};
+    invalid.vin[0].scriptWitness.stack[0] = {1};
+    BOOST_CHECK(invalid.GetHash() == spending.GetHash());
+    BOOST_CHECK(!run(invalid, STANDARD_SCRIPT_VERIFY_FLAGS, &count));
+    // The same witness is valid without NULLDUMMY. That successful count must
+    // never authorize it under the stricter flags.
+    BOOST_REQUIRE(run(invalid, STANDARD_SCRIPT_VERIFY_FLAGS & ~SCRIPT_VERIFY_NULLDUMMY, &count));
+    BOOST_CHECK_EQUAL(count, 2U);
+    BOOST_CHECK(!run(invalid, STANDARD_SCRIPT_VERIFY_FLAGS, &count));
+    BOOST_REQUIRE(run(spending, STANDARD_SCRIPT_VERIFY_FLAGS, &count));
+    BOOST_CHECK_EQUAL(count, 2U);
+
+    // Evict the bounded observation metadata without removing the valid bit.
+    // Re-executing then must recover the same count, not grant a fee bypass.
+    const uint256 first{GetRandHash()};
+    cache.CacheMultisigKeyCount(first, 7);
+    for (size_t i{0}; i < 4096; ++i) cache.CacheMultisigKeyCount(GetRandHash(), i);
+    BOOST_CHECK(!cache.GetMultisigKeyCount(first).has_value());
+    count = 999;
+    BOOST_REQUIRE(run(spending, STANDARD_SCRIPT_VERIFY_FLAGS, &count));
+    BOOST_CHECK_EQUAL(count, 2U);
+}
 
 BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, Dersig100Setup)
 {

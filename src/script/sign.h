@@ -81,6 +81,7 @@ typedef std::pair<CPubKey, std::vector<unsigned char>> SigPair;
 // The information contained here can be used to create a signature and is also filled by ProduceSignature
 // in order to construct final scriptSigs and scriptWitnesses.
 struct SignatureData {
+    ScriptValidationMetrics execution_metrics; ///< Valid only when complete is true.
     bool complete = false; ///< Stores whether the scriptSig and scriptWitness are complete
     bool witness = false; ///< Stores whether the input this SigData corresponds to is a witness input
     CScript scriptSig; ///< The scriptSig of an input. Contains complete signatures or the traditional partial signatures format
@@ -130,6 +131,6 @@ bool IsSegWitOutput(const SigningProvider& provider, const CScript& script);
  * sighash_rules defaults to the rule this node signs by. Message signing passes
  * LEGACY instead: a message signature is verified against a hash type of exactly
  * SIGHASH_ALL, so opting in would produce one this node's own verifier rejects. */
-bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* provider, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum, SighashRules sighash_rules = SighashRulesForSigning());
+bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* provider, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, std::optional<CAmount>* inputs_amount_sum, SighashRules sighash_rules = SighashRulesForSigning(), std::vector<ScriptValidationMetrics>* execution_metrics = nullptr);
 
 #endif // BITCOIN_SCRIPT_SIGN_H

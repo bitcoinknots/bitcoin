@@ -561,7 +561,7 @@ RPCHelpMan settxfee()
 
 
 // Only includes key documentation where the key is snake_case in all RPC methods. MixedCase keys can be added later.
-static std::vector<RPCArg> FundTxDoc(bool solving_data = true)
+static std::vector<RPCArg> FundTxDoc(bool solving_data = true, bool multisig_fee = true)
 {
     std::vector<RPCArg> args = {
         {"conf_target", RPCArg::Type::NUM, RPCArg::DefaultHint{"wallet -txconfirmtarget"}, "Confirmation target in blocks", RPCArgOptions{.also_positional = true}},
@@ -572,6 +572,13 @@ static std::vector<RPCArg> FundTxDoc(bool solving_data = true)
             "Allows this transaction to be replaced by a transaction with higher fees"
         },
     };
+    if (multisig_fee) {
+        args.push_back({"multisig_fee", RPCArg::Type::NUM, RPCArg::DefaultHint{"estimated from exposed scripts or the largest known Taproot leaf"},
+         "Planned total excess-key fee floor in integer satoshis for unsigned funding, not sat/vB. "
+         "Use 0 for key-path-only Taproot spends to avoid reserving for unused recovery leaves. "
+         "Replaces only the wallet's key-fee estimate; normal fee requirements and the final relay-policy check still apply. "
+         "If the eventual signer chooses another path, this estimate may need to be increased."});
+    }
     if (solving_data) {
         args.push_back({"solving_data", RPCArg::Type::OBJ, RPCArg::Optional::OMITTED, "Keys and scripts needed for producing a final transaction with a dummy signature.\n"
         "Used for fee estimation during coin selection.",
@@ -635,6 +642,7 @@ CreatedTransactionResult FundTransaction(CWallet& wallet, const CMutableTransact
                 {"locktime", UniValueType(UniValue::VNUM)},
                 {"fee_rate", UniValueType()}, // will be checked by AmountFromValue() in SetFeeEstimateMode()
                 {"feeRate", UniValueType()}, // will be checked by AmountFromValue() below
+                {"multisig_fee", UniValueType(UniValue::VNUM)},
                 {"psbt", UniValueType(UniValue::VBOOL)},
                 {"solving_data", UniValueType(UniValue::VOBJ)},
                 {"subtractFeeFromOutputs", UniValueType(UniValue::VARR)},
@@ -653,6 +661,14 @@ CreatedTransactionResult FundTransaction(CWallet& wallet, const CMutableTransact
 
         if (options.exists("add_inputs")) {
             coinControl.m_allow_other_inputs = options["add_inputs"].get_bool();
+        }
+
+        if (options.exists("multisig_fee")) {
+            const CAmount fee{options["multisig_fee"].getInt<int64_t>()};
+            if (!MoneyRange(fee)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "multisig_fee must be nonnegative satoshis within the money range");
+            }
+            coinControl.m_multisig_fee = fee;
         }
 
         if (options.exists("segwit_inputs_only")) {
@@ -1506,7 +1522,7 @@ RPCHelpMan sendall()
                         {"minconf", RPCArg::Type::NUM, RPCArg::Default{0}, "Require inputs with at least this many confirmations."},
                         {"maxconf", RPCArg::Type::NUM, RPCArg::Optional::OMITTED, "Require inputs with at most this many confirmations."},
                     },
-                    FundTxDoc()
+                    FundTxDoc(/*solving_data=*/true, /*multisig_fee=*/false)
                 ),
                 RPCArgOptions{.oneline_description="options"}
             },

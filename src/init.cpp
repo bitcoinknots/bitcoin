@@ -768,6 +768,8 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
                    ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-minrelaytxfee=<amt>", strprintf("Fees (in %s/kvB) smaller than this are considered zero fee for relaying, mining and transaction creation (default: %s)",
         CURRENCY_UNIT, FormatMoney(DEFAULT_MIN_RELAY_TX_FEE)), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
+    argsman.AddArg("-minrelaymultisigexcesskeyfee=<n>", strprintf("Require at least <n> satoshis of fee per unproven key operand after one free key per executed multisig input script (CHECKMULTISIG or tapscript CHECKSIGADD); supported packages may pay the summed floor together (default: %s; 0 disables)",
+        DEFAULT_MIN_RELAY_MULTISIG_EXCESS_KEY_FEE), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-rejectparasites", strprintf("Refuse to relay or mine parasitic overlay protocols (default: %u)", DEFAULT_REJECT_PARASITES), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
     argsman.AddArg("-rejecttokens",
                    strprintf("Refuse to relay or mine transactions involving non-bitcoin tokens (default: %u)",
@@ -882,6 +884,7 @@ void InitParameterInteraction(ArgsManager& args)
         args.SoftSetArg("-datacarrierfullcount", "0");
         args.SoftSetArg("-rejectdeadbranches", "0");
         args.SoftSetArg("-maxtxlegacysigops", strprintf("%s", std::numeric_limits<unsigned int>::max()));
+        args.SoftSetArg("-minrelaymultisigexcesskeyfee", "0");
         args.SoftSetArg("-maxscriptsize", strprintf("%s", std::numeric_limits<unsigned int>::max()));
         args.SoftSetArg("-mempooltruc", "enforce");
         args.SoftSetArg("-permitephemeral", "anchor,send,dust");

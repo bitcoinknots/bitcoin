@@ -2,9 +2,11 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <common/args.h>
 #include <consensus/amount.h>
 #include <key.h>
 #include <policy/fees.h>
+#include <policy/policy.h>
 #include <script/solver.h>
 #include <validation.h>
 #include <wallet/coincontrol.h>
@@ -119,6 +121,101 @@ BOOST_FIXTURE_TEST_CASE(wallet_duplicated_preset_inputs_test, TestChain100Setup)
     // Second case, don't use 'subtract_fee_from_outputs'.
     recipients[0].fSubtractFeeFromAmount = false;
     BOOST_CHECK(!CreateTransaction(*wallet, recipients, /*change_pos=*/std::nullopt, coin_control));
+}
+
+BOOST_FIXTURE_TEST_CASE(multisig_fee_uses_change_and_reselects, TestChain100Setup)
+{
+    m_node.args->ForceSetArg("-minrelaymultisigexcesskeyfee", "1000");
+    CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
+    auto wallet = CreateSyncedWallet(*m_node.chain, WITH_LOCK(Assert(m_node.chainman)->GetMutex(), return m_node.chainman->ActiveChain()), coinbaseKey);
+    const std::vector<CPubKey> keys{coinbaseKey.GetPubKey(), GenerateRandomKey().GetPubKey(), GenerateRandomKey().GetPubKey()};
+    const CScript multisig{GetScriptForMultisig(1, keys)};
+    const COutPoint external{Txid{}, 1};
+
+    CCoinControl control;
+    control.m_allow_other_inputs = false;
+    control.m_feerate.emplace(1000);
+    control.fOverrideFeeRate = true;
+    control.destChange = PubKeyDestination(coinbaseKey.GetPubKey());
+    control.Select(external).SetTxOut(CTxOut{1'000'000, GetScriptForDestination(WitnessV0ScriptHash{multisig})});
+    control.m_external_provider.scripts.emplace(CScriptID{multisig}, multisig);
+    for (const auto& key : keys) control.m_external_provider.pubkeys.emplace(key.GetID(), key);
+
+    std::vector<CRecipient> recipients{{PubKeyDestination(coinbaseKey.GetPubKey()), 100'000, false}};
+    auto with_change{CreateTransaction(*wallet, recipients, std::nullopt, control, /*sign=*/false)};
+    BOOST_REQUIRE(with_change);
+    BOOST_CHECK_EQUAL(with_change->fee, 1000);
+    BOOST_REQUIRE(with_change->change_pos);
+    BOOST_CHECK_EQUAL(with_change->tx->vout[*with_change->change_pos].nValue, 899'000);
+
+    // The preset input alone covers the payment and ordinary fee, but not the
+    // key floor. Coin selection must retry and add a wallet coin.
+    recipients[0].nAmount = 999'500;
+    control.m_allow_other_inputs = true;
+    auto reselected{CreateTransaction(*wallet, recipients, std::nullopt, control, /*sign=*/false)};
+    BOOST_REQUIRE(reselected);
+    BOOST_CHECK_EQUAL(reselected->fee, 1000);
+    BOOST_CHECK_GT(reselected->tx->vin.size(), 1U);
+
+    control.m_allow_other_inputs = false;
+    auto insufficient{CreateTransaction(*wallet, recipients, std::nullopt, control, /*sign=*/false)};
+    BOOST_REQUIRE(!insufficient);
+    BOOST_CHECK(util::ErrorString(insufficient).original.find("Internal bug") == std::string::npos);
+}
+
+BOOST_FIXTURE_TEST_CASE(taproot_unsigned_fee_reserve_and_hint, TestChain100Setup)
+{
+    m_node.args->ForceSetArg("-minrelaymultisigexcesskeyfee", "1000");
+    auto wallet = CreateSyncedWallet(*m_node.chain, WITH_LOCK(Assert(m_node.chainman)->GetMutex(), return m_node.chainman->ActiveChain()), coinbaseKey);
+    const std::vector<CPubKey> keys{coinbaseKey.GetPubKey(), GenerateRandomKey().GetPubKey(), GenerateRandomKey().GetPubKey()};
+    CScript leaf{CScript() << ToByteVector(XOnlyPubKey{keys[0]}) << OP_CHECKSIG};
+    leaf << ToByteVector(XOnlyPubKey{keys[1]}) << OP_CHECKSIGADD;
+    leaf << ToByteVector(XOnlyPubKey{keys[2]}) << OP_CHECKSIGADD << OP_1 << OP_NUMEQUAL;
+    TaprootBuilder builder;
+    builder.Add(0, leaf, TAPROOT_LEAF_TAPSCRIPT).Finalize(XOnlyPubKey{keys[0]});
+    const auto output{builder.GetOutput()};
+    const COutPoint external{Txid{}, 2};
+
+    CCoinControl control;
+    control.m_allow_other_inputs = false;
+    control.m_feerate.emplace(1000);
+    control.fOverrideFeeRate = true;
+    control.destChange = PubKeyDestination(coinbaseKey.GetPubKey());
+    control.Select(external).SetTxOut(CTxOut{1'000'000, GetScriptForDestination(output)});
+    control.m_external_provider.tr_trees.emplace(output, builder);
+    for (const auto& key : keys) control.m_external_provider.pubkeys.emplace(key.GetID(), key);
+    const std::vector<CRecipient> recipients{{PubKeyDestination(coinbaseKey.GetPubKey()), 100'000, false}};
+
+    auto reserved{CreateTransaction(*wallet, recipients, std::nullopt, control, /*sign=*/false)};
+    BOOST_REQUIRE(reserved);
+    BOOST_CHECK_EQUAL(reserved->fee, 1000);
+
+    // Funding can specify its intended total key fee without a signed witness.
+    control.m_multisig_fee = 0;
+    auto hinted_key_path{CreateTransaction(*wallet, recipients, std::nullopt, control, /*sign=*/false)};
+    BOOST_REQUIRE(hinted_key_path);
+    BOOST_CHECK_LT(hinted_key_path->fee, 1000);
+    control.m_multisig_fee = 2000;
+    auto hinted_script_path{CreateTransaction(*wallet, recipients, std::nullopt, control, /*sign=*/false)};
+    BOOST_REQUIRE(hinted_script_path);
+    BOOST_CHECK_EQUAL(hinted_script_path->fee, 2000);
+    control.m_multisig_fee = -1;
+    BOOST_CHECK(!CreateTransaction(*wallet, recipients, std::nullopt, control, /*sign=*/false));
+    control.m_multisig_fee.reset();
+
+    CScriptWitness witness;
+    witness.stack.emplace_back(64, 1); // selected key path: no recovery leaf exposed
+    control.Select(external).SetScriptWitness(witness);
+    auto key_path{CreateTransaction(*wallet, recipients, std::nullopt, control, /*sign=*/false)};
+    BOOST_REQUIRE(key_path);
+    BOOST_CHECK_LT(key_path->fee, 1000);
+
+    const auto spend_data{builder.GetSpendData()};
+    witness.stack = {{}, {}, std::vector<unsigned char>(64, 1), std::vector<unsigned char>(leaf.begin(), leaf.end()), *spend_data.scripts.begin()->second.begin()};
+    control.Select(external).SetScriptWitness(witness);
+    auto script_path{CreateTransaction(*wallet, recipients, std::nullopt, control, /*sign=*/false)};
+    BOOST_REQUIRE(script_path);
+    BOOST_CHECK_EQUAL(script_path->fee, 1000);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
