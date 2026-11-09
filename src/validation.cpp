@@ -743,6 +743,13 @@ private:
                               int64_t total_vsize,
                               PackageValidationState& package_state) EXCLUSIVE_LOCKS_REQUIRED(cs_main, m_pool.cs);
 
+    // Package members are staged together, so PreChecks cannot see one member's
+    // script against another. Keep one creator and one spender per script.
+    // A second creator, a second spender, or a creator that descends from the
+    // spender is rejected. A spender that descends from the creator may stay.
+    bool PackageScriptReuseChecks(const ATMPArgs& args, const std::vector<Workspace>& workspaces,
+                                  PackageValidationState& package_state) EXCLUSIVE_LOCKS_REQUIRED(cs_main, m_pool.cs);
+
     // Run the script checks using our policy flags. As this can be slow, we should
     // only invoke this on transactions that have otherwise passed policy checks.
     bool PolicyScriptChecks(const ATMPArgs& args, Workspace& ws) EXCLUSIVE_LOCKS_REQUIRED(cs_main, m_pool.cs);
@@ -1786,6 +1793,82 @@ MempoolAcceptResult MemPoolAccept::AcceptSingleTransaction(const CTransactionRef
                                         effective_feerate, single_wtxid);
 }
 
+bool MemPoolAccept::PackageScriptReuseChecks(const ATMPArgs& args, const std::vector<Workspace>& workspaces, PackageValidationState& package_state)
+{
+    AssertLockHeld(cs_main);
+    AssertLockHeld(m_pool.cs);
+
+    if (workspaces.size() < 2 || SpkReuseMode == SRM_ALLOW || args.m_ignore_rejects.count("txn-spk-reused")) return true;
+    const bool ignore_chained = args.m_ignore_rejects.count("txn-spk-reused-chained");
+    const bool ignore_in_package = args.m_ignore_rejects.count("txn-spk-reused-in-package");
+
+    const size_t package_count = workspaces.size();
+    std::map<Txid, size_t> index_of;
+    for (size_t i = 0; i < package_count; ++i) {
+        index_of.emplace(workspaces[i].m_hash, i);
+    }
+
+    // is_ancestor[i][a] means transaction a is an in-package ancestor of i.
+    // Parents are already ahead of their children.
+    std::vector<std::vector<uint8_t>> is_ancestor(package_count, std::vector<uint8_t>(package_count, 0));
+    for (size_t i = 0; i < package_count; ++i) {
+        for (const CTxIn& txin : workspaces[i].m_ptx->vin) {
+            const auto parent = index_of.find(txin.prevout.hash);
+            if (parent == index_of.end()) continue;
+            const size_t p = parent->second;
+            is_ancestor[i][p] = 1;
+            for (size_t ancestor = 0; ancestor < package_count; ++ancestor) {
+                if (is_ancestor[p][ancestor]) is_ancestor[i][ancestor] = 1;
+            }
+        }
+    }
+
+    struct Claim {
+        std::vector<size_t> creators;
+        std::vector<size_t> spenders;
+    };
+    std::map<uint160, Claim> claims;
+    for (size_t i = 0; i < package_count; ++i) {
+        // Reuse against an in-package ancestor is chained, as it is against a
+        // mempool ancestor. Reuse between unrelated members is in-package.
+        const auto rejected = [&](size_t other) {
+            const bool chained = is_ancestor[i][other];
+            if (chained ? ignore_chained : ignore_in_package) return false;
+            package_state.Invalid(PackageValidationResult::PCKG_POLICY,
+                                  chained ? "txn-spk-reused-chained" : "txn-spk-reused-in-package",
+                                  workspaces[i].m_ptx->GetWitnessHash().ToString());
+            return true;
+        };
+        std::vector<size_t> others;
+        for (const auto& [spk, spk_state] : workspaces[i].m_tx_handle->mapSPK) {
+            const Claim& claim = claims[spk];
+            if (spk_state & MSS_CREATED) {
+                others.insert(others.end(), claim.creators.begin(), claim.creators.end());
+                // A creator beside an unrelated spender can stay: admitting the
+                // creator and then the spender reaches the same mempool.
+                for (const size_t spender : claim.spenders) {
+                    if (is_ancestor[i][spender]) others.push_back(spender);
+                }
+            }
+            if (spk_state & MSS_SPENT) {
+                others.insert(others.end(), claim.spenders.begin(), claim.spenders.end());
+            }
+        }
+        // Report chained reuse first, as submitting one at a time would.
+        for (const bool chained : {true, false}) {
+            for (const size_t other : others) {
+                if (bool{is_ancestor[i][other] != 0} == chained && rejected(other)) return false;
+            }
+        }
+        for (const auto& [spk, spk_state] : workspaces[i].m_tx_handle->mapSPK) {
+            Claim& claim = claims[spk];
+            if (spk_state & MSS_CREATED) claim.creators.push_back(i);
+            if (spk_state & MSS_SPENT) claim.spenders.push_back(i);
+        }
+    }
+    return true;
+}
+
 PackageMempoolAcceptResult MemPoolAccept::AcceptMultipleTransactions(const std::vector<CTransactionRef>& txns, ATMPArgs& args)
 {
     AssertLockHeld(cs_main);
@@ -1832,6 +1915,10 @@ PackageMempoolAcceptResult MemPoolAccept::AcceptMultipleTransactions(const std::
         // same package spending the same in-mempool outpoints. This needs to be revisited for general
         // package RBF.
         m_viewmempool.PackageAddTransaction(ws.m_ptx);
+    }
+
+    if (!PackageScriptReuseChecks(args, workspaces, package_state)) {
+        return PackageMempoolAcceptResult(package_state, std::move(results));
     }
 
     // At this point we have all in-mempool ancestors, and we know every transaction's vsize.

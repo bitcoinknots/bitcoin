@@ -288,6 +288,7 @@ BASE_SCRIPTS = [
     'p2p_v2_misbehaving.py',
     'example_test.py',
     'mempool_truc.py',
+    'mempool_spkreuse.py',
     'wallet_txn_doublespend.py --legacy-wallet',
     'wallet_multisig_descriptor_psbt.py --descriptors',
     'wallet_miniscript_decaying_multisig_descriptor_psbt.py --descriptors',
