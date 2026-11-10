@@ -9,7 +9,7 @@
 using interfaces::FoundBlock;
 
 namespace wallet {
-bool CWalletTx::IsEquivalentTo(const CWalletTx& _tx) const
+bool CWalletTx::IsMalleation(const CWalletTx& _tx) const
 {
         CMutableTransaction tx1 {*this->tx};
         CMutableTransaction tx2 {*_tx.tx};
