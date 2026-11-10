@@ -1069,9 +1069,13 @@ bool CWallet::MarkReplaced(const uint256& originalHash, const uint256& newHash)
     return success;
 }
 
-void CWallet::MarkMalleationsReplaced(WalletBatch& batch)
+void CWallet::MarkMalleationsReplaced(WalletBatch* batch)
 {
     AssertLockHeld(cs_wallet);
+    // Variants are ordered by nOrderPos, which is not set yet if the transactions
+    // could not be reordered while loading
+    if (std::ranges::any_of(wtxOrdered, [](const auto& entry) { return entry.second->nOrderPos == -1; })) return;
+    size_t restored{0};
     // Oldest first, so the result does not depend on the order of mapWallet
     for (const auto& [order_pos, wtx] : wtxOrdered) {
         const auto replaced_by = wtx->mapValue.find("replaced_by_txid");
@@ -1080,10 +1084,14 @@ void CWallet::MarkMalleationsReplaced(WalletBatch& batch)
             // Never overwrite: a variant's own replaced_by_txid is its own record
             if (variant == wtx || variant->mapValue.count("replaced_by_txid")) continue;
             variant->mapValue["replaced_by_txid"] = replaced_by->second;
-            if (!batch.WriteTx(*variant)) {
+            ++restored;
+            if (batch && !batch->WriteTx(*variant)) {
                 WalletLogPrintf("%s: Updating variant tx %s failed\n", __func__, variant->GetHash().ToString());
             }
         }
+    }
+    if (restored > 0) {
+        WalletLogPrintf("Restored replaced_by_txid on %u malleated transaction(s)%s\n", restored, batch ? "" : " in memory only");
     }
 }
 
@@ -2461,6 +2469,15 @@ DBErrors CWallet::LoadWallet()
     Assert(m_spk_managers.empty());
     Assert(m_wallet_flags == 0);
     DBErrors nLoadWalletRet = WalletBatch(GetDatabase()).LoadWallet(this);
+
+    // Write the repair only if the wallet loaded without errors
+    if (nLoadWalletRet == DBErrors::LOAD_OK) {
+        WalletBatch batch(GetDatabase());
+        MarkMalleationsReplaced(&batch);
+    } else if (nLoadWalletRet == DBErrors::NONCRITICAL_ERROR || nLoadWalletRet == DBErrors::NEED_RESCAN) {
+        MarkMalleationsReplaced(nullptr);
+    }
+
     if (nLoadWalletRet == DBErrors::NEED_REWRITE)
     {
         if (GetDatabase().Rewrite("\x04pool"))
