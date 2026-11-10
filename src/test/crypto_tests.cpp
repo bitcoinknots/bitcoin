@@ -1252,6 +1252,20 @@ BOOST_AUTO_TEST_CASE(muhash_tests)
         a.Finalize(out2);
 
         BOOST_CHECK_EQUAL(out, out2);
+
+        // Self-division must yield the empty set
+        y /= x; // x=X, y=Y*X/X
+        // See note about clang + self-assignment in test/arith_uint256_tests.cpp
+#if defined(__clang__)
+#    pragma clang diagnostic push
+#    pragma clang diagnostic ignored "-Wself-assign-overloaded"
+#endif
+        y /= y; // x=X, y=1
+#if defined(__clang__)
+#    pragma clang diagnostic pop
+#endif
+        y.Finalize(out);
+        BOOST_CHECK_EQUAL(out, out2);
     }
 
     MuHash3072 acc = FromInt(0);
