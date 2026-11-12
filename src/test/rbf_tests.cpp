@@ -714,4 +714,121 @@ BOOST_AUTO_TEST_CASE(feerate_chunks_utilities)
     BOOST_CHECK(CompareChunks(new_chunks, old_chunks) == std::partial_ordering::unordered);
 }
 
+
+// Deliberately slow oracle: reconstruct all remaining ancestor packages after
+// every selection. This preserves the original draft's fee-only semantics.
+static std::set<size_t> ReferenceProjection(const std::vector<TrucProjectionEntry>& entries,
+    size_t excluded, int64_t weight_left, int64_t sigops_left, const CFeeRate& minimum)
+{
+    std::set<size_t> selected;
+    while (true) {
+        std::set<size_t> best;
+        FeeFrac best_rate{0, 1};
+        Txid best_id;
+        int64_t best_weight{0}, best_sigops{0};
+        for (size_t i = 0; i < entries.size(); ++i) {
+            if (i == excluded || selected.count(i)) continue;
+            std::vector<size_t> pending{i};
+            std::set<size_t> package;
+            FeeFrac rate{0, 0};
+            int64_t weight{0}, sigops{0};
+            bool valid{true};
+            while (!pending.empty()) {
+                const size_t j = pending.back();
+                pending.pop_back();
+                if (j == excluded) { valid = false; break; }
+                if (selected.count(j) || !package.insert(j).second) continue;
+                rate += entries[j].rate;
+                weight += entries[j].weight;
+                sigops += entries[j].sigops;
+                pending.insert(pending.end(), entries[j].parents.begin(), entries[j].parents.end());
+            }
+            if (!valid || weight > weight_left || sigops > sigops_left || rate.fee < minimum.GetFee(rate.size)) continue;
+            const auto comparison = FeeRateCompare(rate, best_rate);
+            if (best.empty() || comparison > 0 || (comparison == 0 && entries[i].id < best_id)) {
+                best = std::move(package);
+                best_rate = rate;
+                best_id = entries[i].id;
+                best_weight = weight;
+                best_sigops = sigops;
+            }
+        }
+        if (best.empty()) return selected;
+        selected.insert(best.begin(), best.end());
+        weight_left -= best_weight;
+        sigops_left -= best_sigops;
+    }
+}
+
+BOOST_AUTO_TEST_CASE(truc_projection_differential)
+{
+    FastRandomContext rng{true};
+    for (size_t trial = 0; trial < 500; ++trial) {
+        std::vector<TrucProjectionEntry> entries;
+        const size_t count = 1 + rng.randrange(50);
+        for (size_t i = 0; i < count; ++i) {
+            const int32_t size = 60 + rng.randrange(1000);
+            entries.push_back({{int64_t(rng.randrange(20000)), size}, 4 * size,
+                int64_t(rng.randrange(100)), Txid::FromUint256(rng.rand256()), {}});
+            for (size_t j = 0, n = rng.randrange(4); i && j < n; ++j) entries.back().parents.push_back(rng.randrange(i));
+        }
+        const size_t excluded = rng.randrange(count + 1);
+        const int64_t weight = 1000 + rng.randrange(40000), sigops = 50 + rng.randrange(1000);
+        const CFeeRate minimum{int64_t(rng.randrange(10000))};
+        size_t work{0};
+        const auto actual = ProjectTrucBlock(entries, excluded, weight, sigops, minimum, work, 2000000);
+        BOOST_REQUIRE(actual.has_value());
+        BOOST_CHECK(*actual == ReferenceProjection(entries, excluded, weight, sigops, minimum));
+    }
+}
+
+BOOST_AUTO_TEST_CASE(truc_projection_independent_load_and_limits)
+{
+    FastRandomContext rng{true};
+    std::vector<TrucProjectionEntry> entries;
+    for (size_t i = 0; i < 5000; ++i) entries.push_back({{4160, 104}, 416, 0, Txid::FromUint256(rng.rand256()), {}});
+    size_t work{0};
+    const auto selected = ProjectTrucBlock(entries, entries.size(), 796000, 79600, CFeeRate{1000}, work, 2000000);
+    BOOST_REQUIRE(selected.has_value());
+    BOOST_CHECK_EQUAL(selected->size(), 796000 / 416);
+    BOOST_CHECK_LT(work, 100000U);
+    work = 0;
+    BOOST_CHECK(!ProjectTrucBlock(entries, entries.size(), 796000, 79600, CFeeRate{1000}, work, 10));
+    entries[0].parents.push_back(entries.size() + 1);
+    work = 0;
+    BOOST_CHECK(!ProjectTrucBlock(entries, entries.size(), 796000, 79600, CFeeRate{1000}, work, 2000000));
+}
+
+BOOST_AUTO_TEST_CASE(truc_shared_anchor_scope)
+{
+    CMutableTransaction parent;
+    parent.version = 3;
+    parent.vout.emplace_back(330, CScript() << OP_1 << std::vector<unsigned char>{0x4e, 0x73});
+    parent.vout.emplace_back(10000, CScript() << OP_TRUE);
+    CMutableTransaction old, replacement;
+    old.version = replacement.version = 3;
+    old.vin.emplace_back(COutPoint{parent.GetHash(), 0});
+    replacement.vin = old.vin;
+    const auto check = [&]() { return IsTrucSharedAnchorConflict(CTransaction{replacement}, CTransaction{old}, CTransaction{parent}); };
+    BOOST_CHECK(check());
+    old.vin.emplace_back(COutPoint{Txid::FromUint256(uint256{1}), 0});
+    replacement.vin.emplace_back(COutPoint{Txid::FromUint256(uint256{2}), 0});
+    BOOST_CHECK(check());
+    replacement.vin.back() = old.vin.back();
+    BOOST_CHECK(!check()); // Confirmed fee inputs must not also conflict.
+    replacement.vin.pop_back();
+    replacement.vin.emplace_back(COutPoint{parent.GetHash(), 1});
+    BOOST_CHECK(!check()); // No additional common-parent input.
+    replacement.vin.pop_back();
+    replacement.version = 2;
+    BOOST_CHECK(!check());
+    replacement.version = 3;
+    old.vin[0].prevout.n = replacement.vin[0].prevout.n = 1;
+    BOOST_CHECK(!check()); // Non-P2A direct conflicts remain excluded.
+    old.vin[0].prevout.n = replacement.vin[0].prevout.n = 2;
+    BOOST_CHECK(!check()); // Out-of-bounds output.
+    old.vin[0].prevout.n = 0;
+    BOOST_CHECK(!check()); // No shared anchor.
+}
+
 BOOST_AUTO_TEST_SUITE_END()

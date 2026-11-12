@@ -125,4 +125,35 @@ std::optional<std::string> PaysForRBF(CAmount original_fees,
  */
 std::optional<std::pair<DiagramCheckError, std::string>> ImprovesFeerateDiagram(CTxMemPool::ChangeSet& changeset);
 
+/** Exactly one shared input, the parent's P2A output; one parent input per child.
+ * Caller must additionally establish a single unconfirmed parent and conflict. */
+bool IsTrucSharedAnchorConflict(const CTransaction& replacement, const CTransaction& previous,
+                               const CTransaction& parent);
+
+/** Experimental, bounded, fee-only block projection. No mempool mutation.
+ * Return false on ambiguity/work exhaustion. Caller must establish a single policy
+ * sibling eviction or separately enabled shared-anchor conflict, and compatible
+ * miner settings. This still does not reproduce every BlockAssembler heuristic.
+ * This is not a confirmation guarantee or a consensus/mining policy change.
+ */
+bool TrucSiblingNextBlock(const CTxMemPool& pool, const CTxMemPoolEntry& replacement,
+                          const CTxMemPoolEntry& sibling, const CTxMemPoolEntry& parent,
+                          int64_t block_weight_limit) EXCLUSIVE_LOCKS_REQUIRED(pool.cs);
+
+/** Immutable DAG input to the experimental fee-only projection. */
+struct TrucProjectionEntry {
+    FeeFrac rate;
+    int64_t weight;
+    int64_t sigops;
+    Txid id;
+    std::vector<size_t> parents;
+};
+
+/** Select ancestor packages without modifying the mempool. Excluded may equal
+ * entries.size() to exclude nothing. The caller supplies a shared work counter.
+ * This models fee-only selection, not arbitrary miner priorities. */
+std::optional<std::set<size_t>> ProjectTrucBlock(const std::vector<TrucProjectionEntry>& entries,
+    size_t excluded, int64_t weight_left, int64_t sigops_left, const CFeeRate& minimum,
+    size_t& work, size_t max_work);
+
 #endif // BITCOIN_POLICY_RBF_H
