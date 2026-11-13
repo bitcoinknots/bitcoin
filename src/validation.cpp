@@ -733,6 +733,9 @@ private:
          * when the datacarrier recount runs (the `recount` gate below); otherwise left empty and the script
          * execution cache is used as before. An input that verified no key has an empty set. */
         std::vector<VerifiedKeys> m_verified_keys;
+        /** Per-input result of the pre-script static datacarrier count, so the post-script recount can
+         *  reuse each input's dead-branch count and recompute only its unproven-pubkey part. */
+        std::vector<DatacarrierInputCache> m_carrier_cache;
     };
 
     static inline bool MaybeReject_(TxValidationResult reason, const std::string& reason_str, const std::string& debug_msg, const ignore_rejects_type& ignore_rejects, TxValidationState& state) {
@@ -1068,7 +1071,7 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     }
 
     if (m_pool.m_opts.datacarrier_fullcount || !m_pool.m_opts.accept_non_std_datacarrier) {
-        const auto dcb = DatacarrierBytes(tx, m_view);
+        const auto dcb = DatacarrierBytes(tx, m_view, /*verified_keys=*/nullptr, &ws.m_carrier_cache);
         if (dcb.second > 0 && !(m_pool.m_opts.accept_non_std_datacarrier || ignore_rejects.count("txn-datacarrier-nonstandard"))) {
             return state.Invalid(TxValidationResult::TX_NOT_STANDARD, "txn-datacarrier-nonstandard");
         }
@@ -1583,7 +1586,7 @@ bool MemPoolAccept::PolicyScriptChecks(const ATMPArgs& args, Workspace& ws)
     // its set, and an input that verified no key is recounted with an empty one. Only a result without
     // one set per input would be no observation, and the static count would stand.
     if (recount && ws.m_verified_keys.size() == tx.vin.size()) {
-        const auto dcb = DatacarrierBytes(tx, m_view, &ws.m_verified_keys);
+        const auto dcb = DatacarrierBytes(tx, m_view, &ws.m_verified_keys, &ws.m_carrier_cache);
         if (dcb.first + dcb.second > m_pool.m_opts.max_datacarrier_bytes.value_or(0)) {
             return state.Invalid(TxValidationResult::TX_NOT_STANDARD, "txn-datacarrier-exceeded");
         }

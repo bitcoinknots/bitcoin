@@ -249,11 +249,23 @@ size_t BPUBBytes(const CTransaction& tx);
 
 std::pair<CScript, unsigned int> GetScriptForTransactionInput(CScript prevScript, const CTxIn&);
 
+/** Per-input result of the static datacarrier count (verified_keys == nullptr), cached so the
+ *  post-script recount can reuse the dead-branch part and recompute only the unproven-pubkey part. */
+struct DatacarrierInputCache {
+    size_t first;   //!< unproven-pubkey bytes from the static count (keys recompute this)
+    size_t second;  //!< dead-branch/data bytes; independent of the verified keys, reused as-is
+    bool normal;    //!< the per-input script reached DatacarrierBytes's normal return (counted is meaningful)
+};
+
 /**
- * @param[in] verified_keys  One set per input of the keys a signature verified against, from the policy
- *                           script check, or nullptr when none was observed. See CScript::DatacarrierBytes.
+ * @param[in]  verified_keys  One set per input of the keys a signature verified against, from the policy
+ *                            script check, or nullptr when none was observed. See CScript::DatacarrierBytes.
+ * @param[in,out] input_cache With verified_keys == nullptr, filled with one entry per input (the static
+ *                            count). With verified_keys set and a cache that matches the inputs, the
+ *                            cached dead-branch count is reused and only the unproven-pubkey part is
+ *                            recomputed, skipping the dead-branch scan. nullptr disables both.
  */
-std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsViewCache& view, const std::vector<VerifiedKeys>* verified_keys = nullptr);
+std::pair<size_t, size_t> DatacarrierBytes(const CTransaction& tx, const CCoinsViewCache& view, const std::vector<VerifiedKeys>* verified_keys = nullptr, std::vector<DatacarrierInputCache>* input_cache = nullptr);
 
 int32_t CalculateExtraTxWeight(const CTransaction& tx, const CCoinsViewCache& view, const unsigned int weight_per_data_byte);
 

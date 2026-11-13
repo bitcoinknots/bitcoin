@@ -590,10 +590,17 @@ public:
      *                           unproven-key charge is at least what the static count alone would give.
      *                           nullptr means nothing was observed, and the static count alone applies.
      */
-    std::pair<size_t, size_t> DatacarrierBytes(size_t remaining_outputs, const CScriptWitness* witness = nullptr, bool dead_branches = false, const VerifiedKeys* verified_keys = nullptr) const;
+    std::pair<size_t, size_t> DatacarrierBytes(size_t remaining_outputs, const CScriptWitness* witness = nullptr, bool dead_branches = false, const VerifiedKeys* verified_keys = nullptr, bool* reached_normal_return = nullptr) const;
     /** A pointer passed as dead_branches would convert to bool, with no warning for a pointer variable; this makes it a compile error. */
     template <typename T>
     std::pair<size_t, size_t> DatacarrierBytes(size_t remaining_outputs, const CScriptWitness* witness, T* dead_branches, const VerifiedKeys* verified_keys = nullptr) const = delete;
+
+    /** The datacarrier bytes when the dead-branch count (the .second of DatacarrierBytes) is already
+     *  known from an earlier call on the same script that reached its normal return: recompute only the
+     *  unproven-pubkey part (.first) from verified_keys and reuse counted for the rest, skipping the
+     *  dead-branch scan. Must not be called for a script that took an early return (unconditional
+     *  OP_RETURN, unparsable), where counted does not describe the script. */
+    std::pair<size_t, size_t> DatacarrierBytesReusing(size_t remaining_outputs, const CScriptWitness* witness, const VerifiedKeys* verified_keys, size_t counted) const;
 
     void clear()
     {

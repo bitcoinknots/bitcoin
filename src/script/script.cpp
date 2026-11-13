@@ -1119,8 +1119,10 @@ static size_t UnprovenPubkeyBytes(const CScript& script, const CScriptWitness* w
     return std::max(static_charge, verified_charge);
 }
 
-std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outputs, const CScriptWitness* witness, const bool dead_branches, const VerifiedKeys* verified_keys) const
+std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outputs, const CScriptWitness* witness, const bool dead_branches, const VerifiedKeys* verified_keys, bool* reached_normal_return) const
 {
+    // Cleared here and set just before the normal return, so every early return below leaves it false.
+    if (reached_normal_return) *reached_normal_return = false;
     if (size_t olga_bytes = IsOLGA(remaining_outputs); olga_bytes) {
         return {0, olga_bytes};
     }
@@ -1201,6 +1203,23 @@ std::pair<size_t, size_t> CScript::DatacarrierBytes(const size_t remaining_outpu
             if (!is_push(last_opcode)) data_began = opcode_it;  // only reset at the start of a push run
         } else if ((opcode == OP_DROP || opcode == OP_2DROP) && is_push(last_opcode)) {
             counted += it - data_began;
+        }
+    }
+    if (reached_normal_return) *reached_normal_return = true;
+    return {UnprovenPubkeyBytes(*this, witness, verified_keys), counted};
+}
+
+std::pair<size_t, size_t> CScript::DatacarrierBytesReusing(const size_t remaining_outputs, const CScriptWitness* witness, const VerifiedKeys* verified_keys, const size_t counted) const
+{
+    // The same early returns as DatacarrierBytes, which the verified keys cannot change. The caller only
+    // reuses counted for a script that reached DatacarrierBytes's normal return, so the dead-branch scan
+    // and the counting loop (which produce counted) are skipped and only the unproven-pubkey part is redone.
+    if (size_t olga_bytes = IsOLGA(remaining_outputs); olga_bytes) {
+        return {0, olga_bytes};
+    }
+    if (witness) {
+        if (uint32_t opnet_bytes = OPNetWitnessSize(*witness); opnet_bytes) {
+            return {0, opnet_bytes};
         }
     }
     return {UnprovenPubkeyBytes(*this, witness, verified_keys), counted};
