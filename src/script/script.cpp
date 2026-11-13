@@ -439,17 +439,15 @@ DeadParts FindDeadParts(const CScript& script)
     KnownStack stack, alt;
     opcodetype opcode;
     std::vector<unsigned char> push;
-    // Each opcode costs one step, and OP_ROLL also costs its depth, the one move
-    // that is not constant time. Stop, marking nothing more, after a few steps per
-    // byte: no spendable script rolls deep over and over, and one built to do so
-    // gets the plain scan instead of costing the node more than its size.
-    size_t steps_left{4 * size_t{script.size()}};
+    // OP_ROLL moves as many items as its depth, the one move that is not constant
+    // time. Past a few moves per byte, which no spendable script needs, a roll
+    // forgets what is known instead, so following costs no more than the script's
+    // size and what comes after is still followed.
+    size_t roll_left{4 * size_t{script.size()}};
 
     for (CScript::const_iterator it{script.begin()}; it < script.end();) {
         const size_t offset{size_t(it - script.begin())};
         if (!script.GetOp(it, opcode, push)) break;
-        if (steps_left == 0) break;
-        --steps_left;
 
         if (opcode == OP_IF || opcode == OP_NOTIF) {
             if (not_running) {
@@ -602,15 +600,14 @@ DeadParts FindDeadParts(const CScript& script)
         case OP_PICK: case OP_ROLL: {
             int64_t n{0};
             const bool known{values.Num(stack.Pop(), n)};
-            if (!known || n < 0 || size_t(n) >= stack.size()) {
-                // Reaches below what is known, or the depth itself is unknown
+            if (!known || n < 0 || size_t(n) >= stack.size() || (opcode == OP_ROLL && size_t(n) > roll_left)) {
+                // Reaches below what is known, the depth itself is unknown, or the roll is past the budget
                 if (opcode == OP_ROLL || !known) stack.Forget();
                 stack.Push(UNKNOWN);
                 break;
             }
             if (opcode == OP_ROLL) {
-                if (size_t(n) > steps_left) return dead;
-                steps_left -= n;
+                roll_left -= n;
                 stack.Roll(n);
             } else {
                 stack.Push(stack.At(n));
