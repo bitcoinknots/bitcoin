@@ -11,6 +11,7 @@
 #include <pubkey.h>
 #include <script/interpreter.h>
 #include <uint256.h>
+#include <util/check.h>
 #include <util/hash_type.h>
 
 #include <algorithm>
@@ -321,53 +322,81 @@ static bool DataCarrierCastToBool(const std::vector<unsigned char>& vch)
 }
 
 namespace {
-/** A value on the stack that follows from constants alone, as an index into KnownValues; 0 if it depends on the witness or a signature */
-using KnownValue = size_t;
-constexpr KnownValue UNKNOWN{0};
+/**
+ * A value on the stack that follows from constants alone, or UNKNOWN if it depends on the
+ * witness or a signature. Bytes that are the minimal encoding of a number of up to five bytes,
+ * as wide as any number computed here, are held as that number, so arithmetic costs no lookup;
+ * any other bytes were pushed by the script, and are held as which distinct push they are, with
+ * their size and truthiness. Each value has only one form, so equal values compare equal.
+ */
+struct KnownValue {
+    enum Kind : uint8_t { NONE, NUM, BYTES } kind{NONE};
+    bool truth{false}; // of BYTES
+    uint32_t size{0}; // of BYTES
+    int64_t n{0}; // the number, or which distinct bytes
+    friend bool operator==(const KnownValue&, const KnownValue&) = default;
+};
+constexpr KnownValue UNKNOWN{};
+constexpr size_t MAX_KNOWN_NUM_SIZE{5};
+
+bool IsMinimalNum(const std::vector<unsigned char>& vch)
+{
+    return vch.empty() || (vch.back() & 0x7f) != 0 || (vch.size() > 1 && (vch[vch.size() - 2] & 0x80) != 0);
+}
+
+/** The size of CScriptNum::serialize(n) */
+size_t NumSize(int64_t n)
+{
+    uint64_t abs(n < 0 ? -n : n);
+    size_t size{0};
+    while (abs >= 0x100) {
+        abs >>= 8;
+        ++size;
+    }
+    if (abs) size += abs & 0x80 ? 2 : 1;
+    return size;
+}
 
 /**
- * The values FindDeadParts has seen; the stacks hold indexes, so copying a value costs nothing.
- * Each distinct value is kept once, so equal values share an index and comparing them, or
- * judging one again, costs nothing either.
+ * The pushes FindDeadParts has seen that are not numbers, each distinct one kept once, by where
+ * it is in the script, so equal values share an index.
  */
 class KnownValues
 {
-    const std::vector<unsigned char> m_unknown;
-    std::map<std::vector<unsigned char>, KnownValue> m_index;
-    std::vector<const std::vector<unsigned char>*> m_values{&m_unknown};
-    std::vector<bool> m_true{false};
+    struct Less {
+        bool operator()(Span<const unsigned char> a, Span<const unsigned char> b) const
+        {
+            return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end());
+        }
+    };
+    const CScript& m_script;
+    std::map<Span<const unsigned char>, KnownValue, Less> m_index;
 
 public:
-    KnownValues() = default;
-    KnownValues(const KnownValues&) = delete; // m_values points into this object
-    KnownValues& operator=(const KnownValues&) = delete;
-    KnownValue Add(std::vector<unsigned char> v)
+    explicit KnownValues(const CScript& script) : m_script{script} {}
+    /** The value of a push, whose data ends at offset end of the script */
+    KnownValue AddPush(const std::vector<unsigned char>& v, size_t end)
     {
-        const auto [it, added]{m_index.try_emplace(std::move(v), m_values.size())};
-        if (added) {
-            m_values.push_back(&it->first);
-            m_true.push_back(DataCarrierCastToBool(it->first));
+        if (v.size() <= MAX_KNOWN_NUM_SIZE && IsMinimalNum(v)) {
+            return AddNum(CScriptNum{v, /*fRequireMinimal=*/true, MAX_KNOWN_NUM_SIZE}.GetInt64());
         }
+        const auto [it, added]{m_index.try_emplace(Span{m_script.data() + end - v.size(), v.size()})};
+        if (added) it->second = {.kind = KnownValue::BYTES, .truth = DataCarrierCastToBool(v), .size = uint32_t(v.size()), .n = int64_t(m_index.size())};
         return it->second;
     }
-    KnownValue AddNum(int64_t n) { return Add(CScriptNum{n}.getvch()); }
-    const std::vector<unsigned char>& Get(KnownValue v) const { return *m_values[v]; }
-    bool True(KnownValue v) const { return m_true[v]; }
-    /** The value as a script number, if it is known and a valid one */
-    bool Num(KnownValue v, int64_t& out) const
+    static KnownValue AddNum(int64_t n)
     {
-        if (v == UNKNOWN) return false;
-        // Reject what CScriptNum would throw on before constructing one, since an
-        // exception costs far more than the opcode asking for the number
-        const auto& vch{Get(v)};
-        if (vch.size() > CScriptNum::nDefaultMaxNumSize) return false;
-        if (!vch.empty() && (vch.back() & 0x7f) == 0 && (vch.size() <= 1 || (vch[vch.size() - 2] & 0x80) == 0)) return false;
-        try {
-            out = CScriptNum{vch, /*fRequireMinimal=*/true}.GetInt64();
-            return true;
-        } catch (const scriptnum_error&) {
-            return false;
-        }
+        Assume(n >= -0x7fffffffff && n <= 0x7fffffffff); // five bytes, or a push of it would not equal it
+        return {.kind = KnownValue::NUM, .n = n};
+    }
+    static size_t Size(KnownValue v) { return v.kind == KnownValue::NUM ? NumSize(v.n) : v.size; }
+    static bool True(KnownValue v) { return v.kind == KnownValue::NUM ? v.n != 0 : v.truth; }
+    /** The value as a script number, if it is known and a valid one; pushed bytes never are */
+    static bool Num(KnownValue v, int64_t& out)
+    {
+        if (v.kind != KnownValue::NUM || v.n > 0x7fffffff || v.n < -0x7fffffff) return false;
+        out = v.n;
+        return true;
     }
 };
 
@@ -392,6 +421,8 @@ public:
     }
     KnownValue Peek(size_t depth) const { return depth < m_items.size() ? m_items[m_items.size() - 1 - depth] : UNKNOWN; }
     KnownValue& At(size_t depth) { return m_items[m_items.size() - 1 - depth]; }
+    /** Move the item at depth, which must exist, to the top */
+    void Roll(size_t depth) { std::rotate(m_items.end() - 1 - depth, m_items.end() - depth, m_items.end()); }
     void Forget() { m_items.clear(); }
 };
 
@@ -404,7 +435,7 @@ DeadParts FindDeadParts(const CScript& script)
     struct Frame { bool known; bool running; };
     std::vector<Frame> frames;
     size_t not_running{0}; // open frames whose current part does not run
-    KnownValues values;
+    KnownValues values{script};
     KnownStack stack, alt;
     opcodetype opcode;
     std::vector<unsigned char> push;
@@ -470,7 +501,7 @@ DeadParts FindDeadParts(const CScript& script)
         if (not_running) continue;
 
         if (opcode <= OP_PUSHDATA4) {
-            stack.Push(values.Add(push));
+            stack.Push(values.AddPush(push, size_t(it - script.begin())));
             continue;
         }
         if (opcode == OP_1NEGATE || (opcode >= OP_1 && opcode <= OP_16)) {
@@ -531,7 +562,7 @@ DeadParts FindDeadParts(const CScript& script)
         }
         case OP_SIZE: {
             const KnownValue top{stack.Peek(0)};
-            stack.Push(top == UNKNOWN ? UNKNOWN : values.AddNum(values.Get(top).size()));
+            stack.Push(top == UNKNOWN ? UNKNOWN : values.AddNum(values.Size(top)));
             break;
         }
         case OP_DEPTH:
@@ -561,12 +592,10 @@ DeadParts FindDeadParts(const CScript& script)
                 std::swap(stack.At(3), stack.At(1));
                 std::swap(stack.At(2), stack.At(0));
             } else {
-                std::vector<KnownValue> six;
-                for (int i{0}; i < 6; ++i) six.push_back(stack.Pop());
-                // six[5] and six[4] were deepest; they move to the top
-                for (int i{3}; i >= 0; --i) stack.Push(six[i]);
-                stack.Push(six[5]);
-                stack.Push(six[4]);
+                std::swap(stack.At(5), stack.At(3));
+                std::swap(stack.At(4), stack.At(2));
+                std::swap(stack.At(3), stack.At(1));
+                std::swap(stack.At(2), stack.At(0));
             }
             break;
         }
@@ -579,22 +608,19 @@ DeadParts FindDeadParts(const CScript& script)
                 stack.Push(UNKNOWN);
                 break;
             }
-            const KnownValue v{stack.At(n)};
             if (opcode == OP_ROLL) {
                 if (size_t(n) > steps_left) return dead;
                 steps_left -= n;
-                std::vector<KnownValue> above;
-                for (int64_t i{0}; i < n; ++i) above.push_back(stack.Pop());
-                stack.Pop();
-                for (auto i{above.rbegin()}; i != above.rend(); ++i) stack.Push(*i);
+                stack.Roll(n);
+            } else {
+                stack.Push(stack.At(n));
             }
-            stack.Push(v);
             break;
         }
         case OP_EQUAL: case OP_EQUALVERIFY: {
             const KnownValue b{stack.Pop()}, a{stack.Pop()};
             if (opcode == OP_EQUAL) {
-                stack.Push(a == UNKNOWN || b == UNKNOWN ? UNKNOWN : values.Add(a == b ? std::vector<unsigned char>{1} : std::vector<unsigned char>{}));
+                stack.Push(a == UNKNOWN || b == UNKNOWN ? UNKNOWN : values.AddNum(a == b));
             }
             break;
         }
