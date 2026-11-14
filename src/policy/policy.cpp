@@ -764,12 +764,16 @@ std::vector<size_t> DataOutputBytes(const CTransaction& tx, const CCoinsViewCach
     // A payload is spread over several outputs, and its other chunks may be
     // whitened, so anything caught marks its siblings of the same type and
     // value. Separately, DATA_OUTPUT_DUST_RUN or more distinct P2WSH outputs
-    // sharing one small value are data on their own: encoders pay every chunk
-    // the same, Lightning anchors come in pairs and HTLC amounts differ, and
-    // padding repeats one script. Taproot is left to the curve check, since a
-    // run of small taproot outputs is ordinals postage, not a payload. Whitened
-    // chunks at distinct values, above DATA_OUTPUT_RUN_MAX_VALUE or in 20-byte
-    // outputs are not caught, since only their layout would mark them as data.
+    // sharing one value of at most DATA_OUTPUT_RUN_MAX_VALUE are data on their
+    // own: encoders pay every chunk the same, and padding repeats one script.
+    // A Lightning commitment has no P2WSH output that small but its 330-sat
+    // anchors, two at most: BOLT 2 keeps the dust limit at 354 sat or more
+    // and BOLT 3 trims balance and HTLC outputs below it, while HTLCs can
+    // share one amount, so the run stops below 354. Taproot is left to the
+    // curve check, since a run of small taproot outputs is ordinals postage,
+    // not a payload. Whitened chunks at distinct values, above
+    // DATA_OUTPUT_RUN_MAX_VALUE or in 20-byte outputs are not caught, since
+    // only their layout would mark them as data.
     std::set<std::pair<TxoutType, CAmount>> data_groups;
     for (size_t i{0}; i < n; ++i) {
         if (data[i]) data_groups.emplace(types[i], tx.vout[i].nValue);

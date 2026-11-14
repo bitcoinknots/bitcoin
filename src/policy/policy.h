@@ -259,8 +259,8 @@ static constexpr unsigned int DATA_OUTPUT_BYTE_RUN{6};
 static constexpr size_t DATA_OUTPUT_VANITY_ZEROS{7};
 /** Distinct P2WSH outputs sharing one value of at most DATA_OUTPUT_RUN_MAX_VALUE are data from this many up */
 static constexpr unsigned int DATA_OUTPUT_DUST_RUN{3};
-/** Highest output value a data run is looked for at; batch payouts appear from 600 sat up */
-static constexpr CAmount DATA_OUTPUT_RUN_MAX_VALUE{546};
+/** Highest output value a data run is looked for at, one below 354 sat, the smallest dust limit a Lightning channel can set */
+static constexpr CAmount DATA_OUTPUT_RUN_MAX_VALUE{353};
 /** Taproot outputs per transaction whose key is checked to be on the curve */
 static constexpr unsigned int DATA_OUTPUT_CURVE_CHECKS{64};
 

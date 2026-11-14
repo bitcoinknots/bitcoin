@@ -1657,7 +1657,7 @@ BOOST_AUTO_TEST_CASE(tx_DataOutputBytes)
     // Different values do not add up
     t.vout[2].nValue = 331;
     check(t, {0, 0, 0, 0});
-    // Up to DATA_OUTPUT_RUN_MAX_VALUE, as the fake-key encoder pays 546 sat per chunk
+    // Up to DATA_OUTPUT_RUN_MAX_VALUE, one below the smallest Lightning dust limit
     for (auto& txout : t.vout) txout.nValue = DATA_OUTPUT_RUN_MAX_VALUE;
     t.vout[3].nValue = 100000;
     check(t, {41, 41, 41, 0});
@@ -1666,6 +1666,11 @@ BOOST_AUTO_TEST_CASE(tx_DataOutputBytes)
     // A Lightning commitment with two anchors and two small HTLCs of different amounts
     t.vout = {CTxOut{330, p2wsh(hash_a)}, CTxOut{330, p2wsh(hash_b)}, CTxOut{400, p2wsh(hash_c)}, CTxOut{450, p2wsh(hash_d)}};
     check(t, {0, 0, 0, 0});
+    // HTLCs can share one amount, from the smallest dust limit a channel can set (354 sat) up
+    for (const CAmount htlc : {354, 360, 500, 546}) {
+        t.vout = {CTxOut{330, p2wsh(hash_a)}, CTxOut{330, p2wsh(hash_b)}, CTxOut{htlc, p2wsh(hash_c)}, CTxOut{htlc, p2wsh(hash_d)}, CTxOut{htlc, p2wsh(hash_e)}};
+        check(t, {0, 0, 0, 0, 0});
+    }
     // The run counts distinct scripts: padding or consolidation that repeats
     // one script at the threshold is not a spread payload
     t.vout = {CTxOut{330, p2wsh(hash_a)}, CTxOut{330, p2wsh(hash_a)}, CTxOut{330, p2wsh(hash_a)}, CTxOut{330, p2wsh(hash_b)}};

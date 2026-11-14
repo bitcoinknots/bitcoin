@@ -60,8 +60,14 @@ class DataOutputsTest(BitcoinTestFramework):
         self.test_data_output_transaction(node=disabled, outputs=dust_run, reject_reason=None)
         self.test_data_output_transaction(node=corepolicy, outputs=dust_run, reject_reason=None)
 
-        self.log.info("Testing a run at 546 sat, what the fake-key encoder pays per chunk.")
-        self.test_data_output_transaction(node=default, outputs=[(546, p2wsh(randbytes(32))) for _ in range(3)], reject_reason="txn-datacarrier-nonstandard")
+        self.log.info("Testing a run at 353 sat, the highest value a run is looked for at.")
+        self.test_data_output_transaction(node=default, outputs=[(353, p2wsh(randbytes(32))) for _ in range(3)], reject_reason="txn-datacarrier-nonstandard")
+
+        self.log.info("Testing that a Lightning commitment with three HTLCs of one amount is still standard.")
+        # Two 330-sat anchors, then HTLCs at or above the smallest dust limit a channel can set, 354 sat
+        for htlc in (354, 360, 500, 546):
+            commitment = [(330, p2wsh(randbytes(32))) for _ in range(2)] + [(htlc, p2wsh(randbytes(32))) for _ in range(3)]
+            self.test_data_output_transaction(node=default, outputs=commitment, reject_reason=None)
 
         self.log.info("Testing that small P2WSH outputs of different values, or 330-sat taproot outputs, are still standard.")
         self.test_data_output_transaction(node=default, outputs=[(330, p2wsh(randbytes(32))), (330, p2wsh(randbytes(32))), (400, p2wsh(randbytes(32))), (450, p2wsh(randbytes(32)))], reject_reason=None)
