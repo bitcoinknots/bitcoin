@@ -475,6 +475,8 @@ BOOST_AUTO_TEST_CASE(count_addr)
 
     const ServiceFlags hf{ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_BLAKE2B)};
     const ServiceFlags non_hf{ServiceFlags(NODE_NETWORK | NODE_WITNESS)};
+    // NODE_BLAKE2B suffices in place of NODE_WITNESS.
+    const ServiceFlags hf_no_witness{ServiceFlags(NODE_NETWORK | NODE_BLAKE2B)};
     const CNetAddr source = ResolveIP("252.2.2.2");
 
     // Distinct netgroups so nothing evicts from the new table.
@@ -489,18 +491,21 @@ BOOST_AUTO_TEST_CASE(count_addr)
         a.nTime = now;
         addrs.push_back(a);
     }
+    CAddress no_witness{CAddress(ResolveService("247.1.1.1", 8333), hf_no_witness)};
+    no_witness.nTime = now;
+    addrs.push_back(no_witness);
     // Left terrible (no nTime), so it is not counted.
     addrs.emplace_back(ResolveService("249.1.1.1", 8333), hf);
-    // Advertises NODE_BLAKE2B but not the network/witness flags: matches a
+    // Advertises NODE_BLAKE2B but not the network flag: matches a
     // single-flag require, but not the full SeedsServiceFlags() set.
     CAddress bare{CAddress(ResolveService("248.1.1.1", 8333), NODE_BLAKE2B)};
     bare.nTime = now;
     addrs.push_back(bare);
     BOOST_CHECK(addrman->Add(addrs, source));
-    BOOST_CHECK_EQUAL(addrman->Size(), 10U);
+    BOOST_CHECK_EQUAL(addrman->Size(), 11U);
 
-    BOOST_CHECK_EQUAL(addrman->CountAddr(NODE_BLAKE2B, 100), 6U);
-    BOOST_CHECK_EQUAL(addrman->CountAddr(SeedsServiceFlags(), 100), 5U);
+    BOOST_CHECK_EQUAL(addrman->CountAddr(NODE_BLAKE2B, 100), 7U);
+    BOOST_CHECK_EQUAL(addrman->CountAddr(SeedsServiceFlags(), 100), 6U);
     // Early-out caps the count at max.
     BOOST_CHECK_EQUAL(addrman->CountAddr(NODE_BLAKE2B, 3), 3U);
     BOOST_CHECK_EQUAL(addrman->CountAddr(NODE_COMPACT_FILTERS, 100), 0U);

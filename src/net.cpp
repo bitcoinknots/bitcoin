@@ -2356,8 +2356,8 @@ void CConnman::ThreadDNSAddressSeed()
     // Only a full node advertising NODE_BLAKE2B can serve the header chain past
     // the BLAKE2b hard fork, so drive the DNS-seed cadence off the count of such
     // peers in addrman rather than its total size. SeedsServiceFlags() is the
-    // desirable network/witness flags plus NODE_BLAKE2B, matching what the
-    // outbound selection loop requires. Counted up to the delay threshold (all
+    // desirable network flag plus NODE_BLAKE2B (which suffices in place of
+    // NODE_WITNESS), matching what the outbound selection loop requires. Counted up to the delay threshold (all
     // the decision below needs) and skipped when -forcednsseed queries all.
     const bool force_dnsseed{gArgs.GetBoolArg("-forcednsseed", DEFAULT_FORCEDNSSEED)};
     const size_t blake2b_count{force_dnsseed ? 0 : addrman.CountAddr(SeedsServiceFlags(), DNSSEEDS_DELAY_PEER_THRESHOLD)};
