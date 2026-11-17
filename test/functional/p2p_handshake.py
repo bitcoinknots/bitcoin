@@ -58,6 +58,10 @@ BASE_SERVICE_FLAGS_PRUNED = NODE_NETWORK_LIMITED | NODE_WITNESS
 FULL_SERVICE_FLAGS_FULL = NODE_NETWORK | NODE_WITNESS | NODE_REDUCED_DATA | NODE_BLAKE2B
 FULL_SERVICE_FLAGS_PRUNED = NODE_NETWORK_LIMITED | NODE_WITNESS | NODE_REDUCED_DATA | NODE_BLAKE2B
 
+# Desirable service flags for peers advertising NODE_BLAKE2B, which suffices in place of NODE_WITNESS
+BLAKE2B_SERVICE_FLAGS_FULL = NODE_NETWORK | NODE_BLAKE2B
+BLAKE2B_SERVICE_FLAGS_PRUNED = NODE_NETWORK_LIMITED | NODE_BLAKE2B
+
 
 class P2PStartingHeight(P2PInterface):
     def __init__(self, starting_height):
@@ -290,13 +294,19 @@ class P2PHandshakeTest(BitcoinTestFramework):
         self.test_desirable_service_flags(node, [FULL_SERVICE_FLAGS_FULL],
                                           BASE_SERVICE_FLAGS_FULL, expect_disconnect=False)
 
+        self.log.info("Check that NODE_BLAKE2B suffices in place of NODE_WITNESS")
+        self.test_desirable_service_flags(node, [NODE_BLAKE2B],
+                                          BLAKE2B_SERVICE_FLAGS_FULL, expect_disconnect=True)
+        self.test_desirable_service_flags(node, [BLAKE2B_SERVICE_FLAGS_FULL],
+                                          BLAKE2B_SERVICE_FLAGS_FULL, expect_disconnect=False)
+
         self.log.info("Check that limited peers are only desired if the local chain is close to the tip (<24h)")
         self.generate_at_mocktime(int(time.time()) - 25 * 3600)  # tip outside the 24h window, should fail
-        self.test_desirable_service_flags(node, [FULL_SERVICE_FLAGS_PRUNED],
-                                          BASE_SERVICE_FLAGS_FULL, expect_disconnect=True)
+        self.test_desirable_service_flags(node, [FULL_SERVICE_FLAGS_PRUNED, BLAKE2B_SERVICE_FLAGS_PRUNED],
+                                          BLAKE2B_SERVICE_FLAGS_FULL, expect_disconnect=True)
         self.generate_at_mocktime(int(time.time()) - 23 * 3600)  # tip inside the 24h window, should succeed
-        self.test_desirable_service_flags(node, [FULL_SERVICE_FLAGS_PRUNED],
-                                          BASE_SERVICE_FLAGS_PRUNED, expect_disconnect=False)
+        self.test_desirable_service_flags(node, [FULL_SERVICE_FLAGS_PRUNED, BLAKE2B_SERVICE_FLAGS_PRUNED],
+                                          BLAKE2B_SERVICE_FLAGS_PRUNED, expect_disconnect=False)
 
         self.log.info("Check that feeler connections get disconnected immediately")
         with node.assert_debug_log(["feeler connection completed"]):

@@ -1140,7 +1140,7 @@ static bool IsLimitedPeer(const Peer& peer)
 /** Whether this peer can serve us witness data */
 static bool CanServeWitnesses(const Peer& peer)
 {
-    return peer.m_their_services & NODE_WITNESS;
+    return peer.m_their_services & (NODE_WITNESS | NODE_BLAKE2B);
 }
 
 std::chrono::microseconds PeerManagerImpl::NextInvToInbounds(std::chrono::microseconds now,
@@ -1689,10 +1689,10 @@ ServiceFlags PeerManagerImpl::GetDesirableServiceFlags(ServiceFlags services) co
     if (services & NODE_NETWORK_LIMITED) {
         // Limited peers are desirable when we are close to the tip.
         if (ApproximateBestBlockDepth() < NODE_NETWORK_LIMITED_ALLOW_CONN_BLOCKS) {
-            return ServiceFlags(NODE_NETWORK_LIMITED | NODE_WITNESS);
+            return ServiceFlags(NODE_NETWORK_LIMITED | WitnessServiceFlag(services));
         }
     }
-    return ServiceFlags(NODE_NETWORK | NODE_WITNESS);
+    return ServiceFlags(NODE_NETWORK | WitnessServiceFlag(services));
 }
 
 PeerRef PeerManagerImpl::GetPeerRef(NodeId id) const

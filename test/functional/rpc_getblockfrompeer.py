@@ -10,6 +10,7 @@ from test_framework.messages import (
     from_hex,
     msg_block,
     msg_headers,
+    NODE_BLAKE2B,
     NODE_WITNESS,
 )
 from test_framework.p2p import (
@@ -79,18 +80,19 @@ class GetBlockFromPeerTest(BitcoinTestFramework):
             assert_raises_rpc_error(-1, "Peer does not exist", self.nodes[0].getblockfrompeer, short_tip, peer_id)
 
         self.log.info("Fetching from pre-segwit peer generates error")
-        self.nodes[0].add_p2p_connection(P2PInterface(), services=P2P_SERVICES & ~NODE_WITNESS)
+        self.nodes[0].add_p2p_connection(P2PInterface(), services=P2P_SERVICES & ~(NODE_WITNESS | NODE_BLAKE2B))
         peers = self.nodes[0].getpeerinfo()
         assert_equal(len(peers), 2)
         presegwit_peer_id = peers[1]["id"]
         assert_raises_rpc_error(-1, "Pre-SegWit peer", self.nodes[0].getblockfrompeer, short_tip, presegwit_peer_id)
 
-        self.log.info("Fetching from same peer twice generates error")
-        self.nodes[0].add_p2p_connection(P2PInterface())
+        self.log.info("Fetching from a NODE_BLAKE2B peer without NODE_WITNESS succeeds")
+        self.nodes[0].add_p2p_connection(P2PInterface(), services=P2P_SERVICES & ~NODE_WITNESS)
         peers = self.nodes[0].getpeerinfo()
         assert_equal(len(peers), 3)
         slow_peer_id = peers[2]["id"]
         assert_equal(self.nodes[0].getblockfrompeer(short_tip, slow_peer_id), {})
+        self.log.info("Fetching from same peer twice generates error")
         assert_raises_rpc_error(-1, "Already requested from this peer", self.nodes[0].getblockfrompeer, short_tip, slow_peer_id)
 
         self.log.info("Successful fetch")
