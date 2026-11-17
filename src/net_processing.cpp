@@ -1140,7 +1140,7 @@ static bool IsLimitedPeer(const Peer& peer)
 /** Whether this peer can serve us witness data */
 static bool CanServeWitnesses(const Peer& peer)
 {
-    return peer.m_their_services & NODE_WITNESS;
+    return peer.m_their_services & (NODE_WITNESS | NODE_BLAKE2B);
 }
 
 std::chrono::microseconds PeerManagerImpl::NextInvToInbounds(std::chrono::microseconds now,
