@@ -1431,7 +1431,7 @@ unsigned int PolicyScriptVerifyFlags(const ignore_rejects_type& ignore_rejects)
         return STANDARD_SCRIPT_VERIFY_FLAGS;
     }
     if (ignore_rejects.count("non-mandatory-script-verify-flag")) {
-        return MANDATORY_SCRIPT_VERIFY_FLAGS | REDUCED_DATA_MANDATORY_VERIFY_FLAGS;
+        return MANDATORY_SCRIPT_VERIFY_FLAGS | REDUCED_DATA_STANDARD_VERIFY_FLAGS;
     }
 
     unsigned int flags = STANDARD_SCRIPT_VERIFY_FLAGS;
@@ -1480,7 +1480,7 @@ unsigned int PolicyScriptVerifyFlags(const ignore_rejects_type& ignore_rejects)
     if (ignore_rejects.count("non-mandatory-script-verify-flag-const_scriptcode")) {
         flags &= ~SCRIPT_VERIFY_CONST_SCRIPTCODE;
     }
-    flags |= MANDATORY_SCRIPT_VERIFY_FLAGS | REDUCED_DATA_MANDATORY_VERIFY_FLAGS;  // for safety
+    flags |= MANDATORY_SCRIPT_VERIFY_FLAGS | REDUCED_DATA_STANDARD_VERIFY_FLAGS;  // for safety
     return flags;
 }
 
@@ -2678,7 +2678,7 @@ static unsigned int GetBlockScriptFlags(const CBlockIndex& block_index, const Ch
     }
 
     if (DeploymentActiveAt(block_index, chainman, Consensus::DEPLOYMENT_REDUCED_DATA)) {
-        flags |= REDUCED_DATA_MANDATORY_VERIFY_FLAGS;
+        flags |= REDUCED_DATA_STANDARD_VERIFY_FLAGS;
     }
 
     return flags;
