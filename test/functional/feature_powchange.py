@@ -92,6 +92,7 @@ class PowChangeTest(BitcoinTestFramework):
         pre_template = node.getblocktemplate({"rules": ["segwit"]})
         assert "!blake2b" not in pre_template["rules"]
         assert not pre_template["version"] & 0x80000000
+        assert "noncerange" not in pre_template
 
         invalid_pre_header = create_block(
             int(pre_parent_hash, 16),
@@ -123,6 +124,7 @@ class PowChangeTest(BitcoinTestFramework):
         assert_equal(template["height"], CHANGE_HEIGHT)
         assert template["version"] & 0x80000000
         assert "!blake2b" in template["rules"]
+        assert "noncerange" not in template
 
         template = node.getblocktemplate({"rules": ["segwit", "blake2b"]})
         assert_equal(template["height"], CHANGE_HEIGHT)
@@ -141,6 +143,9 @@ class PowChangeTest(BitcoinTestFramework):
         post_hash = self.generatetoaddress(node, 1, addr)[0]
         post_header = self.get_header(post_hash)
         assert_equal(node.getblockcount(), CHANGE_HEIGHT)
+        post_template = node.getblocktemplate({"rules": ["segwit", "blake2b"]})
+        assert_equal(post_template["height"], CHANGE_HEIGHT + 1)
+        assert "noncerange" not in post_template
         assert post_header.m_header_v2
         assert_equal(post_header.m_height, CHANGE_HEIGHT)
         assert_equal(post_header.m_txcount, 1)
