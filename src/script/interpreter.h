@@ -153,10 +153,9 @@ enum : uint32_t {
 
     // Enforce MAX_SCRIPT_ELEMENT_SIZE_REDUCED instead of MAX_SCRIPT_ELEMENT_SIZE
     // The P2SH redeemScript push is exempted
-    // Taproot control blocks are limited to TAPROOT_CONTROL_MAX_SIZE_REDUCED
-    // Taproot annex is also invalid
-    // OP_IF is also forbidden inside Tapscript
-    SCRIPT_VERIFY_REDUCED_DATA = (1U << 21),
+    // It is enforced on the annex as well
+    // NOTE: more RDTS flags after SIGHASH_UNIFIED
+    SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE = (1U << 21),
 
     // Accept the hardfork signature hash, opted into per signature by
     // SIGHASH_UNIFIED. Removes CVE-2013-2292 and CVE-2020-14199 for the inputs
@@ -173,13 +172,42 @@ enum : uint32_t {
     // that a lagging node relays what its peers relay.
     SCRIPT_VERIFY_UNIFIED_SIGHASH = (1U << 22),
 
+    // Taproot control blocks are limited to TAPROOT_CONTROL_MAX_SIZE_REDUCED
+    SCRIPT_VERIFY_REDUCED_CONTROL_BLOCK = (1U << 23),
+
+    // Taproot annex is also invalid
+    SCRIPT_VERIFY_BAN_ANNEX = (1U << 24),
+
+    // OP_IF is forbidden inside Tapscript
+    SCRIPT_VERIFY_BAN_OPIF = (1U << 25),
+
     // Constants to point to the highest flag in use. Add new flags above this line.
     //
     SCRIPT_VERIFY_END_MARKER
 };
 
+static constexpr unsigned int REDUCED_DATA_VERIFY_FLAGS{0
+    | SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE
+    | SCRIPT_VERIFY_REDUCED_CONTROL_BLOCK
+    | SCRIPT_VERIFY_BAN_ANNEX
+    | SCRIPT_VERIFY_BAN_OPIF
+};
+
+static constexpr unsigned int REDUCED_DATA_STANDARD_VERIFY_FLAGS{0
+    | SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE
+    | SCRIPT_VERIFY_REDUCED_CONTROL_BLOCK
+    | SCRIPT_VERIFY_BAN_ANNEX
+    | SCRIPT_VERIFY_BAN_OPIF
+    | SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM
+    | SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_TAPROOT_VERSION
+    | SCRIPT_VERIFY_DISCOURAGE_OP_SUCCESS
+};
+
 static constexpr unsigned int REDUCED_DATA_MANDATORY_VERIFY_FLAGS{0
-    | SCRIPT_VERIFY_REDUCED_DATA
+    | SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE
+    | SCRIPT_VERIFY_REDUCED_CONTROL_BLOCK
+    | SCRIPT_VERIFY_BAN_ANNEX
+    | SCRIPT_VERIFY_BAN_OPIF
     | SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM
     | SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_TAPROOT_VERSION
     | SCRIPT_VERIFY_DISCOURAGE_OP_SUCCESS

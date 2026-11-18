@@ -398,14 +398,14 @@ BOOST_FIXTURE_TEST_CASE(checkinputs_flags_per_input_cache_safety, Dersig100Setup
 {
     // Reproducer for cache poisoning via per-input flag relaxation.
     //
-    // A 300-byte witness push passes only when SCRIPT_VERIFY_REDUCED_DATA is
+    // A 300-byte witness push passes only when SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE is
     // relaxed (as it would be for pre-activation UTXOs). The cache key is
     // computed from the strict global flags, so if the result is cached after
     // passing with relaxed per-input flags, a subsequent strict-flags lookup
     // will incorrectly return a cache hit.
 
     const auto& coinbase_script{m_coinbase_txns[0]->vout[0].scriptPubKey};
-    const unsigned int strict_flags{SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_REDUCED_DATA};
+    const unsigned int strict_flags{SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE};
     const unsigned int relaxed_flags{SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS};
 
     // P2WSH witness script: OP_DROP OP_TRUE (accepts any single witness element)
