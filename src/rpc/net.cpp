@@ -378,6 +378,10 @@ static RPCHelpMan addnode()
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Error: v2transport requested but not enabled (see -v2transport)");
     }
 
+    if (connection_type == ConnectionType::INBOUND) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Error: inbound is not a connection type we can open");
+    }
+
     if (command == "onetry")
     {
         CAddress addr;
