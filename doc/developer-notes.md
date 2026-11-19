@@ -508,6 +508,17 @@ enabled by setting `LCOV_OPTS="--rc branch_coverage=1"`:
 cmake -DLCOV_OPTS="--rc branch_coverage=1" -P build/Coverage.cmake
 ```
 
+HTML_OPTS can override the genhtml options (which default to LCOV_OPTS). If HTML_OPTS is omitted, LCOV_OPTS are implicitly passed to genhtml. If HTML_OPTS is provided but empty (e.g. -DHTML_OPTS=""), no options are passed to genhtml and LCOV_OPTS are not inherited.
+
+Examples:
+```
+# Override genhtml options explicitly
+cmake -DHTML_OPTS="--title 'Knots Coverage'" -P build/Coverage.cmake
+
+# Provide an empty override: pass nothing to genhtml (do not inherit LCOV_OPTS)
+cmake -DHTML_OPTS="" -P build/Coverage.cmake
+```
+
 To enable test parallelism:
 ```
 cmake -DJOBS=$(nproc) -P build/Coverage.cmake
