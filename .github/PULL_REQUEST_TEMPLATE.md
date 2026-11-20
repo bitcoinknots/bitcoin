@@ -1,15 +1,6 @@
 <!--
 *** Please remove the following help text before submitting: ***
 
-Before opening a pull request to Bitcoin Knots, please first consider if it
-is appropriate for Bitcoin Core and, if so, rebase it and [open a pull request](https://github.com/bitcoin/bitcoin/compare)
-there first! Bitcoin Core has a strict and slow review process, but since
-Knots is more relaxed, feel free to request a merge of your Core PR into
-Knots even while it's waiting on Core.
-
--->
-
-<!--
 Please provide clear motivation for your patch and explain how it improves
 Bitcoin Knots user experience or Bitcoin Knots developer experience
 significantly:
@@ -23,6 +14,12 @@ significantly:
   explanation of the potential issue as well as reasoning for the way the bug
   was fixed.
 * Features are typically welcome.
-* Refactoring changes are never accepted in Knots, and must be performed in
-  Bitcoin Core.
+* Refactoring changes are only accepted if they are required for a feature or
+  bug fix or otherwise improve developer experience significantly. For example,
+  most "code style" refactoring changes require a thorough explanation why they
+  are useful, what downsides they have and why they *significantly* improve
+  developer experience or avoid serious programming bugs. Note that code style
+  is often a subjective matter. Unless they are explicitly mentioned to be
+  preferred in the [developer notes](/doc/developer-notes.md), stylistic code
+  changes are usually rejected.
 -->

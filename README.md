@@ -24,18 +24,12 @@ information or see https://opensource.org/licenses/MIT.
 Development Process
 -------------------
 
-Development generally takes place as part of [Bitcoin Core](https://github.com/bitcoin/bitcoin), and is merged into
-Knots for each release.
-
-Even if your pull request to Core is closed, or if your feature is not
-suitable for Core (eg, because it builds on a feature not supported in Core;
-relies on centralised services; etc), it may still be eligible for inclusion
-in Bitcoin Knots. In this case, a pull request may be opened on the
-[Knots GitHub](https://github.com/bitcoinknots/bitcoin) for review and consideration.
+Development generally takes place using pull requests opened on the
+[Bitcoin Knots GitHub](https://github.com/bitcoinknots/bitcoin) for review and consideration.
 When accepted, you are expected to maintain the submitted branch in your own
 repository, and it will be automatically merged into new releases of Knots.
 
-Developer IRC can be found on Freenode at #bitcoin-dev.
+Most development communication occurs [on the Bitcoin Knots Discord](https://discord.gg/MwrrcAEgP8).
 
 Testing
 -------
