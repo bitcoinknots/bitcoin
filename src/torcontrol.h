@@ -136,6 +136,8 @@ private:
     std::string private_key;
     std::string service_id;
     bool m_try_exec{true};
+    //! Whether the current control connection has authenticated (used to warn once when it is lost)
+    bool m_authenticated{false};
     bool reconnect;
     struct event *reconnect_ev = nullptr;
     float reconnect_timeout;
