@@ -481,6 +481,7 @@ void TorController::auth_cb(TorControlConnection& _conn, const TorControlReply& 
     if (reply.code == 250) {
         LogDebug(BCLog::TOR, "Authentication successful\n");
         reconnect_timeout = RECONNECT_TIMEOUT_START;
+        m_authenticated = true;
 
 #ifdef ENABLE_TOR_SUBPROCESS
         if (m_process) {
@@ -727,6 +728,13 @@ void TorController::disconnected_cb(TorControlConnection& _conn)
     if (service.IsValid())
         RemoveLocal(service);
     service = CService();
+
+    if (m_authenticated) {
+        // Only an established connection going away is worth a warning: nodes
+        // that never had a Tor to talk to keep retrying quietly as before.
+        m_authenticated = false;
+        LogWarning("tor: Lost connection to Tor control port %s; the onion service is no longer advertised until it reconnects", m_current_tor_control_center);
+    }
 
 #ifdef ENABLE_TOR_SUBPROCESS
     if (m_try_exec && !m_execute.empty()) {
