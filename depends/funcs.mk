@@ -196,6 +196,10 @@ ifneq ($(host),$(build))
 $(1)_cmake += -DCMAKE_SYSTEM_NAME=$($(host_os)_cmake_system_name)
 $(1)_cmake += -DCMAKE_C_COMPILER_TARGET=$(host)
 $(1)_cmake += -DCMAKE_CXX_COMPILER_TARGET=$(host)
+ifeq ($(host_os),darwin)
+$(1)_cmake += -DCMAKE_OSX_SYSROOT=$(OSX_SDK)
+$(1)_cmake += -DCMAKE_OSX_DEPLOYMENT_TARGET=$(OSX_MIN_VERSION)
+endif
 endif
 endif
 endef

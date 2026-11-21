@@ -115,8 +115,116 @@ all: install
 
 include hosts/$(host_os).mk
 include hosts/default.mk
+
+host_toolchain_CFLAGS := $(host_CFLAGS)
+host_toolchain_CXXFLAGS := $(host_CXXFLAGS)
+host_toolchain_LDFLAGS := $(host_LDFLAGS)
+
 include builders/$(build_os).mk
 include builders/default.mk
+
+hardening_cmake := $(BASEDIR)/../cmake/module/Hardening.cmake
+
+hardening_probe_extra_args_darwin := -DCMAKE_OSX_SYSROOT=$(OSX_SDK) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(OSX_MIN_VERSION)
+
+define run_hardening_probe
+# Key the cache on the probe inputs, not just the triplet. host and build can
+# use different compilers for the same triplet, and each needs the flags its
+# own compiler accepts.
+$(1)_hardening_probe_key := $(shell printf '%s' "$(3)|$(4)|$(5)|$(7)|$(hardening_probe_extra_args_$(6))" | $(build_SHA256SUM) | cut -c1-$(HASH_LENGTH))
+$(1)_hardening_probe_dir := $(WORK_PATH)/hardening_probe/$(2)/$$($(1)_hardening_probe_key)
+$(1)_hardening_mk := $$($(1)_hardening_probe_dir)/hardening.mk
+$(1)_needs_probe :=
+ifeq ($$(wildcard $$($(1)_hardening_mk)),)
+$(1)_needs_probe := 1
+else ifneq ($$(shell test $(hardening_cmake) -nt $$($(1)_hardening_mk) && echo 1),)
+$(1)_needs_probe := 1
+endif
+ifdef $(1)_needs_probe
+ifneq ($$(shell command -v cmake 2>/dev/null),)
+$$(shell rm -rf $$($(1)_hardening_probe_dir) && mkdir -p $$($(1)_hardening_probe_dir) && \
+    cmake -S $(BASEDIR)/probes/hardening -B $$($(1)_hardening_probe_dir) \
+        -DCMAKE_CXX_COMPILER="$(firstword $(3))" \
+        -DCMAKE_CXX_FLAGS="$(wordlist 2,99,$(3)) -O2 $(7)" \
+        -DCMAKE_SYSTEM_NAME="$(4)" \
+        -DCMAKE_SYSTEM_PROCESSOR="$(5)" \
+        -DCMAKE_EXE_LINKER_FLAGS_INIT="$(7)" \
+        $(hardening_probe_extra_args_$(6)) \
+        >$$($(1)_hardening_probe_dir)/configure.log 2>&1)
+endif
+endif
+endef
+
+# Skip the hardening probe (which writes to WORK_PATH) when the user only
+# invokes inspection or housekeeping targets. This keeps `make print-VAR`,
+# `make clean`, `make download`, etc. usable from a read-only srcdir.
+hardening_skip_probe := $(if $(MAKECMDGOALS),$(if $(filter-out print-% clean clean-all download download-% check-packages check-sources,$(MAKECMDGOALS)),,1))
+
+ifndef hardening_skip_probe
+host_CXX_prog := $(firstword $(strip $(host_CXX)))
+build_CXX_prog := $(firstword $(strip $(build_CXX)))
+ifeq ($(host_CXX_prog),)
+$(error host_CXX is empty. Ensure the compiler is in PATH.)
+endif
+ifeq ($(build_CXX_prog),)
+$(error build_CXX is empty. Ensure the compiler is in PATH.)
+endif
+ifneq ($(patsubst -%,,$(host_CXX_prog)),$(host_CXX_prog))
+$(error host_CXX first word is a flag, not a compiler path (got: "$(host_CXX_prog)" from host_CXX="$(host_CXX)"). Ensure the compiler is in PATH.)
+endif
+ifneq ($(patsubst -%,,$(build_CXX_prog)),$(build_CXX_prog))
+$(error build_CXX first word is a flag, not a compiler path (got: "$(build_CXX_prog)" from build_CXX="$(build_CXX)"). Ensure the compiler is in PATH.)
+endif
+ifeq ($(shell command -v $(host_CXX_prog) 2>/dev/null),)
+$(error host_CXX "$(host_CXX_prog)" is not executable / not found. host_CXX="$(host_CXX)")
+endif
+ifeq ($(shell command -v $(build_CXX_prog) 2>/dev/null),)
+$(error build_CXX "$(build_CXX_prog)" is not executable / not found. build_CXX="$(build_CXX)")
+endif
+
+$(eval $(call run_hardening_probe,host,$(host),$(strip $(host_CXX)),$($(host_os)_cmake_system_name),$(host_arch),$(host_os),$(host_toolchain_LDFLAGS)))
+$(eval $(call run_hardening_probe,build,$(build),$(strip $(build_CXX)),$($(build_os)_cmake_system_name),$(build_arch),$(build_os),$(build_LDFLAGS)))
+
+ifeq ($(wildcard $(host_hardening_mk)),)
+$(error Hardening probe failed for host $(host). See $(host_hardening_probe_dir)/configure.log)
+endif
+ifeq ($(wildcard $(build_hardening_mk)),)
+$(error Hardening probe failed for build $(build). See $(build_hardening_probe_dir)/configure.log)
+endif
+endif # hardening_skip_probe
+
+-include $(host_hardening_mk)
+host_probe_workaround_cflags := $(workaround_cflags)
+host_probe_workaround_cxxflags := $(workaround_cxxflags)
+host_probe_hardening_cflags := $(hardening_cflags)
+host_probe_hardening_cxxflags := $(hardening_cxxflags)
+host_probe_hardening_ldflags := $(hardening_ldflags)
+
+hardening_cflags :=
+hardening_cxxflags :=
+hardening_ldflags :=
+workaround_cflags :=
+workaround_cxxflags :=
+-include $(build_hardening_mk)
+build_probe_workaround_cflags := $(workaround_cflags)
+build_probe_workaround_cxxflags := $(workaround_cxxflags)
+build_probe_hardening_cflags := $(hardening_cflags)
+build_probe_hardening_cxxflags := $(hardening_cxxflags)
+build_probe_hardening_ldflags := $(hardening_ldflags)
+
+$(host_arch)_$(host_os)_CFLAGS += $(host_probe_workaround_cflags)
+$(host_arch)_$(host_os)_CXXFLAGS += $(host_probe_workaround_cxxflags)
+build_$(build_arch)_$(build_os)_CFLAGS += $(build_probe_workaround_cflags)
+build_$(build_arch)_$(build_os)_CXXFLAGS += $(build_probe_workaround_cxxflags)
+ifeq ($(NO_HARDEN),)
+$(host_arch)_$(host_os)_CFLAGS += $(host_probe_hardening_cflags)
+$(host_arch)_$(host_os)_CXXFLAGS += $(host_probe_hardening_cxxflags)
+$(host_arch)_$(host_os)_LDFLAGS += $(host_probe_hardening_ldflags)
+build_$(build_arch)_$(build_os)_CFLAGS += $(build_probe_hardening_cflags)
+build_$(build_arch)_$(build_os)_CXXFLAGS += $(build_probe_hardening_cxxflags)
+build_$(build_arch)_$(build_os)_LDFLAGS += $(build_probe_hardening_ldflags)
+endif
+
 include packages/packages.mk
 
 # Previously, we directly invoked the well-known programs using $(shell ...)
@@ -148,7 +256,7 @@ build_id:=$(shell env CC='$(build_CC)' C_STANDARD='$(C_STANDARD)' CXX='$(build_C
                       ./gen_id '$(BUILD_ID_SALT)' 'GUIX_ENVIRONMENT=$(realpath $(GUIX_ENVIRONMENT))')
 
 $(host_arch)_$(host_os)_id:=$(shell env CC='$(host_CC)' C_STANDARD='$(C_STANDARD)' CXX='$(host_CXX)' CXX_STANDARD='$(CXX_STANDARD)' \
-                                        CPPFLAGS='$(CPPFLAGS)' CFLAGS='$(CFLAGS)' CXXFLAGS='$(CXXFLAGS)' LDFLAGS='$(LDFLAGS)' \
+                                        CPPFLAGS='$(host_CPPFLAGS)' CFLAGS='$(host_CFLAGS)' CXXFLAGS='$(host_CXXFLAGS)' LDFLAGS='$(host_LDFLAGS)' \
                                         AR='$(host_AR)' NM='$(host_NM)' RANLIB='$(host_RANLIB)' STRIP='$(host_STRIP)' SHA256SUM='$(build_SHA256SUM)' \
                                         DEBUG='$(DEBUG)' LTO='$(LTO)' NO_HARDEN='$(NO_HARDEN)' \
                                         ./gen_id '$(HOST_ID_SALT)' 'GUIX_ENVIRONMENT=$(realpath $(GUIX_ENVIRONMENT))')
@@ -221,16 +329,16 @@ $(host_prefix)/toolchain.cmake : toolchain.cmake.in $(host_prefix)/.stamp_$(fina
             -e 's|@STRIP@|$(host_STRIP)|' \
             -e 's|@OBJCOPY@|$(host_OBJCOPY)|' \
             -e 's|@OBJDUMP@|$(host_OBJDUMP)|' \
-            -e 's|@CFLAGS@|$(strip $(host_CFLAGS))|' \
+            -e 's|@CFLAGS@|$(strip $(host_toolchain_CFLAGS))|' \
             -e 's|@CFLAGS_RELEASE@|$(strip $(host_release_CFLAGS))|' \
             -e 's|@CFLAGS_DEBUG@|$(strip $(host_debug_CFLAGS))|' \
-            -e 's|@CXXFLAGS@|$(strip $(host_CXXFLAGS))|' \
+            -e 's|@CXXFLAGS@|$(strip $(host_toolchain_CXXFLAGS))|' \
             -e 's|@CXXFLAGS_RELEASE@|$(strip $(host_release_CXXFLAGS))|' \
             -e 's|@CXXFLAGS_DEBUG@|$(strip $(host_debug_CXXFLAGS))|' \
             -e 's|@CPPFLAGS@|$(strip $(host_CPPFLAGS))|' \
             -e 's|@CPPFLAGS_RELEASE@|$(strip $(host_release_CPPFLAGS))|' \
             -e 's|@CPPFLAGS_DEBUG@|$(strip $(host_debug_CPPFLAGS))|' \
-            -e 's|@LDFLAGS@|$(strip $(host_LDFLAGS))|' \
+            -e 's|@LDFLAGS@|$(strip $(host_toolchain_LDFLAGS))|' \
             -e 's|@LDFLAGS_RELEASE@|$(strip $(host_release_LDFLAGS))|' \
             -e 's|@LDFLAGS_DEBUG@|$(strip $(host_debug_LDFLAGS))|' \
             -e 's|@qt_packages@|$(qt_packages_)|' \
