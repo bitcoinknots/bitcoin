@@ -450,7 +450,7 @@ bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& 
     execdata.m_codeseparator_pos = 0xFFFFFFFFUL;
     execdata.m_codeseparator_pos_init = true;
 
-    const unsigned int max_element_size = (flags & SCRIPT_VERIFY_REDUCED_DATA) ? MAX_SCRIPT_ELEMENT_SIZE_REDUCED : MAX_SCRIPT_ELEMENT_SIZE;
+    const unsigned int max_element_size = (flags & SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE) ? MAX_SCRIPT_ELEMENT_SIZE_REDUCED : MAX_SCRIPT_ELEMENT_SIZE;
 
     try
     {
@@ -635,9 +635,8 @@ bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& 
                             if (vch.size() > 1 || (vch.size() == 1 && vch[0] != 1)) {
                                 return set_error(serror, SCRIPT_ERR_TAPSCRIPT_MINIMALIF);
                             }
-                            // REDUCED_DATA bans OP_IF/OP_NOTIF entirely in tapscript;
-                            // reuses MINIMALIF error code as this is a stricter form of the same restriction
-                            if (flags & SCRIPT_VERIFY_REDUCED_DATA) {
+                            // BAN_OPIF reuses MINIMALIF error code as this is a stricter form of the same restriction
+                            if (flags & SCRIPT_VERIFY_BAN_OPIF) {
                                 return set_error(serror, SCRIPT_ERR_TAPSCRIPT_MINIMALIF);
                             }
                         }
@@ -2050,7 +2049,7 @@ static bool ExecuteWitnessScript(const Span<const valtype>& stack_span, const CS
     }
 
     // Disallow stack item size > MAX_SCRIPT_ELEMENT_SIZE in witness stack
-    const unsigned int max_element_size = (flags & SCRIPT_VERIFY_REDUCED_DATA) ? MAX_SCRIPT_ELEMENT_SIZE_REDUCED : MAX_SCRIPT_ELEMENT_SIZE;
+    const unsigned int max_element_size = (flags & SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE) ? MAX_SCRIPT_ELEMENT_SIZE_REDUCED : MAX_SCRIPT_ELEMENT_SIZE;
     for (const valtype& elem : stack) {
         if (elem.size() > max_element_size) return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
     }
@@ -2146,7 +2145,9 @@ static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, 
         if (stack.size() >= 2 && !stack.back().empty() && stack.back()[0] == ANNEX_TAG) {
             // Drop annex (this is non-standard; see IsWitnessStandard)
             const valtype& annex = SpanPopBack(stack);
-            if (flags & SCRIPT_VERIFY_REDUCED_DATA) {
+            if (flags & SCRIPT_VERIFY_BAN_ANNEX) {
+                return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+            } else if ((flags & SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE) && annex.size() > MAX_SCRIPT_ELEMENT_SIZE_REDUCED) {
                 return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
             }
             execdata.m_annex_hash = (HashWriter{} << annex).GetSHA256();
@@ -2165,7 +2166,7 @@ static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, 
             // Script path spending (stack size is >1 after removing optional annex)
             const valtype& control = SpanPopBack(stack);
             const valtype& script = SpanPopBack(stack);
-            const unsigned int max_control_size = (flags & SCRIPT_VERIFY_REDUCED_DATA) ? TAPROOT_CONTROL_MAX_SIZE_REDUCED : TAPROOT_CONTROL_MAX_SIZE;
+            const unsigned int max_control_size = (flags & SCRIPT_VERIFY_REDUCED_CONTROL_BLOCK) ? TAPROOT_CONTROL_MAX_SIZE_REDUCED : TAPROOT_CONTROL_MAX_SIZE;
             if (control.size() < TAPROOT_CONTROL_BASE_SIZE || control.size() > max_control_size || ((control.size() - TAPROOT_CONTROL_BASE_SIZE) % TAPROOT_CONTROL_NODE_SIZE) != 0) {
                 return set_error(serror, SCRIPT_ERR_TAPROOT_WRONG_CONTROL_SIZE);
             }
@@ -2216,8 +2217,8 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const C
     // rather than being simply concatenated (see CVE-2010-5141)
     std::vector<std::vector<unsigned char> > stack, stackCopy;
     if (scriptPubKey.IsPayToScriptHash()) {
-        // Disable SCRIPT_VERIFY_REDUCED_DATA for pushing the P2SH redeemScript
-        if (!EvalScript(stack, scriptSig, flags & ~SCRIPT_VERIFY_REDUCED_DATA, checker, SigVersion::BASE, serror))
+        // Disable SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE for pushing the P2SH redeemScript
+        if (!EvalScript(stack, scriptSig, flags & ~SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE, checker, SigVersion::BASE, serror))
             // serror is set
             return false;
     } else
@@ -2272,7 +2273,7 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const C
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
         popstack(stack);
 
-        if (flags & SCRIPT_VERIFY_REDUCED_DATA) {
+        if (flags & SCRIPT_VERIFY_REDUCED_ELEMENT_SIZE) {
             // We bypassed the reduced data check above to exempt redeemScript
             // Now enforce it on the rest of the stack items here
             // This is sufficient because P2SH requires scriptSig to be push-only
