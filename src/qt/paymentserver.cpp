@@ -242,18 +242,27 @@ void PaymentServer::handleURIConnection()
 {
     QLocalSocket *clientConnection = uriServer->nextPendingConnection();
 
-    while (clientConnection->bytesAvailable() < (int)sizeof(quint32))
-        clientConnection->waitForReadyRead();
-
     connect(clientConnection, &QLocalSocket::disconnected, clientConnection, &QLocalSocket::deleteLater);
+
+    while (clientConnection->bytesAvailable() < (int)sizeof(quint32)) {
+        if (!clientConnection->waitForReadyRead(BITCOIN_IPC_CONNECT_TIMEOUT)) {
+            clientConnection->abort();
+            return;
+        }
+    }
 
     QDataStream in(clientConnection);
     in.setVersion(QDataStream::Qt_4_0);
     if (clientConnection->bytesAvailable() < (int)sizeof(quint16)) {
+        clientConnection->abort();
         return;
     }
     QString msg;
     in >> msg;
+    if (in.status() != QDataStream::Ok) {
+        clientConnection->abort();
+        return;
+    }
 
     handleURIOrFile(msg);
 }
