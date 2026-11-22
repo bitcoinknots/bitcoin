@@ -228,6 +228,7 @@ BASE_SCRIPTS = [
     'feature_chainstate_revalidation.py',
     'mempool_long_coinbase_maturity.py',
     'feature_rolling_coinbase_maturity.py',
+    'mempool_rolling_coinbase_maturity.py',
     'feature_rolling_coinbase_upgrade.py',
     'mempool_spend_coinbase.py',
     'wallet_avoid_mixing_output_types.py --descriptors',

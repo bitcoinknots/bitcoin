@@ -86,6 +86,15 @@ static void AddLongCoinbaseMaturityRevalidationDeployment(Consensus::Params& con
     });
 }
 
+static void AddRollingCoinbaseMaturityRevalidationDeployment(Consensus::Params& consensus)
+{
+    consensus.chainstate_revalidation_deployments.push_back({
+        .name = "rolling_coinbase_maturity_1y",
+        .start_height = consensus.CoinbaseMaturityRollingActivationHeight,
+        .stop_height = std::numeric_limits<int>::max(),
+    });
+}
+
 /**
  * Main network on which people trade goods and services.
  */
@@ -156,6 +165,19 @@ public:
         consensus.CoinbaseMaturityLongUntilRdts = true;
         consensus.CoinbaseMaturityLong = 180 * 144;
         AddLongCoinbaseMaturityRevalidationDeployment(consensus);
+
+        // Rolling one-year coinbase maturity. Every reward from 979919 until the first block
+        // without subsidy waits 365 * 144 blocks from its own block, independent of RDTS.
+        // It activates before any covered reward reaches the 180-day depth above, so no reward
+        // that the earlier rules let mature is ever locked again.
+        static constexpr int ROLLING_START{979919};
+        static constexpr int ROLLING_ACTIVATION{995000};
+        static_assert(ROLLING_ACTIVATION < ROLLING_START + 180 * 144);
+        consensus.CoinbaseMaturityRolling = 365 * 144;
+        consensus.CoinbaseMaturityRollingStartHeight = ROLLING_START;
+        consensus.CoinbaseMaturityRollingEndHeight = 33 * 210000; // first height with no subsidy
+        consensus.CoinbaseMaturityRollingActivationHeight = ROLLING_ACTIVATION;
+        AddRollingCoinbaseMaturityRevalidationDeployment(consensus);
 
         consensus.nMinimumChainWork = uint256{"00000000000000000000000000000000000000013e00277374c9f9eeadc70200"};
         consensus.defaultAssumeValid = uint256{"0000000000000078ed1e20cac1acf78df6d1060c78059fb6331e17141c881fc8"}; // 964264
@@ -729,6 +751,14 @@ public:
                 consensus.RdtsExpiryTime = *opts.coinbase_maturity_long_expiry;
             }
             AddLongCoinbaseMaturityRevalidationDeployment(consensus);
+        }
+
+        if (opts.coinbase_maturity_rolling_activation_height) {
+            consensus.CoinbaseMaturityRollingActivationHeight = *opts.coinbase_maturity_rolling_activation_height;
+            consensus.CoinbaseMaturityRollingStartHeight = *opts.coinbase_maturity_rolling_start_height;
+            consensus.CoinbaseMaturityRollingEndHeight = *opts.coinbase_maturity_rolling_end_height;
+            consensus.CoinbaseMaturityRolling = *opts.coinbase_maturity_rolling;
+            AddRollingCoinbaseMaturityRevalidationDeployment(consensus);
         }
 
         for (const auto& [deployment_pos, version_bits_params] : opts.version_bits_parameters) {

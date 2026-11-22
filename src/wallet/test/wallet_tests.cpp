@@ -389,7 +389,7 @@ BOOST_FIXTURE_TEST_CASE(write_wallet_settings_concurrently, TestingSetup)
 
 BOOST_AUTO_TEST_CASE(old_coinbase_maturity_without_chain_lock)
 {
-    BOOST_CHECK_EQUAL(m_node.chain->maxCoinbaseMaturity(), 25920);
+    BOOST_CHECK_EQUAL(m_node.chain->maxCoinbaseMaturity(), 52560);
     CMutableTransaction tx;
     tx.vin.resize(1);
     tx.vout.emplace_back(COIN, CScript{});
@@ -397,9 +397,9 @@ BOOST_AUTO_TEST_CASE(old_coinbase_maturity_without_chain_lock)
     CWalletTx wtx{MakeTransactionRef(tx), TxStateConfirmed{GetRandHash(), 1, 0}};
     {
         LOCK(m_wallet.cs_wallet);
-        m_wallet.SetLastBlockProcessed(25920, GetRandHash());
+        m_wallet.SetLastBlockProcessed(52560, GetRandHash());
         BOOST_CHECK_EQUAL(m_wallet.GetTxBlocksToMaturity(wtx), 1);
-        m_wallet.SetLastBlockProcessed(25921, GetRandHash());
+        m_wallet.SetLastBlockProcessed(52561, GetRandHash());
         BOOST_CHECK_EQUAL(m_wallet.GetTxBlocksToMaturity(wtx), 0);
     }
 
