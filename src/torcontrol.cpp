@@ -228,6 +228,8 @@ void TorControlConnection::Disconnect()
     if (b_conn)
         bufferevent_free(b_conn);
     b_conn = nullptr;
+    reply_handlers.clear();
+    message.Clear();
 }
 
 bool TorControlConnection::Command(const std::string &cmd, const ReplyHandlerCB& reply_handler)
