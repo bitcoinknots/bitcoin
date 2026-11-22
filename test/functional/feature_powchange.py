@@ -109,6 +109,8 @@ class PowChangeTest(BitcoinTestFramework):
         pre_template = node.getblocktemplate({"rules": ["segwit"]})
         assert "!blake2b" not in pre_template["rules"]
         assert not pre_template["version"] & 0x80000000
+        assert "noncerange" not in pre_template
+        assert "!blake2b" not in node.getblocktemplate({"rules": ["blake2b"]})["rules"]
 
         invalid_pre_header = create_block(
             int(pre_parent_hash, 16),
@@ -145,10 +147,12 @@ class PowChangeTest(BitcoinTestFramework):
             -8, "Support for 'blake2b' rule requires explicit client support",
             lambda: node.getblocktemplate({"rules": ["segwit"]}),
         )
-        template = node.getblocktemplate({"rules": ["segwit", "blake2b"]})
-        assert_equal(template["height"], CHANGE_HEIGHT)
-        assert template["version"] & 0x80000000
-        assert "!blake2b" in template["rules"]
+        for rules in (["segwit", "blake2b"], ["blake2b"]):
+            template = node.getblocktemplate({"rules": rules})
+            assert_equal(template["height"], CHANGE_HEIGHT)
+            assert template["version"] & 0x80000000
+            assert "!blake2b" in template["rules"]
+            assert "noncerange" not in template
 
         invalid_activation_block = create_block(
             int(pre_hash, 16),
@@ -163,6 +167,9 @@ class PowChangeTest(BitcoinTestFramework):
         post_hash = self.generatetoaddress(node, 1, addr)[0]
         post_header = self.get_header(post_hash)
         assert_equal(node.getblockcount(), CHANGE_HEIGHT)
+        post_template = node.getblocktemplate({"rules": ["segwit", "blake2b"]})
+        assert_equal(post_template["height"], CHANGE_HEIGHT + 1)
+        assert "noncerange" not in post_template
         assert post_header.m_header_v2
         assert_equal(post_header.m_height, CHANGE_HEIGHT)
         assert_equal(post_header.m_txcount, 1)
