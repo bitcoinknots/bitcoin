@@ -159,7 +159,8 @@ public:
      * version of the peer may determine which flags are required (eg in the
      * case of NODE_NETWORK_LIMITED where we seek out NODE_NETWORK peers
      * unless they set NODE_NETWORK_LIMITED and we are out of IBD, in which
-     * case NODE_NETWORK_LIMITED suffices).
+     * case NODE_NETWORK_LIMITED suffices, or of NODE_BLAKE2B, which suffices
+     * in place of NODE_WITNESS).
      *
      * Thus, generally, avoid calling with 'services' == NODE_NONE, unless
      * state-specific flags must absolutely be avoided. When called with

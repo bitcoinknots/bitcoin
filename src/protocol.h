@@ -370,7 +370,7 @@ std::vector<std::string> serviceFlagsToStr(uint64_t flags);
  * should be updated appropriately to filter for nodes with
  * desired service flags (compatible with our new flags).
  */
-constexpr ServiceFlags SeedsServiceFlags() { return ServiceFlags(NODE_NETWORK | NODE_WITNESS | NODE_BLAKE2B); }
+constexpr ServiceFlags SeedsServiceFlags() { return ServiceFlags(NODE_NETWORK | NODE_BLAKE2B); }
 
 /**
  * Service flags we assume for addresses obtained from the DNS seeds and the
@@ -387,6 +387,15 @@ constexpr ServiceFlags SeedsAssumedServiceFlags() { return ServiceFlags(SeedsSer
 static inline bool MayHaveUsefulAddressDB(ServiceFlags services)
 {
     return (services & NODE_NETWORK) || (services & NODE_NETWORK_LIMITED);
+}
+
+/**
+ * The service flag indicating witness support for a peer with the given
+ * service flags: NODE_BLAKE2B implies it, superseding NODE_WITNESS.
+ */
+constexpr ServiceFlags WitnessServiceFlag(ServiceFlags services)
+{
+    return (services & NODE_BLAKE2B) ? NODE_BLAKE2B : NODE_WITNESS;
 }
 
 /** A CService with information about it as peer */

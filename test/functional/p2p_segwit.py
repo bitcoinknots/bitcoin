@@ -28,6 +28,7 @@ from test_framework.messages import (
     MSG_WITNESS_FLAG,
     MSG_WITNESS_TX,
     MSG_WTX,
+    NODE_BLAKE2B,
     NODE_NETWORK,
     NODE_WITNESS,
     WITNESS_SCALE_FACTOR,
@@ -247,6 +248,8 @@ class SegWitTest(BitcoinTestFramework):
         self.test_node = self.nodes[0].add_p2p_connection(TestP2PConn(), services=P2P_SERVICES)
         # self.old_node sets only NODE_NETWORK
         self.old_node = self.nodes[0].add_p2p_connection(TestP2PConn(), services=NODE_NETWORK)
+        # self.blake2b_node sets NODE_BLAKE2B, which implies witness support, but not NODE_WITNESS
+        self.blake2b_node = self.nodes[0].add_p2p_connection(TestP2PConn(), services=NODE_NETWORK | NODE_BLAKE2B)
         # self.std_node is for testing node1 (requires standard txs)
         self.std_node = self.nodes[1].add_p2p_connection(TestP2PConn(), services=P2P_SERVICES)
         # self.std_wtx_node is for testing node1 with wtxid relay
@@ -449,6 +452,13 @@ class SegWitTest(BitcoinTestFramework):
             self.old_node.send_message(msg)
             self.old_node.announce_tx_and_wait_for_getdata(block4.vtx[0])
             assert block4.sha256 not in self.old_node.getdataset
+
+            # A NODE_BLAKE2B peer is asked for witness blocks even without NODE_WITNESS
+            block5 = self.build_next_block()
+            block5.solve()
+            self.blake2b_node.announce_block_and_wait_for_getdata(block5, use_header=True)
+            assert self.blake2b_node.last_message["getdata"].inv[0].type == blocktype
+            test_witness_block(self.nodes[0], self.blake2b_node, block5, True)
 
     @subtest
     def test_v0_outputs_arent_spendable(self):
