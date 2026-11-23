@@ -172,6 +172,12 @@ struct Params {
     }
     /** Bind long maturity to the mining block's parent MTP, retaining it after RDTS expires. */
     bool CoinbaseMaturityLongUntilRdts{false};
+    /** Experimental difficulty-adjusted coinbase maturity.
+     * Disabled unless explicitly enabled by network parameters.
+     */
+    bool CoinbaseMaturityDynamic{false};
+    /** Initial dynamic maturity; production default is 180 days of blocks. */
+    int64_t CoinbaseMaturityDynamicInitial{25920};
     bool CoinbaseMaturityLongActiveAt(int height) const
     {
         return height >= CoinbaseMaturityLongEnforceHeight && (CoinbaseMaturityLongUntilRdts || height < CoinbaseMaturityLongReleaseHeight);

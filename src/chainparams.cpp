@@ -151,6 +151,40 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
         options.coinbase_maturity_long_expiry = expiry;
     }
 
+    if (args.IsArgSet("-testdynamiccbm")) {
+        if (!args.GetBoolArg("-testdynamiccbm", false)) {
+            throw std::runtime_error("-testdynamiccbm must be enabled with =1.");
+        }
+        if (!options.coinbase_maturity_long_expiry) {
+            throw std::runtime_error("-testdynamiccbm requires -testcoinbasematuritylongexpiry.");
+        }
+        options.dynamic_coinbase_maturity = true;
+    }
+
+    if (const auto arg{args.GetArg("-testdynamiccbminitial")}; arg) {
+        int64_t initial;
+        if (!options.dynamic_coinbase_maturity ||
+            !ParseInt64(*arg, &initial) ||
+            initial < 100 || initial > 25920) {
+            throw std::runtime_error(
+                "-testdynamiccbminitial requires -testdynamiccbm=1 "
+                "and an integer between 100 and 25920.");
+        }
+        options.dynamic_coinbase_maturity_initial = initial;
+    }
+
+    if (args.IsArgSet("-testdynamiccbmretarget")) {
+        if (!args.GetBoolArg("-testdynamiccbmretarget", false)) {
+            throw std::runtime_error(
+                "-testdynamiccbmretarget must be enabled with =1.");
+        }
+        if (!options.dynamic_coinbase_maturity) {
+            throw std::runtime_error(
+                "-testdynamiccbmretarget requires -testdynamiccbm=1.");
+        }
+        options.dynamic_coinbase_maturity_retarget = true;
+    }
+
     for (const std::string& strDeployment : args.GetArgs("-vbparams")) {
         std::vector<std::string> vDeploymentParams = SplitString(strDeployment, ':');
         if (vDeploymentParams.size() < 3 || 7 < vDeploymentParams.size()) {
