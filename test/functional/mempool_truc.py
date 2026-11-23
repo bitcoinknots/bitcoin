@@ -682,6 +682,35 @@ class MempoolTRUC(BitcoinTestFramework):
                 self.check_mempool([tx_v2_0fee_parent["txid"], tx_v2_child["txid"], tx_v3_0fee_parent["txid"], tx_v3_child["txid"]])
 
 
+    def test_default_and_overrides(self):
+        self.log.info("Test native TRUC default and explicit overrides with both corepolicy settings")
+        node = self.nodes[0]
+        for corepolicy in (0, 1):
+            for mode in (None, "accept", "reject", "enforce"):
+                args = [f"-corepolicy={corepolicy}", "-acceptnonstdtxn=0", "-persistmempool=0"]
+                if mode is not None:
+                    args.append(f"-mempooltruc={mode}")
+                self.restart_node(0, extra_args=args)
+                assert_equal(node.getmempoolinfo()["truc_policy"], mode or "enforce")
+                self.wallet.rescan_utxos()
+                parent = self.wallet.create_self_transfer(version=3, confirmed_only=True)
+                child = self.wallet.create_self_transfer(utxo_to_spend=parent["new_utxo"], version=2)
+                if mode == "reject":
+                    result = node.testmempoolaccept([parent["hex"]])[0]
+                    assert_equal(result["allowed"], False)
+                    assert_equal(result["reject-reason"], "version")
+                    continue
+                node.sendrawtransaction(parent["hex"])
+                result = node.testmempoolaccept([child["hex"]])[0]
+                assert_equal(result["allowed"], mode == "accept")
+                if mode != "accept":
+                    assert_equal(result["reject-reason"], "truc-spent-by-nontruc")
+                if mode in (None, "enforce"):
+                    parent = self.wallet.create_self_transfer(version=3, confirmed_only=True, fee=0, fee_rate=0)
+                    child = self.wallet.create_self_transfer(utxo_to_spend=parent["new_utxo"], version=3, fee_rate=DEFAULT_FEE*50)
+                    assert_equal(node.submitpackage([parent["hex"], child["hex"]])["package_msg"], "success")
+        self.restart_node(0)
+
     def run_test(self):
         self.log.info("Generate blocks to create UTXOs")
         node = self.nodes[0]
@@ -702,6 +731,7 @@ class MempoolTRUC(BitcoinTestFramework):
         self.test_truc_sibling_eviction()
         self.test_reorg_sibling_eviction_1p2c()
         self.test_minrelay_in_package_combos()
+        self.test_default_and_overrides()
 
 
 if __name__ == "__main__":
