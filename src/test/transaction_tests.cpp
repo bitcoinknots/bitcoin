@@ -1053,8 +1053,9 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     CheckIsNotStandard(t, "dust");
 }
 
-/** Spend 1-of-N inputs whose keys carry `stream` in `chunk` bytes each. */
-static size_t AddBpubInputs(CMutableTransaction& tx, const std::vector<unsigned char>& stream, const size_t chunk, const size_t per_input, const std::vector<unsigned char>& control)
+/** Spend 1-of-N inputs whose keys carry `stream` in `chunk` bytes each, with `prefix` and `suffix` around the multisig. */
+static size_t AddBpubInputs(CMutableTransaction& tx, const std::vector<unsigned char>& stream, const size_t chunk, const size_t per_input, const std::vector<unsigned char>& control,
+                            const CScript& prefix = {}, const CScript& suffix = {}, const opcodetype check = OP_CHECKMULTISIG)
 {
     std::vector<std::vector<unsigned char>> keys;
     for (size_t i{0}; i < stream.size(); i += chunk) {
@@ -1066,9 +1067,11 @@ static size_t AddBpubInputs(CMutableTransaction& tx, const std::vector<unsigned 
     size_t bytes{0};
     for (size_t i{0}; i < keys.size(); i += per_input) {
         const size_t n{std::min(per_input, keys.size() - i)};
-        CScript script{CScript() << OP_1};
+        CScript script{prefix};
+        script << OP_1;
         for (size_t j{i}; j < i + n; ++j) script << keys[j];
-        script << control << CScript::EncodeOP_N(n + 1) << OP_CHECKMULTISIG;
+        script << control << CScript::EncodeOP_N(n + 1) << check;
+        script.insert(script.end(), suffix.begin(), suffix.end());
         tx.vin.emplace_back().scriptWitness.stack = {{}, std::vector<unsigned char>(72, 1), {script.begin(), script.end()}};
         bytes += script.size();
     }
@@ -1181,6 +1184,65 @@ BOOST_AUTO_TEST_CASE(bpub_bytes)
     AddBpubInputs(bare, v5, 31, 14, control);
     for (auto& txin : bare.vin) txin.scriptWitness.stack.erase(txin.scriptWitness.stack.begin(), txin.scriptWitness.stack.end() - 1);
     BOOST_CHECK_EQUAL(BPUBBytes(CTransaction{bare}), 0U);
+
+    // Opcodes around the multisig, or CHECKMULTISIGVERIFY, do not hide it
+    const auto around = [&](const CScript& prefix, const CScript& suffix, opcodetype check = OP_CHECKMULTISIG) {
+        CMutableTransaction tx;
+        const size_t bytes{AddBpubInputs(tx, v5, 31, 10, control, prefix, suffix, check)};
+        CMutableTransaction zeros;
+        AddBpubInputs(zeros, std::vector<unsigned char>(v5.size(), 0), 31, 10, control, prefix, suffix, check);
+        return BPUBBytes(CTransaction{tx}) == bytes && BPUBBytes(CTransaction{zeros}) == 0;
+    };
+    BOOST_CHECK(around({}, CScript() << OP_1 << OP_EQUAL));
+    BOOST_CHECK(around(CScript() << OP_1 << OP_DROP, {}));
+    BOOST_CHECK(around(CScript() << OP_1 << OP_1 << OP_EQUALVERIFY, CScript() << OP_1 << OP_EQUAL));
+    BOOST_CHECK(around({}, CScript() << OP_1, OP_CHECKMULTISIGVERIFY));
+    BOOST_CHECK(around({}, CScript() << OP_1 << OP_EQUAL, OP_CHECKMULTISIGVERIFY));
+    // A multisig of another key in the same script hides neither, and the script counts once
+    CMutableTransaction two_multisigs;
+    const CScript decoy_multisig{CScript() << OP_1 << std::vector<unsigned char>(33, 2) << other << OP_2 << OP_CHECKMULTISIGVERIFY};
+    const size_t two_multisigs_bytes{AddBpubInputs(two_multisigs, v5, 31, 10, control, decoy_multisig)};
+    BOOST_CHECK_EQUAL(BPUBBytes(CTransaction{two_multisigs}), two_multisigs_bytes);
+    // Nor does a multisig of the same key with compressed keys ahead of the header, in an unexecuted branch or its own input
+    const CScript same_key_decoy{CScript() << OP_0 << OP_IF << OP_1 << std::vector<unsigned char>(33, 0) << control << OP_2 << OP_CHECKMULTISIG << OP_ENDIF};
+    CMutableTransaction branch_decoyed;
+    const size_t branch_decoyed_bytes{AddBpubInputs(branch_decoyed, v5, 31, 10, control, same_key_decoy)};
+    BOOST_CHECK_EQUAL(BPUBBytes(CTransaction{branch_decoyed}), branch_decoyed_bytes);
+    CMutableTransaction input_decoyed;
+    const CScript same_key_input{CScript() << OP_1 << std::vector<unsigned char>(33, 0) << control << OP_2 << OP_CHECKMULTISIG};
+    input_decoyed.vin.emplace_back().scriptWitness.stack = {{}, std::vector<unsigned char>(72, 1), {same_key_input.begin(), same_key_input.end()}};
+    const size_t input_decoyed_bytes{same_key_input.size() + AddBpubInputs(input_decoyed, v5, 31, 10, control)};
+    BOOST_CHECK_EQUAL(BPUBBytes(CTransaction{input_decoyed}), input_decoyed_bytes);
+    // A header split across two multisigs of one script is joined in script order
+    CMutableTransaction split, split_reversed;
+    const auto key_of = [&](size_t begin, size_t end) {
+        std::vector<unsigned char> key{0x02};
+        key.insert(key.end(), v5.begin() + begin, v5.begin() + end);
+        key.push_back(0);
+        return key;
+    };
+    const CScript first_half{CScript() << OP_1 << key_of(0, 5) << control << OP_2 << OP_CHECKMULTISIGVERIFY};
+    const CScript second_half{CScript() << OP_1 << key_of(5, 12) << control << OP_2 << OP_CHECKMULTISIG};
+    CScript split_script{first_half};
+    split_script.insert(split_script.end(), second_half.begin(), second_half.end());
+    split.vin.emplace_back().scriptWitness.stack = {{}, std::vector<unsigned char>(72, 1), {split_script.begin(), split_script.end()}};
+    BOOST_CHECK_EQUAL(BPUBBytes(CTransaction{split}), split_script.size());
+    CScript reversed_script{second_half};
+    reversed_script.back() = OP_CHECKMULTISIGVERIFY;
+    reversed_script.insert(reversed_script.end(), first_half.begin(), first_half.end());
+    reversed_script.back() = OP_CHECKMULTISIG;
+    split_reversed.vin.emplace_back().scriptWitness.stack = {{}, std::vector<unsigned char>(72, 1), {reversed_script.begin(), reversed_script.end()}};
+    BOOST_CHECK_EQUAL(BPUBBytes(CTransaction{split_reversed}), 0U);
+    CMutableTransaction both_spam;
+    const size_t both_spam_bytes{AddBpubInputs(both_spam, v5, 31, 10, control)};
+    for (auto& txin : both_spam.vin) {
+        auto& script{txin.scriptWitness.stack.back()};
+        script.back() = OP_CHECKMULTISIGVERIFY;
+        const std::vector<unsigned char> copy{script};
+        script.insert(script.end(), copy.begin(), copy.end());
+        script.back() = OP_CHECKMULTISIG;
+    }
+    BOOST_CHECK_EQUAL(BPUBBytes(CTransaction{both_spam}), 2 * both_spam_bytes);
 
     // It counts as non-standard datacarrier, and as data for -datacarriercost
     CCoinsView coins_dummy;
