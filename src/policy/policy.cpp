@@ -752,56 +752,70 @@ static bool IsBPUBHeader(const std::vector<unsigned char>& head)
 size_t BPUBBytes(const CTransaction& tx)
 {
     // Spam can be pushed as the keys of a 1-of-N multisig, since nothing checks the other keys
-    // once the last one signs. Inputs whose witness ends in such a script with the same last key
-    // are joined in input order, taking each key but the last less its first and last bytes, and
-    // counted when the result opens with a known spam header. Keys are taken both as pushes of
-    // any size but OP_0, with N as any opcode valued 0x50 + N, and as compressed keys with OP_N
-    // only, skipping any other input.
-    struct Input {
+    // once the last one signs. Each such multisig in the script that ends an input's witness is
+    // read, with any opcodes around it, and those with the same last key are joined in input
+    // order, taking each key but the last less its first and last bytes. The scripts of their
+    // inputs count when the result, read from any of them, opens with a known spam header. Keys
+    // are taken both as pushes of any size but OP_0, with N as any opcode valued 0x50 + N, and as
+    // compressed keys with OP_N only.
+    struct Multisig {
         std::vector<unsigned char> control, head;
         bool compressed_keys;
-        size_t bytes;
+        size_t input;
     };
-    std::vector<Input> inputs;
+    std::vector<Multisig> multisigs;
     std::vector<unsigned char> push_data;
-    for (const CTxIn& txin : tx.vin) {
-        const auto& stack{txin.scriptWitness.stack};
+    for (size_t i{0}; i < tx.vin.size(); ++i) {
+        const auto& stack{tx.vin[i].scriptWitness.stack};
         if (stack.size() < 2) continue;
         const CScript script(stack.back().begin(), stack.back().end());
-        CScript::const_iterator it{script.begin()};
         opcodetype opcode;
-        if (!script.GetOp(it, opcode) || opcode != OP_1) continue;
-        Input input{{}, {}, true, script.size()};
-        size_t keys{0};
-        bool parsed;
-        while ((parsed = script.GetOp(it, opcode, push_data)) && opcode > OP_0 && opcode <= OP_PUSHDATA4) {
-            if (keys++ && input.head.size() < 10 && input.control.size() > 2) {
-                input.head.insert(input.head.end(), input.control.begin() + 1, input.control.begin() + 1 + std::min(10 - input.head.size(), input.control.size() - 2));
+        for (CScript::const_iterator start{script.begin()}; script.GetOp(start, opcode);) {
+            if (opcode != OP_1) continue;
+            CScript::const_iterator it{start};
+            Multisig multisig{{}, {}, true, i};
+            size_t keys{0};
+            bool parsed;
+            while ((parsed = script.GetOp(it, opcode, push_data)) && opcode > OP_0 && opcode <= OP_PUSHDATA4) {
+                if (keys++ && multisig.head.size() < 10 && multisig.control.size() > 2) {
+                    multisig.head.insert(multisig.head.end(), multisig.control.begin() + 1, multisig.control.begin() + 1 + std::min(10 - multisig.head.size(), multisig.control.size() - 2));
+                }
+                multisig.compressed_keys &= push_data.size() == CPubKey::COMPRESSED_SIZE;
+                multisig.control.swap(push_data);
             }
-            input.compressed_keys &= push_data.size() == CPubKey::COMPRESSED_SIZE;
-            input.control.swap(push_data);
+            if (!parsed || keys < 2 || static_cast<size_t>(opcode) != 0x50 + keys) continue;
+            multisig.compressed_keys &= keys <= 16;
+            if (!script.GetOp(it, opcode) || (opcode != OP_CHECKMULTISIG && opcode != OP_CHECKMULTISIGVERIFY)) continue;
+            multisigs.push_back(std::move(multisig));
         }
-        if (!parsed || keys < 2 || static_cast<size_t>(opcode) != 0x50 + keys) continue;
-        input.compressed_keys &= keys <= 16;
-        if (!script.GetOp(it, opcode) || opcode != OP_CHECKMULTISIG || it != script.end()) continue;
-        inputs.push_back(std::move(input));
     }
 
-    std::stable_sort(inputs.begin(), inputs.end(), [](const Input& a, const Input& b) { return a.control < b.control; });
-    size_t bytes{0};
-    for (auto stream{inputs.begin()}; stream != inputs.end();) {
-        const auto end{std::find_if(stream, inputs.end(), [&](const Input& input) { return input.control != stream->control; })};
-        std::vector<unsigned char> head, compressed_head;
-        size_t stream_bytes{0};
-        for (auto input{stream}; input != end; ++input) {
-            if (head.size() < 10) head.insert(head.end(), input->head.begin(), input->head.end());
-            if (input->compressed_keys && compressed_head.size() < 10) {
-                compressed_head.insert(compressed_head.end(), input->head.begin(), input->head.end());
+    std::stable_sort(multisigs.begin(), multisigs.end(), [](const Multisig& a, const Multisig& b) { return a.control < b.control; });
+    std::vector<bool> spam(tx.vin.size());
+    for (auto stream{multisigs.begin()}; stream != multisigs.end();) {
+        const auto end{std::find_if(stream, multisigs.end(), [&](const Multisig& multisig) { return multisig.control != stream->control; })};
+        // Only a multisig that adds bytes opens a header, and each opening stops at 10 bytes, so
+        // no multisig is read by more than 10 openings.
+        bool found{false};
+        for (auto first{stream}; first != end && !found; ++first) {
+            if (first->head.empty()) continue;
+            std::vector<unsigned char> head, compressed_head;
+            for (auto multisig{first}; multisig != end && head.size() < 10; ++multisig) {
+                head.insert(head.end(), multisig->head.begin(), multisig->head.end());
             }
-            stream_bytes += input->bytes;
+            for (auto multisig{first}; first->compressed_keys && multisig != end && compressed_head.size() < 10; ++multisig) {
+                if (multisig->compressed_keys) compressed_head.insert(compressed_head.end(), multisig->head.begin(), multisig->head.end());
+            }
+            found = IsBPUBHeader(head) || IsBPUBHeader(compressed_head);
         }
-        if (IsBPUBHeader(head) || IsBPUBHeader(compressed_head)) bytes += stream_bytes;
+        if (found) {
+            for (auto multisig{stream}; multisig != end; ++multisig) spam[multisig->input] = true;
+        }
         stream = end;
+    }
+    size_t bytes{0};
+    for (size_t i{0}; i < tx.vin.size(); ++i) {
+        if (spam[i]) bytes += tx.vin[i].scriptWitness.stack.back().size();
     }
     return bytes;
 }
