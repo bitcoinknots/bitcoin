@@ -284,6 +284,7 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   node/mempool_persist_args.cpp
   node/miner.cpp
   node/mini_miner.cpp
+  node/policy_settings.cpp
   node/peerman_args.cpp
   node/psbt.cpp
   node/timeoffsets.cpp
@@ -312,6 +313,7 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   rpc/rawtransaction.cpp
   rpc/server.cpp
   rpc/server_util.cpp
+  rpc/settings.cpp
   rpc/signmessage.cpp
   rpc/txoutproof.cpp
   script/sigcache.cpp
