@@ -7,6 +7,12 @@
 
 #include <QLineEdit>
 
+QT_BEGIN_NAMESPACE
+class QEvent;
+class QFocusEvent;
+class QValidator;
+QT_END_NAMESPACE
+
 /** Line edit that can be marked as "invalid" to show input validation feedback. When marked as invalid,
    it will get a red background until it is focused.
  */
@@ -22,16 +28,21 @@ public:
     bool isValid();
     void setWarningValidator(const QValidator *);
     bool hasWarning() const;
+    void setAllowEmptyInput(bool allow) { m_allow_empty_input = allow; }
+    void setAllowValidationWhileEditing(bool allow) { m_allow_validation_while_editing = allow; }
 
 protected:
     void focusInEvent(QFocusEvent *evt) override;
     void focusOutEvent(QFocusEvent *evt) override;
+    void changeEvent(QEvent *e) override;
 
 private:
     bool valid{true};
     const QValidator* checkValidator{nullptr};
     bool m_has_warning{false};
     const QValidator *m_warning_validator{nullptr};
+    bool m_allow_empty_input{true};
+    bool m_allow_validation_while_editing{false};
 
 public Q_SLOTS:
     void setText(const QString&);
